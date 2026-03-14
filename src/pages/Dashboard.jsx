@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 
 export default function Dashboard() {
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
     fetchProposals()
@@ -23,6 +25,13 @@ export default function Dashboard() {
     await supabase.auth.signOut()
   }
 
+  const totalPipeline = proposals.reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+  const closingSoon = proposals.filter(p => {
+    if (!p.close_date) return false
+    const days = Math.ceil((new Date(p.close_date) - new Date()) / (1000 * 60 * 60 * 24))
+    return days <= 30 && days >= 0
+  }).length
+
   return (
     <div className="min-h-screen bg-[#0F1C2E]">
       {/* Header */}
@@ -36,9 +45,21 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Content */}
       <div className="p-6">
-        <h2 className="text-white text-2xl font-bold mb-6">Proposals</h2>
+        {/* Stats */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-[#1a2d45] rounded-xl p-5">
+            <p className="text-[#8A9AB0] text-sm mb-1">Total Pipeline</p>
+            <p className="text-white text-3xl font-bold">${totalPipeline.toLocaleString()}</p>
+          </div>
+          <div className="bg-[#1a2d45] rounded-xl p-5">
+            <p className="text-[#8A9AB0] text-sm mb-1">Closing in 30 Days</p>
+            <p className="text-[#C8622A] text-3xl font-bold">{closingSoon}</p>
+          </div>
+        </div>
+
+        {/* Proposals List */}
+        <h2 className="text-white text-2xl font-bold mb-4">Proposals</h2>
 
         {loading ? (
           <p className="text-[#8A9AB0]">Loading...</p>
@@ -47,7 +68,11 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-3">
             {proposals.map((proposal) => (
-              <div key={proposal.id} className="bg-[#1a2d45] rounded-xl p-5 flex justify-between items-center">
+              <div
+                key={proposal.id}
+                onClick={() => navigate(`/proposal/${proposal.id}`)}
+                className="bg-[#1a2d45] rounded-xl p-5 flex justify-between items-center cursor-pointer hover:bg-[#1f3550] transition-colors"
+              >
                 <div>
                   <p className="text-white font-semibold">{proposal.proposal_name}</p>
                   <p className="text-[#8A9AB0] text-sm">{proposal.company} · {proposal.rep_name}</p>
@@ -62,6 +87,7 @@ export default function Dashboard() {
                     {proposal.status}
                   </span>
                   <p className="text-[#8A9AB0] text-sm">{proposal.close_date}</p>
+                  <span className="text-[#8A9AB0]">→</span>
                 </div>
               </div>
             ))}
