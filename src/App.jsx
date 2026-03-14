@@ -56,7 +56,7 @@ function App() {
         <Route path="/" element={isAdmin ? <AdminDashboard /> : <Dashboard />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/rep" element={<Dashboard />} />
-        <Route path="/proposal/:id" element={<ProposalDetail />} />
+        <Route path="/proposal/:id" element={<ProposalDetail isAdmin={isAdmin} />} />
         <Route path="/new" element={<NewProposal />} />
         <Route path="/reps" element={<ManageReps />} />
         <Route path="/proposals" element={<Proposals isAdmin={isAdmin} />} />
