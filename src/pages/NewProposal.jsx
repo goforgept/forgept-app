@@ -33,16 +33,18 @@ export default function NewProposal() {
   }
 
   const addLine = () => setLines(prev => [...prev, emptyLine()])
-
   const removeLine = (index) => setLines(prev => prev.filter((_, i) => i !== index))
 
   const handleSubmit = async () => {
     setSaving(true)
 
+    const { data: { user } } = await supabase.auth.getUser()
+
     const { data: proposal, error } = await supabase
       .from('proposals')
       .insert({
         proposal_name: form.job_description,
+        user_id: user.id,
         rep_name: form.rep_name,
         rep_email: form.rep_email,
         client_name: form.client_name,
@@ -97,7 +99,6 @@ export default function NewProposal() {
       <div className="p-6 space-y-6">
         <h2 className="text-white text-2xl font-bold">New Proposal</h2>
 
-        {/* Proposal Info */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <h3 className="text-white font-bold mb-4">Proposal Details</h3>
           <div className="grid grid-cols-2 gap-4">
@@ -144,7 +145,6 @@ export default function NewProposal() {
           </div>
         </div>
 
-        {/* BOM Line Items */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <h3 className="text-white font-bold mb-4">BOM Line Items</h3>
           <div className="overflow-x-auto">
