@@ -4,6 +4,7 @@ import { supabase } from './supabase'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ProposalDetail from './pages/ProposalDetail'
+import NewProposal from './pages/NewProposal'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -33,6 +34,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/proposal/:id" element={<ProposalDetail />} />
+        <Route path="/new" element={<NewProposal />} />
       </Routes>
     </BrowserRouter>
   )

@@ -34,19 +34,14 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#0F1C2E]">
-      {/* Header */}
       <div className="bg-[#1a2d45] border-b border-[#2a3d55] px-6 py-4 flex justify-between items-center">
         <h1 className="text-white text-xl font-bold">ForgePt<span className="text-[#C8622A]">.</span></h1>
-        <button
-          onClick={handleSignOut}
-          className="text-[#8A9AB0] hover:text-white text-sm transition-colors"
-        >
+        <button onClick={handleSignOut} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">
           Sign Out
         </button>
       </div>
 
       <div className="p-6">
-        {/* Stats */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="bg-[#1a2d45] rounded-xl p-5">
             <p className="text-[#8A9AB0] text-sm mb-1">Total Pipeline</p>
@@ -58,8 +53,15 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Proposals List */}
-        <h2 className="text-white text-2xl font-bold mb-4">Proposals</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-white text-2xl font-bold">Proposals</h2>
+          <button
+            onClick={() => navigate('/new')}
+            className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+          >
+            + New Proposal
+          </button>
+        </div>
 
         {loading ? (
           <p className="text-[#8A9AB0]">Loading...</p>
