@@ -10,6 +10,7 @@ import ManageReps from './pages/ManageReps'
 import Proposals from './pages/Proposals'
 import Vendors from './pages/Vendors'
 import Settings from './pages/Settings'
+import ResetPassword from './pages/ResetPassword'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -46,7 +47,14 @@ function App() {
     </div>
   )
 
-  if (!session) return <Login />
+  if (!session) return (
+  <BrowserRouter>
+    <Routes>
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="*" element={<Login />} />
+    </Routes>
+  </BrowserRouter>
+)
 
   const isAdmin = profile?.role === 'admin'
 
