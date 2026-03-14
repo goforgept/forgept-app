@@ -81,12 +81,24 @@ export default function NewProposal() {
         }))
       )
 
-      const total = validLines.reduce((sum, l) =>
+      const totalCustomer = validLines.reduce((sum, l) =>
         sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+
+      const totalCost = validLines.reduce((sum, l) =>
+        sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+
+      const grossMarginDollars = totalCustomer - totalCost
+      const grossMarginPercent = totalCustomer > 0 ? (grossMarginDollars / totalCustomer) * 100 : 0
 
       await supabase
         .from('proposals')
-        .update({ proposal_value: total })
+        .update({
+          proposal_value: totalCustomer,
+          total_customer_value: totalCustomer,
+          total_your_cost: totalCost,
+          total_gross_margin_dollars: grossMarginDollars,
+          total_gross_margin_percent: grossMarginPercent
+        })
         .eq('id', proposal.id)
     }
 
