@@ -62,6 +62,7 @@ export default function NewProposal() {
     if (error) { alert('Error saving proposal'); setSaving(false); return }
 
     const validLines = lines.filter(l => l.item_name.trim() !== '')
+
     if (validLines.length > 0) {
       await supabase.from('bom_line_items').insert(
         validLines.map(l => ({
@@ -79,6 +80,14 @@ export default function NewProposal() {
           pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing'
         }))
       )
+
+      const total = validLines.reduce((sum, l) =>
+        sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+
+      await supabase
+        .from('proposals')
+        .update({ proposal_value: total })
+        .eq('id', proposal.id)
     }
 
     setSaving(false)

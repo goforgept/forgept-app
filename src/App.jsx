@@ -5,21 +5,36 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ProposalDetail from './pages/ProposalDetail'
 import NewProposal from './pages/NewProposal'
+import AdminDashboard from './pages/AdminDashboard'
 
 function App() {
   const [session, setSession] = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      setLoading(false)
+      if (session) fetchProfile(session.user.id)
+      else setLoading(false)
     })
 
     supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
+      if (session) fetchProfile(session.user.id)
+      else { setProfile(null); setLoading(false) }
     })
   }, [])
+
+  const fetchProfile = async (userId) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+    setProfile(data)
+    setLoading(false)
+  }
 
   if (loading) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
@@ -29,10 +44,14 @@ function App() {
 
   if (!session) return <Login />
 
+  const isAdmin = profile?.role === 'admin'
+
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Dashboard />} />
+        <Route path="/" element={isAdmin ? <AdminDashboard /> : <Dashboard />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/rep" element={<Dashboard />} />
         <Route path="/proposal/:id" element={<ProposalDetail />} />
         <Route path="/new" element={<NewProposal />} />
       </Routes>
