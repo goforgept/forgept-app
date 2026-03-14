@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
-export default function Dashboard() {
+export default function Proposals({ isAdmin }) {
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -32,53 +32,17 @@ export default function Dashboard() {
       return (
         p.proposal_name?.toLowerCase().includes(s) ||
         p.company?.toLowerCase().includes(s) ||
+        p.rep_name?.toLowerCase().includes(s) ||
         p.client_name?.toLowerCase().includes(s)
       )
     })
 
-  const activePipeline = proposals
-    .filter(p => p.status !== 'Won' && p.status !== 'Lost')
-    .reduce((sum, p) => sum + (p.proposal_value || 0), 0)
-
-  const wonPipeline = proposals
-    .filter(p => p.status === 'Won')
-    .reduce((sum, p) => sum + (p.proposal_value || 0), 0)
-
-  const closingSoon = proposals.filter(p => {
-    if (!p.close_date) return false
-    const days = Math.ceil((new Date(p.close_date) - new Date()) / (1000 * 60 * 60 * 24))
-    return days <= 30 && days >= 0 && p.status !== 'Won' && p.status !== 'Lost'
-  }).length
-
-  const avgMargin = proposals.filter(p => p.total_gross_margin_percent).length > 0
-    ? (proposals.reduce((sum, p) => sum + (p.total_gross_margin_percent || 0), 0) / proposals.filter(p => p.total_gross_margin_percent).length).toFixed(1)
-    : null
-
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={false} />
+      <Sidebar isAdmin={isAdmin} />
 
       <div className="flex-1 p-6">
-        <div className="grid grid-cols-4 gap-4 mb-6">
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">Active Pipeline</p>
-            <p className="text-white text-2xl font-bold">${activePipeline.toLocaleString()}</p>
-          </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">Won Pipeline</p>
-            <p className="text-green-400 text-2xl font-bold">${wonPipeline.toLocaleString()}</p>
-          </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">Avg Margin</p>
-            <p className="text-[#C8622A] text-2xl font-bold">{avgMargin ? `${avgMargin}%` : '—'}</p>
-          </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">Closing in 30 Days</p>
-            <p className="text-[#C8622A] text-2xl font-bold">{closingSoon}</p>
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-6">
           <h2 className="text-white text-2xl font-bold">Proposals</h2>
           <div className="flex items-center gap-4">
             <p className="text-[#8A9AB0] text-sm">{filtered.length} of {proposals.length}</p>
@@ -94,7 +58,7 @@ export default function Dashboard() {
         <div className="flex gap-3 mb-4">
           <input
             type="text"
-            placeholder="Search by name or company..."
+            placeholder="Search by name, company, rep..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
@@ -131,6 +95,7 @@ export default function Dashboard() {
                 <div>
                   <p className="text-white font-semibold">{proposal.proposal_name}</p>
                   <p className="text-[#8A9AB0] text-sm">{proposal.company} · {proposal.rep_name}</p>
+                  <p className="text-[#8A9AB0] text-xs">{proposal.rep_email}</p>
                 </div>
                 <div className="flex items-center gap-4">
                   {proposal.total_gross_margin_percent && (

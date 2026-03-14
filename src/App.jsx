@@ -6,6 +6,10 @@ import Dashboard from './pages/Dashboard'
 import ProposalDetail from './pages/ProposalDetail'
 import NewProposal from './pages/NewProposal'
 import AdminDashboard from './pages/AdminDashboard'
+import ManageReps from './pages/ManageReps'
+import Proposals from './pages/Proposals'
+import Vendors from './pages/Vendors'
+import Settings from './pages/Settings'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -54,6 +58,10 @@ function App() {
         <Route path="/rep" element={<Dashboard />} />
         <Route path="/proposal/:id" element={<ProposalDetail />} />
         <Route path="/new" element={<NewProposal />} />
+        <Route path="/reps" element={<ManageReps />} />
+        <Route path="/proposals" element={<Proposals isAdmin={isAdmin} />} />
+        <Route path="/vendors" element={<Vendors />} />
+        <Route path="/settings" element={<Settings isAdmin={isAdmin} />} />
       </Routes>
     </BrowserRouter>
   )
