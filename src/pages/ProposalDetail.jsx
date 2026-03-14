@@ -32,6 +32,16 @@ export default function ProposalDetail() {
     setLineItems(data || [])
   }
 
+  const updateStatus = async (newStatus) => {
+    await supabase
+      .from('proposals')
+      .update({ status: newStatus })
+      .eq('id', id)
+    setProposal(prev => ({ ...prev, status: newStatus }))
+  }
+
+  const fmt = (num) => num?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'
+
   if (loading) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
       <p className="text-white">Loading...</p>
@@ -55,14 +65,15 @@ export default function ProposalDetail() {
               <p className="text-[#8A9AB0] mt-1">{proposal?.company} · {proposal?.client_name}</p>
               <p className="text-[#8A9AB0] text-sm">{proposal?.client_email}</p>
             </div>
-            <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              proposal?.status === 'Won' ? 'bg-green-500/20 text-green-400' :
-              proposal?.status === 'Sent' ? 'bg-blue-500/20 text-blue-400' :
-              proposal?.status === 'Lost' ? 'bg-red-500/20 text-red-400' :
-              'bg-[#8A9AB0]/20 text-[#8A9AB0]'
-            }`}>
-              {proposal?.status}
-            </span>
+            <select
+              value={proposal?.status}
+              onChange={e => updateStatus(e.target.value)}
+              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+            >
+              {['Draft', 'Sent', 'Won', 'Lost'].map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
           </div>
           <div className="grid grid-cols-3 gap-4 mt-6">
             <div>
@@ -111,8 +122,8 @@ export default function ProposalDetail() {
                       <td className="text-[#8A9AB0] py-3 pr-4">{item.category}</td>
                       <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor}</td>
                       <td className="text-white py-3 pr-4 text-right">{item.quantity}</td>
-                      <td className="text-white py-3 pr-4 text-right">${item.customer_price_unit?.toFixed(2)}</td>
-                      <td className="text-white py-3 text-right">${item.customer_price_total?.toFixed(2)}</td>
+                      <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
+                      <td className="text-white py-3 text-right">${fmt(item.customer_price_total)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -120,7 +131,7 @@ export default function ProposalDetail() {
                   <tr>
                     <td colSpan="5" className="text-[#8A9AB0] pt-4 text-right font-semibold">Total</td>
                     <td className="text-[#C8622A] pt-4 text-right font-bold text-lg">
-                      ${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toFixed(2)}
+                      ${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                   </tr>
                 </tfoot>
