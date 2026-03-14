@@ -146,6 +146,40 @@ export default function NewProposal() {
       }).eq('id', proposal.id)
     }
 
+    try {
+      await fetch('https://hook.us2.make.com/5mgovcrrabt0q7oymby6vz1kt61nnf1n', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposalId: proposal.id,
+          repName: form.rep_name,
+          repEmail: form.rep_email,
+          clientName: form.client_name,
+          company: form.company,
+          email: form.client_email,
+          closeDate: form.close_date,
+          industry: form.industry,
+          jobDesc: form.job_description,
+          submissionType: tab,
+          lineItems: validLines.map(l => ({
+            itemName: l.item_name,
+            partNumber: l.part_number_sku,
+            quantity: parseFloat(l.quantity) || 0,
+            unit: l.unit,
+            category: l.category,
+            vendor: l.vendor,
+            yourCostUnit: parseFloat(l.your_cost_unit) || null,
+            markupPercent: parseFloat(l.markup_percent) || null,
+            customerPriceUnit: parseFloat(l.customer_price_unit) || null,
+            pricingStatus: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing'
+          }))
+        })
+      })
+    } catch (err) {
+      console.log('Make.com webhook error:', err)
+    }
+
     setSaving(false)
     navigate('/')
   }
@@ -164,7 +198,6 @@ export default function NewProposal() {
       <div className="p-6 space-y-6">
         <h2 className="text-white text-2xl font-bold">New Proposal</h2>
 
-        {/* Proposal Details */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <h3 className="text-white font-bold mb-4">Proposal Details</h3>
           <div className="grid grid-cols-2 gap-4">
@@ -211,7 +244,6 @@ export default function NewProposal() {
           </div>
         </div>
 
-        {/* BOM Entry Tabs */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex gap-2 mb-6">
             <button
