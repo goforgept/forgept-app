@@ -147,8 +147,13 @@ export default function NewProposal() {
     }
 
     try {
-  await supabase.functions.invoke('generate-sow', {
-    body: {
+  await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/generate-sow', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+    },
+    body: JSON.stringify({
       proposalId: proposal.id,
       company: form.company,
       jobDesc: form.job_description,
@@ -160,7 +165,7 @@ export default function NewProposal() {
         customerPriceUnit: parseFloat(l.customer_price_unit) || null,
         customerPriceTotal: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)
       }))
-    }
+    })
   })
 } catch (err) {
   console.log('SOW generation error:', err)
