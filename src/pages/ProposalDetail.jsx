@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
+import autoTable from 'jspdf-autotable'
 
 export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
@@ -128,7 +128,7 @@ export default function ProposalDetail({ isAdmin }) {
       doc.text('Materials & Pricing', 14, yPos)
       yPos += 6
 
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPos,
         head: [['Item', 'Category', 'Vendor', 'Qty', 'Unit Price', 'Total']],
         body: lineItems.map(item => [
