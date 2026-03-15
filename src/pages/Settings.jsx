@@ -13,7 +13,9 @@ export default function Settings({ isAdmin }) {
     terms_and_conditions: ''
   })
   const [saving, setSaving] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
   const [success, setSuccess] = useState(null)
+  const [logoUrl, setLogoUrl] = useState(null)
 
   useEffect(() => {
     fetchProfile()
@@ -27,6 +29,7 @@ export default function Settings({ isAdmin }) {
       .eq('id', user.id)
       .single()
     setProfile(data)
+    setLogoUrl(data?.logo_url || null)
     setForm({
       full_name: data?.full_name || '',
       email: data?.email || '',
@@ -35,6 +38,39 @@ export default function Settings({ isAdmin }) {
       followup_days: data?.followup_days || '30,14,7,0',
       terms_and_conditions: data?.terms_and_conditions || ''
     })
+  }
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingLogo(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${user.id}.${fileExt}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('logos')
+      .upload(fileName, file, { upsert: true })
+
+    if (uploadError) {
+      alert('Error uploading logo')
+      setUploadingLogo(false)
+      return
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('logos')
+      .getPublicUrl(fileName)
+
+    await supabase
+      .from('profiles')
+      .update({ logo_url: publicUrl })
+      .eq('id', user.id)
+
+    setLogoUrl(publicUrl)
+    setUploadingLogo(false)
+    setSuccess('Logo uploaded successfully')
   }
 
   const handleSave = async () => {
@@ -98,6 +134,21 @@ export default function Settings({ isAdmin }) {
                 onChange={e => setForm(prev => ({ ...prev, company_name: e.target.value }))}
                 placeholder="Your company name for proposals"
                 className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+            </div>
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Company Logo</label>
+              {logoUrl && (
+                <div className="mb-3">
+                  <img src={logoUrl} alt="Company logo" className="h-16 object-contain bg-white rounded-lg p-2" />
+                </div>
+              )}
+              <label className="cursor-pointer">
+                <div className="bg-[#0F1C2E] border border-dashed border-[#2a3d55] rounded-lg px-4 py-3 text-sm text-[#8A9AB0] hover:border-[#C8622A] transition-colors inline-block">
+                  {uploadingLogo ? 'Uploading...' : logoUrl ? '↑ Replace Logo' : '↑ Upload Logo'}
+                </div>
+                <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+              </label>
+              <p className="text-[#8A9AB0] text-xs mt-1">PNG or JPG recommended. Will appear at top of PDF proposals.</p>
             </div>
             <div>
               <label className="text-[#8A9AB0] text-xs mb-1 block">Default Markup %</label>

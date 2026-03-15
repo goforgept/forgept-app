@@ -90,11 +90,17 @@ export default function ProposalDetail({ isAdmin }) {
   }
 
   const downloadPDF = () => {
-    const doc = new jsPDF()
-    const pageWidth = doc.internal.pageSize.getWidth()
+  const doc = new jsPDF()
+  const pageWidth = doc.internal.pageSize.getWidth()
 
-    doc.setFillColor(15, 28, 46)
-    doc.rect(0, 0, pageWidth, 40, 'F')
+  doc.setFillColor(15, 28, 46)
+  doc.rect(0, 0, pageWidth, 40, 'F')
+
+  if (profile?.logo_url) {
+    const img = new Image()
+    img.src = profile.logo_url
+    doc.addImage(img, 'PNG', 14, 8, 40, 24)
+  } else {
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(24)
     doc.setFont('helvetica', 'bold')
@@ -103,35 +109,7 @@ export default function ProposalDetail({ isAdmin }) {
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(200, 98, 42)
     doc.text('Scope it. Send it. Close it.', 14, 30)
-
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(18)
-    doc.setFont('helvetica', 'bold')
-    doc.text(proposal?.proposal_name || 'Proposal', 14, 55)
-
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(100, 100, 100)
-    doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
-    doc.text(`Industry: ${proposal?.industry || ''}`, 14, 72)
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 79)
-
-    let yPos = 92
-
-    if (proposal?.scope_of_work) {
-      doc.setFontSize(13)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(15, 28, 46)
-      doc.text('Scope of Work', 14, yPos)
-      yPos += 8
-
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(60, 60, 60)
-      const sowLines = doc.splitTextToSize(proposal.scope_of_work, pageWidth - 28)
-      doc.text(sowLines, 14, yPos)
-      yPos += sowLines.length * 5 + 12
-    }
+  }
 
     if (lineItems.length > 0) {
       doc.setFontSize(13)
