@@ -47,29 +47,27 @@ function App() {
     </div>
   )
 
-  if (!session) return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="*" element={<Login />} />
-      </Routes>
-    </BrowserRouter>
-  )
-
   const isAdmin = profile?.role === 'admin'
 
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={isAdmin ? <AdminDashboard /> : <Dashboard />} />
-        <Route path="/admin" element={<AdminDashboard />} />
-        <Route path="/rep" element={<Dashboard />} />
-        <Route path="/new" element={<NewProposal />} />
-        <Route path="/proposal/:id" element={<ProposalDetail isAdmin={isAdmin} />} />
-        <Route path="/reps" element={<ManageReps />} />
-        <Route path="/proposals" element={<Proposals isAdmin={isAdmin} />} />
-        <Route path="/vendors" element={<Vendors />} />
-        <Route path="/settings" element={<Settings isAdmin={isAdmin} />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        {!session ? (
+          <Route path="*" element={<Login />} />
+        ) : (
+          <>
+            <Route path="/" element={isAdmin ? <AdminDashboard /> : <Dashboard />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/rep" element={<Dashboard />} />
+            <Route path="/new" element={<NewProposal />} />
+            <Route path="/proposal/:id" element={<ProposalDetail isAdmin={isAdmin} />} />
+            <Route path="/reps" element={<ManageReps />} />
+            <Route path="/proposals" element={<Proposals isAdmin={isAdmin} />} />
+            <Route path="/vendors" element={<Vendors />} />
+            <Route path="/settings" element={<Settings isAdmin={isAdmin} />} />
+          </>
+        )}
       </Routes>
     </BrowserRouter>
   )

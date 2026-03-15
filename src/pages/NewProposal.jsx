@@ -1,87 +1,30 @@
-import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
-import Sidebar from '../components/Sidebar'
+import * as XLSX from 'xlsx'
 
-export default function ProposalDetail({ isAdmin }) {
-  const { id } = useParams()
+const emptyLine = () => ({
+  item_name: '', part_number_sku: '', quantity: '', unit: 'ea',
+  category: '', vendor: '', your_cost_unit: '', markup_percent: '35',
+  customer_price_unit: '', pricing_status: 'Needs Pricing'
+})
+
+export default function NewProposal() {
   const navigate = useNavigate()
-  const [proposal, setProposal] = useState(null)
-  const [lineItems, setLineItems] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [editingBOM, setEditingBOM] = useState(false)
-  const [editLines, setEditLines] = useState([])
   const [saving, setSaving] = useState(false)
-  const [generatingSOW, setGeneratingSOW] = useState(false)
+  const [tab, setTab] = useState('inline')
+  const [form, setForm] = useState({
+    rep_name: '', rep_email: '', client_name: '', company: '',
+    client_email: '', close_date: '', industry: '', job_description: ''
+  })
+  const [lines, setLines] = useState([emptyLine(), emptyLine(), emptyLine()])
+  const [uploadedLines, setUploadedLines] = useState([])
+  const [uploadFileName, setUploadFileName] = useState(null)
 
-  useEffect(() => {
-    fetchProposal()
-    fetchLineItems()
-  }, [])
+  const updateForm = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
 
-  const fetchProposal = async () => {
-    const { data } = await supabase
-      .from('proposals')
-      .select('*')
-      .eq('id', id)
-      .single()
-    setProposal(data)
-    setLoading(false)
-  }
-
-  const fetchLineItems = async () => {
-    const { data } = await supabase
-      .from('bom_line_items')
-      .select('*')
-      .eq('proposal_id', id)
-    setLineItems(data || [])
-  }
-
-  const updateStatus = async (newStatus) => {
-    await supabase
-      .from('proposals')
-      .update({ status: newStatus })
-      .eq('id', id)
-    setProposal(prev => ({ ...prev, status: newStatus }))
-  }
-
-  const generateSOW = async () => {
-    setGeneratingSOW(true)
-    try {
-      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/generate-sow', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
-        },
-        body: JSON.stringify({
-          proposalId: id,
-          company: proposal.company,
-          jobDesc: proposal.job_description,
-          industry: proposal.industry,
-          repName: proposal.rep_name,
-          lineItems: lineItems.map(l => ({
-            itemName: l.item_name,
-            quantity: l.quantity,
-            customerPriceUnit: l.customer_price_unit,
-            customerPriceTotal: l.customer_price_total
-          }))
-        })
-      })
-      await fetchProposal()
-    } catch (err) {
-      console.log('SOW generation error:', err)
-    }
-    setGeneratingSOW(false)
-  }
-
-  const startEditing = () => {
-    setEditLines(lineItems.map(l => ({ ...l })))
-    setEditingBOM(true)
-  }
-
-  const updateEditLine = (index, field, value) => {
-    setEditLines(prev => {
+  const updateLine = (index, field, value) => {
+    setLines(prev => {
       const updated = [...prev]
       updated[index] = { ...updated[index], [field]: value }
       if (field === 'your_cost_unit' || field === 'markup_percent') {
@@ -89,290 +32,317 @@ export default function ProposalDetail({ isAdmin }) {
         const markup = parseFloat(updated[index].markup_percent) || 0
         updated[index].customer_price_unit = (cost * (1 + markup / 100)).toFixed(2)
       }
-      if (field === 'customer_price_unit' || field === 'quantity') {
-        const price = parseFloat(updated[index].customer_price_unit) || 0
-        const qty = parseFloat(updated[index].quantity) || 0
-        updated[index].customer_price_total = (price * qty).toFixed(2)
-      }
       return updated
     })
   }
 
-  const addEditLine = () => {
-    setEditLines(prev => [...prev, {
-      proposal_id: id, item_name: '', part_number_sku: '', quantity: '',
-      unit: 'ea', category: '', vendor: '', your_cost_unit: '',
-      markup_percent: '35', customer_price_unit: '', customer_price_total: '',
-      pricing_status: 'Needs Pricing'
-    }])
+  const addLine = () => setLines(prev => [...prev, emptyLine()])
+  const removeLine = (index) => setLines(prev => prev.filter((_, i) => i !== index))
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadFileName(file.name)
+
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      const workbook = XLSX.read(evt.target.result, { type: 'binary' })
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+
+      const parsed = rows.map(row => ({
+        item_name: row['Item Name'] || row['item_name'] || '',
+        part_number_sku: row['Part Number'] || row['Part #'] || row['part_number_sku'] || '',
+        quantity: row['Quantity'] || row['Qty'] || row['quantity'] || '',
+        unit: row['Unit'] || row['unit'] || 'ea',
+        category: row['Category'] || row['category'] || '',
+        vendor: row['Vendor'] || row['vendor'] || '',
+        your_cost_unit: row['Your Cost'] || row['Your Cost (Unit)'] || row['your_cost_unit'] || '',
+        markup_percent: row['Markup %'] || row['markup_percent'] || '35',
+        customer_price_unit: row['Customer Price'] || row['Customer Price (Unit)'] || row['customer_price_unit'] || '',
+        pricing_status: 'Needs Pricing'
+      })).filter(r => r.item_name)
+
+      setUploadedLines(parsed)
+    }
+    reader.readAsBinaryString(file)
   }
 
-  const removeEditLine = (index) => {
-    setEditLines(prev => prev.filter((_, i) => i !== index))
+  const downloadTemplate = () => {
+    const headers = ['Item Name', 'Part #', 'Quantity', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price']
+    const exampleRow = ['Example Item', 'ABC-123', '2', 'ea', 'Electrical', 'Vendor Name', '100.00', '35', '135.00']
+    const ws = XLSX.utils.aoa_to_sheet([headers, exampleRow])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'BOM')
+    XLSX.writeFile(wb, 'ForgePt_BOM_Template.xlsx')
   }
 
-  const saveBOM = async () => {
+  const handleSubmit = async () => {
     setSaving(true)
 
-    const { error: deleteError } = await supabase
-      .from('bom_line_items')
-      .delete()
-      .eq('proposal_id', id)
+    const { data: { user } } = await supabase.auth.getUser()
 
-    if (deleteError) {
-      alert('Error clearing old line items')
-      setSaving(false)
-      return
-    }
+    const { data: proposal, error } = await supabase
+      .from('proposals')
+      .insert({
+        proposal_name: form.job_description,
+        user_id: user.id,
+        rep_name: form.rep_name,
+        rep_email: form.rep_email,
+        client_name: form.client_name,
+        company: form.company,
+        client_email: form.client_email,
+        close_date: form.close_date,
+        industry: form.industry,
+        job_description: form.job_description,
+        status: 'Draft',
+        submission_type: tab
+      })
+      .select()
+      .single()
 
-    const validLines = editLines.filter(l => l.item_name.trim() !== '')
+    if (error) { alert('Error saving proposal'); setSaving(false); return }
+
+    const activeLines = tab === 'inline' ? lines : uploadedLines
+    const validLines = activeLines.filter(l => l.item_name.trim() !== '')
 
     if (validLines.length > 0) {
-      const { error: insertError } = await supabase
-        .from('bom_line_items')
-        .insert(
-          validLines.map(l => ({
-            proposal_id: id,
-            item_name: l.item_name,
-            part_number_sku: l.part_number_sku,
-            quantity: parseFloat(l.quantity) || 0,
-            unit: l.unit,
-            category: l.category,
-            vendor: l.vendor,
-            your_cost_unit: parseFloat(l.your_cost_unit) || null,
-            markup_percent: parseFloat(l.markup_percent) || null,
-            customer_price_unit: parseFloat(l.customer_price_unit) || null,
-            customer_price_total: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0),
-            pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing'
-          }))
-        )
+      await supabase.from('bom_line_items').insert(
+        validLines.map(l => ({
+          proposal_id: proposal.id,
+          item_name: l.item_name,
+          part_number_sku: l.part_number_sku,
+          quantity: parseFloat(l.quantity) || 0,
+          unit: l.unit,
+          category: l.category,
+          vendor: l.vendor,
+          your_cost_unit: parseFloat(l.your_cost_unit) || null,
+          markup_percent: parseFloat(l.markup_percent) || null,
+          customer_price_unit: parseFloat(l.customer_price_unit) || null,
+          customer_price_total: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0),
+          pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing'
+        }))
+      )
 
-      if (insertError) {
-        alert('Error saving line items')
-        setSaving(false)
-        return
-      }
+      const totalCustomer = validLines.reduce((sum, l) =>
+        sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+      const totalCost = validLines.reduce((sum, l) =>
+        sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+      const grossMarginDollars = totalCustomer - totalCost
+      const grossMarginPercent = totalCustomer > 0 ? (grossMarginDollars / totalCustomer) * 100 : 0
+
+      await supabase.from('proposals').update({
+        proposal_value: totalCustomer,
+        total_customer_value: totalCustomer,
+        total_your_cost: totalCost,
+        total_gross_margin_dollars: grossMarginDollars,
+        total_gross_margin_percent: grossMarginPercent
+      }).eq('id', proposal.id)
     }
 
-    const totalCustomer = validLines.reduce((sum, l) =>
-      sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
-    const totalCost = validLines.reduce((sum, l) =>
-      sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
-    const grossMarginDollars = totalCustomer - totalCost
-    const grossMarginPercent = totalCustomer > 0 ? (grossMarginDollars / totalCustomer) * 100 : 0
-
-    await supabase.from('proposals').update({
-      proposal_value: totalCustomer,
-      total_customer_value: totalCustomer,
-      total_your_cost: totalCost,
-      total_gross_margin_dollars: grossMarginDollars,
-      total_gross_margin_percent: grossMarginPercent
-    }).eq('id', id)
-
-    await fetchLineItems()
-    await fetchProposal()
-    setEditingBOM(false)
     setSaving(false)
+    navigate(`/proposal/${proposal.id}`)
   }
 
-  const fmt = (num) => num?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'
   const categories = ['Electrical', 'Mechanical', 'Audio/Visual', 'Security', 'Networking', 'Material', 'Labor', 'Other']
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
-      <p className="text-white">Loading...</p>
-    </div>
-  )
-
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} />
+    <div className="min-h-screen bg-[#0F1C2E]">
+      <div className="bg-[#1a2d45] border-b border-[#2a3d55] px-6 py-4 flex justify-between items-center">
+        <h1 className="text-white text-xl font-bold">ForgePt<span className="text-[#C8622A]">.</span></h1>
+        <button onClick={() => navigate('/')} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">
+          Cancel
+        </button>
+      </div>
 
-      <div className="flex-1 p-6 space-y-6">
+      <div className="p-6 space-y-6">
+        <h2 className="text-white text-2xl font-bold">New Proposal</h2>
+
         <div className="bg-[#1a2d45] rounded-xl p-6">
-          <div className="flex justify-between items-start">
+          <h3 className="text-white font-bold mb-4">Proposal Details</h3>
+          <div className="grid grid-cols-2 gap-4">
+            {[
+              ['rep_name', 'Rep Name'],
+              ['rep_email', 'Rep Email'],
+              ['client_name', 'Client Name'],
+              ['company', 'Company'],
+              ['client_email', 'Client Email'],
+              ['close_date', 'Close Date', 'date'],
+            ].map(([field, label, type]) => (
+              <div key={field}>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">{label}</label>
+                <input
+                  type={type || 'text'}
+                  value={form[field]}
+                  onChange={e => updateForm(field, e.target.value)}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                />
+              </div>
+            ))}
             <div>
-              <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
-              <p className="text-[#8A9AB0] mt-1">{proposal?.company} · {proposal?.client_name}</p>
-              <p className="text-[#8A9AB0] text-sm">{proposal?.client_email}</p>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Industry</label>
+              <select
+                value={form.industry}
+                onChange={e => updateForm('industry', e.target.value)}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+              >
+                <option value="">Select industry</option>
+                {['Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security', 'General Contractor', 'Other'].map(i => (
+                  <option key={i} value={i}>{i}</option>
+                ))}
+              </select>
             </div>
-            <select
-              value={proposal?.status}
-              onChange={e => updateStatus(e.target.value)}
-              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-            >
-              {['Draft', 'Sent', 'Won', 'Lost'].map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-4 gap-4 mt-6">
             <div>
-              <p className="text-[#8A9AB0] text-xs">Rep</p>
-              <p className="text-white text-sm font-medium">{proposal?.rep_name}</p>
-            </div>
-            <div>
-              <p className="text-[#8A9AB0] text-xs">Close Date</p>
-              <p className="text-white text-sm font-medium">{proposal?.close_date}</p>
-            </div>
-            <div>
-              <p className="text-[#8A9AB0] text-xs">Industry</p>
-              <p className="text-white text-sm font-medium">{proposal?.industry}</p>
-            </div>
-            <div>
-              <p className="text-[#8A9AB0] text-xs">Margin</p>
-              <p className="text-[#C8622A] text-sm font-medium">
-                {proposal?.total_gross_margin_percent ? `${proposal.total_gross_margin_percent.toFixed(1)}%` : '—'}
-              </p>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Job Description</label>
+              <input
+                type="text"
+                value={form.job_description}
+                onChange={e => updateForm('job_description', e.target.value)}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+              />
             </div>
           </div>
         </div>
 
         <div className="bg-[#1a2d45] rounded-xl p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-white font-bold text-lg">Scope of Work</h3>
-            <button
-              onClick={generateSOW}
-              disabled={generatingSOW}
-              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
-            >
-              {generatingSOW ? 'Generating...' : proposal?.scope_of_work ? 'Regenerate SOW' : 'Generate SOW'}
+          <div className="flex gap-2 mb-6">
+            <button onClick={() => setTab('inline')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === 'inline' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+              Type It In
+            </button>
+            <button onClick={() => setTab('upload')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === 'upload' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+              Upload Excel
             </button>
           </div>
-          {proposal?.scope_of_work ? (
-            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
-          ) : (
-            <p className="text-[#8A9AB0] text-sm">No Scope of Work yet. Click Generate SOW to create one.</p>
-          )}
-        </div>
 
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-white font-bold text-lg">BOM Line Items ({lineItems.length})</h3>
-            {!editingBOM ? (
-              <button onClick={startEditing} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                Edit BOM
-              </button>
-            ) : (
-              <div className="flex gap-2">
-                <button onClick={() => setEditingBOM(false)} className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">
-                  Cancel
-                </button>
-                <button onClick={saveBOM} disabled={saving} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {saving ? 'Saving...' : 'Save BOM'}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {!editingBOM ? (
-            lineItems.length === 0 ? (
-              <p className="text-[#8A9AB0]">No line items yet. Click Edit BOM to add items.</p>
-            ) : (
+          {tab === 'inline' && (
+            <>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[#2a3d55]">
-                      <th className="text-[#8A9AB0] text-left py-2 pr-4">Item</th>
-                      <th className="text-[#8A9AB0] text-left py-2 pr-4">Category</th>
-                      <th className="text-[#8A9AB0] text-left py-2 pr-4">Vendor</th>
-                      <th className="text-[#8A9AB0] text-right py-2 pr-4">Qty</th>
-                      <th className="text-[#8A9AB0] text-right py-2 pr-4">Unit Price</th>
-                      <th className="text-[#8A9AB0] text-right py-2">Total</th>
+                      {['Item Name', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ''].map(h => (
+                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {lineItems.map((item) => (
-                      <tr key={item.id} className="border-b border-[#2a3d55]/50">
-                        <td className="text-white py-3 pr-4">{item.item_name}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{item.category}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor}</td>
-                        <td className="text-white py-3 pr-4 text-right">{item.quantity}</td>
-                        <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
-                        <td className="text-white py-3 text-right">${fmt(item.customer_price_total)}</td>
+                    {lines.map((line, i) => (
+                      <tr key={i} className={`border-b border-[#2a3d55]/30 ${line.your_cost_unit ? 'bg-green-500/5' : ''}`}>
+                        {[['item_name', 'text', 'Item name'], ['part_number_sku', 'text', 'Part #'], ['quantity', 'number', 'Qty']].map(([field, type, placeholder]) => (
+                          <td key={field} className="pr-2 py-1">
+                            <input type={type} placeholder={placeholder} value={line[field]}
+                              onChange={e => updateLine(i, field, e.target.value)}
+                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                          </td>
+                        ))}
+                        <td className="pr-2 py-1">
+                          <select value={line.unit} onChange={e => updateLine(i, 'unit', e.target.value)}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                            {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
+                          </select>
+                        </td>
+                        <td className="pr-2 py-1">
+                          <select value={line.category} onChange={e => updateLine(i, 'category', e.target.value)}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                            <option value="">Category</option>
+                            {categories.map(c => <option key={c}>{c}</option>)}
+                          </select>
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input type="text" placeholder="Vendor" value={line.vendor}
+                            onChange={e => updateLine(i, 'vendor', e.target.value)}
+                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input type="number" placeholder="0.00" value={line.your_cost_unit}
+                            onChange={e => updateLine(i, 'your_cost_unit', e.target.value)}
+                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input type="number" placeholder="35" value={line.markup_percent}
+                            onChange={e => updateLine(i, 'markup_percent', e.target.value)}
+                            className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input type="number" placeholder="0.00" value={line.customer_price_unit}
+                            onChange={e => updateLine(i, 'customer_price_unit', e.target.value)}
+                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                        </td>
+                        <td className="py-1">
+                          <button onClick={() => removeLine(i)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan="5" className="text-[#8A9AB0] pt-4 text-right font-semibold">Total</td>
-                      <td className="text-[#C8622A] pt-4 text-right font-bold text-lg">
-                        ${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
-            )
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#2a3d55]">
-                    {['Item Name', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ''].map(h => (
-                      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {editLines.map((line, i) => (
-                    <tr key={i} className="border-b border-[#2a3d55]/30">
-                      {[
-                        ['item_name', 'text', 'Item name'],
-                        ['part_number_sku', 'text', 'Part #'],
-                        ['quantity', 'number', 'Qty'],
-                      ].map(([field, type, placeholder]) => (
-                        <td key={field} className="pr-2 py-1">
-                          <input type={type} placeholder={placeholder} value={line[field] || ''}
-                            onChange={e => updateEditLine(i, field, e.target.value)}
-                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                        </td>
-                      ))}
-                      <td className="pr-2 py-1">
-                        <select value={line.unit || 'ea'} onChange={e => updateEditLine(i, 'unit', e.target.value)}
-                          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                          {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
-                        </select>
-                      </td>
-                      <td className="pr-2 py-1">
-                        <select value={line.category || ''} onChange={e => updateEditLine(i, 'category', e.target.value)}
-                          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                          <option value="">Category</option>
-                          {categories.map(c => <option key={c}>{c}</option>)}
-                        </select>
-                      </td>
-                      <td className="pr-2 py-1">
-                        <input type="text" placeholder="Vendor" value={line.vendor || ''}
-                          onChange={e => updateEditLine(i, 'vendor', e.target.value)}
-                          className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                      </td>
-                      <td className="pr-2 py-1">
-                        <input type="number" placeholder="0.00" value={line.your_cost_unit || ''}
-                          onChange={e => updateEditLine(i, 'your_cost_unit', e.target.value)}
-                          className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                      </td>
-                      <td className="pr-2 py-1">
-                        <input type="number" placeholder="35" value={line.markup_percent || ''}
-                          onChange={e => updateEditLine(i, 'markup_percent', e.target.value)}
-                          className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                      </td>
-                      <td className="pr-2 py-1">
-                        <input type="number" placeholder="0.00" value={line.customer_price_unit || ''}
-                          onChange={e => updateEditLine(i, 'customer_price_unit', e.target.value)}
-                          className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                      </td>
-                      <td className="py-1">
-                        <button onClick={() => removeEditLine(i)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <button onClick={addEditLine} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">
+              <button onClick={addLine} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">
                 + Add Line Item
               </button>
+            </>
+          )}
+
+          {tab === 'upload' && (
+            <div className="space-y-4">
+              <div className="flex gap-4 items-center">
+                <button onClick={downloadTemplate}
+                  className="bg-[#0F1C2E] text-[#8A9AB0] hover:text-white border border-[#2a3d55] px-4 py-2 rounded-lg text-sm transition-colors">
+                  ↓ Download Template
+                </button>
+                <p className="text-[#8A9AB0] text-sm">Download the template, fill it in, then upload it below.</p>
+              </div>
+              <label className="block w-full border-2 border-dashed border-[#2a3d55] rounded-xl p-8 text-center cursor-pointer hover:border-[#C8622A] transition-colors">
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" />
+                {uploadFileName ? (
+                  <div>
+                    <p className="text-green-400 font-semibold">{uploadFileName}</p>
+                    <p className="text-[#8A9AB0] text-sm mt-1">{uploadedLines.length} line items parsed</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-white font-semibold">Click to upload or drag and drop</p>
+                    <p className="text-[#8A9AB0] text-sm mt-1">.xlsx, .xls, or .csv files</p>
+                  </div>
+                )}
+              </label>
+              {uploadedLines.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[#2a3d55]">
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Item</th>
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Qty</th>
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Vendor</th>
+                        <th className="text-[#8A9AB0] text-right py-2 font-normal text-xs">Customer Price</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {uploadedLines.map((line, i) => (
+                        <tr key={i} className="border-b border-[#2a3d55]/30">
+                          <td className="text-white py-2 pr-4">{line.item_name}</td>
+                          <td className="text-[#8A9AB0] py-2 pr-4">{line.quantity}</td>
+                          <td className="text-[#8A9AB0] py-2 pr-4">{line.vendor}</td>
+                          <td className="text-white py-2 text-right">{line.customer_price_unit || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
+        </div>
+
+        <div className="flex justify-end gap-4">
+          <button onClick={() => navigate('/')} className="px-6 py-3 text-[#8A9AB0] hover:text-white text-sm transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleSubmit} disabled={saving}
+            className="px-6 py-3 bg-[#C8622A] text-white rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+            {saving ? 'Saving...' : 'Submit Proposal'}
+          </button>
         </div>
       </div>
     </div>

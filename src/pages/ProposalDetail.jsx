@@ -12,6 +12,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [editingBOM, setEditingBOM] = useState(false)
   const [editLines, setEditLines] = useState([])
   const [saving, setSaving] = useState(false)
+  const [generatingSOW, setGeneratingSOW] = useState(false)
 
   useEffect(() => {
     fetchProposal()
@@ -42,6 +43,36 @@ export default function ProposalDetail({ isAdmin }) {
       .update({ status: newStatus })
       .eq('id', id)
     setProposal(prev => ({ ...prev, status: newStatus }))
+  }
+
+  const generateSOW = async () => {
+    setGeneratingSOW(true)
+    try {
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/generate-sow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+        },
+        body: JSON.stringify({
+          proposalId: id,
+          company: proposal.company,
+          jobDesc: proposal.job_description,
+          industry: proposal.industry,
+          repName: proposal.rep_name,
+          lineItems: lineItems.map(l => ({
+            itemName: l.item_name,
+            quantity: l.quantity,
+            customerPriceUnit: l.customer_price_unit,
+            customerPriceTotal: l.customer_price_total
+          }))
+        })
+      })
+      await fetchProposal()
+    } catch (err) {
+      console.log('SOW generation error:', err)
+    }
+    setGeneratingSOW(false)
   }
 
   const startEditing = () => {
@@ -197,12 +228,23 @@ export default function ProposalDetail({ isAdmin }) {
           </div>
         </div>
 
-        {proposal?.scope_of_work && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">Scope of Work</h3>
-            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
+        <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-white font-bold text-lg">Scope of Work</h3>
+            <button
+              onClick={generateSOW}
+              disabled={generatingSOW}
+              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+            >
+              {generatingSOW ? 'Generating...' : proposal?.scope_of_work ? 'Regenerate SOW' : 'Generate SOW'}
+            </button>
           </div>
-        )}
+          {proposal?.scope_of_work ? (
+            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
+          ) : (
+            <p className="text-[#8A9AB0] text-sm">No Scope of Work yet. Click Generate SOW to create one.</p>
+          )}
+        </div>
 
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-center mb-4">
