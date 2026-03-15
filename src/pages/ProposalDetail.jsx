@@ -10,6 +10,7 @@ export default function ProposalDetail({ isAdmin }) {
   const navigate = useNavigate()
   const [proposal, setProposal] = useState(null)
   const [lineItems, setLineItems] = useState([])
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editingBOM, setEditingBOM] = useState(false)
   const [editLines, setEditLines] = useState([])
@@ -19,6 +20,7 @@ export default function ProposalDetail({ isAdmin }) {
   useEffect(() => {
     fetchProposal()
     fetchLineItems()
+    fetchProfile()
   }, [])
 
   const fetchProposal = async () => {
@@ -37,6 +39,16 @@ export default function ProposalDetail({ isAdmin }) {
       .select('*')
       .eq('proposal_id', id)
     setLineItems(data || [])
+  }
+
+  const fetchProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+    setProfile(data)
   }
 
   const updateStatus = async (newStatus) => {
@@ -86,7 +98,7 @@ export default function ProposalDetail({ isAdmin }) {
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(24)
     doc.setFont('helvetica', 'bold')
-    doc.text('ForgePt.', 14, 20)
+    doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(200, 98, 42)
@@ -145,6 +157,19 @@ export default function ProposalDetail({ isAdmin }) {
         alternateRowStyles: { fillColor: [245, 245, 245] },
         styles: { fontSize: 9 }
       })
+    }
+
+    if (profile?.terms_and_conditions) {
+      doc.addPage()
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(15, 28, 46)
+      doc.text('Terms and Conditions', 14, 20)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      const termsLines = doc.splitTextToSize(profile.terms_and_conditions, pageWidth - 28)
+      doc.text(termsLines, 14, 32)
     }
 
     doc.save(`${proposal?.proposal_name || 'Proposal'}.pdf`)
