@@ -17,7 +17,7 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const brevoKey = Deno.env.get('BREVO_API_KEY') ?? ''
 
-    const itemRows = items.map((item: any) => `
+    const itemRows = items.map((item) => `
       <tr style="background: #f5f5f5;">
         <td style="padding: 10px;">${item.itemName}</td>
         <td style="padding: 10px;">${item.partNumber || '—'}</td>
