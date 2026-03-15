@@ -147,38 +147,24 @@ export default function NewProposal() {
     }
 
     try {
-      await fetch('https://hook.us2.make.com/5mgovcrrabt0q7oymby6vz1kt61nnf1n', {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          proposalId: proposal.id,
-          repName: form.rep_name,
-          repEmail: form.rep_email,
-          clientName: form.client_name,
-          company: form.company,
-          email: form.client_email,
-          closeDate: form.close_date,
-          industry: form.industry,
-          jobDesc: form.job_description,
-          submissionType: tab,
-          lineItems: validLines.map(l => ({
-            itemName: l.item_name,
-            partNumber: l.part_number_sku,
-            quantity: parseFloat(l.quantity) || 0,
-            unit: l.unit,
-            category: l.category,
-            vendor: l.vendor,
-            yourCostUnit: parseFloat(l.your_cost_unit) || null,
-            markupPercent: parseFloat(l.markup_percent) || null,
-            customerPriceUnit: parseFloat(l.customer_price_unit) || null,
-            pricingStatus: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing'
-          }))
-        })
-      })
-    } catch (err) {
-      console.log('Make.com webhook error:', err)
+  await supabase.functions.invoke('generate-sow', {
+    body: {
+      proposalId: proposal.id,
+      company: form.company,
+      jobDesc: form.job_description,
+      industry: form.industry,
+      repName: form.rep_name,
+      lineItems: validLines.map(l => ({
+        itemName: l.item_name,
+        quantity: parseFloat(l.quantity) || 0,
+        customerPriceUnit: parseFloat(l.customer_price_unit) || null,
+        customerPriceTotal: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)
+      }))
     }
+  })
+} catch (err) {
+  console.log('SOW generation error:', err)
+}
 
     setSaving(false)
     navigate('/')
