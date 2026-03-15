@@ -29,7 +29,6 @@ export default function Login() {
       return
     }
 
-    // Create auth user
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -46,33 +45,24 @@ export default function Login() {
 
     const userId = data.user.id
 
-    // Create organization
-    const { data: org, error: orgError } = await supabase
-      .from('organizations')
-      .insert({ name: companyName })
-      .select()
-      .single()
+    const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/handle-signup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+      },
+      body: JSON.stringify({ userId, email, fullName, companyName })
+    })
 
-    if (orgError) {
-      setError('Error creating organization')
+    const result = await res.json()
+    if (!result.success) {
+      setError('Error setting up account')
       setLoading(false)
       return
     }
 
-    // Update profile with org_id and org_role
-    await supabase
-      .from('profiles')
-      .upsert({
-        id: userId,
-        email,
-        full_name: fullName,
-        company_name: companyName,
-        org_id: org.id,
-        org_role: 'admin',
-        role: 'admin'
-      })
-
-    setSuccess('Account created! Please check your email to confirm your account, then log in.')
+    setSuccess('Account created! You can now sign in.')
+    setTab('login')
     setLoading(false)
   }
 
