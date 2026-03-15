@@ -17,17 +17,16 @@ Deno.serve(async (req) => {
       `${l.itemName} - Qty: ${l.quantity} - Price: $${l.customerPriceUnit} Total: $${l.customerPriceTotal}`
     ).join('\n')
 
-    const prompt = `You are a professional proposal writer for trades businesses. Write a concise Scope of Work.
+    const prompt = `You are a professional proposal writer for trades businesses. Write a concise Scope of Work based ONLY on the line items provided. Do not add work, materials, or tasks that are not in the line items list.
 
 Company: ${company}
 Job: ${jobDesc}
 Industry: ${industry}
-Rep: ${repName}
 
 Line Items:
 ${lineItemsText}
 
-Write 2 short professional paragraphs describing the scope of work. Then include a clean materials list with all items, quantities and prices. Keep it professional and concise. Use the exact prices provided.`
+Write 2 short professional paragraphs describing only the work shown in the line items above. Then list the materials exactly as provided. Do not invent or assume any additional work, cables, mounts, or materials that are not explicitly listed.`
 
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
