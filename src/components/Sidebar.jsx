@@ -15,12 +15,14 @@ const adminLinks = [
   { label: 'Reps', path: '/reps', icon: '👤' },
   { label: 'Vendors', path: '/vendors', icon: '🏭' },
   { label: 'Settings', path: '/settings', icon: '⚙️' },
+  { label: 'Clients', path: '/clients', icon: '🏢' },
 ]
  const repLinks = [
   { label: 'Dashboard', path: '/', icon: '⬛' },
   { label: 'Proposals', path: '/proposals', icon: '📋' },
   { label: 'New Proposal', path: '/new', icon: '➕' },
   { label: 'Settings', path: '/settings', icon: '⚙️' },
+  { label: 'Clients', path: '/clients', icon: '🏢' },
 ]
   const links = isAdmin ? adminLinks : repLinks
 
