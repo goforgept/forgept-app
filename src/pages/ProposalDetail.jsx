@@ -59,6 +59,14 @@ export default function ProposalDetail({ isAdmin }) {
     setProposal(prev => ({ ...prev, status: newStatus }))
   }
 
+  const updateCloseDate = async (newDate) => {
+    await supabase
+      .from('proposals')
+      .update({ close_date: newDate })
+      .eq('id', id)
+    setProposal(prev => ({ ...prev, close_date: newDate }))
+  }
+
   const generateSOW = async () => {
     setGeneratingSOW(true)
     try {
@@ -384,7 +392,12 @@ export default function ProposalDetail({ isAdmin }) {
             </div>
             <div>
               <p className="text-[#8A9AB0] text-xs">Close Date</p>
-              <p className="text-white text-sm font-medium">{proposal?.close_date}</p>
+              <input
+                type="date"
+                value={proposal?.close_date || ''}
+                onChange={e => updateCloseDate(e.target.value)}
+                className="bg-transparent text-white text-sm font-medium focus:outline-none focus:border-b focus:border-[#C8622A] cursor-pointer"
+              />
             </div>
             <div>
               <p className="text-[#8A9AB0] text-xs">Industry</p>
@@ -552,7 +565,7 @@ export default function ProposalDetail({ isAdmin }) {
                       <td className="pr-2 py-1">
                         <input type="number" placeholder="35" value={line.markup_percent || ''}
                           onChange={e => updateEditLine(i, 'markup_percent', e.target.value)}
-                          className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text:xs focus:outline-none focus:border-[#C8622A]" />
+                          className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
                       </td>
                       <td className="pr-2 py-1">
                         <input type="number" placeholder="0.00" value={line.customer_price_unit || ''}
