@@ -50,7 +50,7 @@ export default function Settings({ isAdmin }) {
     const fileName = `${user.id}.${fileExt}`
 
     const { error: uploadError } = await supabase.storage
-      .from('logos')
+      .from('Logos')
       .upload(fileName, file, { upsert: true })
 
     if (uploadError) {
@@ -60,7 +60,7 @@ export default function Settings({ isAdmin }) {
     }
 
     const { data: { publicUrl } } = supabase.storage
-      .from('logos')
+      .from('Logos')
       .getPublicUrl(fileName)
 
     await supabase
