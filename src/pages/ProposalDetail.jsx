@@ -89,11 +89,21 @@ export default function ProposalDetail({ isAdmin }) {
     setGeneratingSOW(false)
   }
 
+  const hexToRgb = (hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+    return result ? [
+      parseInt(result[1], 16),
+      parseInt(result[2], 16),
+      parseInt(result[3], 16)
+    ] : [15, 28, 46]
+  }
+
   const downloadPDF = () => {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
+    const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
 
-    doc.setFillColor(15, 28, 46)
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
     doc.rect(0, 0, pageWidth, 40, 'F')
 
     if (profile?.logo_url) {
@@ -128,7 +138,7 @@ export default function ProposalDetail({ isAdmin }) {
     if (proposal?.scope_of_work) {
       doc.setFontSize(13)
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(15, 28, 46)
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Scope of Work', 14, yPos)
       yPos += 8
 
@@ -143,7 +153,7 @@ export default function ProposalDetail({ isAdmin }) {
     if (lineItems.length > 0) {
       doc.setFontSize(13)
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(15, 28, 46)
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Materials & Pricing', 14, yPos)
       yPos += 6
 
@@ -159,8 +169,8 @@ export default function ProposalDetail({ isAdmin }) {
           `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
         ]),
         foot: [['', '', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
-        headStyles: { fillColor: [15, 28, 46], textColor: [255, 255, 255] },
-        footStyles: { fillColor: [200, 98, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 245, 245] },
         styles: { fontSize: 9 }
       })
@@ -170,7 +180,7 @@ export default function ProposalDetail({ isAdmin }) {
       doc.addPage()
       doc.setFontSize(13)
       doc.setFont('helvetica', 'bold')
-      doc.setTextColor(15, 28, 46)
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Terms and Conditions', 14, 20)
       doc.setFontSize(9)
       doc.setFont('helvetica', 'normal')
@@ -493,3 +503,4 @@ export default function ProposalDetail({ isAdmin }) {
     </div>
   )
 }
+

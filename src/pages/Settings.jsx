@@ -10,7 +10,8 @@ export default function Settings({ isAdmin }) {
     company_name: '',
     default_markup_percent: '35',
     followup_days: '30,14,7,0',
-    terms_and_conditions: ''
+    terms_and_conditions: '',
+    primary_color: '#0F1C2E'
   })
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -36,7 +37,8 @@ export default function Settings({ isAdmin }) {
       company_name: data?.company_name || '',
       default_markup_percent: data?.default_markup_percent || '35',
       followup_days: data?.followup_days || '30,14,7,0',
-      terms_and_conditions: data?.terms_and_conditions || ''
+      terms_and_conditions: data?.terms_and_conditions || '',
+      primary_color: data?.primary_color || '#0F1C2E'
     })
   }
 
@@ -54,7 +56,7 @@ export default function Settings({ isAdmin }) {
       .upload(fileName, file, { upsert: true })
 
     if (uploadError) {
-      alert('Error uploading logo')
+      alert('Error uploading logo: ' + uploadError.message)
       setUploadingLogo(false)
       return
     }
@@ -84,11 +86,21 @@ export default function Settings({ isAdmin }) {
         company_name: form.company_name,
         default_markup_percent: parseFloat(form.default_markup_percent) || 35,
         followup_days: form.followup_days,
-        terms_and_conditions: form.terms_and_conditions
+        terms_and_conditions: form.terms_and_conditions,
+        primary_color: form.primary_color
       })
       .eq('id', user.id)
     setSuccess('Settings saved successfully')
     setSaving(false)
+  }
+
+  const hexToRgb = (hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+    return result ? [
+      parseInt(result[1], 16),
+      parseInt(result[2], 16),
+      parseInt(result[3], 16)
+    ] : [15, 28, 46]
   }
 
   return (
@@ -155,6 +167,24 @@ export default function Settings({ isAdmin }) {
               <input type="number" value={form.default_markup_percent}
                 onChange={e => setForm(prev => ({ ...prev, default_markup_percent: e.target.value }))}
                 className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+            </div>
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Brand Color</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={form.primary_color}
+                  onChange={e => setForm(prev => ({ ...prev, primary_color: e.target.value }))}
+                  className="w-12 h-10 rounded cursor-pointer border border-[#2a3d55] bg-transparent"
+                />
+                <input
+                  type="text"
+                  value={form.primary_color}
+                  onChange={e => setForm(prev => ({ ...prev, primary_color: e.target.value }))}
+                  className="w-32 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                />
+              </div>
+              <p className="text-[#8A9AB0] text-xs mt-1">This color will be used in your PDF proposals.</p>
             </div>
           </div>
         </div>
