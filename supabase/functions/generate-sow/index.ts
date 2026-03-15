@@ -13,12 +13,11 @@ Deno.serve(async (req) => {
   try {
     const { proposalId, company, jobDesc, industry, repName, lineItems } = await req.json()
 
-    // Build the prompt
     const lineItemsText = lineItems.map((l: any) =>
       `${l.itemName} - Qty: ${l.quantity} - Price: $${l.customerPriceUnit} Total: $${l.customerPriceTotal}`
     ).join('\n')
 
-    const prompt = `You are a professional proposal writer for trades businesses. Write a detailed Scope of Work.
+    const prompt = `You are a professional proposal writer for trades businesses. Write a concise Scope of Work.
 
 Company: ${company}
 Job: ${jobDesc}
@@ -28,9 +27,8 @@ Rep: ${repName}
 Line Items:
 ${lineItemsText}
 
-Write 3-4 professional paragraphs describing the scope of work, then include a formatted materials list with all items, quantities and prices. Use the exact prices provided. Do not say pricing will be provided separately.`
+Write 2 short professional paragraphs describing the scope of work. Then include a clean materials list with all items, quantities and prices. Keep it professional and concise. Use the exact prices provided.`
 
-    // Call Claude API
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -40,7 +38,7 @@ Write 3-4 professional paragraphs describing the scope of work, then include a f
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
+        max_tokens: 1000,
         messages: [{ role: 'user', content: prompt }]
       })
     })
@@ -48,7 +46,6 @@ Write 3-4 professional paragraphs describing the scope of work, then include a f
     const claudeData = await claudeResponse.json()
     const sow = claudeData.content[0].text
 
-    // Update proposal in Supabase
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
