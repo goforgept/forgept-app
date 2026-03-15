@@ -48,13 +48,13 @@ function App() {
   )
 
   if (!session) return (
-  <BrowserRouter>
-    <Routes>
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="*" element={<Login />} />
-    </Routes>
-  </BrowserRouter>
-)
+    <BrowserRouter>
+      <Routes>
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="*" element={<Login />} />
+      </Routes>
+    </BrowserRouter>
+  )
 
   const isAdmin = profile?.role === 'admin'
 
@@ -64,8 +64,8 @@ function App() {
         <Route path="/" element={isAdmin ? <AdminDashboard /> : <Dashboard />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/rep" element={<Dashboard />} />
-        <Route path="/proposal/:id" element={<ProposalDetail isAdmin={isAdmin} />} />
         <Route path="/new" element={<NewProposal />} />
+        <Route path="/proposal/:id" element={<ProposalDetail isAdmin={isAdmin} />} />
         <Route path="/reps" element={<ManageReps />} />
         <Route path="/proposals" element={<Proposals isAdmin={isAdmin} />} />
         <Route path="/vendors" element={<Vendors />} />
