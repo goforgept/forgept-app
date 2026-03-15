@@ -89,6 +89,38 @@ export default function ProposalDetail({ isAdmin }) {
     setGeneratingSOW(false)
   }
 
+  const sendRFQ = async (item) => {
+    const vendorEmail = prompt(`Enter email address for ${item.vendor || 'vendor'}:`)
+    if (!vendorEmail) return
+
+    try {
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-rfq', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+        },
+        body: JSON.stringify({
+          lineItemId: item.id,
+          itemName: item.item_name,
+          partNumber: item.part_number_sku,
+          quantity: item.quantity,
+          unit: item.unit,
+          vendorEmail: vendorEmail,
+          vendorName: item.vendor || 'Vendor',
+          proposalName: proposal.proposal_name,
+          repName: proposal.rep_name,
+          repEmail: proposal.rep_email,
+          company: profile?.company_name || proposal.company
+        })
+      })
+      await fetchLineItems()
+    } catch (err) {
+      console.log('RFQ error:', err)
+      alert('Error sending RFQ')
+    }
+  }
+
   const hexToRgb = (hex) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
     return result ? [
@@ -403,7 +435,8 @@ export default function ProposalDetail({ isAdmin }) {
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Vendor</th>
                       <th className="text-[#8A9AB0] text-right py-2 pr-4">Qty</th>
                       <th className="text-[#8A9AB0] text-right py-2 pr-4">Unit Price</th>
-                      <th className="text-[#8A9AB0] text-right py-2">Total</th>
+                      <th className="text-[#8A9AB0] text-right py-2 pr-4">Total</th>
+                      <th className="text-[#8A9AB0] text-left py-2">RFQ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -414,16 +447,35 @@ export default function ProposalDetail({ isAdmin }) {
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor}</td>
                         <td className="text-white py-3 pr-4 text-right">{item.quantity}</td>
                         <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
-                        <td className="text-white py-3 text-right">${fmt(item.customer_price_total)}</td>
+                        <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>
+                        <td className="py-3">
+                          {item.pricing_status === 'Needs Pricing' ? (
+                            <button
+                              onClick={() => sendRFQ(item)}
+                              className="bg-[#C8622A] text-white px-3 py-1 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors"
+                            >
+                              Send RFQ
+                            </button>
+                          ) : (
+                            <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                              item.pricing_status === 'RFQ Sent' ? 'bg-yellow-500/20 text-yellow-400' :
+                              item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' :
+                              'bg-[#2a3d55] text-[#8A9AB0]'
+                            }`}>
+                              {item.pricing_status}
+                            </span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot>
                     <tr>
                       <td colSpan="5" className="text-[#8A9AB0] pt-4 text-right font-semibold">Total</td>
-                      <td className="text-[#C8622A] pt-4 text-right font-bold text-lg">
+                      <td className="text-[#C8622A] pt-4 text-right font-bold text-lg pr-4">
                         ${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
+                      <td></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -503,4 +555,3 @@ export default function ProposalDetail({ isAdmin }) {
     </div>
   )
 }
-
