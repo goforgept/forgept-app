@@ -45,6 +45,9 @@ export default function Login() {
 
     const userId = data.user.id
 
+    // Wait for auth user to be committed
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
     const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/handle-signup', {
       method: 'POST',
       headers: {
@@ -56,7 +59,7 @@ export default function Login() {
 
     const result = await res.json()
     if (!result.success) {
-      setError('Error setting up account')
+      setError('Error setting up account: ' + (result.error || 'unknown error'))
       setLoading(false)
       return
     }
