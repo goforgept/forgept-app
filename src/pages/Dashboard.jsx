@@ -8,16 +8,28 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [orgId, setOrgId] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchProposals()
+    fetchOrgAndProposals()
   }, [])
 
-  const fetchProposals = async () => {
+  const fetchOrgAndProposals = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.org_id) { setLoading(false); return }
+    setOrgId(profile.org_id)
+
     const { data, error } = await supabase
       .from('proposals')
       .select('*')
+      .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
 
     if (!error) setProposals(data)
@@ -119,7 +131,7 @@ export default function Dashboard() {
         {loading ? (
           <p className="text-[#8A9AB0]">Loading...</p>
         ) : filtered.length === 0 ? (
-          <p className="text-[#8A9AB0]">No proposals match your search.</p>
+          <p className="text-[#8A9AB0]">No proposals yet. Click + New Proposal to get started.</p>
         ) : (
           <div className="space-y-3">
             {filtered.map((proposal) => (

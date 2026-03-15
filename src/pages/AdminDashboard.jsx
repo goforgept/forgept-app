@@ -9,20 +9,29 @@ export default function AdminDashboard() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchAllProposals()
+    fetchOrgAndProposals()
   }, [])
 
-  const fetchAllProposals = async () => {
+  const fetchOrgAndProposals = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.org_id) { setLoading(false); return }
+
     const { data, error } = await supabase
       .from('proposals')
       .select('*')
+      .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
 
     if (!error) setProposals(data)
     setLoading(false)
   }
 
-  // Team stats
   const activePipeline = proposals
     .filter(p => p.status !== 'Won' && p.status !== 'Lost')
     .reduce((sum, p) => sum + (p.proposal_value || 0), 0)
@@ -45,7 +54,6 @@ export default function AdminDashboard() {
   const totalProposals = proposals.length
   const closeRate = totalProposals > 0 ? ((wonCount / totalProposals) * 100).toFixed(1) : null
 
-  // Rep leaderboard
   const repStats = Object.values(
     proposals.reduce((acc, p) => {
       const rep = p.rep_name || 'Unknown'
@@ -63,7 +71,6 @@ export default function AdminDashboard() {
       : null
   })).sort((a, b) => b.pipeline - a.pipeline)
 
-  // Closing soon list
   const closingSoonList = proposals
     .filter(p => {
       if (!p.close_date) return false
@@ -80,7 +87,6 @@ export default function AdminDashboard() {
       <div className="flex-1 p-6">
         <h2 className="text-white text-2xl font-bold mb-6">Team Dashboard</h2>
 
-        {/* Top Stats */}
         <div className="grid grid-cols-5 gap-4 mb-6">
           <div className="bg-[#1a2d45] rounded-xl p-5">
             <p className="text-[#8A9AB0] text-sm mb-1">Active Pipeline</p>
@@ -105,7 +111,6 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-2 gap-6">
-          {/* Rep Leaderboard */}
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Rep Leaderboard</h3>
             {loading ? (
@@ -138,7 +143,6 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* Closing Soon */}
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Closing Soon</h3>
             {loading ? (

@@ -11,13 +11,23 @@ export default function Proposals({ isAdmin }) {
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchProposals()
+    fetchOrgAndProposals()
   }, [])
 
-  const fetchProposals = async () => {
+  const fetchOrgAndProposals = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.org_id) { setLoading(false); return }
+
     const { data, error } = await supabase
       .from('proposals')
       .select('*')
+      .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
 
     if (!error) setProposals(data)

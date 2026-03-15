@@ -82,11 +82,19 @@ export default function NewProposal() {
 
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Get org_id from profile
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
+
     const { data: proposal, error } = await supabase
       .from('proposals')
       .insert({
         proposal_name: form.job_description,
         user_id: user.id,
+        org_id: profile?.org_id,
         rep_name: form.rep_name,
         rep_email: form.rep_email,
         client_name: form.client_name,

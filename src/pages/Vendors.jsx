@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
-export default function Vendors() {
+export default function Vendors({ isAdmin }) {
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  const [orgId, setOrgId] = useState(null)
   const [form, setForm] = useState({
     vendor_name: '', contact_name: '', contact_email: '',
     contact_phone_number: '', account_number: '', payment_terms: '',
@@ -16,13 +17,24 @@ export default function Vendors() {
   })
 
   useEffect(() => {
-    fetchVendors()
+    fetchOrgAndVendors()
   }, [])
 
-  const fetchVendors = async () => {
+  const fetchOrgAndVendors = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.org_id) { setLoading(false); return }
+    setOrgId(profile.org_id)
+
     const { data } = await supabase
       .from('vendors')
       .select('*')
+      .eq('org_id', profile.org_id)
       .order('vendor_name', { ascending: true })
     setVendors(data || [])
     setLoading(false)
@@ -41,7 +53,8 @@ export default function Vendors() {
       payment_terms: form.payment_terms,
       default_markup_percent: parseFloat(form.default_markup_percent) || null,
       notes: form.notes,
-      active: true
+      active: true,
+      org_id: orgId
     })
 
     if (error) { setError(error.message); setAdding(false); return }
@@ -49,13 +62,13 @@ export default function Vendors() {
     setSuccess('Vendor added successfully')
     setForm({ vendor_name: '', contact_name: '', contact_email: '', contact_phone_number: '', account_number: '', payment_terms: '', default_markup_percent: '', notes: '' })
     setShowForm(false)
-    fetchVendors()
+    fetchOrgAndVendors()
     setAdding(false)
   }
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={true} />
+      <Sidebar isAdmin={isAdmin} />
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">

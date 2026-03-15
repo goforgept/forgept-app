@@ -9,26 +9,26 @@ export default function Sidebar({ isAdmin }) {
     await supabase.auth.signOut()
   }
 
-const adminLinks = [
-  { label: 'Dashboard', path: '/', icon: '⬛' },
-  { label: 'Proposals', path: '/proposals', icon: '📋' },
-  { label: 'Reps', path: '/reps', icon: '👤' },
-  { label: 'Vendors', path: '/vendors', icon: '🏭' },
-  { label: 'Settings', path: '/settings', icon: '⚙️' },
-  { label: 'Clients', path: '/clients', icon: '🏢' },
-]
- const repLinks = [
-  { label: 'Dashboard', path: '/', icon: '⬛' },
-  { label: 'Proposals', path: '/proposals', icon: '📋' },
-  { label: 'New Proposal', path: '/new', icon: '➕' },
-  { label: 'Settings', path: '/settings', icon: '⚙️' },
-  { label: 'Clients', path: '/clients', icon: '🏢' },
-]
+  const adminLinks = [
+    { label: 'Dashboard', path: '/', icon: '⬛' },
+    { label: 'Proposals', path: '/proposals', icon: '📋' },
+    { label: 'Clients', path: '/clients', icon: '🏢' },
+    { label: 'Vendors', path: '/vendors', icon: '🏭' },
+    { label: 'Team', path: '/reps', icon: '👥' },
+    { label: 'Settings', path: '/settings', icon: '⚙️' },
+  ]
+
+  const repLinks = [
+    { label: 'Dashboard', path: '/', icon: '⬛' },
+    { label: 'Proposals', path: '/proposals', icon: '📋' },
+    { label: 'New Proposal', path: '/new', icon: '➕' },
+    { label: 'Settings', path: '/settings', icon: '⚙️' },
+  ]
+
   const links = isAdmin ? adminLinks : repLinks
 
   return (
     <div className="w-56 min-h-screen bg-[#1a2d45] border-r border-[#2a3d55] flex flex-col">
-      {/* Logo */}
       <div className="px-6 py-5 border-b border-[#2a3d55]">
         <h1 className="text-white text-xl font-bold">
           ForgePt<span className="text-[#C8622A]">.</span>
@@ -40,7 +40,6 @@ const adminLinks = [
         )}
       </div>
 
-      {/* Nav Links */}
       <nav className="flex-1 px-3 py-4 space-y-1">
         {links.map(({ label, path, icon }) => (
           <button
@@ -58,7 +57,6 @@ const adminLinks = [
         ))}
       </nav>
 
-      {/* Sign Out */}
       <div className="px-3 py-4 border-t border-[#2a3d55]">
         <button
           onClick={handleSignOut}

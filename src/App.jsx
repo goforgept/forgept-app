@@ -48,7 +48,7 @@ function App() {
     </div>
   )
 
-  const isAdmin = profile?.role === 'admin'
+  const isAdmin = profile?.org_role === 'admin' || profile?.role === 'admin'
 
   return (
     <BrowserRouter>
@@ -63,9 +63,9 @@ function App() {
             <Route path="/rep" element={<Dashboard />} />
             <Route path="/new" element={<NewProposal />} />
             <Route path="/proposal/:id" element={<ProposalDetail isAdmin={isAdmin} />} />
-            <Route path="/reps" element={<ManageReps />} />
+            <Route path="/reps" element={<ManageReps isAdmin={isAdmin} />} />
             <Route path="/proposals" element={<Proposals isAdmin={isAdmin} />} />
-            <Route path="/vendors" element={<Vendors />} />
+            <Route path="/vendors" element={<Vendors isAdmin={isAdmin} />} />
             <Route path="/settings" element={<Settings isAdmin={isAdmin} />} />
             <Route path="/clients" element={<Clients isAdmin={isAdmin} />} />
           </>
