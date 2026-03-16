@@ -36,7 +36,7 @@ function App() {
   const fetchProfile = async (userId) => {
     const { data } = await supabase
       .from('profiles')
-      .select('*')
+      .select('*, organizations(status)')
       .eq('id', userId)
       .single()
     setProfile(data)
@@ -50,6 +50,27 @@ function App() {
   )
 
   const isAdmin = profile?.org_role === 'admin' || profile?.role === 'admin'
+  const isPending = profile?.organizations?.status === 'pending'
+
+  if (session && isPending) return (
+    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
+      <div className="text-center max-w-md">
+        <h1 className="text-white text-4xl font-bold mb-2">
+          ForgePt<span className="text-[#C8622A]">.</span>
+        </h1>
+        <div className="bg-[#1a2d45] rounded-2xl p-8 mt-6">
+          <p className="text-yellow-400 text-lg font-semibold mb-3">⏳ Account Pending Approval</p>
+          <p className="text-[#8A9AB0] text-sm">Your account is being reviewed. You will receive an email once approved.</p>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="mt-6 text-[#8A9AB0] hover:text-white text-sm transition-colors"
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <BrowserRouter>
