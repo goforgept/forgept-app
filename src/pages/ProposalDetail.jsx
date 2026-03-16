@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import POList from '../components/POList'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -355,6 +356,27 @@ export default function ProposalDetail({ isAdmin }) {
       styles: { fontSize: 9 }
     })
 
+    // Save PO to database
+    const totalAmount = vendorItems.reduce((sum, item) =>
+      sum + ((item.your_cost_unit || 0) * (item.quantity || 0)), 0)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
+
+    await supabase.from('purchase_orders').insert({
+      po_number: finalPONumber,
+      proposal_id: id,
+      org_id: profileData.org_id,
+      vendor_name: poVendor,
+      status: 'Sent',
+      total_amount: totalAmount
+    })
+
+    // Update line items
     for (const item of vendorItems) {
       await supabase
         .from('bom_line_items')
@@ -613,9 +635,9 @@ export default function ProposalDetail({ isAdmin }) {
                         <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>
                         <td className="py-3">
                           <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                            item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' :
                             item.pricing_status === 'RFQ Sent' ? 'bg-yellow-500/20 text-yellow-400' :
                             item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' :
-                            item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' :
                             'bg-[#2a3d55] text-[#8A9AB0]'
                           }`}>
                             {item.po_status || item.pricing_status}
@@ -706,6 +728,8 @@ export default function ProposalDetail({ isAdmin }) {
             </div>
           )}
         </div>
+
+        <POList proposalId={id} />
       </div>
 
       {/* PO Modal */}
