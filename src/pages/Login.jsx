@@ -44,6 +44,7 @@ export default function Login() {
     }
 
     const userId = data.user.id
+    console.log('Auth user created:', userId)
 
     // Wait for auth user to be committed
     await new Promise(resolve => setTimeout(resolve, 1000))
@@ -58,13 +59,15 @@ export default function Login() {
     })
 
     const result = await res.json()
+    console.log('Signup result:', result, 'userId:', userId)
+
     if (!result.success) {
       setError('Error setting up account: ' + (result.error || 'unknown error'))
       setLoading(false)
       return
     }
 
-    setSuccess('Account created! You can now sign in.')
+    setSuccess('Account created! Your account is pending approval. You will receive an email once approved.')
     setTab('login')
     setLoading(false)
   }
