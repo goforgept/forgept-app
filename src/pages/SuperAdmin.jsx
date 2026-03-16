@@ -30,6 +30,41 @@ export default function SuperAdmin() {
 
   const getOrgProfiles = (orgId) => profiles.filter(p => p.org_id === orgId)
   const getOrgAdmin = (orgId) => profiles.find(p => p.org_id === orgId && p.org_role === 'admin')
+  const approveOrg = async (orgId, adminEmail, adminName) => {
+  await supabase
+    .from('organizations')
+    .update({ status: 'active' })
+    .eq('id', orgId)
+
+  // Send approval email
+  await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-approval', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+    },
+    body: JSON.stringify({ email: adminEmail, name: adminName })
+  })
+
+  fetchData()
+}
+
+const suspendOrg = async (orgId) => {
+  if (!window.confirm('Are you sure you want to suspend this organization?')) return
+  await supabase
+    .from('organizations')
+    .update({ status: 'suspended' })
+    .eq('id', orgId)
+  fetchData()
+}
+
+const reactivateOrg = async (orgId) => {
+  await supabase
+    .from('organizations')
+    .update({ status: 'active' })
+    .eq('id', orgId)
+  fetchData()
+}
 
   return (
     <div className="min-h-screen bg-[#0F1C2E]">
@@ -101,19 +136,34 @@ export default function SuperAdmin() {
 
                     return (
                       <tr key={org.id} className="border-b border-[#2a3d55]/30">
-                        <td className="text-white py-3 pr-4 font-medium">{org.name}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{admin?.full_name || '—'}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{admin?.email || '—'}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{memberCount}</td>
-                        <td className="py-3 pr-4">
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                            status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                            status === 'suspended' ? 'bg-red-500/20 text-red-400' :
-                            'bg-green-500/20 text-green-400'
-                          }`}>
-                            {status}
-                          </span>
-                        </td>
+                      <td className="py-3">
+  <div className="flex gap-2">
+    {status === 'pending' && (
+      <button
+        onClick={() => approveOrg(org.id, admin?.email, admin?.full_name)}
+        className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors"
+      >
+        Approve
+      </button>
+    )}
+    {status !== 'suspended' && status !== 'pending' && (
+      <button
+        onClick={() => suspendOrg(org.id)}
+        className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors"
+      >
+        Suspend
+      </button>
+    )}
+    {status === 'suspended' && (
+      <button
+        onClick={() => reactivateOrg(org.id)}
+        className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors"
+      >
+        Reactivate
+      </button>
+    )}
+  </div>
+</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">
                           {new Date(org.created_at).toLocaleDateString()}
                         </td>
