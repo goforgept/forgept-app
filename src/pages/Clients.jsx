@@ -28,6 +28,7 @@ export default function Clients({ isAdmin }) {
   const [orgId, setOrgId] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState(emptyForm)
+  const [expandedCompanies, setExpandedCompanies] = useState({})
   const navigate = useNavigate()
   const [form, setForm] = useState(emptyForm)
 
@@ -95,7 +96,6 @@ export default function Clients({ isAdmin }) {
 
   const handleEdit = async (clientId) => {
     setError(null)
-
     const { error } = await supabase.from('clients').update({
       client_name: editForm.client_name,
       company: editForm.company,
@@ -112,6 +112,18 @@ export default function Clients({ isAdmin }) {
     setEditingId(null)
     fetchOrgAndClients()
   }
+
+  const toggleCompany = (company) => {
+    setExpandedCompanies(prev => ({ ...prev, [company]: !prev[company] }))
+  }
+
+  // Group clients by company
+  const grouped = clients.reduce((acc, client) => {
+    const company = client.company || 'No Company'
+    if (!acc[company]) acc[company] = []
+    acc[company].push(client)
+    return acc
+  }, {})
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
@@ -165,85 +177,110 @@ export default function Clients({ isAdmin }) {
             <p className="text-[#8A9AB0]">No clients yet. Add your first client above.</p>
           ) : (
             <div className="space-y-3">
-              {clients.map(c => (
-                <div key={c.id} className="border border-[#2a3d55] rounded-xl p-4">
-                  {editingId === c.id ? (
-                    <div>
-                      <div className="grid grid-cols-3 gap-4 mb-4">
-                        {fields.map(([field, label]) => (
-                          <div key={field}>
-                            <label className="text-[#8A9AB0] text-xs mb-1 block">{label}</label>
-                            <input
-                              type="text"
-                              value={editForm[field]}
-                              onChange={e => setEditForm(prev => ({ ...prev, [field]: e.target.value }))}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                            />
+              {Object.entries(grouped).map(([company, contacts]) => {
+                const isExpanded = expandedCompanies[company] !== false
+                return (
+                  <div key={company} className="border border-[#2a3d55] rounded-xl overflow-hidden">
+                    {/* Company Header */}
+                    <button
+                      onClick={() => toggleCompany(company)}
+                      className="w-full flex justify-between items-center px-5 py-4 hover:bg-[#0F1C2E] transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-[#C8622A]/20 flex items-center justify-center">
+                          <span className="text-[#C8622A] text-xs font-bold">
+                            {company.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="text-left">
+                          <p className="text-white font-semibold">{company}</p>
+                          <p className="text-[#8A9AB0] text-xs">
+                            {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'}
+                            {contacts[0]?.industry ? ` · ${contacts[0].industry}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[#8A9AB0] text-sm">{isExpanded ? '▲' : '▼'}</span>
+                    </button>
+
+                    {/* Contacts */}
+                    {isExpanded && (
+                      <div className="border-t border-[#2a3d55]">
+                        {contacts.map((c, idx) => (
+                          <div
+                            key={c.id}
+                            className={`${idx < contacts.length - 1 ? 'border-b border-[#2a3d55]/50' : ''}`}
+                          >
+                            {editingId === c.id ? (
+                              <div className="p-4 bg-[#0F1C2E]/50">
+                                <div className="grid grid-cols-3 gap-4 mb-4">
+                                  {fields.map(([field, label]) => (
+                                    <div key={field}>
+                                      <label className="text-[#8A9AB0] text-xs mb-1 block">{label}</label>
+                                      <input
+                                        type="text"
+                                        value={editForm[field]}
+                                        onChange={e => setEditForm(prev => ({ ...prev, [field]: e.target.value }))}
+                                        className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleEdit(c.id)}
+                                    className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+                                  >
+                                    Save Changes
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingId(null)}
+                                    className="text-[#8A9AB0] hover:text-white px-4 py-2 text-sm transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex justify-between items-center px-5 py-3 hover:bg-[#0F1C2E]/40 transition-colors">
+                                <div
+                                  className="flex items-center gap-6 flex-1 cursor-pointer"
+                                  onClick={() => navigate(`/client/${c.id}`)}
+                                >
+                                  <div className="w-2 h-2 rounded-full bg-[#2a3d55] shrink-0 ml-1" />
+                                  <div>
+                                    <p className="text-white text-sm font-medium">{c.client_name || '—'}</p>
+                                    <p className="text-[#8A9AB0] text-xs">{c.email || ''}{c.email && c.phone ? ' · ' : ''}{c.phone || ''}</p>
+                                  </div>
+                                  {c.crm_source && (
+                                    <span className="text-[#8A9AB0] text-xs bg-[#2a3d55] px-2 py-0.5 rounded">
+                                      {c.crm_source}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex gap-2 items-center">
+                                  <button
+                                    onClick={e => { e.stopPropagation(); navigate(`/client/${c.id}`) }}
+                                    className="text-[#8A9AB0] hover:text-white text-xs transition-colors"
+                                  >
+                                    View →
+                                  </button>
+                                  <button
+                                    onClick={e => { e.stopPropagation(); startEditing(c) }}
+                                    className="bg-[#2a3d55] text-white px-3 py-1 rounded-lg text-xs hover:bg-[#3a4d65] transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEdit(c.id)}
-                          className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
-                        >
-                          Save Changes
-                        </button>
-                        <button
-                          onClick={() => setEditingId(null)}
-                          className="text-[#8A9AB0] hover:text-white px-4 py-2 text-sm transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between items-start">
-                      <div
-                        className="grid grid-cols-4 gap-x-8 gap-y-2 flex-1 cursor-pointer"
-                        onClick={() => navigate(`/client/${c.id}`)}
-                      >
-                        <div>
-                          <p className="text-[#8A9AB0] text-xs">Company</p>
-                          <p className="text-white font-medium">{c.company}</p>
-                        </div>
-                        <div>
-                          <p className="text-[#8A9AB0] text-xs">Contact</p>
-                          <p className="text-white text-sm">{c.client_name || '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[#8A9AB0] text-xs">Email</p>
-                          <p className="text-white text-sm">{c.email || '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[#8A9AB0] text-xs">Phone</p>
-                          <p className="text-white text-sm">{c.phone || '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[#8A9AB0] text-xs">Industry</p>
-                          <p className="text-white text-sm">{c.industry || '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-[#8A9AB0] text-xs">CRM Source</p>
-                          <p className="text-white text-sm">{c.crm_source || '—'}</p>
-                        </div>
-                        {c.notes && (
-                          <div className="col-span-2">
-                            <p className="text-[#8A9AB0] text-xs">Notes</p>
-                            <p className="text-white text-sm">{c.notes}</p>
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={e => { e.stopPropagation(); startEditing(c) }}
-                        className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs hover:bg-[#3a4d65] transition-colors ml-4 shrink-0"
-                      >
-                        Edit
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
