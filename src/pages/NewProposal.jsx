@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import * as XLSX from 'xlsx'
 
@@ -11,6 +11,7 @@ const emptyLine = () => ({
 
 export default function NewProposal() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState('inline')
   const [form, setForm] = useState({
@@ -20,6 +21,29 @@ export default function NewProposal() {
   const [lines, setLines] = useState([emptyLine(), emptyLine(), emptyLine()])
   const [uploadedLines, setUploadedLines] = useState([])
   const [uploadFileName, setUploadFileName] = useState(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const clientId = params.get('clientId')
+    if (clientId) prefillClient(clientId)
+  }, [])
+
+  const prefillClient = async (clientId) => {
+    const { data } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', clientId)
+      .single()
+
+    if (data) {
+      setForm(prev => ({
+        ...prev,
+        client_name: data.client_name || '',
+        company: data.company || '',
+        client_email: data.email || '',
+      }))
+    }
+  }
 
   const updateForm = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
 
@@ -82,12 +106,14 @@ export default function NewProposal() {
 
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Get org_id from profile
     const { data: profile } = await supabase
       .from('profiles')
       .select('org_id')
       .eq('id', user.id)
       .single()
+
+    const params = new URLSearchParams(location.search)
+    const clientId = params.get('clientId')
 
     const { data: proposal, error } = await supabase
       .from('proposals')
@@ -95,6 +121,7 @@ export default function NewProposal() {
         proposal_name: form.job_description,
         user_id: user.id,
         org_id: profile?.org_id,
+        client_id: clientId || null,
         rep_name: form.rep_name,
         rep_email: form.rep_email,
         client_name: form.client_name,
@@ -158,7 +185,7 @@ export default function NewProposal() {
     <div className="min-h-screen bg-[#0F1C2E]">
       <div className="bg-[#1a2d45] border-b border-[#2a3d55] px-6 py-4 flex justify-between items-center">
         <h1 className="text-white text-xl font-bold">ForgePt<span className="text-[#C8622A]">.</span></h1>
-        <button onClick={() => navigate('/')} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">
+        <button onClick={() => navigate(-1)} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">
           Cancel
         </button>
       </div>
@@ -344,7 +371,7 @@ export default function NewProposal() {
         </div>
 
         <div className="flex justify-end gap-4">
-          <button onClick={() => navigate('/')} className="px-6 py-3 text-[#8A9AB0] hover:text-white text-sm transition-colors">
+          <button onClick={() => navigate(-1)} className="px-6 py-3 text-[#8A9AB0] hover:text-white text-sm transition-colors">
             Cancel
           </button>
           <button onClick={handleSubmit} disabled={saving}

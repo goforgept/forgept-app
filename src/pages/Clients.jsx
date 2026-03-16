@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
@@ -9,19 +10,32 @@ export default function Clients({ isAdmin }) {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(null)
   const [error, setError] = useState(null)
+  const [orgId, setOrgId] = useState(null)
+  const navigate = useNavigate()
   const [form, setForm] = useState({
     client_name: '', company: '', email: '', phone: '',
     industry: '', crm_source: '', notes: ''
   })
 
   useEffect(() => {
-    fetchClients()
+    fetchOrgAndClients()
   }, [])
 
-  const fetchClients = async () => {
+  const fetchOrgAndClients = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('org_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.org_id) { setLoading(false); return }
+    setOrgId(profile.org_id)
+
     const { data } = await supabase
       .from('clients')
       .select('*')
+      .eq('org_id', profile.org_id)
       .order('company', { ascending: true })
     setClients(data || [])
     setLoading(false)
@@ -39,7 +53,8 @@ export default function Clients({ isAdmin }) {
       industry: form.industry,
       crm_source: form.crm_source,
       notes: form.notes,
-      active: true
+      active: true,
+      org_id: orgId
     })
 
     if (error) { setError(error.message); setSaving(false); return }
@@ -47,7 +62,7 @@ export default function Clients({ isAdmin }) {
     setSuccess('Client added successfully')
     setForm({ client_name: '', company: '', email: '', phone: '', industry: '', crm_source: '', notes: '' })
     setShowForm(false)
-    fetchClients()
+    fetchOrgAndClients()
     setSaving(false)
   }
 
@@ -121,7 +136,11 @@ export default function Clients({ isAdmin }) {
                 </thead>
                 <tbody>
                   {clients.map(c => (
-                    <tr key={c.id} className="border-b border-[#2a3d55]/30">
+                    <tr
+                      key={c.id}
+                      onClick={() => navigate(`/client/${c.id}`)}
+                      className="border-b border-[#2a3d55]/30 cursor-pointer hover:bg-[#0F1C2E] transition-colors"
+                    >
                       <td className="text-white py-3 pr-4 font-medium">{c.company}</td>
                       <td className="text-[#8A9AB0] py-3 pr-4">{c.client_name || '—'}</td>
                       <td className="text-[#8A9AB0] py-3 pr-4">{c.email || '—'}</td>
