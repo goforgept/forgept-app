@@ -17,6 +17,7 @@ export default function Sidebar({ isAdmin }) {
     { label: 'Team', path: '/reps', icon: '👥' },
     { label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },
+    { label: 'Help', path: '/faq', icon: '❓' },
   ]
 
   const repLinks = [
@@ -25,6 +26,7 @@ export default function Sidebar({ isAdmin }) {
     { label: 'New Proposal', path: '/new', icon: '➕' },
     { label: 'Clients', path: '/clients', icon: '🏢' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },
+    { label: 'Help', path: '/faq', icon: '❓' },
   ]
 
   const links = isAdmin ? adminLinks : repLinks

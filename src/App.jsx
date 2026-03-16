@@ -15,6 +15,7 @@ import Clients from './pages/Clients'
 import SuperAdmin from './pages/SuperAdmin'
 import ClientDetail from './pages/ClientDetail'
 import PurchaseOrders from './pages/PurchaseOrders'
+import FAQ from './pages/FAQ'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -117,6 +118,7 @@ function App() {
             <Route path="/superadmin" element={<SuperAdmin />} />
             <Route path="/client/:id" element={<ClientDetail isAdmin={isAdmin} />} />
             <Route path="/purchase-orders" element={<PurchaseOrders isAdmin={isAdmin} />} />
+            <Route path="/faq" element={<FAQ isAdmin={isAdmin} />} />
           </>
         )}
       </Routes>
