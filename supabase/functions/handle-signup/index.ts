@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
         'Authorization': `Bearer ${supabaseKey}`,
         'Prefer': 'return=representation'
       },
-      body: JSON.stringify({ name: companyName })
+      body: JSON.stringify({ name: companyName, status: 'pending' })
     })
 
     const orgData = await orgRes.json()
