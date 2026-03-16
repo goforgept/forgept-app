@@ -34,20 +34,40 @@ function App() {
   }, [])
 
   const fetchProfile = async (userId) => {
-  const { data } = await supabase
-    .from('profiles')
-    .select('*, organizations(status)')
-    .eq('id', userId)
-    .single()
-  setProfile(data)
-  // Small delay to ensure profile is fully set before routing
-  await new Promise(resolve => setTimeout(resolve, 100))
-  setLoading(false)
-}
+    // Retry up to 5 times waiting for profile to be created
+    for (let i = 0; i < 5; i++) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*, organizations(status)')
+        .eq('id', userId)
+        .single()
+
+      if (data?.org_role) {
+        setProfile(data)
+        setLoading(false)
+        return
+      }
+
+      // Wait 1 second before retrying
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+
+    // Give up after 5 tries and set whatever we have
+    const { data } = await supabase
+      .from('profiles')
+      .select('*, organizations(status)')
+      .eq('id', userId)
+      .single()
+    setProfile(data)
+    setLoading(false)
+  }
 
   if (loading) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
-      <p className="text-white">Loading...</p>
+      <div className="text-center">
+        <h1 className="text-white text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
+        <p className="text-[#8A9AB0] text-sm">Loading...</p>
+      </div>
     </div>
   )
 
