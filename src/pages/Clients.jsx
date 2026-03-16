@@ -10,7 +10,6 @@ const emptyForm = {
 
 const fields = [
   ['client_name', 'Contact Name'],
-  ['company', 'Company'],
   ['email', 'Email'],
   ['phone', 'Phone'],
   ['industry', 'Industry'],
@@ -29,6 +28,8 @@ export default function Clients({ isAdmin }) {
   const [editingId, setEditingId] = useState(null)
   const [editForm, setEditForm] = useState(emptyForm)
   const [expandedCompanies, setExpandedCompanies] = useState({})
+  const [companySuggestions, setCompanySuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
   const navigate = useNavigate()
   const [form, setForm] = useState(emptyForm)
 
@@ -56,9 +57,32 @@ export default function Clients({ isAdmin }) {
     setLoading(false)
   }
 
+  const handleCompanyInput = (value) => {
+    setForm(prev => ({ ...prev, company: value }))
+    if (value.length > 0) {
+      const existing = [...new Set(clients.map(c => c.company).filter(Boolean))]
+      const matches = existing.filter(c => c.toLowerCase().includes(value.toLowerCase()))
+      setCompanySuggestions(matches)
+      setShowSuggestions(matches.length > 0)
+    } else {
+      setShowSuggestions(false)
+    }
+  }
+
+  const selectCompany = (company) => {
+    setForm(prev => ({ ...prev, company }))
+    setShowSuggestions(false)
+  }
+
   const handleAdd = async () => {
     setSaving(true)
     setError(null)
+
+    if (!form.company) {
+      setError('Company name is required')
+      setSaving(false)
+      return
+    }
 
     const { error } = await supabase.from('clients').insert({
       client_name: form.client_name,
@@ -117,13 +141,14 @@ export default function Clients({ isAdmin }) {
     setExpandedCompanies(prev => ({ ...prev, [company]: !prev[company] }))
   }
 
-  // Group clients by company
   const grouped = clients.reduce((acc, client) => {
     const company = client.company || 'No Company'
     if (!acc[company]) acc[company] = []
     acc[company].push(client)
     return acc
   }, {})
+
+  const existingCompanies = [...new Set(clients.map(c => c.company).filter(Boolean))].sort()
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
@@ -133,7 +158,7 @@ export default function Clients({ isAdmin }) {
         <div className="flex justify-between items-center">
           <h2 className="text-white text-2xl font-bold">Clients</h2>
           <button
-            onClick={() => { setShowForm(!showForm); setError(null) }}
+            onClick={() => { setShowForm(!showForm); setError(null); setShowSuggestions(false) }}
             className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
           >
             {showForm ? 'Cancel' : '+ Add Client'}
@@ -147,6 +172,50 @@ export default function Clients({ isAdmin }) {
             <h3 className="text-white font-bold mb-4">New Client</h3>
             {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
             <div className="grid grid-cols-3 gap-4 mb-4">
+
+              {/* Company field with autocomplete */}
+              <div className="relative">
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Company <span className="text-[#C8622A]">*</span></label>
+                <input
+                  type="text"
+                  value={form.company}
+                  onChange={e => handleCompanyInput(e.target.value)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  onFocus={() => {
+                    if (form.company && companySuggestions.length > 0) setShowSuggestions(true)
+                  }}
+                  placeholder="Type or select existing company"
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                />
+                {showSuggestions && (
+                  <div className="absolute z-10 w-full mt-1 bg-[#0F1C2E] border border-[#2a3d55] rounded-lg overflow-hidden shadow-lg">
+                    {companySuggestions.map(company => (
+                      <button
+                        key={company}
+                        onClick={() => selectCompany(company)}
+                        className="w-full text-left px-3 py-2 text-white text-sm hover:bg-[#1a2d45] transition-colors"
+                      >
+                        {company}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {existingCompanies.length > 0 && !form.company && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {existingCompanies.slice(0, 5).map(company => (
+                      <button
+                        key={company}
+                        onClick={() => selectCompany(company)}
+                        className="text-xs bg-[#2a3d55] text-[#8A9AB0] hover:text-white px-2 py-1 rounded transition-colors"
+                      >
+                        {company}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Rest of fields */}
               {fields.map(([field, label]) => (
                 <div key={field}>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">{label}</label>
@@ -200,7 +269,20 @@ export default function Clients({ isAdmin }) {
                           </p>
                         </div>
                       </div>
-                      <span className="text-[#8A9AB0] text-sm">{isExpanded ? '▲' : '▼'}</span>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            setForm(prev => ({ ...prev, company }))
+                            setShowForm(true)
+                            window.scrollTo({ top: 0, behavior: 'smooth' })
+                          }}
+                          className="bg-[#2a3d55] text-white px-3 py-1 rounded-lg text-xs hover:bg-[#3a4d65] transition-colors"
+                        >
+                          + Add Contact
+                        </button>
+                        <span className="text-[#8A9AB0] text-sm">{isExpanded ? '▲' : '▼'}</span>
+                      </div>
                     </button>
 
                     {/* Contacts */}
@@ -214,7 +296,7 @@ export default function Clients({ isAdmin }) {
                             {editingId === c.id ? (
                               <div className="p-4 bg-[#0F1C2E]/50">
                                 <div className="grid grid-cols-3 gap-4 mb-4">
-                                  {fields.map(([field, label]) => (
+                                  {[['company', 'Company'], ...fields].map(([field, label]) => (
                                     <div key={field}>
                                       <label className="text-[#8A9AB0] text-xs mb-1 block">{label}</label>
                                       <input
@@ -247,10 +329,14 @@ export default function Clients({ isAdmin }) {
                                   className="flex items-center gap-6 flex-1 cursor-pointer"
                                   onClick={() => navigate(`/client/${c.id}`)}
                                 >
-                                  <div className="w-2 h-2 rounded-full bg-[#2a3d55] shrink-0 ml-1" />
+                                  <div className="w-2 h-2 rounded-full bg-[#C8622A]/50 shrink-0 ml-1" />
                                   <div>
-                                    <p className="text-white text-sm font-medium">{c.client_name || '—'}</p>
-                                    <p className="text-[#8A9AB0] text-xs">{c.email || ''}{c.email && c.phone ? ' · ' : ''}{c.phone || ''}</p>
+                                    <p className="text-white text-sm font-medium">{c.client_name || 'No contact name'}</p>
+                                    <p className="text-[#8A9AB0] text-xs">
+                                      {c.email || ''}
+                                      {c.email && c.phone ? ' · ' : ''}
+                                      {c.phone || ''}
+                                    </p>
                                   </div>
                                   {c.crm_source && (
                                     <span className="text-[#8A9AB0] text-xs bg-[#2a3d55] px-2 py-0.5 rounded">
