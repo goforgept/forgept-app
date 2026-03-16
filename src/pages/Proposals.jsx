@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
@@ -9,9 +9,19 @@ export default function Proposals({ isAdmin }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     fetchOrgAndProposals()
+
+    // Read URL params from dashboard clicks
+    const params = new URLSearchParams(location.search)
+    const status = params.get('status')
+    const rep = params.get('rep')
+
+    if (status === 'Won') setStatusFilter('Won')
+    else if (status === 'active') setStatusFilter('Active')
+    if (rep) setSearch(rep)
   }, [])
 
   const fetchOrgAndProposals = async () => {
@@ -35,7 +45,21 @@ export default function Proposals({ isAdmin }) {
   }
 
   const filtered = proposals
-    .filter(p => statusFilter === 'All' || p.status === statusFilter)
+    .filter(p => {
+      if (statusFilter === 'All') return true
+      if (statusFilter === 'Active') return p.status !== 'Won' && p.status !== 'Lost'
+      return p.status === statusFilter
+    })
+    .filter(p => {
+      // Check closing in 30 days filter
+      const params = new URLSearchParams(location.search)
+      if (params.get('closing') === '30') {
+        if (!p.close_date) return false
+        const days = Math.ceil((new Date(p.close_date) - new Date()) / (1000 * 60 * 60 * 24))
+        return days <= 30 && days >= 0 && p.status !== 'Won' && p.status !== 'Lost'
+      }
+      return true
+    })
     .filter(p => {
       if (!search) return true
       const s = search.toLowerCase()
@@ -47,13 +71,21 @@ export default function Proposals({ isAdmin }) {
       )
     })
 
+  const params = new URLSearchParams(location.search)
+  const isClosingFilter = params.get('closing') === '30'
+
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
       <Sidebar isAdmin={isAdmin} />
 
       <div className="flex-1 p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-white text-2xl font-bold">Proposals</h2>
+          <div>
+            <h2 className="text-white text-2xl font-bold">Proposals</h2>
+            {isClosingFilter && (
+              <p className="text-[#C8622A] text-sm mt-1">Showing proposals closing in 30 days</p>
+            )}
+          </div>
           <div className="flex items-center gap-4">
             <p className="text-[#8A9AB0] text-sm">{filtered.length} of {proposals.length}</p>
             <button
@@ -74,7 +106,7 @@ export default function Proposals({ isAdmin }) {
             className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
           />
           <div className="flex gap-2">
-            {['All', 'Draft', 'Sent', 'Won', 'Lost'].map(s => (
+            {['All', 'Active', 'Draft', 'Sent', 'Won', 'Lost'].map(s => (
               <button
                 key={s}
                 onClick={() => setStatusFilter(s)}
