@@ -12,6 +12,7 @@ import Vendors from './pages/Vendors'
 import Settings from './pages/Settings'
 import ResetPassword from './pages/ResetPassword'
 import Clients from './pages/Clients'
+import SuperAdmin from './pages/SuperAdmin'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -68,6 +69,7 @@ function App() {
             <Route path="/vendors" element={<Vendors isAdmin={isAdmin} />} />
             <Route path="/settings" element={<Settings isAdmin={isAdmin} />} />
             <Route path="/clients" element={<Clients isAdmin={isAdmin} />} />
+            <Route path="/superadmin" element={<SuperAdmin />} />
           </>
         )}
       </Routes>
