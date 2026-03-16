@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 
 const faqs = [
@@ -120,7 +119,6 @@ const faqs = [
 ]
 
 export default function FAQ({ isAdmin }) {
-  const navigate = useNavigate()
   const [openItem, setOpenItem] = useState(null)
   const [search, setSearch] = useState('')
 
@@ -188,7 +186,7 @@ export default function FAQ({ isAdmin }) {
         <div className="bg-[#1a2d45] rounded-xl p-6 text-center">
           <p className="text-white font-semibold mb-2">Still have questions?</p>
           <p className="text-[#8A9AB0] text-sm mb-4">Reach out to us and we will get back to you within 1 business day.</p>
-          
+          <a
             href="mailto:hello@goforgept.com"
             className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors inline-block"
           >
