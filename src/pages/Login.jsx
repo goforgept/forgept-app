@@ -7,6 +7,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [companyName, setCompanyName] = useState('')
+  const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
@@ -19,59 +20,47 @@ export default function Login() {
     setLoading(false)
   }
 
-  const handleSignUp = async () => {
+  const handleRequestAccess = async () => {
     setLoading(true)
     setError(null)
 
-    if (!fullName || !email || !password || !companyName) {
-      setError('All fields are required')
+    if (!fullName || !email || !companyName) {
+      setError('Name, email and company are required')
       setLoading(false)
       return
     }
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName }
-      }
-    })
+    const { error } = await supabase
+      .from('access_requests')
+      .insert({
+        full_name: fullName,
+        email,
+        company_name: companyName,
+        notes,
+        status: 'pending'
+      })
 
-    if (signUpError) {
-      setError(signUpError.message)
+    if (error) {
+      setError('Error submitting request: ' + error.message)
       setLoading(false)
       return
     }
 
-    const userId = data.user.id
-    console.log('Auth user created:', userId)
-
-    // Sign out immediately so they can't access app until approved
-    await supabase.auth.signOut()
-
-    // Wait for auth user to be committed
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
-    const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/handle-signup', {
+    // Notify you via email
+    await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/notify-new-request', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
       },
-      body: JSON.stringify({ userId, email, fullName, companyName })
+      body: JSON.stringify({ fullName, email, companyName, notes })
     })
 
-    const result = await res.json()
-    console.log('Signup result:', result, 'userId:', userId)
-
-    if (!result.success) {
-      setError('Error setting up account: ' + (result.error || 'unknown error'))
-      setLoading(false)
-      return
-    }
-
-    setSuccess('Account created! Your account is pending approval. You will receive an email once approved.')
-    setTab('login')
+    setSuccess('Request submitted! We will review your application and be in touch shortly.')
+    setFullName('')
+    setEmail('')
+    setCompanyName('')
+    setNotes('')
     setLoading(false)
   }
 
@@ -108,12 +97,12 @@ export default function Login() {
               Sign In
             </button>
             <button
-              onClick={() => { setTab('signup'); setError(null); setSuccess(null) }}
+              onClick={() => { setTab('request'); setError(null); setSuccess(null) }}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                tab === 'signup' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'
+                tab === 'request' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'
               }`}
             >
-              Sign Up
+              Request Access
             </button>
           </div>
 
@@ -160,6 +149,7 @@ export default function Login() {
             </div>
           ) : (
             <div className="space-y-4">
+              <p className="text-[#8A9AB0] text-sm">Tell us about your business and we will get you set up.</p>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Full Name</label>
                 <input
@@ -191,24 +181,24 @@ export default function Login() {
                 />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  placeholder="••••••••"
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Notes (optional)</label>
+                <textarea
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  rows={3}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none"
+                  placeholder="Tell us about your business..."
                 />
               </div>
               <button
-                onClick={handleSignUp}
+                onClick={handleRequestAccess}
                 disabled={loading}
                 className="w-full bg-[#C8622A] text-white py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
               >
-                {loading ? 'Creating account...' : 'Create Account'}
+                {loading ? 'Submitting...' : 'Request Access'}
               </button>
               <p className="text-[#8A9AB0] text-xs text-center">
-                By signing up you agree to our terms of service.
+                We typically respond within 1 business day.
               </p>
             </div>
           )}
