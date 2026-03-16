@@ -16,6 +16,11 @@ export default function ProposalDetail({ isAdmin }) {
   const [editLines, setEditLines] = useState([])
   const [saving, setSaving] = useState(false)
   const [generatingSOW, setGeneratingSOW] = useState(false)
+  const [showPOModal, setShowPOModal] = useState(false)
+  const [poVendor, setPOVendor] = useState(null)
+  const [poNumber, setPONumber] = useState('')
+  const [poAutoNumber, setPOAutoNumber] = useState(true)
+  const [generatingPO, setGeneratingPO] = useState(false)
 
   useEffect(() => {
     fetchProposal()
@@ -254,6 +259,115 @@ export default function ProposalDetail({ isAdmin }) {
     doc.save(`${proposal?.proposal_name || 'Proposal'}.pdf`)
   }
 
+  const generatePO = async () => {
+    setGeneratingPO(true)
+
+    let finalPONumber = poNumber
+
+    if (poAutoNumber) {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('org_id')
+        .eq('id', user.id)
+        .single()
+
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('po_counter, name')
+        .eq('id', profileData.org_id)
+        .single()
+
+      finalPONumber = `PO-${org.po_counter}`
+
+      await supabase
+        .from('organizations')
+        .update({ po_counter: org.po_counter + 1 })
+        .eq('id', profileData.org_id)
+    }
+
+    const vendorItems = lineItems.filter(l => l.vendor === poVendor)
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
+
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.rect(0, 0, pageWidth, 40, 'F')
+
+    if (profile?.logo_url) {
+      const img = new Image()
+      img.src = profile.logo_url
+      doc.addImage(img, 'PNG', 14, 8, 40, 24)
+    } else {
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
+      doc.text(profile?.company_name || 'ForgePt.', 14, 22)
+    }
+
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(16)
+    doc.setFont('helvetica', 'bold')
+    doc.text('PURCHASE ORDER', pageWidth - 14, 18, { align: 'right' })
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text(finalPONumber, pageWidth - 14, 28, { align: 'right' })
+
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52)
+    doc.text(`Project: ${proposal?.proposal_name || ''}`, 14, 60)
+
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text('Vendor', 14, 76)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(60, 60, 60)
+    doc.setFontSize(10)
+    doc.text(poVendor, 14, 84)
+
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text('Bill To', pageWidth / 2, 76)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(60, 60, 60)
+    doc.setFontSize(10)
+    doc.text(profile?.company_name || '', pageWidth / 2, 84)
+
+    autoTable(doc, {
+      startY: 96,
+      head: [['Item', 'Part #', 'Qty', 'Unit', 'Unit Cost', 'Total']],
+      body: vendorItems.map(item => [
+        item.item_name,
+        item.part_number_sku || '—',
+        item.quantity,
+        item.unit || 'ea',
+        `$${(item.your_cost_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+        `$${((item.your_cost_unit || 0) * (item.quantity || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+      ]),
+      foot: [['', '', '', '', 'Total', `$${vendorItems.reduce((sum, item) => sum + ((item.your_cost_unit || 0) * (item.quantity || 0)), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+      headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+      footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      styles: { fontSize: 9 }
+    })
+
+    for (const item of vendorItems) {
+      await supabase
+        .from('bom_line_items')
+        .update({ po_number: finalPONumber, po_status: 'PO Sent' })
+        .eq('id', item.id)
+    }
+
+    await fetchLineItems()
+    doc.save(`${finalPONumber} - ${poVendor}.pdf`)
+    setShowPOModal(false)
+    setGeneratingPO(false)
+  }
+
   const startEditing = () => {
     setEditLines(lineItems.map(l => ({ ...l })))
     setEditingBOM(true)
@@ -444,6 +558,12 @@ export default function ProposalDetail({ isAdmin }) {
             {!editingBOM ? (
               <div className="flex gap-2">
                 <button
+                  onClick={() => setShowPOModal(true)}
+                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors"
+                >
+                  Generate PO
+                </button>
+                <button
                   onClick={sendAllRFQs}
                   className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors"
                 >
@@ -495,9 +615,10 @@ export default function ProposalDetail({ isAdmin }) {
                           <span className={`text-xs font-semibold px-2 py-1 rounded ${
                             item.pricing_status === 'RFQ Sent' ? 'bg-yellow-500/20 text-yellow-400' :
                             item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' :
+                            item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' :
                             'bg-[#2a3d55] text-[#8A9AB0]'
                           }`}>
-                            {item.pricing_status}
+                            {item.po_status || item.pricing_status}
                           </span>
                         </td>
                       </tr>
@@ -586,6 +707,86 @@ export default function ProposalDetail({ isAdmin }) {
           )}
         </div>
       </div>
+
+      {/* PO Modal */}
+      {showPOModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-white font-bold text-lg mb-4">Generate Purchase Order</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Select Vendor</label>
+                <select
+                  value={poVendor || ''}
+                  onChange={e => setPOVendor(e.target.value)}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                >
+                  <option value="">— Select vendor —</option>
+                  {[...new Set(lineItems.filter(l => l.vendor).map(l => l.vendor))].map(v => (
+                    <option key={v} value={v}>{v} ({lineItems.filter(l => l.vendor === v).length} items)</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
+                <div className="flex gap-2 mb-2">
+                  <button
+                    onClick={() => setPOAutoNumber(true)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}
+                  >
+                    Auto-Generate
+                  </button>
+                  <button
+                    onClick={() => setPOAutoNumber(false)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${!poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}
+                  >
+                    Enter Manually
+                  </button>
+                </div>
+                {!poAutoNumber && (
+                  <input
+                    type="text"
+                    value={poNumber}
+                    onChange={e => setPONumber(e.target.value)}
+                    placeholder="e.g. PO-2026-001"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                  />
+                )}
+              </div>
+
+              {poVendor && (
+                <div className="bg-[#0F1C2E] rounded-lg p-3">
+                  <p className="text-[#8A9AB0] text-xs mb-2">Items for {poVendor}:</p>
+                  {lineItems.filter(l => l.vendor === poVendor).map(item => (
+                    <div key={item.id} className="flex justify-between text-xs py-1">
+                      <span className="text-white">{item.item_name}</span>
+                      <span className="text-[#8A9AB0]">Qty: {item.quantity}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowPOModal(false)}
+                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={generatePO}
+                  disabled={!poVendor || generatingPO || (!poAutoNumber && !poNumber)}
+                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+                >
+                  {generatingPO ? 'Generating...' : 'Generate PO'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
