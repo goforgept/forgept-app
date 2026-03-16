@@ -46,6 +46,9 @@ export default function Login() {
     const userId = data.user.id
     console.log('Auth user created:', userId)
 
+    // Sign out immediately so they can't access app until approved
+    await supabase.auth.signOut()
+
     // Wait for auth user to be committed
     await new Promise(resolve => setTimeout(resolve, 1000))
 
