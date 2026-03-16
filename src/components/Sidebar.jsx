@@ -15,6 +15,7 @@ export default function Sidebar({ isAdmin }) {
     { label: 'Clients', path: '/clients', icon: '🏢' },
     { label: 'Vendors', path: '/vendors', icon: '🏭' },
     { label: 'Team', path: '/reps', icon: '👥' },
+    { label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },
   ]
 

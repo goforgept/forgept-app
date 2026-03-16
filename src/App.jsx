@@ -14,6 +14,7 @@ import ResetPassword from './pages/ResetPassword'
 import Clients from './pages/Clients'
 import SuperAdmin from './pages/SuperAdmin'
 import ClientDetail from './pages/ClientDetail'
+import PurchaseOrders from './pages/PurchaseOrders'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -115,6 +116,7 @@ function App() {
             <Route path="/clients" element={<Clients isAdmin={isAdmin} />} />
             <Route path="/superadmin" element={<SuperAdmin />} />
             <Route path="/client/:id" element={<ClientDetail isAdmin={isAdmin} />} />
+            <Route path="/purchase-orders" element={<PurchaseOrders isAdmin={isAdmin} />} />
           </>
         )}
       </Routes>
