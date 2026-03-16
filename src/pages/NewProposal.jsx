@@ -14,6 +14,8 @@ export default function NewProposal() {
   const location = useLocation()
   const [saving, setSaving] = useState(false)
   const [tab, setTab] = useState('inline')
+  const [clients, setClients] = useState([])
+  const [selectedClientId, setSelectedClientId] = useState(null)
   const [form, setForm] = useState({
     rep_name: '', rep_email: '', client_name: '', company: '',
     client_email: '', close_date: '', industry: '', job_description: ''
@@ -23,10 +25,45 @@ export default function NewProposal() {
   const [uploadFileName, setUploadFileName] = useState(null)
 
   useEffect(() => {
+    fetchProfileAndClients()
+  }, [])
+
+  const fetchProfileAndClients = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // Fetch profile to auto-fill rep details
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (profile) {
+      setForm(prev => ({
+        ...prev,
+        rep_name: profile.full_name || '',
+        rep_email: profile.email || user.email || ''
+      }))
+
+      // Fetch clients for this org
+      if (profile.org_id) {
+        const { data: clientsData } = await supabase
+          .from('clients')
+          .select('*')
+          .eq('org_id', profile.org_id)
+          .order('company', { ascending: true })
+        setClients(clientsData || [])
+      }
+    }
+
+    // Check for clientId in URL
     const params = new URLSearchParams(location.search)
     const clientId = params.get('clientId')
-    if (clientId) prefillClient(clientId)
-  }, [])
+    if (clientId) {
+      setSelectedClientId(clientId)
+      prefillClient(clientId)
+    }
+  }
 
   const prefillClient = async (clientId) => {
     const { data } = await supabase
@@ -41,6 +78,21 @@ export default function NewProposal() {
         client_name: data.client_name || '',
         company: data.company || '',
         client_email: data.email || '',
+        industry: data.industry || prev.industry
+      }))
+    }
+  }
+
+  const handleClientSelect = (clientId) => {
+    setSelectedClientId(clientId)
+    if (clientId) {
+      prefillClient(clientId)
+    } else {
+      setForm(prev => ({
+        ...prev,
+        client_name: '',
+        company: '',
+        client_email: ''
       }))
     }
   }
@@ -113,7 +165,7 @@ export default function NewProposal() {
       .single()
 
     const params = new URLSearchParams(location.search)
-    const clientId = params.get('clientId')
+    const clientId = params.get('clientId') || selectedClientId
 
     const { data: proposal, error } = await supabase
       .from('proposals')
@@ -196,24 +248,79 @@ export default function NewProposal() {
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <h3 className="text-white font-bold mb-4">Proposal Details</h3>
           <div className="grid grid-cols-2 gap-4">
-            {[
-              ['rep_name', 'Rep Name'],
-              ['rep_email', 'Rep Email'],
-              ['client_name', 'Client Name'],
-              ['company', 'Company'],
-              ['client_email', 'Client Email'],
-              ['close_date', 'Close Date', 'date'],
-            ].map(([field, label, type]) => (
-              <div key={field}>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">{label}</label>
-                <input
-                  type={type || 'text'}
-                  value={form[field]}
-                  onChange={e => updateForm(field, e.target.value)}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                />
-              </div>
-            ))}
+
+            {/* Rep fields - auto populated */}
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Rep Name</label>
+              <input
+                type="text"
+                value={form.rep_name}
+                onChange={e => updateForm('rep_name', e.target.value)}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+              />
+            </div>
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Rep Email</label>
+              <input
+                type="text"
+                value={form.rep_email}
+                onChange={e => updateForm('rep_email', e.target.value)}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+              />
+            </div>
+
+            {/* Client selector */}
+            <div className="col-span-2">
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Select Client (optional)</label>
+              <select
+                value={selectedClientId || ''}
+                onChange={e => handleClientSelect(e.target.value)}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+              >
+                <option value="">— Select existing client or fill in manually —</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.company} {c.client_name ? `— ${c.client_name}` : ''}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Client fields */}
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Client Name</label>
+              <input
+                type="text"
+                value={form.client_name}
+                onChange={e => updateForm('client_name', e.target.value)}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+              />
+            </div>
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Company</label>
+              <input
+                type="text"
+                value={form.company}
+                onChange={e => updateForm('company', e.target.value)}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+              />
+            </div>
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Client Email</label>
+              <input
+                type="text"
+                value={form.client_email}
+                onChange={e => updateForm('client_email', e.target.value)}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+              />
+            </div>
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Close Date</label>
+              <input
+                type="date"
+                value={form.close_date}
+                onChange={e => updateForm('close_date', e.target.value)}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+              />
+            </div>
             <div>
               <label className="text-[#8A9AB0] text-xs mb-1 block">Industry</label>
               <select
