@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar'
 import POList from '../components/POList'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } from 'docx'
 
 export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
@@ -58,18 +59,12 @@ export default function ProposalDetail({ isAdmin }) {
   }
 
   const updateStatus = async (newStatus) => {
-    await supabase
-      .from('proposals')
-      .update({ status: newStatus })
-      .eq('id', id)
+    await supabase.from('proposals').update({ status: newStatus }).eq('id', id)
     setProposal(prev => ({ ...prev, status: newStatus }))
   }
 
   const updateCloseDate = async (newDate) => {
-    await supabase
-      .from('proposals')
-      .update({ close_date: newDate })
-      .eq('id', id)
+    await supabase.from('proposals').update({ close_date: newDate }).eq('id', id)
     setProposal(prev => ({ ...prev, close_date: newDate }))
   }
 
@@ -260,6 +255,161 @@ export default function ProposalDetail({ isAdmin }) {
     doc.save(`${proposal?.proposal_name || 'Proposal'}.pdf`)
   }
 
+  const downloadDOCX = async () => {
+    const primaryColor = (profile?.primary_color || '#0F1C2E').replace('#', '')
+
+    const border = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
+    const borders = { top: border, bottom: border, left: border, right: border }
+
+    const colWidths = [2800, 1200, 1200, 600, 1000, 1000]
+
+    const headerRow = new TableRow({
+      children: ['Item', 'Category', 'Vendor', 'Qty', 'Unit Price', 'Total'].map((h, i) =>
+        new TableCell({
+          borders,
+          width: { size: colWidths[i], type: WidthType.DXA },
+          shading: { fill: primaryColor, type: ShadingType.CLEAR },
+          margins: { top: 80, bottom: 80, left: 120, right: 120 },
+          children: [new Paragraph({
+            children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })]
+          })]
+        })
+      )
+    })
+
+    const itemRows = lineItems.map(item =>
+      new TableRow({
+        children: [
+          item.item_name,
+          item.category || '—',
+          item.vendor || '—',
+          String(item.quantity || 0),
+          `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+          `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+        ].map((val, i) =>
+          new TableCell({
+            borders,
+            width: { size: colWidths[i], type: WidthType.DXA },
+            margins: { top: 80, bottom: 80, left: 120, right: 120 },
+            children: [new Paragraph({
+              children: [new TextRun({ text: val, size: 18 })]
+            })]
+          })
+        )
+      })
+    )
+
+    const totalRow = new TableRow({
+      children: [
+        new TableCell({
+          borders,
+          columnSpan: 5,
+          margins: { top: 80, bottom: 80, left: 120, right: 120 },
+          shading: { fill: primaryColor, type: ShadingType.CLEAR },
+          children: [new Paragraph({
+            alignment: AlignmentType.RIGHT,
+            children: [new TextRun({ text: 'Total', bold: true, color: 'FFFFFF', size: 18 })]
+          })]
+        }),
+        new TableCell({
+          borders,
+          width: { size: 1000, type: WidthType.DXA },
+          margins: { top: 80, bottom: 80, left: 120, right: 120 },
+          shading: { fill: primaryColor, type: ShadingType.CLEAR },
+          children: [new Paragraph({
+            children: [new TextRun({
+              text: `$${lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+              bold: true, color: 'FFFFFF', size: 18
+            })]
+          })]
+        })
+      ]
+    })
+
+    const children = [
+      new Paragraph({
+        children: [new TextRun({ text: profile?.company_name || proposal?.company || 'ForgePt.', bold: true, size: 36, color: primaryColor })]
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: proposal?.proposal_name || 'Proposal', bold: true, size: 48 })]
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, size: 20, color: '666666' })]
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Industry: ${proposal?.industry || ''}`, size: 20, color: '666666' })]
+      }),
+      new Paragraph({
+        children: [new TextRun({ text: `Date: ${new Date().toLocaleDateString()}`, size: 20, color: '666666' })]
+      }),
+      new Paragraph({ children: [new TextRun({ text: '' })] }),
+    ]
+
+    if (proposal?.scope_of_work) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: 'Scope of Work', bold: true, size: 28, color: primaryColor })]
+        }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        ...proposal.scope_of_work.split('\n').map(line =>
+          new Paragraph({
+            children: [new TextRun({ text: line, size: 20 })]
+          })
+        ),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+      )
+    }
+
+    if (lineItems.length > 0) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: 'Materials & Pricing', bold: true, size: 28, color: primaryColor })]
+        }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Table({
+          width: { size: 9800, type: WidthType.DXA },
+          columnWidths: colWidths,
+          rows: [headerRow, ...itemRows, totalRow]
+        }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+      )
+    }
+
+    if (profile?.terms_and_conditions) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: 'Terms and Conditions', bold: true, size: 28, color: primaryColor })]
+        }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        ...profile.terms_and_conditions.split('\n').map(line =>
+          new Paragraph({
+            children: [new TextRun({ text: line, size: 18, color: '444444' })]
+          })
+        )
+      )
+    }
+
+    const doc = new Document({
+      sections: [{
+        properties: {
+          page: {
+            size: { width: 12240, height: 15840 },
+            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }
+          }
+        },
+        children
+      }]
+    })
+
+    const buffer = await Packer.toBlob(doc)
+    const url = URL.createObjectURL(buffer)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${proposal?.proposal_name || 'Proposal'}.docx`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const generatePO = async () => {
     setGeneratingPO(true)
 
@@ -356,7 +506,6 @@ export default function ProposalDetail({ isAdmin }) {
       styles: { fontSize: 9 }
     })
 
-    // Save PO to database
     const totalAmount = vendorItems.reduce((sum, item) =>
       sum + ((item.your_cost_unit || 0) * (item.quantity || 0)), 0)
 
@@ -376,7 +525,6 @@ export default function ProposalDetail({ isAdmin }) {
       total_amount: totalAmount
     })
 
-    // Update line items
     for (const item of vendorItems) {
       await supabase
         .from('bom_line_items')
@@ -434,11 +582,7 @@ export default function ProposalDetail({ isAdmin }) {
       .delete()
       .eq('proposal_id', id)
 
-    if (deleteError) {
-      alert('Error clearing old line items')
-      setSaving(false)
-      return
-    }
+    if (deleteError) { alert('Error clearing old line items'); setSaving(false); return }
 
     const validLines = editLines.filter(l => l.item_name.trim() !== '')
 
@@ -462,11 +606,7 @@ export default function ProposalDetail({ isAdmin }) {
           }))
         )
 
-      if (insertError) {
-        alert('Error saving line items')
-        setSaving(false)
-        return
-      }
+      if (insertError) { alert('Error saving line items'); setSaving(false); return }
     }
 
     const totalCustomer = validLines.reduce((sum, l) =>
@@ -504,6 +644,7 @@ export default function ProposalDetail({ isAdmin }) {
       <Sidebar isAdmin={isAdmin} />
 
       <div className="flex-1 p-6 space-y-6">
+        {/* Header */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-start">
             <div>
@@ -548,6 +689,7 @@ export default function ProposalDetail({ isAdmin }) {
           </div>
         </div>
 
+        {/* Scope of Work */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-white font-bold text-lg">Scope of Work</h3>
@@ -557,6 +699,12 @@ export default function ProposalDetail({ isAdmin }) {
                 className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors"
               >
                 ↓ Download PDF
+              </button>
+              <button
+                onClick={downloadDOCX}
+                className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors"
+              >
+                ↓ Download DOCX
               </button>
               <button
                 onClick={generateSOW}
@@ -574,6 +722,7 @@ export default function ProposalDetail({ isAdmin }) {
           )}
         </div>
 
+        {/* BOM */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-white font-bold text-lg">BOM Line Items ({lineItems.length})</h3>
@@ -737,7 +886,6 @@ export default function ProposalDetail({ isAdmin }) {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
             <h3 className="text-white font-bold text-lg mb-4">Generate Purchase Order</h3>
-
             <div className="space-y-4">
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Select Vendor</label>
@@ -752,7 +900,6 @@ export default function ProposalDetail({ isAdmin }) {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
                 <div className="flex gap-2 mb-2">
@@ -779,7 +926,6 @@ export default function ProposalDetail({ isAdmin }) {
                   />
                 )}
               </div>
-
               {poVendor && (
                 <div className="bg-[#0F1C2E] rounded-lg p-3">
                   <p className="text-[#8A9AB0] text-xs mb-2">Items for {poVendor}:</p>
@@ -791,7 +937,6 @@ export default function ProposalDetail({ isAdmin }) {
                   ))}
                 </div>
               )}
-
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setShowPOModal(false)}
