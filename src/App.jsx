@@ -34,14 +34,16 @@ function App() {
   }, [])
 
   const fetchProfile = async (userId) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*, organizations(status)')
-      .eq('id', userId)
-      .single()
-    setProfile(data)
-    setLoading(false)
-  }
+  const { data } = await supabase
+    .from('profiles')
+    .select('*, organizations(status)')
+    .eq('id', userId)
+    .single()
+  setProfile(data)
+  // Small delay to ensure profile is fully set before routing
+  await new Promise(resolve => setTimeout(resolve, 100))
+  setLoading(false)
+}
 
   if (loading) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
