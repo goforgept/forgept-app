@@ -23,6 +23,7 @@ export default function Sidebar({ isAdmin }) {
     { label: 'Dashboard', path: '/', icon: '⬛' },
     { label: 'Proposals', path: '/proposals', icon: '📋' },
     { label: 'New Proposal', path: '/new', icon: '➕' },
+    { label: 'Clients', path: '/clients', icon: '🏢' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },
   ]
 
