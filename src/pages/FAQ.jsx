@@ -191,7 +191,7 @@ export default function FAQ({ isAdmin }) {
           
             href="mailto:hello@goforgept.com"
             className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors inline-block"
-          >
+          {'>'}
             Contact Support
           </a>
         </div>
