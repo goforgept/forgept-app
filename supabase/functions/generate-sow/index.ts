@@ -11,22 +11,32 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { proposalId, company, jobDesc, industry, repName, lineItems } = await req.json()
+    const { proposalId, company, ClientName, jobDesc, industry, repName, lineItems, aiNotes } = await req.json()
 
     const lineItemsText = lineItems.map((l: any) =>
       `${l.itemName} - Qty: ${l.quantity} - Price: $${l.customerPriceUnit} Total: $${l.customerPriceTotal}`
     ).join('\n')
 
-    const prompt = `You are a professional proposal writer for trades businesses. Write a concise Scope of Work based ONLY on the line items provided. Do not add work, materials, or tasks that are not in the line items list.
+   const prompt = `You are a professional proposal writer for trades businesses. Write a concise Scope of Work based ONLY on the line items provided. Do not add work, materials, or tasks that are not in the line items list.
 
 Company: ${company}
+Client: ${clientName || 'Not specified'}
 Job: ${jobDesc}
 Industry: ${industry}
+
+User Instructions (AI Notes):
+${aiNotes || 'None provided'}
 
 Line Items:
 ${lineItemsText}
 
+Instructions:
+- Follow the AI Notes for tone, clarity, and emphasis
+- DO NOT add anything not in the line items
+- Keep everything aligned strictly with provided items
+
 Write 2 short professional paragraphs describing only the work shown in the line items above. Then list the materials exactly as provided. Do not invent or assume any additional work, cables, mounts, or materials that are not explicitly listed.`
+
 
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
