@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar'
 import POList from '../components/POList'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import * as XLSX from 'xlsx'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } from 'docx'
 
 export default function ProposalDetail({ isAdmin }) {
@@ -537,7 +538,49 @@ export default function ProposalDetail({ isAdmin }) {
     setShowPOModal(false)
     setGeneratingPO(false)
   }
+const handleExcelUpload = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
 
+  try {
+    const data = await file.arrayBuffer()
+    const workbook = XLSX.read(data)
+
+    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+
+    // Read rows as simple arrays (not column names)
+    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 })
+
+    const mapped = rows
+      .slice(1) // skip first row (header)
+      .filter(r => r[0]) // only keep rows with a first column
+      .map(r => ({
+        proposal_id: id,
+        item_name: r[0] || '',
+        part_number_sku: '',
+        quantity: parseFloat(r[1]) || 1,
+        unit: 'ea',
+        category: '',
+        vendor: '',
+        your_cost_unit: '',
+        markup_percent: '35',
+        customer_price_unit: '',
+        customer_price_total: '',
+        pricing_status: 'Needs Pricing'
+      }))
+
+    setEditLines(mapped)
+
+            // small delay ensures state is ready before switching UI
+            setTimeout(() => {
+            setEditingBOM(true)
+        }, 0)
+
+  } catch (err) {
+    console.log('Excel upload error:', err)
+    alert('Could not read Excel file')
+  }
+}
   const startEditing = () => {
     setEditLines(lineItems.map(l => ({ ...l })))
     setEditingBOM(true)
@@ -743,6 +786,15 @@ export default function ProposalDetail({ isAdmin }) {
                 <button onClick={startEditing} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
                   Edit BOM
                 </button>
+                <label className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors cursor-pointer">
+                 Upload Excel
+                    <input
+                    type="file"
+                     accept=".xlsx,.xls,.csv"
+                    onChange={handleExcelUpload}
+                         className="hidden"
+                      />
+                </label>
               </div>
             ) : (
               <div className="flex gap-2">
