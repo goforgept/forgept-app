@@ -81,7 +81,7 @@ export default function ProposalDetail({ isAdmin }) {
         },
         body: JSON.stringify({
           proposalId: id,
-          company: proposal.company,
+          company: profile?.company_name,
           clientName: proposal.client_name,
           jobDesc: proposal.job_description,
           industry: proposal.industry,

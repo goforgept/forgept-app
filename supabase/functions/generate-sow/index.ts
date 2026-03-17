@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { proposalId, company, ClientName, jobDesc, industry, repName, lineItems, aiNotes } = await req.json()
+    const { proposalId, company, clientName, jobDesc, industry, repName, lineItems, aiNotes } = await req.json()
 
     const lineItemsText = lineItems.map((l: any) =>
       `${l.itemName} - Qty: ${l.quantity} - Price: $${l.customerPriceUnit} Total: $${l.customerPriceTotal}`
@@ -31,12 +31,26 @@ Line Items:
 ${lineItemsText}
 
 Instructions:
+- The Company (${company}) is the contractor performing all work and providing all listed materials
+- The Client (${clientName || 'the client'}) is the customer receiving the work
+- ALWAYS describe the Company as performing all work and supplying all listed materials
+- NEVER use language where the Client provides, installs, or supplies anything
+- If unclear, default to the Company performing the work
 - Follow the AI Notes for tone, clarity, and emphasis
 - DO NOT add anything not in the line items
 - Keep everything aligned strictly with provided items
 
-Write 2 short professional paragraphs describing only the work shown in the line items above. Then list the materials exactly as provided. Do not invent or assume any additional work, cables, mounts, or materials that are not explicitly listed.`
+Write 2 short professional paragraphs describing the scope of work.
 
+CRITICAL:
+CRITICAL:
+- The first sentence MUST be exactly formatted as: "${company} will provide and install..."
+- ALL work descriptions must use the Company as the subject (e.g., "${company} will install...", "${company} will configure...")
+- NEVER use the Client name as the subject of any sentence
+- NEVER write sentences where the Client performs any action
+- If a sentence would normally reference the Client, rewrite it so the Company is the subject instead
+
+Then list the materials exactly as provided. Do not invent or assume any additional work, cables, mounts, or materials that are not explicitly listed.`
 
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
