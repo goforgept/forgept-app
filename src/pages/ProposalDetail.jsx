@@ -24,6 +24,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [poNumber, setPONumber] = useState('')
   const [poAutoNumber, setPOAutoNumber] = useState(true)
   const [generatingPO, setGeneratingPO] = useState(false)
+  const [aiNotes, setAiNotes] = useState('')
 
   useEffect(() => {
     fetchProposal()
@@ -84,6 +85,7 @@ export default function ProposalDetail({ isAdmin }) {
           jobDesc: proposal.job_description,
           industry: proposal.industry,
           repName: proposal.rep_name,
+          aiNotes: aiNotes,
           lineItems: lineItems.map(l => ({
             itemName: l.item_name,
             quantity: l.quantity,
@@ -758,6 +760,23 @@ const handleExcelUpload = async (e) => {
               </button>
             </div>
           </div>
+          {/* AI Notes */}
+<div className="mb-4">
+  <label className="text-white text-sm font-semibold block mb-1">
+    AI Notes (Optional)
+  </label>
+
+  <p className="text-[#8A9AB0] text-xs mb-2">
+    Describe what you want the Scope of Work to include, how it should sound, or anything important.
+  </p>
+
+  <textarea
+    value={aiNotes}
+    onChange={(e) => setAiNotes(e.target.value)}
+    placeholder="Example: This is for a commercial install. Keep it professional, emphasize safety, and make it easy for a non-technical client to understand."
+    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] min-h-[100px]"
+  />
+</div>
           {proposal?.scope_of_work ? (
             <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
           ) : (
