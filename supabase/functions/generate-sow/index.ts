@@ -17,51 +17,48 @@ Deno.serve(async (req) => {
       `${l.itemName} - Qty: ${l.quantity} - Price: $${l.customerPriceUnit} Total: $${l.customerPriceTotal}`
     ).join('\n')
 
-    // Match the frontend shape: role, quantity, unit, your_cost, markup, customer_price
     const laborText = (laborItems || [])
       .filter((l: any) => l.role)
       .map((l: any) =>
         `${l.role} - ${l.quantity} ${l.unit || 'hr'} @ $${l.your_cost}/hr (Customer Price: $${l.customer_price})`
       ).join('\n')
 
-    const prompt = `You are a professional proposal writer for trades businesses. Write a concise Scope of Work based ONLY on the line items provided. Do not add work, materials, or tasks that are not in the line items list.
+    const prompt = `You are a professional proposal writer for trades businesses.
 
-Company: ${company}
+Company (Contractor): ${company}
 Client: ${clientName || 'Not specified'}
 Job: ${jobDesc}
 Industry: ${industry}
 
-User Instructions (AI Notes):
-${aiNotes || 'None provided'}
+${aiNotes ? `
+========================================
+PRIORITY INSTRUCTIONS FROM THE REP:
+========================================
+${aiNotes}
 
-Materials:
+These instructions MUST be followed exactly. They override default behavior.
+If the rep says to exclude something, exclude it.
+If the rep specifies a tone, use that tone.
+If the rep describes specific work, focus the SOW on that work.
+If the rep says to emphasize something, emphasize it.
+========================================
+` : ''}
+
+Materials provided:
 ${lineItemsText || 'None provided'}
 
-Labor:
+Labor provided:
 ${laborText || 'None provided'}
 
-Instructions:
-- The Company (${company}) is the contractor performing all work and providing all listed materials
-- All labor listed is performed by the Company (${company}), not the Client
-- The Client (${clientName || 'the client'}) is the customer receiving the work
-- ALWAYS describe the Company as performing all work and supplying all listed materials
-- NEVER use language where the Client provides, installs, or supplies anything
-- If unclear, default to the Company performing the work
-- Follow the AI Notes for tone, clarity, and emphasis
-- DO NOT add anything not in the line items
-- Keep everything aligned strictly with provided items
+RULES:
+- ${company} is the contractor performing ALL work and supplying ALL materials
+- The client (${clientName || 'the client'}) is ONLY the recipient of the work
+- NEVER say the client provides, installs, or supplies anything
+- DO NOT add materials or tasks not in the line items above
+- The first sentence MUST start with: "${company} will provide and install..."
+- Follow the rep's Priority Instructions above as the primary guide for tone, content, and emphasis
 
-Write 2 short professional paragraphs describing the scope of work.
-
-CRITICAL:
-- The first sentence MUST begin exactly with: "${company} will provide and install..."
-- EVERY sentence must use "${company}" as the subject performing the work
-- NEVER start any sentence with the Client name
-- NEVER state or imply that the Client provides, installs, or supplies anything
-- If referencing the Client, only refer to them as the recipient of the work, not the performer
-- If there is any ambiguity, default to ${company} performing all work and supplying all materials and labor
-
-Then list the materials and labor exactly as provided. Do not invent or assume any additional work, cables, mounts, or materials that are not explicitly listed.`
+Write 2 short professional paragraphs as the Scope of Work, then list the materials exactly as provided.`
 
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

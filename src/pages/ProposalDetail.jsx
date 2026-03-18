@@ -261,6 +261,45 @@ export default function ProposalDetail({ isAdmin }) {
       })
     }
 
+    // Labor section in PDF
+    const laborItems = proposal?.labor_items || []
+    if (laborItems.length > 0 && laborItems.some(l => l.role)) {
+      const tableEnd = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Labor', 14, tableEnd)
+
+      const laborTotal = laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+      const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
+      const grandTotal = materialsTotal + laborTotal
+
+      autoTable(doc, {
+        startY: tableEnd + 6,
+        head: [['Role', 'Qty', 'Unit', 'Customer Price']],
+        body: laborItems.filter(l => l.role).map(l => [
+          l.role,
+          l.quantity,
+          l.unit || 'hr',
+          `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+        ]),
+        foot: [['', '', 'Labor Total', `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        styles: { fontSize: 9 }
+      })
+
+      // Grand total row
+      const afterLabor = doc.lastAutoTable.finalY + 6
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Grand Total:', pageWidth - 60, afterLabor)
+      doc.setTextColor(200, 98, 42)
+      doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterLabor, { align: 'right' })
+    }
+
     if (profile?.terms_and_conditions) {
       doc.addPage()
       doc.setFontSize(13)
@@ -395,11 +434,73 @@ export default function ProposalDetail({ isAdmin }) {
       )
     }
 
+    // Labor section in DOCX
+    const docxLaborItems = proposal?.labor_items || []
+    if (docxLaborItems.length > 0 && docxLaborItems.some(l => l.role)) {
+      const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
+      const lbs = { top: lb, bottom: lb, left: lb, right: lb }
+      const lcw = [3000, 1200, 1200, 2400]
+
+      const lHeaderRow = new TableRow({
+        children: ['Role', 'Qty', 'Unit', 'Customer Price'].map((h, i) =>
+          new TableCell({
+            borders: lbs, width: { size: lcw[i], type: WidthType.DXA },
+            shading: { fill: primaryColor, type: ShadingType.CLEAR },
+            margins: { top: 80, bottom: 80, left: 120, right: 120 },
+            children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })] })]
+          })
+        )
+      })
+
+      const lRows = docxLaborItems.filter(l => l.role).map(l =>
+        new TableRow({
+          children: [l.role, String(l.quantity || ''), l.unit || 'hr',
+            `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+          ].map((val, i) =>
+            new TableCell({
+              borders: lbs, width: { size: lcw[i], type: WidthType.DXA },
+              margins: { top: 80, bottom: 80, left: 120, right: 120 },
+              children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })]
+            })
+          )
+        })
+      )
+
+      const laborTotal = docxLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+      const materialsTotal = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
+      const grandTotal = materialsTotal + laborTotal
+
+      const lTotalRow = new TableRow({
+        children: [
+          new TableCell({
+            borders: lbs, columnSpan: 3,
+            margins: { top: 80, bottom: 80, left: 120, right: 120 },
+            shading: { fill: primaryColor, type: ShadingType.CLEAR },
+            children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'Labor Total', bold: true, color: 'FFFFFF', size: 18 })] })]
+          }),
+          new TableCell({
+            borders: lbs, width: { size: 2400, type: WidthType.DXA },
+            margins: { top: 80, bottom: 80, left: 120, right: 120 },
+            shading: { fill: primaryColor, type: ShadingType.CLEAR },
+            children: [new Paragraph({ children: [new TextRun({ text: `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, color: 'FFFFFF', size: 18 })] })]
+          })
+        ]
+      })
+
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Labor', bold: true, size: 28, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Table({ width: { size: 7800, type: WidthType.DXA }, columnWidths: lcw, rows: [lHeaderRow, ...lRows, lTotalRow] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: `Grand Total: $${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 24, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+      )
+    }
+
     if (profile?.terms_and_conditions) {
       children.push(
-        new Paragraph({
-          children: [new TextRun({ text: 'Terms and Conditions', bold: true, size: 28, color: primaryColor })]
-        }),
+        new Paragraph({ children: [new TextRun({ text: 'Terms and Conditions', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         ...profile.terms_and_conditions.split('\n').map(line =>
           new Paragraph({ children: [new TextRun({ text: line, size: 18, color: '444444' })] })
@@ -576,27 +677,45 @@ export default function ProposalDetail({ isAdmin }) {
 
     try {
       const data = await file.arrayBuffer()
-      const workbook = XLSX.read(data)
+      const workbook = XLSX.read(data, { cellText: false, cellDates: true })
       const sheet = workbook.Sheets[workbook.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 })
 
-      const mapped = rows
-        .slice(1)
-        .filter(r => r[0])
-        .map(r => ({
+      // Use named headers with raw values to preserve actual numbers
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true })
+
+      const clean = (val) => {
+        if (val === null || val === undefined || val === '') return ''
+        return String(val).replace(/[$,%]/g, '').trim()
+      }
+
+      const mapped = rows.filter(r => r['Item Name'] || r['item_name']).map(r => {
+        const yourCost = clean(r['Your Cost'] || r['Your Cost (Unit)'] || r['your_cost_unit'] || '')
+        const markup = clean(r['Markup %'] || r['markup_percent'] || '35')
+        const customerPrice = clean(r['Customer Price'] || r['Customer Price (Unit)'] || r['customer_price_unit'] || '')
+        const qty = clean(r['Quantity'] || r['Qty'] || r['quantity'] || '1')
+
+        let finalCustomerPrice = customerPrice
+        if (!finalCustomerPrice && yourCost && markup) {
+          finalCustomerPrice = (parseFloat(yourCost) * (1 + parseFloat(markup) / 100)).toFixed(2)
+        }
+
+        return {
           proposal_id: id,
-          item_name: r[0] || '',
-          part_number_sku: '',
-          quantity: parseFloat(r[1]) || 1,
-          unit: 'ea',
-          category: '',
-          vendor: '',
-          your_cost_unit: '',
-          markup_percent: '35',
-          customer_price_unit: '',
-          customer_price_total: '',
-          pricing_status: 'Needs Pricing'
-        }))
+          item_name: r['Item Name'] || r['item_name'] || '',
+          part_number_sku: clean(r['Part Number'] || r['Part #'] || r['part_number_sku'] || ''),
+          quantity: qty || '1',
+          unit: r['Unit'] || r['unit'] || 'ea',
+          category: r['Category'] || r['category'] || '',
+          vendor: r['Vendor'] || r['vendor'] || '',
+          your_cost_unit: yourCost,
+          markup_percent: markup || '35',
+          customer_price_unit: finalCustomerPrice,
+          customer_price_total: finalCustomerPrice && qty
+            ? (parseFloat(finalCustomerPrice) * parseFloat(qty)).toFixed(2)
+            : '',
+          pricing_status: yourCost ? 'Confirmed' : 'Needs Pricing'
+        }
+      })
 
       setEditLines(mapped)
       setTimeout(() => { setEditingBOM(true) }, 0)
