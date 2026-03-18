@@ -10,6 +10,8 @@ const PLANS = [
   { name: 'Enterprise', rate: null, color: 'text-green-400', bg: 'bg-green-500/20' },
 ]
 
+const emptyBillingForm = { plan: 'Trial', billing_status: 'trial', monthly_rate: 0, trial_ends_at: '' }
+
 export default function SuperAdmin() {
   const [orgs, setOrgs] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -17,6 +19,8 @@ export default function SuperAdmin() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('requests')
   const [editingBilling, setEditingBilling] = useState(null)
+  const [billingForm, setBillingForm] = useState(emptyBillingForm)
+  const [unauthorized, setUnauthorized] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -24,6 +28,22 @@ export default function SuperAdmin() {
   }, [])
 
   const fetchData = async () => {
+    // FIX: Guard — only allow super admins
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setUnauthorized(true); setLoading(false); return }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.role !== 'superadmin') {
+      setUnauthorized(true)
+      setLoading(false)
+      return
+    }
+
     const { data: orgsData } = await supabase
       .from('organizations')
       .select('*')
@@ -84,9 +104,28 @@ export default function SuperAdmin() {
     fetchData()
   }
 
-  const updateBilling = async (orgId, updates) => {
-    await supabase.from('organizations').update(updates).eq('id', orgId)
+  const startEditingBilling = (org) => {
+    setEditingBilling(org.id)
+    setBillingForm({
+      plan: org.plan || 'Trial',
+      billing_status: org.billing_status || 'trial',
+      monthly_rate: org.monthly_rate || 0,
+      trial_ends_at: org.trial_ends_at
+        ? new Date(org.trial_ends_at).toISOString().split('T')[0]
+        : ''
+    })
+  }
+
+  // FIX: Controlled state instead of document.getElementById
+  const updateBilling = async (orgId) => {
+    await supabase.from('organizations').update({
+      plan: billingForm.plan,
+      billing_status: billingForm.billing_status,
+      monthly_rate: parseFloat(billingForm.monthly_rate) || 0,
+      trial_ends_at: billingForm.trial_ends_at || null
+    }).eq('id', orgId)
     setEditingBilling(null)
+    setBillingForm(emptyBillingForm)
     fetchData()
   }
 
@@ -101,9 +140,26 @@ export default function SuperAdmin() {
   }
 
   const pendingRequests = requests.filter(r => r.status === 'pending')
-  const mrr = orgs.reduce((sum, o) => sum + (o.monthly_rate || 0), 0)
+
+  // FIX: MRR only counts active paying orgs, not trials
+  const mrr = orgs
+    .filter(o => o.billing_status === 'active')
+    .reduce((sum, o) => sum + (o.monthly_rate || 0), 0)
+
   const activeOrgs = orgs.filter(o => o.billing_status === 'active').length
   const trialOrgs = orgs.filter(o => o.billing_status === 'trial').length
+
+  if (unauthorized) return (
+    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
+      <div className="text-center">
+        <p className="text-red-400 text-lg font-bold mb-2">Access Denied</p>
+        <p className="text-[#8A9AB0] text-sm mb-4">You don't have permission to view this page.</p>
+        <button onClick={() => navigate('/')} className="text-[#C8622A] hover:text-white text-sm transition-colors">
+          ← Back to App
+        </button>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-[#0F1C2E]">
@@ -151,7 +207,7 @@ export default function SuperAdmin() {
           {[
             { key: 'requests', label: `Access Requests${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}` },
             { key: 'orgs', label: 'Organizations' },
-            { key: 'billing', label: `Billing & Plans` },
+            { key: 'billing', label: 'Billing & Plans' },
           ].map(t => (
             <button
               key={t.key}
@@ -349,7 +405,7 @@ export default function SuperAdmin() {
                             <span className="text-white text-sm font-bold">${org.monthly_rate}/mo</span>
                           )}
                           <button
-                            onClick={() => setEditingBilling(isEditing ? null : org.id)}
+                            onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)}
                             className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors"
                           >
                             {isEditing ? 'Cancel' : 'Edit'}
@@ -363,25 +419,28 @@ export default function SuperAdmin() {
                         </p>
                       )}
 
+                      {/* FIX: Controlled form state instead of document.getElementById */}
                       {isEditing && (
                         <div className="mt-4 grid grid-cols-4 gap-3 pt-4 border-t border-[#2a3d55]">
                           <div>
                             <label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label>
                             <select
-                              defaultValue={org.plan || 'Trial'}
-                              id={`plan-${org.id}`}
+                              value={billingForm.plan}
+                              onChange={e => setBillingForm(p => ({ ...p, plan: e.target.value }))}
                               className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
                             >
                               {PLANS.map(p => (
-                                <option key={p.name} value={p.name}>{p.name}{p.rate ? ` — $${p.rate}/mo` : p.rate === 0 ? ' — Free' : ' — Custom'}</option>
+                                <option key={p.name} value={p.name}>
+                                  {p.name}{p.rate ? ` — $${p.rate}/mo` : p.rate === 0 ? ' — Free' : ' — Custom'}
+                                </option>
                               ))}
                             </select>
                           </div>
                           <div>
                             <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Status</label>
                             <select
-                              defaultValue={org.billing_status || 'trial'}
-                              id={`billing-status-${org.id}`}
+                              value={billingForm.billing_status}
+                              onChange={e => setBillingForm(p => ({ ...p, billing_status: e.target.value }))}
                               className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
                             >
                               {['trial', 'active', 'past_due', 'cancelled'].map(s => (
@@ -393,8 +452,8 @@ export default function SuperAdmin() {
                             <label className="text-[#8A9AB0] text-xs mb-1 block">Monthly Rate ($)</label>
                             <input
                               type="number"
-                              defaultValue={org.monthly_rate || 0}
-                              id={`rate-${org.id}`}
+                              value={billingForm.monthly_rate}
+                              onChange={e => setBillingForm(p => ({ ...p, monthly_rate: e.target.value }))}
                               className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
                             />
                           </div>
@@ -402,20 +461,14 @@ export default function SuperAdmin() {
                             <label className="text-[#8A9AB0] text-xs mb-1 block">Trial End Date</label>
                             <input
                               type="date"
-                              defaultValue={org.trial_ends_at ? new Date(org.trial_ends_at).toISOString().split('T')[0] : ''}
-                              id={`trial-${org.id}`}
+                              value={billingForm.trial_ends_at}
+                              onChange={e => setBillingForm(p => ({ ...p, trial_ends_at: e.target.value }))}
                               className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
                             />
                           </div>
                           <div className="col-span-4 flex justify-end">
                             <button
-                              onClick={() => {
-                                const plan = document.getElementById(`plan-${org.id}`).value
-                                const billing_status = document.getElementById(`billing-status-${org.id}`).value
-                                const monthly_rate = parseFloat(document.getElementById(`rate-${org.id}`).value) || 0
-                                const trial_ends_at = document.getElementById(`trial-${org.id}`).value || null
-                                updateBilling(org.id, { plan, billing_status, monthly_rate, trial_ends_at })
-                              }}
+                              onClick={() => updateBilling(org.id)}
                               className="bg-[#C8622A] text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors"
                             >
                               Save Changes

@@ -25,13 +25,25 @@ export default function AdminDashboard() {
 
     if (!profile?.org_id) { setLoading(false); return }
 
-    const [proposalsRes, lineItemsRes, clientsRes] = await Promise.all([
-      supabase.from('proposals').select('*').eq('org_id', profile.org_id).order('created_at', { ascending: false }),
-      supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id'),
+    // Fetch proposals first so we can scope line items to this org
+    const { data: proposalsData, error: proposalsError } = await supabase
+      .from('proposals')
+      .select('*')
+      .eq('org_id', profile.org_id)
+      .order('created_at', { ascending: false })
+
+    if (!proposalsError) setProposals(proposalsData)
+
+    // Scope line items explicitly to this org's proposal IDs
+    const proposalIds = (proposalsData || []).map(p => p.id)
+
+    const [lineItemsRes, clientsRes] = await Promise.all([
+      proposalIds.length > 0
+        ? supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id').in('proposal_id', proposalIds)
+        : Promise.resolve({ data: [], error: null }),
       supabase.from('clients').select('*').eq('org_id', profile.org_id)
     ])
 
-    if (!proposalsRes.error) setProposals(proposalsRes.data)
     if (!lineItemsRes.error) setLineItems(lineItemsRes.data)
     if (!clientsRes.error) setClients(clientsRes.data)
     setLoading(false)
@@ -70,7 +82,9 @@ export default function AdminDashboard() {
     : null
 
   const wonCount = filteredProposals.filter(p => p.status === 'Won').length
-  const closeRate = filteredProposals.length > 0 ? ((wonCount / filteredProposals.length) * 100).toFixed(1) : null
+  const closeRate = filteredProposals.length > 0
+    ? ((wonCount / filteredProposals.length) * 100).toFixed(1)
+    : null
 
   const repStats = Object.values(
     filteredProposals.reduce((acc, p) => {
@@ -98,7 +112,6 @@ export default function AdminDashboard() {
     .sort((a, b) => new Date(a.close_date) - new Date(b.close_date))
     .slice(0, 5)
 
-  // Top clients by pipeline
   const topClients = useMemo(() => {
     const clientMap = {}
     filteredProposals.forEach(p => {
@@ -120,7 +133,6 @@ export default function AdminDashboard() {
     return Object.values(clientMap).sort((a, b) => b.pipeline - a.pipeline).slice(0, 5)
   }, [filteredProposals, clients])
 
-  // Top vendors by BOM spend
   const topVendors = useMemo(() => {
     const proposalIds = new Set(filteredProposals.map(p => p.id))
     const vendorMap = {}
