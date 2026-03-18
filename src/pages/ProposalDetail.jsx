@@ -28,6 +28,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [poAutoNumber, setPOAutoNumber] = useState(true)
   const [generatingPO, setGeneratingPO] = useState(false)
   const [aiNotes, setAiNotes] = useState('')
+  const [showSentPrompt, setShowSentPrompt] = useState(false)
 
   useEffect(() => {
     fetchProposal()
@@ -175,7 +176,14 @@ export default function ProposalDetail({ isAdmin }) {
     ] : [15, 28, 46]
   }
 
+  const markAsSent = async () => {
+    await supabase.from('proposals').update({ status: 'Sent' }).eq('id', id)
+    setProposal(prev => ({ ...prev, status: 'Sent' }))
+    setShowSentPrompt(false)
+  }
+
   const downloadPDF = () => {
+    if (proposal?.status === 'Draft') setShowSentPrompt(true)
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
@@ -270,6 +278,7 @@ export default function ProposalDetail({ isAdmin }) {
   }
 
   const downloadDOCX = async () => {
+    if (proposal?.status === 'Draft') setShowSentPrompt(true)
     const primaryColor = (profile?.primary_color || '#0F1C2E').replace('#', '')
 
     const border = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
@@ -1184,6 +1193,33 @@ export default function ProposalDetail({ isAdmin }) {
         <POList proposalId={id} />
 
       </div>
+
+      {/* Sent Prompt Modal */}
+      {showSentPrompt && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-sm text-center">
+            <div className="w-12 h-12 rounded-full bg-[#C8622A]/20 flex items-center justify-center mx-auto mb-4">
+              <span className="text-[#C8622A] text-xl">✉</span>
+            </div>
+            <h3 className="text-white font-bold text-lg mb-2">Did you send this proposal?</h3>
+            <p className="text-[#8A9AB0] text-sm mb-6">Mark it as Sent so follow-up emails go out automatically on schedule.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSentPrompt(false)}
+                className="flex-1 py-2 bg-[#0F1C2E] text-[#8A9AB0] hover:text-white rounded-lg text-sm transition-colors"
+              >
+                Not yet
+              </button>
+              <button
+                onClick={markAsSent}
+                className="flex-1 py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+              >
+                Yes, mark as Sent
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* FIX: PO Modal is now correctly outside all cards, inside the page root */}
       {showPOModal && (
