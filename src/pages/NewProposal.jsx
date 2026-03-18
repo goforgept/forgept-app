@@ -137,22 +137,42 @@ export default function NewProposal() {
 
     const reader = new FileReader()
     reader.onload = (evt) => {
-      const workbook = XLSX.read(evt.target.result, { type: 'binary' })
+      // Use raw values so we get numbers not formatted strings like "$15.69" or "25.00%"
+      const workbook = XLSX.read(evt.target.result, { type: 'binary', cellText: false, cellDates: true })
       const sheet = workbook.Sheets[workbook.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true })
 
-      const parsed = rows.map(row => ({
-        item_name: row['Item Name'] || row['item_name'] || '',
-        part_number_sku: row['Part Number'] || row['Part #'] || row['part_number_sku'] || '',
-        quantity: row['Quantity'] || row['Qty'] || row['quantity'] || '',
-        unit: row['Unit'] || row['unit'] || 'ea',
-        category: row['Category'] || row['category'] || '',
-        vendor: row['Vendor'] || row['vendor'] || '',
-        your_cost_unit: row['Your Cost'] || row['Your Cost (Unit)'] || row['your_cost_unit'] || '',
-        markup_percent: row['Markup %'] || row['markup_percent'] || '35',
-        customer_price_unit: row['Customer Price'] || row['Customer Price (Unit)'] || row['customer_price_unit'] || '',
-        pricing_status: 'Needs Pricing'
-      })).filter(r => r.item_name)
+      // Strip currency symbols, % signs, commas from any value before using it
+      const clean = (val) => {
+        if (val === null || val === undefined || val === '') return ''
+        return String(val).replace(/[$,%]/g, '').trim()
+      }
+
+      const parsed = rows.map(row => {
+        const yourCost = clean(row['Your Cost'] || row['Your Cost (Unit)'] || row['your_cost_unit'] || '')
+        const markup = clean(row['Markup %'] || row['markup_percent'] || '35')
+        const customerPrice = clean(row['Customer Price'] || row['Customer Price (Unit)'] || row['customer_price_unit'] || '')
+        const qty = clean(row['Quantity'] || row['Qty'] || row['quantity'] || '1')
+
+        // Auto-calculate customer price if not provided but cost + markup are
+        let finalCustomerPrice = customerPrice
+        if (!finalCustomerPrice && yourCost && markup) {
+          finalCustomerPrice = (parseFloat(yourCost) * (1 + parseFloat(markup) / 100)).toFixed(2)
+        }
+
+        return {
+          item_name: row['Item Name'] || row['item_name'] || '',
+          part_number_sku: clean(row['Part Number'] || row['Part #'] || row['part_number_sku'] || ''),
+          quantity: qty,
+          unit: row['Unit'] || row['unit'] || 'ea',
+          category: row['Category'] || row['category'] || '',
+          vendor: row['Vendor'] || row['vendor'] || '',
+          your_cost_unit: yourCost,
+          markup_percent: markup || '35',
+          customer_price_unit: finalCustomerPrice,
+          pricing_status: yourCost ? 'Confirmed' : 'Needs Pricing'
+        }
+      }).filter(r => r.item_name)
 
       setUploadedLines(parsed)
     }
