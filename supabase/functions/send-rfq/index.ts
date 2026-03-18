@@ -64,8 +64,9 @@ Deno.serve(async (req) => {
       throw new Error(`Brevo error: ${err}`)
     }
 
-    for (const lineItemId of lineItemIds) {
-      await fetch(`${supabaseUrl}/rest/v1/bom_line_items?id=eq.${lineItemId}`, {
+    // FIX: Update all line items in parallel instead of sequentially
+    await Promise.all(lineItemIds.map((lineItemId: string) =>
+      fetch(`${supabaseUrl}/rest/v1/bom_line_items?id=eq.${lineItemId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -78,7 +79,7 @@ Deno.serve(async (req) => {
           rfq_sent_at: new Date().toISOString()
         })
       })
-    }
+    ))
 
     return new Response(
       JSON.stringify({ success: true }),
