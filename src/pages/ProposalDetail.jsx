@@ -677,34 +677,51 @@ export default function ProposalDetail({ isAdmin }) {
 
     try {
       const data = await file.arrayBuffer()
-      const workbook = XLSX.read(data, { cellText: false, cellDates: true })
+      // cellFormula: false forces XLSX to use cached values instead of formula strings
+      const workbook = XLSX.read(data, { cellText: false, cellDates: true, cellFormula: false })
       const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false })
 
-      // Use named headers with raw values to preserve actual numbers
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true })
-
+      // Strip $, commas, %, spaces from any value
       const clean = (val) => {
         if (val === null || val === undefined || val === '') return ''
-        return String(val).replace(/[$,%]/g, '').trim()
+        // If it's a formula string that slipped through, return empty
+        if (String(val).startsWith('=')) return ''
+        return String(val).replace(/[$,%]/g, '').replace(/,/g, '').trim()
       }
 
-      const mapped = rows.filter(r => r['Item Name'] || r['item_name']).map(r => {
+      const mapped = rows.filter(r => r['Item Name'] || r['item_name'] || r['Part #'] || r['part_number_sku']).map(r => {
+        // Handle swapped columns — if Item Name looks like a part number (no spaces, has numbers)
+        // and Part # looks like a description, swap them
+        let itemName = r['Item Name'] || r['item_name'] || ''
+        let partNum = clean(r['Part Number'] || r['Part #'] || r['part_number_sku'] || '')
+
+        const looksLikePartNumber = (s) => /^[A-Z0-9\-]{3,}$/i.test(String(s).trim()) && !String(s).includes(' ')
+        if (looksLikePartNumber(itemName) && !looksLikePartNumber(partNum) && partNum) {
+          // Swap them
+          const temp = itemName
+          itemName = partNum
+          partNum = temp
+        }
+
         const yourCost = clean(r['Your Cost'] || r['Your Cost (Unit)'] || r['your_cost_unit'] || '')
         const markup = clean(r['Markup %'] || r['markup_percent'] || '35')
-        const customerPrice = clean(r['Customer Price'] || r['Customer Price (Unit)'] || r['customer_price_unit'] || '')
+        const rawCustomerPrice = clean(r['Customer Price'] || r['Customer Price (Unit)'] || r['customer_price_unit'] || '')
         const qty = clean(r['Quantity'] || r['Qty'] || r['quantity'] || '1')
+        const unit = String(r['Unit'] || r['unit'] || 'ea').trim().toLowerCase()
 
-        let finalCustomerPrice = customerPrice
-        if (!finalCustomerPrice && yourCost && markup) {
+        // Recalculate customer price from cost + markup if formula came through as empty
+        let finalCustomerPrice = rawCustomerPrice
+        if ((!finalCustomerPrice || parseFloat(finalCustomerPrice) === 0) && yourCost && markup) {
           finalCustomerPrice = (parseFloat(yourCost) * (1 + parseFloat(markup) / 100)).toFixed(2)
         }
 
         return {
           proposal_id: id,
-          item_name: r['Item Name'] || r['item_name'] || '',
-          part_number_sku: clean(r['Part Number'] || r['Part #'] || r['part_number_sku'] || ''),
+          item_name: itemName,
+          part_number_sku: partNum,
           quantity: qty || '1',
-          unit: r['Unit'] || r['unit'] || 'ea',
+          unit: unit || 'ea',
           category: r['Category'] || r['category'] || '',
           vendor: r['Vendor'] || r['vendor'] || '',
           your_cost_unit: yourCost,

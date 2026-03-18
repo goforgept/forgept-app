@@ -137,34 +137,45 @@ export default function NewProposal() {
 
     const reader = new FileReader()
     reader.onload = (evt) => {
-      // Use raw values so we get numbers not formatted strings like "$15.69" or "25.00%"
-      const workbook = XLSX.read(evt.target.result, { type: 'binary', cellText: false, cellDates: true })
+      const workbook = XLSX.read(evt.target.result, { type: 'binary', cellText: false, cellDates: true, cellFormula: false })
       const sheet = workbook.Sheets[workbook.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: true })
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false })
 
-      // Strip currency symbols, % signs, commas from any value before using it
       const clean = (val) => {
         if (val === null || val === undefined || val === '') return ''
-        return String(val).replace(/[$,%]/g, '').trim()
+        if (String(val).startsWith('=')) return ''
+        return String(val).replace(/[$,%]/g, '').replace(/,/g, '').trim()
       }
 
-      const parsed = rows.map(row => {
+      const looksLikePartNumber = (s) => /^[A-Z0-9-]{3,}$/i.test(String(s).trim()) && !String(s).includes(' ')
+
+      const parsed = rows.filter(r => r['Item Name'] || r['item_name'] || r['Part #']).map(row => {
+        let itemName = row['Item Name'] || row['item_name'] || ''
+        let partNum = clean(row['Part Number'] || row['Part #'] || row['part_number_sku'] || '')
+
+        // Auto-detect swapped columns
+        if (looksLikePartNumber(itemName) && !looksLikePartNumber(partNum) && partNum) {
+          const temp = itemName
+          itemName = partNum
+          partNum = temp
+        }
+
         const yourCost = clean(row['Your Cost'] || row['Your Cost (Unit)'] || row['your_cost_unit'] || '')
         const markup = clean(row['Markup %'] || row['markup_percent'] || '35')
-        const customerPrice = clean(row['Customer Price'] || row['Customer Price (Unit)'] || row['customer_price_unit'] || '')
+        const rawCustomerPrice = clean(row['Customer Price'] || row['Customer Price (Unit)'] || row['customer_price_unit'] || '')
         const qty = clean(row['Quantity'] || row['Qty'] || row['quantity'] || '1')
+        const unit = String(row['Unit'] || row['unit'] || 'ea').trim().toLowerCase()
 
-        // Auto-calculate customer price if not provided but cost + markup are
-        let finalCustomerPrice = customerPrice
-        if (!finalCustomerPrice && yourCost && markup) {
+        let finalCustomerPrice = rawCustomerPrice
+        if ((!finalCustomerPrice || parseFloat(finalCustomerPrice) === 0) && yourCost && markup) {
           finalCustomerPrice = (parseFloat(yourCost) * (1 + parseFloat(markup) / 100)).toFixed(2)
         }
 
         return {
-          item_name: row['Item Name'] || row['item_name'] || '',
-          part_number_sku: clean(row['Part Number'] || row['Part #'] || row['part_number_sku'] || ''),
+          item_name: itemName,
+          part_number_sku: partNum,
           quantity: qty,
-          unit: row['Unit'] || row['unit'] || 'ea',
+          unit: unit || 'ea',
           category: row['Category'] || row['category'] || '',
           vendor: row['Vendor'] || row['vendor'] || '',
           your_cost_unit: yourCost,
