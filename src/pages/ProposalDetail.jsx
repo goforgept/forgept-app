@@ -244,17 +244,16 @@ export default function ProposalDetail({ isAdmin }) {
 
       autoTable(doc, {
         startY: yPos,
-        head: [['Item', 'Part #', 'Category', 'Vendor', 'Qty', 'Unit Price', 'Total']],
+        head: [['Item', 'Part #', 'Category', 'Qty', 'Unit Price', 'Total']],
         body: lineItems.map(item => [
           item.item_name,
           item.part_number_sku || '—',
           item.category || '',
-          item.vendor || '',
           item.quantity,
           `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
           `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
         ]),
-        foot: [['', '', '', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        foot: [['', '', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -323,10 +322,10 @@ export default function ProposalDetail({ isAdmin }) {
 
     const border = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
     const borders = { top: border, bottom: border, left: border, right: border }
-    const colWidths = [2800, 1200, 1200, 600, 1000, 1000]
+    const colWidths = [2800, 1400, 800, 1000, 1000]
 
     const headerRow = new TableRow({
-      children: ['Item', 'Category', 'Vendor', 'Qty', 'Unit Price', 'Total'].map((h, i) =>
+      children: ['Item', 'Part #', 'Qty', 'Unit Price', 'Total'].map((h, i) =>
         new TableCell({
           borders,
           width: { size: colWidths[i], type: WidthType.DXA },
@@ -343,8 +342,7 @@ export default function ProposalDetail({ isAdmin }) {
       new TableRow({
         children: [
           item.item_name,
-          item.category || '—',
-          item.vendor || '—',
+          item.part_number_sku || '—',
           String(item.quantity || 0),
           `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
           `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
@@ -365,7 +363,7 @@ export default function ProposalDetail({ isAdmin }) {
       children: [
         new TableCell({
           borders,
-          columnSpan: 5,
+          columnSpan: 4,
           margins: { top: 80, bottom: 80, left: 120, right: 120 },
           shading: { fill: primaryColor, type: ShadingType.CLEAR },
           children: [new Paragraph({
