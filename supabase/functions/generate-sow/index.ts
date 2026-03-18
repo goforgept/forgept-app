@@ -11,13 +11,20 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { proposalId, company, clientName, jobDesc, industry, repName, lineItems, aiNotes } = await req.json()
+    const { proposalId, company, clientName, jobDesc, industry, repName, lineItems, laborItems, aiNotes } = await req.json()
 
     const lineItemsText = lineItems.map((l: any) =>
       `${l.itemName} - Qty: ${l.quantity} - Price: $${l.customerPriceUnit} Total: $${l.customerPriceTotal}`
     ).join('\n')
 
-   const prompt = `You are a professional proposal writer for trades businesses. Write a concise Scope of Work based ONLY on the line items provided. Do not add work, materials, or tasks that are not in the line items list.
+    // Match the frontend shape: role, quantity, unit, your_cost, markup, customer_price
+    const laborText = (laborItems || [])
+      .filter((l: any) => l.role)
+      .map((l: any) =>
+        `${l.role} - ${l.quantity} ${l.unit || 'hr'} @ $${l.your_cost}/hr (Customer Price: $${l.customer_price})`
+      ).join('\n')
+
+    const prompt = `You are a professional proposal writer for trades businesses. Write a concise Scope of Work based ONLY on the line items provided. Do not add work, materials, or tasks that are not in the line items list.
 
 Company: ${company}
 Client: ${clientName || 'Not specified'}
@@ -27,11 +34,15 @@ Industry: ${industry}
 User Instructions (AI Notes):
 ${aiNotes || 'None provided'}
 
-Line Items:
-${lineItemsText}
+Materials:
+${lineItemsText || 'None provided'}
+
+Labor:
+${laborText || 'None provided'}
 
 Instructions:
 - The Company (${company}) is the contractor performing all work and providing all listed materials
+- All labor listed is performed by the Company (${company}), not the Client
 - The Client (${clientName || 'the client'}) is the customer receiving the work
 - ALWAYS describe the Company as performing all work and supplying all listed materials
 - NEVER use language where the Client provides, installs, or supplies anything
@@ -43,14 +54,14 @@ Instructions:
 Write 2 short professional paragraphs describing the scope of work.
 
 CRITICAL:
-CRITICAL:
-- The first sentence MUST be exactly formatted as: "${company} will provide and install..."
-- ALL work descriptions must use the Company as the subject (e.g., "${company} will install...", "${company} will configure...")
-- NEVER use the Client name as the subject of any sentence
-- NEVER write sentences where the Client performs any action
-- If a sentence would normally reference the Client, rewrite it so the Company is the subject instead
+- The first sentence MUST begin exactly with: "${company} will provide and install..."
+- EVERY sentence must use "${company}" as the subject performing the work
+- NEVER start any sentence with the Client name
+- NEVER state or imply that the Client provides, installs, or supplies anything
+- If referencing the Client, only refer to them as the recipient of the work, not the performer
+- If there is any ambiguity, default to ${company} performing all work and supplying all materials and labor
 
-Then list the materials exactly as provided. Do not invent or assume any additional work, cables, mounts, or materials that are not explicitly listed.`
+Then list the materials and labor exactly as provided. Do not invent or assume any additional work, cables, mounts, or materials that are not explicitly listed.`
 
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

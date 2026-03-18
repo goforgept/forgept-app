@@ -9,6 +9,10 @@ const emptyLine = () => ({
   customer_price_unit: '', pricing_status: 'Needs Pricing'
 })
 
+const emptyLaborLine = () => ({
+  role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: 0
+})
+
 export default function NewProposal() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -23,6 +27,7 @@ export default function NewProposal() {
   const [lines, setLines] = useState([emptyLine(), emptyLine(), emptyLine()])
   const [uploadedLines, setUploadedLines] = useState([])
   const [uploadFileName, setUploadFileName] = useState(null)
+  const [laborItems, setLaborItems] = useState([emptyLaborLine()])
 
   useEffect(() => {
     fetchProfileAndClients()
@@ -31,7 +36,6 @@ export default function NewProposal() {
   const fetchProfileAndClients = async () => {
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Fetch profile to auto-fill rep details
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
@@ -45,7 +49,6 @@ export default function NewProposal() {
         rep_email: profile.email || user.email || ''
       }))
 
-      // Fetch clients for this org
       if (profile.org_id) {
         const { data: clientsData } = await supabase
           .from('clients')
@@ -56,7 +59,6 @@ export default function NewProposal() {
       }
     }
 
-    // Check for clientId in URL
     const params = new URLSearchParams(location.search)
     const clientId = params.get('clientId')
     if (clientId) {
@@ -88,12 +90,7 @@ export default function NewProposal() {
     if (clientId) {
       prefillClient(clientId)
     } else {
-      setForm(prev => ({
-        ...prev,
-        client_name: '',
-        company: '',
-        client_email: ''
-      }))
+      setForm(prev => ({ ...prev, client_name: '', company: '', client_email: '' }))
     }
   }
 
@@ -114,6 +111,24 @@ export default function NewProposal() {
 
   const addLine = () => setLines(prev => [...prev, emptyLine()])
   const removeLine = (index) => setLines(prev => prev.filter((_, i) => i !== index))
+
+  // Same pattern as ProposalDetail — only recalculates on numeric fields
+  const updateLabor = (index, field, value) => {
+    setLaborItems(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], [field]: value }
+      if (field === 'quantity' || field === 'your_cost' || field === 'markup') {
+        const qty = parseFloat(updated[index].quantity) || 0
+        const cost = parseFloat(updated[index].your_cost) || 0
+        const markup = parseFloat(updated[index].markup) || 0
+        updated[index].customer_price = (cost * (1 + markup / 100) * qty).toFixed(2)
+      }
+      return updated
+    })
+  }
+
+  const addLaborLine = () => setLaborItems(prev => [...prev, emptyLaborLine()])
+  const removeLaborLine = (index) => setLaborItems(prev => prev.filter((_, i) => i !== index))
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0]
@@ -183,7 +198,8 @@ export default function NewProposal() {
         industry: form.industry,
         job_description: form.job_description,
         status: 'Draft',
-        submission_type: tab
+        submission_type: tab,
+        labor_items: laborItems
       })
       .select()
       .single()
@@ -210,28 +226,51 @@ export default function NewProposal() {
           pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing'
         }))
       )
-
-      const totalCustomer = validLines.reduce((sum, l) =>
-        sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
-      const totalCost = validLines.reduce((sum, l) =>
-        sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
-      const grossMarginDollars = totalCustomer - totalCost
-      const grossMarginPercent = totalCustomer > 0 ? (grossMarginDollars / totalCustomer) * 100 : 0
-
-      await supabase.from('proposals').update({
-        proposal_value: totalCustomer,
-        total_customer_value: totalCustomer,
-        total_your_cost: totalCost,
-        total_gross_margin_dollars: grossMarginDollars,
-        total_gross_margin_percent: grossMarginPercent
-      }).eq('id', proposal.id)
     }
+
+    // Include labor in totals — same logic as ProposalDetail saveBOM
+    const bomCustomer = validLines.reduce((sum, l) =>
+      sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+    const bomCost = validLines.reduce((sum, l) =>
+      sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+    const laborCustomer = laborItems.reduce((sum, l) =>
+      sum + (parseFloat(l.customer_price) || 0), 0)
+    const laborCost = laborItems.reduce((sum, l) =>
+      sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+
+    const totalCustomer = bomCustomer + laborCustomer
+    const totalCost = bomCost + laborCost
+    const grossMarginDollars = totalCustomer - totalCost
+    const grossMarginPercent = totalCustomer > 0 ? (grossMarginDollars / totalCustomer) * 100 : 0
+
+    await supabase.from('proposals').update({
+      proposal_value: totalCustomer,
+      total_customer_value: totalCustomer,
+      total_your_cost: totalCost,
+      total_gross_margin_dollars: grossMarginDollars,
+      total_gross_margin_percent: grossMarginPercent
+    }).eq('id', proposal.id)
 
     setSaving(false)
     navigate(`/proposal/${proposal.id}`)
   }
 
   const categories = ['Electrical', 'Mechanical', 'Audio/Visual', 'Security', 'Networking', 'Material', 'Labor', 'Other']
+
+  // Live totals for the summary panel
+  const liveBOMTotal = lines.reduce((sum, l) =>
+    sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+  const liveLaborTotal = laborItems.reduce((sum, l) =>
+    sum + (parseFloat(l.customer_price) || 0), 0)
+  const liveGrandTotal = liveBOMTotal + liveLaborTotal
+  const liveBOMCost = lines.reduce((sum, l) =>
+    sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+  const liveLaborCost = laborItems.reduce((sum, l) =>
+    sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+  const liveTotalCost = liveBOMCost + liveLaborCost
+  const liveMargin = liveGrandTotal > 0
+    ? ((liveGrandTotal - liveTotalCost) / liveGrandTotal * 100).toFixed(1)
+    : '0.0'
 
   return (
     <div className="min-h-screen bg-[#0F1C2E]">
@@ -245,11 +284,10 @@ export default function NewProposal() {
       <div className="p-6 space-y-6">
         <h2 className="text-white text-2xl font-bold">New Proposal</h2>
 
+        {/* Proposal Details */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <h3 className="text-white font-bold mb-4">Proposal Details</h3>
           <div className="grid grid-cols-2 gap-4">
-
-            {/* Rep fields - auto populated */}
             <div>
               <label className="text-[#8A9AB0] text-xs mb-1 block">Rep Name</label>
               <input
@@ -268,8 +306,6 @@ export default function NewProposal() {
                 className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
               />
             </div>
-
-            {/* Client selector */}
             <div className="col-span-2">
               <label className="text-[#8A9AB0] text-xs mb-1 block">Select Client (optional)</label>
               <select
@@ -279,12 +315,10 @@ export default function NewProposal() {
               >
                 <option value="">— Select existing client or fill in manually —</option>
                 {clients.map(c => (
-                  <option key={c.id} value={c.id}>{c.company} {c.client_name ? `— ${c.client_name}` : ''}</option>
+                  <option key={c.id} value={c.id}>{c.company}{c.client_name ? ` — ${c.client_name}` : ''}</option>
                 ))}
               </select>
             </div>
-
-            {/* Client fields */}
             <div>
               <label className="text-[#8A9AB0] text-xs mb-1 block">Client Name</label>
               <input
@@ -346,20 +380,26 @@ export default function NewProposal() {
           </div>
         </div>
 
+        {/* BOM + Labor */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex gap-2 mb-6">
-            <button onClick={() => setTab('inline')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === 'inline' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+            <button
+              onClick={() => setTab('inline')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === 'inline' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}
+            >
               Type It In
             </button>
-            <button onClick={() => setTab('upload')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === 'upload' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+            <button
+              onClick={() => setTab('upload')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${tab === 'upload' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}
+            >
               Upload Excel
             </button>
           </div>
 
           {tab === 'inline' && (
             <>
+              {/* Materials BOM */}
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -374,43 +414,69 @@ export default function NewProposal() {
                       <tr key={i} className={`border-b border-[#2a3d55]/30 ${line.your_cost_unit ? 'bg-green-500/5' : ''}`}>
                         {[['item_name', 'text', 'Item name'], ['part_number_sku', 'text', 'Part #'], ['quantity', 'number', 'Qty']].map(([field, type, placeholder]) => (
                           <td key={field} className="pr-2 py-1">
-                            <input type={type} placeholder={placeholder} value={line[field]}
+                            <input
+                              type={type}
+                              placeholder={placeholder}
+                              value={line[field]}
                               onChange={e => updateLine(i, field, e.target.value)}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                            />
                           </td>
                         ))}
                         <td className="pr-2 py-1">
-                          <select value={line.unit} onChange={e => updateLine(i, 'unit', e.target.value)}
-                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                          <select
+                            value={line.unit}
+                            onChange={e => updateLine(i, 'unit', e.target.value)}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          >
                             {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
                           </select>
                         </td>
                         <td className="pr-2 py-1">
-                          <select value={line.category} onChange={e => updateLine(i, 'category', e.target.value)}
-                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                          <select
+                            value={line.category}
+                            onChange={e => updateLine(i, 'category', e.target.value)}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          >
                             <option value="">Category</option>
                             {categories.map(c => <option key={c}>{c}</option>)}
                           </select>
                         </td>
                         <td className="pr-2 py-1">
-                          <input type="text" placeholder="Vendor" value={line.vendor}
+                          <input
+                            type="text"
+                            placeholder="Vendor"
+                            value={line.vendor}
                             onChange={e => updateLine(i, 'vendor', e.target.value)}
-                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
                         </td>
                         <td className="pr-2 py-1">
-                          <input type="number" placeholder="0.00" value={line.your_cost_unit}
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={line.your_cost_unit}
                             onChange={e => updateLine(i, 'your_cost_unit', e.target.value)}
-                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
                         </td>
                         <td className="pr-2 py-1">
-                          <input type="number" placeholder="35" value={line.markup_percent}
+                          <input
+                            type="number"
+                            placeholder="35"
+                            value={line.markup_percent}
                             onChange={e => updateLine(i, 'markup_percent', e.target.value)}
-                            className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                            className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
                         </td>
                         <td className="pr-2 py-1">
-                          <input type="number" placeholder="0.00" value={line.customer_price_unit}
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={line.customer_price_unit}
                             onChange={e => updateLine(i, 'customer_price_unit', e.target.value)}
-                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
                         </td>
                         <td className="py-1">
                           <button onClick={() => removeLine(i)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
@@ -423,14 +489,125 @@ export default function NewProposal() {
               <button onClick={addLine} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">
                 + Add Line Item
               </button>
+
+              {/* Labor — same table pattern as materials */}
+              <div className="mt-8">
+                <h3 className="text-white font-bold text-base mb-3">Labor</h3>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#2a3d55]">
+                      {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', 'Markup %', 'Customer Price', ''].map(h => (
+                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {laborItems.map((item, index) => (
+                      <tr key={index} className="border-b border-[#2a3d55]/30">
+                        <td className="pr-2 py-1">
+                          <input
+                            type="text"
+                            placeholder="e.g. Electrician"
+                            value={item.role}
+                            onChange={(e) => updateLabor(index, 'role', e.target.value)}
+                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={item.quantity}
+                            onChange={(e) => updateLabor(index, 'quantity', e.target.value)}
+                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <select
+                            value={item.unit || 'hr'}
+                            onChange={(e) => updateLabor(index, 'unit', e.target.value)}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          >
+                            {['hr', 'day', 'lot'].map(u => <option key={u}>{u}</option>)}
+                          </select>
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={item.your_cost}
+                            onChange={(e) => updateLabor(index, 'your_cost', e.target.value)}
+                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="35"
+                            value={item.markup}
+                            onChange={(e) => updateLabor(index, 'markup', e.target.value)}
+                            className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={item.customer_price || ''}
+                            readOnly
+                            className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs cursor-not-allowed font-semibold"
+                          />
+                        </td>
+                        <td className="py-1">
+                          <button onClick={() => removeLaborLine(index)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan="5" className="text-[#8A9AB0] pt-3 text-right font-semibold text-xs">Labor Total</td>
+                      <td className="text-[#C8622A] pt-3 font-bold pr-2">
+                        ${liveLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+                <button onClick={addLaborLine} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">
+                  + Add Labor
+                </button>
+              </div>
+
+              {/* Live running total */}
+              <div className="mt-6 border-t border-[#2a3d55] pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#8A9AB0]">Materials</span>
+                  <span className="text-white">${liveBOMTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#8A9AB0]">Labor</span>
+                  <span className="text-white">${liveLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-base font-bold border-t border-[#2a3d55] pt-2">
+                  <span className="text-white">Grand Total</span>
+                  <span className="text-[#C8622A]">${liveGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#8A9AB0]">Gross Margin</span>
+                  <span className="text-[#C8622A] font-semibold">{liveMargin}%</span>
+                </div>
+              </div>
             </>
           )}
 
           {tab === 'upload' && (
             <div className="space-y-4">
               <div className="flex gap-4 items-center">
-                <button onClick={downloadTemplate}
-                  className="bg-[#0F1C2E] text-[#8A9AB0] hover:text-white border border-[#2a3d55] px-4 py-2 rounded-lg text-sm transition-colors">
+                <button
+                  onClick={downloadTemplate}
+                  className="bg-[#0F1C2E] text-[#8A9AB0] hover:text-white border border-[#2a3d55] px-4 py-2 rounded-lg text-sm transition-colors"
+                >
                   ↓ Download Template
                 </button>
                 <p className="text-[#8A9AB0] text-sm">Download the template, fill it in, then upload it below.</p>
@@ -481,8 +658,11 @@ export default function NewProposal() {
           <button onClick={() => navigate(-1)} className="px-6 py-3 text-[#8A9AB0] hover:text-white text-sm transition-colors">
             Cancel
           </button>
-          <button onClick={handleSubmit} disabled={saving}
-            className="px-6 py-3 bg-[#C8622A] text-white rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="px-6 py-3 bg-[#C8622A] text-white rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+          >
             {saving ? 'Saving...' : 'Submit Proposal'}
           </button>
         </div>

@@ -13,6 +13,9 @@ export default function ProposalDetail({ isAdmin }) {
   const navigate = useNavigate()
   const [proposal, setProposal] = useState(null)
   const [lineItems, setLineItems] = useState([])
+  const [laborItems, setLaborItems] = useState([
+    { role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: 0 }
+  ])
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editingBOM, setEditingBOM] = useState(false)
@@ -38,7 +41,13 @@ export default function ProposalDetail({ isAdmin }) {
       .select('*')
       .eq('id', id)
       .single()
+
     setProposal(data)
+
+    if (data?.labor_items && data.labor_items.length > 0) {
+      setLaborItems(data.labor_items)
+    }
+
     setLoading(false)
   }
 
@@ -86,6 +95,7 @@ export default function ProposalDetail({ isAdmin }) {
           jobDesc: proposal.job_description,
           industry: proposal.industry,
           repName: proposal.rep_name,
+          laborItems: laborItems,
           aiNotes: aiNotes,
           lineItems: lineItems.map(l => ({
             itemName: l.item_name,
@@ -264,7 +274,6 @@ export default function ProposalDetail({ isAdmin }) {
 
     const border = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
     const borders = { top: border, bottom: border, left: border, right: border }
-
     const colWidths = [2800, 1200, 1200, 600, 1000, 1000]
 
     const headerRow = new TableRow({
@@ -356,9 +365,7 @@ export default function ProposalDetail({ isAdmin }) {
         }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         ...proposal.scope_of_work.split('\n').map(line =>
-          new Paragraph({
-            children: [new TextRun({ text: line, size: 20 })]
-          })
+          new Paragraph({ children: [new TextRun({ text: line, size: 20 })] })
         ),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
       )
@@ -386,9 +393,7 @@ export default function ProposalDetail({ isAdmin }) {
         }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         ...profile.terms_and_conditions.split('\n').map(line =>
-          new Paragraph({
-            children: [new TextRun({ text: line, size: 18, color: '444444' })]
-          })
+          new Paragraph({ children: [new TextRun({ text: line, size: 18, color: '444444' })] })
         )
       )
     }
@@ -417,16 +422,16 @@ export default function ProposalDetail({ isAdmin }) {
   const generatePO = async () => {
     setGeneratingPO(true)
 
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('org_id, company_name, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip')
+      .eq('id', user.id)
+      .single()
+
     let finalPONumber = poNumber
 
     if (poAutoNumber) {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('org_id')
-        .eq('id', user.id)
-        .single()
-
       const { data: org } = await supabase
         .from('organizations')
         .select('po_counter, name')
@@ -468,32 +473,52 @@ export default function ProposalDetail({ isAdmin }) {
     doc.setFont('helvetica', 'normal')
     doc.text(finalPONumber, pageWidth - 14, 28, { align: 'right' })
 
+    // Address helpers
+    const billToLines = [
+      profileData?.company_name || profile?.company_name || '',
+      profileData?.bill_to_address || '',
+      [profileData?.bill_to_city, profileData?.bill_to_state, profileData?.bill_to_zip].filter(Boolean).join(', ')
+    ].filter(Boolean)
+
+    const shipToLines = [
+      profileData?.company_name || profile?.company_name || '',
+      profileData?.ship_to_address || '',
+      [profileData?.ship_to_city, profileData?.ship_to_state, profileData?.ship_to_zip].filter(Boolean).join(', ')
+    ].filter(Boolean)
+
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
     doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52)
     doc.text(`Project: ${proposal?.proposal_name || ''}`, 14, 60)
 
-    doc.setFontSize(11)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.text('Vendor', 14, 76)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(60, 60, 60)
-    doc.setFontSize(10)
-    doc.text(poVendor, 14, 84)
+    const col1 = 14
+    const col2 = pageWidth / 2 - 10
+    const col3 = pageWidth / 2 + 30
 
-    doc.setFontSize(11)
+    // Row 1: Vendor | Bill To
+    doc.setFontSize(9)
     doc.setFont('helvetica', 'bold')
     doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.text('Bill To', pageWidth / 2, 76)
+    doc.text('VENDOR', col1, 74)
+    doc.text('BILL TO', col2, 74)
+    doc.text('SHIP TO', col3, 74)
+
     doc.setFont('helvetica', 'normal')
-    doc.setTextColor(60, 60, 60)
-    doc.setFontSize(10)
-    doc.text(profile?.company_name || '', pageWidth / 2, 84)
+    doc.setTextColor(40, 40, 40)
+    doc.setFontSize(9)
+    doc.text(poVendor, col1, 81)
+
+    billToLines.forEach((line, i) => doc.text(line, col2, 81 + i * 6))
+    shipToLines.forEach((line, i) => doc.text(line, col3, 81 + i * 6))
+
+    // Divider line
+    const tableStart = 81 + Math.max(billToLines.length, shipToLines.length) * 6 + 6
+    doc.setDrawColor(220, 220, 220)
+    doc.line(14, tableStart - 2, pageWidth - 14, tableStart - 2)
 
     autoTable(doc, {
-      startY: 96,
+      startY: tableStart,
       head: [['Item', 'Part #', 'Qty', 'Unit', 'Unit Cost', 'Total']],
       body: vendorItems.map(item => [
         item.item_name,
@@ -513,13 +538,7 @@ export default function ProposalDetail({ isAdmin }) {
     const totalAmount = vendorItems.reduce((sum, item) =>
       sum + ((item.your_cost_unit || 0) * (item.quantity || 0)), 0)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('org_id')
-      .eq('id', user.id)
-      .single()
-
+    // FIX: Reuse already-fetched profileData instead of calling supabase again
     await supabase.from('purchase_orders').insert({
       po_number: finalPONumber,
       proposal_id: id,
@@ -541,49 +560,43 @@ export default function ProposalDetail({ isAdmin }) {
     setShowPOModal(false)
     setGeneratingPO(false)
   }
-const handleExcelUpload = async (e) => {
-  const file = e.target.files[0]
-  if (!file) return
 
-  try {
-    const data = await file.arrayBuffer()
-    const workbook = XLSX.read(data)
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
 
-    const sheet = workbook.Sheets[workbook.SheetNames[0]]
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const sheet = workbook.Sheets[workbook.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 })
 
-    // Read rows as simple arrays (not column names)
-    const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 })
+      const mapped = rows
+        .slice(1)
+        .filter(r => r[0])
+        .map(r => ({
+          proposal_id: id,
+          item_name: r[0] || '',
+          part_number_sku: '',
+          quantity: parseFloat(r[1]) || 1,
+          unit: 'ea',
+          category: '',
+          vendor: '',
+          your_cost_unit: '',
+          markup_percent: '35',
+          customer_price_unit: '',
+          customer_price_total: '',
+          pricing_status: 'Needs Pricing'
+        }))
 
-    const mapped = rows
-      .slice(1) // skip first row (header)
-      .filter(r => r[0]) // only keep rows with a first column
-      .map(r => ({
-        proposal_id: id,
-        item_name: r[0] || '',
-        part_number_sku: '',
-        quantity: parseFloat(r[1]) || 1,
-        unit: 'ea',
-        category: '',
-        vendor: '',
-        your_cost_unit: '',
-        markup_percent: '35',
-        customer_price_unit: '',
-        customer_price_total: '',
-        pricing_status: 'Needs Pricing'
-      }))
-
-    setEditLines(mapped)
-
-            // small delay ensures state is ready before switching UI
-            setTimeout(() => {
-            setEditingBOM(true)
-        }, 0)
-
-  } catch (err) {
-    console.log('Excel upload error:', err)
-    alert('Could not read Excel file')
+      setEditLines(mapped)
+      setTimeout(() => { setEditingBOM(true) }, 0)
+    } catch (err) {
+      console.log('Excel upload error:', err)
+      alert('Could not read Excel file')
+    }
   }
-}
+
   const startEditing = () => {
     setEditLines(lineItems.map(l => ({ ...l })))
     setEditingBOM(true)
@@ -593,15 +606,32 @@ const handleExcelUpload = async (e) => {
     setEditLines(prev => {
       const updated = [...prev]
       updated[index] = { ...updated[index], [field]: value }
+      // Recalculate customer_price_unit from cost + markup
       if (field === 'your_cost_unit' || field === 'markup_percent') {
         const cost = parseFloat(updated[index].your_cost_unit) || 0
         const markup = parseFloat(updated[index].markup_percent) || 0
         updated[index].customer_price_unit = (cost * (1 + markup / 100)).toFixed(2)
       }
-      if (field === 'customer_price_unit' || field === 'quantity') {
-        const price = parseFloat(updated[index].customer_price_unit) || 0
+      // Always recalculate total from unit price * qty
+      // (covers direct edits to customer_price_unit, quantity, AND cascaded
+      //  changes from your_cost_unit / markup_percent above)
+      const price = parseFloat(updated[index].customer_price_unit) || 0
+      const qty = parseFloat(updated[index].quantity) || 0
+      updated[index].customer_price_total = (price * qty).toFixed(2)
+      return updated
+    })
+  }
+
+  const updateLabor = (index, field, value) => {
+    setLaborItems(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], [field]: value }
+      // Only recalculate customer_price when a numeric field changes
+      if (field === 'quantity' || field === 'your_cost' || field === 'markup') {
         const qty = parseFloat(updated[index].quantity) || 0
-        updated[index].customer_price_total = (price * qty).toFixed(2)
+        const cost = parseFloat(updated[index].your_cost) || 0
+        const markup = parseFloat(updated[index].markup) || 0
+        updated[index].customer_price = (cost * (1 + markup / 100) * qty).toFixed(2)
       }
       return updated
     })
@@ -655,10 +685,18 @@ const handleExcelUpload = async (e) => {
       if (insertError) { alert('Error saving line items'); setSaving(false); return }
     }
 
-    const totalCustomer = validLines.reduce((sum, l) =>
+    const bomCustomer = validLines.reduce((sum, l) =>
       sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
-    const totalCost = validLines.reduce((sum, l) =>
+    const bomCost = validLines.reduce((sum, l) =>
       sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+
+    const laborCustomer = laborItems.reduce((sum, l) =>
+      sum + (parseFloat(l.customer_price) || 0), 0)
+    const laborCost = laborItems.reduce((sum, l) =>
+      sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+
+    const totalCustomer = bomCustomer + laborCustomer
+    const totalCost = bomCost + laborCost
     const grossMarginDollars = totalCustomer - totalCost
     const grossMarginPercent = totalCustomer > 0 ? (grossMarginDollars / totalCustomer) * 100 : 0
 
@@ -667,7 +705,8 @@ const handleExcelUpload = async (e) => {
       total_customer_value: totalCustomer,
       total_your_cost: totalCost,
       total_gross_margin_dollars: grossMarginDollars,
-      total_gross_margin_percent: grossMarginPercent
+      total_gross_margin_percent: grossMarginPercent,
+      labor_items: laborItems,
     }).eq('id', id)
 
     await fetchLineItems()
@@ -690,6 +729,7 @@ const handleExcelUpload = async (e) => {
       <Sidebar isAdmin={isAdmin} />
 
       <div className="flex-1 p-6 space-y-6">
+
         {/* Header */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-start">
@@ -761,23 +801,23 @@ const handleExcelUpload = async (e) => {
               </button>
             </div>
           </div>
+
           {/* AI Notes */}
-<div className="mb-4">
-  <label className="text-white text-sm font-semibold block mb-1">
-    AI Notes (Optional)
-  </label>
+          <div className="mb-4">
+            <label className="text-white text-sm font-semibold block mb-1">
+              AI Notes (Optional)
+            </label>
+            <p className="text-[#8A9AB0] text-xs mb-2">
+              Describe what you want the Scope of Work to include, how it should sound, or anything important.
+            </p>
+            <textarea
+              value={aiNotes}
+              onChange={(e) => setAiNotes(e.target.value)}
+              placeholder="Example: This is for a commercial install. Keep it professional, emphasize safety, and make it easy for a non-technical client to understand."
+              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] min-h-[100px]"
+            />
+          </div>
 
-  <p className="text-[#8A9AB0] text-xs mb-2">
-    Describe what you want the Scope of Work to include, how it should sound, or anything important.
-  </p>
-
-  <textarea
-    value={aiNotes}
-    onChange={(e) => setAiNotes(e.target.value)}
-    placeholder="Example: This is for a commercial install. Keep it professional, emphasize safety, and make it easy for a non-technical client to understand."
-    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] min-h-[100px]"
-  />
-</div>
           {proposal?.scope_of_work ? (
             <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
           ) : (
@@ -803,31 +843,42 @@ const handleExcelUpload = async (e) => {
                 >
                   Send All RFQs
                 </button>
-                <button onClick={startEditing} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                <button
+                  onClick={startEditing}
+                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors"
+                >
                   Edit BOM
                 </button>
                 <label className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors cursor-pointer">
-                 Upload Excel
-                    <input
+                  Upload Excel
+                  <input
                     type="file"
-                     accept=".xlsx,.xls,.csv"
+                    accept=".xlsx,.xls,.csv"
                     onChange={handleExcelUpload}
-                         className="hidden"
-                      />
+                    className="hidden"
+                  />
                 </label>
               </div>
             ) : (
               <div className="flex gap-2">
-                <button onClick={() => setEditingBOM(false)} className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">
+                <button
+                  onClick={() => setEditingBOM(false)}
+                  className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors"
+                >
                   Cancel
                 </button>
-                <button onClick={saveBOM} disabled={saving} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                <button
+                  onClick={saveBOM}
+                  disabled={saving}
+                  className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+                >
                   {saving ? 'Saving...' : 'Save BOM'}
                 </button>
               </div>
             )}
           </div>
 
+          {/* BOM View Mode */}
           {!editingBOM ? (
             lineItems.length === 0 ? (
               <p className="text-[#8A9AB0]">No line items yet. Click Edit BOM to add items.</p>
@@ -869,9 +920,28 @@ const handleExcelUpload = async (e) => {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan="5" className="text-[#8A9AB0] pt-4 text-right font-semibold">Total</td>
-                      <td className="text-[#C8622A] pt-4 text-right font-bold text-lg pr-4">
+                      <td colSpan="5" className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td>
+                      <td className="text-white pt-4 text-right font-bold pr-4">
                         ${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td></td>
+                    </tr>
+                    {proposal?.labor_items?.length > 0 && (
+                      <tr>
+                        <td colSpan="5" className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td>
+                        <td className="text-white pt-1 text-right font-bold pr-4">
+                          ${(proposal.labor_items.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td></td>
+                      </tr>
+                    )}
+                    <tr className="border-t border-[#2a3d55]">
+                      <td colSpan="5" className="text-[#8A9AB0] pt-3 text-right font-semibold">Grand Total</td>
+                      <td className="text-[#C8622A] pt-3 text-right font-bold text-lg pr-4">
+                        ${(
+                          lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0) +
+                          (proposal?.labor_items?.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0) || 0)
+                        ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td></td>
                     </tr>
@@ -880,6 +950,7 @@ const handleExcelUpload = async (e) => {
               </div>
             )
           ) : (
+            /* BOM Edit Mode */
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -898,43 +969,69 @@ const handleExcelUpload = async (e) => {
                         ['quantity', 'number', 'Qty'],
                       ].map(([field, type, placeholder]) => (
                         <td key={field} className="pr-2 py-1">
-                          <input type={type} placeholder={placeholder} value={line[field] || ''}
+                          <input
+                            type={type}
+                            placeholder={placeholder}
+                            value={line[field] || ''}
                             onChange={e => updateEditLine(i, field, e.target.value)}
-                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
                         </td>
                       ))}
                       <td className="pr-2 py-1">
-                        <select value={line.unit || 'ea'} onChange={e => updateEditLine(i, 'unit', e.target.value)}
-                          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                        <select
+                          value={line.unit || 'ea'}
+                          onChange={e => updateEditLine(i, 'unit', e.target.value)}
+                          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                        >
                           {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
                         </select>
                       </td>
                       <td className="pr-2 py-1">
-                        <select value={line.category || ''} onChange={e => updateEditLine(i, 'category', e.target.value)}
-                          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                        <select
+                          value={line.category || ''}
+                          onChange={e => updateEditLine(i, 'category', e.target.value)}
+                          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                        >
                           <option value="">Category</option>
                           {categories.map(c => <option key={c}>{c}</option>)}
                         </select>
                       </td>
                       <td className="pr-2 py-1">
-                        <input type="text" placeholder="Vendor" value={line.vendor || ''}
+                        <input
+                          type="text"
+                          placeholder="Vendor"
+                          value={line.vendor || ''}
                           onChange={e => updateEditLine(i, 'vendor', e.target.value)}
-                          className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                          className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                        />
                       </td>
                       <td className="pr-2 py-1">
-                        <input type="number" placeholder="0.00" value={line.your_cost_unit || ''}
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={line.your_cost_unit || ''}
                           onChange={e => updateEditLine(i, 'your_cost_unit', e.target.value)}
-                          className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                          className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                        />
                       </td>
                       <td className="pr-2 py-1">
-                        <input type="number" placeholder="35" value={line.markup_percent || ''}
+                        <input
+                          type="number"
+                          placeholder="35"
+                          value={line.markup_percent || ''}
                           onChange={e => updateEditLine(i, 'markup_percent', e.target.value)}
-                          className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                          className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                        />
                       </td>
                       <td className="pr-2 py-1">
-                        <input type="number" placeholder="0.00" value={line.customer_price_unit || ''}
+                        <input
+                          type="number"
+                          placeholder="0.00"
+                          value={line.customer_price_unit || ''}
                           onChange={e => updateEditLine(i, 'customer_price_unit', e.target.value)}
-                          className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                          className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                        />
                       </td>
                       <td className="py-1">
                         <button onClick={() => removeEditLine(i)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
@@ -943,17 +1040,152 @@ const handleExcelUpload = async (e) => {
                   ))}
                 </tbody>
               </table>
+
               <button onClick={addEditLine} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">
                 + Add Line Item
               </button>
+
+              {/* Labor Section — mirrors materials BOM table */}
+              <div className="mt-8">
+                <h3 className="text-white font-bold text-base mb-3">Labor</h3>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#2a3d55]">
+                      {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', 'Markup %', 'Customer Price', ''].map(h => (
+                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {laborItems.map((item, index) => (
+                      <tr key={index} className="border-b border-[#2a3d55]/30">
+                        <td className="pr-2 py-1">
+                          <input
+                            type="text"
+                            placeholder="e.g. Electrician"
+                            value={item.role}
+                            onChange={(e) => updateLabor(index, 'role', e.target.value)}
+                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={item.quantity || ''}
+                            onChange={(e) => updateLabor(index, 'quantity', e.target.value)}
+                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <select
+                            value={item.unit || 'hr'}
+                            onChange={(e) => updateLabor(index, 'unit', e.target.value)}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          >
+                            {['hr', 'day', 'lot'].map(u => <option key={u}>{u}</option>)}
+                          </select>
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={item.your_cost || ''}
+                            onChange={(e) => updateLabor(index, 'your_cost', e.target.value)}
+                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="35"
+                            value={item.markup || ''}
+                            onChange={(e) => updateLabor(index, 'markup', e.target.value)}
+                            className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={item.customer_price || ''}
+                            readOnly
+                            className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs cursor-not-allowed font-semibold"
+                          />
+                        </td>
+                        <td className="py-1">
+                          <button
+                            onClick={() => setLaborItems(prev => prev.filter((_, i) => i !== index))}
+                            className="text-[#8A9AB0] hover:text-red-400 text-xs"
+                          >✕</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan="5" className="text-[#8A9AB0] pt-3 text-right font-semibold text-xs">Labor Total</td>
+                      <td className="text-[#C8622A] pt-3 font-bold pr-2">
+                        ${laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+                          .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+                <button
+                  onClick={() => setLaborItems(prev => [...prev, { role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: 0 }])}
+                  className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors"
+                >
+                  + Add Labor
+                </button>
+              </div>
+
+              {/* Live running total — updates as you type */}
+              <div className="mt-6 border-t border-[#2a3d55] pt-4 space-y-2">
+                {(() => {
+                  const liveBOMTotal = editLines.reduce((sum, l) =>
+                    sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+                  const liveLaborTotal = laborItems.reduce((sum, l) =>
+                    sum + (parseFloat(l.customer_price) || 0), 0)
+                  const liveGrandTotal = liveBOMTotal + liveLaborTotal
+                  const liveBOMCost = editLines.reduce((sum, l) =>
+                    sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+                  const liveLaborCost = laborItems.reduce((sum, l) =>
+                    sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+                  const liveTotalCost = liveBOMCost + liveLaborCost
+                  const liveMargin = liveGrandTotal > 0 ? ((liveGrandTotal - liveTotalCost) / liveGrandTotal * 100).toFixed(1) : '0.0'
+                  return (
+                    <>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[#8A9AB0]">Materials</span>
+                        <span className="text-white">${liveBOMTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[#8A9AB0]">Labor</span>
+                        <span className="text-white">${liveLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-base font-bold border-t border-[#2a3d55] pt-2">
+                        <span className="text-white">Grand Total</span>
+                        <span className="text-[#C8622A]">${liveGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-[#8A9AB0]">Gross Margin</span>
+                        <span className="text-[#C8622A] font-semibold">{liveMargin}%</span>
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
             </div>
           )}
         </div>
-
+        {/* FIX: POList is now correctly outside the BOM card */}
         <POList proposalId={id} />
+
       </div>
 
-      {/* PO Modal */}
+      {/* FIX: PO Modal is now correctly outside all cards, inside the page root */}
       {showPOModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
