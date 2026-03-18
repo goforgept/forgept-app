@@ -117,12 +117,26 @@ export default function NewProposal() {
     setLaborItems(prev => {
       const updated = [...prev]
       updated[index] = { ...updated[index], [field]: value }
-      if (field === 'quantity' || field === 'your_cost' || field === 'markup') {
-        const qty = parseFloat(updated[index].quantity) || 0
-        const cost = parseFloat(updated[index].your_cost) || 0
-        const markup = parseFloat(updated[index].markup) || 0
-        updated[index].customer_price = (cost * (1 + markup / 100) * qty).toFixed(2)
+
+      const qty    = parseFloat(updated[index].quantity) || 0
+      const cost   = parseFloat(updated[index].your_cost) || 0
+      const markup = parseFloat(updated[index].markup) || 0
+      const cp     = parseFloat(updated[index].customer_price) || 0
+
+      if (field === 'your_cost' || field === 'markup' || field === 'quantity') {
+        if (cost > 0 && qty > 0) {
+          updated[index].customer_price = (cost * (1 + markup / 100) * qty).toFixed(2)
+        }
+      } else if (field === 'customer_price') {
+        if (cp > 0 && qty > 0) {
+          if (cost > 0) {
+            updated[index].markup = (((cp / qty) / cost - 1) * 100).toFixed(1)
+          } else if (markup >= 0) {
+            updated[index].your_cost = (cp / (1 + markup / 100) / qty).toFixed(2)
+          }
+        }
       }
+
       return updated
     })
   }
@@ -585,8 +599,8 @@ export default function NewProposal() {
                             type="number"
                             placeholder="0.00"
                             value={item.customer_price || ''}
-                            readOnly
-                            className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs cursor-not-allowed font-semibold"
+                            onChange={(e) => updateLabor(index, 'customer_price', e.target.value)}
+                            className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold"
                           />
                         </td>
                         <td className="py-1">
