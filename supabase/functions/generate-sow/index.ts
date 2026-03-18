@@ -19,9 +19,13 @@ Deno.serve(async (req) => {
 
     const laborText = (laborItems || [])
       .filter((l: any) => l.role)
-      .map((l: any) =>
-        `${l.role} - ${l.quantity} ${l.unit || 'hr'} @ $${l.your_cost}/hr (Customer Price: $${l.customer_price})`
-      ).join('\n')
+      .map((l: any) => {
+        const customerRate = l.your_cost && l.markup
+          ? (parseFloat(l.your_cost) * (1 + parseFloat(l.markup) / 100)).toFixed(2)
+          : null
+        const rateStr = customerRate ? ` @ $${customerRate}/${l.unit || 'hr'}` : ''
+        return `${l.role} - ${l.quantity} ${l.unit || 'hr'}${rateStr} - Total: $${l.customer_price}`
+      }).join('\n')
 
     const prompt = `You are a professional proposal writer for trades businesses.
 
