@@ -244,16 +244,17 @@ export default function ProposalDetail({ isAdmin }) {
 
       autoTable(doc, {
         startY: yPos,
-        head: [['Item', 'Category', 'Vendor', 'Qty', 'Unit Price', 'Total']],
+        head: [['Item', 'Part #', 'Category', 'Vendor', 'Qty', 'Unit Price', 'Total']],
         body: lineItems.map(item => [
           item.item_name,
+          item.part_number_sku || '—',
           item.category || '',
           item.vendor || '',
           item.quantity,
           `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
           `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
         ]),
-        foot: [['', '', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        foot: [['', '', '', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -1049,6 +1050,7 @@ export default function ProposalDetail({ isAdmin }) {
                   <thead>
                     <tr className="border-b border-[#2a3d55]">
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Item</th>
+                      <th className="text-[#8A9AB0] text-left py-2 pr-4">Part #</th>
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Category</th>
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Vendor</th>
                       <th className="text-[#8A9AB0] text-right py-2 pr-4">Qty</th>
@@ -1061,6 +1063,7 @@ export default function ProposalDetail({ isAdmin }) {
                     {lineItems.map((item) => (
                       <tr key={item.id} className="border-b border-[#2a3d55]/50">
                         <td className="text-white py-3 pr-4">{item.item_name}</td>
+                        <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.category}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor}</td>
                         <td className="text-white py-3 pr-4 text-right">{item.quantity}</td>
@@ -1081,7 +1084,7 @@ export default function ProposalDetail({ isAdmin }) {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan="5" className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td>
+                      <td colSpan="6" className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td>
                       <td className="text-white pt-4 text-right font-bold pr-4">
                         ${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
@@ -1089,7 +1092,7 @@ export default function ProposalDetail({ isAdmin }) {
                     </tr>
                     {proposal?.labor_items?.length > 0 && (
                       <tr>
-                        <td colSpan="5" className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td>
+                        <td colSpan="6" className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td>
                         <td className="text-white pt-1 text-right font-bold pr-4">
                           ${(proposal.labor_items.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
@@ -1097,7 +1100,7 @@ export default function ProposalDetail({ isAdmin }) {
                       </tr>
                     )}
                     <tr className="border-t border-[#2a3d55]">
-                      <td colSpan="5" className="text-[#8A9AB0] pt-3 text-right font-semibold">Grand Total</td>
+                      <td colSpan="6" className="text-[#8A9AB0] pt-3 text-right font-semibold">Grand Total</td>
                       <td className="text-[#C8622A] pt-3 text-right font-bold text-lg pr-4">
                         ${(
                           lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0) +
