@@ -541,7 +541,7 @@ export default function NewProposal() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[#2a3d55]">
-                      {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', 'Markup %', 'Customer Price', ''].map(h => (
+                      {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', 'Markup %', 'Total Labor', ''].map(h => (
                         <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
                       ))}
                     </tr>
@@ -611,7 +611,7 @@ export default function NewProposal() {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan="5" className="text-[#8A9AB0] pt-3 text-right font-semibold text-xs">Labor Total</td>
+                      <td colSpan="5" className="text-[#8A9AB0] pt-3 text-right font-semibold text-xs">Total Labor</td>
                       <td className="text-[#C8622A] pt-3 font-bold pr-2">
                         ${liveLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>

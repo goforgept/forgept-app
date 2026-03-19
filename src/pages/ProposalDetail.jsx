@@ -275,14 +275,14 @@ export default function ProposalDetail({ isAdmin }) {
 
       autoTable(doc, {
         startY: tableEnd + 6,
-        head: [['Role', 'Qty', 'Unit', 'Customer Price']],
+        head: [['Role', 'Qty', 'Unit', 'Total Labor']],
         body: laborItems.filter(l => l.role).map(l => [
           l.role,
           l.quantity,
           l.unit || 'hr',
           `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
         ]),
-        foot: [['', '', 'Labor Total', `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        foot: [['', '', 'Total Labor', `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -440,7 +440,7 @@ export default function ProposalDetail({ isAdmin }) {
       const lcw = [3000, 1200, 1200, 2400]
 
       const lHeaderRow = new TableRow({
-        children: ['Role', 'Qty', 'Unit', 'Customer Price'].map((h, i) =>
+        children: ['Role', 'Qty', 'Unit', 'Total Labor'].map((h, i) =>
           new TableCell({
             borders: lbs, width: { size: lcw[i], type: WidthType.DXA },
             shading: { fill: primaryColor, type: ShadingType.CLEAR },
@@ -474,7 +474,7 @@ export default function ProposalDetail({ isAdmin }) {
             borders: lbs, columnSpan: 3,
             margins: { top: 80, bottom: 80, left: 120, right: 120 },
             shading: { fill: primaryColor, type: ShadingType.CLEAR },
-            children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'Labor Total', bold: true, color: 'FFFFFF', size: 18 })] })]
+            children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'Total Labor', bold: true, color: 'FFFFFF', size: 18 })] })]
           }),
           new TableCell({
             borders: lbs, width: { size: 2400, type: WidthType.DXA },
@@ -1089,7 +1089,7 @@ export default function ProposalDetail({ isAdmin }) {
                     </tr>
                     {proposal?.labor_items?.length > 0 && (
                       <tr>
-                        <td colSpan="6" className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td>
+                        <td colSpan="6" className="text-[#8A9AB0] pt-1 text-right font-semibold">Total Labor</td>
                         <td className="text-white pt-1 text-right font-bold pr-4">
                           ${(proposal.labor_items.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
@@ -1212,7 +1212,7 @@ export default function ProposalDetail({ isAdmin }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[#2a3d55]">
-                      {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', 'Markup %', 'Customer Price', ''].map(h => (
+                      {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', 'Markup %', 'Total Labor', ''].map(h => (
                         <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
                       ))}
                     </tr>
@@ -1285,7 +1285,7 @@ export default function ProposalDetail({ isAdmin }) {
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan="5" className="text-[#8A9AB0] pt-3 text-right font-semibold text-xs">Labor Total</td>
+                      <td colSpan="5" className="text-[#8A9AB0] pt-3 text-right font-semibold text-xs">Total Labor</td>
                       <td className="text-[#C8622A] pt-3 font-bold pr-2">
                         ${laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
                           .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
