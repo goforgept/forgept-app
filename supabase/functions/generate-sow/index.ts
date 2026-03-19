@@ -62,7 +62,7 @@ RULES:
 - The first sentence MUST start with: "${company} will provide and install..."
 - Follow the rep's Priority Instructions above as the primary guide for tone, content, and emphasis
 
-Write 2 short professional paragraphs as the Scope of Work, then list the materials exactly as provided.`
+Write 2 short professional paragraphs as the Scope of Work only. Do NOT list the materials or labor items — they will be printed separately in the proposal document.`
 
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
