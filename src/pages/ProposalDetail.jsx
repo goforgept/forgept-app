@@ -244,16 +244,15 @@ export default function ProposalDetail({ isAdmin }) {
 
       autoTable(doc, {
         startY: yPos,
-        head: [['Item', 'Part #', 'Category', 'Qty', 'Unit Price', 'Total']],
+        head: [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']],
         body: lineItems.map(item => [
           item.item_name,
           item.part_number_sku || '—',
-          item.category || '',
           item.quantity,
           `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
           `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
         ]),
-        foot: [['', '', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        foot: [['', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 245, 245] },
