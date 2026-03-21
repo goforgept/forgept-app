@@ -312,43 +312,37 @@ export default function ProposalDetail({ isAdmin }) {
       doc.text(termsLines, 14, 32)
     }
 
-    // Signature block — always on last page
-    const sigY = doc.internal.pages.length > 1
-      ? doc.internal.getCurrentPageInfo().pageNumber === doc.internal.pages.length - 1
-        ? doc.lastAutoTable?.finalY + 40 || 200
-        : 200
-      : (doc.lastAutoTable?.finalY || 180) + 40
+    // Signature block — directly after terms on same page
+    {
+      const termsLines = profile?.terms_and_conditions
+        ? doc.splitTextToSize(profile.terms_and_conditions, pageWidth - 28).length
+        : 0
+      const afterTermsY = profile?.terms_and_conditions ? 32 + termsLines * 4.5 + 16 : (doc.lastAutoTable?.finalY || 180) + 20
 
-    // Add new page if not enough space
-    const finalY = doc.internal.getCurrentPageInfo().pageContext.mediaBox.topRightY - doc.internal.getCurrentPageInfo().pageContext.mediaBox.bottomLeftY
-    const currentY = doc.lastAutoTable?.finalY || 180
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Accepted and Agreed', 14, afterTermsY)
 
-    doc.addPage()
-    doc.setFontSize(13)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.text('Accepted and Agreed', 14, 20)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      doc.setDrawColor(180, 180, 180)
 
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(60, 60, 60)
+      const s1 = afterTermsY + 18
+      doc.text('Client Signature:', 14, s1)
+      doc.line(50, s1, 140, s1)
+      doc.text('Date:', 150, s1)
+      doc.line(163, s1, pageWidth - 14, s1)
 
-    const lineColor = [180, 180, 180]
-    doc.setDrawColor(lineColor[0], lineColor[1], lineColor[2])
+      const s2 = s1 + 20
+      doc.text('Printed Name:', 14, s2)
+      doc.line(50, s2, pageWidth - 14, s2)
 
-    // Signature line
-    doc.text('Client Signature:', 14, 45)
-    doc.line(50, 45, 140, 45)
-    doc.text('Date:', 150, 45)
-    doc.line(163, 45, pageWidth - 14, 45)
-
-    // Printed Name line
-    doc.text('Printed Name:', 14, 65)
-    doc.line(50, 65, pageWidth - 14, 65)
-
-    // Title line
-    doc.text('Title:', 14, 85)
-    doc.line(30, 85, pageWidth - 14, 85)
+      const s3 = s2 + 20
+      doc.text('Title:', 14, s3)
+      doc.line(30, s3, pageWidth - 14, s3)
+    }
 
     doc.save(`${proposal?.proposal_name || 'Proposal'}.pdf`)
   }
