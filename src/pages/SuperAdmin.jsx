@@ -21,14 +21,15 @@ export default function SuperAdmin() {
   const [editingBilling, setEditingBilling] = useState(null)
   const [billingForm, setBillingForm] = useState(emptyBillingForm)
   const [unauthorized, setUnauthorized] = useState(false)
+  const [stripeModal, setStripeModal] = useState(null)
+  const [stripeForm, setStripeForm] = useState({ plan: 'Solo', chargeOnboarding: true })
+  const [creatingSubscription, setCreatingSubscription] = useState(false)
+  const [stripeResult, setStripeResult] = useState(null)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    fetchData()
-  }, [])
+  useEffect(() => { fetchData() }, [])
 
   const fetchData = async () => {
-    // FIX: Guard — only allow super admins
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setUnauthorized(true); setLoading(false); return }
 
@@ -38,26 +39,11 @@ export default function SuperAdmin() {
       .eq('id', user.id)
       .single()
 
-    if (profile?.role !== 'superadmin') {
-      setUnauthorized(true)
-      setLoading(false)
-      return
-    }
+    if (profile?.role !== 'superadmin') { setUnauthorized(true); setLoading(false); return }
 
-    const { data: orgsData } = await supabase
-      .from('organizations')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    const { data: profilesData } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    const { data: requestsData } = await supabase
-      .from('access_requests')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const { data: orgsData } = await supabase.from('organizations').select('*').order('created_at', { ascending: false })
+    const { data: profilesData } = await supabase.from('profiles').select('*').order('created_at', { ascending: false })
+    const { data: requestsData } = await supabase.from('access_requests').select('*').order('created_at', { ascending: false })
 
     setOrgs(orgsData || [])
     setProfiles(profilesData || [])
@@ -75,12 +61,7 @@ export default function SuperAdmin() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
       },
-      body: JSON.stringify({
-        requestId: request.id,
-        fullName: request.full_name,
-        email: request.email,
-        companyName: request.company_name
-      })
+      body: JSON.stringify({ requestId: request.id, fullName: request.full_name, email: request.email, companyName: request.company_name })
     })
     const result = await res.json()
     if (result.success) fetchData()
@@ -88,13 +69,13 @@ export default function SuperAdmin() {
   }
 
   const rejectRequest = async (requestId) => {
-    if (!window.confirm('Are you sure you want to reject this request?')) return
+    if (!window.confirm('Reject this request?')) return
     await supabase.from('access_requests').update({ status: 'rejected' }).eq('id', requestId)
     fetchData()
   }
 
   const suspendOrg = async (orgId) => {
-    if (!window.confirm('Are you sure you want to suspend this organization?')) return
+    if (!window.confirm('Suspend this organization?')) return
     await supabase.from('organizations').update({ status: 'suspended' }).eq('id', orgId)
     fetchData()
   }
@@ -110,13 +91,10 @@ export default function SuperAdmin() {
       plan: org.plan || 'Trial',
       billing_status: org.billing_status || 'trial',
       monthly_rate: org.monthly_rate || 0,
-      trial_ends_at: org.trial_ends_at
-        ? new Date(org.trial_ends_at).toISOString().split('T')[0]
-        : ''
+      trial_ends_at: org.trial_ends_at ? new Date(org.trial_ends_at).toISOString().split('T')[0] : ''
     })
   }
 
-  // FIX: Controlled state instead of document.getElementById
   const updateBilling = async (orgId) => {
     await supabase.from('organizations').update({
       plan: billingForm.plan,
@@ -127,6 +105,47 @@ export default function SuperAdmin() {
     setEditingBilling(null)
     setBillingForm(emptyBillingForm)
     fetchData()
+  }
+
+  const openStripeModal = (org) => {
+    const admin = getOrgAdmin(org.id)
+    setStripeModal({ org, admin })
+    setStripeForm({ plan: org.plan && org.plan !== 'Trial' ? org.plan : 'Solo', chargeOnboarding: !org.stripe_customer_id })
+    setStripeResult(null)
+  }
+
+  const createSubscription = async () => {
+    if (!stripeModal) return
+    setCreatingSubscription(true)
+    setStripeResult(null)
+
+    try {
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-create-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+        },
+        body: JSON.stringify({
+          orgId: stripeModal.org.id,
+          orgName: stripeModal.org.name,
+          adminEmail: stripeModal.admin?.email || '',
+          plan: stripeForm.plan,
+          chargeOnboarding: stripeForm.chargeOnboarding
+        })
+      })
+      const result = await res.json()
+      if (result.error) {
+        setStripeResult({ success: false, message: result.error })
+      } else {
+        setStripeResult({ success: true, message: `Subscription created! Status: ${result.status}` })
+        fetchData()
+      }
+    } catch (err) {
+      setStripeResult({ success: false, message: err.message })
+    }
+
+    setCreatingSubscription(false)
   }
 
   const getPlanInfo = (planName) => PLANS.find(p => p.name === planName) || PLANS[0]
@@ -140,12 +159,7 @@ export default function SuperAdmin() {
   }
 
   const pendingRequests = requests.filter(r => r.status === 'pending')
-
-  // FIX: MRR only counts active paying orgs, not trials
-  const mrr = orgs
-    .filter(o => o.billing_status === 'active')
-    .reduce((sum, o) => sum + (o.monthly_rate || 0), 0)
-
+  const mrr = orgs.filter(o => o.billing_status === 'active').reduce((sum, o) => sum + (o.monthly_rate || 0), 0)
   const activeOrgs = orgs.filter(o => o.billing_status === 'active').length
   const trialOrgs = orgs.filter(o => o.billing_status === 'trial').length
 
@@ -154,9 +168,7 @@ export default function SuperAdmin() {
       <div className="text-center">
         <p className="text-red-400 text-lg font-bold mb-2">Access Denied</p>
         <p className="text-[#8A9AB0] text-sm mb-4">You don't have permission to view this page.</p>
-        <button onClick={() => navigate('/')} className="text-[#C8622A] hover:text-white text-sm transition-colors">
-          ← Back to App
-        </button>
+        <button onClick={() => navigate('/')} className="text-[#C8622A] hover:text-white text-sm transition-colors">← Back to App</button>
       </div>
     </div>
   )
@@ -165,41 +177,20 @@ export default function SuperAdmin() {
     <div className="min-h-screen bg-[#0F1C2E]">
       <div className="bg-[#1a2d45] border-b border-[#2a3d55] px-6 py-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
-          <h1 className="text-white text-xl font-bold">
-            ForgePt<span className="text-[#C8622A]">.</span>
-          </h1>
-          <span className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded-full font-semibold">
-            Super Admin
-          </span>
+          <h1 className="text-white text-xl font-bold">ForgePt<span className="text-[#C8622A]">.</span></h1>
+          <span className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded-full font-semibold">Super Admin</span>
         </div>
-        <button onClick={() => navigate('/')} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">
-          ← Back to App
-        </button>
+        <button onClick={() => navigate('/')} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">← Back to App</button>
       </div>
 
       <div className="p-6 space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-5 gap-4">
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">Total Orgs</p>
-            <p className="text-white text-2xl font-bold">{orgs.length}</p>
-          </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">Total Users</p>
-            <p className="text-white text-2xl font-bold">{profiles.length}</p>
-          </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">Pending Requests</p>
-            <p className="text-yellow-400 text-2xl font-bold">{pendingRequests.length}</p>
-          </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">Active Paying</p>
-            <p className="text-green-400 text-2xl font-bold">{activeOrgs}</p>
-          </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">MRR</p>
-            <p className="text-[#C8622A] text-2xl font-bold">${mrr.toLocaleString()}</p>
-          </div>
+          <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Total Orgs</p><p className="text-white text-2xl font-bold">{orgs.length}</p></div>
+          <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Total Users</p><p className="text-white text-2xl font-bold">{profiles.length}</p></div>
+          <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Pending Requests</p><p className="text-yellow-400 text-2xl font-bold">{pendingRequests.length}</p></div>
+          <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Active Paying</p><p className="text-green-400 text-2xl font-bold">{activeOrgs}</p></div>
+          <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">MRR</p><p className="text-[#C8622A] text-2xl font-bold">${mrr.toLocaleString()}</p></div>
         </div>
 
         {/* Tabs */}
@@ -209,13 +200,8 @@ export default function SuperAdmin() {
             { key: 'orgs', label: 'Organizations' },
             { key: 'billing', label: 'Billing & Plans' },
           ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setActiveTab(t.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
-              }`}
-            >
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
               {t.label}
             </button>
           ))}
@@ -225,11 +211,7 @@ export default function SuperAdmin() {
         {activeTab === 'requests' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Access Requests</h3>
-            {loading ? (
-              <p className="text-[#8A9AB0]">Loading...</p>
-            ) : requests.length === 0 ? (
-              <p className="text-[#8A9AB0]">No requests yet.</p>
-            ) : (
+            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : requests.length === 0 ? <p className="text-[#8A9AB0]">No requests yet.</p> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -248,29 +230,15 @@ export default function SuperAdmin() {
                         <td className="text-[#8A9AB0] py-3 pr-4 max-w-xs truncate">{req.notes || '—'}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{new Date(req.created_at).toLocaleDateString()}</td>
                         <td className="py-3 pr-4">
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                            req.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                            req.status === 'approved' ? 'bg-green-500/20 text-green-400' :
-                            'bg-red-500/20 text-red-400'
-                          }`}>
+                          <span className={`text-xs font-semibold px-2 py-1 rounded ${req.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : req.status === 'approved' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                             {req.status}
                           </span>
                         </td>
                         <td className="py-3">
                           {req.status === 'pending' && (
                             <div className="flex gap-2">
-                              <button
-                                onClick={() => approveRequest(req)}
-                                className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors"
-                              >
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => rejectRequest(req.id)}
-                                className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors"
-                              >
-                                Reject
-                              </button>
+                              <button onClick={() => approveRequest(req)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">Approve</button>
+                              <button onClick={() => rejectRequest(req.id)} className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors">Reject</button>
                             </div>
                           )}
                         </td>
@@ -287,11 +255,7 @@ export default function SuperAdmin() {
         {activeTab === 'orgs' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">All Organizations</h3>
-            {loading ? (
-              <p className="text-[#8A9AB0]">Loading...</p>
-            ) : orgs.length === 0 ? (
-              <p className="text-[#8A9AB0]">No organizations yet.</p>
-            ) : (
+            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : orgs.length === 0 ? <p className="text-[#8A9AB0]">No organizations yet.</p> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -313,33 +277,15 @@ export default function SuperAdmin() {
                           <td className="text-[#8A9AB0] py-3 pr-4">{admin?.email || '—'}</td>
                           <td className="text-[#8A9AB0] py-3 pr-4">{memberCount}</td>
                           <td className="py-3 pr-4">
-                            <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                              status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                              status === 'suspended' ? 'bg-red-500/20 text-red-400' :
-                              'bg-green-500/20 text-green-400'
-                            }`}>
+                            <span className={`text-xs font-semibold px-2 py-1 rounded ${status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : status === 'suspended' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
                               {status}
                             </span>
                           </td>
                           <td className="text-[#8A9AB0] py-3 pr-4">{new Date(org.created_at).toLocaleDateString()}</td>
                           <td className="py-3">
                             <div className="flex gap-2">
-                              {status === 'active' && (
-                                <button
-                                  onClick={() => suspendOrg(org.id)}
-                                  className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors"
-                                >
-                                  Suspend
-                                </button>
-                              )}
-                              {status === 'suspended' && (
-                                <button
-                                  onClick={() => reactivateOrg(org.id)}
-                                  className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors"
-                                >
-                                  Reactivate
-                                </button>
-                              )}
+                              {status === 'active' && <button onClick={() => suspendOrg(org.id)} className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors">Suspend</button>}
+                              {status === 'suspended' && <button onClick={() => reactivateOrg(org.id)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">Reactivate</button>}
                             </div>
                           </td>
                         </tr>
@@ -358,34 +304,20 @@ export default function SuperAdmin() {
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-white font-bold text-lg">Billing & Plans</h3>
               <div className="flex gap-4">
-                <div className="text-center">
-                  <p className="text-[#8A9AB0] text-xs">MRR</p>
-                  <p className="text-[#C8622A] font-bold">${mrr.toLocaleString()}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[#8A9AB0] text-xs">Paying</p>
-                  <p className="text-green-400 font-bold">{activeOrgs}</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-[#8A9AB0] text-xs">Trial</p>
-                  <p className="text-yellow-400 font-bold">{trialOrgs}</p>
-                </div>
+                <div className="text-center"><p className="text-[#8A9AB0] text-xs">MRR</p><p className="text-[#C8622A] font-bold">${mrr.toLocaleString()}</p></div>
+                <div className="text-center"><p className="text-[#8A9AB0] text-xs">Paying</p><p className="text-green-400 font-bold">{activeOrgs}</p></div>
+                <div className="text-center"><p className="text-[#8A9AB0] text-xs">Trial</p><p className="text-yellow-400 font-bold">{trialOrgs}</p></div>
               </div>
             </div>
 
-            {loading ? (
-              <p className="text-[#8A9AB0]">Loading...</p>
-            ) : orgs.length === 0 ? (
-              <p className="text-[#8A9AB0]">No organizations yet.</p>
-            ) : (
+            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : orgs.length === 0 ? <p className="text-[#8A9AB0]">No organizations yet.</p> : (
               <div className="space-y-3">
                 {orgs.map(org => {
                   const admin = getOrgAdmin(org.id)
                   const plan = getPlanInfo(org.plan || 'Trial')
                   const isEditing = editingBilling === org.id
-                  const trialDaysLeft = org.trial_ends_at
-                    ? Math.ceil((new Date(org.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24))
-                    : null
+                  const trialDaysLeft = org.trial_ends_at ? Math.ceil((new Date(org.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24)) : null
+                  const hasStripe = !!org.stripe_customer_id
 
                   return (
                     <div key={org.id} className="border border-[#2a3d55] rounded-xl p-4">
@@ -393,22 +325,25 @@ export default function SuperAdmin() {
                         <div>
                           <p className="text-white font-semibold">{org.name}</p>
                           <p className="text-[#8A9AB0] text-xs">{admin?.email || '—'}</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${plan.bg} ${plan.color}`}>
-                            {org.plan || 'Trial'}
-                          </span>
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${getBillingStatusColor(org.billing_status)}`}>
-                            {org.billing_status || 'trial'}
-                          </span>
-                          {org.monthly_rate > 0 && (
-                            <span className="text-white text-sm font-bold">${org.monthly_rate}/mo</span>
+                          {hasStripe && (
+                            <p className="text-green-400 text-xs mt-1">✓ Stripe connected</p>
                           )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap justify-end">
+                          <span className={`text-xs font-semibold px-2 py-1 rounded ${plan.bg} ${plan.color}`}>{org.plan || 'Trial'}</span>
+                          <span className={`text-xs font-semibold px-2 py-1 rounded ${getBillingStatusColor(org.billing_status)}`}>{org.billing_status || 'trial'}</span>
+                          {org.monthly_rate > 0 && <span className="text-white text-sm font-bold">${org.monthly_rate}/mo</span>}
+                          <button
+                            onClick={() => openStripeModal(org)}
+                            className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors"
+                          >
+                            {hasStripe ? 'Update Subscription' : 'Create Subscription'}
+                          </button>
                           <button
                             onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)}
                             className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors"
                           >
-                            {isEditing ? 'Cancel' : 'Edit'}
+                            {isEditing ? 'Cancel' : 'Manual Edit'}
                           </button>
                         </div>
                       </div>
@@ -419,58 +354,34 @@ export default function SuperAdmin() {
                         </p>
                       )}
 
-                      {/* FIX: Controlled form state instead of document.getElementById */}
                       {isEditing && (
                         <div className="mt-4 grid grid-cols-4 gap-3 pt-4 border-t border-[#2a3d55]">
                           <div>
                             <label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label>
-                            <select
-                              value={billingForm.plan}
-                              onChange={e => setBillingForm(p => ({ ...p, plan: e.target.value }))}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
-                            >
-                              {PLANS.map(p => (
-                                <option key={p.name} value={p.name}>
-                                  {p.name}{p.rate ? ` — $${p.rate}/mo` : p.rate === 0 ? ' — Free' : ' — Custom'}
-                                </option>
-                              ))}
+                            <select value={billingForm.plan} onChange={e => setBillingForm(p => ({ ...p, plan: e.target.value }))}
+                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                              {PLANS.map(p => <option key={p.name} value={p.name}>{p.name}{p.rate ? ` — $${p.rate}/mo` : p.rate === 0 ? ' — Free' : ' — Custom'}</option>)}
                             </select>
                           </div>
                           <div>
                             <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Status</label>
-                            <select
-                              value={billingForm.billing_status}
-                              onChange={e => setBillingForm(p => ({ ...p, billing_status: e.target.value }))}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
-                            >
-                              {['trial', 'active', 'past_due', 'cancelled'].map(s => (
-                                <option key={s} value={s}>{s}</option>
-                              ))}
+                            <select value={billingForm.billing_status} onChange={e => setBillingForm(p => ({ ...p, billing_status: e.target.value }))}
+                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                              {['trial', 'active', 'past_due', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
                             </select>
                           </div>
                           <div>
                             <label className="text-[#8A9AB0] text-xs mb-1 block">Monthly Rate ($)</label>
-                            <input
-                              type="number"
-                              value={billingForm.monthly_rate}
-                              onChange={e => setBillingForm(p => ({ ...p, monthly_rate: e.target.value }))}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
-                            />
+                            <input type="number" value={billingForm.monthly_rate} onChange={e => setBillingForm(p => ({ ...p, monthly_rate: e.target.value }))}
+                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]" />
                           </div>
                           <div>
                             <label className="text-[#8A9AB0] text-xs mb-1 block">Trial End Date</label>
-                            <input
-                              type="date"
-                              value={billingForm.trial_ends_at}
-                              onChange={e => setBillingForm(p => ({ ...p, trial_ends_at: e.target.value }))}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
-                            />
+                            <input type="date" value={billingForm.trial_ends_at} onChange={e => setBillingForm(p => ({ ...p, trial_ends_at: e.target.value }))}
+                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]" />
                           </div>
                           <div className="col-span-4 flex justify-end">
-                            <button
-                              onClick={() => updateBilling(org.id)}
-                              className="bg-[#C8622A] text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors"
-                            >
+                            <button onClick={() => updateBilling(org.id)} className="bg-[#C8622A] text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors">
                               Save Changes
                             </button>
                           </div>
@@ -484,6 +395,67 @@ export default function SuperAdmin() {
           </div>
         )}
       </div>
+
+      {/* Stripe Subscription Modal */}
+      {stripeModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-white font-bold text-lg mb-1">Create Stripe Subscription</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">{stripeModal.org.name} · {stripeModal.admin?.email || 'No admin email'}</p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label>
+                <select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  <option value="Solo">Solo — $49/mo</option>
+                  <option value="Team">Team — $149/mo</option>
+                  <option value="Business">Business — $349/mo</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-3 bg-[#0F1C2E] rounded-lg px-4 py-3">
+                <input
+                  type="checkbox"
+                  id="onboarding"
+                  checked={stripeForm.chargeOnboarding}
+                  onChange={e => setStripeForm(p => ({ ...p, chargeOnboarding: e.target.checked }))}
+                  className="accent-[#C8622A]"
+                />
+                <label htmlFor="onboarding" className="text-white text-sm cursor-pointer">
+                  Charge one-time onboarding fee <span className="text-[#C8622A] font-semibold">$249</span>
+                </label>
+              </div>
+
+              <div className="bg-[#0F1C2E] rounded-lg p-3 text-xs text-[#8A9AB0]">
+                <p className="font-semibold text-white mb-1">What this does:</p>
+                <p>• Creates a Stripe customer for {stripeModal.org.name}</p>
+                <p>• Creates a {stripeForm.plan} subscription at ${stripeForm.plan === 'Solo' ? '49' : stripeForm.plan === 'Team' ? '149' : '349'}/mo</p>
+                {stripeForm.chargeOnboarding && <p>• Adds $249 onboarding fee to first invoice</p>}
+                <p>• Updates billing status in ForgePt.</p>
+                <p className="mt-2 text-yellow-400">Note: Customer will need to add payment method via Stripe dashboard or payment link.</p>
+              </div>
+
+              {stripeResult && (
+                <div className={`rounded-lg px-4 py-3 text-sm font-semibold ${stripeResult.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                  {stripeResult.message}
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setStripeModal(null); setStripeResult(null) }}
+                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">
+                  Cancel
+                </button>
+                <button onClick={createSubscription} disabled={creatingSubscription}
+                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {creatingSubscription ? 'Creating...' : 'Create Subscription'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

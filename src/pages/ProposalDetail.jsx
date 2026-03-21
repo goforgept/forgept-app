@@ -312,6 +312,44 @@ export default function ProposalDetail({ isAdmin }) {
       doc.text(termsLines, 14, 32)
     }
 
+    // Signature block — always on last page
+    const sigY = doc.internal.pages.length > 1
+      ? doc.internal.getCurrentPageInfo().pageNumber === doc.internal.pages.length - 1
+        ? doc.lastAutoTable?.finalY + 40 || 200
+        : 200
+      : (doc.lastAutoTable?.finalY || 180) + 40
+
+    // Add new page if not enough space
+    const finalY = doc.internal.getCurrentPageInfo().pageContext.mediaBox.topRightY - doc.internal.getCurrentPageInfo().pageContext.mediaBox.bottomLeftY
+    const currentY = doc.lastAutoTable?.finalY || 180
+
+    doc.addPage()
+    doc.setFontSize(13)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text('Accepted and Agreed', 14, 20)
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(60, 60, 60)
+
+    const lineColor = [180, 180, 180]
+    doc.setDrawColor(lineColor[0], lineColor[1], lineColor[2])
+
+    // Signature line
+    doc.text('Client Signature:', 14, 45)
+    doc.line(50, 45, 140, 45)
+    doc.text('Date:', 150, 45)
+    doc.line(163, 45, pageWidth - 14, 45)
+
+    // Printed Name line
+    doc.text('Printed Name:', 14, 65)
+    doc.line(50, 65, pageWidth - 14, 65)
+
+    // Title line
+    doc.text('Title:', 14, 85)
+    doc.line(30, 85, pageWidth - 14, 85)
+
     doc.save(`${proposal?.proposal_name || 'Proposal'}.pdf`)
   }
 
@@ -505,6 +543,31 @@ export default function ProposalDetail({ isAdmin }) {
         )
       )
     }
+
+    // Signature block
+    const sigBorder = { style: BorderStyle.SINGLE, size: 6, color: 'AAAAAA' }
+    const sigLine = () => new Paragraph({
+      border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'AAAAAA' } },
+      children: [new TextRun({ text: ' ', size: 24 })]
+    })
+
+    children.push(
+      new Paragraph({ children: [new TextRun({ text: '' })] }),
+      new Paragraph({ children: [new TextRun({ text: '' })] }),
+      new Paragraph({ children: [new TextRun({ text: 'Accepted and Agreed', bold: true, size: 28, color: primaryColor })] }),
+      new Paragraph({ children: [new TextRun({ text: '' })] }),
+      new Paragraph({ children: [new TextRun({ text: 'Client Signature', size: 18, color: '888888' })] }),
+      sigLine(),
+      new Paragraph({ children: [new TextRun({ text: '' })] }),
+      new Paragraph({ children: [new TextRun({ text: 'Date', size: 18, color: '888888' })] }),
+      sigLine(),
+      new Paragraph({ children: [new TextRun({ text: '' })] }),
+      new Paragraph({ children: [new TextRun({ text: 'Printed Name', size: 18, color: '888888' })] }),
+      sigLine(),
+      new Paragraph({ children: [new TextRun({ text: '' })] }),
+      new Paragraph({ children: [new TextRun({ text: 'Title', size: 18, color: '888888' })] }),
+      sigLine(),
+    )
 
     const doc = new Document({
       sections: [{
