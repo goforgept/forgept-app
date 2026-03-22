@@ -12,7 +12,7 @@ const DEFAULT_STAGES = [
   { name: 'Lost', color: '#ef4444' },
 ]
 
-export default function Pipeline({ isAdmin }) {
+export default function Pipeline({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [stages, setStages] = useState([])
   const [proposals, setProposals] = useState([])
   const [clients, setClients] = useState([])
@@ -142,7 +142,7 @@ export default function Pipeline({ isAdmin }) {
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6 overflow-hidden">
         <div className="flex justify-between items-center">
