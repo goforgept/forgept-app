@@ -24,20 +24,17 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const todayStr = today.toISOString().split('T')[0]
+
+    // ── PART 1: PROPOSAL FOLLOW-UPS ──────────────────────────────────────
+
     const proposalsRes = await fetch(
       `${supabaseUrl}/rest/v1/proposals?status=eq.Sent&select=*`,
       { headers: dbHeaders }
     )
     const proposals = await proposalsRes.json()
-
-    if (!proposals.length) {
-      return new Response(JSON.stringify({ message: 'No sent proposals' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
 
     let emailsSent = 0
     let skipped = 0
@@ -218,8 +215,139 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── PART 2: DAILY TASK DIGEST ─────────────────────────────────────────
+
+    // Get all incomplete tasks due today or overdue
+    const tasksRes = await fetch(
+      `${supabaseUrl}/rest/v1/tasks?completed=eq.false&select=*,profiles!tasks_assigned_to_fkey(id,email,full_name,org_id),clients(company)`,
+      { headers: dbHeaders }
+    )
+    const allTasks = await tasksRes.json()
+
+    // Group tasks by assigned rep
+    const tasksByRep: Record<string, any> = {}
+
+    for (const task of allTasks) {
+      if (!task.due_date) continue
+      const dueDate = new Date(task.due_date)
+      dueDate.setHours(0, 0, 0, 0)
+      const isOverdue = dueDate < today
+      const isDueToday = task.due_date === todayStr
+      if (!isOverdue && !isDueToday) continue
+
+      const rep = task.profiles
+      if (!rep?.email) continue
+
+      if (!tasksByRep[rep.id]) {
+        tasksByRep[rep.id] = {
+          rep,
+          overdue: [],
+          today: []
+        }
+      }
+
+      if (isOverdue) tasksByRep[rep.id].overdue.push(task)
+      else tasksByRep[rep.id].today.push(task)
+    }
+
+    let taskDigestsSent = 0
+
+    for (const repId of Object.keys(tasksByRep)) {
+      const { rep, overdue, today: todayTasks } = tasksByRep[repId]
+      const totalCount = overdue.length + todayTasks.length
+      if (totalCount === 0) continue
+
+      // Write notifications to DB for bell icon
+      const notificationsToInsert = []
+
+      for (const task of [...overdue, ...todayTasks]) {
+        notificationsToInsert.push({
+          org_id: rep.org_id,
+          user_id: rep.id,
+          type: 'task_due',
+          title: task.due_date < todayStr ? `Overdue: ${task.title}` : `Due today: ${task.title}`,
+          body: task.clients?.company ? `Related to ${task.clients.company}` : null,
+          link: task.client_id ? `/client/${task.client_id}` : '/tasks',
+          read: false
+        })
+      }
+
+      if (notificationsToInsert.length > 0) {
+        await fetch(`${supabaseUrl}/rest/v1/notifications`, {
+          method: 'POST',
+          headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
+          body: JSON.stringify(notificationsToInsert)
+        })
+      }
+
+      // Build task digest email
+      const overdueRows = overdue.map(t => `
+        <tr style="background:#fff5f5;">
+          <td style="padding:10px;border-bottom:1px solid #f0f0f0;">
+            <strong style="color:#ef4444;">⚠ Overdue</strong><br/>
+            ${t.title}
+          </td>
+          <td style="padding:10px;border-bottom:1px solid #f0f0f0;color:#888;">${t.clients?.company || '—'}</td>
+          <td style="padding:10px;border-bottom:1px solid #f0f0f0;color:#ef4444;">${t.due_date}</td>
+        </tr>
+      `).join('')
+
+      const todayRows = todayTasks.map(t => `
+        <tr style="background:#fffbf5;">
+          <td style="padding:10px;border-bottom:1px solid #f0f0f0;">
+            <strong style="color:#C8622A;">● Due Today</strong><br/>
+            ${t.title}
+          </td>
+          <td style="padding:10px;border-bottom:1px solid #f0f0f0;color:#888;">${t.clients?.company || '—'}</td>
+          <td style="padding:10px;border-bottom:1px solid #f0f0f0;color:#C8622A;">Today</td>
+        </tr>
+      `).join('')
+
+      const digestEmailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+        body: JSON.stringify({
+          sender: { name: SENDER_NAME, email: SENDER_EMAIL },
+          to: [{ email: rep.email, name: rep.full_name || rep.email }],
+          subject: `Your task digest — ${totalCount} task${totalCount !== 1 ? 's' : ''} need${totalCount === 1 ? 's' : ''} attention`,
+          htmlContent: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
+              <div style="background:#0F1C2E;padding:20px 28px;">
+                <span style="color:#ffffff;font-size:20px;font-weight:bold;">ForgePt<span style="color:#C8622A;">.</span></span>
+              </div>
+              <div style="padding:28px;">
+                <h2 style="color:#0F1C2E;margin-top:0;">Good morning, ${rep.full_name?.split(' ')[0] || 'there'} 👋</h2>
+                <p>Here is your task summary for today. You have <strong>${totalCount} task${totalCount !== 1 ? 's' : ''}</strong> that need your attention.</p>
+
+                <table style="width:100%;border-collapse:collapse;margin:20px 0;">
+                  <tr style="background:#0F1C2E;color:white;">
+                    <th style="padding:10px;text-align:left;">Task</th>
+                    <th style="padding:10px;text-align:left;">Client</th>
+                    <th style="padding:10px;text-align:left;">Due</th>
+                  </tr>
+                  ${overdueRows}
+                  ${todayRows}
+                </table>
+
+                <p>
+                  <a href="https://app.goforgept.com/tasks" style="background:#C8622A;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">
+                    View All Tasks →
+                  </a>
+                </p>
+                <br/>
+                <p style="color:#888;font-size:12px;">Powered by ForgePt. · <a href="https://app.goforgept.com" style="color:#888;">app.goforgept.com</a></p>
+              </div>
+            </div>
+          `
+        })
+      })
+
+      if (digestEmailRes.ok) taskDigestsSent++
+      else console.error(`Task digest failed for ${rep.email}:`, await digestEmailRes.text())
+    }
+
     return new Response(
-      JSON.stringify({ success: true, emailsSent, skipped, errors }),
+      JSON.stringify({ success: true, emailsSent, skipped, errors, taskDigestsSent }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
