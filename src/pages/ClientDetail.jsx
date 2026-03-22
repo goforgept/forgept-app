@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import ActivityTimeline from '../components/ActivityTimeline'
+import TaskList from '../components/TaskList'
 
 export default function ClientDetail({ isAdmin }) {
   const { id } = useParams()
@@ -10,6 +11,7 @@ export default function ClientDetail({ isAdmin }) {
   const [client, setClient] = useState(null)
   const [proposals, setProposals] = useState([])
   const [profile, setProfile] = useState(null)
+  const [teamProfiles, setTeamProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingClient, setEditingClient] = useState(false)
   const [editForm, setEditForm] = useState({})
@@ -46,6 +48,10 @@ export default function ClientDetail({ isAdmin }) {
     const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setProfile(data)
+    if (data?.org_id) {
+      const { data: team } = await supabase.from('profiles').select('id, full_name').eq('org_id', data.org_id)
+      setTeamProfiles(team || [])
+    }
   }
 
   const saveClient = async () => {
@@ -113,31 +119,20 @@ export default function ClientDetail({ isAdmin }) {
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <button
-                    onClick={() => navigate('/clients')}
-                    className="text-[#8A9AB0] hover:text-white text-xs transition-colors"
-                  >
+                  <button onClick={() => navigate('/clients')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
                     ← Clients
                   </button>
                 </div>
                 <h2 className="text-white text-2xl font-bold">{client?.company}</h2>
                 <p className="text-[#8A9AB0] mt-0.5">{client?.client_name}</p>
-                {fullAddress && (
-                  <p className="text-[#8A9AB0] text-sm mt-0.5">{fullAddress}</p>
-                )}
+                {fullAddress && <p className="text-[#8A9AB0] text-sm mt-0.5">{fullAddress}</p>}
               </div>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setEditingClient(true)}
-                className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors"
-              >
+              <button onClick={() => setEditingClient(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
                 Edit Client
               </button>
-              <button
-                onClick={handleNewProposal}
-                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
-              >
+              <button onClick={handleNewProposal} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                 + New Proposal
               </button>
             </div>
@@ -190,7 +185,7 @@ export default function ClientDetail({ isAdmin }) {
           {fullAddress && (
             <div className="flex items-center gap-2">
               <span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Address</span>
-                <a              
+              <a
                 href={`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`}
                 target="_blank"
                 rel="noreferrer"
@@ -204,7 +199,7 @@ export default function ClientDetail({ isAdmin }) {
 
         {/* Tabs */}
         <div className="flex gap-2">
-          {['proposals', 'activity', 'notes'].map(t => (
+          {['proposals', 'activity', 'tasks', 'notes'].map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
@@ -212,7 +207,9 @@ export default function ClientDetail({ isAdmin }) {
                 activeTab === t ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
               }`}
             >
-              {t === 'proposals' ? `Proposals (${proposals.length})` : t === 'activity' ? 'Activity' : 'Notes'}
+              {t === 'proposals' ? `Proposals (${proposals.length})` :
+               t === 'activity' ? 'Activity' :
+               t === 'tasks' ? 'Tasks' : 'Notes'}
             </button>
           ))}
         </div>
@@ -223,10 +220,7 @@ export default function ClientDetail({ isAdmin }) {
             {proposals.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-[#8A9AB0] mb-4">No proposals yet for this client.</p>
-                <button
-                  onClick={handleNewProposal}
-                  className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
-                >
+                <button onClick={handleNewProposal} className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                   + Create First Proposal
                 </button>
               </div>
@@ -282,16 +276,23 @@ export default function ClientDetail({ isAdmin }) {
           />
         )}
 
+        {/* Tasks tab */}
+        {activeTab === 'tasks' && (
+          <TaskList
+            clientId={id}
+            orgId={client?.org_id}
+            userId={profile?.id}
+            profiles={teamProfiles}
+          />
+        )}
+
         {/* Notes tab */}
         {activeTab === 'notes' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-white font-bold text-lg">Notes</h3>
               {!editingClient && (
-                <button
-                  onClick={() => setEditingClient(true)}
-                  className="text-[#8A9AB0] hover:text-white text-sm transition-colors"
-                >
+                <button onClick={() => setEditingClient(true)} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">
                   Edit
                 </button>
               )}
