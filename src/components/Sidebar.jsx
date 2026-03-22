@@ -7,11 +7,21 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
   const navigate = useNavigate()
   const location = useLocation()
   const [userId, setUserId] = useState(null)
+  const [orgType, setOrgType] = useState('integrator')
 
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (user) setUserId(user.id)
+      if (!user) return
+      setUserId(user.id)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('org_id, organizations(org_type)')
+        .eq('id', user.id)
+        .single()
+      if (profile?.organizations?.org_type) {
+        setOrgType(profile.organizations.org_type)
+      }
     }
     getUser()
   }, [])
@@ -22,7 +32,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
 
   const adminLinks = [
     { label: 'Dashboard', path: '/', icon: '⬛' },
-    { label: 'Catalog', path: '/catalog', icon: '📦' },
+    ...(orgType === 'manufacturer' ? [{ label: 'Catalog', path: '/catalog', icon: '📦' }] : []),
     ...(featureCRM ? [
       { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
       { label: 'Forecast', path: '/forecast', icon: '📈' },
@@ -43,7 +53,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
 
   const repLinks = [
     { label: 'Dashboard', path: '/', icon: '⬛' },
-    { label: 'Catalog', path: '/catalog', icon: '📦' },
+    ...(orgType === 'manufacturer' ? [{ label: 'Catalog', path: '/catalog', icon: '📦' }] : []),
     ...(featureCRM ? [
       { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
       { label: 'Tasks', path: '/tasks', icon: '✅' },
