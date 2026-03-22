@@ -20,7 +20,7 @@ export default function Login() {
     setLoading(false)
   }
 
-  const handleRequestAccess = async () => {
+  const handleRequestDemo = async () => {
     setLoading(true)
     setError(null)
 
@@ -46,7 +46,6 @@ export default function Login() {
       return
     }
 
-    // Notify you via email
     await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/notify-new-request', {
       method: 'POST',
       headers: {
@@ -56,7 +55,7 @@ export default function Login() {
       body: JSON.stringify({ fullName, email, companyName, notes })
     })
 
-    setSuccess('Request submitted! We will review your application and be in touch shortly.')
+    setSuccess("Demo request received! We'll be in touch within 1 business day to schedule your walkthrough.")
     setFullName('')
     setEmail('')
     setCompanyName('')
@@ -83,7 +82,7 @@ export default function Login() {
           <h1 className="text-white text-4xl font-bold">
             ForgePt<span className="text-[#C8622A]">.</span>
           </h1>
-          <p className="text-[#8A9AB0] mt-2">Scope it. Send it. Close it.</p>
+          <p className="text-[#8A9AB0] mt-2">Manage. Propose. Close.</p>
         </div>
 
         <div className="bg-[#1a2d45] rounded-2xl p-8">
@@ -102,7 +101,7 @@ export default function Login() {
                 tab === 'request' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'
               }`}
             >
-              Request Access
+              Request Demo
             </button>
           </div>
 
@@ -149,7 +148,7 @@ export default function Login() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-[#8A9AB0] text-sm">Tell us about your business and we will get you set up.</p>
+              <p className="text-[#8A9AB0] text-sm">Tell us about your business and we will schedule a personalized demo.</p>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Full Name</label>
                 <input
@@ -181,21 +180,21 @@ export default function Login() {
                 />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Notes (optional)</label>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Tell us about your business (optional)</label>
                 <textarea
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
                   rows={3}
                   className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none"
-                  placeholder="Tell us about your business..."
+                  placeholder="What trade do you work in? How many reps on your team?"
                 />
               </div>
               <button
-                onClick={handleRequestAccess}
+                onClick={handleRequestDemo}
                 disabled={loading}
                 className="w-full bg-[#C8622A] text-white py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
               >
-                {loading ? 'Submitting...' : 'Request Access'}
+                {loading ? 'Submitting...' : 'Request Demo'}
               </button>
               <p className="text-[#8A9AB0] text-xs text-center">
                 We typically respond within 1 business day.
