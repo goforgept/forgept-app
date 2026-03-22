@@ -7,6 +7,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
   const [companyName, setCompanyName] = useState('')
+  const [role, setRole] = useState('')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -20,7 +21,7 @@ export default function Login() {
     setLoading(false)
   }
 
-  const handleRequestDemo = async () => {
+  const handleRequestAccess = async () => {
     setLoading(true)
     setError(null)
 
@@ -37,6 +38,7 @@ export default function Login() {
         email,
         company_name: companyName,
         notes,
+        role,
         status: 'pending'
       })
 
@@ -52,13 +54,14 @@ export default function Login() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
       },
-      body: JSON.stringify({ fullName, email, companyName, notes })
+      body: JSON.stringify({ fullName, email, companyName, notes, role })
     })
 
-    setSuccess("Demo request received! We'll be in touch within 1 business day to schedule your walkthrough.")
+    setSuccess("Request submitted! We'll be in touch within 1 business day to schedule your walkthrough.")
     setFullName('')
     setEmail('')
     setCompanyName('')
+    setRole('')
     setNotes('')
     setLoading(false)
   }
@@ -101,7 +104,7 @@ export default function Login() {
                 tab === 'request' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'
               }`}
             >
-              Request Demo
+              Request Access
             </button>
           </div>
 
@@ -148,7 +151,7 @@ export default function Login() {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-[#8A9AB0] text-sm">Tell us about your business and we will schedule a personalized demo.</p>
+              <p className="text-[#8A9AB0] text-sm">Tell us about your business and we will get you set up.</p>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Full Name</label>
                 <input
@@ -168,6 +171,19 @@ export default function Login() {
                   className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
                   placeholder="Acme Electrical"
                 />
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Your Role</label>
+                <select
+                  value={role}
+                  onChange={e => setRole(e.target.value)}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                >
+                  <option value="">Select your role</option>
+                  {['Business Owner', 'Estimator', 'Project Manager', 'Sales Rep', 'Office Manager', 'Manufacturer / Supplier', 'Distributor', 'Other'].map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Email</label>
@@ -190,11 +206,11 @@ export default function Login() {
                 />
               </div>
               <button
-                onClick={handleRequestDemo}
+                onClick={handleRequestAccess}
                 disabled={loading}
                 className="w-full bg-[#C8622A] text-white py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
               >
-                {loading ? 'Submitting...' : 'Request Demo'}
+                {loading ? 'Submitting...' : 'Request Access'}
               </button>
               <p className="text-[#8A9AB0] text-xs text-center">
                 We typically respond within 1 business day.
