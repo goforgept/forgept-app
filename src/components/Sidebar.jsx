@@ -1,9 +1,20 @@
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
+import NotificationBell from './NotificationBell'
 
 export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const [userId, setUserId] = useState(null)
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) setUserId(user.id)
+    }
+    getUser()
+  }, [])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -49,14 +60,19 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
   return (
     <div className="w-56 min-h-screen bg-[#1a2d45] border-r border-[#2a3d55] flex flex-col">
       <div className="px-6 py-5 border-b border-[#2a3d55]">
-        <h1 className="text-white text-xl font-bold">
-          ForgePt<span className="text-[#C8622A]">.</span>
-        </h1>
-        {isAdmin && (
-          <span className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-semibold mt-1 inline-block">
-            Admin
-          </span>
-        )}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-white text-xl font-bold">
+              ForgePt<span className="text-[#C8622A]">.</span>
+            </h1>
+            {isAdmin && (
+              <span className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-semibold mt-1 inline-block">
+                Admin
+              </span>
+            )}
+          </div>
+          <NotificationBell userId={userId} />
+        </div>
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
