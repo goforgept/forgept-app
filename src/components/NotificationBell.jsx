@@ -91,7 +91,7 @@ export default function NotificationBell({ userId }) {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-11 w-80 bg-[#1a2d45] border border-[#2a3d55] rounded-xl shadow-2xl z-50 overflow-hidden">
+          <div className="absolute left-0 top-11 w-80 bg-[#1a2d45] border border-[#2a3d55] rounded-xl shadow-2xl z-50 overflow-hidden">
             <div className="flex justify-between items-center px-4 py-3 border-b border-[#2a3d55]">
               <h3 className="text-white text-sm font-bold">Notifications</h3>
               {unreadCount > 0 && (
