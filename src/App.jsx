@@ -18,6 +18,7 @@ import PurchaseOrders from './pages/PurchaseOrders'
 import FAQ from './pages/FAQ'
 import Tasks from './pages/Tasks'
 import Pipeline from './pages/Pipeline'
+import Forecast from './pages/Forecast'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -123,6 +124,7 @@ function App() {
             <Route path="/faq" element={<FAQ isAdmin={isAdmin} />} />
             <Route path="/tasks" element={<Tasks isAdmin={isAdmin} />} />
             <Route path="/pipeline" element={<Pipeline isAdmin={isAdmin} />} />
+            <Route path="/forecast" element={<Forecast isAdmin={isAdmin} />} />
           </>
         )}
       </Routes>

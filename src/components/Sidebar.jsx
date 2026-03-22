@@ -12,6 +12,7 @@ export default function Sidebar({ isAdmin }) {
   const adminLinks = [
     { label: 'Dashboard', path: '/', icon: '⬛' },
     { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
+    { label: 'Forecast', path: '/forecast', icon: '📈' },
     { label: 'Proposals', path: '/proposals', icon: '📋' },
     { label: 'Clients', path: '/clients', icon: '🏢' },
     { label: 'Tasks', path: '/tasks', icon: '✅' },
