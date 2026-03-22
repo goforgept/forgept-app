@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import ActivityTimeline from '../components/ActivityTimeline'
 
 export default function ClientDetail({ isAdmin }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [client, setClient] = useState(null)
   const [proposals, setProposals] = useState([])
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editingClient, setEditingClient] = useState(false)
   const [editForm, setEditForm] = useState({})
@@ -17,6 +19,7 @@ export default function ClientDetail({ isAdmin }) {
   useEffect(() => {
     fetchClient()
     fetchProposals()
+    fetchProfile()
   }, [])
 
   const fetchClient = async () => {
@@ -37,6 +40,12 @@ export default function ClientDetail({ isAdmin }) {
       .order('created_at', { ascending: false })
     setProposals(data || [])
     setLoading(false)
+  }
+
+  const fetchProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    setProfile(data)
   }
 
   const saveClient = async () => {
@@ -97,7 +106,6 @@ export default function ClientDetail({ isAdmin }) {
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-start">
             <div className="flex items-start gap-4">
-              {/* Avatar */}
               <div className="w-14 h-14 rounded-xl bg-[#C8622A]/20 flex items-center justify-center flex-shrink-0">
                 <span className="text-[#C8622A] text-xl font-bold">
                   {(client?.company || client?.client_name || '?')[0].toUpperCase()}
@@ -135,7 +143,6 @@ export default function ClientDetail({ isAdmin }) {
             </div>
           </div>
 
-          {/* Stats row */}
           <div className="grid grid-cols-5 gap-4 mt-6">
             <div className="bg-[#0F1C2E] rounded-lg p-3">
               <p className="text-[#8A9AB0] text-xs mb-1">Proposals</p>
@@ -165,17 +172,13 @@ export default function ClientDetail({ isAdmin }) {
           {client?.email && (
             <div className="flex items-center gap-2">
               <span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Email</span>
-              <a href={`mailto:${client.email}`} className="text-[#C8622A] text-sm hover:underline">
-                {client.email}
-              </a>
+              <a href={`mailto:${client.email}`} className="text-[#C8622A] text-sm hover:underline">{client.email}</a>
             </div>
           )}
           {client?.phone && (
             <div className="flex items-center gap-2">
               <span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Phone</span>
-              <a href={`tel:${client.phone}`} className="text-white text-sm hover:text-[#C8622A] transition-colors">
-                {client.phone}
-              </a>
+              <a href={`tel:${client.phone}`} className="text-white text-sm hover:text-[#C8622A] transition-colors">{client.phone}</a>
             </div>
           )}
           {client?.industry && (
@@ -187,7 +190,7 @@ export default function ClientDetail({ isAdmin }) {
           {fullAddress && (
             <div className="flex items-center gap-2">
               <span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Address</span>
-              <a
+              
                 href={`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`}
                 target="_blank"
                 rel="noreferrer"
@@ -201,7 +204,7 @@ export default function ClientDetail({ isAdmin }) {
 
         {/* Tabs */}
         <div className="flex gap-2">
-          {['proposals', 'notes'].map(t => (
+          {['proposals', 'activity', 'notes'].map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
@@ -209,7 +212,7 @@ export default function ClientDetail({ isAdmin }) {
                 activeTab === t ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
               }`}
             >
-              {t === 'proposals' ? `Proposals (${proposals.length})` : 'Notes'}
+              {t === 'proposals' ? `Proposals (${proposals.length})` : t === 'activity' ? 'Activity' : 'Notes'}
             </button>
           ))}
         </div>
@@ -236,9 +239,7 @@ export default function ClientDetail({ isAdmin }) {
                     className="flex justify-between items-center bg-[#0F1C2E] rounded-lg p-4 cursor-pointer hover:bg-[#0a1628] transition-colors group"
                   >
                     <div>
-                      <p className="text-white font-semibold group-hover:text-[#C8622A] transition-colors">
-                        {proposal.proposal_name}
-                      </p>
+                      <p className="text-white font-semibold group-hover:text-[#C8622A] transition-colors">{proposal.proposal_name}</p>
                       <p className="text-[#8A9AB0] text-sm mt-0.5">
                         {proposal.rep_name} · {proposal.industry}
                         {proposal.close_date && ` · Close: ${proposal.close_date}`}
@@ -248,16 +249,12 @@ export default function ClientDetail({ isAdmin }) {
                       {proposal.total_gross_margin_percent != null && (
                         <div className="text-right">
                           <p className="text-[#8A9AB0] text-xs">Margin</p>
-                          <p className="text-[#C8622A] text-sm font-semibold">
-                            {proposal.total_gross_margin_percent.toFixed(1)}%
-                          </p>
+                          <p className="text-[#C8622A] text-sm font-semibold">{proposal.total_gross_margin_percent.toFixed(1)}%</p>
                         </div>
                       )}
                       <div className="text-right">
                         <p className="text-[#8A9AB0] text-xs">Value</p>
-                        <p className="text-white text-sm font-bold">
-                          ${(proposal.proposal_value || 0).toLocaleString()}
-                        </p>
+                        <p className="text-white text-sm font-bold">${(proposal.proposal_value || 0).toLocaleString()}</p>
                       </div>
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
                         proposal.status === 'Won' ? 'bg-green-500/20 text-green-400' :
@@ -274,6 +271,15 @@ export default function ClientDetail({ isAdmin }) {
               </div>
             )}
           </div>
+        )}
+
+        {/* Activity tab */}
+        {activeTab === 'activity' && (
+          <ActivityTimeline
+            clientId={id}
+            orgId={client?.org_id}
+            userId={profile?.id}
+          />
         )}
 
         {/* Notes tab */}
@@ -306,51 +312,31 @@ export default function ClientDetail({ isAdmin }) {
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-white font-bold text-lg mb-5">Edit Client</h3>
             <div className="space-y-4">
-
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Company</label>
-                  <input
-                    type="text"
-                    value={editForm.company || ''}
-                    onChange={e => setEditForm(p => ({ ...p, company: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  />
+                  <input type="text" value={editForm.company || ''} onChange={e => setEditForm(p => ({ ...p, company: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Contact Name</label>
-                  <input
-                    type="text"
-                    value={editForm.client_name || ''}
-                    onChange={e => setEditForm(p => ({ ...p, client_name: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  />
+                  <input type="text" value={editForm.client_name || ''} onChange={e => setEditForm(p => ({ ...p, client_name: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Email</label>
-                  <input
-                    type="email"
-                    value={editForm.email || ''}
-                    onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  />
+                  <input type="email" value={editForm.email || ''} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Phone</label>
-                  <input
-                    type="text"
-                    value={editForm.phone || ''}
-                    onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  />
+                  <input type="text" value={editForm.phone || ''} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Industry</label>
-                  <select
-                    value={editForm.industry || ''}
-                    onChange={e => setEditForm(p => ({ ...p, industry: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  >
+                  <select value={editForm.industry || ''} onChange={e => setEditForm(p => ({ ...p, industry: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
                     <option value="">Select industry</option>
                     {['Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security', 'General Contractor', 'Other'].map(i => (
                       <option key={i} value={i}>{i}</option>
@@ -358,74 +344,38 @@ export default function ClientDetail({ isAdmin }) {
                   </select>
                 </div>
               </div>
-
-              {/* Address fields */}
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Street Address</label>
-                <input
-                  type="text"
-                  placeholder="123 Main St"
-                  value={editForm.address || ''}
-                  onChange={e => setEditForm(p => ({ ...p, address: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                />
+                <input type="text" placeholder="123 Main St" value={editForm.address || ''} onChange={e => setEditForm(p => ({ ...p, address: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">City</label>
-                  <input
-                    type="text"
-                    placeholder="Nashville"
-                    value={editForm.city || ''}
-                    onChange={e => setEditForm(p => ({ ...p, city: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  />
+                  <input type="text" placeholder="Nashville" value={editForm.city || ''} onChange={e => setEditForm(p => ({ ...p, city: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">State</label>
-                  <input
-                    type="text"
-                    placeholder="TN"
-                    value={editForm.state || ''}
-                    onChange={e => setEditForm(p => ({ ...p, state: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  />
+                  <input type="text" placeholder="TN" value={editForm.state || ''} onChange={e => setEditForm(p => ({ ...p, state: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">ZIP</label>
-                  <input
-                    type="text"
-                    placeholder="37201"
-                    value={editForm.zip || ''}
-                    onChange={e => setEditForm(p => ({ ...p, zip: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  />
+                  <input type="text" placeholder="37201" value={editForm.zip || ''} onChange={e => setEditForm(p => ({ ...p, zip: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
               </div>
-
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Notes</label>
-                <textarea
-                  value={editForm.notes || ''}
-                  onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))}
-                  placeholder="Any notes about this client..."
-                  rows={4}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none"
-                />
+                <textarea value={editForm.notes || ''} onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))}
+                  placeholder="Any notes about this client..." rows={4}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
               </div>
-
               <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setEditingClient(false)}
-                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={saveClient}
-                  disabled={savingClient}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
-                >
+                <button onClick={() => setEditingClient(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={saveClient} disabled={savingClient}
+                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {savingClient ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
