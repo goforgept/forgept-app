@@ -6,6 +6,7 @@ import POList from '../components/POList'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
+import TaskList from '../components/TaskList'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } from 'docx'
 
 export default function ProposalDetail({ isAdmin }) {
@@ -1400,6 +1401,11 @@ export default function ProposalDetail({ isAdmin }) {
         </div>
         {/* FIX: POList is now correctly outside the BOM card */}
         <POList proposalId={id} />
+        <TaskList
+  proposalId={id}
+  orgId={profile?.org_id}
+  userId={profile?.id}
+/>
 
       </div>
 
