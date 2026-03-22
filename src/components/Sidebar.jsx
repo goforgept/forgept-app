@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 
-export default function Sidebar({ isAdmin }) {
+export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false }) {
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -11,25 +11,35 @@ export default function Sidebar({ isAdmin }) {
 
   const adminLinks = [
     { label: 'Dashboard', path: '/', icon: '⬛' },
-    { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
-    { label: 'Forecast', path: '/forecast', icon: '📈' },
-    { label: 'Proposals', path: '/proposals', icon: '📋' },
+    ...(featureCRM ? [
+      { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
+      { label: 'Forecast', path: '/forecast', icon: '📈' },
+      { label: 'Tasks', path: '/tasks', icon: '✅' },
+    ] : []),
+    ...(featureProposals ? [
+      { label: 'Proposals', path: '/proposals', icon: '📋' },
+    ] : []),
     { label: 'Clients', path: '/clients', icon: '🏢' },
-    { label: 'Tasks', path: '/tasks', icon: '✅' },
-    { label: 'Vendors', path: '/vendors', icon: '🏭' },
+    ...(featureProposals ? [
+      { label: 'Vendors', path: '/vendors', icon: '🏭' },
+      { label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' },
+    ] : []),
     { label: 'Team', path: '/reps', icon: '👥' },
-    { label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },
     { label: 'Help', path: '/faq', icon: '❓' },
   ]
 
   const repLinks = [
     { label: 'Dashboard', path: '/', icon: '⬛' },
-    { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
-    { label: 'Proposals', path: '/proposals', icon: '📋' },
-    { label: 'New Proposal', path: '/new', icon: '➕' },
+    ...(featureCRM ? [
+      { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
+      { label: 'Tasks', path: '/tasks', icon: '✅' },
+    ] : []),
+    ...(featureProposals ? [
+      { label: 'Proposals', path: '/proposals', icon: '📋' },
+      { label: 'New Proposal', path: '/new', icon: '➕' },
+    ] : []),
     { label: 'Clients', path: '/clients', icon: '🏢' },
-    { label: 'Tasks', path: '/tasks', icon: '✅' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },
     { label: 'Help', path: '/faq', icon: '❓' },
   ]

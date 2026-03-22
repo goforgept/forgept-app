@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
-export default function ManageReps({ isAdmin }) {
+export default function ManageReps({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [reps, setReps] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -12,27 +12,17 @@ export default function ManageReps({ isAdmin }) {
   const [success, setSuccess] = useState(null)
   const [currentProfile, setCurrentProfile] = useState(null)
 
-  useEffect(() => {
-    fetchCurrentProfile()
-  }, [])
+  useEffect(() => { fetchCurrentProfile() }, [])
 
   const fetchCurrentProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', user.id)
-      .single()
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
     setCurrentProfile(data)
     if (data?.org_id) fetchReps(data.org_id)
   }
 
   const fetchReps = async (orgId) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false })
+    const { data } = await supabase.from('profiles').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
     setReps(data || [])
     setLoading(false)
   }
@@ -48,11 +38,7 @@ export default function ManageReps({ isAdmin }) {
       return
     }
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-    })
-
+    const { data, error: signUpError } = await supabase.auth.signUp({ email: form.email, password: form.password })
     if (signUpError) { setError(signUpError.message); setAdding(false); return }
 
     await supabase.from('profiles').upsert({
@@ -73,7 +59,7 @@ export default function ManageReps({ isAdmin }) {
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">
@@ -94,40 +80,22 @@ export default function ManageReps({ isAdmin }) {
             <div className="grid grid-cols-3 gap-4 mb-4">
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Full Name</label>
-                <input
-                  type="text"
-                  value={form.full_name}
-                  onChange={e => setForm(prev => ({ ...prev, full_name: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  placeholder="John Smith"
-                />
+                <input type="text" value={form.full_name} onChange={e => setForm(prev => ({ ...prev, full_name: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" placeholder="John Smith" />
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Email</label>
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  placeholder="rep@company.com"
-                />
+                <input type="email" value={form.email} onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" placeholder="rep@company.com" />
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Temporary Password</label>
-                <input
-                  type="text"
-                  value={form.password}
-                  onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  placeholder="TempPass123!"
-                />
+                <input type="text" value={form.password} onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" placeholder="TempPass123!" />
               </div>
             </div>
-            <button
-              onClick={handleAddRep}
-              disabled={adding}
-              className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
-            >
+            <button onClick={handleAddRep} disabled={adding}
+              className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
               {adding ? 'Creating...' : 'Create Rep Account'}
             </button>
           </div>
@@ -147,11 +115,7 @@ export default function ManageReps({ isAdmin }) {
                     <p className="text-white font-medium">{rep.full_name || '—'}</p>
                     <p className="text-[#8A9AB0] text-sm">{rep.email}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    rep.org_role === 'admin'
-                      ? 'bg-[#C8622A]/20 text-[#C8622A]'
-                      : 'bg-[#8A9AB0]/20 text-[#8A9AB0]'
-                  }`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${rep.org_role === 'admin' ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#8A9AB0]/20 text-[#8A9AB0]'}`}>
                     {rep.org_role || rep.role}
                   </span>
                 </div>

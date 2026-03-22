@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx'
 import TaskList from '../components/TaskList'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } from 'docx'
 
-export default function ProposalDetail({ isAdmin }) {
+export default function ProposalDetail({ isAdmin, featureProposals = true, featureCRM = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [proposal, setProposal] = useState(null)
@@ -943,7 +943,7 @@ export default function ProposalDetail({ isAdmin }) {
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6">
 

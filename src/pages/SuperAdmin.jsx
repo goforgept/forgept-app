@@ -10,6 +10,12 @@ const PLANS = [
   { name: 'Enterprise', rate: null, color: 'text-green-400', bg: 'bg-green-500/20' },
 ]
 
+const ORG_TYPES = [
+  { value: 'integrator', label: 'Integrator', desc: 'Trades contractor — full BOM, proposals, POs' },
+  { value: 'manufacturer', label: 'Manufacturer', desc: 'Product catalog, quotes, AI email tools' },
+  { value: 'distributor', label: 'Distributor', desc: 'Dealer management, price lists, quotes' },
+]
+
 const emptyBillingForm = { plan: 'Trial', billing_status: 'trial', monthly_rate: 0, trial_ends_at: '' }
 
 export default function SuperAdmin() {
@@ -20,6 +26,8 @@ export default function SuperAdmin() {
   const [activeTab, setActiveTab] = useState('requests')
   const [editingBilling, setEditingBilling] = useState(null)
   const [billingForm, setBillingForm] = useState(emptyBillingForm)
+  const [editingOrg, setEditingOrg] = useState(null)
+  const [orgForm, setOrgForm] = useState({})
   const [unauthorized, setUnauthorized] = useState(false)
   const [stripeModal, setStripeModal] = useState(null)
   const [stripeForm, setStripeForm] = useState({ plan: 'Solo', chargeOnboarding: true })
@@ -82,6 +90,25 @@ export default function SuperAdmin() {
 
   const reactivateOrg = async (orgId) => {
     await supabase.from('organizations').update({ status: 'active' }).eq('id', orgId)
+    fetchData()
+  }
+
+  const startEditingOrg = (org) => {
+    setEditingOrg(org.id)
+    setOrgForm({
+      org_type: org.org_type || 'integrator',
+      feature_proposals: org.feature_proposals !== false,
+      feature_crm: org.feature_crm || false,
+    })
+  }
+
+  const saveOrgSettings = async (orgId) => {
+    await supabase.from('organizations').update({
+      org_type: orgForm.org_type,
+      feature_proposals: orgForm.feature_proposals,
+      feature_crm: orgForm.feature_crm,
+    }).eq('id', orgId)
+    setEditingOrg(null)
     fetchData()
   }
 
@@ -158,6 +185,12 @@ export default function SuperAdmin() {
     return 'bg-[#2a3d55] text-[#8A9AB0]'
   }
 
+  const getOrgTypeColor = (type) => {
+    if (type === 'manufacturer') return 'bg-purple-500/20 text-purple-400'
+    if (type === 'distributor') return 'bg-blue-500/20 text-blue-400'
+    return 'bg-[#C8622A]/20 text-[#C8622A]'
+  }
+
   const pendingRequests = requests.filter(r => r.status === 'pending')
   const mrr = orgs.filter(o => o.billing_status === 'active').reduce((sum, o) => sum + (o.monthly_rate || 0), 0)
   const activeOrgs = orgs.filter(o => o.billing_status === 'active').length
@@ -216,7 +249,7 @@ export default function SuperAdmin() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[#2a3d55]">
-                      {['Name', 'Email', 'Company', 'Notes', 'Date', 'Status', 'Actions'].map(h => (
+                      {['Name', 'Email', 'Company', 'Role', 'Notes', 'Date', 'Status', 'Actions'].map(h => (
                         <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
                       ))}
                     </tr>
@@ -227,6 +260,11 @@ export default function SuperAdmin() {
                         <td className="text-white py-3 pr-4 font-medium">{req.full_name}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{req.email}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{req.company_name}</td>
+                        <td className="py-3 pr-4">
+                          {req.role ? (
+                            <span className="bg-[#2a3d55] text-white text-xs px-2 py-1 rounded">{req.role}</span>
+                          ) : <span className="text-[#8A9AB0]">—</span>}
+                        </td>
                         <td className="text-[#8A9AB0] py-3 pr-4 max-w-xs truncate">{req.notes || '—'}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{new Date(req.created_at).toLocaleDateString()}</td>
                         <td className="py-3 pr-4">
@@ -256,43 +294,122 @@ export default function SuperAdmin() {
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">All Organizations</h3>
             {loading ? <p className="text-[#8A9AB0]">Loading...</p> : orgs.length === 0 ? <p className="text-[#8A9AB0]">No organizations yet.</p> : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#2a3d55]">
-                      {['Company', 'Admin', 'Email', 'Users', 'Status', 'Created', 'Actions'].map(h => (
-                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orgs.map(org => {
-                      const admin = getOrgAdmin(org.id)
-                      const memberCount = getOrgProfiles(org.id).length
-                      const status = org.status || 'active'
-                      return (
-                        <tr key={org.id} className="border-b border-[#2a3d55]/30">
-                          <td className="text-white py-3 pr-4 font-medium">{org.name}</td>
-                          <td className="text-[#8A9AB0] py-3 pr-4">{admin?.full_name || '—'}</td>
-                          <td className="text-[#8A9AB0] py-3 pr-4">{admin?.email || '—'}</td>
-                          <td className="text-[#8A9AB0] py-3 pr-4">{memberCount}</td>
-                          <td className="py-3 pr-4">
-                            <span className={`text-xs font-semibold px-2 py-1 rounded ${status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : status === 'suspended' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
+              <div className="space-y-3">
+                {orgs.map(org => {
+                  const admin = getOrgAdmin(org.id)
+                  const memberCount = getOrgProfiles(org.id).length
+                  const status = org.status || 'active'
+                  const isEditing = editingOrg === org.id
+
+                  return (
+                    <div key={org.id} className="border border-[#2a3d55] rounded-xl p-4">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-white font-semibold">{org.name}</p>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>
+                              {org.org_type || 'integrator'}
+                            </span>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : status === 'suspended' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
                               {status}
                             </span>
-                          </td>
-                          <td className="text-[#8A9AB0] py-3 pr-4">{new Date(org.created_at).toLocaleDateString()}</td>
-                          <td className="py-3">
-                            <div className="flex gap-2">
-                              {status === 'active' && <button onClick={() => suspendOrg(org.id)} className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors">Suspend</button>}
-                              {status === 'suspended' && <button onClick={() => reactivateOrg(org.id)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">Reactivate</button>}
+                          </div>
+                          <p className="text-[#8A9AB0] text-xs">{admin?.full_name || '—'} · {admin?.email || '—'} · {memberCount} users</p>
+                          <div className="flex gap-2 mt-1.5">
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_proposals !== false ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                              {org.feature_proposals !== false ? '✓ Proposals' : '✗ Proposals'}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                              {org.feature_crm ? '✓ CRM' : '✗ CRM'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => isEditing ? setEditingOrg(null) : startEditingOrg(org)}
+                            className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors"
+                          >
+                            {isEditing ? 'Cancel' : 'Edit Settings'}
+                          </button>
+                          {status === 'active' && (
+                            <button onClick={() => suspendOrg(org.id)} className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors">Suspend</button>
+                          )}
+                          {status === 'suspended' && (
+                            <button onClick={() => reactivateOrg(org.id)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">Reactivate</button>
+                          )}
+                        </div>
+                      </div>
+
+                      {isEditing && (
+                        <div className="mt-4 pt-4 border-t border-[#2a3d55] space-y-4">
+                          <div>
+                            <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">Org Type</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {ORG_TYPES.map(type => (
+                                <button
+                                  key={type.value}
+                                  onClick={() => setOrgForm(p => ({ ...p, org_type: type.value }))}
+                                  className={`p-3 rounded-lg border text-left transition-colors ${
+                                    orgForm.org_type === type.value
+                                      ? 'border-[#C8622A] bg-[#C8622A]/10'
+                                      : 'border-[#2a3d55] bg-[#0F1C2E] hover:border-[#3a4d65]'
+                                  }`}
+                                >
+                                  <p className={`text-sm font-semibold ${orgForm.org_type === type.value ? 'text-[#C8622A]' : 'text-white'}`}>{type.label}</p>
+                                  <p className="text-[#8A9AB0] text-xs mt-0.5">{type.desc}</p>
+                                </button>
+                              ))}
                             </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+                          </div>
+
+                          <div>
+                            <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">Feature Access</label>
+                            <div className="flex gap-3">
+                              <button
+                                onClick={() => setOrgForm(p => ({ ...p, feature_proposals: !p.feature_proposals }))}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+                                  orgForm.feature_proposals
+                                    ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]'
+                                    : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'
+                                }`}
+                              >
+                                <span>{orgForm.feature_proposals ? '✓' : '○'}</span>
+                                Proposals
+                              </button>
+                              <button
+                                onClick={() => setOrgForm(p => ({ ...p, feature_crm: !p.feature_crm }))}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${
+                                  orgForm.feature_crm
+                                    ? 'border-purple-400 bg-purple-500/10 text-purple-400'
+                                    : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'
+                                }`}
+                              >
+                                <span>{orgForm.feature_crm ? '✓' : '○'}</span>
+                                CRM
+                              </button>
+                              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold ${
+                                orgForm.feature_proposals && orgForm.feature_crm
+                                  ? 'border-green-400 bg-green-500/10 text-green-400'
+                                  : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'
+                              }`}>
+                                {orgForm.feature_proposals && orgForm.feature_crm ? '✓ Full Suite' : '○ Full Suite'}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end">
+                            <button
+                              onClick={() => saveOrgSettings(org.id)}
+                              className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+                            >
+                              Save Settings
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
@@ -323,26 +440,31 @@ export default function SuperAdmin() {
                     <div key={org.id} className="border border-[#2a3d55] rounded-xl p-4">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="text-white font-semibold">{org.name}</p>
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="text-white font-semibold">{org.name}</p>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>
+                              {org.org_type || 'integrator'}
+                            </span>
+                          </div>
                           <p className="text-[#8A9AB0] text-xs">{admin?.email || '—'}</p>
-                          {hasStripe && (
-                            <p className="text-green-400 text-xs mt-1">✓ Stripe connected</p>
-                          )}
+                          <div className="flex gap-2 mt-1">
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_proposals !== false ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                              {org.feature_proposals !== false ? '✓ Proposals' : '✗ Proposals'}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                              {org.feature_crm ? '✓ CRM' : '✗ CRM'}
+                            </span>
+                          </div>
+                          {hasStripe && <p className="text-green-400 text-xs mt-1">✓ Stripe connected</p>}
                         </div>
                         <div className="flex items-center gap-2 flex-wrap justify-end">
                           <span className={`text-xs font-semibold px-2 py-1 rounded ${plan.bg} ${plan.color}`}>{org.plan || 'Trial'}</span>
                           <span className={`text-xs font-semibold px-2 py-1 rounded ${getBillingStatusColor(org.billing_status)}`}>{org.billing_status || 'trial'}</span>
                           {org.monthly_rate > 0 && <span className="text-white text-sm font-bold">${org.monthly_rate}/mo</span>}
-                          <button
-                            onClick={() => openStripeModal(org)}
-                            className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors"
-                          >
+                          <button onClick={() => openStripeModal(org)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">
                             {hasStripe ? 'Update Subscription' : 'Create Subscription'}
                           </button>
-                          <button
-                            onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)}
-                            className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors"
-                          >
+                          <button onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">
                             {isEditing ? 'Cancel' : 'Manual Edit'}
                           </button>
                         </div>
@@ -402,7 +524,6 @@ export default function SuperAdmin() {
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
             <h3 className="text-white font-bold text-lg mb-1">Create Stripe Subscription</h3>
             <p className="text-[#8A9AB0] text-sm mb-5">{stripeModal.org.name} · {stripeModal.admin?.email || 'No admin email'}</p>
-
             <div className="space-y-4">
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label>
@@ -413,20 +534,12 @@ export default function SuperAdmin() {
                   <option value="Business">Business — $349/mo</option>
                 </select>
               </div>
-
               <div className="flex items-center gap-3 bg-[#0F1C2E] rounded-lg px-4 py-3">
-                <input
-                  type="checkbox"
-                  id="onboarding"
-                  checked={stripeForm.chargeOnboarding}
-                  onChange={e => setStripeForm(p => ({ ...p, chargeOnboarding: e.target.checked }))}
-                  className="accent-[#C8622A]"
-                />
+                <input type="checkbox" id="onboarding" checked={stripeForm.chargeOnboarding} onChange={e => setStripeForm(p => ({ ...p, chargeOnboarding: e.target.checked }))} className="accent-[#C8622A]" />
                 <label htmlFor="onboarding" className="text-white text-sm cursor-pointer">
                   Charge one-time onboarding fee <span className="text-[#C8622A] font-semibold">$249</span>
                 </label>
               </div>
-
               <div className="bg-[#0F1C2E] rounded-lg p-3 text-xs text-[#8A9AB0]">
                 <p className="font-semibold text-white mb-1">What this does:</p>
                 <p>• Creates a Stripe customer for {stripeModal.org.name}</p>
@@ -435,20 +548,14 @@ export default function SuperAdmin() {
                 <p>• Updates billing status in ForgePt.</p>
                 <p className="mt-2 text-yellow-400">Note: Customer will need to add payment method via Stripe dashboard or payment link.</p>
               </div>
-
               {stripeResult && (
                 <div className={`rounded-lg px-4 py-3 text-sm font-semibold ${stripeResult.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                   {stripeResult.message}
                 </div>
               )}
-
               <div className="flex gap-3 pt-2">
-                <button onClick={() => { setStripeModal(null); setStripeResult(null) }}
-                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">
-                  Cancel
-                </button>
-                <button onClick={createSubscription} disabled={creatingSubscription}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                <button onClick={() => { setStripeModal(null); setStripeResult(null) }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={createSubscription} disabled={creatingSubscription} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {creatingSubscription ? 'Creating...' : 'Create Subscription'}
                 </button>
               </div>

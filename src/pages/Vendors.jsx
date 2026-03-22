@@ -8,7 +8,7 @@ const emptyForm = {
   default_markup_percent: '', notes: ''
 }
 
-export default function Vendors({ isAdmin }) {
+export default function Vendors({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
@@ -118,7 +118,8 @@ export default function Vendors({ isAdmin }) {
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
+
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">

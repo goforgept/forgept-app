@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
-export default function Settings({ isAdmin }) {
+export default function Settings({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [profile, setProfile] = useState(null)
   const [form, setForm] = useState({
     full_name: '',
@@ -148,7 +148,7 @@ export default function Settings({ isAdmin }) {
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6 max-w-3xl">
         <h2 className="text-white text-2xl font-bold">Settings</h2>

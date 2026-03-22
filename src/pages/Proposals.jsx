@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
-export default function Proposals({ isAdmin }) {
+export default function Proposals({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -76,7 +76,7 @@ export default function Proposals({ isAdmin }) {
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6">
         <div className="flex justify-between items-center mb-6">

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
-export default function PurchaseOrders({ isAdmin }) {
+export default function PurchaseOrders({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [pos, setPOs] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('All')
@@ -51,7 +51,7 @@ export default function PurchaseOrders({ isAdmin }) {
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6">
         <h2 className="text-white text-2xl font-bold">Purchase Orders</h2>

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
-export default function AdminDashboard() {
+export default function AdminDashboard({ featureProposals = true, featureCRM = false }) {
   const [proposals, setProposals] = useState([])
   const [lineItems, setLineItems] = useState([])
   const [clients, setClients] = useState([])
@@ -223,29 +223,22 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={true} />
+      <Sidebar isAdmin={true} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6">
 
-        {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-white text-2xl font-bold">Team Dashboard</h2>
           <div className="flex gap-2">
             {Object.entries(periodLabels).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setPeriod(key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  period === key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
-                }`}
-              >
+              <button key={key} onClick={() => setPeriod(key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${period === key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
                 {label}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Stats — 6 cards */}
         <div className="grid grid-cols-6 gap-4 mb-6">
           <div onClick={() => navigate(`/proposals?status=active`)} className="bg-[#1a2d45] rounded-xl p-5 cursor-pointer hover:bg-[#1f3550] transition-colors">
             <p className="text-[#8A9AB0] text-xs mb-1">Active Pipeline</p>
@@ -276,7 +269,6 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Needs Attention */}
         {!loading && needsAttention.length > 0 && (
           <div className="bg-[#1a2d45] border border-yellow-500/30 rounded-xl p-5 mb-6">
             <div className="flex items-center gap-2 mb-4">
@@ -307,38 +299,26 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Tasks Today + Recent Activity */}
         <div className="grid grid-cols-2 gap-6 mb-6">
-
-          {/* Tasks Due Today */}
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-white font-bold text-lg">
                 Tasks Today
                 {todayTasks.length > 0 && (
-                  <span className="ml-2 bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-semibold">
-                    {todayTasks.length}
-                  </span>
+                  <span className="ml-2 bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-semibold">{todayTasks.length}</span>
                 )}
               </h3>
-              <button onClick={() => navigate('/tasks')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
-                View all →
-              </button>
+              <button onClick={() => navigate('/tasks')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">View all →</button>
             </div>
-
             {loading ? (
               <p className="text-[#8A9AB0] text-sm">Loading...</p>
             ) : tasks.length === 0 ? (
               <p className="text-[#8A9AB0] text-sm">No open tasks. You are all caught up.</p>
             ) : (
               <div className="space-y-2">
-                {/* Overdue first */}
                 {overdueTasks.slice(0, 2).map(task => (
                   <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg border border-red-500/20 bg-red-500/5">
-                    <button
-                      onClick={() => toggleTask(task)}
-                      className="w-5 h-5 rounded border-2 border-[#2a3d55] hover:border-[#C8622A] flex items-center justify-center shrink-0 transition-colors"
-                    />
+                    <button onClick={() => toggleTask(task)} className="w-5 h-5 rounded border-2 border-[#2a3d55] hover:border-[#C8622A] flex items-center justify-center shrink-0 transition-colors" />
                     <div className="flex-1">
                       <p className="text-white text-sm font-medium">{task.title}</p>
                       <div className="flex gap-2 mt-0.5">
@@ -349,13 +329,9 @@ export default function AdminDashboard() {
                     <span className="text-red-400 text-xs font-semibold">Overdue</span>
                   </div>
                 ))}
-                {/* Due today */}
                 {todayTasks.map(task => (
                   <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg border border-[#C8622A]/20 bg-[#C8622A]/5">
-                    <button
-                      onClick={() => toggleTask(task)}
-                      className="w-5 h-5 rounded border-2 border-[#2a3d55] hover:border-[#C8622A] flex items-center justify-center shrink-0 transition-colors"
-                    />
+                    <button onClick={() => toggleTask(task)} className="w-5 h-5 rounded border-2 border-[#2a3d55] hover:border-[#C8622A] flex items-center justify-center shrink-0 transition-colors" />
                     <div className="flex-1">
                       <p className="text-white text-sm font-medium">{task.title}</p>
                       <div className="flex gap-2 mt-0.5">
@@ -366,13 +342,9 @@ export default function AdminDashboard() {
                     <span className="text-[#C8622A] text-xs font-semibold">Today</span>
                   </div>
                 ))}
-                {/* Upcoming */}
                 {upcomingTasks.map(task => (
                   <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg border border-[#2a3d55]/50 bg-[#0F1C2E]/30">
-                    <button
-                      onClick={() => toggleTask(task)}
-                      className="w-5 h-5 rounded border-2 border-[#2a3d55] hover:border-[#C8622A] flex items-center justify-center shrink-0 transition-colors"
-                    />
+                    <button onClick={() => toggleTask(task)} className="w-5 h-5 rounded border-2 border-[#2a3d55] hover:border-[#C8622A] flex items-center justify-center shrink-0 transition-colors" />
                     <div className="flex-1">
                       <p className="text-white text-sm font-medium">{task.title}</p>
                       <div className="flex gap-2 mt-0.5">
@@ -387,15 +359,11 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* Recent Activity */}
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-white font-bold text-lg">Recent Activity</h3>
-              <button onClick={() => navigate('/clients')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
-                View clients →
-              </button>
+              <button onClick={() => navigate('/clients')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">View clients →</button>
             </div>
-
             {loading ? (
               <p className="text-[#8A9AB0] text-sm">Loading...</p>
             ) : activities.length === 0 ? (
@@ -404,9 +372,7 @@ export default function AdminDashboard() {
               <div className="space-y-0">
                 {activities.map((activity, i) => (
                   <div key={activity.id} className="flex gap-3 relative">
-                    {i < activities.length - 1 && (
-                      <div className="absolute left-4 top-8 bottom-0 w-px bg-[#2a3d55]" />
-                    )}
+                    {i < activities.length - 1 && <div className="absolute left-4 top-8 bottom-0 w-px bg-[#2a3d55]" />}
                     <div className="w-8 h-8 rounded-full bg-[#0F1C2E] border border-[#2a3d55] flex items-center justify-center text-sm shrink-0 z-10">
                       {activityIcon(activity.type)}
                     </div>
@@ -417,16 +383,11 @@ export default function AdminDashboard() {
                       </div>
                       <div className="flex gap-2 mt-0.5">
                         {activity.clients?.company && (
-                          <button
-                            onClick={() => navigate(`/client/${activity.client_id}`)}
-                            className="text-[#C8622A] text-xs hover:underline"
-                          >
+                          <button onClick={() => navigate(`/client/${activity.client_id}`)} className="text-[#C8622A] text-xs hover:underline">
                             {activity.clients.company}
                           </button>
                         )}
-                        {activity.profiles?.full_name && (
-                          <span className="text-[#8A9AB0] text-xs">{activity.profiles.full_name}</span>
-                        )}
+                        {activity.profiles?.full_name && <span className="text-[#8A9AB0] text-xs">{activity.profiles.full_name}</span>}
                       </div>
                     </div>
                   </div>
@@ -437,14 +398,9 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-2 gap-6 mb-6">
-          {/* Rep Leaderboard */}
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Rep Leaderboard{periodShort[period]}</h3>
-            {loading ? (
-              <p className="text-[#8A9AB0]">Loading...</p>
-            ) : repStats.length === 0 ? (
-              <p className="text-[#8A9AB0]">No data yet.</p>
-            ) : (
+            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : repStats.length === 0 ? <p className="text-[#8A9AB0]">No data yet.</p> : (
               <div className="space-y-4">
                 {repStats.map((rep, i) => (
                   <div key={rep.name} onClick={() => navigate(`/proposals?rep=${encodeURIComponent(rep.name)}`)} className="flex justify-between items-center cursor-pointer hover:bg-[#0F1C2E] rounded-lg p-2 transition-colors">
@@ -468,14 +424,9 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* Closing Soon */}
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Closing Soon</h3>
-            {loading ? (
-              <p className="text-[#8A9AB0]">Loading...</p>
-            ) : closingSoonList.length === 0 ? (
-              <p className="text-[#8A9AB0]">Nothing closing in the next 30 days.</p>
-            ) : (
+            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : closingSoonList.length === 0 ? <p className="text-[#8A9AB0]">Nothing closing in the next 30 days.</p> : (
               <div className="space-y-3">
                 {closingSoonList.map(p => {
                   const days = Math.ceil((new Date(p.close_date) - new Date()) / (1000 * 60 * 60 * 24))
@@ -501,14 +452,9 @@ export default function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-2 gap-6">
-          {/* Top Clients */}
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Top Clients{periodShort[period]}</h3>
-            {loading ? (
-              <p className="text-[#8A9AB0]">Loading...</p>
-            ) : topClients.length === 0 ? (
-              <p className="text-[#8A9AB0]">No client data yet.</p>
-            ) : (
+            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : topClients.length === 0 ? <p className="text-[#8A9AB0]">No client data yet.</p> : (
               <div className="space-y-4">
                 {topClients.map((client, i) => (
                   <div key={client.id} onClick={() => navigate(`/client/${client.id}`)} className="flex justify-between items-center cursor-pointer hover:bg-[#0F1C2E] rounded-lg p-2 transition-colors">
@@ -529,14 +475,9 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          {/* Top Vendors */}
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Top Vendors{periodShort[period]}</h3>
-            {loading ? (
-              <p className="text-[#8A9AB0]">Loading...</p>
-            ) : topVendors.length === 0 ? (
-              <p className="text-[#8A9AB0]">No vendor data yet.</p>
-            ) : (
+            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : topVendors.length === 0 ? <p className="text-[#8A9AB0]">No vendor data yet.</p> : (
               <div className="space-y-4">
                 {topVendors.map((vendor, i) => (
                   <div key={vendor.name} onClick={() => navigate(`/vendors`)} className="flex justify-between items-center cursor-pointer hover:bg-[#0F1C2E] rounded-lg p-2 transition-colors">

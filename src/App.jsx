@@ -1,135 +1,90 @@
-import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { supabase } from './supabase'
-import Login from './pages/Login'
-import Dashboard from './pages/Dashboard'
-import ProposalDetail from './pages/ProposalDetail'
-import NewProposal from './pages/NewProposal'
-import AdminDashboard from './pages/AdminDashboard'
-import ManageReps from './pages/ManageReps'
-import Proposals from './pages/Proposals'
-import Vendors from './pages/Vendors'
-import Settings from './pages/Settings'
-import ResetPassword from './pages/ResetPassword'
-import Clients from './pages/Clients'
-import SuperAdmin from './pages/SuperAdmin'
-import ClientDetail from './pages/ClientDetail'
-import PurchaseOrders from './pages/PurchaseOrders'
-import FAQ from './pages/FAQ'
-import Tasks from './pages/Tasks'
-import Pipeline from './pages/Pipeline'
-import Forecast from './pages/Forecast'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { supabase } from '../supabase'
 
-function App() {
-  const [session, setSession] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false }) {
+  const navigate = useNavigate()
+  const location = useLocation()
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      if (session) fetchProfile(session.user.id)
-      else setLoading(false)
-    })
-
-    supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      if (session) fetchProfile(session.user.id)
-      else { setProfile(null); setLoading(false) }
-    })
-  }, [])
-
-  const fetchProfile = async (userId) => {
-    // Retry up to 5 times waiting for profile to be created
-    for (let i = 0; i < 5; i++) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*, organizations(status)')
-        .eq('id', userId)
-        .single()
-
-      if (data?.org_role) {
-        setProfile(data)
-        setLoading(false)
-        return
-      }
-
-      // Wait 1 second before retrying
-      await new Promise(resolve => setTimeout(resolve, 1000))
-    }
-
-    // Give up after 5 tries and set whatever we have
-    const { data } = await supabase
-      .from('profiles')
-      .select('*, organizations(status)')
-      .eq('id', userId)
-      .single()
-    setProfile(data)
-    setLoading(false)
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
   }
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-white text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
-        <p className="text-[#8A9AB0] text-sm">Loading...</p>
-      </div>
-    </div>
-  )
+  const adminLinks = [
+    { label: 'Dashboard', path: '/', icon: '⬛' },
+    ...(featureCRM ? [
+      { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
+      { label: 'Forecast', path: '/forecast', icon: '📈' },
+      { label: 'Tasks', path: '/tasks', icon: '✅' },
+    ] : []),
+    ...(featureProposals ? [
+      { label: 'Proposals', path: '/proposals', icon: '📋' },
+    ] : []),
+    { label: 'Clients', path: '/clients', icon: '🏢' },
+    ...(featureProposals ? [
+      { label: 'Vendors', path: '/vendors', icon: '🏭' },
+      { label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' },
+    ] : []),
+    { label: 'Team', path: '/reps', icon: '👥' },
+    { label: 'Settings', path: '/settings', icon: '⚙️' },
+    { label: 'Help', path: '/faq', icon: '❓' },
+  ]
 
-  const isAdmin = profile?.org_role === 'admin' || profile?.role === 'admin'
-  const isPending = profile?.organizations?.status === 'pending'
+  const repLinks = [
+    { label: 'Dashboard', path: '/', icon: '⬛' },
+    ...(featureCRM ? [
+      { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
+      { label: 'Tasks', path: '/tasks', icon: '✅' },
+    ] : []),
+    ...(featureProposals ? [
+      { label: 'Proposals', path: '/proposals', icon: '📋' },
+      { label: 'New Proposal', path: '/new', icon: '➕' },
+    ] : []),
+    { label: 'Clients', path: '/clients', icon: '🏢' },
+    { label: 'Settings', path: '/settings', icon: '⚙️' },
+    { label: 'Help', path: '/faq', icon: '❓' },
+  ]
 
-  if (session && isPending) return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
-      <div className="text-center max-w-md">
-        <h1 className="text-white text-4xl font-bold mb-2">
-          ForgePt<span className="text-[#C8622A]">.</span>
-        </h1>
-        <div className="bg-[#1a2d45] rounded-2xl p-8 mt-6">
-          <p className="text-yellow-400 text-lg font-semibold mb-3">⏳ Account Pending Approval</p>
-          <p className="text-[#8A9AB0] text-sm">Your account is being reviewed. You will receive an email once approved.</p>
-          <button
-            onClick={() => supabase.auth.signOut()}
-            className="mt-6 text-[#8A9AB0] hover:text-white text-sm transition-colors"
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
-    </div>
-  )
+  const links = isAdmin ? adminLinks : repLinks
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/reset-password" element={<ResetPassword />} />
-        {!session ? (
-          <Route path="*" element={<Login />} />
-        ) : (
-          <>
-            <Route path="/" element={isAdmin ? <AdminDashboard /> : <Dashboard />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/rep" element={<Dashboard />} />
-            <Route path="/new" element={<NewProposal />} />
-            <Route path="/proposal/:id" element={<ProposalDetail isAdmin={isAdmin} />} />
-            <Route path="/reps" element={<ManageReps isAdmin={isAdmin} />} />
-            <Route path="/proposals" element={<Proposals isAdmin={isAdmin} />} />
-            <Route path="/vendors" element={<Vendors isAdmin={isAdmin} />} />
-            <Route path="/settings" element={<Settings isAdmin={isAdmin} />} />
-            <Route path="/clients" element={<Clients isAdmin={isAdmin} />} />
-            <Route path="/superadmin" element={<SuperAdmin />} />
-            <Route path="/client/:id" element={<ClientDetail isAdmin={isAdmin} />} />
-            <Route path="/purchase-orders" element={<PurchaseOrders isAdmin={isAdmin} />} />
-            <Route path="/faq" element={<FAQ isAdmin={isAdmin} />} />
-            <Route path="/tasks" element={<Tasks isAdmin={isAdmin} />} />
-            <Route path="/pipeline" element={<Pipeline isAdmin={isAdmin} />} />
-            <Route path="/forecast" element={<Forecast isAdmin={isAdmin} />} />
-          </>
+    <div className="w-56 min-h-screen bg-[#1a2d45] border-r border-[#2a3d55] flex flex-col">
+      <div className="px-6 py-5 border-b border-[#2a3d55]">
+        <h1 className="text-white text-xl font-bold">
+          ForgePt<span className="text-[#C8622A]">.</span>
+        </h1>
+        {isAdmin && (
+          <span className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-semibold mt-1 inline-block">
+            Admin
+          </span>
         )}
-      </Routes>
-    </BrowserRouter>
+      </div>
+
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        {links.map(({ label, path, icon }) => (
+          <button
+            key={path}
+            onClick={() => navigate(path)}
+            className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${
+              location.pathname === path
+                ? 'bg-[#C8622A]/20 text-[#C8622A]'
+                : 'text-[#8A9AB0] hover:text-white hover:bg-[#0F1C2E]'
+            }`}
+          >
+            <span>{icon}</span>
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="px-3 py-4 border-t border-[#2a3d55]">
+        <button
+          onClick={handleSignOut}
+          className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-[#8A9AB0] hover:text-white hover:bg-[#0F1C2E] transition-colors flex items-center gap-3"
+        >
+          <span>🚪</span>
+          Sign Out
+        </button>
+      </div>
+    </div>
   )
 }
-
-export default App
