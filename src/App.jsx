@@ -19,6 +19,7 @@ import FAQ from './pages/FAQ'
 import Tasks from './pages/Tasks'
 import Pipeline from './pages/Pipeline'
 import Forecast from './pages/Forecast'
+import Catalog from './pages/Catalog'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -127,6 +128,7 @@ function App() {
             <Route path="/tasks" element={<Tasks isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
             <Route path="/pipeline" element={<Pipeline isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
             <Route path="/forecast" element={<Forecast isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+            <Route path="/catalog" element={<Catalog isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
           </>
         )}
       </Routes>

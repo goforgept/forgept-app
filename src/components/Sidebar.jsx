@@ -22,6 +22,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
 
   const adminLinks = [
     { label: 'Dashboard', path: '/', icon: '⬛' },
+    { label: 'Catalog', path: '/catalog', icon: '📦' },
     ...(featureCRM ? [
       { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
       { label: 'Forecast', path: '/forecast', icon: '📈' },
@@ -42,6 +43,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
 
   const repLinks = [
     { label: 'Dashboard', path: '/', icon: '⬛' },
+    { label: 'Catalog', path: '/catalog', icon: '📦' },
     ...(featureCRM ? [
       { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
       { label: 'Tasks', path: '/tasks', icon: '✅' },
