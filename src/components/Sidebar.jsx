@@ -13,6 +13,7 @@ export default function Sidebar({ isAdmin }) {
     { label: 'Dashboard', path: '/', icon: '⬛' },
     { label: 'Proposals', path: '/proposals', icon: '📋' },
     { label: 'Clients', path: '/clients', icon: '🏢' },
+    { label: 'Tasks', path: '/tasks', icon: '✅' },
     { label: 'Vendors', path: '/vendors', icon: '🏭' },
     { label: 'Team', path: '/reps', icon: '👥' },
     { label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' },
@@ -25,6 +26,7 @@ export default function Sidebar({ isAdmin }) {
     { label: 'Proposals', path: '/proposals', icon: '📋' },
     { label: 'New Proposal', path: '/new', icon: '➕' },
     { label: 'Clients', path: '/clients', icon: '🏢' },
+    { label: 'Tasks', path: '/tasks', icon: '✅' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },
     { label: 'Help', path: '/faq', icon: '❓' },
   ]

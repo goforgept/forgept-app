@@ -190,7 +190,7 @@ export default function ClientDetail({ isAdmin }) {
           {fullAddress && (
             <div className="flex items-center gap-2">
               <span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Address</span>
-              
+                <a              
                 href={`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`}
                 target="_blank"
                 rel="noreferrer"
