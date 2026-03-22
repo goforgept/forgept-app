@@ -11,6 +11,7 @@ export default function Sidebar({ isAdmin }) {
 
   const adminLinks = [
     { label: 'Dashboard', path: '/', icon: '⬛' },
+    { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
     { label: 'Proposals', path: '/proposals', icon: '📋' },
     { label: 'Clients', path: '/clients', icon: '🏢' },
     { label: 'Tasks', path: '/tasks', icon: '✅' },
@@ -23,6 +24,7 @@ export default function Sidebar({ isAdmin }) {
 
   const repLinks = [
     { label: 'Dashboard', path: '/', icon: '⬛' },
+    { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
     { label: 'Proposals', path: '/proposals', icon: '📋' },
     { label: 'New Proposal', path: '/new', icon: '➕' },
     { label: 'Clients', path: '/clients', icon: '🏢' },

@@ -17,6 +17,7 @@ import ClientDetail from './pages/ClientDetail'
 import PurchaseOrders from './pages/PurchaseOrders'
 import FAQ from './pages/FAQ'
 import Tasks from './pages/Tasks'
+import Pipeline from './pages/Pipeline'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -121,6 +122,7 @@ function App() {
             <Route path="/purchase-orders" element={<PurchaseOrders isAdmin={isAdmin} />} />
             <Route path="/faq" element={<FAQ isAdmin={isAdmin} />} />
             <Route path="/tasks" element={<Tasks isAdmin={isAdmin} />} />
+            <Route path="/pipeline" element={<Pipeline isAdmin={isAdmin} />} />
           </>
         )}
       </Routes>
