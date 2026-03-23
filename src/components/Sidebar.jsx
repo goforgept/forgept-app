@@ -1,10 +1,9 @@
-import { useNavigate, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import NotificationBell from './NotificationBell'
 
 export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false }) {
-  const navigate = useNavigate()
   const location = useLocation()
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState('integrator')
@@ -89,10 +88,10 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
 
       <nav className="flex-1 px-3 py-4 space-y-1">
         {links.map(({ label, path, icon }) => (
-          <button
+          <Link
             key={path}
-            onClick={() => navigate(path)}
-            className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-3 ${
+            to={path}
+            className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-3 transition-all duration-200 ${
               location.pathname === path
                 ? 'bg-[#C8622A]/20 text-[#C8622A]'
                 : 'text-[#8A9AB0] hover:text-white hover:bg-[#0F1C2E]'
@@ -100,14 +99,14 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
           >
             <span>{icon}</span>
             {label}
-          </button>
+          </Link>
         ))}
       </nav>
 
       <div className="px-3 py-4 border-t border-[#2a3d55]">
         <button
           onClick={handleSignOut}
-          className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-[#8A9AB0] hover:text-white hover:bg-[#0F1C2E] transition-colors flex items-center gap-3"
+          className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-[#8A9AB0] hover:text-white hover:bg-[#0F1C2E] transition-all duration-200 flex items-center gap-3"
         >
           <span>🚪</span>
           Sign Out
