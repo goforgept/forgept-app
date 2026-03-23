@@ -8,6 +8,7 @@ import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import TaskList from '../components/TaskList'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } from 'docx'
+import CatalogSearch from '../components/CatalogSearch'
 
 export default function ProposalDetail({ isAdmin, featureProposals = true, featureCRM = false }) {
   const { id } = useParams()
@@ -30,6 +31,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [generatingPO, setGeneratingPO] = useState(false)
   const [aiNotes, setAiNotes] = useState('')
   const [showSentPrompt, setShowSentPrompt] = useState(false)
+  const [orgType, setOrgType] = useState('integrator')
+  const [showCatalogSearch, setShowCatalogSearch] = useState(false)
 
   useEffect(() => {
     fetchProposal()
@@ -65,10 +68,11 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase
       .from('profiles')
-      .select('*')
+      .select('*, organizations(org_type)')
       .eq('id', user.id)
       .single()
     setProfile(data)
+    setOrgType(data?.organizations?.org_type || 'integrator')
   }
 
   const updateStatus = async (newStatus) => {
@@ -1060,6 +1064,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 >
                   Send All RFQs
                 </button>
+                {orgType === 'manufacturer' && (
+                  <button
+                    onClick={() => { startEditing(); setShowCatalogSearch(true) }}
+                    className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+                  >
+                    + From Catalog
+                  </button>
+                )}
                 <button
                   onClick={startEditing}
                   className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors"
@@ -1264,8 +1276,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 + Add Line Item
               </button>
 
-              {/* Labor Section — mirrors materials BOM table */}
-              <div className="mt-8">
+              {/* Labor Section — hidden for manufacturers */}
+              {orgType !== 'manufacturer' && <div className="mt-8">
                 <h3 className="text-white font-bold text-base mb-3">Labor</h3>
                 <table className="w-full text-sm">
                   <thead>
@@ -1358,7 +1370,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 >
                   + Add Labor
                 </button>
-              </div>
+              </div>}
 
               {/* Live running total — updates as you type */}
               <div className="mt-6 border-t border-[#2a3d55] pt-4 space-y-2">
@@ -1408,6 +1420,16 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 />
 
       </div>
+
+      {showCatalogSearch && (
+        <CatalogSearch
+          orgId={profile?.org_id}
+          onAdd={(item) => {
+            setEditLines(prev => [...prev, { ...item, proposal_id: id }])
+          }}
+          onClose={() => setShowCatalogSearch(false)}
+        />
+      )}
 
       {/* Sent Prompt Modal */}
       {showSentPrompt && (
