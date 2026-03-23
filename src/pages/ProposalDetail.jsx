@@ -85,33 +85,112 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setProposal(prev => ({ ...prev, close_date: newDate }))
   }
 
+  const buildManufacturerSOW = () => {
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    const companyName = profile?.company_name || proposal?.company || 'Our Company'
+    const clientName = proposal?.client_name || ''
+    const clientCompany = proposal?.company || ''
+    const proposalName = proposal?.proposal_name || ''
+
+    const itemLines = lineItems.length > 0
+      ? lineItems.map(l =>
+          `  • ${l.item_name}${l.part_number_sku ? ` (${l.part_number_sku})` : ''} — Qty: ${l.quantity} ${l.unit || 'ea'}  |  Unit Price: $${(l.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}  |  Total: $${(l.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+        ).join('\n')
+      : '  No line items added.'
+
+    const materialsTotal = lineItems.reduce((sum, l) => sum + (l.customer_price_total || 0), 0)
+
+    return `STATEMENT OF WORK
+${proposalName}
+Prepared by: ${companyName}
+Prepared for: ${clientCompany}${clientName ? ` — ${clientName}` : ''}
+Date: ${date}
+
+────────────────────────────────────────
+
+PRODUCTS & MATERIALS
+
+The following products are included in this order:
+
+${itemLines}
+
+Order Total: $${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+
+────────────────────────────────────────
+
+DELIVERY & SHIPPING TERMS
+
+• All items will be shipped FOB Origin unless otherwise agreed in writing.
+• Estimated lead time will be confirmed upon receipt of purchase order.
+• ${companyName} will provide tracking information upon shipment.
+• Customer is responsible for inspection upon delivery. Any damage or shortage must be reported within 5 business days of receipt.
+
+────────────────────────────────────────
+
+WARRANTY & SUPPORT
+
+• All products carry the manufacturer's standard limited warranty.
+• Warranty claims must be submitted in writing to ${companyName} within the applicable warranty period.
+• Warranty does not cover damage resulting from improper installation, misuse, or unauthorized modification.
+• Technical support is available during standard business hours.
+
+────────────────────────────────────────
+
+PAYMENT TERMS
+
+• Payment is due Net 30 from date of invoice unless otherwise agreed in writing.
+• A purchase order or written approval is required prior to order processing.
+• Overdue balances are subject to a 1.5% monthly finance charge.
+• ${companyName} reserves the right to hold shipment on accounts with past-due balances.
+
+────────────────────────────────────────
+
+ACCEPTANCE
+
+By signing below, the client acknowledges and agrees to the products, pricing, and terms outlined in this Statement of Work.
+
+Client Signature: ________________________________  Date: ____________
+
+Printed Name: ____________________________________
+
+Title: ___________________________________________
+
+${companyName} Representative: ____________________  Date: ____________`
+  }
+
   const generateSOW = async () => {
     setGeneratingSOW(true)
     try {
-      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/generate-sow', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
-        },
-        body: JSON.stringify({
-          proposalId: id,
-          company: profile?.company_name,
-          clientName: proposal.client_name,
-          jobDesc: proposal.job_description,
-          industry: proposal.industry,
-          repName: proposal.rep_name,
-          laborItems: laborItems,
-          aiNotes: aiNotes,
-          lineItems: lineItems.map(l => ({
-            itemName: l.item_name,
-            quantity: l.quantity,
-            customerPriceUnit: l.customer_price_unit,
-            customerPriceTotal: l.customer_price_total
-          }))
+      if (orgType === 'manufacturer') {
+        const sow = buildManufacturerSOW()
+        await supabase.from('proposals').update({ scope_of_work: sow }).eq('id', id)
+        await fetchProposal()
+      } else {
+        await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/generate-sow', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+          },
+          body: JSON.stringify({
+            proposalId: id,
+            company: profile?.company_name,
+            clientName: proposal.client_name,
+            jobDesc: proposal.job_description,
+            industry: proposal.industry,
+            repName: proposal.rep_name,
+            laborItems: laborItems,
+            aiNotes: aiNotes,
+            lineItems: lineItems.map(l => ({
+              itemName: l.item_name,
+              quantity: l.quantity,
+              customerPriceUnit: l.customer_price_unit,
+              customerPriceTotal: l.customer_price_total
+            }))
+          })
         })
-      })
-      await fetchProposal()
+        await fetchProposal()
+      }
     } catch (err) {
       console.log('SOW generation error:', err)
     }
@@ -1023,21 +1102,23 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             </div>
           </div>
 
-          {/* AI Notes */}
-          <div className="mb-4">
-            <label className="text-white text-sm font-semibold block mb-1">
-              AI Notes (Optional)
-            </label>
-            <p className="text-[#8A9AB0] text-xs mb-2">
-              Describe what you want the Scope of Work to include, how it should sound, or anything important.
-            </p>
-            <textarea
-              value={aiNotes}
-              onChange={(e) => setAiNotes(e.target.value)}
-              placeholder="Example: This is for a commercial install. Keep it professional, emphasize safety, and make it easy for a non-technical client to understand."
-              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] min-h-[100px]"
-            />
-          </div>
+          {/* AI Notes — integrators only */}
+          {orgType !== 'manufacturer' && (
+            <div className="mb-4">
+              <label className="text-white text-sm font-semibold block mb-1">
+                AI Notes (Optional)
+              </label>
+              <p className="text-[#8A9AB0] text-xs mb-2">
+                Describe what you want the Scope of Work to include, how it should sound, or anything important.
+              </p>
+              <textarea
+                value={aiNotes}
+                onChange={(e) => setAiNotes(e.target.value)}
+                placeholder="Example: This is for a commercial install. Keep it professional, emphasize safety, and make it easy for a non-technical client to understand."
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] min-h-[100px]"
+              />
+            </div>
+          )}
 
           {proposal?.scope_of_work ? (
             <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
