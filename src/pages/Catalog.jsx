@@ -227,7 +227,18 @@ export default function Catalog({ isAdmin, featureProposals = true, featureCRM =
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <h3 className="text-white font-bold mb-4">All Products ({filtered.length})</h3>
           {loading ? (
-            <p className="text-[#8A9AB0]">Loading...</p>
+            // Skeleton rows — keeps layout stable while data loads, no full-page blank
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex gap-4 animate-pulse">
+                  <div className="h-4 bg-[#2a3d55] rounded w-1/3" />
+                  <div className="h-4 bg-[#2a3d55] rounded w-1/6" />
+                  <div className="h-4 bg-[#2a3d55] rounded w-1/6" />
+                  <div className="h-4 bg-[#2a3d55] rounded w-1/6" />
+                  <div className="h-4 bg-[#2a3d55] rounded w-1/6" />
+                </div>
+              ))}
+            </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-[#8A9AB0] mb-2">No products yet.</p>

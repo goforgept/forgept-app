@@ -6,9 +6,12 @@ import NotificationBell from './NotificationBell'
 export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false }) {
   const location = useLocation()
   const [userId, setUserId] = useState(null)
-  const [orgType, setOrgType] = useState('integrator')
+  const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
 
   useEffect(() => {
+    // Only fetch if we don't already have it cached
+    if (sessionStorage.getItem('orgType')) return
+
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -18,14 +21,16 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
         .select('org_id, organizations(org_type)')
         .eq('id', user.id)
         .single()
-      if (profile?.organizations?.org_type) {
-        setOrgType(profile.organizations.org_type)
-      }
+      const type = profile?.organizations?.org_type || 'integrator'
+      sessionStorage.setItem('orgType', type)
+      setOrgType(type)
     }
     getUser()
   }, [])
 
+  // Clear cache on sign out so next user gets a fresh fetch
   const handleSignOut = async () => {
+    sessionStorage.removeItem('orgType')
     await supabase.auth.signOut()
   }
 
