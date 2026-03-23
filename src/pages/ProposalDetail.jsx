@@ -94,68 +94,120 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     const itemLines = lineItems.length > 0
       ? lineItems.map(l =>
-          `  • ${l.item_name}${l.part_number_sku ? ` (${l.part_number_sku})` : ''} — Qty: ${l.quantity} ${l.unit || 'ea'}  |  Unit Price: $${(l.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}  |  Total: $${(l.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+          `- ${l.item_name}${l.part_number_sku ? ` (${l.part_number_sku})` : ''} | Qty: ${l.quantity} ${l.unit || 'ea'} | Unit Price: $${(l.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} | Total: $${(l.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
         ).join('\n')
-      : '  No line items added.'
+      : 'No line items added.'
 
     const materialsTotal = lineItems.reduce((sum, l) => sum + (l.customer_price_total || 0), 0)
 
-    return `STATEMENT OF WORK
-${proposalName}
-Prepared by: ${companyName}
-Prepared for: ${clientCompany}${clientName ? ` — ${clientName}` : ''}
-Date: ${date}
+    return [
+      `STATEMENT OF WORK`,
+      `${proposalName}`,
+      `Prepared by: ${companyName}`,
+      `Prepared for: ${clientCompany}${clientName ? ` - ${clientName}` : ''}`,
+      `Date: ${date}`,
+      `---SECTION---`,
+      `PRODUCTS & MATERIALS`,
+      `The following products are included in this order:\n\n${itemLines}\n\nOrder Total: $${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+      `---SECTION---`,
+      `DELIVERY & SHIPPING TERMS`,
+      `All items will be shipped FOB Origin unless otherwise agreed in writing.\nEstimated lead time will be confirmed upon receipt of purchase order.\n${companyName} will provide tracking information upon shipment.\nCustomer is responsible for inspection upon delivery. Any damage or shortage must be reported within 5 business days of receipt.`,
+      `---SECTION---`,
+      `WARRANTY & SUPPORT`,
+      `All products carry the manufacturer's standard limited warranty.\nWarranty claims must be submitted in writing to ${companyName} within the applicable warranty period.\nWarranty does not cover damage resulting from improper installation, misuse, or unauthorized modification.\nTechnical support is available during standard business hours.`,
+      `---SECTION---`,
+      `PAYMENT TERMS`,
+      `Payment is due Net 30 from date of invoice unless otherwise agreed in writing.\nA purchase order or written approval is required prior to order processing.\nOverdue balances are subject to a 1.5% monthly finance charge.\n${companyName} reserves the right to hold shipment on accounts with past-due balances.`,
+      `---SECTION---`,
+      `ACCEPTANCE`,
+      `By signing below, the client acknowledges and agrees to the products, pricing, and terms outlined in this Statement of Work.`,
+    ].join('\n')
+  }
 
-────────────────────────────────────────
+  // Renders the manufacturer SOW directly into a jsPDF doc with proper formatting.
+  // Returns the final yPos so the caller can continue (signature block, terms, etc).
+  const renderManufacturerSOWtoPDF = (doc, startY, pageWidth, primaryRgb) => {
+    const sow = proposal?.scope_of_work || ''
+    const chunks = sow.split('---SECTION---')
+    let yPos = startY
+    const margin = 14
+    const contentWidth = pageWidth - margin * 2
+    const pageHeight = doc.internal.pageSize.getHeight()
 
-PRODUCTS & MATERIALS
+    const checkPageBreak = (neededSpace = 12) => {
+      if (yPos + neededSpace > pageHeight - 20) {
+        doc.addPage()
+        yPos = 20
+      }
+    }
 
-The following products are included in this order:
+    // First chunk = header block (title, prepared by, date, etc.)
+    const headerLines = chunks[0].trim().split('\n').filter(Boolean)
+    headerLines.forEach((line, i) => {
+      checkPageBreak(8)
+      if (i === 0) {
+        doc.setFontSize(16)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+        doc.text(line, margin, yPos)
+        yPos += 9
+      } else if (i === 1) {
+        doc.setFontSize(13)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(30, 30, 30)
+        doc.text(line, margin, yPos)
+        yPos += 8
+      } else {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(90, 90, 90)
+        doc.text(line, margin, yPos)
+        yPos += 6
+      }
+    })
 
-${itemLines}
+    // Remaining chunks come in pairs: section_header, body_text
+    const sections = chunks.slice(1)
+    for (let i = 0; i < sections.length; i += 2) {
+      const header = (sections[i] || '').trim()
+      const body = (sections[i + 1] || '').trim()
 
-Order Total: $${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+      // Divider line
+      yPos += 6
+      checkPageBreak(14)
+      doc.setDrawColor(200, 200, 200)
+      doc.line(margin, yPos, pageWidth - margin, yPos)
+      yPos += 8
 
-────────────────────────────────────────
+      // Section header
+      checkPageBreak(10)
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text(header, margin, yPos)
+      yPos += 7
 
-DELIVERY & SHIPPING TERMS
+      // Body — wrap each logical line individually so empty lines become spacing
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      const bodyLines = body.split('\n')
+      bodyLines.forEach(line => {
+        if (line.trim() === '') {
+          yPos += 3
+          return
+        }
+        const wrapped = doc.splitTextToSize(line, contentWidth)
+        wrapped.forEach(wl => {
+          checkPageBreak(6)
+          doc.text(wl, margin, yPos)
+          yPos += 5.5
+        })
+        yPos += 1
+      })
+    }
 
-• All items will be shipped FOB Origin unless otherwise agreed in writing.
-• Estimated lead time will be confirmed upon receipt of purchase order.
-• ${companyName} will provide tracking information upon shipment.
-• Customer is responsible for inspection upon delivery. Any damage or shortage must be reported within 5 business days of receipt.
-
-────────────────────────────────────────
-
-WARRANTY & SUPPORT
-
-• All products carry the manufacturer's standard limited warranty.
-• Warranty claims must be submitted in writing to ${companyName} within the applicable warranty period.
-• Warranty does not cover damage resulting from improper installation, misuse, or unauthorized modification.
-• Technical support is available during standard business hours.
-
-────────────────────────────────────────
-
-PAYMENT TERMS
-
-• Payment is due Net 30 from date of invoice unless otherwise agreed in writing.
-• A purchase order or written approval is required prior to order processing.
-• Overdue balances are subject to a 1.5% monthly finance charge.
-• ${companyName} reserves the right to hold shipment on accounts with past-due balances.
-
-────────────────────────────────────────
-
-ACCEPTANCE
-
-By signing below, the client acknowledges and agrees to the products, pricing, and terms outlined in this Statement of Work.
-
-Client Signature: ________________________________  Date: ____________
-
-Printed Name: ____________________________________
-
-Title: ___________________________________________
-
-${companyName} Representative: ____________________  Date: ____________`
+    return yPos
   }
 
   const generateSOW = async () => {
@@ -305,21 +357,26 @@ ${companyName} Representative: ____________________  Date: ____________`
     let yPos = 92
 
     if (proposal?.scope_of_work) {
-      doc.setFontSize(13)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Scope of Work', 14, yPos)
-      yPos += 8
+      if (orgType === 'manufacturer') {
+        yPos = renderManufacturerSOWtoPDF(doc, yPos, pageWidth, primaryRgb)
+        yPos += 12
+      } else {
+        doc.setFontSize(13)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+        doc.text('Scope of Work', 14, yPos)
+        yPos += 8
 
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(60, 60, 60)
-      const sowLines = doc.splitTextToSize(proposal.scope_of_work, pageWidth - 28)
-      doc.text(sowLines, 14, yPos)
-      yPos += sowLines.length * 5 + 12
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        const sowLines = doc.splitTextToSize(proposal.scope_of_work, pageWidth - 28)
+        doc.text(sowLines, 14, yPos)
+        yPos += sowLines.length * 5 + 12
+      }
     }
 
-    if (lineItems.length > 0) {
+    if (lineItems.length > 0 && orgType !== 'manufacturer') {
       doc.setFontSize(13)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -346,7 +403,7 @@ ${companyName} Representative: ____________________  Date: ____________`
 
     // Labor section in PDF
     const laborItems = proposal?.labor_items || []
-    if (laborItems.length > 0 && laborItems.some(l => l.role)) {
+    if (laborItems.length > 0 && laborItems.some(l => l.role) && orgType !== 'manufacturer') {
       const tableEnd = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12
       doc.setFontSize(13)
       doc.setFont('helvetica', 'bold')
