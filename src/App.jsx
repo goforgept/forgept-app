@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import { supabase } from './supabase'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -101,38 +101,36 @@ function App() {
   )
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/reset-password" element={<ResetPassword />} />
-        {!session ? (
-          <Route path="*" element={<Login />} />
-        ) : (
-          <>
-            <Route path="/" element={isAdmin
-              ? <AdminDashboard featureProposals={featureProposals} featureCRM={featureCRM} />
-              : <Dashboard featureProposals={featureProposals} featureCRM={featureCRM} />}
-            />
-            <Route path="/admin" element={<AdminDashboard featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/rep" element={<Dashboard featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/new" element={<NewProposal />} />
-            <Route path="/proposal/:id" element={<ProposalDetail isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/reps" element={<ManageReps isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/proposals" element={<Proposals isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/vendors" element={<Vendors isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/settings" element={<Settings isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/clients" element={<Clients isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/superadmin" element={<SuperAdmin />} />
-            <Route path="/client/:id" element={<ClientDetail isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/purchase-orders" element={<PurchaseOrders isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/faq" element={<FAQ isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/tasks" element={<Tasks isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/pipeline" element={<Pipeline isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/forecast" element={<Forecast isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-            <Route path="/catalog" element={<Catalog isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          </>
-        )}
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/reset-password" element={<ResetPassword />} />
+      {!session ? (
+        <Route path="*" element={<Login />} />
+      ) : (
+        <>
+          <Route path="/" element={isAdmin
+            ? <AdminDashboard featureProposals={featureProposals} featureCRM={featureCRM} />
+            : <Dashboard featureProposals={featureProposals} featureCRM={featureCRM} />}
+          />
+          <Route path="/admin" element={<AdminDashboard featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/rep" element={<Dashboard featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/new" element={<NewProposal />} />
+          <Route path="/proposal/:id" element={<ProposalDetail isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/reps" element={<ManageReps isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/proposals" element={<Proposals isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/vendors" element={<Vendors isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/settings" element={<Settings isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/clients" element={<Clients isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/superadmin" element={<SuperAdmin />} />
+          <Route path="/client/:id" element={<ClientDetail isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/purchase-orders" element={<PurchaseOrders isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/faq" element={<FAQ isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/tasks" element={<Tasks isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/pipeline" element={<Pipeline isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/forecast" element={<Forecast isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/catalog" element={<Catalog isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+        </>
+      )}
+    </Routes>
   )
 }
 
