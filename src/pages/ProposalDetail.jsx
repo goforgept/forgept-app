@@ -85,50 +85,103 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setProposal(prev => ({ ...prev, close_date: newDate }))
   }
 
+  // Builds a structured SOW object for manufacturers. Stored as JSON in scope_of_work.
   const buildManufacturerSOW = () => {
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
     const companyName = profile?.company_name || proposal?.company || 'Our Company'
     const clientName = proposal?.client_name || ''
     const clientCompany = proposal?.company || ''
     const proposalName = proposal?.proposal_name || ''
-
-    const itemLines = lineItems.length > 0
-      ? lineItems.map(l =>
-          `- ${l.item_name}${l.part_number_sku ? ` (${l.part_number_sku})` : ''} | Qty: ${l.quantity} ${l.unit || 'ea'} | Unit Price: $${(l.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} | Total: $${(l.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-        ).join('\n')
-      : 'No line items added.'
-
     const materialsTotal = lineItems.reduce((sum, l) => sum + (l.customer_price_total || 0), 0)
 
-    return [
-      `STATEMENT OF WORK`,
-      `${proposalName}`,
-      `Prepared by: ${companyName}`,
-      `Prepared for: ${clientCompany}${clientName ? ` - ${clientName}` : ''}`,
-      `Date: ${date}`,
-      `---SECTION---`,
-      `PRODUCTS & MATERIALS`,
-      `The following products are included in this order:\n\n${itemLines}\n\nOrder Total: $${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-      `---SECTION---`,
-      `DELIVERY & SHIPPING TERMS`,
-      `All items will be shipped FOB Origin unless otherwise agreed in writing.\nEstimated lead time will be confirmed upon receipt of purchase order.\n${companyName} will provide tracking information upon shipment.\nCustomer is responsible for inspection upon delivery. Any damage or shortage must be reported within 5 business days of receipt.`,
-      `---SECTION---`,
-      `WARRANTY & SUPPORT`,
-      `All products carry the manufacturer's standard limited warranty.\nWarranty claims must be submitted in writing to ${companyName} within the applicable warranty period.\nWarranty does not cover damage resulting from improper installation, misuse, or unauthorized modification.\nTechnical support is available during standard business hours.`,
-      `---SECTION---`,
-      `PAYMENT TERMS`,
-      `Payment is due Net 30 from date of invoice unless otherwise agreed in writing.\nA purchase order or written approval is required prior to order processing.\nOverdue balances are subject to a 1.5% monthly finance charge.\n${companyName} reserves the right to hold shipment on accounts with past-due balances.`,
-      `---SECTION---`,
-      `ACCEPTANCE`,
-      `By signing below, the client acknowledges and agrees to the products, pricing, and terms outlined in this Statement of Work.`,
-    ].join('\n')
+    const structured = {
+      __mfr_sow: true,
+      title: 'STATEMENT OF WORK',
+      proposalName,
+      preparedBy: companyName,
+      preparedFor: `${clientCompany}${clientName ? ` - ${clientName}` : ''}`,
+      date,
+      sections: [
+        {
+          header: 'PRODUCTS & MATERIALS',
+          body: 'The following products are included in this order:',
+          items: lineItems.map(l => `${l.item_name}${l.part_number_sku ? ` (${l.part_number_sku})` : ''} | Qty: ${l.quantity} ${l.unit || 'ea'} | Unit Price: $${(l.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} | Total: $${(l.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`),
+          footer: `Order Total: $${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+        },
+        {
+          header: 'DELIVERY & SHIPPING TERMS',
+          lines: [
+            'All items will be shipped FOB Origin unless otherwise agreed in writing.',
+            'Estimated lead time will be confirmed upon receipt of purchase order.',
+            `${companyName} will provide tracking information upon shipment.`,
+            'Customer is responsible for inspection upon delivery. Any damage or shortage must be reported within 5 business days of receipt.'
+          ]
+        },
+        {
+          header: 'WARRANTY & SUPPORT',
+          lines: [
+            "All products carry the manufacturer's standard limited warranty.",
+            `Warranty claims must be submitted in writing to ${companyName} within the applicable warranty period.`,
+            'Warranty does not cover damage resulting from improper installation, misuse, or unauthorized modification.',
+            'Technical support is available during standard business hours.'
+          ]
+        },
+        {
+          header: 'PAYMENT TERMS',
+          lines: [
+            'Payment is due Net 30 from date of invoice unless otherwise agreed in writing.',
+            'A purchase order or written approval is required prior to order processing.',
+            'Overdue balances are subject to a 1.5% monthly finance charge.',
+            `${companyName} reserves the right to hold shipment on accounts with past-due balances.`
+          ]
+        },
+        {
+          header: 'ACCEPTANCE',
+          lines: [
+            'By signing below, the client acknowledges and agrees to the products, pricing, and terms outlined in this Statement of Work.'
+          ]
+        }
+      ]
+    }
+
+    // Also store a plain-text fallback for the UI preview
+    const plainLines = [
+      structured.title,
+      structured.proposalName,
+      `Prepared by: ${structured.preparedBy}`,
+      `Prepared for: ${structured.preparedFor}`,
+      `Date: ${structured.date}`,
+      '',
+      ...structured.sections.flatMap(s => [
+        '',
+        s.header,
+        s.body || '',
+        ...(s.items || []).map(i => `  - ${i}`),
+        s.footer || '',
+        ...(s.lines || []).map(l => `  ${l}`)
+      ])
+    ]
+
+    return JSON.stringify({ ...structured, plainText: plainLines.join('\n') })
   }
 
-  // Renders the manufacturer SOW directly into a jsPDF doc with proper formatting.
-  // Returns the final yPos so the caller can continue (signature block, terms, etc).
+  // Parses the stored SOW and renders it properly into a jsPDF doc.
+  // Returns final yPos so caller can continue.
   const renderManufacturerSOWtoPDF = (doc, startY, pageWidth, primaryRgb) => {
-    const sow = proposal?.scope_of_work || ''
-    const chunks = sow.split('---SECTION---')
+    const raw = proposal?.scope_of_work || ''
+    let sow
+    try {
+      sow = JSON.parse(raw)
+    } catch {
+      // Fallback: render as plain text if not valid JSON
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      const lines = doc.splitTextToSize(raw, pageWidth - 28)
+      doc.text(lines, 14, startY)
+      return startY + lines.length * 5.5
+    }
+
     let yPos = startY
     const margin = 14
     const contentWidth = pageWidth - margin * 2
@@ -141,71 +194,90 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       }
     }
 
-    // First chunk = header block (title, prepared by, date, etc.)
-    const headerLines = chunks[0].trim().split('\n').filter(Boolean)
-    headerLines.forEach((line, i) => {
-      checkPageBreak(8)
-      if (i === 0) {
-        doc.setFontSize(16)
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-        doc.text(line, margin, yPos)
-        yPos += 9
-      } else if (i === 1) {
-        doc.setFontSize(13)
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(30, 30, 30)
-        doc.text(line, margin, yPos)
-        yPos += 8
-      } else {
-        doc.setFontSize(10)
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(90, 90, 90)
-        doc.text(line, margin, yPos)
-        yPos += 6
-      }
+    const renderBodyLine = (line) => {
+      if (!line || line.trim() === '') { yPos += 3; return }
+      const wrapped = doc.splitTextToSize(line, contentWidth)
+      wrapped.forEach(wl => {
+        checkPageBreak(6)
+        doc.text(wl, margin, yPos)
+        yPos += 5.5
+      })
+      yPos += 1
+    }
+
+    // Header block
+    checkPageBreak(10)
+    doc.setFontSize(16)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text(sow.title || 'STATEMENT OF WORK', margin, yPos)
+    yPos += 9
+
+    checkPageBreak(8)
+    doc.setFontSize(13)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(30, 30, 30)
+    doc.text(sow.proposalName || '', margin, yPos)
+    yPos += 8
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(90, 90, 90)
+    ;[`Prepared by: ${sow.preparedBy}`, `Prepared for: ${sow.preparedFor}`, `Date: ${sow.date}`].forEach(line => {
+      checkPageBreak(6)
+      doc.text(line, margin, yPos)
+      yPos += 6
     })
 
-    // Remaining chunks come in pairs: section_header, body_text
-    const sections = chunks.slice(1)
-    for (let i = 0; i < sections.length; i += 2) {
-      const header = (sections[i] || '').trim()
-      const body = (sections[i + 1] || '').trim()
-
-      // Divider line
+    // Sections
+    ;(sow.sections || []).forEach(section => {
       yPos += 6
       checkPageBreak(14)
       doc.setDrawColor(200, 200, 200)
       doc.line(margin, yPos, pageWidth - margin, yPos)
       yPos += 8
 
-      // Section header
       checkPageBreak(10)
       doc.setFontSize(11)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text(header, margin, yPos)
+      doc.text(section.header, margin, yPos)
       yPos += 7
 
-      // Body — wrap each logical line individually so empty lines become spacing
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(60, 60, 60)
-      const bodyLines = body.split('\n')
-      bodyLines.forEach(line => {
-        if (line.trim() === '') {
-          yPos += 3
-          return
-        }
-        const wrapped = doc.splitTextToSize(line, contentWidth)
-        wrapped.forEach(wl => {
-          checkPageBreak(6)
-          doc.text(wl, margin, yPos)
-          yPos += 5.5
+
+      if (section.body) renderBodyLine(section.body)
+
+      if (section.items?.length) {
+        yPos += 2
+        section.items.forEach(item => {
+          const wrapped = doc.splitTextToSize(`- ${item}`, contentWidth - 6)
+          wrapped.forEach(wl => {
+            checkPageBreak(6)
+            doc.text(wl, margin + 4, yPos)
+            yPos += 5.5
+          })
+          yPos += 1
         })
-        yPos += 1
-      })
-    }
+        yPos += 2
+      }
+
+      if (section.footer) {
+        checkPageBreak(8)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(30, 30, 30)
+        doc.text(section.footer, margin, yPos)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(60, 60, 60)
+        yPos += 7
+      }
+
+      if (section.lines?.length) {
+        section.lines.forEach(line => renderBodyLine(line))
+      }
+    })
 
     return yPos
   }
@@ -1178,7 +1250,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           )}
 
           {proposal?.scope_of_work ? (
-            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
+            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{
+              (() => {
+                try {
+                  const parsed = JSON.parse(proposal.scope_of_work)
+                  return parsed.__mfr_sow ? parsed.plainText : proposal.scope_of_work
+                } catch { return proposal.scope_of_work }
+              })()
+            }</p>
           ) : (
             <p className="text-[#8A9AB0] text-sm">No Scope of Work yet. Click Generate SOW to create one.</p>
           )}
