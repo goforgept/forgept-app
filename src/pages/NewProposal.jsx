@@ -31,6 +31,7 @@ export default function NewProposal() {
   const [templates, setTemplates] = useState([])
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [loadingTemplates, setLoadingTemplates] = useState(false)
+  const [templateSearch, setTemplateSearch] = useState('')
 
   useEffect(() => {
     fetchProfileAndClients()
@@ -778,12 +779,22 @@ export default function NewProposal() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto">
             <h3 className="text-white font-bold text-lg mb-1">Load a Template</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Select a template to pre-fill the BOM and labor. You can edit everything after loading.</p>
+            <p className="text-[#8A9AB0] text-sm mb-4">Select a template to pre-fill the BOM and labor. You can edit everything after loading.</p>
+            <input
+              type="text"
+              placeholder="Search templates..."
+              value={templateSearch}
+              onChange={e => setTemplateSearch(e.target.value)}
+              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0] mb-4"
+            />
             {loadingTemplates ? (
               <p className="text-[#8A9AB0]">Loading templates...</p>
             ) : (
               <div className="space-y-2">
-                {templates.map(template => {
+                {templates.filter(t => {
+                  const q = templateSearch.toLowerCase()
+                  return !q || t.name.toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q) || (t.industry || '').toLowerCase().includes(q)
+                }).map(template => {
                   const labor = template.labor_items || []
                   const totalLabor = labor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
                   return (
@@ -811,7 +822,7 @@ export default function NewProposal() {
               </div>
             )}
             <button
-              onClick={() => setShowTemplateModal(false)}
+              onClick={() => { setShowTemplateModal(false); setTemplateSearch('') }}
               className="mt-5 w-full py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors"
             >
               Cancel
