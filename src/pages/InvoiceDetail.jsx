@@ -23,6 +23,8 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   const [sendingInvoice, setSendingInvoice] = useState(false)
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesValue, setNotesValue] = useState('')
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [descriptionValue, setDescriptionValue] = useState('')
 
   useEffect(() => {
     fetchAll()
@@ -44,6 +46,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
       .single()
     setInvoice(inv)
     setNotesValue(inv?.notes || '')
+    setDescriptionValue(inv?.description || '')
 
     const { data: items } = await supabase
       .from('invoice_line_items')
@@ -101,8 +104,26 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     doc.text(invoice?.proposals?.company || '', pageWidth / 2, 59)
     doc.text(invoice?.proposals?.client_name || '', pageWidth / 2, 65)
 
+    // Description of Work
+    if (invoice?.description) {
+      yPos = 78
+      doc.setFillColor(248, 248, 248)
+      doc.rect(14, yPos - 5, pageWidth - 28, 4 + doc.splitTextToSize(invoice.description, pageWidth - 40).length * 5.5 + 6, 'F')
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Description of Work', 18, yPos)
+      yPos += 6
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+      const descLines = doc.splitTextToSize(invoice.description, pageWidth - 40)
+      doc.text(descLines, 18, yPos)
+      yPos += descLines.length * 5.5 + 8
+    } else {
+      yPos = 78
+    }
+
     // Line items table
     autoTable(doc, {
+      startY: yPos,
       startY: 78,
       head: [['Description', 'Qty', 'Unit Price', 'Total']],
       body: lineItems.map(item => [
@@ -267,6 +288,12 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setSendingInvoice(false)
   }
 
+  const saveDescription = async () => {
+    await supabase.from('invoices').update({ description: descriptionValue }).eq('id', id)
+    setInvoice(prev => ({ ...prev, description: descriptionValue }))
+    setEditingDescription(false)
+  }
+
   const saveNotes = async () => {
     await supabase.from('invoices').update({ notes: notesValue }).eq('id', id)
     setInvoice(prev => ({ ...prev, notes: notesValue }))
@@ -326,6 +353,25 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
             <div><p className="text-[#8A9AB0] text-xs">Total</p><p className="text-white text-sm font-bold">${(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
             <div><p className="text-[#8A9AB0] text-xs">Balance Due</p><p className={`text-sm font-bold ${invoice.balance_due > 0 ? 'text-[#C8622A]' : 'text-green-400'}`}>${(invoice.balance_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
           </div>
+        </div>
+
+        {/* Description of Work */}
+        <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-white font-bold">Description of Work</h3>
+            {!editingDescription
+              ? <button onClick={() => setEditingDescription(true)} className="text-[#C8622A] text-sm hover:text-white transition-colors">Edit</button>
+              : <div className="flex gap-2">
+                  <button onClick={() => setEditingDescription(false)} className="text-[#8A9AB0] text-sm hover:text-white transition-colors">Cancel</button>
+                  <button onClick={saveDescription} className="text-[#C8622A] text-sm font-semibold hover:text-white transition-colors">Save</button>
+                </div>
+            }
+          </div>
+          {editingDescription
+            ? <textarea value={descriptionValue} onChange={e => setDescriptionValue(e.target.value)} rows={4}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+            : <p className="text-[#D6E4F0] text-sm whitespace-pre-wrap">{invoice.description || <span className="text-[#8A9AB0]">No description. Click Edit to add one.</span>}</p>
+          }
         </div>
 
         {/* Line Items */}

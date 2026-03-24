@@ -15,6 +15,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     issued_date: new Date().toISOString().split('T')[0],
     due_date: '',
     tax_percent: '0',
+    description: '',
     notes: '',
   })
   const [lineItems, setLineItems] = useState([])
@@ -52,6 +53,12 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       .from('bom_line_items')
       .select('*')
       .eq('proposal_id', proposalId)
+
+    // Pre-fill description from proposal
+    if (prop) {
+      const desc = prop.job_description || prop.proposal_name || ''
+      setForm(prev => ({ ...prev, description: desc }))
+    }
 
     const items = []
     if (bomItems?.length) {
@@ -124,6 +131,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       total,
       amount_paid: 0,
       balance_due: total,
+      description: form.description,
       notes: form.notes
     }).select().single()
 
@@ -172,6 +180,12 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
               {selectedProposal && (
                 <p className="text-green-400 text-xs mt-1">✓ Line items loaded from proposal</p>
               )}
+            </div>
+            <div className="col-span-2">
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Description of Work</label>
+              <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                rows={3} placeholder="Brief description of the work being invoiced..."
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
             </div>
             <div>
               <label className="text-[#8A9AB0] text-xs mb-1 block">Invoice Date</label>
