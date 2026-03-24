@@ -187,7 +187,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={true} />
+      <Sidebar isAdmin={true} featureProposals={true} featureCRM={true} />
 
       <div className="flex-1 p-6">
 
