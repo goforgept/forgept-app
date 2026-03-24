@@ -21,6 +21,9 @@ import Pipeline from './pages/Pipeline'
 import Forecast from './pages/Forecast'
 import Catalog from './pages/Catalog'
 import Templates from './pages/Templates'
+import Invoices from './pages/Invoices'
+import InvoiceDetail from './pages/InvoiceDetail'
+import NewInvoice from './pages/NewInvoice'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -45,7 +48,7 @@ function App() {
     for (let i = 0; i < 5; i++) {
       const { data } = await supabase
         .from('profiles')
-        .select('*, organizations(status, org_type, feature_proposals, feature_crm)')
+        .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal)')
         .eq('id', userId)
         .single()
 
@@ -60,7 +63,7 @@ function App() {
 
     const { data } = await supabase
       .from('profiles')
-      .select('*, organizations(status, org_type, feature_proposals, feature_crm)')
+      .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal)')
       .eq('id', userId)
       .single()
     setProfile(data)
@@ -80,6 +83,7 @@ function App() {
   const isPending = profile?.organizations?.status === 'pending'
   const featureProposals = profile?.organizations?.feature_proposals !== false
   const featureCRM = profile?.organizations?.feature_crm || false
+  const featureSendProposal = profile?.organizations?.feature_send_proposal || false
 
   if (session && isPending) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
@@ -101,6 +105,8 @@ function App() {
     </div>
   )
 
+  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal }
+
   return (
     <Routes>
       <Route path="/reset-password" element={<ResetPassword />} />
@@ -109,27 +115,30 @@ function App() {
       ) : (
         <>
           <Route path="/" element={isAdmin
-            ? <AdminDashboard featureProposals={featureProposals} featureCRM={featureCRM} />
-            : <Dashboard featureProposals={featureProposals} featureCRM={featureCRM} />}
+            ? <AdminDashboard {...sharedProps} />
+            : <Dashboard {...sharedProps} />}
           />
-          <Route path="/admin" element={<AdminDashboard featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/rep" element={<Dashboard featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/admin" element={<AdminDashboard {...sharedProps} />} />
+          <Route path="/rep" element={<Dashboard {...sharedProps} />} />
           <Route path="/new" element={<NewProposal />} />
-          <Route path="/proposal/:id" element={<ProposalDetail isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/reps" element={<ManageReps isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/proposals" element={<Proposals isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/vendors" element={<Vendors isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/settings" element={<Settings isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/clients" element={<Clients isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/proposal/:id" element={<ProposalDetail {...sharedProps} />} />
+          <Route path="/reps" element={<ManageReps {...sharedProps} />} />
+          <Route path="/proposals" element={<Proposals {...sharedProps} />} />
+          <Route path="/vendors" element={<Vendors {...sharedProps} />} />
+          <Route path="/settings" element={<Settings {...sharedProps} />} />
+          <Route path="/clients" element={<Clients {...sharedProps} />} />
           <Route path="/superadmin" element={<SuperAdmin />} />
-          <Route path="/client/:id" element={<ClientDetail isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/purchase-orders" element={<PurchaseOrders isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/faq" element={<FAQ isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/tasks" element={<Tasks isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/pipeline" element={<Pipeline isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/forecast" element={<Forecast isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
-          <Route path="/catalog" element={<Catalog isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />} />
+          <Route path="/client/:id" element={<ClientDetail {...sharedProps} />} />
+          <Route path="/purchase-orders" element={<PurchaseOrders {...sharedProps} />} />
+          <Route path="/faq" element={<FAQ {...sharedProps} />} />
+          <Route path="/tasks" element={<Tasks {...sharedProps} />} />
+          <Route path="/pipeline" element={<Pipeline {...sharedProps} />} />
+          <Route path="/forecast" element={<Forecast {...sharedProps} />} />
+          <Route path="/catalog" element={<Catalog {...sharedProps} />} />
           <Route path="/templates" element={<Templates isAdmin={isAdmin} />} />
+          <Route path="/invoices" element={<Invoices {...sharedProps} />} />
+          <Route path="/invoices/new" element={<NewInvoice {...sharedProps} />} />
+          <Route path="/invoices/:id" element={<InvoiceDetail {...sharedProps} />} />
         </>
       )}
     </Routes>

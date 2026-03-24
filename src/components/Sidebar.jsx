@@ -9,9 +9,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
 
   useEffect(() => {
-    // Only fetch if we don't already have it cached
     if (sessionStorage.getItem('orgType')) return
-
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -28,7 +26,6 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
     getUser()
   }, [])
 
-  // Clear cache on sign out so next user gets a fresh fetch
   const handleSignOut = async () => {
     sessionStorage.removeItem('orgType')
     await supabase.auth.signOut()
@@ -46,6 +43,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
       { label: 'Proposals', path: '/proposals', icon: '📋' },
       ...(orgType !== 'manufacturer' ? [{ label: 'Templates', path: '/templates', icon: '📋' }] : []),
     ] : []),
+    { label: 'Invoices', path: '/invoices', icon: '🧾' },
     { label: 'Clients', path: '/clients', icon: '🏢' },
     ...(featureProposals && orgType !== 'manufacturer' ? [
       { label: 'Vendors', path: '/vendors', icon: '🏭' },
@@ -67,6 +65,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
       { label: 'Proposals', path: '/proposals', icon: '📋' },
       { label: 'New Proposal', path: '/new', icon: '➕' },
     ] : []),
+    { label: 'Invoices', path: '/invoices', icon: '🧾' },
     { label: 'Clients', path: '/clients', icon: '🏢' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },
     { label: 'Help', path: '/faq', icon: '❓' },
@@ -98,7 +97,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
             key={path}
             to={path}
             className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-3 transition-all duration-200 ${
-              location.pathname === path
+              location.pathname === path || location.pathname.startsWith(path + '/')
                 ? 'bg-[#C8622A]/20 text-[#C8622A]'
                 : 'text-[#8A9AB0] hover:text-white hover:bg-[#0F1C2E]'
             }`}
