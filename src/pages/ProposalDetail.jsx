@@ -6,11 +6,9 @@ import POList from '../components/POList'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
-import TaskList from '../components/TaskList'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } from 'docx'
-import CatalogSearch from '../components/CatalogSearch'
 
-export default function ProposalDetail({ isAdmin, featureProposals = true, featureCRM = false }) {
+export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [proposal, setProposal] = useState(null)
@@ -31,8 +29,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [generatingPO, setGeneratingPO] = useState(false)
   const [aiNotes, setAiNotes] = useState('')
   const [showSentPrompt, setShowSentPrompt] = useState(false)
-  const [orgType, setOrgType] = useState('integrator')
-  const [showCatalogSearch, setShowCatalogSearch] = useState(false)
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
+  const [templateName, setTemplateName] = useState('')
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [featureSendProposal, setFeatureSendProposal] = useState(false)
+  const [showSendModal, setShowSendModal] = useState(false)
+  const [sendingProposal, setSendingProposal] = useState(false)
+  const [sendForm, setSendForm] = useState({ subject: '', message: '' })
 
   useEffect(() => {
     fetchProposal()
@@ -68,11 +71,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase
       .from('profiles')
-      .select('*, organizations(org_type)')
+      .select('*, organizations(org_type, feature_send_proposal)')
       .eq('id', user.id)
       .single()
     setProfile(data)
     setOrgType(data?.organizations?.org_type || 'integrator')
+    setFeatureSendProposal(data?.organizations?.feature_send_proposal || false)
   }
 
   const updateStatus = async (newStatus) => {
@@ -85,236 +89,33 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setProposal(prev => ({ ...prev, close_date: newDate }))
   }
 
-  // Builds a structured SOW object for manufacturers. Stored as JSON in scope_of_work.
-  const buildManufacturerSOW = () => {
-    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    const companyName = profile?.company_name || proposal?.company || 'Our Company'
-    const clientName = proposal?.client_name || ''
-    const clientCompany = proposal?.company || ''
-    const proposalName = proposal?.proposal_name || ''
-    const materialsTotal = lineItems.reduce((sum, l) => sum + (l.customer_price_total || 0), 0)
-
-    const structured = {
-      __mfr_sow: true,
-      title: 'STATEMENT OF WORK',
-      proposalName,
-      preparedBy: companyName,
-      preparedFor: `${clientCompany}${clientName ? ` - ${clientName}` : ''}`,
-      date,
-      sections: [
-        {
-          header: 'PRODUCTS & MATERIALS',
-          body: 'The following products are included in this order:',
-          items: lineItems.map(l => `${l.item_name}${l.part_number_sku ? ` (${l.part_number_sku})` : ''} | Qty: ${l.quantity} ${l.unit || 'ea'} | Unit Price: $${(l.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} | Total: $${(l.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`),
-          footer: `Order Total: $${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-        },
-        {
-          header: 'DELIVERY & SHIPPING TERMS',
-          lines: [
-            'All items will be shipped FOB Origin unless otherwise agreed in writing.',
-            'Estimated lead time will be confirmed upon receipt of purchase order.',
-            `${companyName} will provide tracking information upon shipment.`,
-            'Customer is responsible for inspection upon delivery. Any damage or shortage must be reported within 5 business days of receipt.'
-          ]
-        },
-        {
-          header: 'WARRANTY & SUPPORT',
-          lines: [
-            "All products carry the manufacturer's standard limited warranty.",
-            `Warranty claims must be submitted in writing to ${companyName} within the applicable warranty period.`,
-            'Warranty does not cover damage resulting from improper installation, misuse, or unauthorized modification.',
-            'Technical support is available during standard business hours.'
-          ]
-        },
-        {
-          header: 'PAYMENT TERMS',
-          lines: [
-            'Payment is due Net 30 from date of invoice unless otherwise agreed in writing.',
-            'A purchase order or written approval is required prior to order processing.',
-            'Overdue balances are subject to a 1.5% monthly finance charge.',
-            `${companyName} reserves the right to hold shipment on accounts with past-due balances.`
-          ]
-        },
-        {
-          header: 'ACCEPTANCE',
-          lines: [
-            'By signing below, the client acknowledges and agrees to the products, pricing, and terms outlined in this Statement of Work.'
-          ]
-        }
-      ]
-    }
-
-    // Also store a plain-text fallback for the UI preview
-    const plainLines = [
-      structured.title,
-      structured.proposalName,
-      `Prepared by: ${structured.preparedBy}`,
-      `Prepared for: ${structured.preparedFor}`,
-      `Date: ${structured.date}`,
-      '',
-      ...structured.sections.flatMap(s => [
-        '',
-        s.header,
-        s.body || '',
-        ...(s.items || []).map(i => `  - ${i}`),
-        s.footer || '',
-        ...(s.lines || []).map(l => `  ${l}`)
-      ])
-    ]
-
-    return JSON.stringify({ ...structured, plainText: plainLines.join('\n') })
-  }
-
-  // Parses the stored SOW and renders it properly into a jsPDF doc.
-  // Returns final yPos so caller can continue.
-  const renderManufacturerSOWtoPDF = (doc, startY, pageWidth, primaryRgb) => {
-    const raw = proposal?.scope_of_work || ''
-    let sow
-    try {
-      sow = JSON.parse(raw)
-    } catch {
-      // Fallback: render as plain text if not valid JSON
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(60, 60, 60)
-      const lines = doc.splitTextToSize(raw, pageWidth - 28)
-      doc.text(lines, 14, startY)
-      return startY + lines.length * 5.5
-    }
-
-    let yPos = startY
-    const margin = 14
-    const contentWidth = pageWidth - margin * 2
-    const pageHeight = doc.internal.pageSize.getHeight()
-
-    const checkPageBreak = (neededSpace = 12) => {
-      if (yPos + neededSpace > pageHeight - 20) {
-        doc.addPage()
-        yPos = 20
-      }
-    }
-
-    const renderBodyLine = (line) => {
-      if (!line || line.trim() === '') { yPos += 3; return }
-      const wrapped = doc.splitTextToSize(line, contentWidth)
-      wrapped.forEach(wl => {
-        checkPageBreak(6)
-        doc.text(wl, margin, yPos)
-        yPos += 5.5
-      })
-      yPos += 1
-    }
-
-    // Header block
-    checkPageBreak(10)
-    doc.setFontSize(16)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.text(sow.title || 'STATEMENT OF WORK', margin, yPos)
-    yPos += 9
-
-    checkPageBreak(8)
-    doc.setFontSize(13)
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(30, 30, 30)
-    doc.text(sow.proposalName || '', margin, yPos)
-    yPos += 8
-
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(90, 90, 90)
-    ;[`Prepared by: ${sow.preparedBy}`, `Prepared for: ${sow.preparedFor}`, `Date: ${sow.date}`].forEach(line => {
-      checkPageBreak(6)
-      doc.text(line, margin, yPos)
-      yPos += 6
-    })
-
-    // Sections
-    ;(sow.sections || []).forEach(section => {
-      yPos += 6
-      checkPageBreak(14)
-      doc.setDrawColor(200, 200, 200)
-      doc.line(margin, yPos, pageWidth - margin, yPos)
-      yPos += 8
-
-      checkPageBreak(10)
-      doc.setFontSize(11)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text(section.header, margin, yPos)
-      yPos += 7
-
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(60, 60, 60)
-
-      if (section.body) renderBodyLine(section.body)
-
-      if (section.items?.length) {
-        yPos += 2
-        section.items.forEach(item => {
-          const wrapped = doc.splitTextToSize(`- ${item}`, contentWidth - 6)
-          wrapped.forEach(wl => {
-            checkPageBreak(6)
-            doc.text(wl, margin + 4, yPos)
-            yPos += 5.5
-          })
-          yPos += 1
-        })
-        yPos += 2
-      }
-
-      if (section.footer) {
-        checkPageBreak(8)
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(30, 30, 30)
-        doc.text(section.footer, margin, yPos)
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(60, 60, 60)
-        yPos += 7
-      }
-
-      if (section.lines?.length) {
-        section.lines.forEach(line => renderBodyLine(line))
-      }
-    })
-
-    return yPos
-  }
-
   const generateSOW = async () => {
     setGeneratingSOW(true)
     try {
-      if (orgType === 'manufacturer') {
-        const sow = buildManufacturerSOW()
-        await supabase.from('proposals').update({ scope_of_work: sow }).eq('id', id)
-        await fetchProposal()
-      } else {
-        await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/generate-sow', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
-          },
-          body: JSON.stringify({
-            proposalId: id,
-            company: profile?.company_name,
-            clientName: proposal.client_name,
-            jobDesc: proposal.job_description,
-            industry: proposal.industry,
-            repName: proposal.rep_name,
-            laborItems: laborItems,
-            aiNotes: aiNotes,
-            lineItems: lineItems.map(l => ({
-              itemName: l.item_name,
-              quantity: l.quantity,
-              customerPriceUnit: l.customer_price_unit,
-              customerPriceTotal: l.customer_price_total
-            }))
-          })
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/generate-sow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+        },
+        body: JSON.stringify({
+          proposalId: id,
+          company: profile?.company_name,
+          clientName: proposal.client_name,
+          jobDesc: proposal.job_description,
+          industry: proposal.industry,
+          repName: proposal.rep_name,
+          laborItems: laborItems,
+          aiNotes: aiNotes,
+          lineItems: lineItems.map(l => ({
+            itemName: l.item_name,
+            quantity: l.quantity,
+            customerPriceUnit: l.customer_price_unit,
+            customerPriceTotal: l.customer_price_total
+          }))
         })
-        await fetchProposal()
-      }
+      })
+      await fetchProposal()
     } catch (err) {
       console.log('SOW generation error:', err)
     }
@@ -429,26 +230,21 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     let yPos = 92
 
     if (proposal?.scope_of_work) {
-      if (orgType === 'manufacturer') {
-        yPos = renderManufacturerSOWtoPDF(doc, yPos, pageWidth, primaryRgb)
-        yPos += 12
-      } else {
-        doc.setFontSize(13)
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-        doc.text('Scope of Work', 14, yPos)
-        yPos += 8
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Scope of Work', 14, yPos)
+      yPos += 8
 
-        doc.setFontSize(10)
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(60, 60, 60)
-        const sowLines = doc.splitTextToSize(proposal.scope_of_work, pageWidth - 28)
-        doc.text(sowLines, 14, yPos)
-        yPos += sowLines.length * 5 + 12
-      }
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      const sowLines = doc.splitTextToSize(proposal.scope_of_work, pageWidth - 28)
+      doc.text(sowLines, 14, yPos)
+      yPos += sowLines.length * 5 + 12
     }
 
-    if (lineItems.length > 0 && orgType !== 'manufacturer') {
+    if (lineItems.length > 0) {
       doc.setFontSize(13)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -475,7 +271,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     // Labor section in PDF
     const laborItems = proposal?.labor_items || []
-    if (laborItems.length > 0 && laborItems.some(l => l.role) && orgType !== 'manufacturer') {
+    if (laborItems.length > 0 && laborItems.some(l => l.role)) {
       const tableEnd = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12
       doc.setFontSize(13)
       doc.setFont('helvetica', 'bold')
@@ -1144,6 +940,118 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setSaving(false)
   }
 
+  const saveAsTemplate = async () => {
+    if (!templateName.trim()) return
+    setSavingTemplate(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profileData } = await supabase
+      .from('profiles').select('org_id').eq('id', user.id).single()
+
+    const { data: template, error } = await supabase
+      .from('templates')
+      .insert({
+        org_id: profileData.org_id,
+        name: templateName.trim(),
+        industry: proposal?.industry || '',
+        description: proposal?.job_description || '',
+        labor_items: laborItems.filter(l => l.role) || []
+      })
+      .select().single()
+
+    if (!error && lineItems.length > 0) {
+      await supabase.from('template_line_items').insert(
+        lineItems.map(l => ({
+          template_id: template.id,
+          item_name: l.item_name,
+          part_number_sku: l.part_number_sku,
+          quantity: l.quantity,
+          unit: l.unit,
+          category: l.category,
+          vendor: l.vendor,
+          your_cost_unit: l.your_cost_unit,
+          markup_percent: l.markup_percent,
+          customer_price_unit: l.customer_price_unit,
+        }))
+      )
+    }
+
+    setSavingTemplate(false)
+    setShowSaveTemplateModal(false)
+    setTemplateName('')
+    alert(`Template "${templateName}" saved successfully!`)
+  }
+
+  const sendProposal = async () => {
+    if (!proposal?.client_email) { alert('No client email on this proposal.'); return }
+    setSendingProposal(true)
+
+    try {
+      // Generate PDF as base64
+      const { default: jsPDFLib } = await import('jspdf')
+      const { default: autoTableLib } = await import('jspdf-autotable')
+      const pdfDoc = new jsPDFLib()
+      const pageWidth = pdfDoc.internal.pageSize.getWidth()
+      const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
+
+      pdfDoc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      pdfDoc.rect(0, 0, pageWidth, 40, 'F')
+      if (profile?.logo_url) {
+        const img = new Image(); img.src = profile.logo_url
+        pdfDoc.addImage(img, 'PNG', 14, 8, 40, 24)
+      } else {
+        pdfDoc.setTextColor(255,255,255); pdfDoc.setFontSize(24); pdfDoc.setFont('helvetica','bold')
+        pdfDoc.text(profile?.company_name || 'ForgePt.', 14, 20)
+      }
+      pdfDoc.setTextColor(0,0,0); pdfDoc.setFontSize(18); pdfDoc.setFont('helvetica','bold')
+      pdfDoc.text(proposal?.proposal_name || 'Proposal', 14, 55)
+      pdfDoc.setFontSize(10); pdfDoc.setFont('helvetica','normal'); pdfDoc.setTextColor(100,100,100)
+      pdfDoc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
+      pdfDoc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 72)
+
+      if (proposal?.scope_of_work) {
+        pdfDoc.setFontSize(13); pdfDoc.setFont('helvetica','bold')
+        pdfDoc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+        pdfDoc.text('Scope of Work', 14, 85)
+        pdfDoc.setFontSize(10); pdfDoc.setFont('helvetica','normal'); pdfDoc.setTextColor(60,60,60)
+        const sowLines = pdfDoc.splitTextToSize(proposal.scope_of_work, pageWidth - 28)
+        pdfDoc.text(sowLines, 14, 93)
+      }
+
+      const pdfBase64 = pdfDoc.output('datauristring').split(',')[1]
+
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+        },
+        body: JSON.stringify({
+          proposalId: id,
+          clientEmail: proposal.client_email,
+          clientName: proposal.client_name || 'there',
+          repName: proposal.rep_name || profile?.full_name || '',
+          repEmail: proposal.rep_email || profile?.email || '',
+          companyName: profile?.company_name || proposal.company || '',
+          proposalName: proposal.proposal_name || 'Proposal',
+          subject: sendForm.subject,
+          message: sendForm.message,
+          logoUrl: profile?.logo_url || null,
+          pdfBase64
+        })
+      })
+
+      setProposal(prev => ({ ...prev, status: 'Sent' }))
+      setShowSendModal(false)
+      setSendForm({ subject: '', message: '' })
+    } catch (err) {
+      console.error('Send proposal error:', err)
+      alert('Error sending proposal: ' + err.message)
+    }
+
+    setSendingProposal(false)
+  }
+
   const fmt = (num) => num?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'
   const categories = ['Electrical', 'Mechanical', 'Audio/Visual', 'Security', 'Networking', 'Material', 'Labor', 'Other']
 
@@ -1155,7 +1063,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
+      <Sidebar isAdmin={isAdmin} />
 
       <div className="flex-1 p-6 space-y-6">
 
@@ -1209,6 +1117,20 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-white font-bold text-lg">Scope of Work</h3>
             <div className="flex gap-2">
+              {featureSendProposal && proposal?.client_email && (
+                <button
+                  onClick={() => {
+                    setSendForm({
+                      subject: `Proposal: ${proposal.proposal_name}`,
+                      message: `Hi ${proposal.client_name || 'there'},\n\nPlease find your proposal attached. Don't hesitate to reach out with any questions.\n\nLooking forward to working with you.`
+                    })
+                    setShowSendModal(true)
+                  }}
+                  className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
+                >
+                  ✉ Send Proposal
+                </button>
+              )}
               <button
                 onClick={downloadPDF}
                 className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors"
@@ -1231,33 +1153,24 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             </div>
           </div>
 
-          {/* AI Notes — integrators only */}
-          {orgType !== 'manufacturer' && (
-            <div className="mb-4">
-              <label className="text-white text-sm font-semibold block mb-1">
-                AI Notes (Optional)
-              </label>
-              <p className="text-[#8A9AB0] text-xs mb-2">
-                Describe what you want the Scope of Work to include, how it should sound, or anything important.
-              </p>
-              <textarea
-                value={aiNotes}
-                onChange={(e) => setAiNotes(e.target.value)}
-                placeholder="Example: This is for a commercial install. Keep it professional, emphasize safety, and make it easy for a non-technical client to understand."
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] min-h-[100px]"
-              />
-            </div>
-          )}
+          {/* AI Notes */}
+          <div className="mb-4">
+            <label className="text-white text-sm font-semibold block mb-1">
+              AI Notes (Optional)
+            </label>
+            <p className="text-[#8A9AB0] text-xs mb-2">
+              Describe what you want the Scope of Work to include, how it should sound, or anything important.
+            </p>
+            <textarea
+              value={aiNotes}
+              onChange={(e) => setAiNotes(e.target.value)}
+              placeholder="Example: This is for a commercial install. Keep it professional, emphasize safety, and make it easy for a non-technical client to understand."
+              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] min-h-[100px]"
+            />
+          </div>
 
           {proposal?.scope_of_work ? (
-            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{
-              (() => {
-                try {
-                  const parsed = JSON.parse(proposal.scope_of_work)
-                  return parsed.__mfr_sow ? parsed.plainText : proposal.scope_of_work
-                } catch { return proposal.scope_of_work }
-              })()
-            }</p>
+            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
           ) : (
             <p className="text-[#8A9AB0] text-sm">No Scope of Work yet. Click Generate SOW to create one.</p>
           )}
@@ -1281,14 +1194,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 >
                   Send All RFQs
                 </button>
-                {orgType === 'manufacturer' && (
-                  <button
-                    onClick={() => { startEditing(); setShowCatalogSearch(true) }}
-                    className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
-                  >
-                    + From Catalog
-                  </button>
-                )}
+                <button
+                  onClick={() => { setTemplateName(proposal?.proposal_name || ''); setShowSaveTemplateModal(true) }}
+                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors"
+                >
+                  Save as Template
+                </button>
                 <button
                   onClick={startEditing}
                   className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors"
@@ -1493,8 +1404,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 + Add Line Item
               </button>
 
-              {/* Labor Section — hidden for manufacturers */}
-              {orgType !== 'manufacturer' && <div className="mt-8">
+              {/* Labor Section — mirrors materials BOM table */}
+              <div className="mt-8">
                 <h3 className="text-white font-bold text-base mb-3">Labor</h3>
                 <table className="w-full text-sm">
                   <thead>
@@ -1587,7 +1498,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 >
                   + Add Labor
                 </button>
-              </div>}
+              </div>
 
               {/* Live running total — updates as you type */}
               <div className="mt-6 border-t border-[#2a3d55] pt-4 space-y-2">
@@ -1630,22 +1541,99 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         </div>
         {/* FIX: POList is now correctly outside the BOM card */}
         <POList proposalId={id} />
-        <TaskList
-  proposalId={id}
-  orgId={profile?.org_id}
-  userId={profile?.id}
-/>
 
       </div>
 
-      {showCatalogSearch && (
-        <CatalogSearch
-          orgId={profile?.org_id}
-          onAdd={(item) => {
-            setEditLines(prev => [...prev, { ...item, proposal_id: id }])
-          }}
-          onClose={() => setShowCatalogSearch(false)}
-        />
+      {/* Save as Template Modal */}
+      {showSaveTemplateModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-sm">
+            <div className="w-12 h-12 rounded-full bg-[#C8622A]/20 flex items-center justify-center mx-auto mb-4">
+              <span className="text-[#C8622A] text-xl">📋</span>
+            </div>
+            <h3 className="text-white font-bold text-lg mb-2 text-center">Save as Template</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5 text-center">This will save all {lineItems.length} line items{laborItems.filter(l => l.role).length > 0 ? ` and ${laborItems.filter(l => l.role).length} labor item${laborItems.filter(l => l.role).length > 1 ? 's' : ''}` : ''} as a reusable template.</p>
+            <div className="mb-4">
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Template Name</label>
+              <input
+                type="text"
+                value={templateName}
+                onChange={e => setTemplateName(e.target.value)}
+                placeholder="e.g. 8 Camera Install"
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowSaveTemplateModal(false); setTemplateName('') }}
+                className="flex-1 py-2 bg-[#0F1C2E] text-[#8A9AB0] hover:text-white rounded-lg text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveAsTemplate}
+                disabled={savingTemplate || !templateName.trim()}
+                className="flex-1 py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+              >
+                {savingTemplate ? 'Saving...' : 'Save Template'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Proposal Modal */}
+      {showSendModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg">
+            <h3 className="text-white font-bold text-lg mb-1">Send Proposal</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">
+              Sending to <span className="text-white font-medium">{proposal?.client_email}</span> · PDF will be attached
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Subject</label>
+                <input
+                  type="text"
+                  value={sendForm.subject}
+                  onChange={e => setSendForm(p => ({ ...p, subject: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                />
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Message</label>
+                <textarea
+                  value={sendForm.message}
+                  onChange={e => setSendForm(p => ({ ...p, message: e.target.value }))}
+                  rows={6}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none"
+                />
+              </div>
+              <div className="bg-[#0F1C2E] rounded-lg px-4 py-3 text-xs text-[#8A9AB0]">
+                <p>✓ PDF proposal will be attached automatically</p>
+                <p>✓ Proposal will be marked as Sent</p>
+                <p>✓ Follow-up emails will begin on your cadence</p>
+                <p>✓ Reply-to will be set to your email</p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowSendModal(false)}
+                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={sendProposal}
+                  disabled={sendingProposal || !sendForm.subject || !sendForm.message}
+                  className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {sendingProposal ? 'Sending...' : 'Send Proposal →'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Sent Prompt Modal */}

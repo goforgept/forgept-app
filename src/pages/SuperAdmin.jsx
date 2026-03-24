@@ -65,10 +65,7 @@ export default function SuperAdmin() {
   const approveRequest = async (request) => {
     const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/approve-request', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE` },
       body: JSON.stringify({ requestId: request.id, fullName: request.full_name, email: request.email, companyName: request.company_name })
     })
     const result = await res.json()
@@ -99,6 +96,7 @@ export default function SuperAdmin() {
       org_type: org.org_type || 'integrator',
       feature_proposals: org.feature_proposals !== false,
       feature_crm: org.feature_crm || false,
+      feature_send_proposal: org.feature_send_proposal || false,
     })
   }
 
@@ -107,6 +105,7 @@ export default function SuperAdmin() {
       org_type: orgForm.org_type,
       feature_proposals: orgForm.feature_proposals,
       feature_crm: orgForm.feature_crm,
+      feature_send_proposal: orgForm.feature_send_proposal,
     }).eq('id', orgId)
     setEditingOrg(null)
     fetchData()
@@ -145,33 +144,18 @@ export default function SuperAdmin() {
     if (!stripeModal) return
     setCreatingSubscription(true)
     setStripeResult(null)
-
     try {
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-create-subscription', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
-        },
-        body: JSON.stringify({
-          orgId: stripeModal.org.id,
-          orgName: stripeModal.org.name,
-          adminEmail: stripeModal.admin?.email || '',
-          plan: stripeForm.plan,
-          chargeOnboarding: stripeForm.chargeOnboarding
-        })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE` },
+        body: JSON.stringify({ orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeModal.admin?.email || '', plan: stripeForm.plan, chargeOnboarding: stripeForm.chargeOnboarding })
       })
       const result = await res.json()
-      if (result.error) {
-        setStripeResult({ success: false, message: result.error })
-      } else {
-        setStripeResult({ success: true, message: `Subscription created! Status: ${result.status}` })
-        fetchData()
-      }
+      if (result.error) setStripeResult({ success: false, message: result.error })
+      else { setStripeResult({ success: true, message: `Subscription created! Status: ${result.status}` }); fetchData() }
     } catch (err) {
       setStripeResult({ success: false, message: err.message })
     }
-
     setCreatingSubscription(false)
   }
 
@@ -217,7 +201,6 @@ export default function SuperAdmin() {
       </div>
 
       <div className="p-6 space-y-6">
-        {/* Stats */}
         <div className="grid grid-cols-5 gap-4">
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Total Orgs</p><p className="text-white text-2xl font-bold">{orgs.length}</p></div>
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Total Users</p><p className="text-white text-2xl font-bold">{profiles.length}</p></div>
@@ -226,7 +209,6 @@ export default function SuperAdmin() {
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">MRR</p><p className="text-[#C8622A] text-2xl font-bold">${mrr.toLocaleString()}</p></div>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2">
           {[
             { key: 'requests', label: `Access Requests${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}` },
@@ -260,17 +242,11 @@ export default function SuperAdmin() {
                         <td className="text-white py-3 pr-4 font-medium">{req.full_name}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{req.email}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{req.company_name}</td>
-                        <td className="py-3 pr-4">
-                          {req.role ? (
-                            <span className="bg-[#2a3d55] text-white text-xs px-2 py-1 rounded">{req.role}</span>
-                          ) : <span className="text-[#8A9AB0]">—</span>}
-                        </td>
+                        <td className="py-3 pr-4">{req.role ? <span className="bg-[#2a3d55] text-white text-xs px-2 py-1 rounded">{req.role}</span> : <span className="text-[#8A9AB0]">—</span>}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4 max-w-xs truncate">{req.notes || '—'}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{new Date(req.created_at).toLocaleDateString()}</td>
                         <td className="py-3 pr-4">
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${req.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : req.status === 'approved' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                            {req.status}
-                          </span>
+                          <span className={`text-xs font-semibold px-2 py-1 rounded ${req.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : req.status === 'approved' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{req.status}</span>
                         </td>
                         <td className="py-3">
                           {req.status === 'pending' && (
@@ -307,36 +283,20 @@ export default function SuperAdmin() {
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <p className="text-white font-semibold">{org.name}</p>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>
-                              {org.org_type || 'integrator'}
-                            </span>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : status === 'suspended' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>
-                              {status}
-                            </span>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>{org.org_type || 'integrator'}</span>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : status === 'suspended' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>{status}</span>
                           </div>
                           <p className="text-[#8A9AB0] text-xs">{admin?.full_name || '—'} · {admin?.email || '—'} · {memberCount} users</p>
-                          <div className="flex gap-2 mt-1.5">
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_proposals !== false ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
-                              {org.feature_proposals !== false ? '✓ Proposals' : '✗ Proposals'}
-                            </span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
-                              {org.feature_crm ? '✓ CRM' : '✗ CRM'}
-                            </span>
+                          <div className="flex gap-2 mt-1.5 flex-wrap">
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_proposals !== false ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_proposals !== false ? '✓ Proposals' : '✗ Proposals'}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_crm ? '✓ CRM' : '✗ CRM'}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_send_proposal ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_send_proposal ? '✓ Send Proposal' : '✗ Send Proposal'}</span>
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <button
-                            onClick={() => isEditing ? setEditingOrg(null) : startEditingOrg(org)}
-                            className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors"
-                          >
-                            {isEditing ? 'Cancel' : 'Edit Settings'}
-                          </button>
-                          {status === 'active' && (
-                            <button onClick={() => suspendOrg(org.id)} className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors">Suspend</button>
-                          )}
-                          {status === 'suspended' && (
-                            <button onClick={() => reactivateOrg(org.id)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">Reactivate</button>
-                          )}
+                          <button onClick={() => isEditing ? setEditingOrg(null) : startEditingOrg(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">{isEditing ? 'Cancel' : 'Edit Settings'}</button>
+                          {status === 'active' && <button onClick={() => suspendOrg(org.id)} className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors">Suspend</button>}
+                          {status === 'suspended' && <button onClick={() => reactivateOrg(org.id)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">Reactivate</button>}
                         </div>
                       </div>
 
@@ -346,15 +306,8 @@ export default function SuperAdmin() {
                             <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">Org Type</label>
                             <div className="grid grid-cols-3 gap-2">
                               {ORG_TYPES.map(type => (
-                                <button
-                                  key={type.value}
-                                  onClick={() => setOrgForm(p => ({ ...p, org_type: type.value }))}
-                                  className={`p-3 rounded-lg border text-left transition-colors ${
-                                    orgForm.org_type === type.value
-                                      ? 'border-[#C8622A] bg-[#C8622A]/10'
-                                      : 'border-[#2a3d55] bg-[#0F1C2E] hover:border-[#3a4d65]'
-                                  }`}
-                                >
+                                <button key={type.value} onClick={() => setOrgForm(p => ({ ...p, org_type: type.value }))}
+                                  className={`p-3 rounded-lg border text-left transition-colors ${orgForm.org_type === type.value ? 'border-[#C8622A] bg-[#C8622A]/10' : 'border-[#2a3d55] bg-[#0F1C2E] hover:border-[#3a4d65]'}`}>
                                   <p className={`text-sm font-semibold ${orgForm.org_type === type.value ? 'text-[#C8622A]' : 'text-white'}`}>{type.label}</p>
                                   <p className="text-[#8A9AB0] text-xs mt-0.5">{type.desc}</p>
                                 </button>
@@ -364,46 +317,27 @@ export default function SuperAdmin() {
 
                           <div>
                             <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">Feature Access</label>
-                            <div className="flex gap-3">
-                              <button
-                                onClick={() => setOrgForm(p => ({ ...p, feature_proposals: !p.feature_proposals }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${
-                                  orgForm.feature_proposals
-                                    ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]'
-                                    : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'
-                                }`}
-                              >
-                                <span>{orgForm.feature_proposals ? '✓' : '○'}</span>
-                                Proposals
+                            <div className="flex gap-3 flex-wrap">
+                              <button onClick={() => setOrgForm(p => ({ ...p, feature_proposals: !p.feature_proposals }))}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_proposals ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                <span>{orgForm.feature_proposals ? '✓' : '○'}</span> Proposals
                               </button>
-                              <button
-                                onClick={() => setOrgForm(p => ({ ...p, feature_crm: !p.feature_crm }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${
-                                  orgForm.feature_crm
-                                    ? 'border-purple-400 bg-purple-500/10 text-purple-400'
-                                    : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'
-                                }`}
-                              >
-                                <span>{orgForm.feature_crm ? '✓' : '○'}</span>
-                                CRM
+                              <button onClick={() => setOrgForm(p => ({ ...p, feature_crm: !p.feature_crm }))}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_crm ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                <span>{orgForm.feature_crm ? '✓' : '○'}</span> CRM
                               </button>
-                              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold ${
-                                orgForm.feature_proposals && orgForm.feature_crm
-                                  ? 'border-green-400 bg-green-500/10 text-green-400'
-                                  : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'
-                              }`}>
+                              <button onClick={() => setOrgForm(p => ({ ...p, feature_send_proposal: !p.feature_send_proposal }))}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_send_proposal ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                <span>{orgForm.feature_send_proposal ? '✓' : '○'}</span> Send Proposal
+                              </button>
+                              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold ${orgForm.feature_proposals && orgForm.feature_crm ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
                                 {orgForm.feature_proposals && orgForm.feature_crm ? '✓ Full Suite' : '○ Full Suite'}
                               </div>
                             </div>
                           </div>
 
                           <div className="flex justify-end">
-                            <button
-                              onClick={() => saveOrgSettings(org.id)}
-                              className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
-                            >
-                              Save Settings
-                            </button>
+                            <button onClick={() => saveOrgSettings(org.id)} className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save Settings</button>
                           </div>
                         </div>
                       )}
@@ -426,7 +360,6 @@ export default function SuperAdmin() {
                 <div className="text-center"><p className="text-[#8A9AB0] text-xs">Trial</p><p className="text-yellow-400 font-bold">{trialOrgs}</p></div>
               </div>
             </div>
-
             {loading ? <p className="text-[#8A9AB0]">Loading...</p> : orgs.length === 0 ? <p className="text-[#8A9AB0]">No organizations yet.</p> : (
               <div className="space-y-3">
                 {orgs.map(org => {
@@ -442,18 +375,13 @@ export default function SuperAdmin() {
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <p className="text-white font-semibold">{org.name}</p>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>
-                              {org.org_type || 'integrator'}
-                            </span>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>{org.org_type || 'integrator'}</span>
                           </div>
                           <p className="text-[#8A9AB0] text-xs">{admin?.email || '—'}</p>
-                          <div className="flex gap-2 mt-1">
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_proposals !== false ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
-                              {org.feature_proposals !== false ? '✓ Proposals' : '✗ Proposals'}
-                            </span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
-                              {org.feature_crm ? '✓ CRM' : '✗ CRM'}
-                            </span>
+                          <div className="flex gap-2 mt-1 flex-wrap">
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_proposals !== false ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_proposals !== false ? '✓ Proposals' : '✗ Proposals'}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_crm ? '✓ CRM' : '✗ CRM'}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_send_proposal ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_send_proposal ? '✓ Send Proposal' : '✗ Send Proposal'}</span>
                           </div>
                           {hasStripe && <p className="text-green-400 text-xs mt-1">✓ Stripe connected</p>}
                         </div>
@@ -461,52 +389,20 @@ export default function SuperAdmin() {
                           <span className={`text-xs font-semibold px-2 py-1 rounded ${plan.bg} ${plan.color}`}>{org.plan || 'Trial'}</span>
                           <span className={`text-xs font-semibold px-2 py-1 rounded ${getBillingStatusColor(org.billing_status)}`}>{org.billing_status || 'trial'}</span>
                           {org.monthly_rate > 0 && <span className="text-white text-sm font-bold">${org.monthly_rate}/mo</span>}
-                          <button onClick={() => openStripeModal(org)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">
-                            {hasStripe ? 'Update Subscription' : 'Create Subscription'}
-                          </button>
-                          <button onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">
-                            {isEditing ? 'Cancel' : 'Manual Edit'}
-                          </button>
+                          <button onClick={() => openStripeModal(org)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">{hasStripe ? 'Update Subscription' : 'Create Subscription'}</button>
+                          <button onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">{isEditing ? 'Cancel' : 'Manual Edit'}</button>
                         </div>
                       </div>
-
                       {org.billing_status === 'trial' && trialDaysLeft !== null && (
-                        <p className={`text-xs mt-2 ${trialDaysLeft <= 3 ? 'text-red-400' : 'text-yellow-400'}`}>
-                          {trialDaysLeft > 0 ? `Trial ends in ${trialDaysLeft} days` : 'Trial expired'}
-                        </p>
+                        <p className={`text-xs mt-2 ${trialDaysLeft <= 3 ? 'text-red-400' : 'text-yellow-400'}`}>{trialDaysLeft > 0 ? `Trial ends in ${trialDaysLeft} days` : 'Trial expired'}</p>
                       )}
-
                       {isEditing && (
                         <div className="mt-4 grid grid-cols-4 gap-3 pt-4 border-t border-[#2a3d55]">
-                          <div>
-                            <label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label>
-                            <select value={billingForm.plan} onChange={e => setBillingForm(p => ({ ...p, plan: e.target.value }))}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
-                              {PLANS.map(p => <option key={p.name} value={p.name}>{p.name}{p.rate ? ` — $${p.rate}/mo` : p.rate === 0 ? ' — Free' : ' — Custom'}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Status</label>
-                            <select value={billingForm.billing_status} onChange={e => setBillingForm(p => ({ ...p, billing_status: e.target.value }))}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
-                              {['trial', 'active', 'past_due', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-[#8A9AB0] text-xs mb-1 block">Monthly Rate ($)</label>
-                            <input type="number" value={billingForm.monthly_rate} onChange={e => setBillingForm(p => ({ ...p, monthly_rate: e.target.value }))}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]" />
-                          </div>
-                          <div>
-                            <label className="text-[#8A9AB0] text-xs mb-1 block">Trial End Date</label>
-                            <input type="date" value={billingForm.trial_ends_at} onChange={e => setBillingForm(p => ({ ...p, trial_ends_at: e.target.value }))}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]" />
-                          </div>
-                          <div className="col-span-4 flex justify-end">
-                            <button onClick={() => updateBilling(org.id)} className="bg-[#C8622A] text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors">
-                              Save Changes
-                            </button>
-                          </div>
+                          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label><select value={billingForm.plan} onChange={e => setBillingForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">{PLANS.map(p => <option key={p.name} value={p.name}>{p.name}{p.rate ? ` — $${p.rate}/mo` : p.rate === 0 ? ' — Free' : ' — Custom'}</option>)}</select></div>
+                          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Billing Status</label><select value={billingForm.billing_status} onChange={e => setBillingForm(p => ({ ...p, billing_status: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">{['trial', 'active', 'past_due', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}</select></div>
+                          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Monthly Rate ($)</label><input type="number" value={billingForm.monthly_rate} onChange={e => setBillingForm(p => ({ ...p, monthly_rate: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]" /></div>
+                          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Trial End Date</label><input type="date" value={billingForm.trial_ends_at} onChange={e => setBillingForm(p => ({ ...p, trial_ends_at: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]" /></div>
+                          <div className="col-span-4 flex justify-end"><button onClick={() => updateBilling(org.id)} className="bg-[#C8622A] text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors">Save Changes</button></div>
                         </div>
                       )}
                     </div>
@@ -518,27 +414,16 @@ export default function SuperAdmin() {
         )}
       </div>
 
-      {/* Stripe Subscription Modal */}
       {stripeModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
             <h3 className="text-white font-bold text-lg mb-1">Create Stripe Subscription</h3>
             <p className="text-[#8A9AB0] text-sm mb-5">{stripeModal.org.name} · {stripeModal.admin?.email || 'No admin email'}</p>
             <div className="space-y-4">
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label>
-                <select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                  <option value="Solo">Solo — $49/mo</option>
-                  <option value="Team">Team — $149/mo</option>
-                  <option value="Business">Business — $349/mo</option>
-                </select>
-              </div>
+              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label><select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"><option value="Solo">Solo — $49/mo</option><option value="Team">Team — $149/mo</option><option value="Business">Business — $349/mo</option></select></div>
               <div className="flex items-center gap-3 bg-[#0F1C2E] rounded-lg px-4 py-3">
                 <input type="checkbox" id="onboarding" checked={stripeForm.chargeOnboarding} onChange={e => setStripeForm(p => ({ ...p, chargeOnboarding: e.target.checked }))} className="accent-[#C8622A]" />
-                <label htmlFor="onboarding" className="text-white text-sm cursor-pointer">
-                  Charge one-time onboarding fee <span className="text-[#C8622A] font-semibold">$249</span>
-                </label>
+                <label htmlFor="onboarding" className="text-white text-sm cursor-pointer">Charge one-time onboarding fee <span className="text-[#C8622A] font-semibold">$249</span></label>
               </div>
               <div className="bg-[#0F1C2E] rounded-lg p-3 text-xs text-[#8A9AB0]">
                 <p className="font-semibold text-white mb-1">What this does:</p>
@@ -548,16 +433,10 @@ export default function SuperAdmin() {
                 <p>• Updates billing status in ForgePt.</p>
                 <p className="mt-2 text-yellow-400">Note: Customer will need to add payment method via Stripe dashboard or payment link.</p>
               </div>
-              {stripeResult && (
-                <div className={`rounded-lg px-4 py-3 text-sm font-semibold ${stripeResult.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                  {stripeResult.message}
-                </div>
-              )}
+              {stripeResult && <div className={`rounded-lg px-4 py-3 text-sm font-semibold ${stripeResult.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{stripeResult.message}</div>}
               <div className="flex gap-3 pt-2">
                 <button onClick={() => { setStripeModal(null); setStripeResult(null) }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={createSubscription} disabled={creatingSubscription} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {creatingSubscription ? 'Creating...' : 'Create Subscription'}
-                </button>
+                <button onClick={createSubscription} disabled={creatingSubscription} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{creatingSubscription ? 'Creating...' : 'Create Subscription'}</button>
               </div>
             </div>
           </div>
