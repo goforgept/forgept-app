@@ -70,7 +70,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
   }
 
-  const generateInvoicePDF = () => {
+  const generateInvoicePDF = (descOverride) => {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
@@ -106,8 +106,9 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
     // Description of Work
     let yPos = 78
-    if (invoice?.description) {
-      const descLines = doc.splitTextToSize(invoice.description, pageWidth - 32)
+    const pdfDescription = descOverride !== undefined ? descOverride : (invoice?.description || '')
+    if (pdfDescription) {
+      const descLines = doc.splitTextToSize(pdfDescription, pageWidth - 32)
       const blockHeight = descLines.length * 5.5 + 16
       doc.setFillColor(245, 247, 250)
       doc.rect(14, yPos, pageWidth - 28, blockHeight, 'F')
@@ -215,7 +216,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   }
 
   const downloadPDF = () => {
-    const doc = generateInvoicePDF()
+    const doc = generateInvoicePDF(descriptionValue)
     doc.save(`${invoice?.invoice_number || 'Invoice'}.pdf`)
   }
 
@@ -258,7 +259,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     if (!invoice?.proposals?.client_email) { alert('No client email on linked proposal.'); return }
     setSendingInvoice(true)
     try {
-      const doc = generateInvoicePDF()
+      const doc = generateInvoicePDF(descriptionValue)
       const pdfBase64 = doc.output('datauristring').split(',')[1]
 
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
