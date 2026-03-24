@@ -32,6 +32,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
+  const [orgType, setOrgType] = useState('integrator')
   const [featureSendProposal, setFeatureSendProposal] = useState(false)
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendingProposal, setSendingProposal] = useState(false)
