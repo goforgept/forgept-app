@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
-import NotificationBell from './NotificationBell'
+
 
 export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false }) {
   const location = useLocation()
