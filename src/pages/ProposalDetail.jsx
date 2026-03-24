@@ -1055,16 +1055,15 @@ export default function ProposalDetail({ isAdmin }) {
   const fmt = (num) => num?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'
   const categories = ['Electrical', 'Mechanical', 'Audio/Visual', 'Security', 'Networking', 'Material', 'Labor', 'Other']
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
-      <p className="text-white">Loading...</p>
-    </div>
-  )
-
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
       <Sidebar isAdmin={isAdmin} />
 
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-white">Loading...</p>
+        </div>
+      ) : (
       <div className="flex-1 p-6 space-y-6">
 
         {/* Header */}
@@ -1117,7 +1116,7 @@ export default function ProposalDetail({ isAdmin }) {
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-white font-bold text-lg">Scope of Work</h3>
             <div className="flex gap-2">
-              {featureSendProposal && proposal?.client_email && (
+              {featureSendProposal && (
                 <button
                   onClick={() => {
                     setSendForm({
@@ -1543,6 +1542,7 @@ export default function ProposalDetail({ isAdmin }) {
         <POList proposalId={id} />
 
       </div>
+      )}
 
       {/* Save as Template Modal */}
       {showSaveTemplateModal && (
