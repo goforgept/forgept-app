@@ -9,6 +9,7 @@ export default function AdminDashboard() {
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState('all')
+  const [orgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -466,7 +467,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Labor Forecast */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        {orgType !== 'manufacturer' && <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-center mb-5">
             <div>
               <h3 className="text-white font-bold text-lg">Labor Forecast{periodShort[period]}</h3>
@@ -507,7 +508,7 @@ export default function AdminDashboard() {
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
       </div>
     </div>

@@ -9,6 +9,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [orgId, setOrgId] = useState(null)
+  const [orgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -177,7 +178,7 @@ export default function Dashboard() {
         )}
 
         {/* Labor Forecast */}
-        {!loading && (laborQuoted > 0 || laborWon > 0) && (
+        {!loading && orgType !== 'manufacturer' && (laborQuoted > 0 || laborWon > 0) && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="mb-4">
               <h3 className="text-white font-bold text-lg">Labor Forecast</h3>
