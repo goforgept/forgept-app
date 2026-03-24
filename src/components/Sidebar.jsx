@@ -44,6 +44,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
     ] : []),
     ...(featureProposals ? [
       { label: 'Proposals', path: '/proposals', icon: '📋' },
+      { label: 'Templates', path: '/templates', icon: '📋' },
     ] : []),
     { label: 'Clients', path: '/clients', icon: '🏢' },
     ...(featureProposals ? [

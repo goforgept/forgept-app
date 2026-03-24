@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import * as XLSX from 'xlsx'
-import CatalogSearch from '../components/CatalogSearch'
 
 const emptyLine = () => ({
   item_name: '', part_number_sku: '', quantity: '', unit: 'ea',
@@ -29,9 +28,9 @@ export default function NewProposal() {
   const [uploadedLines, setUploadedLines] = useState([])
   const [uploadFileName, setUploadFileName] = useState(null)
   const [laborItems, setLaborItems] = useState([emptyLaborLine()])
-  const [orgType, setOrgType] = useState('integrator')
-  const [showCatalogSearch, setShowCatalogSearch] = useState(false)
-  const [orgId, setOrgId] = useState(null)
+  const [templates, setTemplates] = useState([])
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
 
   useEffect(() => {
     fetchProfileAndClients()
@@ -42,7 +41,7 @@ export default function NewProposal() {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('*, organizations(org_type)')
+      .select('*')
       .eq('id', user.id)
       .single()
 
@@ -52,8 +51,6 @@ export default function NewProposal() {
         rep_name: profile.full_name || '',
         rep_email: profile.email || user.email || ''
       }))
-      setOrgType(profile?.organizations?.org_type || 'integrator')
-      setOrgId(profile?.org_id || null)
 
       if (profile.org_id) {
         const { data: clientsData } = await supabase
@@ -62,6 +59,7 @@ export default function NewProposal() {
           .eq('org_id', profile.org_id)
           .order('company', { ascending: true })
         setClients(clientsData || [])
+        fetchTemplates(profile.org_id)
       }
     }
 
@@ -71,6 +69,52 @@ export default function NewProposal() {
       setSelectedClientId(clientId)
       prefillClient(clientId)
     }
+  }
+
+  const fetchTemplates = async (orgId) => {
+    setLoadingTemplates(true)
+    const { data } = await supabase
+      .from('templates')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('name', { ascending: true })
+    setTemplates(data || [])
+    setLoadingTemplates(false)
+  }
+
+  const loadTemplate = async (template) => {
+    // Fetch template line items
+    const { data: items } = await supabase
+      .from('template_line_items')
+      .select('*')
+      .eq('template_id', template.id)
+      .order('id', { ascending: true })
+
+    if (items && items.length > 0) {
+      setLines(items.map(l => ({
+        item_name: l.item_name || '',
+        part_number_sku: l.part_number_sku || '',
+        quantity: String(l.quantity || ''),
+        unit: l.unit || 'ea',
+        category: l.category || '',
+        vendor: l.vendor || '',
+        your_cost_unit: String(l.your_cost_unit || ''),
+        markup_percent: String(l.markup_percent || '35'),
+        customer_price_unit: String(l.customer_price_unit || ''),
+        pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing'
+      })))
+    }
+
+    if (template.labor_items && template.labor_items.length > 0) {
+      setLaborItems(template.labor_items)
+    }
+
+    if (template.industry) {
+      setForm(prev => ({ ...prev, industry: template.industry }))
+    }
+
+    setShowTemplateModal(false)
+    setTab('inline')
   }
 
   const prefillClient = async (clientId) => {
@@ -448,12 +492,12 @@ export default function NewProposal() {
                 Upload Excel
               </button>
             </div>
-            {tab === 'inline' && orgType === 'manufacturer' && (
+            {templates.length > 0 && (
               <button
-                onClick={() => setShowCatalogSearch(true)}
-                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+                onClick={() => setShowTemplateModal(true)}
+                className="flex items-center gap-2 bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors"
               >
-                + From Catalog
+                📋 Load Template
               </button>
             )}
           </div>
@@ -551,96 +595,94 @@ export default function NewProposal() {
                 + Add Line Item
               </button>
 
-              {/* Labor — hidden for manufacturers */}
-              {orgType !== 'manufacturer' && (
-                <div className="mt-8">
-                  <h3 className="text-white font-bold text-base mb-3">Labor</h3>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[#2a3d55]">
-                        {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', 'Markup %', 'Total Labor', ''].map(h => (
-                          <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {laborItems.map((item, index) => (
-                        <tr key={index} className="border-b border-[#2a3d55]/30">
-                          <td className="pr-2 py-1">
-                            <input
-                              type="text"
-                              placeholder="e.g. Electrician"
-                              value={item.role}
-                              onChange={(e) => updateLabor(index, 'role', e.target.value)}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
-                            />
-                          </td>
-                          <td className="pr-2 py-1">
-                            <input
-                              type="number"
-                              placeholder="0"
-                              value={item.quantity}
-                              onChange={(e) => updateLabor(index, 'quantity', e.target.value)}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
-                            />
-                          </td>
-                          <td className="pr-2 py-1">
-                            <select
-                              value={item.unit || 'hr'}
-                              onChange={(e) => updateLabor(index, 'unit', e.target.value)}
-                              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
-                            >
-                              {['hr', 'day', 'lot'].map(u => <option key={u}>{u}</option>)}
-                            </select>
-                          </td>
-                          <td className="pr-2 py-1">
-                            <input
-                              type="number"
-                              placeholder="0.00"
-                              value={item.your_cost}
-                              onChange={(e) => updateLabor(index, 'your_cost', e.target.value)}
-                              className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
-                            />
-                          </td>
-                          <td className="pr-2 py-1">
-                            <input
-                              type="number"
-                              placeholder="35"
-                              value={item.markup}
-                              onChange={(e) => updateLabor(index, 'markup', e.target.value)}
-                              className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
-                            />
-                          </td>
-                          <td className="pr-2 py-1">
-                            <input
-                              type="number"
-                              placeholder="0.00"
-                              value={item.customer_price || ''}
-                              onChange={(e) => updateLabor(index, 'customer_price', e.target.value)}
-                              className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold"
-                            />
-                          </td>
-                          <td className="py-1">
-                            <button onClick={() => removeLaborLine(index)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
-                          </td>
-                        </tr>
+              {/* Labor — same table pattern as materials */}
+              <div className="mt-8">
+                <h3 className="text-white font-bold text-base mb-3">Labor</h3>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#2a3d55]">
+                      {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', 'Markup %', 'Total Labor', ''].map(h => (
+                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
                       ))}
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <td colSpan="5" className="text-[#8A9AB0] pt-3 text-right font-semibold text-xs">Total Labor</td>
-                        <td className="text-[#C8622A] pt-3 font-bold pr-2">
-                          ${liveLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {laborItems.map((item, index) => (
+                      <tr key={index} className="border-b border-[#2a3d55]/30">
+                        <td className="pr-2 py-1">
+                          <input
+                            type="text"
+                            placeholder="e.g. Electrician"
+                            value={item.role}
+                            onChange={(e) => updateLabor(index, 'role', e.target.value)}
+                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
                         </td>
-                        <td></td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={item.quantity}
+                            onChange={(e) => updateLabor(index, 'quantity', e.target.value)}
+                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <select
+                            value={item.unit || 'hr'}
+                            onChange={(e) => updateLabor(index, 'unit', e.target.value)}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          >
+                            {['hr', 'day', 'lot'].map(u => <option key={u}>{u}</option>)}
+                          </select>
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={item.your_cost}
+                            onChange={(e) => updateLabor(index, 'your_cost', e.target.value)}
+                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="35"
+                            value={item.markup}
+                            onChange={(e) => updateLabor(index, 'markup', e.target.value)}
+                            className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input
+                            type="number"
+                            placeholder="0.00"
+                            value={item.customer_price || ''}
+                            onChange={(e) => updateLabor(index, 'customer_price', e.target.value)}
+                            className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold"
+                          />
+                        </td>
+                        <td className="py-1">
+                          <button onClick={() => removeLaborLine(index)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
+                        </td>
                       </tr>
-                    </tfoot>
-                  </table>
-                  <button onClick={addLaborLine} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">
-                    + Add Labor
-                  </button>
-                </div>
-              )}
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan="5" className="text-[#8A9AB0] pt-3 text-right font-semibold text-xs">Total Labor</td>
+                      <td className="text-[#C8622A] pt-3 font-bold pr-2">
+                        ${liveLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+                <button onClick={addLaborLine} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">
+                  + Add Labor
+                </button>
+              </div>
 
               {/* Live running total */}
               <div className="mt-6 border-t border-[#2a3d55] pt-4 space-y-2">
@@ -648,12 +690,10 @@ export default function NewProposal() {
                   <span className="text-[#8A9AB0]">Materials</span>
                   <span className="text-white">${liveBOMTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
-                {orgType !== 'manufacturer' && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[#8A9AB0]">Labor</span>
-                    <span className="text-white">${liveLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                  </div>
-                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#8A9AB0]">Labor</span>
+                  <span className="text-white">${liveLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
                 <div className="flex justify-between text-base font-bold border-t border-[#2a3d55] pt-2">
                   <span className="text-white">Grand Total</span>
                   <span className="text-[#C8622A]">${liveGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -733,14 +773,51 @@ export default function NewProposal() {
         </div>
       </div>
 
-      {showCatalogSearch && (
-        <CatalogSearch
-          orgId={orgId}
-          onAdd={(item) => {
-            setLines(prev => [...prev, { ...emptyLine(), ...item }])
-          }}
-          onClose={() => setShowCatalogSearch(false)}
-        />
+      {/* Template Modal */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto">
+            <h3 className="text-white font-bold text-lg mb-1">Load a Template</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">Select a template to pre-fill the BOM and labor. You can edit everything after loading.</p>
+            {loadingTemplates ? (
+              <p className="text-[#8A9AB0]">Loading templates...</p>
+            ) : (
+              <div className="space-y-2">
+                {templates.map(template => {
+                  const labor = template.labor_items || []
+                  const totalLabor = labor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+                  return (
+                    <div
+                      key={template.id}
+                      onClick={() => loadTemplate(template)}
+                      className="flex justify-between items-center bg-[#0F1C2E] hover:bg-[#0a1520] rounded-xl px-4 py-3 cursor-pointer transition-colors border border-[#2a3d55] hover:border-[#C8622A]/40"
+                    >
+                      <div>
+                        <p className="text-white text-sm font-semibold">{template.name}</p>
+                        <p className="text-[#8A9AB0] text-xs mt-0.5">
+                          {template.industry && <span className="mr-2">{template.industry}</span>}
+                          {template.description && <span>{template.description}</span>}
+                        </p>
+                      </div>
+                      <div className="text-right ml-4">
+                        {totalLabor > 0 && (
+                          <p className="text-[#C8622A] text-xs font-semibold">${totalLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })} labor</p>
+                        )}
+                        <p className="text-[#8A9AB0] text-xs">→ Load</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <button
+              onClick={() => setShowTemplateModal(false)}
+              className="mt-5 w-full py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
