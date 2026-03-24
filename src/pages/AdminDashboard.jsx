@@ -165,6 +165,12 @@ export default function AdminDashboard() {
         return sum + items.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
       }, 0)
 
+    const getLaborHours = (proposals) =>
+      proposals.reduce((sum, p) => {
+        const items = p.labor_items || []
+        return sum + items.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0)
+      }, 0)
+
     const active = filteredProposals.filter(p => p.status !== 'Won' && p.status !== 'Lost')
     const won = filteredProposals.filter(p => p.status === 'Won')
     const closingSoonProposals = filteredProposals.filter(p => {
@@ -176,10 +182,13 @@ export default function AdminDashboard() {
     const laborQuoted = getLaborTotal(active)
     const laborWon = getLaborTotal(won)
     const laborClosingSoon = getLaborTotal(closingSoonProposals)
+    const hoursQuoted = getLaborHours(active)
+    const hoursWon = getLaborHours(won)
+    const hoursClosingSoon = getLaborHours(closingSoonProposals)
     const dealsWithLabor = active.filter(p => (p.labor_items || []).some(l => parseFloat(l.customer_price) > 0))
     const avgLaborPerDeal = dealsWithLabor.length > 0 ? laborQuoted / dealsWithLabor.length : 0
 
-    return { laborQuoted, laborWon, laborClosingSoon, avgLaborPerDeal, dealsWithLabor: dealsWithLabor.length }
+    return { laborQuoted, laborWon, laborClosingSoon, hoursQuoted, hoursWon, hoursClosingSoon, avgLaborPerDeal, dealsWithLabor: dealsWithLabor.length }
   }, [filteredProposals])
 
   const periodLabels = { all: 'All Time', ytd: 'Year to Date', qtd: 'Quarter to Date', mtd: 'Month to Date' }
@@ -476,17 +485,20 @@ export default function AdminDashboard() {
               <div className="bg-[#0F1C2E] rounded-xl p-4">
                 <p className="text-[#8A9AB0] text-xs mb-1">Total Labor Quoted</p>
                 <p className="text-white text-xl font-bold">${laborStats.laborQuoted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                <p className="text-[#8A9AB0] text-xs mt-1">Active pipeline</p>
+                <p className="text-[#C8622A] text-xs font-semibold mt-1">{laborStats.hoursQuoted.toLocaleString()} hrs</p>
+                <p className="text-[#8A9AB0] text-xs">Active pipeline</p>
               </div>
               <div className="bg-[#0F1C2E] rounded-xl p-4">
                 <p className="text-[#8A9AB0] text-xs mb-1">Total Labor Won</p>
                 <p className="text-green-400 text-xl font-bold">${laborStats.laborWon.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                <p className="text-[#8A9AB0] text-xs mt-1">Confirmed backlog</p>
+                <p className="text-[#C8622A] text-xs font-semibold mt-1">{laborStats.hoursWon.toLocaleString()} hrs</p>
+                <p className="text-[#8A9AB0] text-xs">Confirmed backlog</p>
               </div>
               <div className="bg-[#0F1C2E] rounded-xl p-4">
                 <p className="text-[#8A9AB0] text-xs mb-1">Closing in 30 Days</p>
                 <p className="text-[#C8622A] text-xl font-bold">${laborStats.laborClosingSoon.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                <p className="text-[#8A9AB0] text-xs mt-1">Plan ahead</p>
+                <p className="text-[#C8622A] text-xs font-semibold mt-1">{laborStats.hoursClosingSoon.toLocaleString()} hrs</p>
+                <p className="text-[#8A9AB0] text-xs">Plan ahead</p>
               </div>
               <div className="bg-[#0F1C2E] rounded-xl p-4">
                 <p className="text-[#8A9AB0] text-xs mb-1">Avg Labor per Deal</p>
