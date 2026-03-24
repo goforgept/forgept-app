@@ -8,7 +8,7 @@ import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } from 'docx'
 
-export default function ProposalDetail({ isAdmin, featureProposals = true, featureCRM = false }) {
+export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [proposal, setProposal] = useState(null)
@@ -32,7 +32,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
-  const [orgType, setOrgType] = useState('integrator')
   const [featureSendProposal, setFeatureSendProposal] = useState(false)
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendingProposal, setSendingProposal] = useState(false)
@@ -194,166 +193,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
   const downloadPDF = () => {
     if (proposal?.status === 'Draft') setShowSentPrompt(true)
-    const doc = new jsPDF()
-    const pageWidth = doc.internal.pageSize.getWidth()
-    const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
-
-    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.rect(0, 0, pageWidth, 40, 'F')
-
-    if (profile?.logo_url) {
-      const img = new Image()
-      img.src = profile.logo_url
-      doc.addImage(img, 'PNG', 14, 8, 40, 24)
-    } else {
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(24)
-      doc.setFont('helvetica', 'bold')
-      doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(200, 98, 42)
-      doc.text('Scope it. Send it. Close it.', 14, 30)
-    }
-
-    doc.setTextColor(0, 0, 0)
-    doc.setFontSize(18)
-    doc.setFont('helvetica', 'bold')
-    doc.text(proposal?.proposal_name || 'Proposal', 14, 55)
-
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(100, 100, 100)
-    doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
-    doc.text(`Industry: ${proposal?.industry || ''}`, 14, 72)
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 79)
-
-    let yPos = 92
-
-    if (proposal?.scope_of_work) {
-      doc.setFontSize(13)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Scope of Work', 14, yPos)
-      yPos += 8
-
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(60, 60, 60)
-      const sowLines = doc.splitTextToSize(proposal.scope_of_work, pageWidth - 28)
-      doc.text(sowLines, 14, yPos)
-      yPos += sowLines.length * 5 + 12
-    }
-
-    if (lineItems.length > 0) {
-      doc.setFontSize(13)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Materials & Pricing', 14, yPos)
-      yPos += 6
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']],
-        body: lineItems.map(item => [
-          item.item_name,
-          item.part_number_sku || '—',
-          item.quantity,
-          `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-          `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-        ]),
-        foot: [['', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        styles: { fontSize: 9 }
-      })
-    }
-
-    // Labor section in PDF
-    const laborItems = proposal?.labor_items || []
-    if (laborItems.length > 0 && laborItems.some(l => l.role)) {
-      const tableEnd = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12
-      doc.setFontSize(13)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Labor', 14, tableEnd)
-
-      const laborTotal = laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-      const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
-      const grandTotal = materialsTotal + laborTotal
-
-      autoTable(doc, {
-        startY: tableEnd + 6,
-        head: [['Role', 'Qty', 'Unit', 'Total Labor']],
-        body: laborItems.filter(l => l.role).map(l => [
-          l.role,
-          l.quantity,
-          l.unit || 'hr',
-          `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-        ]),
-        foot: [['', '', 'Total Labor', `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        styles: { fontSize: 9 }
-      })
-
-      // Grand total row
-      const afterLabor = doc.lastAutoTable.finalY + 6
-      doc.setFontSize(11)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Grand Total:', pageWidth - 60, afterLabor)
-      doc.setTextColor(200, 98, 42)
-      doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterLabor, { align: 'right' })
-    }
-
-    if (profile?.terms_and_conditions) {
-      doc.addPage()
-      doc.setFontSize(13)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Terms and Conditions', 14, 20)
-      doc.setFontSize(9)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(60, 60, 60)
-      const termsLines = doc.splitTextToSize(profile.terms_and_conditions, pageWidth - 28)
-      doc.text(termsLines, 14, 32)
-    }
-
-    // Signature block — directly after terms on same page
-    {
-      const termsLines = profile?.terms_and_conditions
-        ? doc.splitTextToSize(profile.terms_and_conditions, pageWidth - 28).length
-        : 0
-      const afterTermsY = profile?.terms_and_conditions ? 32 + termsLines * 4.5 + 16 : (doc.lastAutoTable?.finalY || 180) + 20
-
-      doc.setFontSize(13)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Accepted and Agreed', 14, afterTermsY)
-
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(60, 60, 60)
-      doc.setDrawColor(180, 180, 180)
-
-      const s1 = afterTermsY + 18
-      doc.text('Client Signature:', 14, s1)
-      doc.line(50, s1, 140, s1)
-      doc.text('Date:', 150, s1)
-      doc.line(163, s1, pageWidth - 14, s1)
-
-      const s2 = s1 + 20
-      doc.text('Printed Name:', 14, s2)
-      doc.line(50, s2, pageWidth - 14, s2)
-
-      const s3 = s2 + 20
-      doc.text('Title:', 14, s3)
-      doc.line(30, s3, pageWidth - 14, s3)
-    }
-
+    const doc = generatePDFDoc()
     doc.save(`${proposal?.proposal_name || 'Proposal'}.pdf`)
   }
 
@@ -983,42 +823,167 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     alert(`Template "${templateName}" saved successfully!`)
   }
 
+  const generatePDFDoc = () => {
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
+
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.rect(0, 0, pageWidth, 40, 'F')
+
+    if (profile?.logo_url) {
+      const img = new Image()
+      img.src = profile.logo_url
+      doc.addImage(img, 'PNG', 14, 8, 40, 24)
+    } else {
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(24)
+      doc.setFont('helvetica', 'bold')
+      doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(200, 98, 42)
+      doc.text('Scope it. Send it. Close it.', 14, 30)
+    }
+
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(18)
+    doc.setFont('helvetica', 'bold')
+    doc.text(proposal?.proposal_name || 'Proposal', 14, 55)
+
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100, 100, 100)
+    doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
+    doc.text(`Industry: ${proposal?.industry || ''}`, 14, 72)
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 79)
+
+    let yPos = 92
+
+    if (proposal?.scope_of_work) {
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Scope of Work', 14, yPos)
+      yPos += 8
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      const sowLines = doc.splitTextToSize(proposal.scope_of_work, pageWidth - 28)
+      doc.text(sowLines, 14, yPos)
+      yPos += sowLines.length * 5 + 12
+    }
+
+    if (lineItems.length > 0) {
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Materials & Pricing', 14, yPos)
+      yPos += 6
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']],
+        body: lineItems.map(item => [
+          item.item_name,
+          item.part_number_sku || '—',
+          item.quantity,
+          `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+          `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+        ]),
+        foot: [['', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        styles: { fontSize: 9 }
+      })
+    }
+
+    const pdfLaborItems = proposal?.labor_items || []
+    if (pdfLaborItems.length > 0 && pdfLaborItems.some(l => l.role)) {
+      const tableEnd = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Labor', 14, tableEnd)
+      const laborTotal = pdfLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+      const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
+      const grandTotal = materialsTotal + laborTotal
+      autoTable(doc, {
+        startY: tableEnd + 6,
+        head: [['Role', 'Qty', 'Unit', 'Total Labor']],
+        body: pdfLaborItems.filter(l => l.role).map(l => [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
+        foot: [['', '', 'Total Labor', `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        styles: { fontSize: 9 }
+      })
+      const afterLabor = doc.lastAutoTable.finalY + 6
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Grand Total:', pageWidth - 60, afterLabor)
+      doc.setTextColor(200, 98, 42)
+      doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterLabor, { align: 'right' })
+    }
+
+    if (profile?.terms_and_conditions) {
+      doc.addPage()
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Terms and Conditions', 14, 20)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      const termsLines = doc.splitTextToSize(profile.terms_and_conditions, pageWidth - 28)
+      doc.text(termsLines, 14, 32)
+
+      const tLen = termsLines.length
+      const afterTermsY = 32 + tLen * 4.5 + 16
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Accepted and Agreed', 14, afterTermsY)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      doc.setDrawColor(180, 180, 180)
+      const s1 = afterTermsY + 18
+      doc.text('Client Signature:', 14, s1); doc.line(50, s1, 140, s1)
+      doc.text('Date:', 150, s1); doc.line(163, s1, pageWidth - 14, s1)
+      const s2 = s1 + 20
+      doc.text('Printed Name:', 14, s2); doc.line(50, s2, pageWidth - 14, s2)
+      const s3 = s2 + 20
+      doc.text('Title:', 14, s3); doc.line(30, s3, pageWidth - 14, s3)
+    } else {
+      const afterY = (doc.lastAutoTable?.finalY || 180) + 20
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Accepted and Agreed', 14, afterY)
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      doc.setDrawColor(180, 180, 180)
+      const s1 = afterY + 18
+      doc.text('Client Signature:', 14, s1); doc.line(50, s1, 140, s1)
+      doc.text('Date:', 150, s1); doc.line(163, s1, pageWidth - 14, s1)
+      const s2 = s1 + 20
+      doc.text('Printed Name:', 14, s2); doc.line(50, s2, pageWidth - 14, s2)
+      const s3 = s2 + 20
+      doc.text('Title:', 14, s3); doc.line(30, s3, pageWidth - 14, s3)
+    }
+
+    return doc
+  }
+
   const sendProposal = async () => {
     if (!proposal?.client_email) { alert('No client email on this proposal.'); return }
     setSendingProposal(true)
 
     try {
-      // Generate PDF as base64
-      const { default: jsPDFLib } = await import('jspdf')
-      const { default: autoTableLib } = await import('jspdf-autotable')
-      const pdfDoc = new jsPDFLib()
-      const pageWidth = pdfDoc.internal.pageSize.getWidth()
-      const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
-
-      pdfDoc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      pdfDoc.rect(0, 0, pageWidth, 40, 'F')
-      if (profile?.logo_url) {
-        const img = new Image(); img.src = profile.logo_url
-        pdfDoc.addImage(img, 'PNG', 14, 8, 40, 24)
-      } else {
-        pdfDoc.setTextColor(255,255,255); pdfDoc.setFontSize(24); pdfDoc.setFont('helvetica','bold')
-        pdfDoc.text(profile?.company_name || 'ForgePt.', 14, 20)
-      }
-      pdfDoc.setTextColor(0,0,0); pdfDoc.setFontSize(18); pdfDoc.setFont('helvetica','bold')
-      pdfDoc.text(proposal?.proposal_name || 'Proposal', 14, 55)
-      pdfDoc.setFontSize(10); pdfDoc.setFont('helvetica','normal'); pdfDoc.setTextColor(100,100,100)
-      pdfDoc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
-      pdfDoc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 72)
-
-      if (proposal?.scope_of_work) {
-        pdfDoc.setFontSize(13); pdfDoc.setFont('helvetica','bold')
-        pdfDoc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-        pdfDoc.text('Scope of Work', 14, 85)
-        pdfDoc.setFontSize(10); pdfDoc.setFont('helvetica','normal'); pdfDoc.setTextColor(60,60,60)
-        const sowLines = pdfDoc.splitTextToSize(proposal.scope_of_work, pageWidth - 28)
-        pdfDoc.text(sowLines, 14, 93)
-      }
-
+      const pdfDoc = generatePDFDoc()
       const pdfBase64 = pdfDoc.output('datauristring').split(',')[1]
 
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
@@ -1056,15 +1021,16 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const fmt = (num) => num?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'
   const categories = ['Electrical', 'Mechanical', 'Audio/Visual', 'Security', 'Networking', 'Material', 'Labor', 'Other']
 
+  if (loading) return (
+    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
+      <p className="text-white">Loading...</p>
+    </div>
+  )
+
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
+      <Sidebar isAdmin={isAdmin} />
 
-      {loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-white">Loading...</p>
-        </div>
-      ) : (
       <div className="flex-1 p-6 space-y-6">
 
         {/* Header */}
@@ -1117,7 +1083,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-white font-bold text-lg">Scope of Work</h3>
             <div className="flex gap-2">
-              {featureSendProposal && (
+              {featureSendProposal && proposal?.client_email && (
                 <button
                   onClick={() => {
                     setSendForm({
@@ -1543,7 +1509,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         <POList proposalId={id} />
 
       </div>
-      )}
 
       {/* Save as Template Modal */}
       {showSaveTemplateModal && (
