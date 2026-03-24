@@ -125,7 +125,6 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     // Line items table
     autoTable(doc, {
       startY: yPos,
-      startY: 78,
       head: [['Description', 'Qty', 'Unit Price', 'Total']],
       body: lineItems.map(item => [
         item.description,
