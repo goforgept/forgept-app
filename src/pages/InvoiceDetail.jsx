@@ -107,16 +107,18 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     // Description of Work
     let yPos = 78
     if (invoice?.description) {
-      doc.setFillColor(248, 248, 248)
-      doc.rect(14, yPos - 5, pageWidth - 28, 4 + doc.splitTextToSize(invoice.description, pageWidth - 40).length * 5.5 + 6, 'F')
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold')
+      const descLines = doc.splitTextToSize(invoice.description, pageWidth - 32)
+      const blockHeight = descLines.length * 5.5 + 16
+      doc.setFillColor(245, 247, 250)
+      doc.rect(14, yPos, pageWidth - 28, blockHeight, 'F')
+      yPos += 8
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold')
       doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Description of Work', 18, yPos)
+      doc.text('DESCRIPTION OF WORK', 18, yPos)
       yPos += 6
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
-      const descLines = doc.splitTextToSize(invoice.description, pageWidth - 40)
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(50, 50, 50)
       doc.text(descLines, 18, yPos)
-      yPos += descLines.length * 5.5 + 8
+      yPos += descLines.length * 5.5 + 10
     }
 
     // Line items table
