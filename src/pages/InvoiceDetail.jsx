@@ -105,8 +105,8 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     doc.text(invoice?.proposals?.client_name || '', pageWidth / 2, 65)
 
     // Description of Work
+    let yPos = 78
     if (invoice?.description) {
-      yPos = 78
       doc.setFillColor(248, 248, 248)
       doc.rect(14, yPos - 5, pageWidth - 28, 4 + doc.splitTextToSize(invoice.description, pageWidth - 40).length * 5.5 + 6, 'F')
       doc.setFontSize(9); doc.setFont('helvetica', 'bold')
@@ -117,8 +117,6 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
       const descLines = doc.splitTextToSize(invoice.description, pageWidth - 40)
       doc.text(descLines, 18, yPos)
       yPos += descLines.length * 5.5 + 8
-    } else {
-      yPos = 78
     }
 
     // Line items table
@@ -137,7 +135,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
       styles: { fontSize: 9 }
     })
 
-    let yPos = doc.lastAutoTable.finalY + 8
+    yPos = doc.lastAutoTable.finalY + 8
 
     // Subtotal / tax / total
     const col = pageWidth - 14
