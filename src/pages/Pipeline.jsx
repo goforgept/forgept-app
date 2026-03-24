@@ -134,17 +134,16 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
     .filter(p => p.status === 'Won')
     .reduce((sum, p) => sum + (p.proposal_value || 0), 0)
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
-      <p className="text-white">Loading...</p>
-    </div>
-  )
-
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6 overflow-hidden">
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center h-full">
+          <p className="text-white">Loading...</p>
+        </div>
+      ) : (<>
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-white text-2xl font-bold">Pipeline</h2>
@@ -265,6 +264,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
             )
           })}
         </div>
+      </>)}
       </div>
     </div>
   )

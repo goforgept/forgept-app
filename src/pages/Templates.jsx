@@ -33,6 +33,10 @@ export default function Templates({ isAdmin }) {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [editingTemplate, setEditingTemplate] = useState(null)
+  const [editForm, setEditForm] = useState(emptyTemplate)
+  const [editLines, setEditLines] = useState([])
+  const [editLaborItems, setEditLaborItems] = useState([])
+  const [editSaving, setEditSaving] = useState(false)
 
   useEffect(() => { fetchData() }, [])
 
@@ -137,6 +141,102 @@ export default function Templates({ isAdmin }) {
     setLaborItems([emptyLaborLine()])
     setShowForm(false)
     setSaving(false)
+    fetchData()
+  }
+
+  const startEditing = async (template) => {
+    setEditingTemplate(template.id)
+    setEditForm({ name: template.name, description: template.description || '', industry: template.industry || '' })
+    setEditLaborItems(template.labor_items?.length > 0 ? template.labor_items : [emptyLaborLine()])
+    // Fetch line items if not already loaded
+    if (!templateLines[template.id]) await fetchTemplateLines(template.id)
+    const items = templateLines[template.id] || []
+    setEditLines(items.length > 0 ? items.map(l => ({
+      id: l.id,
+      item_name: l.item_name || '',
+      part_number_sku: l.part_number_sku || '',
+      quantity: String(l.quantity || ''),
+      unit: l.unit || 'ea',
+      category: l.category || '',
+      vendor: l.vendor || '',
+      your_cost_unit: String(l.your_cost_unit || ''),
+      markup_percent: String(l.markup_percent || '35'),
+      customer_price_unit: String(l.customer_price_unit || ''),
+    })) : [emptyLine()])
+    setExpandedId(null)
+  }
+
+  const updateEditLine = (index, field, value) => {
+    setEditLines(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], [field]: value }
+      if (field === 'your_cost_unit' || field === 'markup_percent') {
+        const cost = parseFloat(updated[index].your_cost_unit) || 0
+        const markup = parseFloat(updated[index].markup_percent) || 0
+        updated[index].customer_price_unit = (cost * (1 + markup / 100)).toFixed(2)
+      }
+      return updated
+    })
+  }
+
+  const updateEditLabor = (index, field, value) => {
+    setEditLaborItems(prev => {
+      const updated = [...prev]
+      updated[index] = { ...updated[index], [field]: value }
+      const qty = parseFloat(updated[index].quantity) || 0
+      const cost = parseFloat(updated[index].your_cost) || 0
+      const markup = parseFloat(updated[index].markup) || 0
+      const cp = parseFloat(updated[index].customer_price) || 0
+      if (field === 'your_cost' || field === 'markup' || field === 'quantity') {
+        if (cost > 0 && qty > 0) updated[index].customer_price = (cost * (1 + markup / 100) * qty).toFixed(2)
+      } else if (field === 'customer_price') {
+        if (cp > 0 && qty > 0) {
+          if (cost > 0) updated[index].markup = (((cp / qty) / cost - 1) * 100).toFixed(1)
+          else if (markup >= 0) updated[index].your_cost = (cp / (1 + markup / 100) / qty).toFixed(2)
+        }
+      }
+      return updated
+    })
+  }
+
+  const saveEdit = async (templateId) => {
+    setEditSaving(true)
+    setError(null)
+
+    // Update template record
+    await supabase.from('templates').update({
+      name: editForm.name,
+      description: editForm.description,
+      industry: editForm.industry,
+      labor_items: editLaborItems
+    }).eq('id', templateId)
+
+    // Delete old line items and re-insert
+    await supabase.from('template_line_items').delete().eq('template_id', templateId)
+
+    const validLines = editLines.filter(l => l.item_name.trim() !== '')
+    if (validLines.length > 0) {
+      await supabase.from('template_line_items').insert(
+        validLines.map(l => ({
+          template_id: templateId,
+          item_name: l.item_name,
+          part_number_sku: l.part_number_sku,
+          quantity: parseFloat(l.quantity) || 1,
+          unit: l.unit,
+          category: l.category,
+          vendor: l.vendor,
+          your_cost_unit: parseFloat(l.your_cost_unit) || null,
+          markup_percent: parseFloat(l.markup_percent) || 35,
+          customer_price_unit: parseFloat(l.customer_price_unit) || null,
+        }))
+      )
+    }
+
+    // Clear cached line items so they reload fresh
+    setTemplateLines(prev => { const next = { ...prev }; delete next[templateId]; return next })
+    setEditingTemplate(null)
+    setEditSaving(false)
+    setSuccess('Template updated!')
     fetchData()
   }
 
@@ -295,7 +395,115 @@ export default function Templates({ isAdmin }) {
         <input type="text" placeholder="Search templates..." value={search} onChange={e => setSearch(e.target.value)}
           className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
 
-        {/* Template List */}
+        {/* Edit Template Modal */}
+      {editingTemplate && isAdmin && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-white font-bold text-lg mb-5">Edit Template</h3>
+
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Template Name <span className="text-[#C8622A]">*</span></label>
+                <input type="text" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Industry</label>
+                <select value={editForm.industry} onChange={e => setEditForm(p => ({ ...p, industry: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  <option value="">Select industry</option>
+                  {industries.map(i => <option key={i} value={i}>{i}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Description</label>
+                <input type="text" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              </div>
+            </div>
+
+            {/* Edit Materials */}
+            <h4 className="text-white font-semibold text-sm mb-3">Materials</h4>
+            <div className="overflow-x-auto mb-2">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#2a3d55]">
+                    {['Item Name', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ''].map(h => (
+                      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {editLines.map((line, i) => (
+                    <tr key={i} className="border-b border-[#2a3d55]/30">
+                      <td className="pr-2 py-1"><input type="text" value={line.item_name} onChange={e => updateEditLine(i, 'item_name', e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                      <td className="pr-2 py-1"><input type="text" value={line.part_number_sku} onChange={e => updateEditLine(i, 'part_number_sku', e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                      <td className="pr-2 py-1"><input type="number" value={line.quantity} onChange={e => updateEditLine(i, 'quantity', e.target.value)} className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                      <td className="pr-2 py-1">
+                        <select value={line.unit} onChange={e => updateEditLine(i, 'unit', e.target.value)} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                          {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
+                        </select>
+                      </td>
+                      <td className="pr-2 py-1">
+                        <select value={line.category} onChange={e => updateEditLine(i, 'category', e.target.value)} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                          <option value="">Category</option>
+                          {categories.map(c => <option key={c}>{c}</option>)}
+                        </select>
+                      </td>
+                      <td className="pr-2 py-1"><input type="text" value={line.vendor} onChange={e => updateEditLine(i, 'vendor', e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                      <td className="pr-2 py-1"><input type="number" value={line.your_cost_unit} onChange={e => updateEditLine(i, 'your_cost_unit', e.target.value)} className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                      <td className="pr-2 py-1"><input type="number" value={line.markup_percent} onChange={e => updateEditLine(i, 'markup_percent', e.target.value)} className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                      <td className="pr-2 py-1"><input type="number" value={line.customer_price_unit} onChange={e => updateEditLine(i, 'customer_price_unit', e.target.value)} className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                      <td className="py-1"><button onClick={() => setEditLines(prev => prev.filter((_, idx) => idx !== i))} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button onClick={() => setEditLines(prev => [...prev, emptyLine()])} className="text-[#C8622A] hover:text-white text-sm transition-colors mb-6">+ Add Line Item</button>
+
+            {/* Edit Labor */}
+            <h4 className="text-white font-semibold text-sm mb-3">Labor</h4>
+            <table className="w-full text-sm mb-2">
+              <thead>
+                <tr className="border-b border-[#2a3d55]">
+                  {['Role', 'Qty', 'Unit', 'Your Cost/hr', 'Markup %', 'Total Labor', ''].map(h => (
+                    <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {editLaborItems.map((item, i) => (
+                  <tr key={i} className="border-b border-[#2a3d55]/30">
+                    <td className="pr-2 py-1"><input type="text" value={item.role} onChange={e => updateEditLabor(i, 'role', e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                    <td className="pr-2 py-1"><input type="number" value={item.quantity} onChange={e => updateEditLabor(i, 'quantity', e.target.value)} className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                    <td className="pr-2 py-1">
+                      <select value={item.unit || 'hr'} onChange={e => updateEditLabor(i, 'unit', e.target.value)} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                        {['hr', 'day', 'lot'].map(u => <option key={u}>{u}</option>)}
+                      </select>
+                    </td>
+                    <td className="pr-2 py-1"><input type="number" value={item.your_cost} onChange={e => updateEditLabor(i, 'your_cost', e.target.value)} className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                    <td className="pr-2 py-1"><input type="number" value={item.markup} onChange={e => updateEditLabor(i, 'markup', e.target.value)} className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                    <td className="pr-2 py-1"><input type="number" value={item.customer_price || ''} onChange={e => updateEditLabor(i, 'customer_price', e.target.value)} className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold" /></td>
+                    <td className="py-1"><button onClick={() => setEditLaborItems(prev => prev.filter((_, idx) => idx !== i))} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <button onClick={() => setEditLaborItems(prev => [...prev, emptyLaborLine()])} className="text-[#C8622A] hover:text-white text-sm transition-colors mb-6">+ Add Labor</button>
+
+            <div className="flex justify-end gap-3 pt-4 border-t border-[#2a3d55]">
+              <button onClick={() => setEditingTemplate(null)} className="px-6 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+              <button onClick={() => saveEdit(editingTemplate)} disabled={editSaving || !editForm.name}
+                className="px-6 py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                {editSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Template List */}
         {loading ? (
           <p className="text-[#8A9AB0]">Loading...</p>
         ) : filtered.length === 0 ? (
@@ -328,6 +536,10 @@ export default function Templates({ isAdmin }) {
                     </div>
                     <div className="flex items-center gap-4">
                       {totalLabor > 0 && <span className="text-[#8A9AB0] text-xs">{fmt(totalLabor)} labor</span>}
+                      {isAdmin && (
+                        <button onClick={e => { e.stopPropagation(); startEditing(template) }}
+                          className="text-[#8A9AB0] hover:text-white text-xs transition-colors px-2">Edit</button>
+                      )}
                       {isAdmin && (
                         <button onClick={e => { e.stopPropagation(); handleDelete(template.id) }}
                           className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors px-2">Delete</button>

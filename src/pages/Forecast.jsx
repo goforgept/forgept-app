@@ -99,12 +99,15 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
   const maxMonthlyValue = Math.max(...monthlyWon.map(m => m.total), 1)
   const maxStageValue = Math.max(...stageBreakdown.map(s => s.value), 1)
 
-  if (loading) return <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center"><p className="text-white">Loading...</p></div>
-
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-white">Loading...</p>
+        </div>
+      ) : (
       <div className="flex-1 p-6 space-y-6">
         <div>
           <h2 className="text-white text-2xl font-bold">Forecast</h2>
@@ -281,6 +284,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
           </div>
         )}
       </div>
+      )}
     </div>
   )
 }
