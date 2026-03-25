@@ -351,7 +351,7 @@ export default function NewProposal() {
     navigate(`/proposal/${proposal.id}`)
   }
 
-  const categories = ['Electrical', 'Mechanical', 'Audio/Visual', 'Security', 'Networking', 'Material', 'Labor', 'Other']
+  const categories = ['Electrical', 'Mechanical', 'Audio/Visual', 'Security', 'Networking', 'Material', 'Labor', 'Roofing Materials', 'Insulation', 'Windows & Doors', 'Flooring', 'Painting & Finishing', 'Plumbing', 'HVAC', 'Solar', 'Hardware', 'Other']
 
   // Live totals for the summary panel
   const liveBOMTotal = lines.reduce((sum, l) =>
@@ -459,7 +459,7 @@ export default function NewProposal() {
                 className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
               >
                 <option value="">Select industry</option>
-                {['Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security', 'General Contractor', 'Other'].map(i => (
+                {['Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security', 'Low Voltage', 'General Contractor', 'Roofing', 'Home Improvement', 'Flooring', 'Painting', 'Landscaping', 'Solar', 'Fire Protection', 'Telecom', 'IT / Networking', 'Other'].map(i => (
                   <option key={i} value={i}>{i}</option>
                 ))}
               </select>
