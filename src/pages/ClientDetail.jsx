@@ -88,12 +88,15 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
           repName: profile?.full_name
         })
       })
-      const data = await res.json()
+      const text = await res.text()
+      let data
+      try { data = JSON.parse(text) } catch (e) { throw new Error('Invalid response: ' + text.slice(0, 200)) }
       if (data.error) throw new Error(data.error)
-      setDraftedEmail(data.draft || '')
+      if (!data.draft) throw new Error('No draft returned. Response: ' + JSON.stringify(data))
+      setDraftedEmail(data.draft)
       setEmailEditMode(false)
     } catch (err) {
-      setDraftedEmail('Error generating email. Please try again.')
+      setDraftedEmail('Error: ' + err.message)
     }
     setGeneratingEmail(false)
   }
