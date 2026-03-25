@@ -32,7 +32,7 @@ const industryColors = {
   'Other': 'bg-[#2a3d55] text-[#8A9AB0]',
 }
 
-export default function Clients({ isAdmin }) {
+export default function Clients({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -128,7 +128,7 @@ export default function Clients({ isAdmin }) {
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6">
 
