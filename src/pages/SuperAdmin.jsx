@@ -97,6 +97,7 @@ export default function SuperAdmin() {
       feature_proposals: org.feature_proposals !== false,
       feature_crm: org.feature_crm || false,
       feature_send_proposal: org.feature_send_proposal || false,
+      feature_ai_email: org.feature_ai_email || false,
     })
   }
 
@@ -106,6 +107,7 @@ export default function SuperAdmin() {
       feature_proposals: orgForm.feature_proposals,
       feature_crm: orgForm.feature_crm,
       feature_send_proposal: orgForm.feature_send_proposal,
+      feature_ai_email: orgForm.feature_ai_email,
     }).eq('id', orgId)
     setEditingOrg(null)
     fetchData()
@@ -291,6 +293,7 @@ export default function SuperAdmin() {
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_proposals !== false ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_proposals !== false ? '✓ Proposals' : '✗ Proposals'}</span>
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_crm ? '✓ CRM' : '✗ CRM'}</span>
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_send_proposal ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_send_proposal ? '✓ Send Proposal' : '✗ Send Proposal'}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_ai_email ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_ai_email ? '✓ AI Email' : '✗ AI Email'}</span>
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -329,6 +332,10 @@ export default function SuperAdmin() {
                               <button onClick={() => setOrgForm(p => ({ ...p, feature_send_proposal: !p.feature_send_proposal }))}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_send_proposal ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
                                 <span>{orgForm.feature_send_proposal ? '✓' : '○'}</span> Send Proposal
+                              </button>
+                              <button onClick={() => setOrgForm(p => ({ ...p, feature_ai_email: !p.feature_ai_email }))}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_ai_email ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                <span>{orgForm.feature_ai_email ? '✓' : '○'}</span> AI Email Writer
                               </button>
                               <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold ${orgForm.feature_proposals && orgForm.feature_crm ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
                                 {orgForm.feature_proposals && orgForm.feature_crm ? '✓ Full Suite' : '○ Full Suite'}
@@ -382,6 +389,7 @@ export default function SuperAdmin() {
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_proposals !== false ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_proposals !== false ? '✓ Proposals' : '✗ Proposals'}</span>
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_crm ? '✓ CRM' : '✗ CRM'}</span>
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_send_proposal ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_send_proposal ? '✓ Send Proposal' : '✗ Send Proposal'}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_ai_email ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_ai_email ? '✓ AI Email' : '✗ AI Email'}</span>
                           </div>
                           {hasStripe && <p className="text-green-400 text-xs mt-1">✓ Stripe connected</p>}
                         </div>

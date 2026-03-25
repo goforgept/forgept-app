@@ -12,7 +12,7 @@ const INDUSTRIES = [
   'Telecom', 'IT / Networking', 'Other'
 ]
 
-export default function ClientDetail({ isAdmin, featureProposals = true, featureCRM = false }) {
+export default function ClientDetail({ isAdmin, featureProposals = true, featureCRM = false, featureAiEmail = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [client, setClient] = useState(null)
@@ -24,6 +24,13 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [editForm, setEditForm] = useState({})
   const [savingClient, setSavingClient] = useState(false)
   const [activeTab, setActiveTab] = useState('proposals')
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [emailForm, setEmailForm] = useState({ subject: '', context: '' })
+  const [draftedEmail, setDraftedEmail] = useState('')
+  const [generatingEmail, setGeneratingEmail] = useState(false)
+  const [sendingEmail, setSendingEmail] = useState(false)
+  const [clientEmails, setClientEmails] = useState([])
+  const [emailEditMode, setEmailEditMode] = useState(false)
 
   useEffect(() => {
     fetchClient()
@@ -55,6 +62,90 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
       const { data: team } = await supabase.from('profiles').select('id, full_name').eq('org_id', data.org_id)
       setTeamProfiles(team || [])
     }
+    fetchClientEmails(user.id)
+  }
+
+  const fetchClientEmails = async (userId) => {
+    const { data } = await supabase.from('client_emails').select('*').eq('client_id', id).order('sent_at', { ascending: false })
+    setClientEmails(data || [])
+  }
+
+  const draftEmail = async () => {
+    setGeneratingEmail(true)
+    setDraftedEmail('')
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: `You are an expert sales email writer for a trades/AV/security integration company.
+
+Write a professional, personalized sales email based on this context:
+- Company: ${client?.company}
+- Contact: ${client?.client_name || 'the contact'}
+- Industry: ${client?.industry || 'trades'}
+- What I want to accomplish: ${emailForm.context || 'introduce ourselves and open a conversation'}
+- My name: ${profile?.full_name || 'the rep'}
+
+Write only the email body — no subject line, no "Here is the email" preamble. Start directly with the greeting. Keep it concise (3-4 short paragraphs), professional, and action-oriented with a clear call to action.`
+          }]
+        })
+      })
+      const data = await res.json()
+      const text = data.content?.[0]?.text || ''
+      setDraftedEmail(text)
+      setEmailEditMode(false)
+    } catch (err) {
+      setDraftedEmail('Error generating email. Please try again.')
+    }
+    setGeneratingEmail(false)
+  }
+
+  const sendEmail = async () => {
+    if (!client?.email) { alert('No email on file for this client.'); return }
+    if (!draftedEmail || !emailForm.subject) { alert('Subject and email body required.'); return }
+    setSendingEmail(true)
+    try {
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-followup-emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+        body: JSON.stringify({
+          type: 'ai_email',
+          toEmail: client.email,
+          toName: client.client_name || client.company,
+          fromName: profile?.full_name || '',
+          fromEmail: profile?.email || '',
+          subject: emailForm.subject,
+          body: draftedEmail,
+          clientId: id,
+          orgId: profile?.org_id,
+          sentBy: profile?.id
+        })
+      })
+      const result = await res.json()
+
+      await supabase.from('client_emails').insert({
+        org_id: profile?.org_id,
+        client_id: id,
+        sent_by: profile?.id,
+        subject: emailForm.subject,
+        body: draftedEmail,
+        to_email: client.email,
+        brevo_message_id: result.messageId || null
+      })
+
+      await fetchClientEmails(profile?.id)
+      setShowEmailModal(false)
+      setEmailForm({ subject: '', context: '' })
+      setDraftedEmail('')
+    } catch (err) {
+      alert('Error sending email: ' + err.message)
+    }
+    setSendingEmail(false)
   }
 
   const saveClient = async () => {
@@ -118,6 +209,12 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
               </div>
             </div>
             <div className="flex gap-2">
+              {featureAiEmail && client?.email && (
+                <button onClick={() => { setShowEmailModal(true); setDraftedEmail(''); setEmailForm({ subject: '', context: '' }) }}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">
+                  ✍️ Draft Email
+                </button>
+              )}
               <button onClick={() => setEditingClient(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Edit Client</button>
               <button onClick={handleNewProposal} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ New Proposal</button>
             </div>
@@ -163,10 +260,10 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
 
         {/* Tabs */}
         <div className="flex gap-2">
-          {['proposals', 'activity', 'tasks', 'notes'].map(t => (
+          {['proposals', 'activity', 'tasks', 'emails', 'notes'].map(t => (
             <button key={t} onClick={() => setActiveTab(t)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-colors ${activeTab === t ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
-              {t === 'proposals' ? `Proposals (${proposals.length})` : t === 'activity' ? 'Activity' : t === 'tasks' ? 'Tasks' : 'Notes'}
+              {t === 'proposals' ? `Proposals (${proposals.length})` : t === 'activity' ? 'Activity' : t === 'tasks' ? 'Tasks' : t === 'emails' ? `Emails (${clientEmails.length})` : 'Notes'}
             </button>
           ))}
         </div>
@@ -223,6 +320,42 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
           <TaskList clientId={id} orgId={client?.org_id} userId={profile?.id} profiles={teamProfiles} />
         )}
 
+        {activeTab === 'emails' && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white font-bold text-lg">Email History</h3>
+              {featureAiEmail && client?.email && (
+                <button onClick={() => { setShowEmailModal(true); setDraftedEmail(''); setEmailForm({ subject: '', context: '' }) }}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">
+                  ✍️ Draft Email
+                </button>
+              )}
+            </div>
+            {clientEmails.length === 0 ? (
+              <p className="text-[#8A9AB0] text-sm">No emails sent yet.{featureAiEmail ? ' Click "Draft Email" to compose one with AI.' : ''}</p>
+            ) : (
+              <div className="space-y-3">
+                {clientEmails.map(email => (
+                  <div key={email.id} className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55]">
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="text-white font-semibold text-sm">{email.subject}</p>
+                      <div className="flex items-center gap-2">
+                        {email.opened_at ? (
+                          <span className="text-green-400 text-xs font-semibold">✓ Opened {new Date(email.opened_at).toLocaleDateString()}</span>
+                        ) : (
+                          <span className="text-[#8A9AB0] text-xs">Not opened yet</span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-[#8A9AB0] text-xs mb-2">To: {email.to_email} · {new Date(email.sent_at).toLocaleDateString()}</p>
+                    <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap line-clamp-3">{email.body}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'notes' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
@@ -236,6 +369,67 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
           </div>
         )}
       </div>
+
+      {/* AI Email Modal */}
+      {showEmailModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-white font-bold text-lg mb-1">✍️ Draft Email with AI</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">
+              Sending to <span className="text-white font-medium">{client?.company}</span>{client?.client_name ? ` · ${client.client_name}` : ''} · {client?.email}
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Subject Line</label>
+                <input type="text" value={emailForm.subject} onChange={e => setEmailForm(p => ({ ...p, subject: e.target.value }))}
+                  placeholder="e.g. Security System Upgrade for Your Facility"
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">What do you want to accomplish?</label>
+                <textarea value={emailForm.context} onChange={e => setEmailForm(p => ({ ...p, context: e.target.value }))}
+                  rows={3} placeholder="e.g. Cold outreach to a GC about camera system for their next project. They build commercial warehouses."
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+              </div>
+              <button onClick={draftEmail} disabled={generatingEmail || !emailForm.context}
+                className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
+                {generatingEmail ? '✨ Drafting...' : '✨ Generate Draft'}
+              </button>
+
+              {draftedEmail && (
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="text-[#8A9AB0] text-xs">Email Draft</label>
+                    <button onClick={() => setEmailEditMode(!emailEditMode)} className="text-[#C8622A] text-xs hover:text-white transition-colors">{emailEditMode ? 'Preview' : 'Edit'}</button>
+                  </div>
+                  {emailEditMode ? (
+                    <textarea value={draftedEmail} onChange={e => setDraftedEmail(e.target.value)} rows={12}
+                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+                  ) : (
+                    <div className="bg-[#0F1C2E] border border-[#2a3d55] rounded-lg p-4">
+                      <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{draftedEmail}</p>
+                    </div>
+                  )}
+                  <div className="bg-[#0F1C2E] rounded-lg px-4 py-3 mt-3 text-xs text-[#8A9AB0]">
+                    <p>✓ Sent via Brevo with open tracking</p>
+                    <p>✓ Logged to this client's email history</p>
+                    <p>✓ You'll see when they open it</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setShowEmailModal(false); setDraftedEmail(''); setEmailEditMode(false) }}
+                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={sendEmail} disabled={sendingEmail || !draftedEmail || !emailForm.subject}
+                  className="flex-1 bg-purple-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
+                  {sendingEmail ? 'Sending...' : 'Send Email →'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Client Modal */}
       {editingClient && (

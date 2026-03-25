@@ -37,6 +37,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendingProposal, setSendingProposal] = useState(false)
   const [sendForm, setSendForm] = useState({ subject: '', message: '' })
+  const [collaborators, setCollaborators] = useState([])
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [orgProfiles, setOrgProfiles] = useState([])
+  const [sharingProposal, setSharingProposal] = useState(false)
 
   useEffect(() => {
     fetchProposal()
@@ -52,6 +56,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       .single()
 
     setProposal(data)
+    setCollaborators(data?.collaborator_ids || [])
 
     if (data?.labor_items && data.labor_items.length > 0) {
       setLaborItems(data.labor_items)
@@ -78,6 +83,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setProfile(data)
     setOrgType(data?.organizations?.org_type || 'integrator')
     setFeatureSendProposal(data?.organizations?.feature_send_proposal || false)
+    if (data?.org_id) {
+      const { data: teamData } = await supabase.from('profiles').select('id, full_name, email').eq('org_id', data.org_id)
+      setOrgProfiles(teamData || [])
+    }
   }
 
   const updateStatus = async (newStatus) => {
@@ -824,6 +833,38 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     alert(`Template "${templateName}" saved successfully!`)
   }
 
+  const shareProposal = async (profileId) => {
+    setSharingProposal(true)
+    const newCollabs = collaborators.includes(profileId)
+      ? collaborators.filter(id => id !== profileId)
+      : [...collaborators, profileId]
+    await supabase.from('proposals').update({ collaborator_ids: newCollabs }).eq('id', id)
+    setCollaborators(newCollabs)
+    setProposal(prev => ({ ...prev, collaborator_ids: newCollabs }))
+
+    // Notify new collaborator
+    if (!collaborators.includes(profileId)) {
+      const sharedWith = orgProfiles.find(p => p.id === profileId)
+      if (sharedWith?.email) {
+        try {
+          await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-followup-emails', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE` },
+            body: JSON.stringify({
+              type: 'share_notification',
+              toEmail: sharedWith.email,
+              toName: sharedWith.full_name,
+              fromName: profile?.full_name || 'A teammate',
+              proposalName: proposal?.proposal_name,
+              proposalId: id
+            })
+          })
+        } catch (e) { console.log('Share notification error', e) }
+      }
+    }
+    setSharingProposal(false)
+  }
+
   const generatePDFDoc = () => {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
@@ -1041,6 +1082,15 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
               <p className="text-[#8A9AB0] mt-1">{proposal?.company} · {proposal?.client_name}</p>
               <p className="text-[#8A9AB0] text-sm">{proposal?.client_email}</p>
+              {collaborators.length > 0 && (
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-[#8A9AB0] text-xs">Shared with:</span>
+                  {collaborators.map(cid => {
+                    const cp = orgProfiles.find(p => p.id === cid)
+                    return cp ? <span key={cid} className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full">{cp.full_name}</span> : null
+                  })}
+                </div>
+              )}
             </div>
             <select
               value={proposal?.status}
@@ -1084,7 +1134,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-white font-bold text-lg">Scope of Work</h3>
             <div className="flex gap-2">
-              {featureSendProposal && proposal?.client_email && (
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-2"
+              >
+                👥 Share{collaborators.length > 0 ? ` (${collaborators.length})` : ''}
+              </button>
+            {featureSendProposal && proposal?.client_email && (
                 <button
                   onClick={() => {
                     setSendForm({
@@ -1510,6 +1566,38 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         <POList proposalId={id} />
 
       </div>
+
+      {/* Share / Collaborate Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-white font-bold text-lg mb-1">Share Proposal</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">Tag teammates on this deal — they'll be notified and gain visibility.</p>
+            {orgProfiles.filter(p => p.id !== profile?.id).length === 0 ? (
+              <p className="text-[#8A9AB0] text-sm">No other team members found.</p>
+            ) : (
+              <div className="space-y-2">
+                {orgProfiles.filter(p => p.id !== profile?.id).map(p => {
+                  const isCollab = collaborators.includes(p.id)
+                  return (
+                    <div key={p.id} className={`flex justify-between items-center p-3 rounded-lg border cursor-pointer transition-colors ${isCollab ? 'border-[#C8622A] bg-[#C8622A]/10' : 'border-[#2a3d55] bg-[#0F1C2E] hover:border-[#3a4d65]'}`}
+                      onClick={() => shareProposal(p.id)}>
+                      <div>
+                        <p className="text-white text-sm font-medium">{p.full_name}</p>
+                        <p className="text-[#8A9AB0] text-xs">{p.email}</p>
+                      </div>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded ${isCollab ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                        {isCollab ? '✓ Shared' : '+ Share'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <button onClick={() => setShowShareModal(false)} className="mt-5 w-full py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Done</button>
+          </div>
+        </div>
+      )}
 
       {/* Save as Template Modal */}
       {showSaveTemplateModal && (

@@ -48,7 +48,7 @@ function App() {
     for (let i = 0; i < 5; i++) {
       const { data } = await supabase
         .from('profiles')
-        .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal)')
+        .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email)')
         .eq('id', userId)
         .single()
 
@@ -63,7 +63,7 @@ function App() {
 
     const { data } = await supabase
       .from('profiles')
-      .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal)')
+      .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email)')
       .eq('id', userId)
       .single()
     setProfile(data)
@@ -84,6 +84,7 @@ function App() {
   const featureProposals = profile?.organizations?.feature_proposals !== false
   const featureCRM = profile?.organizations?.feature_crm || false
   const featureSendProposal = profile?.organizations?.feature_send_proposal || false
+  const featureAiEmail = profile?.organizations?.feature_ai_email || false
 
   if (session && isPending) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
@@ -105,7 +106,7 @@ function App() {
     </div>
   )
 
-  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal }
+  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail }
 
   return (
     <Routes>
