@@ -74,30 +74,23 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     setGeneratingEmail(true)
     setDraftedEmail('')
     try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-draft-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+        },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          messages: [{
-            role: 'user',
-            content: `You are an expert sales email writer for a trades/AV/security integration company.
-
-Write a professional, personalized sales email based on this context:
-- Company: ${client?.company}
-- Contact: ${client?.client_name || 'the contact'}
-- Industry: ${client?.industry || 'trades'}
-- What I want to accomplish: ${emailForm.context || 'introduce ourselves and open a conversation'}
-- My name: ${profile?.full_name || 'the rep'}
-
-Write only the email body — no subject line, no "Here is the email" preamble. Start directly with the greeting. Keep it concise (3-4 short paragraphs), professional, and action-oriented with a clear call to action.`
-          }]
+          company: client?.company,
+          clientName: client?.client_name,
+          industry: client?.industry,
+          context: emailForm.context,
+          repName: profile?.full_name
         })
       })
       const data = await res.json()
-      const text = data.content?.[0]?.text || ''
-      setDraftedEmail(text)
+      if (data.error) throw new Error(data.error)
+      setDraftedEmail(data.draft || '')
       setEmailEditMode(false)
     } catch (err) {
       setDraftedEmail('Error generating email. Please try again.')
