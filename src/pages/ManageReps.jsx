@@ -2,15 +2,26 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
+const ROLES = [
+  { value: 'admin', label: 'Admin', color: 'bg-[#C8622A]/20 text-[#C8622A]', desc: 'Full access — manages team, settings, and all proposals' },
+  { value: 'rep', label: 'Rep', color: 'bg-[#8A9AB0]/20 text-[#8A9AB0]', desc: 'Creates and manages their own proposals' },
+  { value: 'sales_engineer', label: 'Sales Engineer', color: 'bg-blue-500/20 text-blue-400', desc: 'Tagged on deals, gets notified on assignment' },
+  { value: 'project_manager', label: 'Project Manager', color: 'bg-purple-500/20 text-purple-400', desc: 'Manages fulfillment on Won proposals and orders' },
+]
+
+const getRoleStyle = (role) => ROLES.find(r => r.value === role)?.color || 'bg-[#8A9AB0]/20 text-[#8A9AB0]'
+const getRoleLabel = (role) => ROLES.find(r => r.value === role)?.label || role || 'Rep'
+
 export default function ManageReps({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [reps, setReps] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ email: '', password: '', full_name: '' })
+  const [form, setForm] = useState({ email: '', password: '', full_name: '', org_role: 'rep' })
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [currentProfile, setCurrentProfile] = useState(null)
+  const [updatingRole, setUpdatingRole] = useState({})
 
   useEffect(() => { fetchCurrentProfile() }, [])
 
@@ -22,7 +33,11 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
   }
 
   const fetchReps = async (orgId) => {
-    const { data } = await supabase.from('profiles').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false })
     setReps(data || [])
     setLoading(false)
   }
@@ -45,17 +60,26 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
       id: data.user.id,
       email: form.email,
       full_name: form.full_name,
-      role: 'rep',
-      org_role: 'rep',
+      role: form.org_role,
+      org_role: form.org_role,
       org_id: currentProfile.org_id
     })
 
-    setSuccess(`Rep account created for ${form.email}`)
-    setForm({ email: '', password: '', full_name: '' })
+    setSuccess(`Account created for ${form.email} as ${getRoleLabel(form.org_role)}`)
+    setForm({ email: '', password: '', full_name: '', org_role: 'rep' })
     setShowForm(false)
     fetchReps(currentProfile.org_id)
     setAdding(false)
   }
+
+  const updateRole = async (repId, newRole) => {
+    setUpdatingRole(prev => ({ ...prev, [repId]: true }))
+    await supabase.from('profiles').update({ org_role: newRole, role: newRole }).eq('id', repId)
+    setReps(prev => prev.map(r => r.id === repId ? { ...r, org_role: newRole, role: newRole } : r))
+    setUpdatingRole(prev => ({ ...prev, [repId]: false }))
+  }
+
+  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
@@ -64,39 +88,67 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">
           <h2 className="text-white text-2xl font-bold">Team</h2>
-          <button
-            onClick={() => { setShowForm(!showForm); setError(null); setSuccess(null) }}
-            className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
-          >
-            {showForm ? 'Cancel' : '+ Add Rep'}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setShowForm(!showForm); setError(null); setSuccess(null) }}
+              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+            >
+              {showForm ? 'Cancel' : '+ Add Team Member'}
+            </button>
+          )}
         </div>
 
-        {showForm && (
+        {/* Role legend */}
+        <div className="bg-[#1a2d45] rounded-xl p-5">
+          <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Roles</p>
+          <div className="grid grid-cols-2 gap-3">
+            {ROLES.map(role => (
+              <div key={role.value} className="flex items-start gap-3">
+                <span className={`text-xs font-semibold px-2 py-1 rounded whitespace-nowrap ${role.color}`}>{role.label}</span>
+                <p className="text-[#8A9AB0] text-xs leading-relaxed">{role.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {showForm && isAdmin && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold mb-4">Add New Rep</h3>
+            <h3 className="text-white font-bold mb-4">Add Team Member</h3>
             {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
             {success && <p className="text-green-400 text-sm mb-4">{success}</p>}
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Full Name</label>
-                <input type="text" value={form.full_name} onChange={e => setForm(prev => ({ ...prev, full_name: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" placeholder="John Smith" />
+                <input type="text" value={form.full_name}
+                  onChange={e => setForm(prev => ({ ...prev, full_name: e.target.value }))}
+                  className={inputClass} placeholder="John Smith" />
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Email</label>
-                <input type="email" value={form.email} onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" placeholder="rep@company.com" />
+                <input type="email" value={form.email}
+                  onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
+                  className={inputClass} placeholder="rep@company.com" />
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Temporary Password</label>
-                <input type="text" value={form.password} onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" placeholder="TempPass123!" />
+                <input type="text" value={form.password}
+                  onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
+                  className={inputClass} placeholder="TempPass123!" />
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Role</label>
+                <select value={form.org_role}
+                  onChange={e => setForm(prev => ({ ...prev, org_role: e.target.value }))}
+                  className={inputClass}>
+                  {ROLES.map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <button onClick={handleAddRep} disabled={adding}
               className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-              {adding ? 'Creating...' : 'Create Rep Account'}
+              {adding ? 'Creating...' : 'Create Account'}
             </button>
           </div>
         )}
@@ -108,18 +160,42 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
           ) : reps.length === 0 ? (
             <p className="text-[#8A9AB0]">No team members yet. Add your first rep above.</p>
           ) : (
-            <div className="space-y-3">
-              {reps.map(rep => (
-                <div key={rep.id} className="flex justify-between items-center border-b border-[#2a3d55] py-3">
-                  <div>
-                    <p className="text-white font-medium">{rep.full_name || '—'}</p>
-                    <p className="text-[#8A9AB0] text-sm">{rep.email}</p>
+            <div className="space-y-2">
+              {reps.map(rep => {
+                const isCurrentUser = rep.id === currentProfile?.id
+                const currentRole = rep.org_role || rep.role || 'rep'
+                return (
+                  <div key={rep.id} className="flex justify-between items-center border-b border-[#2a3d55] py-3 last:border-0">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="text-white font-medium">{rep.full_name || '—'}</p>
+                        {isCurrentUser && <span className="text-[#8A9AB0] text-xs">(you)</span>}
+                      </div>
+                      <p className="text-[#8A9AB0] text-sm">{rep.email}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {updatingRole[rep.id] && (
+                        <span className="text-[#8A9AB0] text-xs">Saving...</span>
+                      )}
+                      {isAdmin && !isCurrentUser ? (
+                        <select
+                          value={currentRole}
+                          onChange={e => updateRole(rep.id, e.target.value)}
+                          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                        >
+                          {ROLES.map(r => (
+                            <option key={r.value} value={r.value}>{r.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getRoleStyle(currentRole)}`}>
+                          {getRoleLabel(currentRole)}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${rep.org_role === 'admin' ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#8A9AB0]/20 text-[#8A9AB0]'}`}>
-                    {rep.org_role || rep.role}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
