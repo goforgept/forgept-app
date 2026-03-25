@@ -17,7 +17,7 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [form, setForm] = useState({ email: '', password: '', full_name: '', org_role: 'rep' })
+  const [form, setForm] = useState({ email: '', full_name: '', org_role: 'rep' })
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [currentProfile, setCurrentProfile] = useState(null)
@@ -47,28 +47,38 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
     setError(null)
     setSuccess(null)
 
-    if (!form.email || !form.password || !form.full_name) {
-      setError('All fields are required')
+    if (!form.email || !form.full_name) {
+      setError('Name and email are required')
       setAdding(false)
       return
     }
 
-    const { data, error: signUpError } = await supabase.auth.signUp({ email: form.email, password: form.password })
-    if (signUpError) { setError(signUpError.message); setAdding(false); return }
+    try {
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/invite-team-member', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+        },
+        body: JSON.stringify({
+          email: form.email,
+          fullName: form.full_name,
+          orgId: currentProfile.org_id,
+          orgRole: form.org_role,
+        })
+      })
 
-    await supabase.from('profiles').upsert({
-      id: data.user.id,
-      email: form.email,
-      full_name: form.full_name,
-      role: form.org_role,
-      org_role: form.org_role,
-      org_id: currentProfile.org_id
-    })
+      const result = await res.json()
+      if (result.error) { setError(result.error); setAdding(false); return }
 
-    setSuccess(`Account created for ${form.email} as ${getRoleLabel(form.org_role)}`)
-    setForm({ email: '', password: '', full_name: '', org_role: 'rep' })
-    setShowForm(false)
-    fetchReps(currentProfile.org_id)
+      setSuccess(`Invite sent to ${form.email} — they'll receive an email to set up their account.`)
+      setForm({ email: '', full_name: '', org_role: 'rep' })
+      setShowForm(false)
+      fetchReps(currentProfile.org_id)
+    } catch (err) {
+      setError('Failed to send invite. Please try again.')
+    }
+
     setAdding(false)
   }
 
@@ -113,7 +123,8 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
 
         {showForm && isAdmin && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold mb-4">Add Team Member</h3>
+            <h3 className="text-white font-bold mb-4">Invite Team Member</h3>
+            <p className="text-[#8A9AB0] text-sm mb-4">They'll receive an email with a link to set up their password.</p>
             {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
             {success && <p className="text-green-400 text-sm mb-4">{success}</p>}
             <div className="grid grid-cols-2 gap-4 mb-4">
@@ -130,12 +141,6 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
                   className={inputClass} placeholder="rep@company.com" />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Temporary Password</label>
-                <input type="text" value={form.password}
-                  onChange={e => setForm(prev => ({ ...prev, password: e.target.value }))}
-                  className={inputClass} placeholder="TempPass123!" />
-              </div>
-              <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Role</label>
                 <select value={form.org_role}
                   onChange={e => setForm(prev => ({ ...prev, org_role: e.target.value }))}
@@ -148,7 +153,7 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
             </div>
             <button onClick={handleAddRep} disabled={adding}
               className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-              {adding ? 'Creating...' : 'Create Account'}
+              {adding ? 'Sending...' : 'Send Invite'}
             </button>
           </div>
         )}
