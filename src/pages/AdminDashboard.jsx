@@ -180,28 +180,46 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     return { laborQuoted, laborWon: getLaborTotal(won), laborClosingSoon: getLaborTotal(closingSoonPs), hoursQuoted: getLaborHours(active), hoursWon: getLaborHours(won), hoursClosingSoon: getLaborHours(closingSoonPs), avgLaborPerDeal: dealsWithLabor.length > 0 ? getLaborTotal(active) / dealsWithLabor.length : 0, dealsWithLabor: dealsWithLabor.length }
   }, [filteredProposals])
 
-  // Upcoming renewals filtered by selected period
-  const upcomingRenewals = useMemo(() => {
+  // Recurring revenue stats — filtered by selected period
+  const recurringStats = useMemo(() => {
     const today = new Date()
     const in90 = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
-    // For period filter, use the period's start date as the lower bound
     const periodStart = getStartDate(period)
-    const filtered = recurringItems.filter(item => {
+    const periodEnd = period === 'mtd'
+      ? new Date(today.getFullYear(), today.getMonth() + 1, 0)
+      : period === 'qtd'
+      ? new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3 + 3, 0)
+      : period === 'ytd'
+      ? new Date(today.getFullYear(), 11, 31)
+      : in90
+
+    // Revenue = sum of recurring items with renewal_date in the period
+    const inPeriod = recurringItems.filter(item => {
       const rd = new Date(item.renewal_date)
       if (period === 'all') return rd >= today && rd <= in90
-      // Show renewals within the period window
-      return rd >= today && rd <= in90 && (!periodStart || rd >= periodStart)
+      return rd >= (periodStart || today) && rd <= periodEnd
     })
-    // Group by client_id (via proposal)
+
+    const recurringRevenue = inPeriod.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
+
+    // Needs quoting = recurring items with renewal in next 90 days where no renewal proposal exists
+    const needsQuoting = recurringItems.filter(item => {
+      const rd = new Date(item.renewal_date)
+      return rd >= today && rd <= in90
+    })
+
+    // Group needsQuoting by client
     const groups = {}
-    filtered.forEach(item => {
+    needsQuoting.forEach(item => {
       const cid = item.proposals?.client_id || item.proposals?.company || 'unknown'
       if (!groups[cid]) groups[cid] = { clientId: item.proposals?.client_id, company: item.proposals?.company, repName: item.proposals?.rep_name, items: [], earliestDate: item.renewal_date }
       groups[cid].items.push(item)
       if (item.renewal_date < groups[cid].earliestDate) groups[cid].earliestDate = item.renewal_date
     })
-    return Object.values(groups).sort((a, b) => new Date(a.earliestDate) - new Date(b.earliestDate))
-  }, [recurringItems])
+    const upcomingGroups = Object.values(groups).sort((a, b) => new Date(a.earliestDate) - new Date(b.earliestDate))
+
+    return { recurringRevenue, needsQuotingCount: needsQuoting.length, needsQuotingClients: upcomingGroups.length, upcomingGroups, inPeriodCount: inPeriod.length }
+  }, [recurringItems, period])
 
   // Targets per rep for current month
   const now = new Date()
@@ -347,52 +365,60 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           </div>
         </div>
 
-        {/* Upcoming Renewals */}
-        {upcomingRenewals.length > 0 && (
+        {/* Recurring Revenue */}
+        {recurringItems.length > 0 && (
           <div className="bg-[#1a2d45] rounded-xl p-6 mb-6 border border-[#C8622A]/20">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
                 <span className="text-[#C8622A] text-lg">🔄</span>
-                <h3 className="text-white font-bold text-lg">Upcoming Renewals</h3>
-                <span className="text-[#8A9AB0] text-xs ml-1">— next 90 days</span>
-              </div>
-              <div className="flex gap-6">
-                <div className="text-right">
-                  <p className="text-[#8A9AB0] text-xs">Total Renewal Value</p>
-                  <p className="text-[#C8622A] font-bold">${upcomingRenewals.reduce((sum, g) => sum + g.items.reduce((s, i) => s + (i.customer_price_total || 0), 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[#8A9AB0] text-xs">Renewals Due</p>
-                  <p className="text-white font-bold">{upcomingRenewals.length} client{upcomingRenewals.length !== 1 ? 's' : ''}</p>
-                </div>
+                <h3 className="text-white font-bold text-lg">Recurring Revenue{periodShort[period]}</h3>
               </div>
             </div>
-            <div className="space-y-3">
-              {upcomingRenewals.map((group, i) => {
-                const totalValue = group.items.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
-                const daysUntil = Math.ceil((new Date(group.earliestDate) - new Date()) / (1000 * 60 * 60 * 24))
-                return (
-                  <div key={i} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-4 py-3 cursor-pointer hover:bg-[#0a1628] transition-colors"
-                    onClick={() => group.clientId && navigate(`/client/${group.clientId}`)}>
-                    <div>
-                      <p className="text-white text-sm font-medium">{group.company}</p>
-                      <p className="text-[#8A9AB0] text-xs">{group.repName} · {group.items.length} item{group.items.length !== 1 ? 's' : ''}</p>
-                      <div className="flex gap-1 mt-1 flex-wrap">
-                        {group.items.map(item => (
-                          <span key={item.id} className="text-xs bg-[#1a2d45] text-[#8A9AB0] px-2 py-0.5 rounded">{item.item_name}</span>
-                        ))}
+
+            {/* Summary stats */}
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="bg-[#0F1C2E] rounded-xl p-4">
+                <p className="text-[#8A9AB0] text-xs mb-1">Recurring Revenue{periodShort[period]}</p>
+                <p className="text-[#C8622A] text-xl font-bold">${recurringStats.recurringRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p className="text-[#8A9AB0] text-xs mt-1">{recurringStats.inPeriodCount} item{recurringStats.inPeriodCount !== 1 ? 's' : ''} renewing</p>
+              </div>
+              <div className="bg-[#0F1C2E] rounded-xl p-4">
+                <p className="text-[#8A9AB0] text-xs mb-1">Need Quoting — 90 Days</p>
+                <p className={`text-xl font-bold ${recurringStats.needsQuotingCount > 0 ? 'text-yellow-400' : 'text-white'}`}>{recurringStats.needsQuotingCount}</p>
+                <p className="text-[#8A9AB0] text-xs mt-1">across {recurringStats.needsQuotingClients} client{recurringStats.needsQuotingClients !== 1 ? 's' : ''}</p>
+              </div>
+              <div className="bg-[#0F1C2E] rounded-xl p-4">
+                <p className="text-[#8A9AB0] text-xs mb-1">Total Recurring Items</p>
+                <p className="text-white text-xl font-bold">{recurringItems.length}</p>
+                <p className="text-[#8A9AB0] text-xs mt-1">across all won deals</p>
+              </div>
+            </div>
+
+            {/* Upcoming list */}
+            {recurringStats.upcomingGroups.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Due in next 90 days</p>
+                {recurringStats.upcomingGroups.map((group, i) => {
+                  const totalValue = group.items.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
+                  const daysUntil = Math.ceil((new Date(group.earliestDate) - new Date()) / (1000 * 60 * 60 * 24))
+                  return (
+                    <div key={i} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-4 py-3 cursor-pointer hover:bg-[#0a1628] transition-colors"
+                      onClick={() => group.clientId && navigate(`/client/${group.clientId}`)}>
+                      <div>
+                        <p className="text-white text-sm font-medium">{group.company}</p>
+                        <p className="text-[#8A9AB0] text-xs">{group.repName} · {group.items.map(i => i.item_name).join(', ')}</p>
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="text-white text-sm font-bold">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                        <p className={`text-xs font-semibold ${daysUntil <= 30 ? 'text-red-400' : daysUntil <= 60 ? 'text-yellow-400' : 'text-[#C8622A]'}`}>
+                          {daysUntil === 0 ? 'Today' : `${daysUntil}d`} — {new Date(group.earliestDate).toLocaleDateString()}
+                        </p>
                       </div>
                     </div>
-                    <div className="text-right ml-4">
-                      <p className="text-white text-sm font-bold">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                      <p className={`text-xs font-semibold ${daysUntil <= 30 ? 'text-red-400' : daysUntil <= 60 ? 'text-yellow-400' : 'text-[#C8622A]'}`}>
-                        {daysUntil === 0 ? 'Today' : `${daysUntil}d`} — {new Date(group.earliestDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
