@@ -20,14 +20,51 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId }
   }, [clientId, proposalId])
 
   const fetchActivities = async () => {
-    let query = supabase
-      .from('activities')
-      .select('*, profiles(full_name)')
-      .order('created_at', { ascending: false })
-    if (clientId) query = query.eq('client_id', clientId)
-    if (proposalId) query = query.eq('proposal_id', proposalId)
-    const { data } = await query
-    setActivities(data || [])
+    setLoading(true)
+
+    if (clientId) {
+      // For client view: fetch all activities for this client
+      // including those logged against any of their proposals
+      const { data: clientProposals } = await supabase
+        .from('proposals')
+        .select('id')
+        .eq('client_id', clientId)
+
+      const proposalIds = (clientProposals || []).map(p => p.id)
+
+      let allActivities = []
+
+      // Direct client activities
+      const { data: clientActs } = await supabase
+        .from('activities')
+        .select('*, profiles(full_name), proposals(proposal_name)')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false })
+      allActivities = [...(clientActs || [])]
+
+      // Proposal-level activities not already captured
+      if (proposalIds.length > 0) {
+        const { data: proposalActs } = await supabase
+          .from('activities')
+          .select('*, profiles(full_name), proposals(proposal_name)')
+          .in('proposal_id', proposalIds)
+          .is('client_id', null)
+          .order('created_at', { ascending: false })
+        allActivities = [...allActivities, ...(proposalActs || [])]
+      }
+
+      // Sort merged list newest first
+      allActivities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      setActivities(allActivities)
+    } else if (proposalId) {
+      const { data } = await supabase
+        .from('activities')
+        .select('*, profiles(full_name), proposals(proposal_name)')
+        .eq('proposal_id', proposalId)
+        .order('created_at', { ascending: false })
+      setActivities(data || [])
+    }
+
     setLoading(false)
   }
 
@@ -135,7 +172,12 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId }
                 {activity.body && (
                   <p className="text-[#8A9AB0] text-xs mt-1 leading-relaxed">{activity.body}</p>
                 )}
-                <p className="text-[#2a3d55] text-xs mt-0.5">{activity.profiles?.full_name}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <p className="text-[#2a3d55] text-xs">{activity.profiles?.full_name}</p>
+                  {activity.proposals?.proposal_name && (
+                    <span className="text-[#2a3d55] text-xs">· {activity.proposals.proposal_name}</span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
