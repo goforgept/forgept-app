@@ -13,6 +13,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [orgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
+  const [recurringItems, setRecurringItems] = useState([])
   const navigate = useNavigate()
 
   useEffect(() => { fetchAll() }, [])
@@ -38,6 +39,18 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
     setTarget(targetRes.data || null)
     setInvoices(invoicesRes.data || [])
     setPurchaseOrders(posRes.data || [])
+
+    // Fetch recurring items for this rep's proposals
+    const propIds = (proposalsRes.data || []).filter(p => p.status === 'Won').map(p => p.id)
+    if (propIds.length > 0) {
+      const { data: recData } = await supabase
+        .from('bom_line_items')
+        .select('*, proposals(proposal_name, company, client_id)')
+        .eq('recurring', true)
+        .not('renewal_date', 'is', null)
+        .in('proposal_id', propIds)
+      setRecurringItems(recData || [])
+    }
     setLoading(false)
   }
 
@@ -105,6 +118,24 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
   // Target progress
   const targetProgress = target ? Math.min(100, Math.round((wonPipeline / target.revenue_target) * 100)) : null
 
+  // Upcoming renewals for this rep — next 90 days grouped by client
+  const upcomingRenewals = (() => {
+    const today = new Date()
+    const in90 = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
+    const filtered = recurringItems.filter(item => {
+      const rd = new Date(item.renewal_date)
+      return rd >= today && rd <= in90
+    })
+    const groups = {}
+    filtered.forEach(item => {
+      const cid = item.proposals?.client_id || item.proposals?.company || 'unknown'
+      if (!groups[cid]) groups[cid] = { clientId: item.proposals?.client_id, company: item.proposals?.company, items: [], earliestDate: item.renewal_date }
+      groups[cid].items.push(item)
+      if (item.renewal_date < groups[cid].earliestDate) groups[cid].earliestDate = item.renewal_date
+    })
+    return Object.values(groups).sort((a, b) => new Date(a.earliestDate) - new Date(b.earliestDate))
+  })()
+
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
       <Sidebar isAdmin={false} featureProposals={featureProposals} featureCRM={featureCRM} />
@@ -165,6 +196,37 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
             </div>
           </div>
         </div>
+
+        {/* Upcoming Renewals */}
+        {upcomingRenewals.length > 0 && (
+          <div className="bg-[#1a2d45] rounded-xl p-5 mb-0 border border-[#C8622A]/20">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[#C8622A]">🔄</span>
+              <h3 className="text-white font-bold">Upcoming Renewals — next 90 days</h3>
+            </div>
+            <div className="space-y-2">
+              {upcomingRenewals.map((group, i) => {
+                const totalValue = group.items.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
+                const daysUntil = Math.ceil((new Date(group.earliestDate) - new Date()) / (1000 * 60 * 60 * 24))
+                return (
+                  <div key={i} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-4 py-3 cursor-pointer hover:bg-[#0a1628] transition-colors"
+                    onClick={() => group.clientId && navigate(`/client/${group.clientId}`)}>
+                    <div>
+                      <p className="text-white text-sm font-medium">{group.company}</p>
+                      <p className="text-[#8A9AB0] text-xs">{group.items.length} item{group.items.length !== 1 ? 's' : ''} · {group.items.map(i => i.item_name).join(', ')}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-white text-sm font-bold">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                      <p className={`text-xs font-semibold ${daysUntil <= 30 ? 'text-red-400' : daysUntil <= 60 ? 'text-yellow-400' : 'text-[#C8622A]'}`}>
+                        {daysUntil === 0 ? 'Today' : `${daysUntil}d`} — {new Date(group.earliestDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Needs Attention */}
         {!loading && needsAttention.length > 0 && (

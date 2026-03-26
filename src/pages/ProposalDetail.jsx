@@ -41,6 +41,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [showShareModal, setShowShareModal] = useState(false)
   const [orgProfiles, setOrgProfiles] = useState([])
   const [sharingProposal, setSharingProposal] = useState(false)
+  const [renewalDates, setRenewalDates] = useState({})
+  const [savingRenewal, setSavingRenewal] = useState(false)
 
   useEffect(() => {
     fetchProposal()
@@ -71,6 +73,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       .select('*')
       .eq('proposal_id', id)
     setLineItems(data || [])
+    // Load existing renewal dates
+    const dates = {}
+    ;(data || []).forEach(l => { if (l.renewal_date) dates[l.id] = l.renewal_date })
+    setRenewalDates(dates)
   }
 
   const fetchProfile = async () => {
@@ -754,7 +760,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             markup_percent: parseFloat(l.markup_percent) || null,
             customer_price_unit: parseFloat(l.customer_price_unit) || null,
             customer_price_total: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0),
-            pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing'
+            pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing',
+            recurring: l.recurring || false
           }))
         )
 
@@ -863,6 +870,24 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       }
     }
     setSharingProposal(false)
+  }
+
+  const toggleRecurring = async (itemId, currentValue) => {
+    await supabase.from('bom_line_items').update({ recurring: !currentValue }).eq('id', itemId)
+    setLineItems(prev => prev.map(l => l.id === itemId ? { ...l, recurring: !currentValue } : l))
+    // Update has_recurring on proposal
+    const updatedItems = lineItems.map(l => l.id === itemId ? { ...l, recurring: !currentValue } : l)
+    const hasAny = updatedItems.some(l => l.recurring)
+    await supabase.from('proposals').update({ has_recurring: hasAny }).eq('id', id)
+    setProposal(prev => ({ ...prev, has_recurring: hasAny }))
+  }
+
+  const saveRenewalDate = async (itemId, date) => {
+    setSavingRenewal(true)
+    await supabase.from('bom_line_items').update({ renewal_date: date || null }).eq('id', itemId)
+    setLineItems(prev => prev.map(l => l.id === itemId ? { ...l, renewal_date: date } : l))
+    setRenewalDates(prev => ({ ...prev, [itemId]: date }))
+    setSavingRenewal(false)
   }
 
   const generatePDFDoc = () => {
@@ -1275,6 +1300,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                       <th className="text-[#8A9AB0] text-right py-2 pr-4">Unit Price</th>
                       <th className="text-[#8A9AB0] text-right py-2 pr-4">Total</th>
                       <th className="text-[#8A9AB0] text-left py-2">Status</th>
+                      <th className="text-[#8A9AB0] text-center py-2 pr-2">🔄</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1296,6 +1322,18 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                           }`}>
                             {item.po_status || item.pricing_status}
                           </span>
+                        </td>
+                        <td className="py-3 pr-2 text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            <input type="checkbox" checked={!!item.recurring} onChange={() => toggleRecurring(item.id, !!item.recurring)}
+                              className="accent-[#C8622A] cursor-pointer" title="Mark as recurring" />
+                            {item.recurring && proposal?.status === 'Won' && (
+                              <input type="date" value={renewalDates[item.id] || item.renewal_date || ''}
+                                onChange={e => saveRenewalDate(item.id, e.target.value)}
+                                className="bg-[#0F1C2E] text-[#C8622A] border border-[#C8622A]/40 rounded px-1 py-0.5 text-xs focus:outline-none focus:border-[#C8622A] w-28"
+                                placeholder="Renewal date" />
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1337,7 +1375,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#2a3d55]">
-                    {['Item Name', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ''].map(h => (
+                    {['Item Name', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', '🔄', ''].map(h => (
                       <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
                     ))}
                   </tr>
@@ -1414,6 +1452,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                           onChange={e => updateEditLine(i, 'customer_price_unit', e.target.value)}
                           className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
                         />
+                      </td>
+                      <td className="py-1 text-center">
+                        <input type="checkbox" checked={!!line.recurring} onChange={e => updateEditLine(i, 'recurring', e.target.checked)}
+                          className="accent-[#C8622A] cursor-pointer" title="Recurring" />
                       </td>
                       <td className="py-1">
                         <button onClick={() => removeEditLine(i)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
@@ -1563,6 +1605,36 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           )}
         </div>
         {/* FIX: POList is now correctly outside the BOM card */}
+        {/* Recurring Items Summary */}
+        {proposal?.status === 'Won' && lineItems.some(l => l.recurring) && (
+          <div className="bg-[#1a2d45] border border-[#C8622A]/30 rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[#C8622A] text-lg">🔄</span>
+              <h3 className="text-white font-bold">Recurring Line Items</h3>
+            </div>
+            <div className="space-y-2">
+              {lineItems.filter(l => l.recurring).map(item => (
+                <div key={item.id} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-4 py-3">
+                  <div>
+                    <p className="text-white text-sm font-medium">{item.item_name}</p>
+                    <p className="text-[#8A9AB0] text-xs">${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} / renewal</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {item.renewal_date ? (
+                      <span className="text-[#C8622A] text-xs font-semibold">Renews {new Date(item.renewal_date).toLocaleDateString()}</span>
+                    ) : (
+                      <span className="text-yellow-400 text-xs">⚠ Set renewal date</span>
+                    )}
+                    <input type="date" value={renewalDates[item.id] || item.renewal_date || ''}
+                      onChange={e => saveRenewalDate(item.id, e.target.value)}
+                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <POList proposalId={id} />
 
       </div>

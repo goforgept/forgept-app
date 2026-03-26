@@ -17,6 +17,8 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const [showSetTargetModal, setShowSetTargetModal] = useState(false)
   const [targetForm, setTargetForm] = useState({ profile_id: '', revenue_target: '', deals_target: '', period_start: new Date().toISOString().split('T')[0].slice(0, 7) + '-01' })
   const [savingTarget, setSavingTarget] = useState(false)
+  const [recurringItems, setRecurringItems] = useState([])
+  const [targetPeriod, setTargetPeriod] = useState('monthly')
   const navigate = useNavigate()
 
   useEffect(() => { fetchOrgData() }, [])
@@ -26,7 +28,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
     if (!profile?.org_id) { setLoading(false); return }
 
-    const [proposalsRes, lineItemsRes, clientsRes, profilesRes, targetsRes, invoicesRes, posRes] = await Promise.all([
+    const [proposalsRes, lineItemsRes, clientsRes, profilesRes, targetsRes, invoicesRes, posRes, recurringRes] = await Promise.all([
       supabase.from('proposals').select('*').eq('org_id', profile.org_id).order('created_at', { ascending: false }),
       supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id'),
       supabase.from('clients').select('*').eq('org_id', profile.org_id),
@@ -34,6 +36,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       supabase.from('targets').select('*').eq('org_id', profile.org_id),
       supabase.from('invoices').select('*').eq('org_id', profile.org_id),
       supabase.from('purchase_orders').select('*').eq('org_id', profile.org_id),
+      supabase.from('bom_line_items').select('*, proposals(proposal_name, company, client_id, rep_name, user_id)').eq('recurring', true).not('renewal_date', 'is', null),
     ])
 
     setProposals(proposalsRes.data || [])
@@ -43,6 +46,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     setTargets(targetsRes.data || [])
     setInvoices(invoicesRes.data || [])
     setPurchaseOrders(posRes.data || [])
+    setRecurringItems(recurringRes.data || [])
     setLoading(false)
   }
 
@@ -60,7 +64,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     if (existing) {
       await supabase.from('targets').update({ revenue_target: parseFloat(targetForm.revenue_target) || 0, deals_target: parseInt(targetForm.deals_target) || 0 }).eq('id', existing.id)
     } else {
-      await supabase.from('targets').insert({ org_id: profile.org_id, profile_id: targetForm.profile_id, period: 'monthly', period_start: targetForm.period_start, revenue_target: parseFloat(targetForm.revenue_target) || 0, deals_target: parseInt(targetForm.deals_target) || 0 })
+      await supabase.from('targets').insert({ org_id: profile.org_id, profile_id: targetForm.profile_id, period: targetPeriod, period_start: targetForm.period_start, revenue_target: parseFloat(targetForm.revenue_target) || 0, deals_target: parseInt(targetForm.deals_target) || 0 })
     }
     setShowSetTargetModal(false)
     fetchOrgData()
@@ -175,6 +179,25 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const laborQuoted = getLaborTotal(active)
     return { laborQuoted, laborWon: getLaborTotal(won), laborClosingSoon: getLaborTotal(closingSoonPs), hoursQuoted: getLaborHours(active), hoursWon: getLaborHours(won), hoursClosingSoon: getLaborHours(closingSoonPs), avgLaborPerDeal: dealsWithLabor.length > 0 ? getLaborTotal(active) / dealsWithLabor.length : 0, dealsWithLabor: dealsWithLabor.length }
   }, [filteredProposals])
+
+  // Upcoming renewals — next 90 days, grouped by client
+  const upcomingRenewals = useMemo(() => {
+    const today = new Date()
+    const in90 = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000)
+    const filtered = recurringItems.filter(item => {
+      const rd = new Date(item.renewal_date)
+      return rd >= today && rd <= in90
+    })
+    // Group by client_id (via proposal)
+    const groups = {}
+    filtered.forEach(item => {
+      const cid = item.proposals?.client_id || item.proposals?.company || 'unknown'
+      if (!groups[cid]) groups[cid] = { clientId: item.proposals?.client_id, company: item.proposals?.company, repName: item.proposals?.rep_name, items: [], earliestDate: item.renewal_date }
+      groups[cid].items.push(item)
+      if (item.renewal_date < groups[cid].earliestDate) groups[cid].earliestDate = item.renewal_date
+    })
+    return Object.values(groups).sort((a, b) => new Date(a.earliestDate) - new Date(b.earliestDate))
+  }, [recurringItems])
 
   // Targets per rep for current month
   const now = new Date()
@@ -318,6 +341,43 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           </div>
         </div>
 
+        {/* Upcoming Renewals */}
+        {upcomingRenewals.length > 0 && (
+          <div className="bg-[#1a2d45] rounded-xl p-6 mb-6 border border-[#C8622A]/20">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-[#C8622A] text-lg">🔄</span>
+              <h3 className="text-white font-bold text-lg">Upcoming Renewals</h3>
+              <span className="text-[#8A9AB0] text-xs ml-1">— next 90 days</span>
+            </div>
+            <div className="space-y-3">
+              {upcomingRenewals.map((group, i) => {
+                const totalValue = group.items.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
+                const daysUntil = Math.ceil((new Date(group.earliestDate) - new Date()) / (1000 * 60 * 60 * 24))
+                return (
+                  <div key={i} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-4 py-3 cursor-pointer hover:bg-[#0a1628] transition-colors"
+                    onClick={() => group.clientId && navigate(`/client/${group.clientId}`)}>
+                    <div>
+                      <p className="text-white text-sm font-medium">{group.company}</p>
+                      <p className="text-[#8A9AB0] text-xs">{group.repName} · {group.items.length} item{group.items.length !== 1 ? 's' : ''}</p>
+                      <div className="flex gap-1 mt-1 flex-wrap">
+                        {group.items.map(item => (
+                          <span key={item.id} className="text-xs bg-[#1a2d45] text-[#8A9AB0] px-2 py-0.5 rounded">{item.item_name}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="text-right ml-4">
+                      <p className="text-white text-sm font-bold">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                      <p className={`text-xs font-semibold ${daysUntil <= 30 ? 'text-red-400' : daysUntil <= 60 ? 'text-yellow-400' : 'text-[#C8622A]'}`}>
+                        {daysUntil === 0 ? 'Today' : `${daysUntil}d`} — {new Date(group.earliestDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Rep Targets */}
         <div className="bg-[#1a2d45] rounded-xl p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
@@ -417,9 +477,20 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       {showSetTargetModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-1">Set Monthly Target</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Assign a revenue goal to a rep for the month.</p>
+            <h3 className="text-white font-bold text-lg mb-1">Set Target</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">Assign a revenue goal to a rep.</p>
             <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Period</label>
+                <div className="flex gap-2">
+                  {['monthly', 'quarterly', 'annual'].map(p => (
+                    <button key={p} onClick={() => setTargetPeriod(p)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-colors ${targetPeriod === p ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Rep</label>
                 <select value={targetForm.profile_id} onChange={e => setTargetForm(p => ({ ...p, profile_id: e.target.value }))} className={inputClass}>
@@ -428,7 +499,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                 </select>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Month</label>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">{targetPeriod === 'monthly' ? 'Month' : targetPeriod === 'quarterly' ? 'Quarter Start' : 'Year Start'}</label>
                 <input type="month" value={targetForm.period_start?.slice(0, 7)} onChange={e => setTargetForm(p => ({ ...p, period_start: e.target.value + '-01' }))} className={inputClass} />
               </div>
               <div>
