@@ -289,7 +289,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         </div>
 
         {/* AR + PO Summary */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className={`grid ${orgType === 'manufacturer' ? 'grid-cols-1' : 'grid-cols-2'} gap-4 mb-6`}>
           <div className="bg-[#1a2d45] rounded-xl p-5 cursor-pointer hover:bg-[#1f3550] transition-colors" onClick={() => navigate('/invoices')}>
             <p className="text-white font-bold mb-3">Invoicing & AR</p>
             <div className="grid grid-cols-4 gap-3">
@@ -299,14 +299,16 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               <div><p className="text-[#8A9AB0] text-xs mb-1">Needs Invoice</p><p className={`text-lg font-bold ${needsInvoice > 0 ? 'text-yellow-400' : 'text-white'}`}>{needsInvoice}</p></div>
             </div>
           </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5 cursor-pointer hover:bg-[#1f3550] transition-colors" onClick={() => navigate('/purchase-orders')}>
-            <p className="text-white font-bold mb-3">Purchase Orders</p>
-            <div className="grid grid-cols-3 gap-3">
-              <div><p className="text-[#8A9AB0] text-xs mb-1">Total Value</p><p className="text-white text-lg font-bold">${totalPOValue.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
-              <div><p className="text-[#8A9AB0] text-xs mb-1">Partial</p><p className={`text-lg font-bold ${partialPOs > 0 ? 'text-yellow-400' : 'text-white'}`}>{partialPOs}</p></div>
-              <div><p className="text-[#8A9AB0] text-xs mb-1">Pending</p><p className={`text-lg font-bold ${pendingPOs > 0 ? 'text-blue-400' : 'text-white'}`}>{pendingPOs}</p></div>
+          {orgType !== 'manufacturer' && (
+            <div className="bg-[#1a2d45] rounded-xl p-5 cursor-pointer hover:bg-[#1f3550] transition-colors" onClick={() => navigate('/purchase-orders')}>
+              <p className="text-white font-bold mb-3">Purchase Orders</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div><p className="text-[#8A9AB0] text-xs mb-1">Total Value</p><p className="text-white text-lg font-bold">${totalPOValue.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
+                <div><p className="text-[#8A9AB0] text-xs mb-1">Partial</p><p className={`text-lg font-bold ${partialPOs > 0 ? 'text-yellow-400' : 'text-white'}`}>{partialPOs}</p></div>
+                <div><p className="text-[#8A9AB0] text-xs mb-1">Pending</p><p className={`text-lg font-bold ${pendingPOs > 0 ? 'text-blue-400' : 'text-white'}`}>{pendingPOs}</p></div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Needs Attention */}
