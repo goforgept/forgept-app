@@ -19,6 +19,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const [savingTarget, setSavingTarget] = useState(false)
   const [recurringItems, setRecurringItems] = useState([])
   const [targetPeriod, setTargetPeriod] = useState('monthly')
+  const [recurringModal, setRecurringModal] = useState(null) // 'revenue' | 'quoting' | 'all'
   const navigate = useNavigate()
 
   useEffect(() => { fetchOrgData() }, [])
@@ -194,15 +195,16 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       : in90
 
     // Revenue = sum of recurring items with renewal_date in the period
+    // All Time = all recurring items regardless of date
     const inPeriod = recurringItems.filter(item => {
+      if (period === 'all') return true
       const rd = new Date(item.renewal_date)
-      if (period === 'all') return rd >= today && rd <= in90
       return rd >= (periodStart || today) && rd <= periodEnd
     })
 
     const recurringRevenue = inPeriod.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
 
-    // Needs quoting = recurring items with renewal in next 90 days where no renewal proposal exists
+    // Needs quoting = recurring items with renewal in next 90 days
     const needsQuoting = recurringItems.filter(item => {
       const rd = new Date(item.renewal_date)
       return rd >= today && rd <= in90
@@ -218,7 +220,27 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     })
     const upcomingGroups = Object.values(groups).sort((a, b) => new Date(a.earliestDate) - new Date(b.earliestDate))
 
-    return { recurringRevenue, needsQuotingCount: needsQuoting.length, needsQuotingClients: upcomingGroups.length, upcomingGroups, inPeriodCount: inPeriod.length }
+    // Per-client breakdown for drill-down modal (all recurring items)
+    const allGroups = {}
+    recurringItems.forEach(item => {
+      const cid = item.proposals?.client_id || item.proposals?.company || 'unknown'
+      if (!allGroups[cid]) allGroups[cid] = { clientId: item.proposals?.client_id, company: item.proposals?.company, repName: item.proposals?.rep_name, proposalName: item.proposals?.proposal_name, items: [], totalValue: 0 }
+      allGroups[cid].items.push(item)
+      allGroups[cid].totalValue += item.customer_price_total || 0
+    })
+    const allClientGroups = Object.values(allGroups).sort((a, b) => b.totalValue - a.totalValue)
+
+    // Period groups for revenue drill-down
+    const periodGroups = {}
+    inPeriod.forEach(item => {
+      const cid = item.proposals?.client_id || item.proposals?.company || 'unknown'
+      if (!periodGroups[cid]) periodGroups[cid] = { clientId: item.proposals?.client_id, company: item.proposals?.company, repName: item.proposals?.rep_name, proposalName: item.proposals?.proposal_name, items: [], totalValue: 0 }
+      periodGroups[cid].items.push(item)
+      periodGroups[cid].totalValue += item.customer_price_total || 0
+    })
+    const periodClientGroups = Object.values(periodGroups).sort((a, b) => b.totalValue - a.totalValue)
+
+    return { recurringRevenue, needsQuotingCount: needsQuoting.length, needsQuotingClients: upcomingGroups.length, upcomingGroups, inPeriodCount: inPeriod.length, allClientGroups, periodClientGroups }
   }, [recurringItems, period])
 
   // Targets per rep for current month
@@ -375,22 +397,25 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               </div>
             </div>
 
-            {/* Summary stats */}
+            {/* Summary stats — clickable */}
             <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="bg-[#0F1C2E] rounded-xl p-4">
+              <div className="bg-[#0F1C2E] rounded-xl p-4 cursor-pointer hover:bg-[#0a1628] transition-colors border border-transparent hover:border-[#C8622A]/30"
+                onClick={() => setRecurringModal('revenue')}>
                 <p className="text-[#8A9AB0] text-xs mb-1">Recurring Revenue{periodShort[period]}</p>
                 <p className="text-[#C8622A] text-xl font-bold">${recurringStats.recurringRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                <p className="text-[#8A9AB0] text-xs mt-1">{recurringStats.inPeriodCount} item{recurringStats.inPeriodCount !== 1 ? 's' : ''} renewing</p>
+                <p className="text-[#8A9AB0] text-xs mt-1">{recurringStats.inPeriodCount} item{recurringStats.inPeriodCount !== 1 ? 's' : ''} renewing · click to drill down</p>
               </div>
-              <div className="bg-[#0F1C2E] rounded-xl p-4">
+              <div className="bg-[#0F1C2E] rounded-xl p-4 cursor-pointer hover:bg-[#0a1628] transition-colors border border-transparent hover:border-yellow-500/30"
+                onClick={() => setRecurringModal('quoting')}>
                 <p className="text-[#8A9AB0] text-xs mb-1">Need Quoting — 90 Days</p>
                 <p className={`text-xl font-bold ${recurringStats.needsQuotingCount > 0 ? 'text-yellow-400' : 'text-white'}`}>{recurringStats.needsQuotingCount}</p>
-                <p className="text-[#8A9AB0] text-xs mt-1">across {recurringStats.needsQuotingClients} client{recurringStats.needsQuotingClients !== 1 ? 's' : ''}</p>
+                <p className="text-[#8A9AB0] text-xs mt-1">across {recurringStats.needsQuotingClients} client{recurringStats.needsQuotingClients !== 1 ? 's' : ''} · click to drill down</p>
               </div>
-              <div className="bg-[#0F1C2E] rounded-xl p-4">
+              <div className="bg-[#0F1C2E] rounded-xl p-4 cursor-pointer hover:bg-[#0a1628] transition-colors border border-transparent hover:border-[#2a3d55]"
+                onClick={() => setRecurringModal('all')}>
                 <p className="text-[#8A9AB0] text-xs mb-1">Total Recurring Items</p>
                 <p className="text-white text-xl font-bold">{recurringItems.length}</p>
-                <p className="text-[#8A9AB0] text-xs mt-1">across all won deals</p>
+                <p className="text-[#8A9AB0] text-xs mt-1">across all won deals · click to drill down</p>
               </div>
             </div>
 
@@ -516,6 +541,77 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           </div>
         )}
       </div>
+
+      {/* Recurring Revenue Drill-Down Modal */}
+      {recurringModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <h3 className="text-white font-bold text-lg">
+                  {recurringModal === 'revenue' ? `Recurring Revenue${periodShort[period]}` :
+                   recurringModal === 'quoting' ? 'Need Quoting — Next 90 Days' :
+                   'All Recurring Items'}
+                </h3>
+                <p className="text-[#8A9AB0] text-xs mt-0.5">
+                  {recurringModal === 'revenue' ? `${recurringStats.inPeriodCount} items · $${recurringStats.recurringRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })} total` :
+                   recurringModal === 'quoting' ? `${recurringStats.needsQuotingCount} items across ${recurringStats.needsQuotingClients} clients` :
+                   `${recurringItems.length} total recurring items`}
+                </p>
+              </div>
+              <button onClick={() => setRecurringModal(null)} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">✕ Close</button>
+            </div>
+
+            {(() => {
+              const groups = recurringModal === 'revenue' ? recurringStats.periodClientGroups :
+                             recurringModal === 'quoting' ? recurringStats.upcomingGroups :
+                             recurringStats.allClientGroups
+              if (groups.length === 0) return <p className="text-[#8A9AB0] text-sm">No items found.</p>
+              return (
+                <div className="space-y-3">
+                  {groups.map((group, i) => {
+                    const totalValue = group.totalValue || group.items?.reduce((s, i) => s + (i.customer_price_total || 0), 0) || 0
+                    return (
+                      <div key={i} className="bg-[#0F1C2E] rounded-xl p-4 cursor-pointer hover:bg-[#0a1628] transition-colors"
+                        onClick={() => { setRecurringModal(null); group.clientId && navigate(`/client/${group.clientId}`) }}>
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="text-white font-semibold">{group.company}</p>
+                            <p className="text-[#8A9AB0] text-xs">{group.repName} · {group.proposalName}</p>
+                          </div>
+                          <p className="text-[#C8622A] font-bold">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                        </div>
+                        <div className="space-y-1">
+                          {group.items.map(item => (
+                            <div key={item.id} className="flex justify-between items-center">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[#C8622A] text-xs">🔄</span>
+                                <span className="text-[#D6E4F0] text-xs">{item.item_name}</span>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span className="text-[#8A9AB0] text-xs">${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                {item.renewal_date && (
+                                  <span className={`text-xs font-semibold ${
+                                    Math.ceil((new Date(item.renewal_date) - new Date()) / (1000 * 60 * 60 * 24)) <= 30 ? 'text-red-400' :
+                                    Math.ceil((new Date(item.renewal_date) - new Date()) / (1000 * 60 * 60 * 24)) <= 60 ? 'text-yellow-400' :
+                                    'text-[#8A9AB0]'
+                                  }`}>
+                                    {new Date(item.renewal_date).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Set Target Modal */}
       {showSetTargetModal && (
