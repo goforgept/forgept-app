@@ -56,7 +56,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('*')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type')
       .eq('id', id)
       .single()
 

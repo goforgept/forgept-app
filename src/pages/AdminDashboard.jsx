@@ -29,7 +29,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     if (!profile?.org_id) { setLoading(false); return }
 
     const [proposalsRes, lineItemsRes, clientsRes, profilesRes, targetsRes, invoicesRes, posRes, recurringRes] = await Promise.all([
-      supabase.from('proposals').select('*').eq('org_id', profile.org_id).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).order('created_at', { ascending: false }),
       supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id'),
       supabase.from('clients').select('*').eq('org_id', profile.org_id),
       supabase.from('profiles').select('id, full_name, email').eq('org_id', profile.org_id),
