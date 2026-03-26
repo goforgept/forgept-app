@@ -20,9 +20,14 @@ export default function NewProposal() {
   const [tab, setTab] = useState('inline')
   const [clients, setClients] = useState([])
   const [selectedClientId, setSelectedClientId] = useState(null)
-  const [form, setForm] = useState({
-    rep_name: '', rep_email: '', client_name: '', company: '',
-    client_email: '', close_date: '', industry: '', job_description: ''
+  const [form, setForm] = useState(() => {
+    const d = new Date()
+    d.setDate(d.getDate() + 45)
+    const defaultCloseDate = d.toISOString().split('T')[0]
+    return {
+      rep_name: '', rep_email: '', client_name: '', company: '',
+      client_email: '', close_date: defaultCloseDate, industry: '', job_description: ''
+    }
   })
   const [lines, setLines] = useState([emptyLine(), emptyLine(), emptyLine()])
   const [uploadedLines, setUploadedLines] = useState([])
