@@ -41,6 +41,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [showShareModal, setShowShareModal] = useState(false)
   const [orgProfiles, setOrgProfiles] = useState([])
   const [sharingProposal, setSharingProposal] = useState(false)
+  const [clientAddress, setClientAddress] = useState('')
   const [renewalDates, setRenewalDates] = useState({})
   const [savingRenewal, setSavingRenewal] = useState(false)
   const [showRenewalModal, setShowRenewalModal] = useState(false)
@@ -65,6 +66,19 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     if (data?.labor_items && data.labor_items.length > 0) {
       setLaborItems(data.labor_items)
+    }
+
+    // Fetch client address if client_id exists
+    if (data?.client_id) {
+      const { data: clientData } = await supabase
+        .from('clients')
+        .select('address, city, state, zip')
+        .eq('id', data.client_id)
+        .single()
+      if (clientData) {
+        const addr = [clientData.address, clientData.city, clientData.state, clientData.zip].filter(Boolean).join(', ')
+        setClientAddress(addr)
+      }
     }
 
     setLoading(false)
@@ -331,7 +345,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         children: [new TextRun({ text: `Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, size: 20, color: '666666' })]
       }),
       new Paragraph({
-        children: [new TextRun({ text: `Industry: ${proposal?.industry || ''}`, size: 20, color: '666666' })]
+        children: [new TextRun({ text: clientAddress ? `Address: ${clientAddress}` : `Email: ${proposal?.client_email || ''}`, size: 20, color: '666666' })]
       }),
       new Paragraph({
         children: [new TextRun({ text: `Date: ${new Date().toLocaleDateString()}`, size: 20, color: '666666' })]
@@ -345,7 +359,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           children: [new TextRun({ text: 'Scope of Work', bold: true, size: 28, color: primaryColor })]
         }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
-        ...proposal.scope_of_work.split('\n').map(line =>
+        ...proposal.scope_of_work.replace(/^\*\*Scope of Work\*\*\s*/i, '').replace(/\*\*(.*?)\*\*/g, '$1').trim().split('\n').map(line =>
           new Paragraph({ children: [new TextRun({ text: line, size: 20 })] })
         ),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
@@ -959,8 +973,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
     doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
-    doc.text(`Industry: ${proposal?.industry || ''}`, 14, 72)
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 79)
+    if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, 72)
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, clientAddress ? 79 : 72)
 
     let yPos = 92
 
@@ -973,7 +987,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       doc.setFontSize(10)
       doc.setFont('helvetica', 'normal')
       doc.setTextColor(60, 60, 60)
-      const sowLines = doc.splitTextToSize(proposal.scope_of_work, pageWidth - 28)
+      const cleanSOW = proposal.scope_of_work.replace(/^\*\*Scope of Work\*\*\s*/i, '').replace(/\*\*(.*?)\*\*/g, '$1').trim()
+      const sowLines = doc.splitTextToSize(cleanSOW, pageWidth - 28)
       doc.text(sowLines, 14, yPos)
       yPos += sowLines.length * 5 + 12
     }
