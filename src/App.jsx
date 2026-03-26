@@ -22,6 +22,7 @@ import Forecast from './pages/Forecast'
 import Catalog from './pages/Catalog'
 import Templates from './pages/Templates'
 import Invoices from './pages/Invoices'
+import ManufacturerOrders from './pages/ManufacturerOrders'
 import InvoiceDetail from './pages/InvoiceDetail'
 import NewInvoice from './pages/NewInvoice'
 
@@ -140,6 +141,7 @@ function App() {
           <Route path="/invoices" element={<Invoices {...sharedProps} />} />
           <Route path="/invoices/new" element={<NewInvoice {...sharedProps} />} />
           <Route path="/invoices/:id" element={<InvoiceDetail {...sharedProps} />} />
+          <Route path="/orders" element={<ManufacturerOrders {...sharedProps} />} />
         </>
       )}
     </Routes>

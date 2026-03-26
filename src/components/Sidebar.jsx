@@ -48,6 +48,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
     ...(featureProposals && orgType !== 'manufacturer' ? [
       { label: 'Vendors', path: '/vendors', icon: '🏭' },
       { label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' },
+      ...(orgType === 'manufacturer' ? [{ label: 'Orders', path: '/orders', icon: '🏭' }] : []),
     ] : []),
     { label: 'Team', path: '/reps', icon: '👥' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },

@@ -42,6 +42,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [orgProfiles, setOrgProfiles] = useState([])
   const [sharingProposal, setSharingProposal] = useState(false)
   const [clientAddress, setClientAddress] = useState('')
+  const [showOrderModal, setShowOrderModal] = useState(false)
+  const [orderVendor, setOrderVendor] = useState('')
+  const [orderAutoNumber, setOrderAutoNumber] = useState(true)
+  const [orderNumber, setOrderNumber] = useState('')
+  const [orderExpectedShip, setOrderExpectedShip] = useState('')
+  const [creatingOrder, setCreatingOrder] = useState(false)
   const [activity, setActivity] = useState([])
   const [newActivityNote, setNewActivityNote] = useState('')
   const [savingActivity, setSavingActivity] = useState(false)
@@ -988,6 +994,64 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setSavingRenewal(false)
   }
 
+  const createOrder = async () => {
+    setCreatingOrder(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+
+      let finalOrderNumber = orderNumber
+      if (orderAutoNumber) {
+        const { data: org } = await supabase.from('organizations').select('po_counter').eq('id', profileData.org_id).single()
+        finalOrderNumber = `ORD-${org.po_counter}`
+        await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profileData.org_id)
+      }
+
+      const vendorItems = orderVendor === '__all__'
+        ? lineItems
+        : lineItems.filter(l => l.vendor === orderVendor)
+
+      const totalCost = vendorItems.reduce((sum, l) => sum + ((l.your_cost_unit || 0) * (l.quantity || 0)), 0)
+
+      const { data: order, error } = await supabase.from('manufacturer_orders').insert({
+        org_id: profileData.org_id,
+        proposal_id: id,
+        order_number: finalOrderNumber,
+        vendor_name: orderVendor === '__all__' ? 'Multiple Vendors' : orderVendor,
+        status: 'Draft',
+        expected_ship_date: orderExpectedShip || null,
+        total_cost: totalCost
+      }).select().single()
+
+      if (error) throw error
+
+      await supabase.from('manufacturer_order_items').insert(
+        vendorItems.map(l => ({
+          order_id: order.id,
+          item_name: l.item_name,
+          part_number_sku: l.part_number_sku,
+          quantity: l.quantity,
+          unit: l.unit,
+          vendor: l.vendor,
+          your_cost_unit: l.your_cost_unit,
+          total_cost: (l.your_cost_unit || 0) * (l.quantity || 0),
+          received_qty: 0,
+          status: 'Pending'
+        }))
+      )
+
+      logActivity(`Order ${finalOrderNumber} created for ${orderVendor === '__all__' ? 'all vendors' : orderVendor}`)
+      setShowOrderModal(false)
+      setOrderVendor('')
+      setOrderNumber('')
+      setOrderExpectedShip('')
+      alert(`Order ${finalOrderNumber} created successfully!`)
+    } catch (err) {
+      alert('Error creating order: ' + err.message)
+    }
+    setCreatingOrder(false)
+  }
+
   const generatePDFDoc = () => {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
@@ -1330,6 +1394,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             <h3 className="text-white font-bold text-lg">BOM Line Items ({lineItems.length})</h3>
             {!editingBOM ? (
               <div className="flex gap-2">
+                {proposal?.status === 'Won' && lineItems.length > 0 && orgType === 'manufacturer' && (
+                  <button
+                    onClick={() => setShowOrderModal(true)}
+                    className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+                  >
+                    🏭 Convert to Order
+                  </button>
+                )}
                 <button
                   onClick={() => setShowPOModal(true)}
                   className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors"
@@ -1805,6 +1877,76 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         <POList proposalId={id} />
 
       </div>
+
+      {/* Convert to Order Modal */}
+      {showOrderModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-white font-bold text-lg mb-1">Convert to Manufacturer Order</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">Create an order from this proposal's BOM to track fulfillment.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor</label>
+                <select value={orderVendor} onChange={e => setOrderVendor(e.target.value)}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  <option value="">— Select vendor —</option>
+                  <option value="__all__">All vendors ({lineItems.length} items)</option>
+                  {[...new Set(lineItems.filter(l => l.vendor).map(l => l.vendor))].map(v => (
+                    <option key={v} value={v}>{v} ({lineItems.filter(l => l.vendor === v).length} items)</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Order Number</label>
+                <div className="flex gap-2 mb-2">
+                  <button onClick={() => setOrderAutoNumber(true)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${orderAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                    Auto-Generate
+                  </button>
+                  <button onClick={() => setOrderAutoNumber(false)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${!orderAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                    Enter Manually
+                  </button>
+                </div>
+                {!orderAutoNumber && (
+                  <input type="text" value={orderNumber} onChange={e => setOrderNumber(e.target.value)}
+                    placeholder="e.g. ORD-2026-001"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                )}
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Expected Ship Date (optional)</label>
+                <input type="date" value={orderExpectedShip} onChange={e => setOrderExpectedShip(e.target.value)}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              </div>
+              {orderVendor && (
+                <div className="bg-[#0F1C2E] rounded-lg p-3">
+                  <p className="text-[#8A9AB0] text-xs mb-2">Items to order:</p>
+                  {(orderVendor === '__all__' ? lineItems : lineItems.filter(l => l.vendor === orderVendor)).map(item => (
+                    <div key={item.id} className="flex justify-between text-xs py-1">
+                      <span className="text-white">{item.item_name}</span>
+                      <span className="text-[#8A9AB0]">Qty: {item.quantity} · ${((item.your_cost_unit || 0) * (item.quantity || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  ))}
+                  <div className="border-t border-[#2a3d55] mt-2 pt-2 flex justify-between text-xs">
+                    <span className="text-[#8A9AB0]">Total Cost</span>
+                    <span className="text-white font-semibold">${(orderVendor === '__all__' ? lineItems : lineItems.filter(l => l.vendor === orderVendor)).reduce((sum, l) => sum + ((l.your_cost_unit || 0) * (l.quantity || 0)), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowOrderModal(false)}
+                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={createOrder}
+                  disabled={creatingOrder || !orderVendor || (!orderAutoNumber && !orderNumber)}
+                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {creatingOrder ? 'Creating...' : 'Create Order'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Renewal Date Modal — shown when closing Won with recurring items */}
       {showRenewalModal && (
