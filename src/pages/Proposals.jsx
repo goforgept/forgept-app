@@ -14,7 +14,6 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
   useEffect(() => {
     fetchOrgAndProposals()
 
-    // Read URL params from dashboard clicks
     const params = new URLSearchParams(location.search)
     const status = params.get('status')
     const rep = params.get('rep')
@@ -36,7 +35,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
 
     const { data, error } = await supabase
       .from('proposals')
-      .select('*')
+      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id')
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
 
@@ -51,7 +50,6 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
       return p.status === statusFilter
     })
     .filter(p => {
-      // Check closing in 30 days filter
       const params = new URLSearchParams(location.search)
       if (params.get('closing') === '30') {
         if (!p.close_date) return false
@@ -73,6 +71,9 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
 
   const params = new URLSearchParams(location.search)
   const isClosingFilter = params.get('closing') === '30'
+
+  const totalValue = filtered.reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+  const wonValue = filtered.filter(p => p.status === 'Won').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
@@ -97,6 +98,22 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
           </div>
         </div>
 
+        {/* Summary stats */}
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="bg-[#1a2d45] rounded-xl p-4">
+            <p className="text-[#8A9AB0] text-xs mb-1">Total Value</p>
+            <p className="text-white text-xl font-bold">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          </div>
+          <div className="bg-[#1a2d45] rounded-xl p-4">
+            <p className="text-[#8A9AB0] text-xs mb-1">Won Value</p>
+            <p className="text-green-400 text-xl font-bold">${wonValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+          </div>
+          <div className="bg-[#1a2d45] rounded-xl p-4">
+            <p className="text-[#8A9AB0] text-xs mb-1">Proposals Shown</p>
+            <p className="text-white text-xl font-bold">{filtered.length}</p>
+          </div>
+        </div>
+
         <div className="flex gap-3 mb-4">
           <input
             type="text"
@@ -111,9 +128,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                 key={s}
                 onClick={() => setStatusFilter(s)}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                  statusFilter === s
-                    ? 'bg-[#C8622A] text-white'
-                    : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
+                  statusFilter === s ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
                 }`}
               >
                 {s}
@@ -140,6 +155,9 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                   <p className="text-[#8A9AB0] text-xs">{proposal.rep_email}</p>
                 </div>
                 <div className="flex items-center gap-4">
+                  {proposal.proposal_value > 0 && (
+                    <p className="text-white text-sm font-bold">${(proposal.proposal_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  )}
                   {proposal.total_gross_margin_percent && (
                     <p className="text-[#C8622A] text-sm font-semibold">{proposal.total_gross_margin_percent.toFixed(1)}%</p>
                   )}
