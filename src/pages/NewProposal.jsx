@@ -300,7 +300,7 @@ export default function NewProposal() {
       .select()
       .single()
 
-    if (error) { alert('Error saving proposal'); setSaving(false); return }
+    if (error) { alert('Error saving proposal: ' + error.message + ' | ' + JSON.stringify(error.details)); setSaving(false); return }
 
     const activeLines = tab === 'inline' ? lines : uploadedLines
     const validLines = activeLines.filter(l => l.item_name.trim() !== '')
