@@ -42,6 +42,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [orgProfiles, setOrgProfiles] = useState([])
   const [sharingProposal, setSharingProposal] = useState(false)
   const [clientAddress, setClientAddress] = useState('')
+  const [activity, setActivity] = useState([])
+  const [newActivityNote, setNewActivityNote] = useState('')
+  const [savingActivity, setSavingActivity] = useState(false)
   const [renewalDates, setRenewalDates] = useState({})
   const [savingRenewal, setSavingRenewal] = useState(false)
   const [showRenewalModal, setShowRenewalModal] = useState(false)
@@ -52,6 +55,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     fetchProposal()
     fetchLineItems()
     fetchProfile()
+    fetchActivity()
   }, [])
 
   const fetchProposal = async () => {
@@ -112,6 +116,35 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     }
   }
 
+  const fetchActivity = async () => {
+    const { data } = await supabase
+      .from('proposal_activity')
+      .select('*, profiles(full_name)')
+      .eq('proposal_id', id)
+      .order('created_at', { ascending: false })
+    setActivity(data || [])
+  }
+
+  const logActivity = async (event, type = 'auto') => {
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('proposal_activity').insert({
+      proposal_id: id,
+      org_id: proposal?.org_id,
+      user_id: user.id,
+      type,
+      event
+    })
+    fetchActivity()
+  }
+
+  const addManualActivity = async () => {
+    if (!newActivityNote.trim()) return
+    setSavingActivity(true)
+    await logActivity(newActivityNote.trim(), 'manual')
+    setNewActivityNote('')
+    setSavingActivity(false)
+  }
+
   const updateStatus = async (newStatus) => {
     // If marking as Won and there are recurring items without renewal dates, prompt first
     if (newStatus === 'Won') {
@@ -130,6 +163,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     }
     await supabase.from('proposals').update({ status: newStatus }).eq('id', id)
     setProposal(prev => ({ ...prev, status: newStatus }))
+    logActivity(`Status changed to ${newStatus}`)
   }
 
   const saveRenewalModalDates = async () => {
@@ -154,6 +188,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const updateCloseDate = async (newDate) => {
     await supabase.from('proposals').update({ close_date: newDate }).eq('id', id)
     setProposal(prev => ({ ...prev, close_date: newDate }))
+    logActivity(`Close date updated to ${newDate}`)
   }
 
   const generateSOW = async () => {
@@ -183,6 +218,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         })
       })
       await fetchProposal()
+      logActivity('Scope of Work generated')
     } catch (err) {
       console.log('SOW generation error:', err)
     }
@@ -638,6 +674,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     }
 
     await fetchLineItems()
+    logActivity(`Purchase Order ${finalPONumber} generated for ${poVendor}`)
     doc.save(`${finalPONumber} - ${poVendor}.pdf`)
     setShowPOModal(false)
     setGeneratingPO(false)
@@ -845,6 +882,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     await fetchLineItems()
     await fetchProposal()
+    logActivity(`BOM updated — ${validLines.length} line items`)
     setEditingBOM(false)
     setSaving(false)
   }
@@ -899,6 +937,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     await supabase.from('proposals').update({ collaborator_ids: newCollabs }).eq('id', id)
     setCollaborators(newCollabs)
     setProposal(prev => ({ ...prev, collaborator_ids: newCollabs }))
+
+    // Log share activity
+    const sharedWithProfile = orgProfiles.find(p => p.id === profileId)
+    if (!collaborators.includes(profileId) && sharedWithProfile) {
+      logActivity(`Deal shared with ${sharedWithProfile.full_name}`)
+    }
 
     // Notify new collaborator
     if (!collaborators.includes(profileId)) {
@@ -1127,6 +1171,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       })
 
       setProposal(prev => ({ ...prev, status: 'Sent' }))
+      logActivity(`Proposal sent to ${proposal.client_email}`)
       setShowSendModal(false)
       setSendForm({ subject: '', message: '' })
     } catch (err) {
@@ -1686,6 +1731,52 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             </div>
           </div>
         )}
+
+        {/* Activity Feed */}
+        <div className="bg-[#1a2d45] rounded-xl p-6">
+          <h3 className="text-white font-bold text-lg mb-4">Activity</h3>
+
+          {/* Manual entry */}
+          <div className="flex gap-2 mb-5">
+            <input
+              type="text"
+              value={newActivityNote}
+              onChange={e => setNewActivityNote(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addManualActivity()}
+              placeholder="Log a note, call, follow-up..."
+              className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
+            />
+            <button
+              onClick={addManualActivity}
+              disabled={savingActivity || !newActivityNote.trim()}
+              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+            >
+              Log
+            </button>
+          </div>
+
+          {/* Feed */}
+          {activity.length === 0 ? (
+            <p className="text-[#8A9AB0] text-sm">No activity yet. Changes and notes will appear here.</p>
+          ) : (
+            <div className="space-y-3">
+              {activity.map(item => (
+                <div key={item.id} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${item.type === 'manual' ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`} />
+                    <div className="w-px flex-1 bg-[#2a3d55] mt-1" />
+                  </div>
+                  <div className="pb-3 flex-1">
+                    <p className="text-white text-sm">{item.event}</p>
+                    <p className="text-[#8A9AB0] text-xs mt-0.5">
+                      {item.profiles?.full_name || 'System'} · {new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <POList proposalId={id} />
 
