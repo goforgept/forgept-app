@@ -8,7 +8,7 @@ import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } from 'docx'
 
-export default function ProposalDetail({ isAdmin, featureProposals = true, featureCRM = false }) {
+export default function ProposalDetail({ isAdmin, featureProposals = true, featureCRM = false, featureAiBom = false, featureSitePhotos = true }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [proposal, setProposal] = useState(null)
@@ -1456,12 +1456,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               >
                 ↓ Download DOCX
               </button>
-              <button
-                onClick={() => setShowPhotosModal(true)}
-                className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-2"
-              >
-                📷 Photos{photos.length > 0 ? ` (${photos.length})` : ''}
-              </button>
+              {featureSitePhotos && (
+                <button
+                  onClick={() => setShowPhotosModal(true)}
+                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-2"
+                >
+                  📷 Photos{photos.length > 0 ? ` (${photos.length})` : ''}
+                </button>
+              )}
               <button
                 onClick={generateSOW}
                 disabled={generatingSOW}
@@ -1531,12 +1533,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 >
                   Save as Template
                 </button>
-                <button
-                  onClick={() => setShowAIBOMModal(true)}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors"
-                >
-                  ✨ AI Build BOM
-                </button>
+                {featureAiBom && (
+                  <button
+                    onClick={() => setShowAIBOMModal(true)}
+                    className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors"
+                  >
+                    ✨ AI Build BOM
+                  </button>
+                )}
                 <button
                   onClick={startEditing}
                   className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors"

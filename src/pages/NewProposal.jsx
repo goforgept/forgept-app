@@ -13,7 +13,7 @@ const emptyLaborLine = () => ({
   role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: 0
 })
 
-export default function NewProposal() {
+export default function NewProposal({ featureAiBom = false }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [saving, setSaving] = useState(false)
@@ -562,12 +562,14 @@ export default function NewProposal() {
               </button>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={() => setShowAIBOMModal(true)}
-                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors"
-              >
-                ✨ AI Build BOM
-              </button>
+              {featureAiBom && (
+                <button
+                  onClick={() => setShowAIBOMModal(true)}
+                  className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors"
+                >
+                  ✨ AI Build BOM
+                </button>
+              )}
               {templates.length > 0 && (
                 <button
                   onClick={() => setShowTemplateModal(true)}

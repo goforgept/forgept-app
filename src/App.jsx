@@ -49,7 +49,7 @@ function App() {
     for (let i = 0; i < 5; i++) {
       const { data } = await supabase
         .from('profiles')
-        .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email)')
+        .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos)')
         .eq('id', userId)
         .single()
 
@@ -64,7 +64,7 @@ function App() {
 
     const { data } = await supabase
       .from('profiles')
-      .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email)')
+      .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos)')
       .eq('id', userId)
       .single()
     setProfile(data)
@@ -86,6 +86,10 @@ function App() {
   const featureCRM = profile?.organizations?.feature_crm || false
   const featureSendProposal = profile?.organizations?.feature_send_proposal || false
   const featureAiEmail = profile?.organizations?.feature_ai_email || false
+  const featurePurchaseOrders = profile?.organizations?.feature_purchase_orders !== false
+  const featureInvoices = profile?.organizations?.feature_invoices !== false
+  const featureAiBom = profile?.organizations?.feature_ai_bom || false
+  const featureSitePhotos = profile?.organizations?.feature_site_photos !== false
 
   if (session && isPending) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
@@ -107,7 +111,7 @@ function App() {
     </div>
   )
 
-  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail }
+  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail, featurePurchaseOrders, featureInvoices, featureAiBom, featureSitePhotos }
 
   return (
     <Routes>
@@ -122,7 +126,7 @@ function App() {
           />
           <Route path="/admin" element={<AdminDashboard {...sharedProps} />} />
           <Route path="/rep" element={<Dashboard {...sharedProps} />} />
-          <Route path="/new" element={<NewProposal />} />
+          <Route path="/new" element={<NewProposal featureAiBom={featureAiBom} />} />
           <Route path="/proposal/:id" element={<ProposalDetail {...sharedProps} />} />
           <Route path="/reps" element={<ManageReps {...sharedProps} />} />
           <Route path="/proposals" element={<Proposals {...sharedProps} />} />

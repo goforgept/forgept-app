@@ -33,6 +33,9 @@ export default function SuperAdmin() {
   const [stripeForm, setStripeForm] = useState({ plan: 'Solo', chargeOnboarding: true })
   const [creatingSubscription, setCreatingSubscription] = useState(false)
   const [stripeResult, setStripeResult] = useState(null)
+  const [deleteModal, setDeleteModal] = useState(null) // org to delete
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deletingOrg, setDeletingOrg] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => { fetchData() }, [])
@@ -90,6 +93,50 @@ export default function SuperAdmin() {
     fetchData()
   }
 
+  const deleteOrg = async () => {
+    if (!deleteModal || deleteConfirmText !== deleteModal.name) return
+    setDeletingOrg(true)
+    try {
+      const orgId = deleteModal.id
+      const orgProfiles = profiles.filter(p => p.org_id === orgId)
+      const profileIds = orgProfiles.map(p => p.id)
+
+      // Delete in order — cascade through related data
+      await supabase.from('proposal_activity').delete().eq('org_id', orgId)
+      await supabase.from('activities').delete().eq('org_id', orgId)
+      await supabase.from('manufacturer_order_items').delete().in('order_id',
+        (await supabase.from('manufacturer_orders').select('id').eq('org_id', orgId)).data?.map(o => o.id) || []
+      )
+      await supabase.from('manufacturer_orders').delete().eq('org_id', orgId)
+      await supabase.from('invoice_payments').delete().in('invoice_id',
+        (await supabase.from('invoices').select('id').eq('org_id', orgId)).data?.map(i => i.id) || []
+      )
+      await supabase.from('invoice_line_items').delete().in('invoice_id',
+        (await supabase.from('invoices').select('id').eq('org_id', orgId)).data?.map(i => i.id) || []
+      )
+      await supabase.from('invoices').delete().eq('org_id', orgId)
+      await supabase.from('purchase_orders').delete().eq('org_id', orgId)
+      await supabase.from('bom_line_items').delete().in('proposal_id',
+        (await supabase.from('proposals').select('id').eq('org_id', orgId)).data?.map(p => p.id) || []
+      )
+      await supabase.from('proposals').delete().eq('org_id', orgId)
+      await supabase.from('clients').delete().eq('org_id', orgId)
+      await supabase.from('targets').delete().eq('org_id', orgId)
+      await supabase.from('templates').delete().eq('org_id', orgId)
+      await supabase.from('client_emails').delete().eq('org_id', orgId)
+      await supabase.from('profiles').delete().eq('org_id', orgId)
+      await supabase.from('organizations').delete().eq('id', orgId)
+
+      setDeleteModal(null)
+      setDeleteConfirmText('')
+      fetchData()
+      alert(`Organization "${deleteModal.name}" and all data deleted.`)
+    } catch (err) {
+      alert('Error deleting org: ' + err.message)
+    }
+    setDeletingOrg(false)
+  }
+
   const startEditingOrg = (org) => {
     setEditingOrg(org.id)
     setOrgForm({
@@ -100,6 +147,8 @@ export default function SuperAdmin() {
       feature_ai_email: org.feature_ai_email || false,
       feature_purchase_orders: org.feature_purchase_orders !== false,
       feature_invoices: org.feature_invoices !== false,
+      feature_ai_bom: org.feature_ai_bom || false,
+      feature_site_photos: org.feature_site_photos !== false,
     })
   }
 
@@ -112,6 +161,8 @@ export default function SuperAdmin() {
       feature_ai_email: orgForm.feature_ai_email,
       feature_purchase_orders: orgForm.feature_purchase_orders,
       feature_invoices: orgForm.feature_invoices,
+      feature_ai_bom: orgForm.feature_ai_bom,
+      feature_site_photos: orgForm.feature_site_photos,
     }).eq('id', orgId)
     setEditingOrg(null)
     fetchData()
@@ -306,6 +357,7 @@ export default function SuperAdmin() {
                           <button onClick={() => isEditing ? setEditingOrg(null) : startEditingOrg(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">{isEditing ? 'Cancel' : 'Edit Settings'}</button>
                           {status === 'active' && <button onClick={() => suspendOrg(org.id)} className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors">Suspend</button>}
                           {status === 'suspended' && <button onClick={() => reactivateOrg(org.id)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">Reactivate</button>}
+                          <button onClick={() => { setDeleteModal(org); setDeleteConfirmText('') }} className="bg-red-900/30 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-900/50 transition-colors">Delete</button>
                         </div>
                       </div>
 
@@ -350,6 +402,14 @@ export default function SuperAdmin() {
                               <button onClick={() => setOrgForm(p => ({ ...p, feature_invoices: !p.feature_invoices }))}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_invoices ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
                                 <span>{orgForm.feature_invoices ? '✓' : '○'}</span> Invoices
+                              </button>
+                              <button onClick={() => setOrgForm(p => ({ ...p, feature_ai_bom: !p.feature_ai_bom }))}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_ai_bom ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                <span>{orgForm.feature_ai_bom ? '✓' : '○'}</span> AI BOM Builder
+                              </button>
+                              <button onClick={() => setOrgForm(p => ({ ...p, feature_site_photos: !p.feature_site_photos }))}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_site_photos ? 'border-blue-400 bg-blue-500/10 text-blue-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                <span>{orgForm.feature_site_photos ? '✓' : '○'}</span> Site Photos
                               </button>
                               <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold ${orgForm.feature_proposals && orgForm.feature_crm ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
                                 {orgForm.feature_proposals && orgForm.feature_crm ? '✓ Full Suite' : '○ Full Suite'}
@@ -437,6 +497,41 @@ export default function SuperAdmin() {
           </div>
         )}
       </div>
+
+      {/* Delete Org Modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+            <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+              <span className="text-red-400 text-xl">⚠</span>
+            </div>
+            <h3 className="text-white font-bold text-lg mb-1 text-center">Delete Organization</h3>
+            <p className="text-[#8A9AB0] text-sm mb-2 text-center">This will permanently delete <span className="text-white font-semibold">{deleteModal.name}</span> and all associated data:</p>
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 mb-4 text-xs text-red-400 space-y-1">
+              <p>• All proposals and BOM line items</p>
+              <p>• All clients and contacts</p>
+              <p>• All invoices and purchase orders</p>
+              <p>• All activity, tasks, and emails</p>
+              <p>• All user accounts for this org</p>
+              <p className="text-white font-semibold mt-2">This cannot be undone.</p>
+            </div>
+            <div className="mb-4">
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Type <span className="text-white font-mono">{deleteModal.name}</span> to confirm</label>
+              <input type="text" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder={deleteModal.name}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => { setDeleteModal(null); setDeleteConfirmText('') }}
+                className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+              <button onClick={deleteOrg} disabled={deletingOrg || deleteConfirmText !== deleteModal.name}
+                className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50">
+                {deletingOrg ? 'Deleting...' : 'Delete Everything'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {stripeModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
