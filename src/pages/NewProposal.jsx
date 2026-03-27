@@ -37,6 +37,10 @@ export default function NewProposal() {
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [loadingTemplates, setLoadingTemplates] = useState(false)
   const [templateSearch, setTemplateSearch] = useState('')
+  const [showAIBOMModal, setShowAIBOMModal] = useState(false)
+  const [aiBOMPrompt, setAIBOMPrompt] = useState('')
+  const [generatingBOM, setGeneratingBOM] = useState(false)
+  const [aiBOMPreview, setAIBOMPreview] = useState([])
 
   useEffect(() => {
     fetchProfileAndClients()
@@ -199,6 +203,51 @@ export default function NewProposal() {
 
   const addLaborLine = () => setLaborItems(prev => [...prev, emptyLaborLine()])
   const removeLaborLine = (index) => setLaborItems(prev => prev.filter((_, i) => i !== index))
+
+  const generateAIBOM = async () => {
+    if (!aiBOMPrompt.trim()) return
+    setGeneratingBOM(true)
+    setAIBOMPreview([])
+    try {
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-build-bom', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+        },
+        body: JSON.stringify({
+          description: aiBOMPrompt,
+          industry: form.industry || '',
+        })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setAIBOMPreview(data.items || [])
+    } catch (err) {
+      alert('Error generating BOM: ' + err.message)
+    }
+    setGeneratingBOM(false)
+  }
+
+  const applyAIBOM = () => {
+    const newLines = aiBOMPreview.map(item => ({
+      item_name: item.item_name,
+      part_number_sku: '',
+      quantity: String(item.quantity || '1'),
+      unit: item.unit || 'ea',
+      category: item.category || '',
+      vendor: '',
+      your_cost_unit: '',
+      markup_percent: '35',
+      customer_price_unit: '',
+      pricing_status: 'Needs Pricing'
+    }))
+    setLines(prev => [...prev.filter(l => l.item_name.trim() !== ''), ...newLines])
+    setShowAIBOMModal(false)
+    setAIBOMPrompt('')
+    setAIBOMPreview([])
+    setTab('inline')
+  }
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0]
@@ -512,14 +561,22 @@ export default function NewProposal() {
                 Upload Excel
               </button>
             </div>
-            {templates.length > 0 && (
+            <div className="flex gap-2">
               <button
-                onClick={() => setShowTemplateModal(true)}
-                className="flex items-center gap-2 bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors"
+                onClick={() => setShowAIBOMModal(true)}
+                className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors"
               >
-                📋 Load Template
+                ✨ AI Build BOM
               </button>
-            )}
+              {templates.length > 0 && (
+                <button
+                  onClick={() => setShowTemplateModal(true)}
+                  className="flex items-center gap-2 bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors"
+                >
+                  📋 Load Template
+                </button>
+              )}
+            </div>
           </div>
 
           {tab === 'inline' && (
@@ -792,6 +849,68 @@ export default function NewProposal() {
           </button>
         </div>
       </div>
+
+      {/* AI BOM Builder Modal */}
+      {showAIBOMModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            <h3 className="text-white font-bold text-lg mb-1">✨ AI BOM Builder</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">Describe the system or project and AI will generate a complete parts list. You'll review before adding.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Describe the system you need</label>
+                <textarea value={aiBOMPrompt} onChange={e => setAIBOMPrompt(e.target.value)}
+                  rows={3} placeholder="e.g. 8 camera outdoor commercial security system with NVR, remote access, and PoE switch. No specific brands."
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+              </div>
+              <button onClick={generateAIBOM} disabled={generatingBOM || !aiBOMPrompt.trim()}
+                className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
+                {generatingBOM ? '✨ Building BOM...' : '✨ Generate BOM'}
+              </button>
+
+              {aiBOMPreview.length > 0 && (
+                <div>
+                  <p className="text-white text-sm font-semibold mb-2">{aiBOMPreview.length} items generated — review before adding</p>
+                  <div className="bg-[#0F1C2E] rounded-xl overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-[#2a3d55]">
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Item</th>
+                          <th className="text-[#8A9AB0] text-right py-2 px-3 font-normal">Qty</th>
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Unit</th>
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Category</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {aiBOMPreview.map((item, i) => (
+                          <tr key={i} className="border-b border-[#2a3d55]/30">
+                            <td className="text-white py-2 px-3">{item.item_name}</td>
+                            <td className="text-[#8A9AB0] py-2 px-3 text-right">{item.quantity}</td>
+                            <td className="text-[#8A9AB0] py-2 px-3">{item.unit}</td>
+                            <td className="text-[#8A9AB0] py-2 px-3">{item.category}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[#8A9AB0] text-xs mt-2">Items will be added to your BOM. Add your costs and markup after.</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setShowAIBOMModal(false); setAIBOMPreview([]); setAIBOMPrompt('') }}
+                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                {aiBOMPreview.length > 0 && (
+                  <button onClick={applyAIBOM}
+                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                    Add {aiBOMPreview.length} Items to BOM →
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Template Modal */}
       {showTemplateModal && (

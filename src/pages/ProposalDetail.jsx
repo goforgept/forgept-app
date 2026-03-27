@@ -56,12 +56,20 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [showRenewalModal, setShowRenewalModal] = useState(false)
   const [pendingRenewalItems, setPendingRenewalItems] = useState([])
   const [pendingRenewalDates, setPendingRenewalDates] = useState({})
+  const [showAIBOMModal, setShowAIBOMModal] = useState(false)
+  const [aiBOMPrompt, setAIBOMPrompt] = useState('')
+  const [generatingBOM, setGeneratingBOM] = useState(false)
+  const [aiBOMPreview, setAIBOMPreview] = useState([])
+  const [photos, setPhotos] = useState([])
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [showPhotosModal, setShowPhotosModal] = useState(false)
 
   useEffect(() => {
     fetchProposal()
     fetchLineItems()
     fetchProfile()
     fetchActivity()
+    fetchPhotos()
   }, [])
 
   const fetchProposal = async () => {
@@ -1047,6 +1055,104 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setCreatingOrder(false)
   }
 
+  const fetchPhotos = async () => {
+    const { data } = await supabase.from('proposal_photos').select('*').eq('proposal_id', id).order('created_at', { ascending: true })
+    setPhotos(data || [])
+  }
+
+  const generateAIBOM = async () => {
+    if (!aiBOMPrompt.trim()) return
+    setGeneratingBOM(true)
+    setAIBOMPreview([])
+    try {
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-build-bom', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+        },
+        body: JSON.stringify({
+          description: aiBOMPrompt,
+          industry: proposal?.industry || '',
+        })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setAIBOMPreview(data.items || [])
+    } catch (err) {
+      alert('Error generating BOM: ' + err.message)
+    }
+    setGeneratingBOM(false)
+  }
+
+  const applyAIBOM = async () => {
+    if (aiBOMPreview.length === 0) return
+    // Merge with existing line items — start editing mode with AI items appended
+    const newLines = aiBOMPreview.map(item => ({
+      proposal_id: id,
+      item_name: item.item_name,
+      part_number_sku: '',
+      quantity: item.quantity,
+      unit: item.unit || 'ea',
+      category: item.category || '',
+      vendor: item.vendor || '',
+      your_cost_unit: '',
+      markup_percent: '35',
+      customer_price_unit: '',
+      customer_price_total: '',
+      pricing_status: 'Needs Pricing',
+      recurring: false
+    }))
+    setEditLines([...lineItems.map(l => ({ ...l })), ...newLines])
+    setEditingBOM(true)
+    setShowAIBOMModal(false)
+    setAIBOMPrompt('')
+    setAIBOMPreview([])
+    logActivity(`AI BOM generated — ${aiBOMPreview.length} items added`)
+  }
+
+  const uploadPhoto = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingPhoto(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${id}/${Date.now()}.${fileExt}`
+      const { error: uploadError } = await supabase.storage
+        .from('proposal-photos')
+        .upload(fileName, file, { upsert: false })
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage.from('proposal-photos').getPublicUrl(fileName)
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('proposal_photos').insert({
+        proposal_id: id,
+        org_id: proposal?.org_id,
+        user_id: user.id,
+        url: urlData.publicUrl,
+        caption: ''
+      })
+      await fetchPhotos()
+      logActivity(`Site photo added`)
+    } catch (err) {
+      alert('Error uploading photo: ' + err.message)
+    }
+    setUploadingPhoto(false)
+  }
+
+  const deletePhoto = async (photoId, url) => {
+    if (!window.confirm('Delete this photo?')) return
+    const path = url.split('/proposal-photos/')[1]
+    await supabase.storage.from('proposal-photos').remove([path])
+    await supabase.from('proposal_photos').delete().eq('id', photoId)
+    await fetchPhotos()
+  }
+
+  const updatePhotoCaption = async (photoId, caption) => {
+    await supabase.from('proposal_photos').update({ caption }).eq('id', photoId)
+    setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, caption } : p))
+  }
+
   const generatePDFDoc = () => {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
@@ -1351,6 +1457,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 ↓ Download DOCX
               </button>
               <button
+                onClick={() => setShowPhotosModal(true)}
+                className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-2"
+              >
+                📷 Photos{photos.length > 0 ? ` (${photos.length})` : ''}
+              </button>
+              <button
                 onClick={generateSOW}
                 disabled={generatingSOW}
                 className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
@@ -1418,6 +1530,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors"
                 >
                   Save as Template
+                </button>
+                <button
+                  onClick={() => setShowAIBOMModal(true)}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors"
+                >
+                  ✨ AI Build BOM
                 </button>
                 <button
                   onClick={startEditing}
@@ -1876,6 +1994,111 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         <POList proposalId={id} />
 
       </div>
+
+      {/* AI BOM Builder Modal */}
+      {showAIBOMModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            <h3 className="text-white font-bold text-lg mb-1">✨ AI BOM Builder</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">Describe the system or project and AI will generate a complete parts list. You'll review before adding.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Describe the system you need</label>
+                <textarea value={aiBOMPrompt} onChange={e => setAIBOMPrompt(e.target.value)}
+                  rows={3} placeholder="e.g. 8 camera outdoor commercial security system with NVR, remote access, and PoE switch. No specific brands."
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+              </div>
+              <button onClick={generateAIBOM} disabled={generatingBOM || !aiBOMPrompt.trim()}
+                className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
+                {generatingBOM ? '✨ Building BOM...' : '✨ Generate BOM'}
+              </button>
+
+              {aiBOMPreview.length > 0 && (
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-white text-sm font-semibold">{aiBOMPreview.length} items generated — review before adding</p>
+                  </div>
+                  <div className="bg-[#0F1C2E] rounded-xl overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-[#2a3d55]">
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Item</th>
+                          <th className="text-[#8A9AB0] text-right py-2 px-3 font-normal">Qty</th>
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Unit</th>
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Category</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {aiBOMPreview.map((item, i) => (
+                          <tr key={i} className="border-b border-[#2a3d55]/30">
+                            <td className="text-white py-2 px-3">{item.item_name}</td>
+                            <td className="text-[#8A9AB0] py-2 px-3 text-right">{item.quantity}</td>
+                            <td className="text-[#8A9AB0] py-2 px-3">{item.unit}</td>
+                            <td className="text-[#8A9AB0] py-2 px-3">{item.category}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[#8A9AB0] text-xs mt-2">Items will be added to your BOM in Edit mode. Add your costs and markup after.</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setShowAIBOMModal(false); setAIBOMPreview([]); setAIBOMPrompt('') }}
+                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                {aiBOMPreview.length > 0 && (
+                  <button onClick={applyAIBOM}
+                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                    Add {aiBOMPreview.length} Items to BOM →
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Site Photos Modal */}
+      {showPhotosModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <h3 className="text-white font-bold text-lg">📷 Site Photos</h3>
+                <p className="text-[#8A9AB0] text-sm mt-0.5">Attach job site photos to this proposal</p>
+              </div>
+              <label className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors cursor-pointer">
+                {uploadingPhoto ? 'Uploading...' : '+ Upload Photo'}
+                <input type="file" accept="image/*" onChange={uploadPhoto} className="hidden" disabled={uploadingPhoto} />
+              </label>
+            </div>
+
+            {photos.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed border-[#2a3d55] rounded-xl">
+                <p className="text-[#8A9AB0] text-lg mb-2">📷</p>
+                <p className="text-[#8A9AB0] text-sm">No photos yet. Upload site photos to attach to this proposal.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {photos.map(photo => (
+                  <div key={photo.id} className="bg-[#0F1C2E] rounded-xl overflow-hidden">
+                    <img src={photo.url} alt={photo.caption || 'Site photo'} className="w-full h-48 object-cover" />
+                    <div className="p-3 flex items-center gap-2">
+                      <input type="text" value={photo.caption || ''} placeholder="Add caption..."
+                        onChange={e => updatePhotoCaption(photo.id, e.target.value)}
+                        onBlur={e => updatePhotoCaption(photo.id, e.target.value)}
+                        className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                      <button onClick={() => deletePhoto(photo.id, photo.url)} className="text-red-400 hover:text-red-300 text-xs">✕</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setShowPhotosModal(false)} className="mt-5 w-full py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Done</button>
+          </div>
+        </div>
+      )}
 
       {/* Convert to Order Modal */}
       {showOrderModal && (
