@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import NotificationBell from './NotificationBell'
 
-export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false }) {
+export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true }) {
   const location = useLocation()
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
@@ -43,11 +43,11 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
       { label: 'Proposals', path: '/proposals', icon: '📋' },
       ...(orgType !== 'manufacturer' ? [{ label: 'Templates', path: '/templates', icon: '📋' }] : []),
     ] : []),
-    { label: 'Invoices', path: '/invoices', icon: '🧾' },
+    ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
     { label: 'Clients', path: '/clients', icon: '🏢' },
     ...(featureProposals && orgType !== 'manufacturer' ? [
       { label: 'Vendors', path: '/vendors', icon: '🏭' },
-      { label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' },
+      ...(featurePurchaseOrders ? [{ label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' }] : []),
     ] : []),
     ...(orgType === 'manufacturer' ? [{ label: 'Orders', path: '/orders', icon: '📦' }] : []),
     { label: 'Team', path: '/reps', icon: '👥' },
@@ -66,7 +66,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
       { label: 'Proposals', path: '/proposals', icon: '📋' },
       { label: 'New Proposal', path: '/new', icon: '➕' },
     ] : []),
-    { label: 'Invoices', path: '/invoices', icon: '🧾' },
+    ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
     { label: 'Clients', path: '/clients', icon: '🏢' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },
     { label: 'Help', path: '/faq', icon: '❓' },

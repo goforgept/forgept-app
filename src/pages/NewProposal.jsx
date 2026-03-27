@@ -281,7 +281,20 @@ export default function NewProposal() {
       .single()
 
     const params = new URLSearchParams(location.search)
-    const clientId = params.get('clientId') || selectedClientId
+    let clientId = params.get('clientId') || selectedClientId
+
+    // Auto-create client if no existing client selected and company is filled in
+    if (!clientId && form.company) {
+      const { data: newClient } = await supabase.from('clients').insert({
+        org_id: profile?.org_id,
+        company: form.company,
+        client_name: form.client_name || '',
+        email: form.client_email || '',
+        industry: form.industry || '',
+        active: true
+      }).select().single()
+      if (newClient) clientId = newClient.id
+    }
 
     const { data: proposal, error } = await supabase
       .from('proposals')

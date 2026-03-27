@@ -98,6 +98,8 @@ export default function SuperAdmin() {
       feature_crm: org.feature_crm || false,
       feature_send_proposal: org.feature_send_proposal || false,
       feature_ai_email: org.feature_ai_email || false,
+      feature_purchase_orders: org.feature_purchase_orders !== false,
+      feature_invoices: org.feature_invoices !== false,
     })
   }
 
@@ -108,6 +110,8 @@ export default function SuperAdmin() {
       feature_crm: orgForm.feature_crm,
       feature_send_proposal: orgForm.feature_send_proposal,
       feature_ai_email: orgForm.feature_ai_email,
+      feature_purchase_orders: orgForm.feature_purchase_orders,
+      feature_invoices: orgForm.feature_invoices,
     }).eq('id', orgId)
     setEditingOrg(null)
     fetchData()
@@ -294,6 +298,8 @@ export default function SuperAdmin() {
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_crm ? '✓ CRM' : '✗ CRM'}</span>
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_send_proposal ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_send_proposal ? '✓ Send Proposal' : '✗ Send Proposal'}</span>
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_ai_email ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_ai_email ? '✓ AI Email' : '✗ AI Email'}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${org.feature_purchase_orders !== false ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_purchase_orders !== false ? '✓ POs' : '✗ POs'}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${org.feature_invoices !== false ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_invoices !== false ? '✓ Invoices' : '✗ Invoices'}</span>
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -336,6 +342,14 @@ export default function SuperAdmin() {
                               <button onClick={() => setOrgForm(p => ({ ...p, feature_ai_email: !p.feature_ai_email }))}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_ai_email ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
                                 <span>{orgForm.feature_ai_email ? '✓' : '○'}</span> AI Email Writer
+                              </button>
+                              <button onClick={() => setOrgForm(p => ({ ...p, feature_purchase_orders: !p.feature_purchase_orders }))}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_purchase_orders ? 'border-blue-400 bg-blue-500/10 text-blue-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                <span>{orgForm.feature_purchase_orders ? '✓' : '○'}</span> Purchase Orders
+                              </button>
+                              <button onClick={() => setOrgForm(p => ({ ...p, feature_invoices: !p.feature_invoices }))}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_invoices ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                <span>{orgForm.feature_invoices ? '✓' : '○'}</span> Invoices
                               </button>
                               <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold ${orgForm.feature_proposals && orgForm.feature_crm ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
                                 {orgForm.feature_proposals && orgForm.feature_crm ? '✓ Full Suite' : '○ Full Suite'}
@@ -390,6 +404,8 @@ export default function SuperAdmin() {
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_crm ? '✓ CRM' : '✗ CRM'}</span>
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_send_proposal ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_send_proposal ? '✓ Send Proposal' : '✗ Send Proposal'}</span>
                             <span className={`text-xs px-2 py-0.5 rounded ${org.feature_ai_email ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_ai_email ? '✓ AI Email' : '✗ AI Email'}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${org.feature_purchase_orders !== false ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_purchase_orders !== false ? '✓ POs' : '✗ POs'}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${org.feature_invoices !== false ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_invoices !== false ? '✓ Invoices' : '✗ Invoices'}</span>
                           </div>
                           {hasStripe && <p className="text-green-400 text-xs mt-1">✓ Stripe connected</p>}
                         </div>
