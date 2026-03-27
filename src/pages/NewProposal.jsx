@@ -230,7 +230,11 @@ export default function NewProposal({ featureAiBom = false }) {
   }
 
   const applyAIBOM = () => {
-    const newLines = aiBOMPreview.map(item => ({
+    const laborAI = aiBOMPreview.filter(i => i.category === 'Labor')
+    const materialsAI = aiBOMPreview.filter(i => i.category !== 'Labor')
+
+    // Materials into BOM
+    const newLines = materialsAI.map(item => ({
       item_name: item.item_name,
       part_number_sku: '',
       quantity: String(item.quantity || '1'),
@@ -243,6 +247,23 @@ export default function NewProposal({ featureAiBom = false }) {
       pricing_status: 'Needs Pricing'
     }))
     setLines(prev => [...prev.filter(l => l.item_name.trim() !== ''), ...newLines])
+
+    // Labor into labor table
+    if (laborAI.length > 0) {
+      const newLaborItems = laborAI.map(item => ({
+        role: item.item_name,
+        quantity: String(item.quantity || ''),
+        unit: item.unit === 'hr' ? 'hr' : item.unit === 'day' ? 'day' : 'lot',
+        your_cost: '',
+        markup: 35,
+        customer_price: 0
+      }))
+      setLaborItems(prev => {
+        const existing = prev.filter(l => l.role)
+        return [...existing, ...newLaborItems]
+      })
+    }
+
     setShowAIBOMModal(false)
     setAIBOMPrompt('')
     setAIBOMPreview([])

@@ -1087,15 +1087,20 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
   const applyAIBOM = async () => {
     if (aiBOMPreview.length === 0) return
-    // Merge with existing line items — start editing mode with AI items appended
-    const newLines = aiBOMPreview.map(item => ({
+
+    // Split labor vs materials
+    const laborAI = aiBOMPreview.filter(i => i.category === 'Labor')
+    const materialsAI = aiBOMPreview.filter(i => i.category !== 'Labor')
+
+    // Materials go into BOM edit mode
+    const newLines = materialsAI.map(item => ({
       proposal_id: id,
       item_name: item.item_name,
       part_number_sku: '',
       quantity: item.quantity,
       unit: item.unit || 'ea',
       category: item.category || '',
-      vendor: item.vendor || '',
+      vendor: '',
       your_cost_unit: '',
       markup_percent: '35',
       customer_price_unit: '',
@@ -1104,11 +1109,28 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       recurring: false
     }))
     setEditLines([...lineItems.map(l => ({ ...l })), ...newLines])
+
+    // Labor items go into labor table
+    if (laborAI.length > 0) {
+      const newLaborItems = laborAI.map(item => ({
+        role: item.item_name,
+        quantity: String(item.quantity),
+        unit: item.unit === 'hr' ? 'hr' : item.unit === 'day' ? 'day' : 'lot',
+        your_cost: '',
+        markup: 35,
+        customer_price: 0
+      }))
+      setLaborItems(prev => {
+        const existing = prev.filter(l => l.role)
+        return [...existing, ...newLaborItems]
+      })
+    }
+
     setEditingBOM(true)
     setShowAIBOMModal(false)
     setAIBOMPrompt('')
     setAIBOMPreview([])
-    logActivity(`AI BOM generated — ${aiBOMPreview.length} items added`)
+    logActivity(`AI BOM generated — ${materialsAI.length} materials, ${laborAI.length} labor items added`)
   }
 
   const uploadPhoto = async (e) => {
