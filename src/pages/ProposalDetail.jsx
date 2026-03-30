@@ -86,7 +86,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number')
       .eq('id', id)
       .single()
 
@@ -1392,6 +1392,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
     doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
+    if (proposal?.quote_number) doc.text(`Quote #: ${proposal.quote_number}`, 14, 72)
     if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, 72)
     doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, clientAddress ? 79 : 72)
 
@@ -1625,7 +1626,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
+                {proposal?.quote_number && (
+                  <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs px-2 py-1 rounded-lg font-mono">{proposal.quote_number}</span>
+                )}
+              </div>
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-[#8A9AB0]">{proposal?.company} · {proposal?.client_name}</p>
                 <button onClick={openEditClientModal} className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors" title="Edit client info">✏️</button>

@@ -246,6 +246,14 @@ export default function NewProposal({ featureAiBom = false }) {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+
+    // Auto-generate quote number
+    let quoteNumber = ''
+    if (profile?.org_id) {
+      const { data: org } = await supabase.from('organizations').select('quote_counter').eq('id', profile.org_id).single()
+      quoteNumber = `Q-${org.quote_counter}`
+      await supabase.from('organizations').update({ quote_counter: org.quote_counter + 1 }).eq('id', profile.org_id)
+    }
     const params = new URLSearchParams(location.search)
     let clientId = params.get('clientId') || selectedClientId
     if (!clientId && form.company) {
@@ -260,7 +268,7 @@ export default function NewProposal({ featureAiBom = false }) {
       client_id: clientId || null, location_id: selectedLocationId || null, rep_name: form.rep_name, rep_email: form.rep_email,
       client_name: form.client_name, company: form.company, client_email: form.client_email,
       close_date: form.close_date, industry: form.industry, job_description: form.job_description,
-      status: 'Draft', submission_type: tab, labor_items: laborItems
+      status: 'Draft', submission_type: tab, labor_items: laborItems, quote_number: quoteNumber
     }).select().single()
     if (error) { alert('Error saving proposal: ' + error.message); setSaving(false); return }
     const activeLines = tab === 'inline' ? lines : uploadedLines
