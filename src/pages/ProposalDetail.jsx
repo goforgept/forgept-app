@@ -134,7 +134,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     if (data?.org_id) {
       const { data: teamData } = await supabase.from('profiles').select('id, full_name, email').eq('org_id', data.org_id)
       setOrgProfiles(teamData || [])
-      const { data: vendorData } = await supabase.from('vendors').select('id, vendor_name, default_markup_percent').eq('org_id', data.org_id).eq('active', true).order('vendor_name')
+      const { data: vendorData } = await supabase.from('vendors').select('id, vendor_name, default_markup_percent, contact_email').eq('org_id', data.org_id).eq('active', true).order('vendor_name')
       setVendors(vendorData || [])
     }
   }
@@ -265,7 +265,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     }, {})
     // Init vendor data with empty emails and Excel unchecked
     const initData = {}
-    Object.keys(byVendor).forEach(v => { initData[v] = { email: '', attachExcel: false } })
+    Object.keys(byVendor).forEach(v => {
+      const vendorRecord = vendors.find(vr => vr.vendor_name === v)
+      initData[v] = { email: vendorRecord?.contact_email || '', attachExcel: false }
+    })
     setRfqVendorData(initData)
     setShowRFQModal(true)
   }
