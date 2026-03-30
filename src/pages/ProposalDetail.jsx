@@ -1018,6 +1018,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         lineItems.map(l => ({
           template_id: template.id,
           item_name: l.item_name,
+          manufacturer: l.manufacturer || null,
           part_number_sku: l.part_number_sku,
           quantity: l.quantity,
           unit: l.unit,

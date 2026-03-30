@@ -41,6 +41,18 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     ])
 
     setProposals(proposalsRes.data || [])
+
+    // Expired pricing check
+    const today = new Date().toISOString().split('T')[0]
+    const { data: expiredItems } = await supabase
+      .from('bom_line_items')
+      .select('proposal_id')
+      .eq('pricing_status', 'RFQ Sent')
+      .lt('rfq_expires_at', today)
+      .not('rfq_expires_at', 'is', null)
+    const uniqueExpired = [...new Set((expiredItems || []).map(i => i.proposal_id))]
+    setExpiredPricingCount(uniqueExpired.length)
+    setExpiredPricingProposals(uniqueExpired)
     setLineItems(lineItemsRes.data || [])
     setClients(clientsRes.data || [])
     setProfiles(profilesRes.data || [])
@@ -165,6 +177,9 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       return Math.floor((new Date() - new Date(p.created_at)) / (1000 * 60 * 60 * 24)) >= 3
     }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
   , [proposals])
+
+  const [expiredPricingCount, setExpiredPricingCount] = useState(0)
+  const [expiredPricingProposals, setExpiredPricingProposals] = useState([])
 
   const laborStats = useMemo(() => {
     const getLaborTotal = (ps) => ps.reduce((sum, p) => sum + (p.labor_items || []).reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0), 0)
@@ -312,6 +327,19 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         </div>
 
         {/* Needs Attention */}
+        {!loading && expiredPricingCount > 0 && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="text-red-400">⚠</span>
+                <div>
+                  <p className="text-white font-semibold text-sm">Pricing Expired</p>
+                  <p className="text-red-400 text-xs">{expiredPricingCount} proposal{expiredPricingCount !== 1 ? 's' : ''} have expired RFQ pricing — re-quote vendors</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {!loading && needsAttention.length > 0 && (
           <div className="bg-[#1a2d45] border border-yellow-500/30 rounded-xl p-5 mb-6">
             <div className="flex items-center gap-2 mb-4">
