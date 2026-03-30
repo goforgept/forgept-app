@@ -645,8 +645,19 @@ export default function NewProposal({ featureAiBom = false }) {
                 </button>
                 <p className="text-[#8A9AB0] text-sm">Download the template, fill it in, then upload it below.</p>
               </div>
-              <label className="block w-full border-2 border-dashed border-[#2a3d55] rounded-xl p-8 text-center cursor-pointer hover:border-[#C8622A] transition-colors">
+              <label
+                  className="block w-full border-2 border-dashed border-[#2a3d55] rounded-xl p-8 text-center cursor-pointer hover:border-[#C8622A] transition-colors"
+                  onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add('border-[#C8622A]') }}
+                  onDragLeave={e => e.currentTarget.classList.remove('border-[#C8622A]')}
+                  onDrop={e => {
+                    e.preventDefault()
+                    e.currentTarget.classList.remove('border-[#C8622A]')
+                    const file = e.dataTransfer.files[0]
+                    if (file) handleFileUpload({ target: { files: [file] } })
+                  }}
+                >
                 <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" />
+
                 {uploadFileName ? (
                   <div>
                     <p className="text-green-400 font-semibold">{uploadFileName}</p>
