@@ -1150,38 +1150,57 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       client_name: proposal?.client_name || '',
       company: proposal?.company || '',
       client_email: proposal?.client_email || '',
+      client_id: proposal?.client_id || '',
     })
-    // Fetch clients for re-linking
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-    const { data: clientsData } = await supabase.from('clients').select('id, company, client_name').eq('org_id', profileData.org_id).order('company', { ascending: true })
+    const { data: clientsData } = await supabase.from('clients').select('id, company, client_name, email').eq('org_id', profileData.org_id).order('company', { ascending: true })
     setAllClients(clientsData || [])
     setShowEditClientModal(true)
   }
 
   const saveClientInfo = async () => {
     setSavingClient(true)
-    // Update proposal fields
+
+    const selectedClientId = editClientForm.client_id || null
+
+    // If linking to a client, pre-fill fields from that client record
+    let finalForm = { ...editClientForm }
+    if (selectedClientId && selectedClientId !== proposal?.client_id) {
+      const found = allClients.find(c => c.id === selectedClientId)
+      if (found) {
+        finalForm = {
+          ...finalForm,
+          client_name: found.client_name || finalForm.client_name,
+          company: found.company || finalForm.company,
+          client_email: found.email || finalForm.client_email,
+        }
+      }
+    }
+
+    // Update proposal
     await supabase.from('proposals').update({
-      client_name: editClientForm.client_name,
-      company: editClientForm.company,
-      client_email: editClientForm.client_email,
+      client_id: selectedClientId,
+      client_name: finalForm.client_name,
+      company: finalForm.company,
+      client_email: finalForm.client_email,
     }).eq('id', id)
 
-    // If linked to a client record, update that too
-    if (proposal?.client_id) {
+    // If linked to a client, update the client record too
+    if (selectedClientId) {
       await supabase.from('clients').update({
-        client_name: editClientForm.client_name,
-        company: editClientForm.company,
-        email: editClientForm.client_email,
-      }).eq('id', proposal.client_id)
+        client_name: finalForm.client_name,
+        company: finalForm.company,
+        email: finalForm.client_email,
+      }).eq('id', selectedClientId)
     }
 
     setProposal(prev => ({
       ...prev,
-      client_name: editClientForm.client_name,
-      company: editClientForm.company,
-      client_email: editClientForm.client_email,
+      client_id: selectedClientId,
+      client_name: finalForm.client_name,
+      company: finalForm.company,
+      client_email: finalForm.client_email,
     }))
     logActivity('Client info updated')
     setShowEditClientModal(false)
@@ -2320,10 +2339,37 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
             <h3 className="text-white font-bold text-lg mb-1">Edit Client Info</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">
-              {proposal?.client_id ? 'Updates both this proposal and the linked client record.' : 'Updates this proposal only — no client record linked.'}
-            </p>
+            <p className="text-[#8A9AB0] text-sm mb-5">Link to an existing client or edit the contact details directly.</p>
             <div className="space-y-3">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Link to Client Record</label>
+                <select
+                  value={editClientForm.client_id || ''}
+                  onChange={e => {
+                    const cid = e.target.value
+                    const found = allClients.find(c => c.id === cid)
+                    setEditClientForm(p => ({
+                      ...p,
+                      client_id: cid,
+                      // Auto-fill fields when selecting a client
+                      ...(found ? {
+                        company: found.company || p.company,
+                        client_name: found.client_name || p.client_name,
+                        client_email: found.email || p.client_email,
+                      } : {})
+                    }))
+                  }}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                >
+                  <option value="">— No client linked —</option>
+                  {allClients.map(c => (
+                    <option key={c.id} value={c.id}>{c.company}{c.client_name ? ` — ${c.client_name}` : ''}</option>
+                  ))}
+                </select>
+                {editClientForm.client_id && (
+                  <p className="text-green-400 text-xs mt-1">✓ Linked — changes below will also update the client record</p>
+                )}
+              </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Company</label>
                 <input type="text" value={editClientForm.company}
