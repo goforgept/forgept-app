@@ -4,7 +4,7 @@ import { supabase } from '../supabase'
 import * as XLSX from 'xlsx'
 
 const emptyLine = () => ({
-  item_name: '', part_number_sku: '', quantity: '', unit: 'ea',
+  item_name: '', manufacturer: '', part_number_sku: '', quantity: '', unit: 'ea',
   category: '', vendor: '', your_cost_unit: '', markup_percent: '35',
   customer_price_unit: '', pricing_status: 'Needs Pricing'
 })
@@ -478,7 +478,7 @@ export default function NewProposal({ featureAiBom = false }) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[#2a3d55]">
-                      {['Item Name', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ''].map(h => (
+                      {['Item Name', 'Mfr', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ''].map(h => (
                         <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
                       ))}
                     </tr>
@@ -486,7 +486,7 @@ export default function NewProposal({ featureAiBom = false }) {
                   <tbody>
                     {lines.map((line, i) => (
                       <tr key={i} className={`border-b border-[#2a3d55]/30 ${line.your_cost_unit ? 'bg-green-500/5' : ''}`}>
-                        {[['item_name', 'text', 'Item name'], ['part_number_sku', 'text', 'Part #'], ['quantity', 'number', 'Qty']].map(([field, type, placeholder]) => (
+                        {[['item_name', 'text', 'Item name'], ['manufacturer', 'text', 'Mfr'], ['part_number_sku', 'text', 'Part #'], ['quantity', 'number', 'Qty']].map(([field, type, placeholder]) => (
                           <td key={field} className="pr-2 py-1">
                             <input type={type} placeholder={placeholder} value={line[field]}
                               onChange={e => updateLine(i, field, e.target.value)}
