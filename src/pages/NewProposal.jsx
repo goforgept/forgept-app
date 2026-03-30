@@ -673,10 +673,13 @@ export default function NewProposal({ featureAiBom = false }) {
               {uploadedLines.length > 0 && (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead>
+                   <thead>
                       <tr className="border-b border-[#2a3d55]">
                         <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Item</th>
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Mfr</th>
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Part #</th>
                         <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Qty</th>
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Category</th>
                         <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Vendor</th>
                         <th className="text-[#8A9AB0] text-right py-2 font-normal text-xs">Customer Price</th>
                       </tr>
@@ -685,8 +688,11 @@ export default function NewProposal({ featureAiBom = false }) {
                       {uploadedLines.map((line, i) => (
                         <tr key={i} className="border-b border-[#2a3d55]/30">
                           <td className="text-white py-2 pr-4">{line.item_name}</td>
+                          <td className="text-[#8A9AB0] py-2 pr-4">{line.manufacturer || '—'}</td>
+                          <td className="text-[#8A9AB0] py-2 pr-4">{line.part_number_sku || '—'}</td>
                           <td className="text-[#8A9AB0] py-2 pr-4">{line.quantity}</td>
-                          <td className="text-[#8A9AB0] py-2 pr-4">{line.vendor}</td>
+                          <td className="text-[#8A9AB0] py-2 pr-4">{line.category || '—'}</td>
+                          <td className="text-[#8A9AB0] py-2 pr-4">{line.vendor || '—'}</td>
                           <td className="text-white py-2 text-right">{line.customer_price_unit || '—'}</td>
                         </tr>
                       ))}
