@@ -49,7 +49,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [orderExpectedShip, setOrderExpectedShip] = useState('')
   const [creatingOrder, setCreatingOrder] = useState(false)
   const [activity, setActivity] = useState([])
-  const [vendors, setVendors] = useState([])
   const [newActivityNote, setNewActivityNote] = useState('')
   const [savingActivity, setSavingActivity] = useState(false)
   const [renewalDates, setRenewalDates] = useState({})
@@ -68,6 +67,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showPhotosModal, setShowPhotosModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showEditClientModal, setShowEditClientModal] = useState(false)
+  const [editClientForm, setEditClientForm] = useState({ client_name: '', company: '', client_email: '' })
+  const [savingClient, setSavingClient] = useState(false)
+  const [allClients, setAllClients] = useState([])
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deletingProposal, setDeletingProposal] = useState(false)
 
@@ -134,8 +137,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     if (data?.org_id) {
       const { data: teamData } = await supabase.from('profiles').select('id, full_name, email').eq('org_id', data.org_id)
       setOrgProfiles(teamData || [])
-      const { data: vendorData } = await supabase.from('vendors').select('id, vendor_name, default_markup_percent, contact_email').eq('org_id', data.org_id).eq('active', true).order('vendor_name')
-      setVendors(vendorData || [])
     }
   }
 
@@ -265,10 +266,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     }, {})
     // Init vendor data with empty emails and Excel unchecked
     const initData = {}
-    Object.keys(byVendor).forEach(v => {
-      const vendorRecord = vendors.find(vr => vr.vendor_name === v)
-      initData[v] = { email: vendorRecord?.contact_email || '', attachExcel: false }
-    })
+    Object.keys(byVendor).forEach(v => { initData[v] = { email: '', attachExcel: false } })
     setRfqVendorData(initData)
     setShowRFQModal(true)
   }
@@ -836,7 +834,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         return {
           proposal_id: id,
           item_name: itemName,
-          manufacturer: r['Manufacturer'] || r['manufacturer'] || r['Mfr'] || r['mfr'] || '',
           part_number_sku: partNum,
           quantity: qty || '1',
           unit: unit || 'ea',
@@ -1146,6 +1143,49 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       alert('Error creating order: ' + err.message)
     }
     setCreatingOrder(false)
+  }
+
+  const openEditClientModal = async () => {
+    setEditClientForm({
+      client_name: proposal?.client_name || '',
+      company: proposal?.company || '',
+      client_email: proposal?.client_email || '',
+    })
+    // Fetch clients for re-linking
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+    const { data: clientsData } = await supabase.from('clients').select('id, company, client_name').eq('org_id', profileData.org_id).order('company', { ascending: true })
+    setAllClients(clientsData || [])
+    setShowEditClientModal(true)
+  }
+
+  const saveClientInfo = async () => {
+    setSavingClient(true)
+    // Update proposal fields
+    await supabase.from('proposals').update({
+      client_name: editClientForm.client_name,
+      company: editClientForm.company,
+      client_email: editClientForm.client_email,
+    }).eq('id', id)
+
+    // If linked to a client record, update that too
+    if (proposal?.client_id) {
+      await supabase.from('clients').update({
+        client_name: editClientForm.client_name,
+        company: editClientForm.company,
+        email: editClientForm.client_email,
+      }).eq('id', proposal.client_id)
+    }
+
+    setProposal(prev => ({
+      ...prev,
+      client_name: editClientForm.client_name,
+      company: editClientForm.company,
+      client_email: editClientForm.client_email,
+    }))
+    logActivity('Client info updated')
+    setShowEditClientModal(false)
+    setSavingClient(false)
   }
 
   const deleteProposal = async () => {
@@ -1551,7 +1591,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           <div className="flex justify-between items-start">
             <div>
               <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
-              <p className="text-[#8A9AB0] mt-1">{proposal?.company} · {proposal?.client_name}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-[#8A9AB0]">{proposal?.company} · {proposal?.client_name}</p>
+                <button onClick={openEditClientModal} className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors" title="Edit client info">✏️</button>
+              </div>
               <p className="text-[#8A9AB0] text-sm">{proposal?.client_email}</p>
               {collaborators.length > 0 && (
                 <div className="flex items-center gap-2 mt-2">
@@ -1915,23 +1958,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                         </select>
                       </td>
                       <td className="pr-2 py-1">
-                        <select
+                        <input
+                          type="text"
+                          placeholder="Vendor"
                           value={line.vendor || ''}
-                          onChange={e => {
-                            const selectedVendor = vendors.find(v => v.vendor_name === e.target.value)
-                            updateEditLine(i, 'vendor', e.target.value)
-                            if (selectedVendor?.default_markup_percent) {
-                              updateEditLine(i, 'markup_percent', String(selectedVendor.default_markup_percent))
-                            }
-                          }}
+                          onChange={e => updateEditLine(i, 'vendor', e.target.value)}
                           className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
-                        >
-                          <option value="">— Vendor —</option>
-                          {vendors.map(v => (
-                            <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>
-                          ))}
-                          <option value="Other">Other</option>
-                        </select>
+                        />
                       </td>
                       <td className="pr-2 py-1">
                         <input
@@ -2281,6 +2314,46 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           </div>
         )
       })()}
+
+      {/* Edit Client Modal */}
+      {showEditClientModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-white font-bold text-lg mb-1">Edit Client Info</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">
+              {proposal?.client_id ? 'Updates both this proposal and the linked client record.' : 'Updates this proposal only — no client record linked.'}
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Company</label>
+                <input type="text" value={editClientForm.company}
+                  onChange={e => setEditClientForm(p => ({ ...p, company: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Client Name</label>
+                <input type="text" value={editClientForm.client_name}
+                  onChange={e => setEditClientForm(p => ({ ...p, client_name: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Email</label>
+                <input type="email" value={editClientForm.client_email}
+                  onChange={e => setEditClientForm(p => ({ ...p, client_email: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setShowEditClientModal(false)}
+                className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+              <button onClick={saveClientInfo} disabled={savingClient}
+                className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                {savingClient ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Proposal Modal */}
       {showDeleteModal && (
