@@ -61,7 +61,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
 
     const { data } = await supabase
       .from('clients')
-      .select('*')
+      .select('*, client_locations(id)')
       .eq('org_id', profile.org_id)
       .order('company', { ascending: true })
     setClients(data || [])
@@ -234,9 +234,15 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
 
                   {/* Footer */}
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-[#2a3d55]">
-                    <span className="text-[#8A9AB0] text-xs">
-                      {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'}
-                    </span>
+                    <div className="flex gap-3">
+                      <span className="text-[#8A9AB0] text-xs">
+                        {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'}
+                      </span>
+                      {(() => {
+                        const locCount = contacts.reduce((sum, c) => sum + (c.client_locations?.length || 0), 0)
+                        return locCount > 0 ? <span className="text-[#8A9AB0] text-xs">· {locCount} {locCount === 1 ? 'location' : 'locations'}</span> : null
+                      })()}
+                    </div>
                     <div className="flex gap-2">
                       <button
                         onClick={e => {

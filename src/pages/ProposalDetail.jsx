@@ -42,6 +42,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [orgProfiles, setOrgProfiles] = useState([])
   const [sharingProposal, setSharingProposal] = useState(false)
   const [clientAddress, setClientAddress] = useState('')
+  const [locationName, setLocationName] = useState('')
   const [showOrderModal, setShowOrderModal] = useState(false)
   const [orderVendor, setOrderVendor] = useState('')
   const [orderAutoNumber, setOrderAutoNumber] = useState(true)
@@ -106,6 +107,20 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       if (clientData) {
         const addr = [clientData.address, clientData.city, clientData.state, clientData.zip].filter(Boolean).join(', ')
         setClientAddress(addr)
+      }
+    }
+    // Fetch location name if location_id exists
+    if (data?.location_id) {
+      const { data: locData } = await supabase
+        .from('client_locations')
+        .select('site_name, address, city, state, zip')
+        .eq('id', data.location_id)
+        .single()
+      if (locData) {
+        setLocationName(locData.site_name)
+        // Use location address for PDF if available
+        const locAddr = [locData.address, locData.city, locData.state, locData.zip].filter(Boolean).join(', ')
+        if (locAddr) setClientAddress(locAddr)
       }
     }
 
@@ -1616,6 +1631,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 <button onClick={openEditClientModal} className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors" title="Edit client info">✏️</button>
               </div>
               <p className="text-[#8A9AB0] text-sm">{proposal?.client_email}</p>
+              {locationName && <span className="inline-flex items-center gap-1 bg-[#2a3d55] text-[#8A9AB0] text-xs px-2 py-0.5 rounded-full mt-1">📍 {locationName}</span>}
               {collaborators.length > 0 && (
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-[#8A9AB0] text-xs">Shared with:</span>

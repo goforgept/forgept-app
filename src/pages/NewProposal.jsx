@@ -22,6 +22,8 @@ export default function NewProposal({ featureAiBom = false }) {
   const [selectedClientId, setSelectedClientId] = useState(null)
   const [orgType, setOrgType] = useState('integrator')
   const [vendors, setVendors] = useState([])
+  const [locations, setLocations] = useState([])
+  const [selectedLocationId, setSelectedLocationId] = useState(null)
   const [form, setForm] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() + 45)
@@ -93,12 +95,25 @@ export default function NewProposal({ featureAiBom = false }) {
   const prefillClient = async (clientId) => {
     const { data } = await supabase.from('clients').select('*').eq('id', clientId).single()
     if (data) setForm(prev => ({ ...prev, client_name: data.client_name || '', company: data.company || '', client_email: data.email || '', industry: data.industry || prev.industry }))
+    // Fetch locations for this client
+    const { data: locs } = await supabase.from('client_locations').select('*').eq('client_id', clientId).order('site_name', { ascending: true })
+    setLocations(locs || [])
+    // Check if a locationId was pre-selected from URL
+    const params = new URLSearchParams(location.search)
+    const locationId = params.get('locationId')
+    if (locationId && locs?.some(l => l.id === locationId)) {
+      setSelectedLocationId(locationId)
+    }
   }
 
   const handleClientSelect = (clientId) => {
     setSelectedClientId(clientId)
     if (clientId) prefillClient(clientId)
-    else setForm(prev => ({ ...prev, client_name: '', company: '', client_email: '' }))
+    else {
+      setForm(prev => ({ ...prev, client_name: '', company: '', client_email: '' }))
+      setLocations([])
+      setSelectedLocationId(null)
+    }
   }
 
   const updateForm = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
@@ -242,7 +257,7 @@ export default function NewProposal({ featureAiBom = false }) {
     }
     const { data: proposal, error } = await supabase.from('proposals').insert({
       proposal_name: form.job_description, user_id: user.id, org_id: profile?.org_id,
-      client_id: clientId || null, rep_name: form.rep_name, rep_email: form.rep_email,
+      client_id: clientId || null, location_id: selectedLocationId || null, rep_name: form.rep_name, rep_email: form.rep_email,
       client_name: form.client_name, company: form.company, client_email: form.client_email,
       close_date: form.close_date, industry: form.industry, job_description: form.job_description,
       status: 'Draft', submission_type: tab, labor_items: laborItems
@@ -307,6 +322,18 @@ export default function NewProposal({ featureAiBom = false }) {
                 {clients.map(c => <option key={c.id} value={c.id}>{c.company}{c.client_name ? ` — ${c.client_name}` : ''}</option>)}
               </select>
             </div>
+            {locations.length > 0 && (
+              <div className="col-span-2">
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Job Site Location (optional)</label>
+                <select value={selectedLocationId || ''} onChange={e => setSelectedLocationId(e.target.value || null)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  <option value="">— Select location —</option>
+                  {locations.map(l => {
+                    const addr = [l.address, l.city, l.state].filter(Boolean).join(', ')
+                    return <option key={l.id} value={l.id}>{l.site_name}{addr ? ` — ${addr}` : ''}</option>
+                  })}
+                </select>
+              </div>
+            )}
             {[['client_name','Client Name'],['company','Company'],['client_email','Client Email'],['close_date','Close Date'],].map(([f,l]) => (
               <div key={f}><label className="text-[#8A9AB0] text-xs mb-1 block">{l}</label>
               <input type={f === 'close_date' ? 'date' : 'text'} value={form[f]} onChange={e => updateForm(f, e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" /></div>
