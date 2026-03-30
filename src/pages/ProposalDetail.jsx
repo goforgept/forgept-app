@@ -49,6 +49,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [orderExpectedShip, setOrderExpectedShip] = useState('')
   const [creatingOrder, setCreatingOrder] = useState(false)
   const [activity, setActivity] = useState([])
+  const [vendors, setVendors] = useState([])
   const [newActivityNote, setNewActivityNote] = useState('')
   const [savingActivity, setSavingActivity] = useState(false)
   const [renewalDates, setRenewalDates] = useState({})
@@ -133,6 +134,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     if (data?.org_id) {
       const { data: teamData } = await supabase.from('profiles').select('id, full_name, email').eq('org_id', data.org_id)
       setOrgProfiles(teamData || [])
+      const { data: vendorData } = await supabase.from('vendors').select('id, vendor_name, default_markup_percent').eq('org_id', data.org_id).eq('active', true).order('vendor_name')
+      setVendors(vendorData || [])
     }
   }
 
@@ -1908,13 +1911,23 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                         </select>
                       </td>
                       <td className="pr-2 py-1">
-                        <input
-                          type="text"
-                          placeholder="Vendor"
+                        <select
                           value={line.vendor || ''}
-                          onChange={e => updateEditLine(i, 'vendor', e.target.value)}
+                          onChange={e => {
+                            const selectedVendor = vendors.find(v => v.vendor_name === e.target.value)
+                            updateEditLine(i, 'vendor', e.target.value)
+                            if (selectedVendor?.default_markup_percent) {
+                              updateEditLine(i, 'markup_percent', String(selectedVendor.default_markup_percent))
+                            }
+                          }}
                           className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
-                        />
+                        >
+                          <option value="">— Vendor —</option>
+                          {vendors.map(v => (
+                            <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>
+                          ))}
+                          <option value="Other">Other</option>
+                        </select>
                       </td>
                       <td className="pr-2 py-1">
                         <input
