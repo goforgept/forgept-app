@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar'
 const emptyForm = {
   vendor_name: '', contact_name: '', contact_email: '',
   contact_phone_number: '', account_number: '', payment_terms: '',
-  default_markup_percent: '', notes: ''
+  default_markup_percent: '', pricing_valid_days: '30', notes: ''
 }
 
 export default function Vendors({ isAdmin, featureProposals = true, featureCRM = false }) {
@@ -56,6 +56,7 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
       account_number: form.account_number,
       payment_terms: form.payment_terms,
       default_markup_percent: parseFloat(form.default_markup_percent) || null,
+      pricing_valid_days: parseInt(form.pricing_valid_days) || 30,
       notes: form.notes,
       active: true,
       org_id: orgId
@@ -80,6 +81,7 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
       account_number: vendor.account_number || '',
       payment_terms: vendor.payment_terms || '',
       default_markup_percent: vendor.default_markup_percent || '',
+      pricing_valid_days: vendor.pricing_valid_days || '30',
       notes: vendor.notes || ''
     })
   }
@@ -95,6 +97,7 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
       account_number: editForm.account_number,
       payment_terms: editForm.payment_terms,
       default_markup_percent: parseFloat(editForm.default_markup_percent) || null,
+      pricing_valid_days: parseInt(editForm.pricing_valid_days) || 30,
       notes: editForm.notes
     }).eq('id', vendorId)
 
@@ -113,13 +116,13 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
     ['account_number', 'Account Number'],
     ['payment_terms', 'Payment Terms'],
     ['default_markup_percent', 'Default Markup %'],
+    ['pricing_valid_days', 'Pricing Valid (days)'],
     ['notes', 'Notes'],
   ]
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
-
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">
@@ -231,6 +234,10 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
                         <div>
                           <p className="text-[#8A9AB0] text-xs">Payment Terms</p>
                           <p className="text-white text-sm">{v.payment_terms || '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[#8A9AB0] text-xs">Pricing Valid</p>
+                          <p className="text-white text-sm">{v.pricing_valid_days || 30} days</p>
                         </div>
                         {v.notes && (
                           <div>

@@ -56,6 +56,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [showRenewalModal, setShowRenewalModal] = useState(false)
   const [pendingRenewalItems, setPendingRenewalItems] = useState([])
   const [pendingRenewalDates, setPendingRenewalDates] = useState({})
+  const [showRFQModal, setShowRFQModal] = useState(false)
+  const [rfqVendorData, setRfqVendorData] = useState({}) // { vendorName: { email, attachExcel } }
+  const [sendingRFQs, setSendingRFQs] = useState(false)
   const [showAIBOMModal, setShowAIBOMModal] = useState(false)
   const [aiBOMPrompt, setAIBOMPrompt] = useState('')
   const [generatingBOM, setGeneratingBOM] = useState(false)
@@ -63,6 +66,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [photos, setPhotos] = useState([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showPhotosModal, setShowPhotosModal] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deletingProposal, setDeletingProposal] = useState(false)
 
   useEffect(() => {
     fetchProposal()
@@ -242,13 +248,28 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setGeneratingSOW(false)
   }
 
-  const sendAllRFQs = async () => {
+  const openRFQModal = () => {
     const needsPricing = lineItems.filter(l => l.pricing_status === 'Needs Pricing' && l.vendor)
     if (needsPricing.length === 0) {
       alert('No items need pricing or no vendors assigned.')
       return
     }
+    const byVendor = needsPricing.reduce((acc, item) => {
+      const vendor = item.vendor || 'Unknown Vendor'
+      if (!acc[vendor]) acc[vendor] = []
+      acc[vendor].push(item)
+      return acc
+    }, {})
+    // Init vendor data with empty emails and Excel unchecked
+    const initData = {}
+    Object.keys(byVendor).forEach(v => { initData[v] = { email: '', attachExcel: false } })
+    setRfqVendorData(initData)
+    setShowRFQModal(true)
+  }
 
+  const sendAllRFQs = async () => {
+    setSendingRFQs(true)
+    const needsPricing = lineItems.filter(l => l.pricing_status === 'Needs Pricing' && l.vendor)
     const byVendor = needsPricing.reduce((acc, item) => {
       const vendor = item.vendor || 'Unknown Vendor'
       if (!acc[vendor]) acc[vendor] = []
@@ -256,13 +277,38 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       return acc
     }, {})
 
-    const vendorCount = Object.keys(byVendor).length
-    const confirmed = window.confirm(`Send RFQs to ${vendorCount} vendor(s): ${Object.keys(byVendor).join(', ')}?`)
-    if (!confirmed) return
+    // Fetch vendor pricing_valid_days for expiry calculation
+    const { data: vendorRecords } = await supabase
+      .from('vendors')
+      .select('vendor_name, pricing_valid_days')
+      .eq('org_id', proposal?.org_id)
+
+    const vendorExpiryMap = {}
+    ;(vendorRecords || []).forEach(v => { vendorExpiryMap[v.vendor_name] = v.pricing_valid_days || 30 })
 
     for (const [vendorName, items] of Object.entries(byVendor)) {
-      const vendorEmail = prompt(`Enter email for ${vendorName}:`)
-      if (!vendorEmail) continue
+      const vendorInfo = rfqVendorData[vendorName]
+      if (!vendorInfo?.email) continue
+
+      const expiryDays = vendorExpiryMap[vendorName] || 30
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + expiryDays)
+      const expiresAtStr = expiresAt.toISOString().split('T')[0]
+
+      // Generate Excel if requested
+      let excelBase64 = null
+      if (vendorInfo.attachExcel) {
+        const XLSX = await import('xlsx')
+        const wsData = [
+          ['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Your Price (fill in)'],
+          ...items.map(i => [i.item_name, i.manufacturer || '', i.part_number_sku || '', i.quantity, i.unit || 'ea', ''])
+        ]
+        const ws = XLSX.utils.aoa_to_sheet(wsData)
+        const wb = XLSX.utils.book_new()
+        XLSX.utils.book_append_sheet(wb, ws, 'RFQ')
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' })
+        excelBase64 = wbout
+      }
 
       try {
         await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-rfq', {
@@ -275,24 +321,34 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             lineItemIds: items.map(i => i.id),
             items: items.map(i => ({
               itemName: i.item_name,
-              partNumber: i.part_number_sku,
+              manufacturer: i.manufacturer || '',
+              partNumber: i.part_number_sku || '',
               quantity: i.quantity,
-              unit: i.unit
+              unit: i.unit || 'ea'
             })),
-            vendorEmail,
+            vendorEmail: vendorInfo.email,
             vendorName,
             proposalName: proposal.proposal_name,
             repName: proposal.rep_name,
             repEmail: proposal.rep_email,
-            company: profile?.company_name || proposal.company
+            company: profile?.company_name || proposal.company,
+            excelBase64: excelBase64,
+            expiresAt: expiresAtStr
           })
         })
+
+        // Update rfq_expires_at on each line item
+        for (const item of items) {
+          await supabase.from('bom_line_items').update({ rfq_expires_at: expiresAtStr }).eq('id', item.id)
+        }
       } catch (err) {
         console.log(`RFQ error for ${vendorName}:`, err)
       }
     }
 
     await fetchLineItems()
+    setShowRFQModal(false)
+    setSendingRFQs(false)
     alert('RFQs sent successfully.')
   }
 
@@ -311,9 +367,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setShowSentPrompt(false)
   }
 
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
     if (proposal?.status === 'Draft') setShowSentPrompt(true)
-    const doc = generatePDFDoc()
+    const doc = await generatePDFDoc()
     doc.save(`${proposal?.proposal_name || 'Proposal'}.pdf`)
   }
 
@@ -532,6 +588,35 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       new Paragraph({ children: [new TextRun({ text: 'Title', size: 18, color: '888888' })] }),
       sigLine(),
     )
+
+    // Site Photos for DOCX
+    if (photos && photos.length > 0) {
+      const { ImageRun } = await import('docx')
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Site Photos', bold: true, size: 28, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+      )
+      for (const photo of photos) {
+        try {
+          const response = await fetch(photo.url)
+          const arrayBuffer = await response.arrayBuffer()
+          children.push(
+            new Paragraph({
+              children: [new ImageRun({ data: arrayBuffer, transformation: { width: 400, height: 250 }, type: 'jpg' })]
+            })
+          )
+          if (photo.caption) {
+            children.push(
+              new Paragraph({ children: [new TextRun({ text: photo.caption, size: 16, color: '888888', italics: true })] })
+            )
+          }
+          children.push(new Paragraph({ children: [new TextRun({ text: '' })] }))
+        } catch (e) {
+          console.log('DOCX photo error:', e)
+        }
+      }
+    }
 
     const doc = new Document({
       sections: [{
@@ -856,6 +941,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           validLines.map(l => ({
             proposal_id: id,
             item_name: l.item_name,
+            manufacturer: l.manufacturer || null,
             part_number_sku: l.part_number_sku,
             quantity: parseFloat(l.quantity) || 0,
             unit: l.unit,
@@ -1055,6 +1141,28 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setCreatingOrder(false)
   }
 
+  const deleteProposal = async () => {
+    if (deleteConfirmText !== proposal?.proposal_name) return
+    setDeletingProposal(true)
+    try {
+      // Delete related data
+      const photoData = await supabase.from('proposal_photos').select('url').eq('proposal_id', id)
+      for (const photo of (photoData.data || [])) {
+        const path = photo.url.split('/proposal-photos/')[1]
+        if (path) await supabase.storage.from('proposal-photos').remove([path])
+      }
+      await supabase.from('proposal_photos').delete().eq('proposal_id', id)
+      await supabase.from('activities').delete().eq('proposal_id', id)
+      await supabase.from('bom_line_items').delete().eq('proposal_id', id)
+      await supabase.from('purchase_orders').delete().eq('proposal_id', id)
+      await supabase.from('proposals').delete().eq('id', id)
+      navigate('/proposals')
+    } catch (err) {
+      alert('Error deleting proposal: ' + err.message)
+      setDeletingProposal(false)
+    }
+  }
+
   const fetchPhotos = async () => {
     const { data } = await supabase.from('proposal_photos').select('*').eq('proposal_id', id).order('created_at', { ascending: true })
     setPhotos(data || [])
@@ -1175,7 +1283,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, caption } : p))
   }
 
-  const generatePDFDoc = () => {
+  const generatePDFDoc = async () => {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
@@ -1328,6 +1436,55 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       doc.text('Title:', 14, s3); doc.line(30, s3, pageWidth - 14, s3)
     }
 
+    // Site Photos section
+    if (photos && photos.length > 0) {
+      doc.addPage()
+      doc.setFontSize(13)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Site Photos', 14, 20)
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(14, 23, pageWidth - 14, 23)
+
+      let photoX = 14
+      let photoY = 30
+      const photoWidth = (pageWidth - 42) / 2
+      const photoHeight = 60
+
+      for (let i = 0; i < photos.length; i++) {
+        try {
+          const response = await fetch(photos[i].url)
+          const blob = await response.blob()
+          const base64 = await new Promise(resolve => {
+            const reader = new FileReader()
+            reader.onloadend = () => resolve(reader.result)
+            reader.readAsDataURL(blob)
+          })
+          const ext = photos[i].url.split('.').pop()?.split('?')[0]?.toUpperCase() || 'JPEG'
+          const imgFormat = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes(ext) ? ext : 'JPEG'
+          doc.addImage(base64, imgFormat === 'JPG' ? 'JPEG' : imgFormat, photoX, photoY, photoWidth, photoHeight)
+          if (photos[i].caption) {
+            doc.setFontSize(8)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(100, 100, 100)
+            doc.text(photos[i].caption, photoX, photoY + photoHeight + 4, { maxWidth: photoWidth })
+          }
+          if (i % 2 === 0) {
+            photoX = photoX + photoWidth + 14
+          } else {
+            photoX = 14
+            photoY = photoY + photoHeight + 16
+            if (photoY > 250) {
+              doc.addPage()
+              photoY = 20
+            }
+          }
+        } catch (e) {
+          console.log('Photo load error:', e)
+        }
+      }
+    }
+
     return doc
   }
 
@@ -1336,7 +1493,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setSendingProposal(true)
 
     try {
-      const pdfDoc = generatePDFDoc()
+      const pdfDoc = await generatePDFDoc()
       const pdfBase64 = pdfDoc.output('datauristring').split(',')[1]
 
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
@@ -1404,15 +1561,25 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 </div>
               )}
             </div>
-            <select
-              value={proposal?.status}
-              onChange={e => updateStatus(e.target.value)}
-              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-            >
-              {['Draft', 'Sent', 'Won', 'Lost'].map(s => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              {isAdmin && proposal?.status !== 'Won' && (
+                <button
+                  onClick={() => { setDeleteConfirmText(''); setShowDeleteModal(true) }}
+                  className="bg-red-900/30 text-red-400 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-red-900/50 transition-colors"
+                >
+                  Delete
+                </button>
+              )}
+              <select
+                value={proposal?.status}
+                onChange={e => updateStatus(e.target.value)}
+                className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+              >
+                {['Draft', 'Sent', 'Won', 'Lost'].map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="grid grid-cols-4 gap-4 mt-6">
             <div>
@@ -1543,7 +1710,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 )}
                 {orgType !== 'manufacturer' && (
                   <button
-                    onClick={sendAllRFQs}
+                    onClick={openRFQModal}
                     className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors"
                   >
                     Send All RFQs
@@ -1608,6 +1775,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   <thead>
                     <tr className="border-b border-[#2a3d55]">
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Item</th>
+                      <th className="text-[#8A9AB0] text-left py-2 pr-4">Mfr</th>
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Part #</th>
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Category</th>
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Vendor</th>
@@ -1622,6 +1790,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                     {lineItems.map((item) => (
                       <tr key={item.id} className="border-b border-[#2a3d55]/50">
                         <td className="text-white py-3 pr-4">{item.item_name}</td>
+                        <td className="text-[#8A9AB0] py-3 pr-4">{item.manufacturer || '—'}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.category}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor}</td>
@@ -1629,14 +1798,24 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                         <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
                         <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>
                         <td className="py-3">
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                            item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' :
-                            item.pricing_status === 'RFQ Sent' ? 'bg-yellow-500/20 text-yellow-400' :
-                            item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' :
-                            'bg-[#2a3d55] text-[#8A9AB0]'
-                          }`}>
-                            {item.po_status || item.pricing_status}
-                          </span>
+                          <div className="flex flex-col gap-1">
+                            <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                              item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' :
+                              item.pricing_status === 'RFQ Sent' ? 'bg-yellow-500/20 text-yellow-400' :
+                              item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' :
+                              'bg-[#2a3d55] text-[#8A9AB0]'
+                            }`}>
+                              {item.po_status || item.pricing_status}
+                            </span>
+                            {item.rfq_expires_at && item.pricing_status === 'RFQ Sent' && (() => {
+                              const expired = new Date(item.rfq_expires_at) < new Date()
+                              return expired ? (
+                                <span className="text-xs font-semibold px-2 py-1 rounded bg-red-500/20 text-red-400">⚠ Pricing Expired</span>
+                              ) : (
+                                <span className="text-xs px-2 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0]">Exp {new Date(item.rfq_expires_at).toLocaleDateString()}</span>
+                              )
+                            })()}
+                          </div>
                         </td>
                         <td className="py-3 pr-2 text-center">
                           <div className="flex flex-col items-center gap-1">
@@ -1690,7 +1869,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-[#2a3d55]">
-                    {['Item Name', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', '🔄', ''].map(h => (
+                    {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', '🔄', ''].map(h => (
                       <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
                     ))}
                   </tr>
@@ -1700,6 +1879,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                     <tr key={i} className="border-b border-[#2a3d55]/30">
                       {[
                         ['item_name', 'text', 'Item name'],
+                        ['manufacturer', 'text', 'Manufacturer'],
                         ['part_number_sku', 'text', 'Part #'],
                         ['quantity', 'number', 'Qty'],
                       ].map(([field, type, placeholder]) => (
@@ -2020,6 +2200,103 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         <POList proposalId={id} />
 
       </div>
+
+      {/* RFQ Modal */}
+      {showRFQModal && (() => {
+        const needsPricing = lineItems.filter(l => l.pricing_status === 'Needs Pricing' && l.vendor)
+        const byVendor = needsPricing.reduce((acc, item) => {
+          const vendor = item.vendor || 'Unknown Vendor'
+          if (!acc[vendor]) acc[vendor] = []
+          acc[vendor].push(item)
+          return acc
+        }, {})
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
+              <h3 className="text-white font-bold text-lg mb-1">Send RFQs</h3>
+              <p className="text-[#8A9AB0] text-sm mb-5">Verify vendor emails and choose delivery options for each vendor.</p>
+              <div className="space-y-4">
+                {Object.entries(byVendor).map(([vendorName, items]) => (
+                  <div key={vendorName} className="bg-[#0F1C2E] rounded-xl p-4">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <p className="text-white font-semibold text-sm">{vendorName}</p>
+                        <p className="text-[#8A9AB0] text-xs">{items.length} item{items.length !== 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
+                    {/* Item list */}
+                    <div className="mb-3 space-y-1">
+                      {items.map(item => (
+                        <div key={item.id} className="flex justify-between text-xs py-0.5">
+                          <span className="text-[#8A9AB0]">{item.item_name}</span>
+                          <div className="flex gap-3 text-[#8A9AB0]">
+                            {item.manufacturer && <span className="text-[#C8622A]">{item.manufacturer}</span>}
+                            <span>Qty: {item.quantity}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Email field */}
+                    <div className="mb-2">
+                      <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor Email</label>
+                      <input type="email"
+                        value={rfqVendorData[vendorName]?.email || ''}
+                        onChange={e => setRfqVendorData(prev => ({ ...prev, [vendorName]: { ...prev[vendorName], email: e.target.value } }))}
+                        placeholder="vendor@company.com"
+                        className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                    </div>
+                    {/* Excel checkbox */}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox"
+                        checked={rfqVendorData[vendorName]?.attachExcel || false}
+                        onChange={e => setRfqVendorData(prev => ({ ...prev, [vendorName]: { ...prev[vendorName], attachExcel: e.target.checked } }))}
+                        className="accent-[#C8622A]" />
+                      <span className="text-[#8A9AB0] text-xs">Attach Excel spreadsheet for pricing</span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button onClick={() => setShowRFQModal(false)}
+                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={sendAllRFQs}
+                  disabled={sendingRFQs || !Object.values(rfqVendorData).some(v => v.email)}
+                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {sendingRFQs ? 'Sending...' : `Send ${Object.values(rfqVendorData).filter(v => v.email).length} RFQ${Object.values(rfqVendorData).filter(v => v.email).length !== 1 ? 's' : ''} →`}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Delete Proposal Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+            <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
+              <span className="text-red-400 text-xl">⚠</span>
+            </div>
+            <h3 className="text-white font-bold text-lg mb-1 text-center">Delete Proposal</h3>
+            <p className="text-[#8A9AB0] text-sm mb-4 text-center">This will permanently delete this proposal and all associated data including BOM, photos, and activity. This cannot be undone.</p>
+            <div className="mb-4">
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Type <span className="text-white font-mono">{proposal?.proposal_name}</span> to confirm</label>
+              <input type="text" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder={proposal?.proposal_name}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+              <button onClick={deleteProposal}
+                disabled={deletingProposal || deleteConfirmText !== proposal?.proposal_name}
+                className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50">
+                {deletingProposal ? 'Deleting...' : 'Delete Proposal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AI BOM Builder Modal */}
       {showAIBOMModal && (
