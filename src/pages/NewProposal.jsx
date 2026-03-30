@@ -286,7 +286,9 @@ export default function NewProposal({ featureAiBom = false }) {
           finalCustomerPrice = (parseFloat(yourCost) * (1 + parseFloat(markup) / 100)).toFixed(2)
         }
         return {
-          item_name: itemName, part_number_sku: partNum, quantity: qty, unit: unit || 'ea',
+          item_name: itemName,
+          manufacturer: row['Manufacturer'] || row['manufacturer'] || row['Mfr'] || row['mfr'] || '',
+          part_number_sku: partNum, quantity: qty, unit: unit || 'ea',
           category: row['Category'] || row['category'] || '', vendor: row['Vendor'] || row['vendor'] || '',
           your_cost_unit: yourCost, markup_percent: markup || '35', customer_price_unit: finalCustomerPrice,
           pricing_status: yourCost ? 'Confirmed' : 'Needs Pricing'
@@ -298,8 +300,8 @@ export default function NewProposal({ featureAiBom = false }) {
   }
 
   const downloadTemplate = () => {
-    const headers = ['Item Name', 'Part #', 'Quantity', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price']
-    const exampleRow = ['Example Item', 'ABC-123', '2', 'ea', 'Electrical', 'Vendor Name', '100.00', '35', '135.00']
+    const headers = ['Item Name', 'Manufacturer', 'Part #', 'Quantity', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price']
+    const exampleRow = ['Example Item', 'Hanwha', 'ABC-123', '2', 'ea', 'Electrical', 'Vendor Name', '100.00', '35', '135.00']
     const ws = XLSX.utils.aoa_to_sheet([headers, exampleRow])
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'BOM')
@@ -337,7 +339,7 @@ export default function NewProposal({ featureAiBom = false }) {
     if (validLines.length > 0) {
       await supabase.from('bom_line_items').insert(
         validLines.map(l => ({
-          proposal_id: proposal.id, item_name: l.item_name, part_number_sku: l.part_number_sku,
+          proposal_id: proposal.id, item_name: l.item_name, manufacturer: l.manufacturer || null, part_number_sku: l.part_number_sku,
           quantity: parseFloat(l.quantity) || 0, unit: l.unit, category: l.category, vendor: l.vendor,
           your_cost_unit: parseFloat(l.your_cost_unit) || null, markup_percent: parseFloat(l.markup_percent) || null,
           customer_price_unit: parseFloat(l.customer_price_unit) || null,

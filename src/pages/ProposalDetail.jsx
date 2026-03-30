@@ -836,6 +836,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         return {
           proposal_id: id,
           item_name: itemName,
+          manufacturer: r['Manufacturer'] || r['manufacturer'] || r['Mfr'] || r['mfr'] || '',
           part_number_sku: partNum,
           quantity: qty || '1',
           unit: unit || 'ea',
