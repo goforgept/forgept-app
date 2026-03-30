@@ -18,13 +18,13 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
         ...(orgType !== 'manufacturer' ? [{ label: 'Templates', path: '/templates', icon: '📄' }] : []),
       ] : []),
       { label: 'Clients', path: '/clients', icon: '🏢' },
+      ...(featureCRM ? [{ label: 'Tasks', path: '/tasks', icon: '✅' }] : []),
     ]
   },
   {
     key: 'operations',
     label: 'Operations',
     links: [
-      ...(featureCRM ? [{ label: 'Tasks', path: '/tasks', icon: '✅' }] : []),
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(orgType !== 'manufacturer' && featureProposals ? [
         { label: 'Vendors', path: '/vendors', icon: '🏭' },
@@ -62,6 +62,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType) 
         { label: 'New Proposal', path: '/new', icon: '➕' },
       ] : []),
       { label: 'Clients', path: '/clients', icon: '🏢' },
+      ...(featureCRM ? [{ label: 'Tasks', path: '/tasks', icon: '✅' }] : []),
     ]
   },
   {

@@ -1144,23 +1144,18 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const deleteProposal = async () => {
     if (deleteConfirmText !== proposal?.proposal_name) return
     setDeletingProposal(true)
-    try {
-      // Delete related data
-      const photoData = await supabase.from('proposal_photos').select('url').eq('proposal_id', id)
-      for (const photo of (photoData.data || [])) {
-        const path = photo.url.split('/proposal-photos/')[1]
-        if (path) await supabase.storage.from('proposal-photos').remove([path])
-      }
-      await supabase.from('proposal_photos').delete().eq('proposal_id', id)
-      await supabase.from('activities').delete().eq('proposal_id', id)
-      await supabase.from('bom_line_items').delete().eq('proposal_id', id)
-      await supabase.from('purchase_orders').delete().eq('proposal_id', id)
-      await supabase.from('proposals').delete().eq('id', id)
-      navigate('/proposals')
-    } catch (err) {
-      alert('Error deleting proposal: ' + err.message)
-      setDeletingProposal(false)
+    // Delete related data — each step independent
+    const photoData = await supabase.from('proposal_photos').select('url').eq('proposal_id', id)
+    for (const photo of (photoData.data || [])) {
+      const path = photo.url.split('/proposal-photos/')[1]
+      if (path) await supabase.storage.from('proposal-photos').remove([path])
     }
+    await supabase.from('proposal_photos').delete().eq('proposal_id', id)
+    await supabase.from('activities').delete().eq('proposal_id', id)
+    await supabase.from('bom_line_items').delete().eq('proposal_id', id)
+    await supabase.from('purchase_orders').delete().eq('proposal_id', id)
+    await supabase.from('proposals').delete().eq('id', id)
+    navigate('/proposals')
   }
 
   const fetchPhotos = async () => {
