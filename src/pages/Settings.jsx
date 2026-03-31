@@ -507,16 +507,13 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                         setConnectingQBO(true)
                         setQboMessage(null)
                         try {
-                          const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
-                          const token = sessionData?.session?.access_token
-                          if (!token) throw new Error('Not logged in — please refresh and try again.')
+                          const { data: { user } } = await supabase.auth.getUser()
+                          const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+                          if (!profileData?.org_id) throw new Error('Could not find your organization.')
                           const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-oauth-start', {
                             method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              'Authorization': `Bearer ${token}`,
-                              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE'
-                            }
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ org_id: profileData.org_id })
                           })
                           const data = await res.json()
                           if (data.url) window.location.href = data.url
