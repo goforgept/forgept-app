@@ -1391,12 +1391,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
-    doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
-    if (proposal?.quote_number) doc.text(`Quote #: ${proposal.quote_number}`, 14, 72)
-    if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, 72)
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, clientAddress ? 79 : 72)
+    let headerY = 65
+    doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, headerY)
+    headerY += 7
+    if (proposal?.quote_number) { doc.text(`Quote #: ${proposal.quote_number}`, 14, headerY); headerY += 7 }
+    if (clientAddress) { doc.text(`Address: ${clientAddress}`, 14, headerY); headerY += 7 }
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, headerY)
 
-    let yPos = 92
+    let yPos = headerY + 13
 
     if (proposal?.scope_of_work) {
       doc.setFontSize(13)

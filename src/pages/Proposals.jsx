@@ -150,7 +150,12 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                 className="bg-[#1a2d45] rounded-xl p-5 flex justify-between items-center cursor-pointer hover:bg-[#1f3550] transition-colors"
               >
                 <div>
-                  <p className="text-white font-semibold">{proposal.proposal_name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-white font-semibold">{proposal.proposal_name}</p>
+                    {proposal.quote_number && (
+                      <span className="text-[#8A9AB0] text-xs font-mono bg-[#2a3d55] px-2 py-0.5 rounded">{proposal.quote_number}</span>
+                    )}
+                  </div>
                   <p className="text-[#8A9AB0] text-sm">{proposal.company} · {proposal.rep_name}</p>
                   <p className="text-[#8A9AB0] text-xs">{proposal.rep_email}</p>
                 </div>
