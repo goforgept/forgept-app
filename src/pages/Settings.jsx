@@ -46,6 +46,12 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [savingPassword, setSavingPassword] = useState(false)
   const [sameAsShipTo, setSameAsShipTo] = useState(false)
   const [expandedStage, setExpandedStage] = useState('early')
+  const [orgTaxRate, setOrgTaxRate] = useState('')
+  const [savingTaxRate, setSavingTaxRate] = useState(false)
+  const [qboConnected, setQboConnected] = useState(false)
+  const [qboCompanyName, setQboCompanyName] = useState('')
+  const [connectingQBO, setConnectingQBO] = useState(false)
+  const [qboMessage, setQboMessage] = useState(null)
   const [invoicingForm, setInvoicingForm] = useState({
     payment_instructions_payable_to: '',
     payment_instructions_bank: '',
@@ -108,6 +114,16 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       close_subject: data?.email_template_close_subject || `Today's the day — {{proposalName}}`,
       close_body: data?.email_template_close_body || `Hi {{clientName}},\n\nToday is the date we had targeted to move forward on {{proposalName}}. I wanted to reach out personally to see where things stand.\n\nWe have everything ready on our end and are excited to get started. If now is not the right time, no pressure — I just want to make sure we stay in touch.\n\n{{repName}}\n{{companyName}}`,
     })
+
+    // Fetch org data (tax rate + QBO status)
+    if (data?.org_id) {
+      try {
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, qbo_connected, qbo_company_name').eq('id', data.org_id).single()
+        setOrgTaxRate(orgData?.default_tax_rate ?? '')
+        setQboConnected(orgData?.qbo_connected || false)
+        setQboCompanyName(orgData?.qbo_company_name || '')
+      } catch (e) { /* ignore */ }
+    }
   }
 
   const handleLogoUpload = async (e) => {
