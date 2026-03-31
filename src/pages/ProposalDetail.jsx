@@ -69,6 +69,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [showPhotosModal, setShowPhotosModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showEditClientModal, setShowEditClientModal] = useState(false)
+  const [lumpSum, setLumpSum] = useState(false)
   const [editClientForm, setEditClientForm] = useState({ client_name: '', company: '', client_email: '' })
   const [savingClient, setSavingClient] = useState(false)
   const [allClients, setAllClients] = useState([])
@@ -86,12 +87,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing')
       .eq('id', id)
       .single()
 
     setProposal(data)
     setCollaborators(data?.collaborator_ids || [])
+    setLumpSum(data?.lump_sum_pricing || false)
 
     if (data?.labor_items && data.labor_items.length > 0) {
       setLaborItems(data.labor_items)
@@ -1423,15 +1425,22 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       yPos += 6
       autoTable(doc, {
         startY: yPos,
-        head: [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']],
-        body: lineItems.map(item => [
+        head: [lumpSum ? ['Item', 'Part #', 'Qty'] : ['Item', 'Part #', 'Qty', 'Unit Price', 'Total']],
+        body: lineItems.map(item => lumpSum ? [
+          item.item_name,
+          item.part_number_sku || '—',
+          item.quantity,
+        ] : [
           item.item_name,
           item.part_number_sku || '—',
           item.quantity,
           `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
           `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
         ]),
-        foot: [['', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        foot: [lumpSum
+          ? ['', '', `Lump Sum Total: $${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+          : ['', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+        ],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -1694,6 +1703,21 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 {proposal?.total_gross_margin_percent ? `${proposal.total_gross_margin_percent.toFixed(1)}%` : '—'}
               </p>
             </div>
+            <div>
+              <p className="text-[#8A9AB0] text-xs mb-1">Lump Sum Pricing</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={lumpSum}
+                  onChange={async e => {
+                    setLumpSum(e.target.checked)
+                    await supabase.from('proposals').update({ lump_sum_pricing: e.target.checked }).eq('id', id)
+                  }}
+                  className="accent-[#C8622A] w-4 h-4 cursor-pointer"
+                />
+                <span className="text-white text-sm font-medium">{lumpSum ? 'On' : 'Off'}</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -1869,8 +1893,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Category</th>
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Vendor</th>
                       <th className="text-[#8A9AB0] text-right py-2 pr-4">Qty</th>
-                      <th className="text-[#8A9AB0] text-right py-2 pr-4">Unit Price</th>
-                      <th className="text-[#8A9AB0] text-right py-2 pr-4">Total</th>
+                      {!lumpSum && <th className="text-[#8A9AB0] text-right py-2 pr-4">Unit Price</th>}
+                      {!lumpSum && <th className="text-[#8A9AB0] text-right py-2 pr-4">Total</th>}
                       <th className="text-[#8A9AB0] text-left py-2">Status</th>
                       <th className="text-[#8A9AB0] text-center py-2 pr-2">🔄</th>
                     </tr>
@@ -1884,8 +1908,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.category}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor}</td>
                         <td className="text-white py-3 pr-4 text-right">{item.quantity}</td>
-                        <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
-                        <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>
+                        {!lumpSum && <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>}
+                        {!lumpSum && <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>}
                         <td className="py-3">
                           <div className="flex flex-col gap-1">
                             <span className={`text-xs font-semibold px-2 py-1 rounded ${
@@ -1923,7 +1947,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan="6" className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td>
+                      <td colSpan={lumpSum ? 8 : 6} className="text-[#8A9AB0] pt-4 text-right font-semibold">
+                        {lumpSum ? 'Lump Sum Materials Total' : 'Materials Total'}
+                      </td>
                       <td className="text-white pt-4 text-right font-bold pr-4">
                         ${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
