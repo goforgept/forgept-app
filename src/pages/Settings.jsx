@@ -55,19 +55,19 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     payment_instructions_notes: '',
   })
   const [savingInvoicing, setSavingInvoicing] = useState(false)
-  const [orgTaxRate, setOrgTaxRate] = useState('')
-  const [savingTaxRate, setSavingTaxRate] = useState(false)
 
-  useEffect(() => { fetchProfile() }, [])
+  useEffect(() => {
+    fetchProfile()
+    // Check for QBO OAuth callback result
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('tab') === 'integrations') setActiveTab('integrations')
+    if (params.get('qbo_success')) setQboMessage({ type: 'success', text: 'QuickBooks connected successfully!' })
+    if (params.get('qbo_error')) setQboMessage({ type: 'error', text: `QuickBooks connection failed: ${params.get('qbo_error')}` })
+  }, [])
 
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
-    // Fetch org default tax rate
-    if (data?.org_id) {
-      const { data: orgData } = await supabase.from('organizations').select('default_tax_rate').eq('id', data.org_id).single()
-      setOrgTaxRate(orgData?.default_tax_rate ?? '')
-    }
     setProfile(data)
     setLogoUrl(data?.logo_url || null)
     setForm({
@@ -242,6 +242,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         <div className="flex gap-2 mb-6">
           {[
             { key: 'general', label: 'General' },
+            ...(isAdmin ? [{ key: 'integrations', label: 'Integrations' }] : []),
             ...(isAdmin ? [{ key: 'email', label: 'Email Templates' }] : []),
             ...(isAdmin ? [{ key: 'invoicing', label: 'Invoicing' }] : []),
           ].map(tab => (
@@ -374,36 +375,6 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
               </div>
             </div>
 
-            {/* Tax Rate */}
-            <div className="bg-[#1a2d45] rounded-xl p-6">
-              <h3 className="text-white font-bold mb-1">Default Tax Rate</h3>
-              <p className="text-[#8A9AB0] text-sm mb-4">Applied to materials on proposals. Reps can override or mark tax exempt per deal.</p>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  value={orgTaxRate}
-                  onChange={e => setOrgTaxRate(e.target.value)}
-                  placeholder="e.g. 9.25"
-                  className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                />
-                <span className="text-[#8A9AB0] text-sm">%</span>
-                <button
-                  onClick={async () => {
-                    setSavingTaxRate(true)
-                    const { data: { user } } = await supabase.auth.getUser()
-                    const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-                    await supabase.from('organizations').update({ default_tax_rate: parseFloat(orgTaxRate) || 0 }).eq('id', profileData.org_id)
-                    setSuccess('Tax rate saved')
-                    setSavingTaxRate(false)
-                  }}
-                  disabled={savingTaxRate}
-                  className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
-                >
-                  {savingTaxRate ? 'Saving...' : 'Save Tax Rate'}
-                </button>
-              </div>
-            </div>
-
             {/* Terms and Conditions */}
             <div className="bg-[#1a2d45] rounded-xl p-6">
               <h3 className="text-white font-bold mb-1">Terms and Conditions</h3>
@@ -469,6 +440,136 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
               className="bg-[#C8622A] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
               {savingInvoicing ? 'Saving...' : 'Save Invoicing Settings'}
             </button>
+          </div>
+        )}
+
+        {/* ── INTEGRATIONS TAB ── */}
+        {activeTab === 'integrations' && isAdmin && (
+          <div className="space-y-4">
+            {qboMessage && (
+              <div className={`rounded-xl px-5 py-4 text-sm font-medium ${qboMessage.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                {qboMessage.text}
+              </div>
+            )}
+
+            {/* QuickBooks */}
+            <div className="bg-[#1a2d45] rounded-xl p-6">
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-[#2CA01C]/10 rounded-xl flex items-center justify-center text-2xl">🟢</div>
+                  <div>
+                    <h3 className="text-white font-bold">QuickBooks Online</h3>
+                    <p className="text-[#8A9AB0] text-sm mt-0.5">Sync won proposals directly to QBO as invoices. Customers are created automatically.</p>
+                    {qboConnected && qboCompanyName && (
+                      <p className="text-green-400 text-xs mt-1">✓ Connected to <span className="font-semibold">{qboCompanyName}</span></p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {qboConnected ? (
+                    <div className="flex items-center gap-3">
+                      <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-3 py-1 rounded-full">✓ Connected</span>
+                      <button
+                        onClick={async () => {
+                          if (!window.confirm('Disconnect QuickBooks?')) return
+                          const { data: { user } } = await supabase.auth.getUser()
+                          const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+                          await supabase.from('organizations').update({
+                            qbo_connected: false, qbo_access_token: null, qbo_refresh_token: null,
+                            qbo_realm_id: null, qbo_company_name: null
+                          }).eq('id', profileData.org_id)
+                          setQboConnected(false)
+                          setQboCompanyName('')
+                          setQboMessage({ type: 'success', text: 'QuickBooks disconnected.' })
+                        }}
+                        className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors"
+                      >Disconnect</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        setConnectingQBO(true)
+                        try {
+                          const { data: { session } } = await supabase.auth.getSession()
+                          const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-oauth-start', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${session.access_token}`
+                            }
+                          })
+                          const data = await res.json()
+                          if (data.url) window.location.href = data.url
+                          else setQboMessage({ type: 'error', text: 'Could not start QuickBooks connection.' })
+                        } catch (err) {
+                          setQboMessage({ type: 'error', text: err.message })
+                        }
+                        setConnectingQBO(false)
+                      }}
+                      disabled={connectingQBO}
+                      className="bg-[#2CA01C] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#259018] transition-colors disabled:opacity-50"
+                    >
+                      {connectingQBO ? 'Connecting...' : 'Connect QuickBooks'}
+                    </button>
+                  )}
+                </div>
+              </div>
+              {qboConnected && (
+                <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">What syncs</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-[#8A9AB0]">
+                    <div className="flex items-center gap-2"><span className="text-green-400">✓</span> Won proposals → QBO Invoice</div>
+                    <div className="flex items-center gap-2"><span className="text-green-400">✓</span> Line items with descriptions</div>
+                    <div className="flex items-center gap-2"><span className="text-green-400">✓</span> Labor line items</div>
+                    <div className="flex items-center gap-2"><span className="text-green-400">✓</span> Sales tax if applicable</div>
+                    <div className="flex items-center gap-2"><span className="text-green-400">✓</span> Auto-create customer if new</div>
+                    <div className="flex items-center gap-2"><span className="text-green-400">✓</span> Quote number → Invoice #</div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Google — Coming Soon */}
+            <div className="bg-[#1a2d45] rounded-xl p-6 opacity-60">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-2xl">📅</div>
+                  <div>
+                    <h3 className="text-white font-bold">Google Calendar & Meet</h3>
+                    <p className="text-[#8A9AB0] text-sm mt-0.5">Auto-create calendar events and Meet links when proposals are Won.</p>
+                  </div>
+                </div>
+                <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs font-semibold px-3 py-1 rounded-full">Coming Soon</span>
+              </div>
+            </div>
+
+            {/* Microsoft — Coming Soon */}
+            <div className="bg-[#1a2d45] rounded-xl p-6 opacity-60">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-600/10 rounded-xl flex items-center justify-center text-2xl">🗓</div>
+                  <div>
+                    <h3 className="text-white font-bold">Microsoft Outlook & Teams</h3>
+                    <p className="text-[#8A9AB0] text-sm mt-0.5">Sync proposals to Outlook calendar and create Teams meetings automatically.</p>
+                  </div>
+                </div>
+                <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs font-semibold px-3 py-1 rounded-full">Coming Soon</span>
+              </div>
+            </div>
+
+            {/* Square — Coming Soon */}
+            <div className="bg-[#1a2d45] rounded-xl p-6 opacity-60">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-[#3E4348]/30 rounded-xl flex items-center justify-center text-2xl">💳</div>
+                  <div>
+                    <h3 className="text-white font-bold">Square Payments</h3>
+                    <p className="text-[#8A9AB0] text-sm mt-0.5">Generate Square payment links on invoices so clients can pay online.</p>
+                  </div>
+                </div>
+                <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs font-semibold px-3 py-1 rounded-full">Coming Soon</span>
+              </div>
+            </div>
           </div>
         )}
 

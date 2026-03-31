@@ -69,14 +69,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [showPhotosModal, setShowPhotosModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showEditClientModal, setShowEditClientModal] = useState(false)
-  const [lumpSum, setLumpSum] = useState(false)
-  const [taxRate, setTaxRate] = useState(0)
-  const [taxExempt, setTaxExempt] = useState(false)
   const [editClientForm, setEditClientForm] = useState({ client_name: '', company: '', client_email: '' })
   const [savingClient, setSavingClient] = useState(false)
   const [allClients, setAllClients] = useState([])
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deletingProposal, setDeletingProposal] = useState(false)
+  const [qboConnected, setQboConnected] = useState(false)
+  const [sendingToQBO, setSendingToQBO] = useState(false)
+  const [qboInvoiceId, setQboInvoiceId] = useState(null)
 
   useEffect(() => {
     fetchProposal()
@@ -89,15 +89,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,tax_rate,tax_exempt')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type')
       .eq('id', id)
       .single()
 
     setProposal(data)
     setCollaborators(data?.collaborator_ids || [])
-    setLumpSum(data?.lump_sum_pricing || false)
-    setTaxRate(data?.tax_rate || 0)
-    setTaxExempt(data?.tax_exempt || false)
+    setQboInvoiceId(data?.qbo_invoice_id || null)
 
     if (data?.labor_items && data.labor_items.length > 0) {
       setLaborItems(data.labor_items)
@@ -155,6 +153,11 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setProfile(data)
     setOrgType(data?.organizations?.org_type || 'integrator')
     setFeatureSendProposal(data?.organizations?.feature_send_proposal || false)
+    // Check QBO connection
+    if (data?.org_id) {
+      const { data: orgData } = await supabase.from('organizations').select('qbo_connected').eq('id', data.org_id).single()
+      setQboConnected(orgData?.qbo_connected || false)
+    }
     if (data?.org_id) {
       const { data: teamData } = await supabase.from('profiles').select('id, full_name, email').eq('org_id', data.org_id)
       setOrgProfiles(teamData || [])
@@ -406,9 +409,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     const borders = { top: border, bottom: border, left: border, right: border }
     const colWidths = [2800, 1400, 800, 1000, 1000]
 
-    const docxColumns = lumpSum ? ['Item', 'Part #', 'Qty'] : ['Item', 'Part #', 'Qty', 'Unit Price', 'Total']
     const headerRow = new TableRow({
-      children: docxColumns.map((h, i) =>
+      children: ['Item', 'Part #', 'Qty', 'Unit Price', 'Total'].map((h, i) =>
         new TableCell({
           borders,
           width: { size: colWidths[i], type: WidthType.DXA },
@@ -423,17 +425,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     const itemRows = lineItems.map(item =>
       new TableRow({
-        children: (lumpSum ? [
-          item.item_name,
-          item.part_number_sku || '—',
-          String(item.quantity || 0),
-        ] : [
+        children: [
           item.item_name,
           item.part_number_sku || '—',
           String(item.quantity || 0),
           `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
           `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-        ]).map((val, i) =>
+        ].map((val, i) =>
           new TableCell({
             borders,
             width: { size: colWidths[i], type: WidthType.DXA },
@@ -450,7 +448,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       children: [
         new TableCell({
           borders,
-          columnSpan: lumpSum ? 2 : 4,
+          columnSpan: 4,
           margins: { top: 80, bottom: 80, left: 120, right: 120 },
           shading: { fill: primaryColor, type: ShadingType.CLEAR },
           children: [new Paragraph({
@@ -1234,6 +1232,29 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setSavingClient(false)
   }
 
+  const sendToQBO = async () => {
+    setSendingToQBO(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-create-invoice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ proposalId: id })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setQboInvoiceId(data.invoiceId)
+      logActivity(`Invoice sent to QuickBooks${data.invoiceNumber ? ` — #${data.invoiceNumber}` : ''} · $${(data.totalAmt || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`)
+      alert(`✓ Invoice created in QuickBooks${data.invoiceNumber ? ` — #${data.invoiceNumber}` : ''}`)
+    } catch (err) {
+      alert('QuickBooks error: ' + err.message)
+    }
+    setSendingToQBO(false)
+  }
+
   const deleteProposal = async () => {
     if (deleteConfirmText !== proposal?.proposal_name) return
     setDeletingProposal(true)
@@ -1402,14 +1423,11 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
-    let headerY = 65
-    doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, headerY)
-    headerY += 7
-    if (proposal?.quote_number) { doc.text(`Quote #: ${proposal.quote_number}`, 14, headerY); headerY += 7 }
-    if (clientAddress) { doc.text(`Address: ${clientAddress}`, 14, headerY); headerY += 7 }
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, headerY)
+    doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
+    if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, 72)
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, clientAddress ? 79 : 72)
 
-    let yPos = headerY + 13
+    let yPos = 92
 
     if (proposal?.scope_of_work) {
       doc.setFontSize(13)
@@ -1434,22 +1452,15 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       yPos += 6
       autoTable(doc, {
         startY: yPos,
-        head: [lumpSum ? ['Item', 'Part #', 'Qty'] : ['Item', 'Part #', 'Qty', 'Unit Price', 'Total']],
-        body: lineItems.map(item => lumpSum ? [
-          item.item_name,
-          item.part_number_sku || '—',
-          item.quantity,
-        ] : [
+        head: [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']],
+        body: lineItems.map(item => [
           item.item_name,
           item.part_number_sku || '—',
           item.quantity,
           `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
           `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
         ]),
-        foot: [lumpSum
-          ? ['', '', `Lump Sum Total: $${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
-          : ['', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
-        ],
+        foot: [['', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
         alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -1477,43 +1488,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         alternateRowStyles: { fillColor: [245, 245, 245] },
         styles: { fontSize: 9 }
       })
-      const taxAmount = !taxExempt && parseFloat(taxRate) > 0 ? materialsTotal * parseFloat(taxRate) / 100 : 0
-      const grandTotalWithTax = grandTotal + taxAmount
       const afterLabor = doc.lastAutoTable.finalY + 6
-      let afterLaborY = afterLabor
-      if (taxAmount > 0) {
-        doc.setFontSize(10)
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(100, 100, 100)
-        doc.text(`Tax (${taxRate}%):`, pageWidth - 60, afterLaborY)
-        doc.text(`$${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterLaborY, { align: 'right' })
-        afterLaborY += 8
-      }
       doc.setFontSize(11)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Grand Total:', pageWidth - 60, afterLaborY)
+      doc.text('Grand Total:', pageWidth - 60, afterLabor)
       doc.setTextColor(200, 98, 42)
-      doc.text(`$${grandTotalWithTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterLaborY, { align: 'right' })
-    }
- // If no labor section, still show tax + grand total
-    if (!(pdfLaborItems.length > 0 && pdfLaborItems.some(l => l.role))) {
-      const matTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
-      const taxAmt = !taxExempt && parseFloat(taxRate) > 0 ? matTotal * parseFloat(taxRate) / 100 : 0
-      if (taxAmt > 0) {
-        const afterTable = (doc.lastAutoTable?.finalY || 100) + 8
-        doc.setFontSize(10)
-        doc.setFont('helvetica', 'normal')
-        doc.setTextColor(100, 100, 100)
-        doc.text(`Tax (${taxRate}%):`, pageWidth - 60, afterTable)
-        doc.text(`$${taxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterTable, { align: 'right' })
-        doc.setFontSize(11)
-        doc.setFont('helvetica', 'bold')
-        doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-        doc.text('Grand Total:', pageWidth - 60, afterTable + 8)
-        doc.setTextColor(200, 98, 42)
-        doc.text(`$${(matTotal + taxAmt).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterTable + 8, { align: 'right' })
-      }
+      doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterLabor, { align: 'right' })
     }
 
     if (profile?.terms_and_conditions) {
@@ -1676,12 +1657,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-start">
             <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
-                {proposal?.quote_number && (
-                  <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs px-2 py-1 rounded-lg font-mono">{proposal.quote_number}</span>
-                )}
-              </div>
+              <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-[#8A9AB0]">{proposal?.company} · {proposal?.client_name}</p>
                 <button onClick={openEditClientModal} className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors" title="Edit client info">✏️</button>
@@ -1742,47 +1718,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 {proposal?.total_gross_margin_percent ? `${proposal.total_gross_margin_percent.toFixed(1)}%` : '—'}
               </p>
             </div>
-            <div>
-              <p className="text-[#8A9AB0] text-xs mb-1">Tax Rate %</p>
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={taxRate}
-                  onChange={async e => {
-                    setTaxRate(e.target.value)
-                    await supabase.from('proposals').update({ tax_rate: parseFloat(e.target.value) || 0 }).eq('id', id)
-                  }}
-                  disabled={taxExempt}
-                  placeholder="0.00"
-                  className={`w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-[#C8622A] ${taxExempt ? 'opacity-40' : ''}`}
-                />
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input type="checkbox" checked={taxExempt}
-                    onChange={async e => {
-                      setTaxExempt(e.target.checked)
-                      await supabase.from('proposals').update({ tax_exempt: e.target.checked }).eq('id', id)
-                    }}
-                    className="accent-[#C8622A] w-3.5 h-3.5"
-                  />
-                  <span className="text-[#8A9AB0] text-xs">Exempt</span>
-                </label>
-              </div>
-            </div>
-            <div>
-              <p className="text-[#8A9AB0] text-xs mb-1">Lump Sum Pricing</p>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={lumpSum}
-                  onChange={async e => {
-                    setLumpSum(e.target.checked)
-                    await supabase.from('proposals').update({ lump_sum_pricing: e.target.checked }).eq('id', id)
-                  }}
-                  className="accent-[#C8622A] w-4 h-4 cursor-pointer"
-                />
-                <span className="text-white text-sm font-medium">{lumpSum ? 'On' : 'Off'}</span>
-              </label>
-            </div>
           </div>
         </div>
 
@@ -1809,6 +1744,15 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors"
                 >
                   ✉ Send Proposal
+                </button>
+              )}
+              {qboConnected && proposal?.status === 'Won' && (
+                <button
+                  onClick={sendToQBO}
+                  disabled={sendingToQBO}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${qboInvoiceId ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-[#2CA01C] text-white hover:bg-[#259018]'}`}
+                >
+                  {sendingToQBO ? 'Sending...' : qboInvoiceId ? '✓ In QuickBooks' : '🟢 Send to QuickBooks'}
                 </button>
               )}
               <button
@@ -2027,24 +1971,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                         <td></td>
                       </tr>
                     )}
-                    {!taxExempt && parseFloat(taxRate) > 0 && (() => {
-                      const matTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
-                      const taxAmount = matTotal * parseFloat(taxRate) / 100
-                      return (
-                        <tr>
-                          <td colSpan="6" className="text-[#8A9AB0] pt-1 text-right font-semibold">Tax ({taxRate}%)</td>
-                          <td className="text-white pt-1 text-right font-bold pr-4">${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                          <td></td>
-                        </tr>
-                      )
-                    })()}
                     <tr className="border-t border-[#2a3d55]">
                       <td colSpan="6" className="text-[#8A9AB0] pt-3 text-right font-semibold">Grand Total</td>
                       <td className="text-[#C8622A] pt-3 text-right font-bold text-lg pr-4">
                         ${(
                           lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0) +
-                          (proposal?.labor_items?.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0) || 0) +
-                          (!taxExempt && parseFloat(taxRate) > 0 ? lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0) * parseFloat(taxRate) / 100 : 0)
+                          (proposal?.labor_items?.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0) || 0)
                         ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
                       <td></td>
