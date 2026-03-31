@@ -402,8 +402,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     const borders = { top: border, bottom: border, left: border, right: border }
     const colWidths = [2800, 1400, 800, 1000, 1000]
 
+    const docxColumns = lumpSum ? ['Item', 'Part #', 'Qty'] : ['Item', 'Part #', 'Qty', 'Unit Price', 'Total']
     const headerRow = new TableRow({
-      children: ['Item', 'Part #', 'Qty', 'Unit Price', 'Total'].map((h, i) =>
+      children: docxColumns.map((h, i) =>
         new TableCell({
           borders,
           width: { size: colWidths[i], type: WidthType.DXA },
@@ -418,13 +419,17 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     const itemRows = lineItems.map(item =>
       new TableRow({
-        children: [
+        children: (lumpSum ? [
+          item.item_name,
+          item.part_number_sku || '—',
+          String(item.quantity || 0),
+        ] : [
           item.item_name,
           item.part_number_sku || '—',
           String(item.quantity || 0),
           `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
           `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-        ].map((val, i) =>
+        ]).map((val, i) =>
           new TableCell({
             borders,
             width: { size: colWidths[i], type: WidthType.DXA },
@@ -441,7 +446,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       children: [
         new TableCell({
           borders,
-          columnSpan: 4,
+          columnSpan: lumpSum ? 2 : 4,
           margins: { top: 80, bottom: 80, left: 120, right: 120 },
           shading: { fill: primaryColor, type: ShadingType.CLEAR },
           children: [new Paragraph({
@@ -1893,8 +1898,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Category</th>
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Vendor</th>
                       <th className="text-[#8A9AB0] text-right py-2 pr-4">Qty</th>
-                      {!lumpSum && <th className="text-[#8A9AB0] text-right py-2 pr-4">Unit Price</th>}
-                      {!lumpSum && <th className="text-[#8A9AB0] text-right py-2 pr-4">Total</th>}
+                      <th className="text-[#8A9AB0] text-right py-2 pr-4">Unit Price</th>
+                      <th className="text-[#8A9AB0] text-right py-2 pr-4">Total</th>
                       <th className="text-[#8A9AB0] text-left py-2">Status</th>
                       <th className="text-[#8A9AB0] text-center py-2 pr-2">🔄</th>
                     </tr>
@@ -1908,8 +1913,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.category}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor}</td>
                         <td className="text-white py-3 pr-4 text-right">{item.quantity}</td>
-                        {!lumpSum && <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>}
-                        {!lumpSum && <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>}
+                        <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
+                        <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>
                         <td className="py-3">
                           <div className="flex flex-col gap-1">
                             <span className={`text-xs font-semibold px-2 py-1 rounded ${
@@ -1947,9 +1952,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan={lumpSum ? 8 : 6} className="text-[#8A9AB0] pt-4 text-right font-semibold">
-                        {lumpSum ? 'Lump Sum Materials Total' : 'Materials Total'}
-                      </td>
+                      <td colSpan="6" className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td>
                       <td className="text-white pt-4 text-right font-bold pr-4">
                         ${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </td>
