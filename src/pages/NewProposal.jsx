@@ -22,6 +22,8 @@ export default function NewProposal({ featureAiBom = false }) {
   const [selectedClientId, setSelectedClientId] = useState(null)
   const [orgType, setOrgType] = useState('integrator')
   const [vendors, setVendors] = useState([])
+  const [taxRate, setTaxRate] = useState('')
+  const [taxExempt, setTaxExempt] = useState(false)
   const [locations, setLocations] = useState([])
   const [selectedLocationId, setSelectedLocationId] = useState(null)
   const [form, setForm] = useState(() => {
@@ -60,6 +62,8 @@ export default function NewProposal({ featureAiBom = false }) {
         fetchTemplates(profile.org_id)
         const { data: vendorData } = await supabase.from('vendors').select('id, vendor_name, default_markup_percent, contact_email').eq('org_id', profile.org_id).eq('active', true).order('vendor_name')
         setVendors(vendorData || [])
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate').eq('id', profile.org_id).single()
+        setTaxRate(orgData?.default_tax_rate ?? '')
       }
     }
     const params = new URLSearchParams(location.search)
@@ -263,12 +267,14 @@ export default function NewProposal({ featureAiBom = false }) {
       }).select().single()
       if (newClient) clientId = newClient.id
     }
+    const taxRateVal = taxExempt ? 0 : (parseFloat(taxRate) || 0)
     const { data: proposal, error } = await supabase.from('proposals').insert({
       proposal_name: form.job_description, user_id: user.id, org_id: profile?.org_id,
       client_id: clientId || null, location_id: selectedLocationId || null, rep_name: form.rep_name, rep_email: form.rep_email,
       client_name: form.client_name, company: form.company, client_email: form.client_email,
       close_date: form.close_date, industry: form.industry, job_description: form.job_description,
-      status: 'Draft', submission_type: tab, labor_items: laborItems, quote_number: quoteNumber
+      status: 'Draft', submission_type: tab, labor_items: laborItems, quote_number: quoteNumber,
+      tax_rate: taxRateVal, tax_exempt: taxExempt
     }).select().single()
     if (error) { alert('Error saving proposal: ' + error.message); setSaving(false); return }
     const activeLines = tab === 'inline' ? lines : uploadedLines
@@ -355,6 +361,18 @@ export default function NewProposal({ featureAiBom = false }) {
             </div>
             <div><label className="text-[#8A9AB0] text-xs mb-1 block">Job Description</label>
             <input type="text" value={form.job_description} onChange={e => updateForm('job_description', e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" /></div>
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Tax Rate %</label>
+              <input type="number" value={taxRate} onChange={e => setTaxRate(e.target.value)}
+                placeholder="e.g. 9.25" disabled={taxExempt}
+                className={`w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] ${taxExempt ? 'opacity-40' : ''}`} />
+            </div>
+            <div className="flex items-center gap-3 mt-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={taxExempt} onChange={e => setTaxExempt(e.target.checked)} className="accent-[#C8622A] w-4 h-4" />
+                <span className="text-[#8A9AB0] text-sm">Tax Exempt</span>
+              </label>
+            </div>
           </div>
         </div>
 
@@ -452,7 +470,13 @@ export default function NewProposal({ featureAiBom = false }) {
             <div className="mt-6 border-t border-[#2a3d55] pt-4 space-y-2">
               <div className="flex justify-between text-sm"><span className="text-[#8A9AB0]">Materials</span><span className="text-white">${liveBOMTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
               {orgType !== 'manufacturer' && <div className="flex justify-between text-sm"><span className="text-[#8A9AB0]">Labor</span><span className="text-white">${liveLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>}
-              <div className="flex justify-between text-base font-bold border-t border-[#2a3d55] pt-2"><span className="text-white">Grand Total</span><span className="text-[#C8622A]">${liveGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+              {!taxExempt && parseFloat(taxRate) > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-[#8A9AB0]">Tax ({taxRate}%)</span>
+                  <span className="text-white">${(liveBOMTotal * parseFloat(taxRate) / 100).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-base font-bold border-t border-[#2a3d55] pt-2"><span className="text-white">Grand Total</span><span className="text-[#C8622A]">${(liveGrandTotal + (!taxExempt ? liveBOMTotal * (parseFloat(taxRate) || 0) / 100 : 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
               <div className="flex justify-between text-sm"><span className="text-[#8A9AB0]">Gross Margin</span><span className="text-[#C8622A] font-semibold">{liveMargin}%</span></div>
             </div>
           </>)}

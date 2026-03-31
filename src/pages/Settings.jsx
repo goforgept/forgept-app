@@ -55,12 +55,19 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     payment_instructions_notes: '',
   })
   const [savingInvoicing, setSavingInvoicing] = useState(false)
+  const [orgTaxRate, setOrgTaxRate] = useState('')
+  const [savingTaxRate, setSavingTaxRate] = useState(false)
 
   useEffect(() => { fetchProfile() }, [])
 
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    // Fetch org default tax rate
+    if (data?.org_id) {
+      const { data: orgData } = await supabase.from('organizations').select('default_tax_rate').eq('id', data.org_id).single()
+      setOrgTaxRate(orgData?.default_tax_rate ?? '')
+    }
     setProfile(data)
     setLogoUrl(data?.logo_url || null)
     setForm({
@@ -364,6 +371,36 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Tax Rate */}
+            <div className="bg-[#1a2d45] rounded-xl p-6">
+              <h3 className="text-white font-bold mb-1">Default Tax Rate</h3>
+              <p className="text-[#8A9AB0] text-sm mb-4">Applied to materials on proposals. Reps can override or mark tax exempt per deal.</p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  value={orgTaxRate}
+                  onChange={e => setOrgTaxRate(e.target.value)}
+                  placeholder="e.g. 9.25"
+                  className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                />
+                <span className="text-[#8A9AB0] text-sm">%</span>
+                <button
+                  onClick={async () => {
+                    setSavingTaxRate(true)
+                    const { data: { user } } = await supabase.auth.getUser()
+                    const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+                    await supabase.from('organizations').update({ default_tax_rate: parseFloat(orgTaxRate) || 0 }).eq('id', profileData.org_id)
+                    setSuccess('Tax rate saved')
+                    setSavingTaxRate(false)
+                  }}
+                  disabled={savingTaxRate}
+                  className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+                >
+                  {savingTaxRate ? 'Saving...' : 'Save Tax Rate'}
+                </button>
               </div>
             </div>
 
