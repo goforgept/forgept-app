@@ -505,18 +505,21 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                     <button
                       onClick={async () => {
                         setConnectingQBO(true)
+                        setQboMessage(null)
                         try {
-                          const { data: { session } } = await supabase.auth.getSession()
+                          const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+                          const token = sessionData?.session?.access_token
+                          if (!token) throw new Error('Not logged in — please refresh and try again.')
                           const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-oauth-start', {
                             method: 'POST',
                             headers: {
                               'Content-Type': 'application/json',
-                              'Authorization': `Bearer ${session.access_token}`
+                              'Authorization': `Bearer ${token}`
                             }
                           })
                           const data = await res.json()
                           if (data.url) window.location.href = data.url
-                          else setQboMessage({ type: 'error', text: 'Could not start QuickBooks connection.' })
+                          else setQboMessage({ type: 'error', text: data.error || 'Could not start QuickBooks connection.' })
                         } catch (err) {
                           setQboMessage({ type: 'error', text: err.message })
                         }
