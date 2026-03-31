@@ -514,7 +514,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                             method: 'POST',
                             headers: {
                               'Content-Type': 'application/json',
-                              'Authorization': `Bearer ${token}`
+                              'Authorization': `Bearer ${token}`,
+                              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE'
                             }
                           })
                           const data = await res.json()
