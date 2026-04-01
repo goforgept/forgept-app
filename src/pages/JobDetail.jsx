@@ -60,6 +60,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [poVendorEmail, setPOVendorEmail] = useState('')
   const [poNumber, setPONumber] = useState('')
   const [poAutoNumber, setPOAutoNumber] = useState(true)
+  const [expandedPO, setExpandedPO] = useState(null)
+  const [savingReceiving, setSavingReceiving] = useState({})
 
   // Change order modal
   const [showCOModal, setShowCOModal] = useState(false)
@@ -414,10 +416,41 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     setGeneratingPO(false)
   }
 
+  const updateReceivedQty = async (poId, itemId, receivedQty) => {
+    setSavingReceiving(prev => ({ ...prev, [itemId]: true }))
+    const qty = parseFloat(receivedQty) || 0
+    const item = lineItems.find(l => l.id === itemId)
+    const ordered = parseFloat(item?.quantity) || 0
+    const now = qty > 0 ? new Date().toISOString() : null
+    const newPoStatus = qty >= ordered ? 'Received' : qty > 0 ? 'Partial' : 'PO Sent'
+
+    await supabase.from('bom_line_items').update({
+      received_qty: qty,
+      received_at: now,
+      po_status: newPoStatus
+    }).eq('id', itemId)
+
+    const updatedItems = lineItems.map(l => l.id === itemId ? { ...l, received_qty: qty, received_at: now, po_status: newPoStatus } : l)
+    setLineItems(updatedItems)
+    setEditLines(prev => prev.map(l => l.id === itemId ? { ...l, received_qty: qty, received_at: now, po_status: newPoStatus } : l))
+
+    // Update the PO's overall status based on all its items
+    const po = existingPOs.find(p => p.id === poId)
+    if (po) {
+      const poItems = updatedItems.filter(l => l.po_number === po.po_number)
+      const totalOrdered = poItems.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0)
+      const totalReceived = poItems.reduce((sum, i) => sum + (parseFloat(i.received_qty) || 0), 0)
+      const poStatus = totalReceived === 0 ? 'Sent' : totalReceived >= totalOrdered ? 'Received' : 'Partial'
+      await supabase.from('purchase_orders').update({ status: poStatus }).eq('id', poId)
+      setExistingPOs(prev => prev.map(p => p.id === poId ? { ...p, status: poStatus } : p))
+    }
+
+    setSavingReceiving(prev => ({ ...prev, [itemId]: false }))
+  }
+
   const markReceived = async (itemId) => {
-    await supabase.from('bom_line_items').update({ po_status: 'Received' }).eq('id', itemId)
-    setLineItems(prev => prev.map(l => l.id === itemId ? { ...l, po_status: 'Received' } : l))
-    setEditLines(prev => prev.map(l => l.id === itemId ? { ...l, po_status: 'Received' } : l))
+    const item = lineItems.find(l => l.id === itemId)
+    if (item) await updateReceivedQty(null, itemId, item.quantity)
   }
 
   const calcCoTotals = (lineItems, laborItems) => {
@@ -927,31 +960,98 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
               {/* Existing POs */}
               {existingPOs.length > 0 && (
                 <div className="bg-[#1a2d45] rounded-xl p-6">
-                  <h3 className="text-white font-bold text-lg mb-4">Purchase Orders</h3>
+                  <h3 className="text-white font-bold text-lg mb-4">Purchase Orders — Receiving</h3>
                   <div className="space-y-3">
                     {existingPOs.map(po => {
                       const poItems = lineItems.filter(l => l.po_number === po.po_number)
-                      const allReceived = poItems.length > 0 && poItems.every(l => l.po_status === 'Received')
+                      const totalOrdered = poItems.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0)
+                      const totalReceived = poItems.reduce((sum, i) => sum + (parseFloat(i.received_qty) || 0), 0)
+                      const isExpanded = expandedPO === po.id
+                      const statusColor = po.status === 'Received' ? 'bg-green-500/20 text-green-400' : po.status === 'Partial' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'
                       return (
-                        <div key={po.id} className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
-                          <div className="flex justify-between items-start">
+                        <div key={po.id} className="bg-[#0F1C2E] rounded-xl border border-[#2a3d55] overflow-hidden">
+                          {/* PO header — click to expand */}
+                          <div className="flex justify-between items-center p-4 cursor-pointer hover:bg-[#162236] transition-colors"
+                            onClick={() => setExpandedPO(isExpanded ? null : po.id)}>
                             <div>
                               <p className="text-white font-semibold font-mono">{po.po_number}</p>
-                              {po.vendor_name && <p className="text-[#8A9AB0] text-sm mt-0.5">{po.vendor_name}</p>}
-                              <p className="text-[#8A9AB0] text-xs mt-1">{poItems.length} item{poItems.length !== 1 ? 's' : ''} · ${fmt(po.total_amount)}</p>
+                              <p className="text-[#8A9AB0] text-xs mt-0.5">
+                                {po.vendor_name && `${po.vendor_name} · `}{poItems.length} item{poItems.length !== 1 ? 's' : ''} · ${fmt(po.total_amount)}
+                              </p>
                             </div>
-                            <span className={`text-xs px-2 py-1 rounded font-semibold ${allReceived ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                              {allReceived ? 'All Received' : 'On Order'}
-                            </span>
+                            <div className="flex items-center gap-3">
+                              {poItems.length > 0 && (
+                                <span className="text-[#8A9AB0] text-xs">{totalReceived} / {totalOrdered} received</span>
+                              )}
+                              <span className={`text-xs px-2 py-1 rounded font-semibold ${statusColor}`}>{po.status || 'Sent'}</span>
+                              <span className="text-[#8A9AB0] text-xs">{isExpanded ? '▲' : '▼'}</span>
+                            </div>
                           </div>
-                          {poItems.length > 0 && (
-                            <div className="mt-3 space-y-1">
-                              {poItems.map(item => (
-                                <div key={item.id} className="flex justify-between text-xs">
-                                  <span className="text-[#D6E4F0]">{item.item_name} <span className="text-[#8A9AB0]">× {item.quantity} {item.unit}</span></span>
-                                  <span className={item.po_status === 'Received' ? 'text-green-400' : 'text-blue-400'}>{item.po_status}</span>
-                                </div>
-                              ))}
+
+                          {/* Receiving table */}
+                          {isExpanded && (
+                            <div className="border-t border-[#2a3d55] p-4">
+                              {poItems.length === 0 ? (
+                                <p className="text-[#8A9AB0] text-sm">No items found for this PO.</p>
+                              ) : (
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="border-b border-[#2a3d55]">
+                                      {['Item', 'Part #', 'Ordered', 'Received', 'Status'].map(h => (
+                                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {poItems.map(item => {
+                                      const ordered = parseFloat(item.quantity) || 0
+                                      const received = parseFloat(item.received_qty) || 0
+                                      const itemStatus = received === 0 ? 'Pending' : received >= ordered ? 'Received' : 'Partial'
+                                      return (
+                                        <tr key={item.id} className="border-b border-[#2a3d55]/30">
+                                          <td className="text-white py-3 pr-4">
+                                            {item.item_name}
+                                            {item.received_at && <p className="text-[#8A9AB0] text-xs">{new Date(item.received_at).toLocaleDateString()}</p>}
+                                          </td>
+                                          <td className="text-[#8A9AB0] py-3 pr-4 text-xs">{item.part_number_sku || '—'}</td>
+                                          <td className="text-white py-3 pr-4 text-sm">{ordered} {item.unit}</td>
+                                          <td className="py-3 pr-4">
+                                            <div className="flex items-center gap-2">
+                                              <input
+                                                type="number" min="0" step="any"
+                                                value={received || ''}
+                                                onChange={e => updateReceivedQty(po.id, item.id, e.target.value)}
+                                                placeholder="0"
+                                                className="w-20 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] text-right"
+                                              />
+                                              {savingReceiving[item.id] && <span className="text-green-400 text-xs">✓</span>}
+                                              {received < ordered && ordered > 0 && (
+                                                <button onClick={() => updateReceivedQty(po.id, item.id, ordered)}
+                                                  className="text-xs text-[#C8622A] hover:text-white transition-colors whitespace-nowrap">All in</button>
+                                              )}
+                                            </div>
+                                          </td>
+                                          <td className="py-3">
+                                            <span className={`text-xs font-semibold px-2 py-1 rounded ${
+                                              itemStatus === 'Received' ? 'bg-green-500/20 text-green-400' :
+                                              itemStatus === 'Partial' ? 'bg-yellow-500/20 text-yellow-400' :
+                                              'bg-[#2a3d55] text-[#8A9AB0]'
+                                            }`}>{itemStatus}</span>
+                                          </td>
+                                        </tr>
+                                      )
+                                    })}
+                                  </tbody>
+                                  <tfoot>
+                                    <tr>
+                                      <td colSpan="2" className="text-[#8A9AB0] pt-3 text-right text-xs font-semibold pr-4">Total</td>
+                                      <td className="text-white pt-3 pr-4 text-xs font-semibold">{totalOrdered}</td>
+                                      <td className="text-[#C8622A] pt-3 text-xs font-semibold">{totalReceived}</td>
+                                      <td></td>
+                                    </tr>
+                                  </tfoot>
+                                </table>
+                              )}
                             </div>
                           )}
                         </div>
