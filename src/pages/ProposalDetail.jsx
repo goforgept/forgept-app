@@ -82,6 +82,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [poVendorEmail, setPOVendorEmail] = useState('')
   const [bulkField, setBulkField] = useState('')
   const [bulkValue, setBulkValue] = useState('')
+  const [bulkSelectedLines, setBulkSelectedLines] = useState(new Set())
   // E-signing
   const [requestingSignature, setRequestingSignature] = useState(false)
 
@@ -284,10 +285,19 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   }
 
   const applyBulkEdit = () => {
-    if (!bulkField || !bulkValue) return
-    setEditLines(prev => prev.map(l => ({ ...l, [bulkField]: bulkValue })))
+    if (!bulkField || !bulkValue || bulkSelectedLines.size === 0) return
+    setEditLines(prev => prev.map(l => {
+      if (!bulkSelectedLines.has(l.id || l.item_name + l.quantity)) return l
+      const updated = { ...l, [bulkField]: bulkValue }
+      if (bulkField === 'markup_percent' && l.your_cost_unit) {
+        updated.customer_price_unit = (parseFloat(l.your_cost_unit) * (1 + parseFloat(bulkValue) / 100)).toFixed(2)
+        updated.customer_price_total = (parseFloat(updated.customer_price_unit) * parseFloat(l.quantity || 0)).toFixed(2)
+      }
+      return updated
+    }))
     setBulkField('')
     setBulkValue('')
+    setBulkSelectedLines(new Set())
   }
 
   const requestSignature = async () => {
@@ -943,6 +953,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     await fetchLineItems()
     await fetchProposal()
     logActivity(`BOM updated — ${validLines.length} line items`)
+    setBulkSelectedLines(new Set())
     setEditingBOM(false)
     setSaving(false)
   }
@@ -1498,9 +1509,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 {proposal?.status === 'Won' && lineItems.length > 0 && orgType === 'manufacturer' && (
                   <button onClick={() => setShowOrderModal(true)} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">🏭 Convert to Order</button>
                 )}
-                {orgType !== 'manufacturer' && selectedForPO.size > 0 && (
-                  <button onClick={() => setShowPOModal(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                    Generate PO ({selectedForPO.size})
+                {orgType !== 'manufacturer' && (
+                  <button onClick={() => selectedForPO.size > 0 && setShowPOModal(true)}
+                    disabled={selectedForPO.size === 0}
+                    title={selectedForPO.size === 0 ? 'Check items below to select for PO' : `Generate PO for ${selectedForPO.size} items`}
+                    className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    {selectedForPO.size > 0 ? `Generate PO (${selectedForPO.size})` : 'Generate PO'}
                   </button>
                 )}
                 {orgType !== 'manufacturer' && (
@@ -1628,9 +1642,11 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           ) : (
             /* BOM Edit Mode */
             <div>
-              {/* Bulk Edit Bar */}
-              <div className="flex items-center gap-2 mb-4 p-3 bg-[#0F1C2E] rounded-lg border border-[#2a3d55]">
-                <span className="text-[#8A9AB0] text-xs font-semibold whitespace-nowrap">Bulk Edit</span>
+              {/* Bulk Edit Bar — applies to checked rows only */}
+              <div className="flex items-center gap-2 mb-4 p-3 bg-[#0F1C2E] rounded-lg border border-[#2a3d55] flex-wrap">
+                <span className="text-[#8A9AB0] text-xs font-semibold whitespace-nowrap">
+                  Bulk Edit {bulkSelectedLines.size > 0 ? <span className="text-[#C8622A]">({bulkSelectedLines.size} selected)</span> : <span className="text-[#2a3d55]">(check rows below)</span>}
+                </span>
                 <select value={bulkField} onChange={e => { setBulkField(e.target.value); setBulkValue('') }}
                   className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
                   <option value="">— Field —</option>
@@ -1653,24 +1669,46 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   <input type={bulkField === 'markup_percent' ? 'number' : 'text'} placeholder={bulkField ? `Enter ${bulkField}` : ''} value={bulkValue} onChange={e => setBulkValue(e.target.value)} disabled={!bulkField}
                     className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] disabled:opacity-40" />
                 )}
-                <button onClick={applyBulkEdit} disabled={!bulkField || !bulkValue}
+                <button onClick={applyBulkEdit} disabled={!bulkField || !bulkValue || bulkSelectedLines.size === 0}
                   className="bg-[#C8622A] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40 whitespace-nowrap">
-                  Apply to All
+                  Apply to Selected
                 </button>
+                {bulkSelectedLines.size > 0 && (
+                  <button onClick={() => setBulkSelectedLines(new Set())} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Clear</button>
+                )}
               </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[#2a3d55]">
+                      <th className="py-2 pr-2 w-8">
+                        <input type="checkbox" className="accent-[#C8622A]"
+                          checked={editLines.length > 0 && editLines.every(l => bulkSelectedLines.has(l.id || l.item_name + l.quantity))}
+                          onChange={() => {
+                            const allSelected = editLines.every(l => bulkSelectedLines.has(l.id || l.item_name + l.quantity))
+                            setBulkSelectedLines(allSelected ? new Set() : new Set(editLines.map(l => l.id || l.item_name + l.quantity)))
+                          }} />
+                      </th>
                       {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', '🔄', ''].map(h => (
                         <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {editLines.map((line, i) => (
-                      <tr key={i} className="border-b border-[#2a3d55]/30">
+                    {editLines.map((line, i) => {
+                      const rowKey = line.id || line.item_name + line.quantity
+                      return (
+                      <tr key={i} className={`border-b border-[#2a3d55]/30 ${bulkSelectedLines.has(rowKey) ? 'bg-[#C8622A]/5' : ''}`}>
+                        <td className="pr-2 py-1">
+                          <input type="checkbox" className="accent-[#C8622A] cursor-pointer"
+                            checked={bulkSelectedLines.has(rowKey)}
+                            onChange={() => setBulkSelectedLines(prev => {
+                              const next = new Set(prev)
+                              next.has(rowKey) ? next.delete(rowKey) : next.add(rowKey)
+                              return next
+                            })} />
+                        </td>
                         {[['item_name', 'text', 'Item name'], ['manufacturer', 'text', 'Manufacturer'], ['part_number_sku', 'text', 'Part #'], ['quantity', 'number', 'Qty']].map(([field, type, placeholder]) => (
                           <td key={field} className="pr-2 py-1">
                             <input type={type} placeholder={placeholder} value={line[field] || ''} onChange={e => updateEditLine(i, field, e.target.value)}
@@ -1721,7 +1759,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                           <button onClick={() => removeEditLine(i)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
                 <button onClick={addEditLine} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">+ Add Line Item</button>
