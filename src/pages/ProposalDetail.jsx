@@ -89,7 +89,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,tax_rate,tax_exempt,qbo_invoice_id,location_id')
       .eq('id', id)
       .single()
 
@@ -197,6 +197,22 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   }
 
   const updateStatus = async (newStatus) => {
+    // Auto-create job when marked Won
+    if (newStatus === 'Won' && proposal?.status !== 'Won') {
+      try {
+        const { data: orgData } = await supabase.from('organizations').select('job_counter').eq('id', proposal.org_id).single()
+        const jobNumber = `JOB-${orgData?.job_counter || 1000}`
+        await supabase.from('organizations').update({ job_counter: (orgData?.job_counter || 1000) + 1 }).eq('id', proposal.org_id)
+        await supabase.from('jobs').insert({
+          org_id: proposal.org_id,
+          proposal_id: id,
+          client_id: proposal.client_id || null,
+          job_number: jobNumber,
+          name: proposal.proposal_name,
+          status: 'Active',
+        })
+      } catch (e) { console.log('Job creation error:', e) }
+    }
     // If marking as Won and there are recurring items without renewal dates, prompt first
     if (newStatus === 'Won') {
       const recurringMissingDate = lineItems.filter(l => l.recurring && !l.renewal_date && !(renewalDates[l.id]))

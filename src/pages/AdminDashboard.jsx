@@ -5,6 +5,8 @@ import Sidebar from '../components/Sidebar'
 
 export default function AdminDashboard({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [proposals, setProposals] = useState([])
+  const [dashboardMode, setDashboardMode] = useState(() => localStorage.getItem('dashboardMode') || 'sales')
+  const [jobs, setJobs] = useState([])
   const [lineItems, setLineItems] = useState([])
   const [clients, setClients] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -20,6 +22,8 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const [recurringItems, setRecurringItems] = useState([])
   const [targetPeriod, setTargetPeriod] = useState('monthly')
   const [recurringModal, setRecurringModal] = useState(null) // 'revenue' | 'quoting' | 'all'
+  const [expiredPricingCount, setExpiredPricingCount] = useState(0)
+  const [expiredPricingProposals, setExpiredPricingProposals] = useState([])
   const navigate = useNavigate()
 
   useEffect(() => { fetchOrgData() }, [])
@@ -41,6 +45,14 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     ])
 
     setProposals(proposalsRes.data || [])
+
+    // Fetch jobs for PM mode
+    const { data: jobsData } = await supabase
+      .from('jobs')
+      .select('*, job_checklist_items(id, completed), clients(company)')
+      .eq('org_id', profile.org_id)
+      .order('created_at', { ascending: false })
+    setJobs(jobsData || [])
 
     // Expired pricing check
     const today = new Date().toISOString().split('T')[0]
@@ -177,9 +189,6 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       return Math.floor((new Date() - new Date(p.created_at)) / (1000 * 60 * 60 * 24)) >= 3
     }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
   , [proposals])
-
-  const [expiredPricingCount, setExpiredPricingCount] = useState(0)
-  const [expiredPricingProposals, setExpiredPricingProposals] = useState([])
 
   const laborStats = useMemo(() => {
     const getLaborTotal = (ps) => ps.reduce((sum, p) => sum + (p.labor_items || []).reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0), 0)
@@ -325,6 +334,80 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
             </div>
           )}
         </div>
+
+        {/* Dashboard Mode Toggle */}
+        <div className="flex justify-end mb-2">
+          <div className="flex bg-[#0F1C2E] rounded-lg p-1 gap-1">
+            <button
+              onClick={() => { setDashboardMode('sales'); localStorage.setItem('dashboardMode', 'sales') }}
+              className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'sales' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+              📊 Sales
+            </button>
+            <button
+              onClick={() => { setDashboardMode('pm'); localStorage.setItem('dashboardMode', 'pm') }}
+              className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'pm' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+              🔨 PM
+            </button>
+          </div>
+        </div>
+
+        {/* PM Dashboard */}
+        {dashboardMode === 'pm' && !loading && (
+          <div className="space-y-4">
+            {/* PM Stats */}
+            <div className="grid grid-cols-4 gap-4">
+              {[
+                { label: 'Active Jobs', value: jobs.filter(j => j.status === 'Active').length, color: 'text-green-400' },
+                { label: 'On Hold', value: jobs.filter(j => j.status === 'On Hold').length, color: 'text-yellow-400' },
+                { label: 'Completed', value: jobs.filter(j => j.status === 'Completed').length, color: 'text-blue-400' },
+                { label: 'Total Jobs', value: jobs.length, color: 'text-white' },
+              ].map(stat => (
+                <div key={stat.label} className="bg-[#1a2d45] rounded-xl p-4">
+                  <p className="text-[#8A9AB0] text-xs mb-1">{stat.label}</p>
+                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Active jobs with progress */}
+            <div className="bg-[#1a2d45] rounded-xl p-5">
+              <h3 className="text-white font-bold mb-4">Active Jobs</h3>
+              {jobs.filter(j => j.status === 'Active').length === 0 ? (
+                <p className="text-[#8A9AB0] text-sm">No active jobs. Jobs are created when proposals are marked Won.</p>
+              ) : (
+                <div className="space-y-3">
+                  {jobs.filter(j => j.status === 'Active').map(job => {
+                    const items = job.job_checklist_items || []
+                    const done = items.filter(i => i.completed).length
+                    const progress = items.length > 0 ? Math.round((done / items.length) * 100) : 0
+                    return (
+                      <div key={job.id} onClick={() => window.location.href = `/jobs/${job.id}`}
+                        className="bg-[#0F1C2E] rounded-lg p-4 cursor-pointer hover:bg-[#0a1628] transition-colors group">
+                        <div className="flex justify-between items-center mb-2">
+                          <div>
+                            <p className="text-white font-semibold group-hover:text-[#C8622A] transition-colors">{job.name}</p>
+                            {job.clients?.company && <p className="text-[#8A9AB0] text-xs">{job.clients.company}</p>}
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[#8A9AB0] text-xs">{done}/{items.length} tasks</p>
+                            <p className="text-[#C8622A] text-sm font-semibold">{progress}%</p>
+                          </div>
+                        </div>
+                        <div className="w-full bg-[#1a2d45] rounded-full h-1.5">
+                          <div className={`h-1.5 rounded-full ${progress === 100 ? 'bg-green-400' : 'bg-[#C8622A]'}`} style={{ width: `${progress}%` }} />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Sales Dashboard (existing content) */}
+        {dashboardMode === 'sales' && (
+        <div className="space-y-4">
 
         {/* Needs Attention */}
         {!loading && expiredPricingCount > 0 && (
@@ -642,6 +725,9 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           </div>
         </div>
       )}
+
+        </div>
+        {/* End Sales Dashboard */}
 
       {/* Set Target Modal */}
       {showSetTargetModal && (

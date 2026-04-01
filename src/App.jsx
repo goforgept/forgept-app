@@ -25,6 +25,8 @@ import Invoices from './pages/Invoices'
 import ManufacturerOrders from './pages/ManufacturerOrders'
 import InvoiceDetail from './pages/InvoiceDetail'
 import NewInvoice from './pages/NewInvoice'
+import Jobs from './pages/Jobs'
+import JobDetail from './pages/JobDetail'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -44,6 +46,30 @@ function App() {
       else { setProfile(null); setLoading(false) }
     })
   }, [])
+
+  // Auto-logout after 1 hour of inactivity
+  useEffect(() => {
+    if (!session) return
+
+    const IDLE_TIMEOUT = 60 * 60 * 1000 // 1 hour in ms
+    let timer
+
+    const resetTimer = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        supabase.auth.signOut()
+      }, IDLE_TIMEOUT)
+    }
+
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
+    events.forEach(e => window.addEventListener(e, resetTimer))
+    resetTimer() // start timer on mount
+
+    return () => {
+      clearTimeout(timer)
+      events.forEach(e => window.removeEventListener(e, resetTimer))
+    }
+  }, [session])
 
   const fetchProfile = async (userId) => {
     for (let i = 0; i < 5; i++) {
@@ -146,6 +172,8 @@ function App() {
           <Route path="/invoices/new" element={<NewInvoice {...sharedProps} />} />
           <Route path="/invoices/:id" element={<InvoiceDetail {...sharedProps} />} />
           <Route path="/orders" element={<ManufacturerOrders {...sharedProps} />} />
+          <Route path="/jobs" element={<Jobs {...sharedProps} />} />
+          <Route path="/jobs/:id" element={<JobDetail {...sharedProps} />} />
         </>
       )}
     </Routes>

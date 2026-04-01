@@ -25,6 +25,7 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
     key: 'operations',
     label: 'Operations',
     links: [
+      { label: 'Jobs', path: '/jobs', icon: '🔨' },
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(orgType !== 'manufacturer' && featureProposals ? [
         { label: 'Vendors', path: '/vendors', icon: '🏭' },
@@ -62,13 +63,13 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType) 
         { label: 'New Proposal', path: '/new', icon: '➕' },
       ] : []),
       { label: 'Clients', path: '/clients', icon: '🏢' },
-      ...(featureCRM ? [{ label: 'Tasks', path: '/tasks', icon: '✅' }] : []),
     ]
   },
   {
     key: 'operations',
     label: 'Operations',
     links: [
+      { label: 'Jobs', path: '/jobs', icon: '🔨' },
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(orgType === 'manufacturer' ? [
         { label: 'Catalog', path: '/catalog', icon: '📦' },
@@ -129,7 +130,6 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
     ? NAV_GROUPS_ADMIN(featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType)
     : NAV_GROUPS_REP(featureProposals, featureCRM, featureInvoices, orgType)
 
-  // Filter out empty groups
   const visibleGroups = groups.filter(g => g.links.length > 0)
 
   const isActive = (path) =>
@@ -137,7 +137,6 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
 
   return (
     <div className="w-56 min-h-screen bg-[#1a2d45] border-r border-[#2a3d55] flex flex-col">
-      {/* Logo */}
       <div className="px-6 py-5 border-b border-[#2a3d55]">
         <div className="flex justify-between items-center">
           <div>
@@ -154,27 +153,21 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
         </div>
       </div>
 
-      {/* Nav Groups */}
       <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
         {visibleGroups.map((group) => {
           const isOpen = !collapsed[group.key]
           const hasActive = group.links.some(l => isActive(l.path))
           return (
             <div key={group.key} className="mb-1">
-              {/* Group header */}
               <button
                 onClick={() => toggleGroup(group.key)}
                 className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors ${
-                  hasActive && !isOpen
-                    ? 'text-[#C8622A]'
-                    : 'text-[#8A9AB0] hover:text-white'
+                  hasActive && !isOpen ? 'text-[#C8622A]' : 'text-[#8A9AB0] hover:text-white'
                 }`}
               >
                 <span>{group.label}</span>
                 <span className="text-[#2a3d55] text-xs">{isOpen ? '▾' : '▸'}</span>
               </button>
-
-              {/* Group links */}
               {isOpen && (
                 <div className="mt-0.5 space-y-0.5">
                   {group.links.map(({ label, path, icon }) => (
@@ -198,7 +191,6 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
         })}
       </nav>
 
-      {/* Sign Out */}
       <div className="px-3 py-4 border-t border-[#2a3d55]">
         <button
           onClick={handleSignOut}
