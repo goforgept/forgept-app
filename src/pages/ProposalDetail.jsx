@@ -307,6 +307,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           proposalName: proposal.proposal_name,
           signingUrl,
           orgId: proposal.org_id,
+          logoUrl: profile?.logo_url || null,
+          companyName: profile?.company_name || proposal.company || '',
         })
       })
       const data = await res.json()

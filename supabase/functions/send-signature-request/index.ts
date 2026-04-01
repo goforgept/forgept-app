@@ -23,6 +23,8 @@ Deno.serve(async (req) => {
       proposalName,
       signingUrl,
       orgId,
+      logoUrl,
+      companyName,
     } = await req.json()
 
     if (!toEmail || !signingUrl) {
@@ -33,9 +35,10 @@ Deno.serve(async (req) => {
 
     const htmlContent = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
-        <div style="background:#0F1C2E;padding:20px 28px;">
-          <span style="color:#ffffff;font-size:20px;font-weight:bold;font-family:Arial,sans-serif;">ForgePt<span style="color:#C8622A;">.</span></span>
-        </div>
+        ${logoUrl
+          ? `<div style="background:#0F1C2E;padding:16px 28px;"><img src="${logoUrl}" alt="${companyName || 'ForgePt.'}" style="max-height:44px;max-width:180px;object-fit:contain;display:block;" /></div>`
+          : `<div style="background:#0F1C2E;padding:20px 28px;"><span style="color:#ffffff;font-size:20px;font-weight:bold;font-family:Arial,sans-serif;">${companyName || 'ForgePt'}<span style="color:#C8622A;">.</span></span></div>`
+        }
         <div style="padding:28px;">
           <h2 style="color:#0F1C2E;margin-top:0;">Your Proposal is Ready to Sign</h2>
           <p>Hi ${toName || 'there'},</p>
