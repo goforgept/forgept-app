@@ -113,7 +113,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       if (profileData?.org_id) {
         const { data: vendorData } = await supabase
           .from('vendors')
-          .select('id, vendor_name, default_markup_percent')
+          .select('id, vendor_name, default_markup_percent, contact_email')
           .eq('org_id', profileData.org_id)
           .eq('active', true)
           .order('vendor_name')
@@ -864,7 +864,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                               }}
                               className="accent-[#C8622A]" />
                           </th>
-                          {['Item', 'Mfr / Part #', 'Vendor', 'Qty', 'Your Cost', 'PO #', 'Status', ''].map(h => (
+                          {['Item', 'Vendor', 'Qty', 'Your Cost', 'PO #', 'Status', ''].map(h => (
                             <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
                           ))}
                         </tr>
