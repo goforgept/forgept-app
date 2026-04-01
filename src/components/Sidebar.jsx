@@ -26,6 +26,7 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
     label: 'Operations',
     links: [
       { label: 'Jobs', path: '/jobs', icon: '🔨' },
+      { label: 'Tech Log', path: '/tech-log', icon: '📋' },
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(orgType !== 'manufacturer' && featureProposals ? [
         { label: 'Vendors', path: '/vendors', icon: '🏭' },
@@ -70,6 +71,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType) 
     label: 'Operations',
     links: [
       { label: 'Jobs', path: '/jobs', icon: '🔨' },
+      { label: 'Tech Log', path: '/tech-log', icon: '📋' },
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(orgType === 'manufacturer' ? [
         { label: 'Catalog', path: '/catalog', icon: '📦' },

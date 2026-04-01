@@ -26,6 +26,7 @@ import ManufacturerOrders from './pages/ManufacturerOrders'
 import InvoiceDetail from './pages/InvoiceDetail'
 import NewInvoice from './pages/NewInvoice'
 import Jobs from './pages/Jobs'
+import TechLog from './pages/TechLog'
 import SignProposal from './pages/SignProposal'
 import JobDetail from './pages/JobDetail'
 
@@ -176,6 +177,7 @@ function App() {
           <Route path="/orders" element={<ManufacturerOrders {...sharedProps} />} />
           <Route path="/jobs" element={<Jobs {...sharedProps} />} />
           <Route path="/jobs/:id" element={<JobDetail {...sharedProps} />} />
+          <Route path="/tech-log" element={<TechLog {...sharedProps} />} />
         </>
       )}
     </Routes>
