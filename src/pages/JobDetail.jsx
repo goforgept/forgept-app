@@ -52,6 +52,11 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [savingBOM, setSavingBOM] = useState(false)
   const [vendors, setVendors] = useState([])
 
+  // PO generation & tracking
+  const [selectedForPO, setSelectedForPO] = useState(new Set())
+  const [generatingPO, setGeneratingPO] = useState(false)
+  const [existingPOs, setExistingPOs] = useState([])
+
   // Change order modal
   const [showCOModal, setShowCOModal] = useState(false)
   const [coForm, setCoForm] = useState({ name: '', description: '' })
@@ -139,6 +144,16 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       .eq('job_id', id)
       .order('created_at', { ascending: false })
     setChangeOrders(coData || [])
+
+    // Fetch existing POs for this job's proposal
+    if (jobData?.proposal_id) {
+      const { data: poData } = await supabase
+        .from('purchase_orders')
+        .select('*')
+        .eq('proposal_id', jobData.proposal_id)
+        .order('created_at', { ascending: false })
+      setExistingPOs(poData || [])
+    }
 
     // Fetch tech daily logs
     const { data: logData } = await supabase
@@ -346,6 +361,47 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       }
       return updated
     })
+  }
+
+  const generatePO = async () => {
+    if (selectedForPO.size === 0 || !job?.proposal_id) return
+    setGeneratingPO(true)
+
+    const { count } = await supabase
+      .from('purchase_orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', profile.org_id)
+    const poNumber = `PO-${String((count || 0) + 1).padStart(4, '0')}`
+
+    const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
+    const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
+    const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))].join(', ')
+
+    const { data: newPO } = await supabase.from('purchase_orders').insert({
+      proposal_id: job.proposal_id,
+      org_id: profile.org_id,
+      po_number: poNumber,
+      status: 'Sent',
+      total: poTotal,
+      vendor: vendorNames || null,
+    }).select().single()
+
+    // Tag each selected BOM item with the PO number
+    for (const itemId of selectedForPO) {
+      await supabase.from('bom_line_items').update({ po_number: poNumber, po_status: 'PO Sent' }).eq('id', itemId)
+    }
+
+    setLineItems(prev => prev.map(l => selectedForPO.has(l.id) ? { ...l, po_number: poNumber, po_status: 'PO Sent' } : l))
+    setEditLines(prev => prev.map(l => selectedForPO.has(l.id) ? { ...l, po_number: poNumber, po_status: 'PO Sent' } : l))
+    if (newPO) setExistingPOs(prev => [newPO, ...prev])
+    setSelectedForPO(new Set())
+    setGeneratingPO(false)
+  }
+
+  const markReceived = async (itemId) => {
+    await supabase.from('bom_line_items').update({ po_status: 'Received' }).eq('id', itemId)
+    setLineItems(prev => prev.map(l => l.id === itemId ? { ...l, po_status: 'Received' } : l))
+    setEditLines(prev => prev.map(l => l.id === itemId ? { ...l, po_status: 'Received' } : l))
   }
 
   const calcCoTotals = (lineItems, laborItems) => {
@@ -590,186 +646,307 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           </div>
         )}
 
-        {/* BOM TAB */}
-        {activeTab === 'bom' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-bold text-lg">Bill of Materials</h3>
-              {!editingBOM ? (
-                <button onClick={() => { setEditingBOM(true); setEditLines([...lineItems]); setSelectedLines(new Set()) }}
-                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                  Edit BOM
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button onClick={() => { setEditingBOM(false); setSelectedLines(new Set()) }}
-                    className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                  <button onClick={saveBOM} disabled={savingBOM}
-                    className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                    {savingBOM ? 'Saving...' : 'Save BOM'}
-                  </button>
+        {/* PURCHASE ORDERS TAB */}
+        {activeTab === 'pos' && (() => {
+          const unordered = lineItems.filter(l => !l.po_status || l.po_status === 'Needs Pricing' || l.po_status === 'Confirmed' || l.po_status === '')
+          const onOrder = lineItems.filter(l => l.po_status === 'PO Sent')
+          const received = lineItems.filter(l => l.po_status === 'Received')
+          return (
+            <div className="space-y-5">
+
+              {/* Stats */}
+              {lineItems.length > 0 && (
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-[#1a2d45] rounded-xl p-4">
+                    <p className="text-[#8A9AB0] text-xs mb-1">Not Yet Ordered</p>
+                    <p className="text-white font-bold text-xl">{unordered.length}</p>
+                  </div>
+                  <div className="bg-[#1a2d45] rounded-xl p-4">
+                    <p className="text-[#8A9AB0] text-xs mb-1">On Order</p>
+                    <p className="text-blue-400 font-bold text-xl">{onOrder.length}</p>
+                  </div>
+                  <div className="bg-[#1a2d45] rounded-xl p-4">
+                    <p className="text-[#8A9AB0] text-xs mb-1">Received</p>
+                    <p className="text-green-400 font-bold text-xl">{received.length}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Generate PO action bar */}
+              {selectedForPO.size > 0 && (
+                <div className="bg-[#C8622A]/10 border border-[#C8622A]/30 rounded-xl px-4 py-3 flex items-center justify-between">
+                  <span className="text-[#C8622A] text-sm font-semibold">{selectedForPO.size} item{selectedForPO.size !== 1 ? 's' : ''} selected</span>
+                  <div className="flex gap-2">
+                    <button onClick={() => setSelectedForPO(new Set())} className="text-[#8A9AB0] hover:text-white text-sm transition-colors px-3">Clear</button>
+                    <button onClick={generatePO} disabled={generatingPO}
+                      className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                      {generatingPO ? 'Generating...' : `Generate PO for ${selectedForPO.size} item${selectedForPO.size !== 1 ? 's' : ''}`}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* BOM table */}
+              <div className="bg-[#1a2d45] rounded-xl p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-white font-bold text-lg">Materials — BOM</h3>
+                  <div className="flex gap-2">
+                    {unordered.length > 0 && selectedForPO.size === 0 && (
+                      <button onClick={() => setSelectedForPO(new Set(unordered.map(l => l.id)))}
+                        className="text-[#C8622A] text-sm hover:text-white transition-colors">
+                        Select all unordered
+                      </button>
+                    )}
+                    {!editingBOM ? (
+                      <button onClick={() => { setEditingBOM(true); setEditLines([...lineItems]); setSelectedLines(new Set()) }}
+                        className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                        Edit BOM
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button onClick={() => { setEditingBOM(false); setSelectedLines(new Set()) }}
+                          className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                        <button onClick={saveBOM} disabled={savingBOM}
+                          className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                          {savingBOM ? 'Saving...' : 'Save BOM'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {lineItems.length === 0 ? (
+                  <p className="text-[#8A9AB0] text-sm">No materials on this proposal's BOM.</p>
+                ) : editingBOM ? (
+                  <>
+                    {/* Bulk action bar */}
+                    {selectedLines.size > 0 && (
+                      <div className="bg-[#C8622A]/10 border border-[#C8622A]/30 rounded-xl px-4 py-3 mb-4 flex items-center gap-4 flex-wrap">
+                        <span className="text-[#C8622A] text-sm font-semibold">{selectedLines.size} selected</span>
+                        <div className="flex gap-2 flex-1 flex-wrap">
+                          <select value={bulkField} onChange={e => { setBulkField(e.target.value); setBulkValue('') }}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
+                            <option value="">— Bulk edit field —</option>
+                            <option value="vendor">Vendor</option>
+                            <option value="manufacturer">Manufacturer</option>
+                            <option value="category">Category</option>
+                            <option value="markup_percent">Markup %</option>
+                          </select>
+                          {bulkField === 'vendor' && (
+                            <select value={bulkValue} onChange={e => setBulkValue(e.target.value)}
+                              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
+                              <option value="">— Select vendor —</option>
+                              {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
+                              <option value="Other">Other</option>
+                            </select>
+                          )}
+                          {bulkField === 'category' && (
+                            <select value={bulkValue} onChange={e => setBulkValue(e.target.value)}
+                              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
+                              <option value="">— Select category —</option>
+                              {categories.map(c => <option key={c}>{c}</option>)}
+                            </select>
+                          )}
+                          {(bulkField === 'manufacturer' || bulkField === 'markup_percent') && (
+                            <input type={bulkField === 'markup_percent' ? 'number' : 'text'} value={bulkValue}
+                              onChange={e => setBulkValue(e.target.value)}
+                              placeholder={bulkField === 'markup_percent' ? 'e.g. 35' : 'e.g. Hanwha'}
+                              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]" />
+                          )}
+                          <button onClick={applyBulkEdit} disabled={!bulkField || !bulkValue}
+                            className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">Apply</button>
+                        </div>
+                        <button onClick={() => setSelectedLines(new Set())} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">Clear</button>
+                      </div>
+                    )}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-[#2a3d55]">
+                            <th className="py-2 pr-2 w-8">
+                              <input type="checkbox" checked={selectedLines.size === editLines.length && editLines.length > 0}
+                                onChange={toggleSelectAll} className="accent-[#C8622A]" />
+                            </th>
+                            {['Item', 'Mfr', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price'].map(h => (
+                              <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {editLines.map((line, i) => (
+                            <tr key={line.id} className={`border-b border-[#2a3d55]/30 ${selectedLines.has(line.id) ? 'bg-[#C8622A]/5' : ''}`}>
+                              <td className="pr-2 py-1">
+                                <input type="checkbox" checked={selectedLines.has(line.id)} onChange={() => toggleLineSelect(line.id)} className="accent-[#C8622A]" />
+                              </td>
+                              {[['item_name','text','Item'],['manufacturer','text','Mfr'],['part_number_sku','text','Part #'],['quantity','number','Qty']].map(([field, type, placeholder]) => (
+                                <td key={field} className="pr-2 py-1">
+                                  <input type={type} placeholder={placeholder} value={line[field] || ''}
+                                    onChange={e => updateEditLine(i, field, e.target.value)}
+                                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                                </td>
+                              ))}
+                              <td className="pr-2 py-1">
+                                <select value={line.unit || 'ea'} onChange={e => updateEditLine(i, 'unit', e.target.value)}
+                                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                                  {['ea','ft','lot','hr','box','roll'].map(u => <option key={u}>{u}</option>)}
+                                </select>
+                              </td>
+                              <td className="pr-2 py-1">
+                                <select value={line.category || ''} onChange={e => updateEditLine(i, 'category', e.target.value)}
+                                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                                  <option value="">Category</option>
+                                  {categories.map(c => <option key={c}>{c}</option>)}
+                                </select>
+                              </td>
+                              <td className="pr-2 py-1">
+                                <select value={line.vendor || ''} onChange={e => updateEditLine(i, 'vendor', e.target.value)}
+                                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                                  <option value="">— Vendor —</option>
+                                  {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
+                                  <option value="Other">Other</option>
+                                </select>
+                              </td>
+                              <td className="pr-2 py-1">
+                                <input type="number" placeholder="0.00" value={line.your_cost_unit || ''}
+                                  onChange={e => updateEditLine(i, 'your_cost_unit', e.target.value)}
+                                  className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                              </td>
+                              <td className="pr-2 py-1">
+                                <input type="number" placeholder="35" value={line.markup_percent || ''}
+                                  onChange={e => updateEditLine(i, 'markup_percent', e.target.value)}
+                                  className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                              </td>
+                              <td className="pr-2 py-1">
+                                <input type="number" placeholder="0.00" value={line.customer_price_unit || ''}
+                                  onChange={e => updateEditLine(i, 'customer_price_unit', e.target.value)}
+                                  className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#2a3d55]">
+                          <th className="py-2 pr-2 w-8">
+                            <input type="checkbox"
+                              checked={unordered.length > 0 && unordered.every(l => selectedForPO.has(l.id))}
+                              onChange={() => {
+                                const allSelected = unordered.every(l => selectedForPO.has(l.id))
+                                setSelectedForPO(prev => {
+                                  const next = new Set(prev)
+                                  unordered.forEach(l => allSelected ? next.delete(l.id) : next.add(l.id))
+                                  return next
+                                })
+                              }}
+                              className="accent-[#C8622A]" />
+                          </th>
+                          {['Item', 'Mfr / Part #', 'Vendor', 'Qty', 'Your Cost', 'PO #', 'Status', ''].map(h => (
+                            <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {lineItems.map(item => {
+                          const isOrdered = item.po_status === 'PO Sent' || item.po_status === 'Received'
+                          const isReceived = item.po_status === 'Received'
+                          return (
+                            <tr key={item.id} className={`border-b border-[#2a3d55]/50 ${isReceived ? 'opacity-60' : ''}`}>
+                              <td className="pr-2 py-3">
+                                {!isOrdered && (
+                                  <input type="checkbox"
+                                    checked={selectedForPO.has(item.id)}
+                                    onChange={() => setSelectedForPO(prev => {
+                                      const next = new Set(prev)
+                                      next.has(item.id) ? next.delete(item.id) : next.add(item.id)
+                                      return next
+                                    })}
+                                    className="accent-[#C8622A]" />
+                                )}
+                              </td>
+                              <td className="py-3 pr-4">
+                                <p className="text-white">{item.item_name}</p>
+                                {(item.manufacturer || item.part_number_sku) && (
+                                  <p className="text-[#8A9AB0] text-xs mt-0.5">{[item.manufacturer, item.part_number_sku].filter(Boolean).join(' · ')}</p>
+                                )}
+                              </td>
+                              <td className="text-[#8A9AB0] py-3 pr-4 text-sm">{item.vendor || '—'}</td>
+                              <td className="text-white py-3 pr-4 text-sm">{item.quantity} {item.unit}</td>
+                              <td className="text-white py-3 pr-4 text-sm">${fmt((item.your_cost_unit || 0) * (item.quantity || 0))}</td>
+                              <td className="py-3 pr-4">
+                                {item.po_number ? (
+                                  <span className="text-[#8A9AB0] text-xs font-mono">{item.po_number}</span>
+                                ) : <span className="text-[#2a3d55]">—</span>}
+                              </td>
+                              <td className="py-3 pr-4">
+                                <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                                  isReceived ? 'bg-green-500/20 text-green-400'
+                                  : item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400'
+                                  : 'bg-[#2a3d55] text-[#8A9AB0]'
+                                }`}>
+                                  {item.po_status || 'Not Ordered'}
+                                </span>
+                              </td>
+                              <td className="py-3">
+                                {item.po_status === 'PO Sent' && (
+                                  <button onClick={() => markReceived(item.id)}
+                                    className="text-xs bg-green-600/20 text-green-400 hover:bg-green-600/40 px-3 py-1 rounded font-semibold transition-colors whitespace-nowrap">
+                                    Mark Received
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Existing POs */}
+              {existingPOs.length > 0 && (
+                <div className="bg-[#1a2d45] rounded-xl p-6">
+                  <h3 className="text-white font-bold text-lg mb-4">Purchase Orders</h3>
+                  <div className="space-y-3">
+                    {existingPOs.map(po => {
+                      const poItems = lineItems.filter(l => l.po_number === po.po_number)
+                      const allReceived = poItems.length > 0 && poItems.every(l => l.po_status === 'Received')
+                      return (
+                        <div key={po.id} className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <p className="text-white font-semibold font-mono">{po.po_number}</p>
+                              {po.vendor && <p className="text-[#8A9AB0] text-sm mt-0.5">{po.vendor}</p>}
+                              <p className="text-[#8A9AB0] text-xs mt-1">{poItems.length} item{poItems.length !== 1 ? 's' : ''} · ${fmt(po.total)}</p>
+                            </div>
+                            <span className={`text-xs px-2 py-1 rounded font-semibold ${allReceived ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                              {allReceived ? 'All Received' : 'On Order'}
+                            </span>
+                          </div>
+                          {poItems.length > 0 && (
+                            <div className="mt-3 space-y-1">
+                              {poItems.map(item => (
+                                <div key={item.id} className="flex justify-between text-xs">
+                                  <span className="text-[#D6E4F0]">{item.item_name} <span className="text-[#8A9AB0]">× {item.quantity} {item.unit}</span></span>
+                                  <span className={item.po_status === 'Received' ? 'text-green-400' : 'text-blue-400'}>{item.po_status}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </div>
-
-            {/* Bulk action bar */}
-            {editingBOM && selectedLines.size > 0 && (
-              <div className="bg-[#C8622A]/10 border border-[#C8622A]/30 rounded-xl px-4 py-3 mb-4 flex items-center gap-4 flex-wrap">
-                <span className="text-[#C8622A] text-sm font-semibold">{selectedLines.size} item{selectedLines.size !== 1 ? 's' : ''} selected</span>
-                <div className="flex gap-2 flex-1 flex-wrap">
-                  <select value={bulkField} onChange={e => { setBulkField(e.target.value); setBulkValue('') }}
-                    className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
-                    <option value="">— Bulk edit field —</option>
-                    <option value="vendor">Vendor</option>
-                    <option value="manufacturer">Manufacturer</option>
-                    <option value="category">Category</option>
-                    <option value="markup_percent">Markup %</option>
-                  </select>
-                  {bulkField === 'vendor' && (
-                    <select value={bulkValue} onChange={e => setBulkValue(e.target.value)}
-                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
-                      <option value="">— Select vendor —</option>
-                      {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
-                      <option value="Other">Other</option>
-                    </select>
-                  )}
-                  {bulkField === 'category' && (
-                    <select value={bulkValue} onChange={e => setBulkValue(e.target.value)}
-                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
-                      <option value="">— Select category —</option>
-                      {categories.map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  )}
-                  {(bulkField === 'manufacturer' || bulkField === 'markup_percent') && (
-                    <input type={bulkField === 'markup_percent' ? 'number' : 'text'} value={bulkValue}
-                      onChange={e => setBulkValue(e.target.value)}
-                      placeholder={bulkField === 'markup_percent' ? 'e.g. 35' : 'e.g. Hanwha'}
-                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]" />
-                  )}
-                  <button onClick={applyBulkEdit} disabled={!bulkField || !bulkValue}
-                    className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                    Apply
-                  </button>
-                </div>
-                <button onClick={() => setSelectedLines(new Set())} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">Clear</button>
-              </div>
-            )}
-
-            {lineItems.length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No line items on this proposal.</p>
-            ) : editingBOM ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#2a3d55]">
-                      <th className="py-2 pr-2 w-8">
-                        <input type="checkbox" checked={selectedLines.size === editLines.length && editLines.length > 0}
-                          onChange={toggleSelectAll} className="accent-[#C8622A]" />
-                      </th>
-                      {['Item', 'Mfr', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price'].map(h => (
-                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {editLines.map((line, i) => (
-                      <tr key={line.id} className={`border-b border-[#2a3d55]/30 ${selectedLines.has(line.id) ? 'bg-[#C8622A]/5' : ''}`}>
-                        <td className="pr-2 py-1">
-                          <input type="checkbox" checked={selectedLines.has(line.id)} onChange={() => toggleLineSelect(line.id)} className="accent-[#C8622A]" />
-                        </td>
-                        {[
-                          ['item_name', 'text', 'Item'],
-                          ['manufacturer', 'text', 'Mfr'],
-                          ['part_number_sku', 'text', 'Part #'],
-                          ['quantity', 'number', 'Qty'],
-                        ].map(([field, type, placeholder]) => (
-                          <td key={field} className="pr-2 py-1">
-                            <input type={type} placeholder={placeholder} value={line[field] || ''}
-                              onChange={e => updateEditLine(i, field, e.target.value)}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                          </td>
-                        ))}
-                        <td className="pr-2 py-1">
-                          <select value={line.unit || 'ea'} onChange={e => updateEditLine(i, 'unit', e.target.value)}
-                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                            {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
-                          </select>
-                        </td>
-                        <td className="pr-2 py-1">
-                          <select value={line.category || ''} onChange={e => updateEditLine(i, 'category', e.target.value)}
-                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                            <option value="">Category</option>
-                            {categories.map(c => <option key={c}>{c}</option>)}
-                          </select>
-                        </td>
-                        <td className="pr-2 py-1">
-                          <select value={line.vendor || ''} onChange={e => updateEditLine(i, 'vendor', e.target.value)}
-                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                            <option value="">— Vendor —</option>
-                            {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
-                            <option value="Other">Other</option>
-                          </select>
-                        </td>
-                        <td className="pr-2 py-1">
-                          <input type="number" placeholder="0.00" value={line.your_cost_unit || ''}
-                            onChange={e => updateEditLine(i, 'your_cost_unit', e.target.value)}
-                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                        </td>
-                        <td className="pr-2 py-1">
-                          <input type="number" placeholder="35" value={line.markup_percent || ''}
-                            onChange={e => updateEditLine(i, 'markup_percent', e.target.value)}
-                            className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                        </td>
-                        <td className="pr-2 py-1">
-                          <input type="number" placeholder="0.00" value={line.customer_price_unit || ''}
-                            onChange={e => updateEditLine(i, 'customer_price_unit', e.target.value)}
-                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#2a3d55]">
-                      {['Item', 'Mfr', 'Part #', 'Vendor', 'Qty', 'Unit Price', 'Total', 'Status'].map(h => (
-                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lineItems.map(item => (
-                      <tr key={item.id} className="border-b border-[#2a3d55]/50">
-                        <td className="text-white py-3 pr-4">{item.item_name}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{item.manufacturer || '—'}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor || '—'}</td>
-                        <td className="text-white py-3 pr-4">{item.quantity}</td>
-                        <td className="text-white py-3 pr-4">${fmt(item.customer_price_unit)}</td>
-                        <td className="text-white py-3 pr-4">${fmt(item.customer_price_total)}</td>
-                        <td className="py-3">
-                          <span className={`text-xs px-2 py-1 rounded font-semibold ${item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
-                            {item.po_status || item.pricing_status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan="5" className="text-[#8A9AB0] pt-4 text-right font-semibold">Total</td>
-                      <td className="text-[#C8622A] pt-4 font-bold pr-4 text-right">${fmt(lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0))}</td>
-                      <td></td><td></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
+          )
+        })()}
 
         {/* CHANGE ORDERS TAB */}
         {activeTab === 'changeorders' && (
