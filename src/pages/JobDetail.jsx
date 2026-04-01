@@ -46,13 +46,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [activeTab, setActiveTab] = useState('checklist')
   const [savingStatus, setSavingStatus] = useState(false)
 
-  // Bulk BOM edit
-  const [editingBOM, setEditingBOM] = useState(false)
-  const [editLines, setEditLines] = useState([])
-  const [selectedLines, setSelectedLines] = useState(new Set())
-  const [bulkField, setBulkField] = useState('')
-  const [bulkValue, setBulkValue] = useState('')
-  const [savingBOM, setSavingBOM] = useState(false)
   const [vendors, setVendors] = useState([])
 
   // PO generation
@@ -105,13 +98,11 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         .select('*')
         .eq('proposal_id', jobData.proposal_id)
       setLineItems(lineData || [])
-      setEditLines(lineData || [])
 
-      // Fetch vendors for bulk edit
       if (profileData?.org_id) {
         const { data: vendorData } = await supabase
           .from('vendors')
-          .select('id, vendor_name, default_markup_percent')
+          .select('id, vendor_name, contact_email')
           .eq('org_id', profileData.org_id)
           .eq('active', true)
           .order('vendor_name')
@@ -268,83 +259,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       setNotifyMessage(`Hi ${job.clients.client_name || job.clients.company},\n\nYour job has been scheduled to start on ${new Date(value).toLocaleDateString()}. We look forward to working with you.\n\nPlease reach out with any questions.`)
       setShowNotifyModal(true)
     }
-  }
-
-  // Bulk BOM edit
-  const toggleLineSelect = (id) => {
-    setSelectedLines(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  const toggleSelectAll = () => {
-    if (selectedLines.size === editLines.length) {
-      setSelectedLines(new Set())
-    } else {
-      setSelectedLines(new Set(editLines.map(l => l.id)))
-    }
-  }
-
-  const applyBulkEdit = () => {
-    if (!bulkField || !bulkValue || selectedLines.size === 0) return
-    setEditLines(prev => prev.map(l => {
-      if (!selectedLines.has(l.id)) return l
-      const updated = { ...l, [bulkField]: bulkValue }
-      // Auto-apply vendor markup
-      if (bulkField === 'vendor') {
-        const vendor = vendors.find(v => v.vendor_name === bulkValue)
-        if (vendor?.default_markup_percent) updated.markup_percent = vendor.default_markup_percent
-      }
-      // Recalculate price if cost/markup changed
-      if (bulkField === 'markup_percent' && l.your_cost_unit) {
-        updated.customer_price_unit = (parseFloat(l.your_cost_unit) * (1 + parseFloat(bulkValue) / 100)).toFixed(2)
-        updated.customer_price_total = (parseFloat(updated.customer_price_unit) * parseFloat(l.quantity || 0)).toFixed(2)
-      }
-      return updated
-    }))
-    setBulkField('')
-    setBulkValue('')
-    setSelectedLines(new Set())
-  }
-
-  const saveBOM = async () => {
-    setSavingBOM(true)
-    for (const line of editLines) {
-      await supabase.from('bom_line_items').update({
-        item_name: line.item_name,
-        manufacturer: line.manufacturer || null,
-        part_number_sku: line.part_number_sku || null,
-        quantity: parseFloat(line.quantity) || 0,
-        unit: line.unit,
-        category: line.category,
-        vendor: line.vendor,
-        your_cost_unit: parseFloat(line.your_cost_unit) || null,
-        markup_percent: parseFloat(line.markup_percent) || null,
-        customer_price_unit: parseFloat(line.customer_price_unit) || null,
-        customer_price_total: (parseFloat(line.customer_price_unit) || 0) * (parseFloat(line.quantity) || 0),
-        pricing_status: line.your_cost_unit ? 'Confirmed' : 'Needs Pricing',
-      }).eq('id', line.id)
-    }
-    setLineItems([...editLines])
-    setEditingBOM(false)
-    setSelectedLines(new Set())
-    setSavingBOM(false)
-  }
-
-  const updateEditLine = (index, field, value) => {
-    setEditLines(prev => {
-      const updated = [...prev]
-      updated[index] = { ...updated[index], [field]: value }
-      if (field === 'your_cost_unit' || field === 'markup_percent') {
-        const cost = parseFloat(updated[index].your_cost_unit) || 0
-        const markup = parseFloat(updated[index].markup_percent) || 0
-        updated[index].customer_price_unit = (cost * (1 + markup / 100)).toFixed(2)
-        updated[index].customer_price_total = (parseFloat(updated[index].customer_price_unit) * (parseFloat(updated[index].quantity) || 0)).toFixed(2)
-      }
-      return updated
-    })
   }
 
   const saveChangeOrder = async () => {
@@ -796,6 +710,83 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                 {sendingNotify ? 'Sending...' : 'Send Notification →'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PO Modal */}
+      {showPOModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-white font-bold text-lg mb-4">Generate Purchase Order</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Select Vendor</label>
+                <select
+                  value={poVendor}
+                  onChange={e => {
+                    setPOVendor(e.target.value)
+                    const found = vendors.find(v => v.vendor_name === e.target.value)
+                    setPOVendorEmail(found?.contact_email || '')
+                  }}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                >
+                  <option value="">— Select vendor —</option>
+                  {[...new Set(lineItems.filter(l => l.vendor && l.po_status !== 'PO Sent').map(l => l.vendor))].map(v => (
+                    <option key={v} value={v}>{v} ({lineItems.filter(l => l.vendor === v && l.po_status !== 'PO Sent').length} items)</option>
+                  ))}
+                </select>
+                {poVendor && (
+                  <div className="mt-2">
+                    <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor Email</label>
+                    <input type="email" value={poVendorEmail} onChange={e => setPOVendorEmail(e.target.value)}
+                      placeholder="vendor@company.com"
+                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
+                <div className="flex gap-2 mb-2">
+                  <button onClick={() => setPOAutoNumber(true)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                    Auto-Generate
+                  </button>
+                  <button onClick={() => setPOAutoNumber(false)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${!poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                    Enter Manually
+                  </button>
+                </div>
+                {!poAutoNumber && (
+                  <input type="text" value={poNumber} onChange={e => setPONumber(e.target.value)}
+                    placeholder="e.g. PO-2026-001"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                )}
+              </div>
+              {poVendor && (
+                <div className="bg-[#0F1C2E] rounded-lg p-3">
+                  <p className="text-[#8A9AB0] text-xs mb-2">Items for {poVendor}:</p>
+                  {lineItems.filter(l => l.vendor === poVendor && l.po_status !== 'PO Sent').map(item => (
+                    <div key={item.id} className="flex justify-between text-xs py-1 border-b border-[#2a3d55]/30 last:border-0">
+                      <span className="text-white">{item.item_name}</span>
+                      <span className="text-[#8A9AB0]">Qty: {item.quantity} · ${fmt(item.your_cost_unit)}/ea</span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between text-xs pt-2 font-semibold">
+                    <span className="text-[#8A9AB0]">Total Cost</span>
+                    <span className="text-[#C8622A]">${fmt(lineItems.filter(l => l.vendor === poVendor && l.po_status !== 'PO Sent').reduce((s, i) => s + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0))}</span>
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setShowPOModal(false); setPOVendor(''); setPOVendorEmail('') }}
+                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={generatePO} disabled={!poVendor || generatingPO || (!poAutoNumber && !poNumber)}
+                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {generatingPO ? 'Generating...' : 'Generate PO'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
