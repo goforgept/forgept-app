@@ -54,7 +54,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
   // Change order modal
   const [showCOModal, setShowCOModal] = useState(false)
-  const [coForm, setCoForm] = useState({ name: '', description: '', amount: '' })
+  const [coForm, setCoForm] = useState({ name: '', description: '' })
+  const [coLineItems, setCoLineItems] = useState([])
+  const [coLaborItems, setCoLaborItems] = useState([])
   const [savingCO, setSavingCO] = useState(false)
 
   // Checklist add
@@ -346,20 +348,58 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     })
   }
 
+  const calcCoTotals = (lineItems, laborItems) => {
+    const matTotal = lineItems.reduce((sum, l) => sum + (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0), 0)
+    const labTotal = laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+    return { matTotal, labTotal, total: matTotal + labTotal }
+  }
+
+  const updateCoLine = (idx, field, value) => {
+    setCoLineItems(prev => {
+      const next = [...prev]
+      next[idx] = { ...next[idx], [field]: value }
+      if (field === 'your_cost_unit' || field === 'markup_percent') {
+        const cost = parseFloat(field === 'your_cost_unit' ? value : next[idx].your_cost_unit) || 0
+        const markup = parseFloat(field === 'markup_percent' ? value : next[idx].markup_percent) || 0
+        next[idx].customer_price_unit = (cost * (1 + markup / 100)).toFixed(2)
+      }
+      return next
+    })
+  }
+
+  const updateCoLabor = (idx, field, value) => {
+    setCoLaborItems(prev => {
+      const next = [...prev]
+      next[idx] = { ...next[idx], [field]: value }
+      if (field === 'your_cost' || field === 'markup' || field === 'quantity') {
+        const cost = parseFloat(field === 'your_cost' ? value : next[idx].your_cost) || 0
+        const markup = parseFloat(field === 'markup' ? value : next[idx].markup) || 0
+        const qty = parseFloat(field === 'quantity' ? value : next[idx].quantity) || 0
+        next[idx].customer_price = (cost * (1 + markup / 100) * qty).toFixed(2)
+      }
+      return next
+    })
+  }
+
   const saveChangeOrder = async () => {
     if (!coForm.name.trim()) return
     setSavingCO(true)
+    const { total } = calcCoTotals(coLineItems, coLaborItems)
     const { data } = await supabase.from('change_orders').insert({
       job_id: id,
       org_id: profile?.org_id,
       proposal_id: job?.proposal_id || null,
       name: coForm.name,
       description: coForm.description,
-      amount: parseFloat(coForm.amount) || 0,
+      amount: total,
+      line_items: coLineItems.length > 0 ? coLineItems : null,
+      labor_items: coLaborItems.length > 0 ? coLaborItems : null,
       status: 'Pending'
     }).select().single()
     if (data) setChangeOrders(prev => [data, ...prev])
-    setCoForm({ name: '', description: '', amount: '' })
+    setCoForm({ name: '', description: '' })
+    setCoLineItems([])
+    setCoLaborItems([])
     setShowCOModal(false)
     setSavingCO(false)
   }
@@ -750,11 +790,10 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
               <div className="space-y-3">
                 {changeOrders.map(co => (
                   <div key={co.id} className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
-                    <div className="flex justify-between items-start">
+                    <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="text-white font-semibold">{co.name}</p>
                         {co.description && <p className="text-[#8A9AB0] text-sm mt-0.5">{co.description}</p>}
-                        <p className="text-[#C8622A] font-bold mt-1">${fmt(co.amount)}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`text-xs px-2 py-1 rounded font-semibold ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : co.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
@@ -770,6 +809,44 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                         )}
                       </div>
                     </div>
+
+                    {/* Line items breakdown */}
+                    {(co.line_items?.length > 0 || co.labor_items?.length > 0) ? (
+                      <div className="mt-3 space-y-2">
+                        {co.line_items?.length > 0 && (
+                          <div>
+                            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">Materials</p>
+                            <div className="space-y-1">
+                              {co.line_items.map((item, i) => (
+                                <div key={i} className="flex justify-between text-xs">
+                                  <span className="text-[#D6E4F0]">{item.item_name} <span className="text-[#8A9AB0]">× {item.quantity} {item.unit}</span></span>
+                                  <span className="text-white">${fmt((parseFloat(item.customer_price_unit) || 0) * (parseFloat(item.quantity) || 0))}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {co.labor_items?.length > 0 && (
+                          <div>
+                            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">Labor</p>
+                            <div className="space-y-1">
+                              {co.labor_items.map((item, i) => (
+                                <div key={i} className="flex justify-between text-xs">
+                                  <span className="text-[#D6E4F0]">{item.role} <span className="text-[#8A9AB0]">× {item.quantity} {item.unit}</span></span>
+                                  <span className="text-white">${fmt(parseFloat(item.customer_price) || 0)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center pt-2 border-t border-[#2a3d55]">
+                          <span className="text-[#8A9AB0] text-xs font-semibold">Total</span>
+                          <span className="text-[#C8622A] font-bold">${fmt(co.amount)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[#C8622A] font-bold text-sm mt-1">${fmt(co.amount)}</p>
+                    )}
                   </div>
                 ))}
                 {totalCOAmount > 0 && (
@@ -981,38 +1058,199 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       )}
 
       {/* Change Order Modal */}
-      {showCOModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-5">New Change Order</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Name <span className="text-[#C8622A]">*</span></label>
-                <input type="text" value={coForm.name} onChange={e => setCoForm(p => ({ ...p, name: e.target.value }))}
-                  placeholder="e.g. Additional camera location" className={`w-full ${inputClass}`} />
-              </div>
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Description</label>
-                <textarea value={coForm.description} onChange={e => setCoForm(p => ({ ...p, description: e.target.value }))}
-                  rows={3} placeholder="Details about the change..."
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
-              </div>
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Amount ($)</label>
-                <input type="number" value={coForm.amount} onChange={e => setCoForm(p => ({ ...p, amount: e.target.value }))}
-                  placeholder="0.00" className={`w-full ${inputClass}`} />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowCOModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={saveChangeOrder} disabled={savingCO || !coForm.name.trim()}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {savingCO ? 'Saving...' : 'Create Change Order'}
-                </button>
+      {showCOModal && (() => {
+        const { matTotal, labTotal, total } = calcCoTotals(coLineItems, coLaborItems)
+        const coInputClass = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+              <h3 className="text-white font-bold text-lg mb-5">New Change Order</h3>
+              <div className="space-y-5">
+
+                {/* Name + Description */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[#8A9AB0] text-xs mb-1 block">Name <span className="text-[#C8622A]">*</span></label>
+                    <input type="text" value={coForm.name} onChange={e => setCoForm(p => ({ ...p, name: e.target.value }))}
+                      placeholder="e.g. Additional camera location" className={`w-full ${inputClass}`} />
+                  </div>
+                  <div>
+                    <label className="text-[#8A9AB0] text-xs mb-1 block">Description</label>
+                    <input type="text" value={coForm.description} onChange={e => setCoForm(p => ({ ...p, description: e.target.value }))}
+                      placeholder="Brief description..." className={`w-full ${inputClass}`} />
+                  </div>
+                </div>
+
+                {/* Materials */}
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Materials</p>
+                    <button onClick={() => setCoLineItems(p => [...p, { id: crypto.randomUUID(), item_name: '', quantity: 1, unit: 'ea', your_cost_unit: '', markup_percent: 35, customer_price_unit: '' }])}
+                      className="text-[#C8622A] text-xs hover:text-white transition-colors">+ Add Material</button>
+                  </div>
+                  {coLineItems.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-[#2a3d55]">
+                            {['Item Name', 'Qty', 'Unit', 'Your Cost', 'Markup %', 'Unit Price', 'Total', ''].map(h => (
+                              <th key={h} className="text-[#8A9AB0] text-left py-1.5 pr-2 font-normal">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {coLineItems.map((line, i) => {
+                            const lineTotal = (parseFloat(line.customer_price_unit) || 0) * (parseFloat(line.quantity) || 0)
+                            return (
+                              <tr key={line.id} className="border-b border-[#2a3d55]/30">
+                                <td className="pr-2 py-1">
+                                  <input value={line.item_name} onChange={e => updateCoLine(i, 'item_name', e.target.value)}
+                                    placeholder="Item name" className={`w-36 ${coInputClass}`} />
+                                </td>
+                                <td className="pr-2 py-1">
+                                  <input type="number" min="0" step="any" value={line.quantity} onChange={e => updateCoLine(i, 'quantity', e.target.value)}
+                                    className={`w-16 ${coInputClass}`} />
+                                </td>
+                                <td className="pr-2 py-1">
+                                  <select value={line.unit} onChange={e => updateCoLine(i, 'unit', e.target.value)}
+                                    className={`${coInputClass}`}>
+                                    {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
+                                  </select>
+                                </td>
+                                <td className="pr-2 py-1">
+                                  <input type="number" min="0" step="0.01" placeholder="0.00" value={line.your_cost_unit}
+                                    onChange={e => updateCoLine(i, 'your_cost_unit', e.target.value)}
+                                    className={`w-20 ${coInputClass}`} />
+                                </td>
+                                <td className="pr-2 py-1">
+                                  <input type="number" min="0" placeholder="35" value={line.markup_percent}
+                                    onChange={e => updateCoLine(i, 'markup_percent', e.target.value)}
+                                    className={`w-14 ${coInputClass}`} />
+                                </td>
+                                <td className="pr-2 py-1">
+                                  <input type="number" min="0" step="0.01" placeholder="0.00" value={line.customer_price_unit}
+                                    onChange={e => updateCoLine(i, 'customer_price_unit', e.target.value)}
+                                    className={`w-20 ${coInputClass}`} />
+                                </td>
+                                <td className="pr-2 py-1 text-white font-medium">${fmt(lineTotal)}</td>
+                                <td className="py-1">
+                                  <button onClick={() => setCoLineItems(p => p.filter((_, idx) => idx !== i))}
+                                    className="text-[#8A9AB0] hover:text-red-400 transition-colors">✕</button>
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan="6" className="text-[#8A9AB0] text-right pt-2 pr-2 font-semibold">Materials Total</td>
+                            <td className="text-[#C8622A] font-bold pt-2">${fmt(matTotal)}</td>
+                            <td></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                  {coLineItems.length === 0 && (
+                    <p className="text-[#8A9AB0] text-xs italic">No materials added yet.</p>
+                  )}
+                </div>
+
+                {/* Labor */}
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Labor</p>
+                    <button onClick={() => setCoLaborItems(p => [...p, { id: crypto.randomUUID(), role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: '' }])}
+                      className="text-[#C8622A] text-xs hover:text-white transition-colors">+ Add Labor</button>
+                  </div>
+                  {coLaborItems.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-[#2a3d55]">
+                            {['Role', 'Qty', 'Unit', 'Your Cost', 'Markup %', 'Total', ''].map(h => (
+                              <th key={h} className="text-[#8A9AB0] text-left py-1.5 pr-2 font-normal">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {coLaborItems.map((labor, i) => (
+                            <tr key={labor.id} className="border-b border-[#2a3d55]/30">
+                              <td className="pr-2 py-1">
+                                <input value={labor.role} onChange={e => updateCoLabor(i, 'role', e.target.value)}
+                                  placeholder="e.g. Electrician" className={`w-36 ${coInputClass}`} />
+                              </td>
+                              <td className="pr-2 py-1">
+                                <input type="number" min="0" step="0.5" value={labor.quantity}
+                                  onChange={e => updateCoLabor(i, 'quantity', e.target.value)}
+                                  className={`w-16 ${coInputClass}`} />
+                              </td>
+                              <td className="pr-2 py-1">
+                                <select value={labor.unit} onChange={e => updateCoLabor(i, 'unit', e.target.value)}
+                                  className={`${coInputClass}`}>
+                                  {['hr', 'day', 'lot'].map(u => <option key={u}>{u}</option>)}
+                                </select>
+                              </td>
+                              <td className="pr-2 py-1">
+                                <input type="number" min="0" step="0.01" placeholder="0.00" value={labor.your_cost}
+                                  onChange={e => updateCoLabor(i, 'your_cost', e.target.value)}
+                                  className={`w-20 ${coInputClass}`} />
+                              </td>
+                              <td className="pr-2 py-1">
+                                <input type="number" min="0" placeholder="35" value={labor.markup}
+                                  onChange={e => updateCoLabor(i, 'markup', e.target.value)}
+                                  className={`w-14 ${coInputClass}`} />
+                              </td>
+                              <td className="pr-2 py-1 text-white font-medium">${fmt(parseFloat(labor.customer_price) || 0)}</td>
+                              <td className="py-1">
+                                <button onClick={() => setCoLaborItems(p => p.filter((_, idx) => idx !== i))}
+                                  className="text-[#8A9AB0] hover:text-red-400 transition-colors">✕</button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan="5" className="text-[#8A9AB0] text-right pt-2 pr-2 font-semibold">Labor Total</td>
+                            <td className="text-[#C8622A] font-bold pt-2">${fmt(labTotal)}</td>
+                            <td></td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                  {coLaborItems.length === 0 && (
+                    <p className="text-[#8A9AB0] text-xs italic">No labor added yet.</p>
+                  )}
+                </div>
+
+                {/* Summary */}
+                {(coLineItems.length > 0 || coLaborItems.length > 0) && (
+                  <div className="bg-[#0F1C2E] rounded-xl p-4 flex justify-between items-center">
+                    <div className="text-sm text-[#8A9AB0] space-y-0.5">
+                      {coLineItems.length > 0 && <p>Materials: <span className="text-white">${fmt(matTotal)}</span></p>}
+                      {coLaborItems.length > 0 && <p>Labor: <span className="text-white">${fmt(labTotal)}</span></p>}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[#8A9AB0] text-xs mb-0.5">Change Order Total</p>
+                      <p className="text-[#C8622A] font-bold text-xl">${fmt(total)}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-1">
+                  <button onClick={() => { setShowCOModal(false); setCoLineItems([]); setCoLaborItems([]) }}
+                    className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                  <button onClick={saveChangeOrder} disabled={savingCO || !coForm.name.trim()}
+                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                    {savingCO ? 'Saving...' : 'Create Change Order'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
