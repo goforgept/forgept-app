@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import POList from '../components/POList'
 
 const AUTO_CHECK_TYPES = [
   { type: 'proposal_signed', label: 'Proposal signed', icon: '✍️' },
@@ -54,7 +55,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
   // Change order modal
   const [showCOModal, setShowCOModal] = useState(false)
-  const [coForm, setCoForm] = useState({ name: '', description: '', amount: '' })
+  const [coForm, setCoForm] = useState({ name: '', description: '', amount: '', amountOverride: false, materials: [], labor: [] })
   const [savingCO, setSavingCO] = useState(false)
 
   // Checklist add
