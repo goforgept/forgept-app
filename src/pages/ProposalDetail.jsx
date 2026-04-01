@@ -77,6 +77,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [qboConnected, setQboConnected] = useState(false)
   const [sendingToQBO, setSendingToQBO] = useState(false)
   const [qboInvoiceId, setQboInvoiceId] = useState(null)
+  const [vendors, setVendors] = useState([])
+  const [poVendorEmail, setPOVendorEmail] = useState('')
+  const [bulkField, setBulkField] = useState('')
+  const [bulkValue, setBulkValue] = useState('')
 
   useEffect(() => {
     fetchProposal()
@@ -84,6 +88,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     fetchProfile()
     fetchActivity()
     fetchPhotos()
+    fetchVendors()
   }, [])
 
   const fetchProposal = async () => {
@@ -162,6 +167,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const { data: teamData } = await supabase.from('profiles').select('id, full_name, email').eq('org_id', data.org_id)
       setOrgProfiles(teamData || [])
     }
+  }
+
+  const fetchVendors = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+    if (!prof?.org_id) return
+    const { data } = await supabase.from('vendors').select('id, vendor_name, contact_email').eq('org_id', prof.org_id).eq('active', true).order('vendor_name')
+    setVendors(data || [])
   }
 
   const fetchActivity = async () => {
@@ -258,6 +271,30 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     logActivity(`Close date updated to ${newDate}`)
   }
 
+  const toggleLumpSum = async () => {
+    const newVal = !proposal?.lump_sum_pricing
+    await supabase.from('proposals').update({ lump_sum_pricing: newVal }).eq('id', id)
+    setProposal(prev => ({ ...prev, lump_sum_pricing: newVal }))
+  }
+
+  const updateTaxRate = async (val) => {
+    const num = parseFloat(val) || null
+    await supabase.from('proposals').update({ tax_rate: num }).eq('id', id)
+    setProposal(prev => ({ ...prev, tax_rate: num }))
+  }
+
+  const updateTaxExempt = async (val) => {
+    await supabase.from('proposals').update({ tax_exempt: val, tax_rate: val ? null : proposal?.tax_rate }).eq('id', id)
+    setProposal(prev => ({ ...prev, tax_exempt: val, tax_rate: val ? null : prev?.tax_rate }))
+  }
+
+  const applyBulkEdit = () => {
+    if (!bulkField || !bulkValue) return
+    setEditLines(prev => prev.map(l => ({ ...l, [bulkField]: bulkValue })))
+    setBulkField('')
+    setBulkValue('')
+  }
+
   const generateSOW = async () => {
     setGeneratingSOW(true)
     try {
@@ -304,9 +341,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       acc[vendor].push(item)
       return acc
     }, {})
-    // Init vendor data with empty emails and Excel unchecked
+    // Init vendor data — prepopulate emails from vendor records
     const initData = {}
-    Object.keys(byVendor).forEach(v => { initData[v] = { email: '', attachExcel: false } })
+    Object.keys(byVendor).forEach(v => {
+      const found = vendors.find(vr => vr.vendor_name === v)
+      initData[v] = { email: found?.contact_email || '', attachExcel: false }
+    })
     setRfqVendorData(initData)
     setShowRFQModal(true)
   }
@@ -990,7 +1030,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             quantity: parseFloat(l.quantity) || 0,
             unit: l.unit,
             category: l.category,
-            vendor: l.vendor,
+            vendor: l.vendor === '__custom__' ? null : l.vendor,
             your_cost_unit: parseFloat(l.your_cost_unit) || null,
             markup_percent: parseFloat(l.markup_percent) || null,
             customer_price_unit: parseFloat(l.customer_price_unit) || null,
@@ -1466,22 +1506,36 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Materials & Pricing', 14, yPos)
       yPos += 6
-      autoTable(doc, {
-        startY: yPos,
-        head: [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']],
-        body: lineItems.map(item => [
-          item.item_name,
-          item.part_number_sku || '—',
-          item.quantity,
-          `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-          `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-        ]),
-        foot: [['', '', '', 'Total', `$${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        styles: { fontSize: 9 }
-      })
+      const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
+      if (proposal?.lump_sum_pricing) {
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Item', 'Part #', 'Qty']],
+          body: lineItems.map(item => [item.item_name, item.part_number_sku || '—', item.quantity]),
+          foot: [['', 'Materials Total', `$${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+          footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
+          styles: { fontSize: 9 }
+        })
+      } else {
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']],
+          body: lineItems.map(item => [
+            item.item_name,
+            item.part_number_sku || '—',
+            item.quantity,
+            `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+            `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+          ]),
+          foot: [['', '', '', 'Total', `$${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+          footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
+          styles: { fontSize: 9 }
+        })
+      }
     }
 
     const pdfLaborItems = proposal?.labor_items || []
@@ -1710,7 +1764,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               </select>
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-4 mt-6">
+          <div className="grid grid-cols-6 gap-4 mt-6">
             <div>
               <p className="text-[#8A9AB0] text-xs">Rep</p>
               <p className="text-white text-sm font-medium">{proposal?.rep_name}</p>
@@ -1733,6 +1787,30 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               <p className="text-[#C8622A] text-sm font-medium">
                 {proposal?.total_gross_margin_percent ? `${proposal.total_gross_margin_percent.toFixed(1)}%` : '—'}
               </p>
+            </div>
+            <div>
+              <p className="text-[#8A9AB0] text-xs mb-1">Tax Exempt</p>
+              <button
+                onClick={() => updateTaxExempt(!proposal?.tax_exempt)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${proposal?.tax_exempt ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-[#0F1C2E] text-[#8A9AB0] border border-[#2a3d55] hover:text-white'}`}
+              >
+                {proposal?.tax_exempt ? 'Exempt' : 'Taxable'}
+              </button>
+            </div>
+            <div>
+              <p className="text-[#8A9AB0] text-xs mb-1">Tax Rate %</p>
+              {proposal?.tax_exempt ? (
+                <p className="text-[#8A9AB0] text-sm">—</p>
+              ) : (
+                <input
+                  type="number"
+                  step="0.01"
+                  placeholder="e.g. 8.5"
+                  value={proposal?.tax_rate ?? ''}
+                  onChange={e => updateTaxRate(e.target.value)}
+                  className="w-full bg-transparent text-white text-sm font-medium border-b border-[#2a3d55] focus:outline-none focus:border-[#C8622A]"
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1771,6 +1849,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   {sendingToQBO ? 'Sending...' : qboInvoiceId ? '✓ In QuickBooks' : '🟢 Send to QuickBooks'}
                 </button>
               )}
+              <button
+                onClick={toggleLumpSum}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${proposal?.lump_sum_pricing ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}
+                title="Hide per-item pricing on PDF — show lump sum only"
+              >
+                Lump Sum
+              </button>
               <button
                 onClick={downloadPDF}
                 className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors"
@@ -2003,6 +2088,49 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             )
           ) : (
             /* BOM Edit Mode */
+            <div>
+              {/* Bulk Edit Bar */}
+              <div className="flex items-center gap-2 mb-4 p-3 bg-[#0F1C2E] rounded-lg border border-[#2a3d55]">
+                <span className="text-[#8A9AB0] text-xs font-semibold whitespace-nowrap">Bulk Edit</span>
+                <select
+                  value={bulkField}
+                  onChange={e => { setBulkField(e.target.value); setBulkValue('') }}
+                  className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
+                >
+                  <option value="">— Field —</option>
+                  <option value="manufacturer">Manufacturer</option>
+                  <option value="category">Category</option>
+                  <option value="vendor">Vendor</option>
+                  <option value="markup_percent">Markup %</option>
+                </select>
+                {bulkField === 'category' ? (
+                  <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                    <option value="">— Category —</option>
+                    {categories.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                ) : bulkField === 'vendor' ? (
+                  <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                    <option value="">— Vendor —</option>
+                    {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type={bulkField === 'markup_percent' ? 'number' : 'text'}
+                    placeholder={bulkField ? `Enter ${bulkField}` : ''}
+                    value={bulkValue}
+                    onChange={e => setBulkValue(e.target.value)}
+                    disabled={!bulkField}
+                    className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] disabled:opacity-40"
+                  />
+                )}
+                <button
+                  onClick={applyBulkEdit}
+                  disabled={!bulkField || !bulkValue}
+                  className="bg-[#C8622A] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40 whitespace-nowrap"
+                >
+                  Apply to All
+                </button>
+              </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -2050,14 +2178,25 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                           {categories.map(c => <option key={c}>{c}</option>)}
                         </select>
                       </td>
-                      <td className="pr-2 py-1">
-                        <input
-                          type="text"
-                          placeholder="Vendor"
-                          value={line.vendor || ''}
-                          onChange={e => updateEditLine(i, 'vendor', e.target.value)}
+                      <td className="pr-2 py-1 min-w-[120px]">
+                        <select
+                          value={vendors.some(v => v.vendor_name === line.vendor) ? line.vendor : (line.vendor ? '__other__' : '')}
+                          onChange={e => updateEditLine(i, 'vendor', e.target.value === '__other__' ? '__custom__' : e.target.value)}
                           className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
-                        />
+                        >
+                          <option value="">— Vendor —</option>
+                          {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
+                          <option value="__other__">Other...</option>
+                        </select>
+                        {line.vendor && !vendors.some(v => v.vendor_name === line.vendor) && (
+                          <input
+                            type="text"
+                            placeholder="Vendor name"
+                            value={line.vendor === '__custom__' ? '' : line.vendor}
+                            onChange={e => updateEditLine(i, 'vendor', e.target.value || '__custom__')}
+                            className="w-full mt-1 bg-[#0F1C2E] text-white border border-[#C8622A]/40 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                        )}
                       </td>
                       <td className="pr-2 py-1">
                         <input
@@ -2101,6 +2240,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               <button onClick={addEditLine} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">
                 + Add Line Item
               </button>
+            </div>{/* end overflow-x-auto */}
 
               {/* Labor Section — mirrors materials BOM table */}
               <div className="mt-8">
@@ -2876,7 +3016,11 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Select Vendor</label>
                 <select
                   value={poVendor || ''}
-                  onChange={e => setPOVendor(e.target.value)}
+                  onChange={e => {
+                    setPOVendor(e.target.value)
+                    const found = vendors.find(v => v.vendor_name === e.target.value)
+                    setPOVendorEmail(found?.contact_email || '')
+                  }}
                   className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
                 >
                   <option value="">— Select vendor —</option>
@@ -2884,6 +3028,18 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                     <option key={v} value={v}>{v} ({lineItems.filter(l => l.vendor === v).length} items)</option>
                   ))}
                 </select>
+                {poVendor && (
+                  <div className="mt-2">
+                    <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor Email (for your records)</label>
+                    <input
+                      type="email"
+                      value={poVendorEmail}
+                      onChange={e => setPOVendorEmail(e.target.value)}
+                      placeholder="vendor@company.com"
+                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                    />
+                  </div>
+                )}
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
