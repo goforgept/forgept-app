@@ -30,6 +30,51 @@ const STATUS_COLORS = {
   'Cancelled': 'bg-red-500/20 text-red-400',
 }
 
+// Inline PO list for JobDetail — queries by proposal_id
+function JobPOList({ proposalId }) {
+  const [pos, setPos] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!proposalId) { setLoading(false); return }
+    supabase.from('purchase_orders').select('*').eq('proposal_id', proposalId).order('created_at', { ascending: false })
+      .then(({ data }) => { setPos(data || []); setLoading(false) })
+  }, [proposalId])
+
+  const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+  if (loading) return <p className="text-[#8A9AB0] text-sm">Loading...</p>
+  if (!proposalId) return <p className="text-[#8A9AB0] text-sm">No proposal linked to this job.</p>
+  if (pos.length === 0) return (
+    <div className="text-center py-8 border-2 border-dashed border-[#2a3d55] rounded-xl">
+      <p className="text-[#8A9AB0]">No purchase orders yet.</p>
+      <p className="text-[#8A9AB0] text-xs mt-1">Generate POs from the linked proposal's BOM tab.</p>
+    </div>
+  )
+
+  return (
+    <div className="space-y-3">
+      {pos.map(po => (
+        <div key={po.id} className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-white font-semibold font-mono">{po.po_number}</p>
+              <p className="text-[#8A9AB0] text-sm mt-0.5">{po.vendor_name}</p>
+              <p className="text-[#8A9AB0] text-xs mt-0.5">{po.created_at ? new Date(po.created_at).toLocaleDateString() : ''}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[#C8622A] font-bold text-lg">${fmt(po.total_amount)}</p>
+              <span className={`text-xs px-2 py-1 rounded font-semibold ${po.status === 'Received' ? 'bg-green-500/20 text-green-400' : po.status === 'Sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                {po.status}
+              </span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function JobDetail({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true }) {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -52,22 +97,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [savingBOM, setSavingBOM] = useState(false)
   const [vendors, setVendors] = useState([])
 
-  // PO generation & tracking
-  const [selectedForPO, setSelectedForPO] = useState(new Set())
-  const [generatingPO, setGeneratingPO] = useState(false)
-  const [existingPOs, setExistingPOs] = useState([])
-  const [showPOModal, setShowPOModal] = useState(false)
-  const [poVendorEmail, setPOVendorEmail] = useState('')
-  const [poNumber, setPONumber] = useState('')
-  const [poAutoNumber, setPOAutoNumber] = useState(true)
-  const [expandedPO, setExpandedPO] = useState(null)
-  const [savingReceiving, setSavingReceiving] = useState({})
-
   // Change order modal
   const [showCOModal, setShowCOModal] = useState(false)
-  const [coForm, setCoForm] = useState({ name: '', description: '' })
-  const [coLineItems, setCoLineItems] = useState([])
-  const [coLaborItems, setCoLaborItems] = useState([])
+  const [coForm, setCoForm] = useState({ name: '', description: '', amount: '' })
   const [savingCO, setSavingCO] = useState(false)
 
   // Checklist add
@@ -115,7 +147,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       if (profileData?.org_id) {
         const { data: vendorData } = await supabase
           .from('vendors')
-          .select('id, vendor_name, default_markup_percent, contact_email')
+          .select('id, vendor_name, default_markup_percent')
           .eq('org_id', profileData.org_id)
           .eq('active', true)
           .order('vendor_name')
@@ -150,16 +182,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       .eq('job_id', id)
       .order('created_at', { ascending: false })
     setChangeOrders(coData || [])
-
-    // Fetch existing POs for this job's proposal
-    if (jobData?.proposal_id) {
-      const { data: poData } = await supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('proposal_id', jobData.proposal_id)
-        .order('created_at', { ascending: false })
-      setExistingPOs(poData || [])
-    }
 
     // Fetch tech daily logs
     const { data: logData } = await supabase
@@ -369,142 +391,20 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     })
   }
 
-  const openPOModal = () => {
-    const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
-    const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
-    const firstVendor = vendorNames[0] || ''
-    const foundVendor = vendors.find(v => v.vendor_name === firstVendor)
-    setPOVendorEmail(foundVendor?.contact_email || '')
-    setPONumber('')
-    setPOAutoNumber(true)
-    setShowPOModal(true)
-  }
-
-  const generatePO = async () => {
-    if (selectedForPO.size === 0 || !job?.proposal_id) return
-    setGeneratingPO(true)
-
-    let finalPONumber = poNumber.trim()
-    if (poAutoNumber || !finalPONumber) {
-      const { data: org } = await supabase.from('organizations').select('po_counter').eq('id', profile.org_id).single()
-      finalPONumber = `PO-${org.po_counter}`
-      await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profile.org_id)
-    }
-
-    const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
-    const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
-    const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))].join(', ')
-
-    const { data: newPO } = await supabase.from('purchase_orders').insert({
-      proposal_id: job.proposal_id,
-      org_id: profile.org_id,
-      po_number: finalPONumber,
-      status: 'Sent',
-      total_amount: poTotal,
-      vendor_name: vendorNames || null,
-    }).select().single()
-
-    for (const itemId of selectedForPO) {
-      await supabase.from('bom_line_items').update({ po_number: finalPONumber, po_status: 'PO Sent' }).eq('id', itemId)
-    }
-
-    setLineItems(prev => prev.map(l => selectedForPO.has(l.id) ? { ...l, po_number: finalPONumber, po_status: 'PO Sent' } : l))
-    setEditLines(prev => prev.map(l => selectedForPO.has(l.id) ? { ...l, po_number: finalPONumber, po_status: 'PO Sent' } : l))
-    if (newPO) setExistingPOs(prev => [newPO, ...prev])
-    setSelectedForPO(new Set())
-    setShowPOModal(false)
-    setGeneratingPO(false)
-  }
-
-  const updateReceivedQty = async (poId, itemId, receivedQty) => {
-    setSavingReceiving(prev => ({ ...prev, [itemId]: true }))
-    const qty = parseFloat(receivedQty) || 0
-    const item = lineItems.find(l => l.id === itemId)
-    const ordered = parseFloat(item?.quantity) || 0
-    const now = qty > 0 ? new Date().toISOString() : null
-    const newPoStatus = qty >= ordered ? 'Received' : qty > 0 ? 'Partial' : 'PO Sent'
-
-    await supabase.from('bom_line_items').update({
-      received_qty: qty,
-      received_at: now,
-      po_status: newPoStatus
-    }).eq('id', itemId)
-
-    const updatedItems = lineItems.map(l => l.id === itemId ? { ...l, received_qty: qty, received_at: now, po_status: newPoStatus } : l)
-    setLineItems(updatedItems)
-    setEditLines(prev => prev.map(l => l.id === itemId ? { ...l, received_qty: qty, received_at: now, po_status: newPoStatus } : l))
-
-    // Update the PO's overall status based on all its items
-    const po = existingPOs.find(p => p.id === poId)
-    if (po) {
-      const poItems = updatedItems.filter(l => l.po_number === po.po_number)
-      const totalOrdered = poItems.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0)
-      const totalReceived = poItems.reduce((sum, i) => sum + (parseFloat(i.received_qty) || 0), 0)
-      const poStatus = totalReceived === 0 ? 'Sent' : totalReceived >= totalOrdered ? 'Received' : 'Partial'
-      await supabase.from('purchase_orders').update({ status: poStatus }).eq('id', poId)
-      setExistingPOs(prev => prev.map(p => p.id === poId ? { ...p, status: poStatus } : p))
-    }
-
-    setSavingReceiving(prev => ({ ...prev, [itemId]: false }))
-  }
-
-  const markReceived = async (itemId) => {
-    const item = lineItems.find(l => l.id === itemId)
-    if (item) await updateReceivedQty(null, itemId, item.quantity)
-  }
-
-  const calcCoTotals = (lineItems, laborItems) => {
-    const matTotal = lineItems.reduce((sum, l) => sum + (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0), 0)
-    const labTotal = laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-    return { matTotal, labTotal, total: matTotal + labTotal }
-  }
-
-  const updateCoLine = (idx, field, value) => {
-    setCoLineItems(prev => {
-      const next = [...prev]
-      next[idx] = { ...next[idx], [field]: value }
-      if (field === 'your_cost_unit' || field === 'markup_percent') {
-        const cost = parseFloat(field === 'your_cost_unit' ? value : next[idx].your_cost_unit) || 0
-        const markup = parseFloat(field === 'markup_percent' ? value : next[idx].markup_percent) || 0
-        next[idx].customer_price_unit = (cost * (1 + markup / 100)).toFixed(2)
-      }
-      return next
-    })
-  }
-
-  const updateCoLabor = (idx, field, value) => {
-    setCoLaborItems(prev => {
-      const next = [...prev]
-      next[idx] = { ...next[idx], [field]: value }
-      if (field === 'your_cost' || field === 'markup' || field === 'quantity') {
-        const cost = parseFloat(field === 'your_cost' ? value : next[idx].your_cost) || 0
-        const markup = parseFloat(field === 'markup' ? value : next[idx].markup) || 0
-        const qty = parseFloat(field === 'quantity' ? value : next[idx].quantity) || 0
-        next[idx].customer_price = (cost * (1 + markup / 100) * qty).toFixed(2)
-      }
-      return next
-    })
-  }
-
   const saveChangeOrder = async () => {
     if (!coForm.name.trim()) return
     setSavingCO(true)
-    const { total } = calcCoTotals(coLineItems, coLaborItems)
     const { data } = await supabase.from('change_orders').insert({
       job_id: id,
       org_id: profile?.org_id,
       proposal_id: job?.proposal_id || null,
       name: coForm.name,
       description: coForm.description,
-      amount: total,
-      line_items: coLineItems.length > 0 ? coLineItems : null,
-      labor_items: coLaborItems.length > 0 ? coLaborItems : null,
+      amount: parseFloat(coForm.amount) || 0,
       status: 'Pending'
     }).select().single()
     if (data) setChangeOrders(prev => [data, ...prev])
-    setCoForm({ name: '', description: '' })
-    setCoLineItems([])
-    setCoLaborItems([])
+    setCoForm({ name: '', description: '', amount: '' })
     setShowCOModal(false)
     setSavingCO(false)
   }
@@ -695,374 +595,186 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           </div>
         )}
 
-        {/* PURCHASE ORDERS TAB */}
-        {activeTab === 'pos' && (() => {
-          const unordered = lineItems.filter(l => !l.po_status || l.po_status === 'Needs Pricing' || l.po_status === 'Confirmed' || l.po_status === '')
-          const onOrder = lineItems.filter(l => l.po_status === 'PO Sent')
-          const received = lineItems.filter(l => l.po_status === 'Received')
-          return (
-            <div className="space-y-5">
-
-              {/* Stats */}
-              {lineItems.length > 0 && (
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-[#1a2d45] rounded-xl p-4">
-                    <p className="text-[#8A9AB0] text-xs mb-1">Not Yet Ordered</p>
-                    <p className="text-white font-bold text-xl">{unordered.length}</p>
-                  </div>
-                  <div className="bg-[#1a2d45] rounded-xl p-4">
-                    <p className="text-[#8A9AB0] text-xs mb-1">On Order</p>
-                    <p className="text-blue-400 font-bold text-xl">{onOrder.length}</p>
-                  </div>
-                  <div className="bg-[#1a2d45] rounded-xl p-4">
-                    <p className="text-[#8A9AB0] text-xs mb-1">Received</p>
-                    <p className="text-green-400 font-bold text-xl">{received.length}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Generate PO action bar */}
-              {selectedForPO.size > 0 && (
-                <div className="bg-[#C8622A]/10 border border-[#C8622A]/30 rounded-xl px-4 py-3 flex items-center justify-between">
-                  <span className="text-[#C8622A] text-sm font-semibold">{selectedForPO.size} item{selectedForPO.size !== 1 ? 's' : ''} selected</span>
-                  <div className="flex gap-2">
-                    <button onClick={() => setSelectedForPO(new Set())} className="text-[#8A9AB0] hover:text-white text-sm transition-colors px-3">Clear</button>
-                    <button onClick={openPOModal}
-                      className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-                      {`Generate PO for ${selectedForPO.size} item${selectedForPO.size !== 1 ? 's' : ''} →`}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* BOM table */}
-              <div className="bg-[#1a2d45] rounded-xl p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-white font-bold text-lg">Materials — BOM</h3>
-                  <div className="flex gap-2">
-                    {unordered.length > 0 && selectedForPO.size === 0 && (
-                      <button onClick={() => setSelectedForPO(new Set(unordered.map(l => l.id)))}
-                        className="text-[#C8622A] text-sm hover:text-white transition-colors">
-                        Select all unordered
-                      </button>
-                    )}
-                    {!editingBOM ? (
-                      <button onClick={() => { setEditingBOM(true); setEditLines([...lineItems]); setSelectedLines(new Set()) }}
-                        className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                        Edit BOM
-                      </button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button onClick={() => { setEditingBOM(false); setSelectedLines(new Set()) }}
-                          className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                        <button onClick={saveBOM} disabled={savingBOM}
-                          className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                          {savingBOM ? 'Saving...' : 'Save BOM'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {lineItems.length === 0 ? (
-                  <p className="text-[#8A9AB0] text-sm">No materials on this proposal's BOM.</p>
-                ) : editingBOM ? (
-                  <>
-                    {/* Bulk action bar */}
-                    {selectedLines.size > 0 && (
-                      <div className="bg-[#C8622A]/10 border border-[#C8622A]/30 rounded-xl px-4 py-3 mb-4 flex items-center gap-4 flex-wrap">
-                        <span className="text-[#C8622A] text-sm font-semibold">{selectedLines.size} selected</span>
-                        <div className="flex gap-2 flex-1 flex-wrap">
-                          <select value={bulkField} onChange={e => { setBulkField(e.target.value); setBulkValue('') }}
-                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
-                            <option value="">— Bulk edit field —</option>
-                            <option value="vendor">Vendor</option>
-                            <option value="manufacturer">Manufacturer</option>
-                            <option value="category">Category</option>
-                            <option value="markup_percent">Markup %</option>
-                          </select>
-                          {bulkField === 'vendor' && (
-                            <select value={bulkValue} onChange={e => setBulkValue(e.target.value)}
-                              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
-                              <option value="">— Select vendor —</option>
-                              {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
-                              <option value="Other">Other</option>
-                            </select>
-                          )}
-                          {bulkField === 'category' && (
-                            <select value={bulkValue} onChange={e => setBulkValue(e.target.value)}
-                              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
-                              <option value="">— Select category —</option>
-                              {categories.map(c => <option key={c}>{c}</option>)}
-                            </select>
-                          )}
-                          {(bulkField === 'manufacturer' || bulkField === 'markup_percent') && (
-                            <input type={bulkField === 'markup_percent' ? 'number' : 'text'} value={bulkValue}
-                              onChange={e => setBulkValue(e.target.value)}
-                              placeholder={bulkField === 'markup_percent' ? 'e.g. 35' : 'e.g. Hanwha'}
-                              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]" />
-                          )}
-                          <button onClick={applyBulkEdit} disabled={!bulkField || !bulkValue}
-                            className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">Apply</button>
-                        </div>
-                        <button onClick={() => setSelectedLines(new Set())} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">Clear</button>
-                      </div>
-                    )}
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-[#2a3d55]">
-                            <th className="py-2 pr-2 w-8">
-                              <input type="checkbox" checked={selectedLines.size === editLines.length && editLines.length > 0}
-                                onChange={toggleSelectAll} className="accent-[#C8622A]" />
-                            </th>
-                            {['Item', 'Mfr', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price'].map(h => (
-                              <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {editLines.map((line, i) => (
-                            <tr key={line.id} className={`border-b border-[#2a3d55]/30 ${selectedLines.has(line.id) ? 'bg-[#C8622A]/5' : ''}`}>
-                              <td className="pr-2 py-1">
-                                <input type="checkbox" checked={selectedLines.has(line.id)} onChange={() => toggleLineSelect(line.id)} className="accent-[#C8622A]" />
-                              </td>
-                              {[['item_name','text','Item'],['manufacturer','text','Mfr'],['part_number_sku','text','Part #'],['quantity','number','Qty']].map(([field, type, placeholder]) => (
-                                <td key={field} className="pr-2 py-1">
-                                  <input type={type} placeholder={placeholder} value={line[field] || ''}
-                                    onChange={e => updateEditLine(i, field, e.target.value)}
-                                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                                </td>
-                              ))}
-                              <td className="pr-2 py-1">
-                                <select value={line.unit || 'ea'} onChange={e => updateEditLine(i, 'unit', e.target.value)}
-                                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                                  {['ea','ft','lot','hr','box','roll'].map(u => <option key={u}>{u}</option>)}
-                                </select>
-                              </td>
-                              <td className="pr-2 py-1">
-                                <select value={line.category || ''} onChange={e => updateEditLine(i, 'category', e.target.value)}
-                                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                                  <option value="">Category</option>
-                                  {categories.map(c => <option key={c}>{c}</option>)}
-                                </select>
-                              </td>
-                              <td className="pr-2 py-1">
-                                <select value={line.vendor || ''} onChange={e => updateEditLine(i, 'vendor', e.target.value)}
-                                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                                  <option value="">— Vendor —</option>
-                                  {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
-                                  <option value="Other">Other</option>
-                                </select>
-                              </td>
-                              <td className="pr-2 py-1">
-                                <input type="number" placeholder="0.00" value={line.your_cost_unit || ''}
-                                  onChange={e => updateEditLine(i, 'your_cost_unit', e.target.value)}
-                                  className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                              </td>
-                              <td className="pr-2 py-1">
-                                <input type="number" placeholder="35" value={line.markup_percent || ''}
-                                  onChange={e => updateEditLine(i, 'markup_percent', e.target.value)}
-                                  className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                              </td>
-                              <td className="pr-2 py-1">
-                                <input type="number" placeholder="0.00" value={line.customer_price_unit || ''}
-                                  onChange={e => updateEditLine(i, 'customer_price_unit', e.target.value)}
-                                  className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[#2a3d55]">
-                          <th className="py-2 pr-2 w-8">
-                            <input type="checkbox"
-                              checked={unordered.length > 0 && unordered.every(l => selectedForPO.has(l.id))}
-                              onChange={() => {
-                                const allSelected = unordered.every(l => selectedForPO.has(l.id))
-                                setSelectedForPO(prev => {
-                                  const next = new Set(prev)
-                                  unordered.forEach(l => allSelected ? next.delete(l.id) : next.add(l.id))
-                                  return next
-                                })
-                              }}
-                              className="accent-[#C8622A]" />
-                          </th>
-                          {['Item', 'Vendor', 'Qty', 'Your Cost', 'PO #', 'Status', ''].map(h => (
-                            <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {lineItems.map(item => {
-                          const isOrdered = item.po_status === 'PO Sent' || item.po_status === 'Received'
-                          const isReceived = item.po_status === 'Received'
-                          return (
-                            <tr key={item.id} className={`border-b border-[#2a3d55]/50 ${isReceived ? 'opacity-60' : ''}`}>
-                              <td className="pr-2 py-3">
-                                {!isOrdered && (
-                                  <input type="checkbox"
-                                    checked={selectedForPO.has(item.id)}
-                                    onChange={() => setSelectedForPO(prev => {
-                                      const next = new Set(prev)
-                                      next.has(item.id) ? next.delete(item.id) : next.add(item.id)
-                                      return next
-                                    })}
-                                    className="accent-[#C8622A]" />
-                                )}
-                              </td>
-                              <td className="py-3 pr-4">
-                                <p className="text-white">{item.item_name}</p>
-                                {(item.manufacturer || item.part_number_sku) && (
-                                  <p className="text-[#8A9AB0] text-xs mt-0.5">{[item.manufacturer, item.part_number_sku].filter(Boolean).join(' · ')}</p>
-                                )}
-                              </td>
-                              <td className="text-[#8A9AB0] py-3 pr-4 text-sm">{item.vendor || '—'}</td>
-                              <td className="text-white py-3 pr-4 text-sm">{item.quantity} {item.unit}</td>
-                              <td className="text-white py-3 pr-4 text-sm">${fmt((item.your_cost_unit || 0) * (item.quantity || 0))}</td>
-                              <td className="py-3 pr-4">
-                                {item.po_number ? (
-                                  <span className="text-[#8A9AB0] text-xs font-mono">{item.po_number}</span>
-                                ) : <span className="text-[#2a3d55]">—</span>}
-                              </td>
-                              <td className="py-3 pr-4">
-                                <span className={`text-xs px-2 py-1 rounded font-semibold ${
-                                  isReceived ? 'bg-green-500/20 text-green-400'
-                                  : item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400'
-                                  : 'bg-[#2a3d55] text-[#8A9AB0]'
-                                }`}>
-                                  {item.po_status || 'Not Ordered'}
-                                </span>
-                              </td>
-                              <td className="py-3">
-                                {item.po_status === 'PO Sent' && (
-                                  <button onClick={() => markReceived(item.id)}
-                                    className="text-xs bg-green-600/20 text-green-400 hover:bg-green-600/40 px-3 py-1 rounded font-semibold transition-colors whitespace-nowrap">
-                                    Mark Received
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* Existing POs */}
-              {existingPOs.length > 0 && (
-                <div className="bg-[#1a2d45] rounded-xl p-6">
-                  <h3 className="text-white font-bold text-lg mb-4">Purchase Orders — Receiving</h3>
-                  <div className="space-y-3">
-                    {existingPOs.map(po => {
-                      const poItems = lineItems.filter(l => l.po_number === po.po_number)
-                      const totalOrdered = poItems.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0)
-                      const totalReceived = poItems.reduce((sum, i) => sum + (parseFloat(i.received_qty) || 0), 0)
-                      const isExpanded = expandedPO === po.id
-                      const statusColor = po.status === 'Received' ? 'bg-green-500/20 text-green-400' : po.status === 'Partial' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'
-                      return (
-                        <div key={po.id} className="bg-[#0F1C2E] rounded-xl border border-[#2a3d55] overflow-hidden">
-                          {/* PO header — click to expand */}
-                          <div className="flex justify-between items-center p-4 cursor-pointer hover:bg-[#162236] transition-colors"
-                            onClick={() => setExpandedPO(isExpanded ? null : po.id)}>
-                            <div>
-                              <p className="text-white font-semibold font-mono">{po.po_number}</p>
-                              <p className="text-[#8A9AB0] text-xs mt-0.5">
-                                {po.vendor_name && `${po.vendor_name} · `}{poItems.length} item{poItems.length !== 1 ? 's' : ''} · ${fmt(po.total_amount)}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              {poItems.length > 0 && (
-                                <span className="text-[#8A9AB0] text-xs">{totalReceived} / {totalOrdered} received</span>
-                              )}
-                              <span className={`text-xs px-2 py-1 rounded font-semibold ${statusColor}`}>{po.status || 'Sent'}</span>
-                              <span className="text-[#8A9AB0] text-xs">{isExpanded ? '▲' : '▼'}</span>
-                            </div>
-                          </div>
-
-                          {/* Receiving table */}
-                          {isExpanded && (
-                            <div className="border-t border-[#2a3d55] p-4">
-                              {poItems.length === 0 ? (
-                                <p className="text-[#8A9AB0] text-sm">No items found for this PO.</p>
-                              ) : (
-                                <table className="w-full text-sm">
-                                  <thead>
-                                    <tr className="border-b border-[#2a3d55]">
-                                      {['Item', 'Part #', 'Ordered', 'Received', 'Status'].map(h => (
-                                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
-                                      ))}
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {poItems.map(item => {
-                                      const ordered = parseFloat(item.quantity) || 0
-                                      const received = parseFloat(item.received_qty) || 0
-                                      const itemStatus = received === 0 ? 'Pending' : received >= ordered ? 'Received' : 'Partial'
-                                      return (
-                                        <tr key={item.id} className="border-b border-[#2a3d55]/30">
-                                          <td className="text-white py-3 pr-4">
-                                            {item.item_name}
-                                            {item.received_at && <p className="text-[#8A9AB0] text-xs">{new Date(item.received_at).toLocaleDateString()}</p>}
-                                          </td>
-                                          <td className="text-[#8A9AB0] py-3 pr-4 text-xs">{item.part_number_sku || '—'}</td>
-                                          <td className="text-white py-3 pr-4 text-sm">{ordered} {item.unit}</td>
-                                          <td className="py-3 pr-4">
-                                            <div className="flex items-center gap-2">
-                                              <input
-                                                type="number" min="0" step="any"
-                                                value={received || ''}
-                                                onChange={e => updateReceivedQty(po.id, item.id, e.target.value)}
-                                                placeholder="0"
-                                                className="w-20 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] text-right"
-                                              />
-                                              {savingReceiving[item.id] && <span className="text-green-400 text-xs">✓</span>}
-                                              {received < ordered && ordered > 0 && (
-                                                <button onClick={() => updateReceivedQty(po.id, item.id, ordered)}
-                                                  className="text-xs text-[#C8622A] hover:text-white transition-colors whitespace-nowrap">All in</button>
-                                              )}
-                                            </div>
-                                          </td>
-                                          <td className="py-3">
-                                            <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                                              itemStatus === 'Received' ? 'bg-green-500/20 text-green-400' :
-                                              itemStatus === 'Partial' ? 'bg-yellow-500/20 text-yellow-400' :
-                                              'bg-[#2a3d55] text-[#8A9AB0]'
-                                            }`}>{itemStatus}</span>
-                                          </td>
-                                        </tr>
-                                      )
-                                    })}
-                                  </tbody>
-                                  <tfoot>
-                                    <tr>
-                                      <td colSpan="2" className="text-[#8A9AB0] pt-3 text-right text-xs font-semibold pr-4">Total</td>
-                                      <td className="text-white pt-3 pr-4 text-xs font-semibold">{totalOrdered}</td>
-                                      <td className="text-[#C8622A] pt-3 text-xs font-semibold">{totalReceived}</td>
-                                      <td></td>
-                                    </tr>
-                                  </tfoot>
-                                </table>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
+        {/* BOM TAB */}
+        {activeTab === 'bom' && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white font-bold text-lg">Bill of Materials</h3>
+              {!editingBOM ? (
+                <button onClick={() => { setEditingBOM(true); setEditLines([...lineItems]); setSelectedLines(new Set()) }}
+                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                  Edit BOM
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button onClick={() => { setEditingBOM(false); setSelectedLines(new Set()) }}
+                    className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                  <button onClick={saveBOM} disabled={savingBOM}
+                    className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                    {savingBOM ? 'Saving...' : 'Save BOM'}
+                  </button>
                 </div>
               )}
             </div>
-          )
-        })()}
+
+            {/* Bulk action bar */}
+            {editingBOM && selectedLines.size > 0 && (
+              <div className="bg-[#C8622A]/10 border border-[#C8622A]/30 rounded-xl px-4 py-3 mb-4 flex items-center gap-4 flex-wrap">
+                <span className="text-[#C8622A] text-sm font-semibold">{selectedLines.size} item{selectedLines.size !== 1 ? 's' : ''} selected</span>
+                <div className="flex gap-2 flex-1 flex-wrap">
+                  <select value={bulkField} onChange={e => { setBulkField(e.target.value); setBulkValue('') }}
+                    className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
+                    <option value="">— Bulk edit field —</option>
+                    <option value="vendor">Vendor</option>
+                    <option value="manufacturer">Manufacturer</option>
+                    <option value="category">Category</option>
+                    <option value="markup_percent">Markup %</option>
+                  </select>
+                  {bulkField === 'vendor' && (
+                    <select value={bulkValue} onChange={e => setBulkValue(e.target.value)}
+                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
+                      <option value="">— Select vendor —</option>
+                      {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
+                      <option value="Other">Other</option>
+                    </select>
+                  )}
+                  {bulkField === 'category' && (
+                    <select value={bulkValue} onChange={e => setBulkValue(e.target.value)}
+                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
+                      <option value="">— Select category —</option>
+                      {categories.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  )}
+                  {(bulkField === 'manufacturer' || bulkField === 'markup_percent') && (
+                    <input type={bulkField === 'markup_percent' ? 'number' : 'text'} value={bulkValue}
+                      onChange={e => setBulkValue(e.target.value)}
+                      placeholder={bulkField === 'markup_percent' ? 'e.g. 35' : 'e.g. Hanwha'}
+                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]" />
+                  )}
+                  <button onClick={applyBulkEdit} disabled={!bulkField || !bulkValue}
+                    className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                    Apply
+                  </button>
+                </div>
+                <button onClick={() => setSelectedLines(new Set())} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">Clear</button>
+              </div>
+            )}
+
+            {lineItems.length === 0 ? (
+              <p className="text-[#8A9AB0] text-sm">No line items on this proposal.</p>
+            ) : editingBOM ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#2a3d55]">
+                      <th className="py-2 pr-2 w-8">
+                        <input type="checkbox" checked={selectedLines.size === editLines.length && editLines.length > 0}
+                          onChange={toggleSelectAll} className="accent-[#C8622A]" />
+                      </th>
+                      {['Item', 'Mfr', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price'].map(h => (
+                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editLines.map((line, i) => (
+                      <tr key={line.id} className={`border-b border-[#2a3d55]/30 ${selectedLines.has(line.id) ? 'bg-[#C8622A]/5' : ''}`}>
+                        <td className="pr-2 py-1">
+                          <input type="checkbox" checked={selectedLines.has(line.id)} onChange={() => toggleLineSelect(line.id)} className="accent-[#C8622A]" />
+                        </td>
+                        {[
+                          ['item_name', 'text', 'Item'],
+                          ['manufacturer', 'text', 'Mfr'],
+                          ['part_number_sku', 'text', 'Part #'],
+                          ['quantity', 'number', 'Qty'],
+                        ].map(([field, type, placeholder]) => (
+                          <td key={field} className="pr-2 py-1">
+                            <input type={type} placeholder={placeholder} value={line[field] || ''}
+                              onChange={e => updateEditLine(i, field, e.target.value)}
+                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                          </td>
+                        ))}
+                        <td className="pr-2 py-1">
+                          <select value={line.unit || 'ea'} onChange={e => updateEditLine(i, 'unit', e.target.value)}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                            {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
+                          </select>
+                        </td>
+                        <td className="pr-2 py-1">
+                          <select value={line.category || ''} onChange={e => updateEditLine(i, 'category', e.target.value)}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                            <option value="">Category</option>
+                            {categories.map(c => <option key={c}>{c}</option>)}
+                          </select>
+                        </td>
+                        <td className="pr-2 py-1">
+                          <select value={line.vendor || ''} onChange={e => updateEditLine(i, 'vendor', e.target.value)}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                            <option value="">— Vendor —</option>
+                            {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
+                            <option value="Other">Other</option>
+                          </select>
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input type="number" placeholder="0.00" value={line.your_cost_unit || ''}
+                            onChange={e => updateEditLine(i, 'your_cost_unit', e.target.value)}
+                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input type="number" placeholder="35" value={line.markup_percent || ''}
+                            onChange={e => updateEditLine(i, 'markup_percent', e.target.value)}
+                            className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                        </td>
+                        <td className="pr-2 py-1">
+                          <input type="number" placeholder="0.00" value={line.customer_price_unit || ''}
+                            onChange={e => updateEditLine(i, 'customer_price_unit', e.target.value)}
+                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#2a3d55]">
+                      {['Item', 'Mfr', 'Part #', 'Vendor', 'Qty', 'Unit Price', 'Total', 'Status'].map(h => (
+                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineItems.map(item => (
+                      <tr key={item.id} className="border-b border-[#2a3d55]/50">
+                        <td className="text-white py-3 pr-4">{item.item_name}</td>
+                        <td className="text-[#8A9AB0] py-3 pr-4">{item.manufacturer || '—'}</td>
+                        <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
+                        <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor || '—'}</td>
+                        <td className="text-white py-3 pr-4">{item.quantity}</td>
+                        <td className="text-white py-3 pr-4">${fmt(item.customer_price_unit)}</td>
+                        <td className="text-white py-3 pr-4">${fmt(item.customer_price_total)}</td>
+                        <td className="py-3">
+                          <span className={`text-xs px-2 py-1 rounded font-semibold ${item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                            {item.po_status || item.pricing_status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan="5" className="text-[#8A9AB0] pt-4 text-right font-semibold">Total</td>
+                      <td className="text-[#C8622A] pt-4 font-bold pr-4 text-right">${fmt(lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0))}</td>
+                      <td></td><td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* CHANGE ORDERS TAB */}
         {activeTab === 'changeorders' && (
@@ -1083,10 +795,11 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
               <div className="space-y-3">
                 {changeOrders.map(co => (
                   <div key={co.id} className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
-                    <div className="flex justify-between items-start mb-2">
+                    <div className="flex justify-between items-start">
                       <div>
                         <p className="text-white font-semibold">{co.name}</p>
                         {co.description && <p className="text-[#8A9AB0] text-sm mt-0.5">{co.description}</p>}
+                        <p className="text-[#C8622A] font-bold mt-1">${fmt(co.amount)}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`text-xs px-2 py-1 rounded font-semibold ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : co.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
@@ -1102,44 +815,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                         )}
                       </div>
                     </div>
-
-                    {/* Line items breakdown */}
-                    {(co.line_items?.length > 0 || co.labor_items?.length > 0) ? (
-                      <div className="mt-3 space-y-2">
-                        {co.line_items?.length > 0 && (
-                          <div>
-                            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">Materials</p>
-                            <div className="space-y-1">
-                              {co.line_items.map((item, i) => (
-                                <div key={i} className="flex justify-between text-xs">
-                                  <span className="text-[#D6E4F0]">{item.item_name} <span className="text-[#8A9AB0]">× {item.quantity} {item.unit}</span></span>
-                                  <span className="text-white">${fmt((parseFloat(item.customer_price_unit) || 0) * (parseFloat(item.quantity) || 0))}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        {co.labor_items?.length > 0 && (
-                          <div>
-                            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">Labor</p>
-                            <div className="space-y-1">
-                              {co.labor_items.map((item, i) => (
-                                <div key={i} className="flex justify-between text-xs">
-                                  <span className="text-[#D6E4F0]">{item.role} <span className="text-[#8A9AB0]">× {item.quantity} {item.unit}</span></span>
-                                  <span className="text-white">${fmt(parseFloat(item.customer_price) || 0)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center pt-2 border-t border-[#2a3d55]">
-                          <span className="text-[#8A9AB0] text-xs font-semibold">Total</span>
-                          <span className="text-[#C8622A] font-bold">${fmt(co.amount)}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-[#C8622A] font-bold text-sm mt-1">${fmt(co.amount)}</p>
-                    )}
                   </div>
                 ))}
                 {totalCOAmount > 0 && (
@@ -1150,6 +825,22 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {/* PURCHASE ORDERS TAB */}
+        {activeTab === 'pos' && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-white font-bold text-lg">Purchase Orders</h3>
+              {job?.proposal_id && (
+                <button onClick={() => navigate(`/proposal/${job.proposal_id}`)}
+                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                  Generate PO in Proposal →
+                </button>
+              )}
+            </div>
+            <JobPOList proposalId={job?.proposal_id} />
           </div>
         )}
 
@@ -1331,76 +1022,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         )}
       </div>
 
-      {/* PO Modal */}
-      {showPOModal && (() => {
-        const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
-        const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
-        const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
-        return (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-              <h3 className="text-white font-bold text-lg mb-4">Generate Purchase Order</h3>
-              <div className="space-y-4">
-
-                {/* Vendor email */}
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">
-                    Vendor Email <span className="text-[#8A9AB0] font-normal">(for your records)</span>
-                  </label>
-                  {vendorNames.length > 1 && (
-                    <p className="text-yellow-400 text-xs mb-1">Items from multiple vendors: {vendorNames.join(', ')}</p>
-                  )}
-                  <input type="email" value={poVendorEmail} onChange={e => setPOVendorEmail(e.target.value)}
-                    placeholder="vendor@company.com"
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-
-                {/* PO number */}
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
-                  <div className="flex gap-2 mb-2">
-                    <button onClick={() => setPOAutoNumber(true)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
-                      Auto-Generate
-                    </button>
-                    <button onClick={() => setPOAutoNumber(false)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${!poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
-                      Enter Manually
-                    </button>
-                  </div>
-                  {!poAutoNumber && (
-                    <input type="text" value={poNumber} onChange={e => setPONumber(e.target.value)}
-                      placeholder="e.g. PO-2026-001"
-                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                  )}
-                </div>
-
-                {/* Items preview */}
-                <div className="bg-[#0F1C2E] rounded-lg p-3">
-                  <p className="text-[#8A9AB0] text-xs mb-2">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} · Your cost: ${fmt(poTotal)}</p>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {selectedItems.map(item => (
-                      <div key={item.id} className="flex justify-between text-xs">
-                        <span className="text-white">{item.item_name}</span>
-                        <span className="text-[#8A9AB0]">{item.vendor ? `${item.vendor} · ` : ''}Qty: {item.quantity} {item.unit}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-1">
-                  <button onClick={() => setShowPOModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                  <button onClick={generatePO} disabled={generatingPO || (!poAutoNumber && !poNumber.trim())}
-                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                    {generatingPO ? 'Generating...' : 'Generate PO'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
-
       {/* Notify Customer Modal */}
       {showNotifyModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
@@ -1421,199 +1042,38 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       )}
 
       {/* Change Order Modal */}
-      {showCOModal && (() => {
-        const { matTotal, labTotal, total } = calcCoTotals(coLineItems, coLaborItems)
-        const coInputClass = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
-        return (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-              <h3 className="text-white font-bold text-lg mb-5">New Change Order</h3>
-              <div className="space-y-5">
-
-                {/* Name + Description */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Name <span className="text-[#C8622A]">*</span></label>
-                    <input type="text" value={coForm.name} onChange={e => setCoForm(p => ({ ...p, name: e.target.value }))}
-                      placeholder="e.g. Additional camera location" className={`w-full ${inputClass}`} />
-                  </div>
-                  <div>
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Description</label>
-                    <input type="text" value={coForm.description} onChange={e => setCoForm(p => ({ ...p, description: e.target.value }))}
-                      placeholder="Brief description..." className={`w-full ${inputClass}`} />
-                  </div>
-                </div>
-
-                {/* Materials */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Materials</p>
-                    <button onClick={() => setCoLineItems(p => [...p, { id: crypto.randomUUID(), item_name: '', quantity: 1, unit: 'ea', your_cost_unit: '', markup_percent: 35, customer_price_unit: '' }])}
-                      className="text-[#C8622A] text-xs hover:text-white transition-colors">+ Add Material</button>
-                  </div>
-                  {coLineItems.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-[#2a3d55]">
-                            {['Item Name', 'Qty', 'Unit', 'Your Cost', 'Markup %', 'Unit Price', 'Total', ''].map(h => (
-                              <th key={h} className="text-[#8A9AB0] text-left py-1.5 pr-2 font-normal">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {coLineItems.map((line, i) => {
-                            const lineTotal = (parseFloat(line.customer_price_unit) || 0) * (parseFloat(line.quantity) || 0)
-                            return (
-                              <tr key={line.id} className="border-b border-[#2a3d55]/30">
-                                <td className="pr-2 py-1">
-                                  <input value={line.item_name} onChange={e => updateCoLine(i, 'item_name', e.target.value)}
-                                    placeholder="Item name" className={`w-36 ${coInputClass}`} />
-                                </td>
-                                <td className="pr-2 py-1">
-                                  <input type="number" min="0" step="any" value={line.quantity} onChange={e => updateCoLine(i, 'quantity', e.target.value)}
-                                    className={`w-16 ${coInputClass}`} />
-                                </td>
-                                <td className="pr-2 py-1">
-                                  <select value={line.unit} onChange={e => updateCoLine(i, 'unit', e.target.value)}
-                                    className={`${coInputClass}`}>
-                                    {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
-                                  </select>
-                                </td>
-                                <td className="pr-2 py-1">
-                                  <input type="number" min="0" step="0.01" placeholder="0.00" value={line.your_cost_unit}
-                                    onChange={e => updateCoLine(i, 'your_cost_unit', e.target.value)}
-                                    className={`w-20 ${coInputClass}`} />
-                                </td>
-                                <td className="pr-2 py-1">
-                                  <input type="number" min="0" placeholder="35" value={line.markup_percent}
-                                    onChange={e => updateCoLine(i, 'markup_percent', e.target.value)}
-                                    className={`w-14 ${coInputClass}`} />
-                                </td>
-                                <td className="pr-2 py-1">
-                                  <input type="number" min="0" step="0.01" placeholder="0.00" value={line.customer_price_unit}
-                                    onChange={e => updateCoLine(i, 'customer_price_unit', e.target.value)}
-                                    className={`w-20 ${coInputClass}`} />
-                                </td>
-                                <td className="pr-2 py-1 text-white font-medium">${fmt(lineTotal)}</td>
-                                <td className="py-1">
-                                  <button onClick={() => setCoLineItems(p => p.filter((_, idx) => idx !== i))}
-                                    className="text-[#8A9AB0] hover:text-red-400 transition-colors">✕</button>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                        <tfoot>
-                          <tr>
-                            <td colSpan="6" className="text-[#8A9AB0] text-right pt-2 pr-2 font-semibold">Materials Total</td>
-                            <td className="text-[#C8622A] font-bold pt-2">${fmt(matTotal)}</td>
-                            <td></td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  )}
-                  {coLineItems.length === 0 && (
-                    <p className="text-[#8A9AB0] text-xs italic">No materials added yet.</p>
-                  )}
-                </div>
-
-                {/* Labor */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Labor</p>
-                    <button onClick={() => setCoLaborItems(p => [...p, { id: crypto.randomUUID(), role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: '' }])}
-                      className="text-[#C8622A] text-xs hover:text-white transition-colors">+ Add Labor</button>
-                  </div>
-                  {coLaborItems.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="border-b border-[#2a3d55]">
-                            {['Role', 'Qty', 'Unit', 'Your Cost', 'Markup %', 'Total', ''].map(h => (
-                              <th key={h} className="text-[#8A9AB0] text-left py-1.5 pr-2 font-normal">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {coLaborItems.map((labor, i) => (
-                            <tr key={labor.id} className="border-b border-[#2a3d55]/30">
-                              <td className="pr-2 py-1">
-                                <input value={labor.role} onChange={e => updateCoLabor(i, 'role', e.target.value)}
-                                  placeholder="e.g. Electrician" className={`w-36 ${coInputClass}`} />
-                              </td>
-                              <td className="pr-2 py-1">
-                                <input type="number" min="0" step="0.5" value={labor.quantity}
-                                  onChange={e => updateCoLabor(i, 'quantity', e.target.value)}
-                                  className={`w-16 ${coInputClass}`} />
-                              </td>
-                              <td className="pr-2 py-1">
-                                <select value={labor.unit} onChange={e => updateCoLabor(i, 'unit', e.target.value)}
-                                  className={`${coInputClass}`}>
-                                  {['hr', 'day', 'lot'].map(u => <option key={u}>{u}</option>)}
-                                </select>
-                              </td>
-                              <td className="pr-2 py-1">
-                                <input type="number" min="0" step="0.01" placeholder="0.00" value={labor.your_cost}
-                                  onChange={e => updateCoLabor(i, 'your_cost', e.target.value)}
-                                  className={`w-20 ${coInputClass}`} />
-                              </td>
-                              <td className="pr-2 py-1">
-                                <input type="number" min="0" placeholder="35" value={labor.markup}
-                                  onChange={e => updateCoLabor(i, 'markup', e.target.value)}
-                                  className={`w-14 ${coInputClass}`} />
-                              </td>
-                              <td className="pr-2 py-1 text-white font-medium">${fmt(parseFloat(labor.customer_price) || 0)}</td>
-                              <td className="py-1">
-                                <button onClick={() => setCoLaborItems(p => p.filter((_, idx) => idx !== i))}
-                                  className="text-[#8A9AB0] hover:text-red-400 transition-colors">✕</button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr>
-                            <td colSpan="5" className="text-[#8A9AB0] text-right pt-2 pr-2 font-semibold">Labor Total</td>
-                            <td className="text-[#C8622A] font-bold pt-2">${fmt(labTotal)}</td>
-                            <td></td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  )}
-                  {coLaborItems.length === 0 && (
-                    <p className="text-[#8A9AB0] text-xs italic">No labor added yet.</p>
-                  )}
-                </div>
-
-                {/* Summary */}
-                {(coLineItems.length > 0 || coLaborItems.length > 0) && (
-                  <div className="bg-[#0F1C2E] rounded-xl p-4 flex justify-between items-center">
-                    <div className="text-sm text-[#8A9AB0] space-y-0.5">
-                      {coLineItems.length > 0 && <p>Materials: <span className="text-white">${fmt(matTotal)}</span></p>}
-                      {coLaborItems.length > 0 && <p>Labor: <span className="text-white">${fmt(labTotal)}</span></p>}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[#8A9AB0] text-xs mb-0.5">Change Order Total</p>
-                      <p className="text-[#C8622A] font-bold text-xl">${fmt(total)}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-3 pt-1">
-                  <button onClick={() => { setShowCOModal(false); setCoLineItems([]); setCoLaborItems([]) }}
-                    className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                  <button onClick={saveChangeOrder} disabled={savingCO || !coForm.name.trim()}
-                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                    {savingCO ? 'Saving...' : 'Create Change Order'}
-                  </button>
-                </div>
+      {showCOModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-white font-bold text-lg mb-5">New Change Order</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Name <span className="text-[#C8622A]">*</span></label>
+                <input type="text" value={coForm.name} onChange={e => setCoForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="e.g. Additional camera location" className={`w-full ${inputClass}`} />
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Description</label>
+                <textarea value={coForm.description} onChange={e => setCoForm(p => ({ ...p, description: e.target.value }))}
+                  rows={3} placeholder="Details about the change..."
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Amount ($)</label>
+                <input type="number" value={coForm.amount} onChange={e => setCoForm(p => ({ ...p, amount: e.target.value }))}
+                  placeholder="0.00" className={`w-full ${inputClass}`} />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowCOModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={saveChangeOrder} disabled={savingCO || !coForm.name.trim()}
+                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {savingCO ? 'Saving...' : 'Create Change Order'}
+                </button>
               </div>
             </div>
           </div>
-        )
-      })()}
+        </div>
+      )}
     </div>
   )
 }

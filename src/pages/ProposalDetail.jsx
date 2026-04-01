@@ -733,8 +733,15 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     doc.rect(0, 0, pageWidth, 40, 'F')
 
     if (profile?.logo_url) {
-      const img = new Image(); img.src = profile.logo_url
-      doc.addImage(img, 'PNG', 14, 8, 40, 24)
+      const img = new Image()
+      img.src = profile.logo_url
+      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+      const maxW = 50, maxH = 26
+      const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+      const logoW = img.naturalWidth * ratio
+      const logoH = img.naturalHeight * ratio
+      const logoY = 8 + (maxH - logoH) / 2
+      doc.addImage(img, 'PNG', 14, logoY, logoW, logoH)
     } else {
       doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
       doc.text(profile?.company_name || 'ForgePt.', 14, 22)
@@ -772,7 +779,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
       footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
       alternateRowStyles: { fillColor: [245, 245, 245] },
-      styles: { fontSize: 9 }
+      styles: { fontSize: 9 }, showFoot: 'lastPage'
     })
 
     const totalAmount = vendorItems.reduce((sum, item) => sum + ((item.your_cost_unit || 0) * (item.quantity || 0)), 0)
@@ -1165,8 +1172,15 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     doc.rect(0, 0, pageWidth, 40, 'F')
 
     if (profile?.logo_url) {
-      const img = new Image(); img.src = profile.logo_url
-      doc.addImage(img, 'PNG', 14, 8, 40, 24)
+      const img = new Image()
+      img.src = profile.logo_url
+      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+      const maxW = 50, maxH = 26
+      const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+      const logoW = img.naturalWidth * ratio
+      const logoH = img.naturalHeight * ratio
+      const logoY = 8 + (maxH - logoH) / 2
+      doc.addImage(img, 'PNG', 14, logoY, logoW, logoH)
     } else {
       doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont('helvetica', 'bold')
       doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
@@ -1207,7 +1221,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           foot: [['', 'Materials Total', `$${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
           footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }
+          alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
         })
       } else {
         autoTable(doc, {
@@ -1217,7 +1231,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           foot: [['', '', '', 'Total', `$${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
           footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }
+          alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
         })
       }
     }
@@ -1239,7 +1253,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         foot: [['', '', 'Total Labor', `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }
+        alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
       })
       let afterLabor = doc.lastAutoTable.finalY + 6
       if (pdfTaxRate > 0) {
