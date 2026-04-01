@@ -336,16 +336,16 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         </div>
 
         {/* Dashboard Mode Toggle */}
-        <div className="flex justify-end mb-2">
-          <div className="flex bg-[#0F1C2E] rounded-lg p-1 gap-1">
+        <div className="flex justify-end mb-4">
+          <div className="flex bg-[#0F1C2E] border border-[#2a3d55] rounded-xl p-1.5 gap-1.5">
             <button
               onClick={() => { setDashboardMode('sales'); localStorage.setItem('dashboardMode', 'sales') }}
-              className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'sales' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${dashboardMode === 'sales' ? 'bg-[#C8622A] text-white shadow' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white hover:bg-[#1f3550]'}`}>
               📊 Sales
             </button>
             <button
               onClick={() => { setDashboardMode('pm'); localStorage.setItem('dashboardMode', 'pm') }}
-              className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'pm' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${dashboardMode === 'pm' ? 'bg-[#C8622A] text-white shadow' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white hover:bg-[#1f3550]'}`}>
               🔨 PM
             </button>
           </div>
