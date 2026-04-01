@@ -7,6 +7,8 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const [proposals, setProposals] = useState([])
   const [dashboardMode, setDashboardMode] = useState(() => localStorage.getItem('dashboardMode') || 'sales')
   const [jobs, setJobs] = useState([])
+  const [techLogs, setTechLogs] = useState([])
+  const [pendingCOs, setPendingCOs] = useState([])
   const [lineItems, setLineItems] = useState([])
   const [clients, setClients] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -53,6 +55,22 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
     setJobs(jobsData || [])
+
+    // Fetch tech logs for PM mode
+    const { data: logsData } = await supabase
+      .from('tech_daily_logs')
+      .select('job_id, hours_worked, log_date, user_id, profiles(full_name)')
+      .eq('org_id', profile.org_id)
+      .gte('log_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+    setTechLogs(logsData || [])
+
+    // Fetch all change orders for PM mode
+    const { data: coData } = await supabase
+      .from('change_orders')
+      .select('*, jobs(name)')
+      .eq('org_id', profile.org_id)
+      .eq('status', 'Pending')
+    setPendingCOs(coData || [])
 
     // Expired pricing check
     const today = new Date().toISOString().split('T')[0]
@@ -336,74 +354,293 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         </div>
 
         {/* Dashboard Mode Toggle */}
-        <div className="flex justify-end mb-4">
-          <div className="flex bg-[#0F1C2E] border border-[#2a3d55] rounded-xl p-1.5 gap-1.5">
+        <div className="flex justify-end mb-2">
+          <div className="flex bg-[#0F1C2E] rounded-lg p-1 gap-1">
             <button
               onClick={() => { setDashboardMode('sales'); localStorage.setItem('dashboardMode', 'sales') }}
-              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${dashboardMode === 'sales' ? 'bg-[#C8622A] text-white shadow' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white hover:bg-[#1f3550]'}`}>
+              className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'sales' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
               📊 Sales
             </button>
             <button
               onClick={() => { setDashboardMode('pm'); localStorage.setItem('dashboardMode', 'pm') }}
-              className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${dashboardMode === 'pm' ? 'bg-[#C8622A] text-white shadow' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white hover:bg-[#1f3550]'}`}>
+              className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'pm' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
               🔨 PM
             </button>
           </div>
         </div>
 
         {/* PM Dashboard */}
-        {dashboardMode === 'pm' && !loading && (
-          <div className="space-y-4">
-            {/* PM Stats */}
-            <div className="grid grid-cols-4 gap-4">
+        {dashboardMode === 'pm' && !loading && (() => {
+          const activeJobs = jobs.filter(j => j.status === 'Active')
+          const hoursThisWeek = techLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0)
+          const overdueJobs = jobs.filter(j => j.status === 'Active' && j.end_date && new Date(j.end_date) < new Date())
+          const pendingPOsCount = purchaseOrders.filter(p => p.status === 'Sent' || p.status === 'Partial').length
+          const totalContractValue = jobs.filter(j => j.status === 'Active').reduce((sum, j) => {
+            const prop = proposals.find(p => p.id === j.proposal_id)
+            return sum + (prop?.proposal_value || 0)
+          }, 0)
+
+          return (
+          <div className="space-y-5">
+
+            {/* PM Stats row */}
+            <div className="grid grid-cols-6 gap-4">
               {[
-                { label: 'Active Jobs', value: jobs.filter(j => j.status === 'Active').length, color: 'text-green-400' },
-                { label: 'On Hold', value: jobs.filter(j => j.status === 'On Hold').length, color: 'text-yellow-400' },
-                { label: 'Completed', value: jobs.filter(j => j.status === 'Completed').length, color: 'text-blue-400' },
-                { label: 'Total Jobs', value: jobs.length, color: 'text-white' },
+                { label: 'Active Jobs', value: activeJobs.length, color: 'text-green-400', click: () => navigate('/jobs') },
+                { label: 'On Hold', value: jobs.filter(j => j.status === 'On Hold').length, color: 'text-yellow-400', click: () => navigate('/jobs') },
+                { label: 'Completed', value: jobs.filter(j => j.status === 'Completed').length, color: 'text-blue-400', click: () => navigate('/jobs') },
+                { label: 'Hours This Week', value: hoursThisWeek.toFixed(1), color: 'text-[#C8622A]', click: () => navigate('/tech-log') },
+                { label: 'Overdue Jobs', value: overdueJobs.length, color: overdueJobs.length > 0 ? 'text-red-400' : 'text-white', click: () => navigate('/jobs') },
+                { label: 'POs Outstanding', value: pendingPOsCount, color: pendingPOsCount > 0 ? 'text-yellow-400' : 'text-white', click: () => navigate('/purchase-orders') },
               ].map(stat => (
-                <div key={stat.label} className="bg-[#1a2d45] rounded-xl p-4">
+                <div key={stat.label} onClick={stat.click} className="bg-[#1a2d45] rounded-xl p-4 cursor-pointer hover:bg-[#1f3550] transition-colors">
                   <p className="text-[#8A9AB0] text-xs mb-1">{stat.label}</p>
                   <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
                 </div>
               ))}
             </div>
 
-            {/* Active jobs with progress */}
-            <div className="bg-[#1a2d45] rounded-xl p-5">
-              <h3 className="text-white font-bold mb-4">Active Jobs</h3>
-              {jobs.filter(j => j.status === 'Active').length === 0 ? (
-                <p className="text-[#8A9AB0] text-sm">No active jobs. Jobs are created when proposals are marked Won.</p>
-              ) : (
-                <div className="space-y-3">
-                  {jobs.filter(j => j.status === 'Active').map(job => {
-                    const items = job.job_checklist_items || []
-                    const done = items.filter(i => i.completed).length
-                    const progress = items.length > 0 ? Math.round((done / items.length) * 100) : 0
-                    return (
-                      <div key={job.id} onClick={() => window.location.href = `/jobs/${job.id}`}
-                        className="bg-[#0F1C2E] rounded-lg p-4 cursor-pointer hover:bg-[#0a1628] transition-colors group">
-                        <div className="flex justify-between items-center mb-2">
-                          <div>
-                            <p className="text-white font-semibold group-hover:text-[#C8622A] transition-colors">{job.name}</p>
-                            {job.clients?.company && <p className="text-[#8A9AB0] text-xs">{job.clients.company}</p>}
+            {/* Pending Change Orders alert */}
+            {pendingCOs.length > 0 && (
+              <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-yellow-400 text-lg">⚠</span>
+                  <div>
+                    <p className="text-white font-semibold text-sm">{pendingCOs.length} Change Order{pendingCOs.length !== 1 ? 's' : ''} Pending Approval</p>
+                    <p className="text-yellow-400 text-xs">{pendingCOs.map(co => co.jobs?.name || 'Unknown Job').join(', ')}</p>
+                  </div>
+                </div>
+                <button onClick={() => navigate('/jobs')} className="text-yellow-400 hover:text-white text-xs transition-colors">Review →</button>
+              </div>
+            )}
+
+            {/* Overdue jobs alert */}
+            {overdueJobs.length > 0 && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-red-400">⚠</span>
+                  <p className="text-white font-semibold text-sm">{overdueJobs.length} Job{overdueJobs.length !== 1 ? 's' : ''} Past End Date</p>
+                </div>
+                <div className="space-y-1">
+                  {overdueJobs.map(job => (
+                    <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)} className="flex justify-between items-center cursor-pointer hover:bg-red-500/5 rounded px-2 py-1 transition-colors">
+                      <span className="text-white text-sm">{job.name}</span>
+                      <span className="text-red-400 text-xs">{Math.ceil((new Date() - new Date(job.end_date)) / (1000 * 60 * 60 * 24))}d overdue</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-5">
+              {/* Active Jobs with progress */}
+              <div className="bg-[#1a2d45] rounded-xl p-5">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-white font-bold">Active Jobs</h3>
+                  <button onClick={() => navigate('/jobs')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">View all →</button>
+                </div>
+                {activeJobs.length === 0 ? (
+                  <p className="text-[#8A9AB0] text-sm">No active jobs. Created when proposals are marked Won.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {activeJobs.map(job => {
+                      const items = job.job_checklist_items || []
+                      const done = items.filter(i => i.completed).length
+                      const progress = items.length > 0 ? Math.round((done / items.length) * 100) : 0
+                      const prop = proposals.find(p => p.id === job.proposal_id)
+                      const isOverdue = job.end_date && new Date(job.end_date) < new Date()
+                      return (
+                        <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)}
+                          className="bg-[#0F1C2E] rounded-lg p-4 cursor-pointer hover:bg-[#0a1628] transition-colors group">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-white text-sm font-semibold group-hover:text-[#C8622A] transition-colors">{job.name}</p>
+                                {isOverdue && <span className="text-red-400 text-xs font-semibold">OVERDUE</span>}
+                              </div>
+                              {job.clients?.company && <p className="text-[#8A9AB0] text-xs">{job.clients.company}</p>}
+                              <div className="flex gap-3 mt-0.5">
+                                {job.start_date && <p className="text-[#8A9AB0] text-xs">Start: {new Date(job.start_date + 'T12:00:00').toLocaleDateString()}</p>}
+                                {job.end_date && <p className={`text-xs ${isOverdue ? 'text-red-400' : 'text-[#8A9AB0]'}`}>End: {new Date(job.end_date + 'T12:00:00').toLocaleDateString()}</p>}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[#C8622A] text-sm font-bold">{progress}%</p>
+                              <p className="text-[#8A9AB0] text-xs">{done}/{items.length} tasks</p>
+                              {prop?.proposal_value && <p className="text-white text-xs font-semibold mt-0.5">${(prop.proposal_value).toLocaleString()}</p>}
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-[#8A9AB0] text-xs">{done}/{items.length} tasks</p>
-                            <p className="text-[#C8622A] text-sm font-semibold">{progress}%</p>
+                          <div className="w-full bg-[#1a2d45] rounded-full h-1.5">
+                            <div className={`h-1.5 rounded-full transition-all ${progress === 100 ? 'bg-green-400' : isOverdue ? 'bg-red-500' : 'bg-[#C8622A]'}`} style={{ width: `${progress}%` }} />
                           </div>
                         </div>
-                        <div className="w-full bg-[#1a2d45] rounded-full h-1.5">
-                          <div className={`h-1.5 rounded-full ${progress === 100 ? 'bg-green-400' : 'bg-[#C8622A]'}`} style={{ width: `${progress}%` }} />
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Cost vs Budget */}
+              <div className="bg-[#1a2d45] rounded-xl p-5">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-white font-bold">Cost vs Budget</h3>
+                  <p className="text-[#8A9AB0] text-xs">Active jobs</p>
+                </div>
+                {activeJobs.length === 0 ? (
+                  <p className="text-[#8A9AB0] text-sm">No active jobs.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {activeJobs.map(job => {
+                      const prop = proposals.find(p => p.id === job.proposal_id)
+                      if (!prop) return null
+                      const budget = prop.proposal_value || 0
+                      const cost = prop.total_your_cost || 0
+                      const margin = prop.total_gross_margin_percent || 0
+                      if (budget === 0) return null
+                      return (
+                        <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)}
+                          className="bg-[#0F1C2E] rounded-lg p-3 cursor-pointer hover:bg-[#0a1628] transition-colors">
+                          <div className="flex justify-between items-start mb-1">
+                            <p className="text-white text-sm font-medium">{job.name}</p>
+                            <p className={`text-xs font-bold ${margin >= 30 ? 'text-green-400' : margin >= 15 ? 'text-[#C8622A]' : 'text-red-400'}`}>{margin.toFixed(1)}% margin</p>
+                          </div>
+                          <div className="flex justify-between text-xs text-[#8A9AB0] mb-1.5">
+                            <span>Revenue: <span className="text-white font-semibold">${budget.toLocaleString()}</span></span>
+                            <span>Cost: <span className="text-white font-semibold">${cost.toLocaleString()}</span></span>
+                          </div>
+                          <div className="w-full bg-[#1a2d45] rounded-full h-1.5">
+                            <div className="h-1.5 rounded-full bg-[#C8622A]" style={{ width: `${Math.min(100, (cost / budget) * 100)}%` }} />
+                          </div>
+                        </div>
+                      )
+                    }).filter(Boolean)}
+                    {activeJobs.every(j => !proposals.find(p => p.id === j.proposal_id)?.proposal_value) && (
+                      <p className="text-[#8A9AB0] text-sm">No budget data on linked proposals.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-5">
+              {/* Hours Logged This Week */}
+              <div className="bg-[#1a2d45] rounded-xl p-5">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h3 className="text-white font-bold">Hours Logged — This Week</h3>
+                    <p className="text-[#8A9AB0] text-xs mt-0.5">{hoursThisWeek.toFixed(1)} total hours across all jobs</p>
+                  </div>
+                  <button onClick={() => navigate('/tech-log')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Full log →</button>
+                </div>
+                {techLogs.length === 0 ? (
+                  <p className="text-[#8A9AB0] text-sm">No hours logged this week.</p>
+                ) : (() => {
+                  // Group by job
+                  const byJob = {}
+                  techLogs.forEach(l => {
+                    const job = jobs.find(j => j.id === l.job_id)
+                    const key = l.job_id
+                    if (!byJob[key]) byJob[key] = { name: job?.name || 'Unknown', hours: 0, entries: 0 }
+                    byJob[key].hours += l.hours_worked || 0
+                    byJob[key].entries += 1
+                  })
+                  return (
+                    <div className="space-y-2">
+                      {Object.values(byJob).sort((a, b) => b.hours - a.hours).map((item, i) => (
+                        <div key={i} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-3 py-2">
+                          <div>
+                            <p className="text-white text-sm">{item.name}</p>
+                            <p className="text-[#8A9AB0] text-xs">{item.entries} log{item.entries !== 1 ? 's' : ''}</p>
+                          </div>
+                          <p className="text-[#C8622A] font-bold">{item.hours.toFixed(1)} hrs</p>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                })()}
+              </div>
+
+              {/* Materials — POs Outstanding */}
+              <div className="bg-[#1a2d45] rounded-xl p-5">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-white font-bold">Materials Status</h3>
+                  <button onClick={() => navigate('/purchase-orders')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">All POs →</button>
+                </div>
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {[
+                    { label: 'On Order', value: purchaseOrders.filter(p => p.status === 'Sent').length, color: 'text-blue-400' },
+                    { label: 'Partial', value: purchaseOrders.filter(p => p.status === 'Partial').length, color: 'text-yellow-400' },
+                    { label: 'Received', value: purchaseOrders.filter(p => p.status === 'Received').length, color: 'text-green-400' },
+                  ].map(s => (
+                    <div key={s.label} className="bg-[#0F1C2E] rounded-lg p-3 text-center">
+                      <p className="text-[#8A9AB0] text-xs mb-1">{s.label}</p>
+                      <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                    </div>
+                  ))}
+                </div>
+                {purchaseOrders.filter(p => p.status === 'Sent' || p.status === 'Partial').length === 0 ? (
+                  <p className="text-[#8A9AB0] text-sm">No outstanding POs.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {purchaseOrders.filter(p => p.status === 'Sent' || p.status === 'Partial').slice(0, 5).map(po => (
+                      <div key={po.id} onClick={() => navigate('/purchase-orders')} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-3 py-2 cursor-pointer hover:bg-[#0a1628] transition-colors">
+                        <div>
+                          <p className="text-white text-sm font-mono">{po.po_number}</p>
+                          <p className="text-[#8A9AB0] text-xs">{po.vendor_name}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-white text-sm font-semibold">${(po.total_amount || 0).toLocaleString()}</p>
+                          <span className={`text-xs font-semibold ${po.status === 'Partial' ? 'text-yellow-400' : 'text-blue-400'}`}>{po.status}</span>
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Upcoming deadlines */}
+            <div className="bg-[#1a2d45] rounded-xl p-5">
+              <h3 className="text-white font-bold mb-4">Upcoming Deadlines</h3>
+              {(() => {
+                const upcoming = jobs
+                  .filter(j => (j.status === 'Active' || j.status === 'On Hold') && j.end_date)
+                  .sort((a, b) => new Date(a.end_date) - new Date(b.end_date))
+                  .slice(0, 6)
+                if (upcoming.length === 0) return <p className="text-[#8A9AB0] text-sm">No jobs with end dates set.</p>
+                return (
+                  <div className="grid grid-cols-3 gap-3">
+                    {upcoming.map(job => {
+                      const daysLeft = Math.ceil((new Date(job.end_date) - new Date()) / (1000 * 60 * 60 * 24))
+                      const items = job.job_checklist_items || []
+                      const done = items.filter(i => i.completed).length
+                      const progress = items.length > 0 ? Math.round((done / items.length) * 100) : 0
+                      const isOverdue = daysLeft < 0
+                      return (
+                        <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)}
+                          className={`rounded-xl p-4 cursor-pointer transition-colors hover:opacity-90 ${isOverdue ? 'bg-red-500/10 border border-red-500/20' : daysLeft <= 7 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-[#0F1C2E] border border-[#2a3d55]'}`}>
+                          <p className="text-white text-sm font-semibold mb-0.5">{job.name}</p>
+                          {job.clients?.company && <p className="text-[#8A9AB0] text-xs mb-2">{job.clients.company}</p>}
+                          <div className="flex justify-between items-center mb-2">
+                            <span className={`text-xs font-bold ${isOverdue ? 'text-red-400' : daysLeft <= 7 ? 'text-yellow-400' : 'text-[#8A9AB0]'}`}>
+                              {isOverdue ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? 'Due today' : `${daysLeft}d left`}
+                            </span>
+                            <span className="text-[#C8622A] text-xs font-semibold">{progress}%</span>
+                          </div>
+                          <div className="w-full bg-[#1a2d45] rounded-full h-1">
+                            <div className={`h-1 rounded-full ${isOverdue ? 'bg-red-500' : 'bg-[#C8622A]'}`} style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+
           </div>
-        )}
+          )
+        })()}
 
         {/* Sales Dashboard (existing content) */}
         {dashboardMode === 'sales' && (
@@ -654,7 +891,6 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           </div>
         )}
       </div>
-        )}
 
       {/* Recurring Revenue Drill-Down Modal */}
       {recurringModal && (
