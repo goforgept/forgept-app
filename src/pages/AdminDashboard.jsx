@@ -891,6 +891,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           </div>
         )}
       </div>
+      )}
 
       {/* Recurring Revenue Drill-Down Modal */}
       {recurringModal && (
