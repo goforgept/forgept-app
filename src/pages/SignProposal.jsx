@@ -11,6 +11,7 @@ export default function SignProposal() {
   const [signerName, setSignerName] = useState('')
   const [signing, setSigning] = useState(false)
   const [signed, setSigned] = useState(false)
+  const [terms, setTerms] = useState('')
   const [signedAt, setSignedAt] = useState(null)
 
   useEffect(() => { fetchProposal() }, [token])
@@ -44,6 +45,18 @@ export default function SignProposal() {
       .eq('proposal_id', data.id)
 
     setLineItems(items || [])
+
+    // Fetch terms and conditions from org profile
+    if (data.org_id) {
+      const { data: orgProfile } = await supabase
+        .from('profiles')
+        .select('terms_and_conditions, company_name')
+        .eq('org_id', data.org_id)
+        .limit(1)
+        .single()
+      if (orgProfile?.terms_and_conditions) setTerms(orgProfile.terms_and_conditions)
+    }
+
     setLoading(false)
   }
 
@@ -210,6 +223,14 @@ export default function SignProposal() {
                 </tfoot>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Terms and Conditions */}
+        {terms && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <h3 className="text-white font-bold text-lg mb-4">Terms and Conditions</h3>
+            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{terms}</p>
           </div>
         )}
 
