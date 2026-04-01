@@ -19,6 +19,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     notes: '',
   })
   const [lineItems, setLineItems] = useState([])
+  const [includedCOs, setIncludedCOs] = useState([])
 
   useEffect(() => {
     fetchData()
@@ -81,6 +82,54 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
         total: parseFloat(l.customer_price) || 0
       })
     })
+
+    // Load approved change orders for the job linked to this proposal
+    const { data: jobData } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('proposal_id', proposalId)
+      .maybeSingle()
+
+    if (jobData?.id) {
+      const { data: coData } = await supabase
+        .from('change_orders')
+        .select('*')
+        .eq('job_id', jobData.id)
+        .eq('status', 'Approved')
+      const approved = coData || []
+      setIncludedCOs(approved)
+      approved.forEach(co => {
+        if (co.line_items?.length || co.labor_items?.length) {
+          // Expand individual CO line items
+          ;(co.line_items || []).forEach(l => {
+            if (l.item_name) items.push({
+              description: `CO: ${co.name} — ${l.item_name}`,
+              quantity: parseFloat(l.quantity) || 1,
+              unit_price: parseFloat(l.customer_price_unit) || 0,
+              total: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 1)
+            })
+          })
+          ;(co.labor_items || []).forEach(l => {
+            if (l.role) items.push({
+              description: `CO: ${co.name} — ${l.role}`,
+              quantity: parseFloat(l.quantity) || 1,
+              unit_price: l.quantity > 0 ? (parseFloat(l.customer_price) || 0) / parseFloat(l.quantity) : 0,
+              total: parseFloat(l.customer_price) || 0
+            })
+          })
+        } else {
+          // Flat-amount CO (legacy)
+          items.push({
+            description: `Change Order: ${co.name}`,
+            quantity: 1,
+            unit_price: co.amount || 0,
+            total: co.amount || 0
+          })
+        }
+      })
+    } else {
+      setIncludedCOs([])
+    }
 
     setLineItems(items)
   }
@@ -178,7 +227,10 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
                 ))}
               </select>
               {selectedProposal && (
-                <p className="text-green-400 text-xs mt-1">✓ Line items loaded from proposal</p>
+                <p className="text-green-400 text-xs mt-1">
+                  ✓ Line items loaded from proposal
+                  {includedCOs.length > 0 && ` + ${includedCOs.length} approved change order${includedCOs.length !== 1 ? 's' : ''}`}
+                </p>
               )}
             </div>
             <div className="col-span-2">
