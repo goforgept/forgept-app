@@ -48,6 +48,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [expandedStage, setExpandedStage] = useState('early')
   const [orgTaxRate, setOrgTaxRate] = useState('')
   const [savingTaxRate, setSavingTaxRate] = useState(false)
+  const [orgId, setOrgId] = useState(null)
   const [qboConnected, setQboConnected] = useState(false)
   const [qboCompanyName, setQboCompanyName] = useState('')
   const [connectingQBO, setConnectingQBO] = useState(false)
@@ -120,6 +121,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       try {
         const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, qbo_connected, qbo_company_name').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
+        setOrgId(data.org_id)
         setQboConnected(orgData?.qbo_connected || false)
         setQboCompanyName(orgData?.qbo_company_name || '')
       } catch (e) { /* ignore */ }
@@ -175,6 +177,9 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       ship_to_state: form.ship_to_state,
       ship_to_zip: form.ship_to_zip,
     }).eq('id', user.id)
+    if (orgId) {
+      await supabase.from('organizations').update({ default_tax_rate: parseFloat(orgTaxRate) || null }).eq('id', orgId)
+    }
     setSuccess('Settings saved successfully')
     setSaving(false)
   }
@@ -337,6 +342,11 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Default Markup %</label>
                   <input type="number" value={form.default_markup_percent} onChange={e => setForm(prev => ({ ...prev, default_markup_percent: e.target.value }))} className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Default Tax Rate %</label>
+                  <input type="number" step="0.01" placeholder="e.g. 8.5" value={orgTaxRate} onChange={e => setOrgTaxRate(e.target.value)} className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                  <p className="text-[#8A9AB0] text-xs mt-1">Applied as default to new proposals.</p>
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Brand Color</label>

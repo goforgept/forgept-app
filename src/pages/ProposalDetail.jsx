@@ -1547,7 +1547,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       doc.text('Labor', 14, tableEnd)
       const laborTotal = pdfLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
-      const grandTotal = materialsTotal + laborTotal
+      const pdfTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
+      const pdfTaxAmount = materialsTotal * (pdfTaxRate / 100)
+      const grandTotal = materialsTotal + laborTotal + pdfTaxAmount
       autoTable(doc, {
         startY: tableEnd + 6,
         head: [['Role', 'Qty', 'Unit', 'Total Labor']],
@@ -1558,7 +1560,15 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         alternateRowStyles: { fillColor: [245, 245, 245] },
         styles: { fontSize: 9 }
       })
-      const afterLabor = doc.lastAutoTable.finalY + 6
+      let afterLabor = doc.lastAutoTable.finalY + 6
+      if (pdfTaxRate > 0) {
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'normal')
+        doc.setTextColor(100, 100, 100)
+        doc.text(`Tax (${pdfTaxRate}% on materials):`, pageWidth - 70, afterLabor)
+        doc.text(`$${pdfTaxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterLabor, { align: 'right' })
+        afterLabor += 8
+      }
       doc.setFontSize(11)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -2056,32 +2066,41 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                     ))}
                   </tbody>
                   <tfoot>
-                    <tr>
-                      <td colSpan="6" className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td>
-                      <td className="text-white pt-4 text-right font-bold pr-4">
-                        ${lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td></td>
-                    </tr>
-                    {proposal?.labor_items?.length > 0 && (
-                      <tr>
-                        <td colSpan="6" className="text-[#8A9AB0] pt-1 text-right font-semibold">Total Labor</td>
-                        <td className="text-white pt-1 text-right font-bold pr-4">
-                          ${(proposal.labor_items.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </td>
-                        <td></td>
-                      </tr>
-                    )}
-                    <tr className="border-t border-[#2a3d55]">
-                      <td colSpan="6" className="text-[#8A9AB0] pt-3 text-right font-semibold">Grand Total</td>
-                      <td className="text-[#C8622A] pt-3 text-right font-bold text-lg pr-4">
-                        ${(
-                          lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0) +
-                          (proposal?.labor_items?.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0) || 0)
-                        ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td></td>
-                    </tr>
+                    {(() => {
+                      const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
+                      const laborTotal = proposal?.labor_items?.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0) || 0
+                      const taxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
+                      const taxAmount = materialsTotal * (taxRate / 100)
+                      const grandTotal = materialsTotal + laborTotal + taxAmount
+                      return (
+                        <>
+                          <tr>
+                            <td colSpan="6" className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td>
+                            <td className="text-white pt-4 text-right font-bold pr-4">${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td></td>
+                          </tr>
+                          {laborTotal > 0 && (
+                            <tr>
+                              <td colSpan="6" className="text-[#8A9AB0] pt-1 text-right font-semibold">Total Labor</td>
+                              <td className="text-white pt-1 text-right font-bold pr-4">${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td></td>
+                            </tr>
+                          )}
+                          {taxRate > 0 && (
+                            <tr>
+                              <td colSpan="6" className="text-[#8A9AB0] pt-1 text-right font-semibold">Tax ({taxRate}% on materials)</td>
+                              <td className="text-white pt-1 text-right font-bold pr-4">${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td></td>
+                            </tr>
+                          )}
+                          <tr className="border-t border-[#2a3d55]">
+                            <td colSpan="6" className="text-[#8A9AB0] pt-3 text-right font-semibold">Grand Total</td>
+                            <td className="text-[#C8622A] pt-3 text-right font-bold text-lg pr-4">${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td></td>
+                          </tr>
+                        </>
+                      )
+                    })()}
                   </tfoot>
                 </table>
               </div>
@@ -2345,7 +2364,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                     sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
                   const liveLaborTotal = laborItems.reduce((sum, l) =>
                     sum + (parseFloat(l.customer_price) || 0), 0)
-                  const liveGrandTotal = liveBOMTotal + liveLaborTotal
+                  const liveTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
+                  const liveTaxAmount = liveBOMTotal * (liveTaxRate / 100)
+                  const liveGrandTotal = liveBOMTotal + liveLaborTotal + liveTaxAmount
                   const liveBOMCost = editLines.reduce((sum, l) =>
                     sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
                   const liveLaborCost = laborItems.reduce((sum, l) =>
@@ -2362,6 +2383,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                         <span className="text-[#8A9AB0]">Labor</span>
                         <span className="text-white">${liveLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                       </div>
+                      {liveTaxRate > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-[#8A9AB0]">Tax ({liveTaxRate}% on materials)</span>
+                          <span className="text-white">${liveTaxAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between text-base font-bold border-t border-[#2a3d55] pt-2">
                         <span className="text-white">Grand Total</span>
                         <span className="text-[#C8622A]">${liveGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
