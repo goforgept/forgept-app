@@ -1252,30 +1252,29 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const requestSignature = async () => {
     if (!proposal?.client_email) { alert('No client email on this proposal.'); return }
     setRequestingSignature(true)
+    const signingUrl = `${window.location.origin}/sign/${proposal.signing_token}`
     try {
-      const signingUrl = `${window.location.origin}/sign/${proposal.signing_token}`
       const { data: { session } } = await supabase.auth.getSession()
-      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-followup-emails', {
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-signature-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
-          type: 'ai_email',
           toEmail: proposal.client_email,
-          toName: proposal.client_name || 'there',
+          toName: proposal.client_name || '',
           fromName: profile?.full_name || '',
           fromEmail: profile?.email || '',
           subject: `Please sign your proposal: ${proposal.proposal_name}`,
-          body: `Hi ${proposal.client_name || 'there'},\n\nYour proposal is ready for your review and signature.\n\nClick the link below to review and sign:\n${signingUrl}\n\nIf you have any questions, please don't hesitate to reach out.\n\nThank you,\n${profile?.full_name || ''}`,
+          proposalName: proposal.proposal_name,
+          signingUrl,
           orgId: proposal.org_id,
-          sentBy: profile?.id
         })
       })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
       logActivity(`Signature request sent to ${proposal.client_email}`)
       alert(`✓ Signature request sent to ${proposal.client_email}`)
     } catch (e) {
-      // Even if email fails, show the link
-      const signingUrl = `${window.location.origin}/sign/${proposal.signing_token}`
-      alert(`Signature link (copy and send manually):\n${signingUrl}`)
+      alert(`Could not send email. Share this link manually:\n${signingUrl}`)
     }
     setRequestingSignature(false)
   }
