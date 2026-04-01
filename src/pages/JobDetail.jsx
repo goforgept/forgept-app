@@ -56,6 +56,10 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [selectedForPO, setSelectedForPO] = useState(new Set())
   const [generatingPO, setGeneratingPO] = useState(false)
   const [existingPOs, setExistingPOs] = useState([])
+  const [showPOModal, setShowPOModal] = useState(false)
+  const [poVendorEmail, setPOVendorEmail] = useState('')
+  const [poNumber, setPONumber] = useState('')
+  const [poAutoNumber, setPOAutoNumber] = useState(true)
 
   // Change order modal
   const [showCOModal, setShowCOModal] = useState(false)
@@ -363,15 +367,29 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     })
   }
 
+  const openPOModal = () => {
+    const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
+    const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
+    const firstVendor = vendorNames[0] || ''
+    const foundVendor = vendors.find(v => v.vendor_name === firstVendor)
+    setPOVendorEmail(foundVendor?.contact_email || '')
+    setPONumber('')
+    setPOAutoNumber(true)
+    setShowPOModal(true)
+  }
+
   const generatePO = async () => {
     if (selectedForPO.size === 0 || !job?.proposal_id) return
     setGeneratingPO(true)
 
-    const { count } = await supabase
-      .from('purchase_orders')
-      .select('id', { count: 'exact', head: true })
-      .eq('org_id', profile.org_id)
-    const poNumber = `PO-${String((count || 0) + 1).padStart(4, '0')}`
+    let finalPONumber = poNumber.trim()
+    if (poAutoNumber || !finalPONumber) {
+      const { count } = await supabase
+        .from('purchase_orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('org_id', profile.org_id)
+      finalPONumber = `PO-${String((count || 0) + 1).padStart(4, '0')}`
+    }
 
     const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
     const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
@@ -380,21 +398,22 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     const { data: newPO } = await supabase.from('purchase_orders').insert({
       proposal_id: job.proposal_id,
       org_id: profile.org_id,
-      po_number: poNumber,
+      po_number: finalPONumber,
       status: 'Sent',
       total: poTotal,
       vendor: vendorNames || null,
+      vendor_email: poVendorEmail.trim() || null,
     }).select().single()
 
-    // Tag each selected BOM item with the PO number
     for (const itemId of selectedForPO) {
-      await supabase.from('bom_line_items').update({ po_number: poNumber, po_status: 'PO Sent' }).eq('id', itemId)
+      await supabase.from('bom_line_items').update({ po_number: finalPONumber, po_status: 'PO Sent' }).eq('id', itemId)
     }
 
-    setLineItems(prev => prev.map(l => selectedForPO.has(l.id) ? { ...l, po_number: poNumber, po_status: 'PO Sent' } : l))
-    setEditLines(prev => prev.map(l => selectedForPO.has(l.id) ? { ...l, po_number: poNumber, po_status: 'PO Sent' } : l))
+    setLineItems(prev => prev.map(l => selectedForPO.has(l.id) ? { ...l, po_number: finalPONumber, po_status: 'PO Sent' } : l))
+    setEditLines(prev => prev.map(l => selectedForPO.has(l.id) ? { ...l, po_number: finalPONumber, po_status: 'PO Sent' } : l))
     if (newPO) setExistingPOs(prev => [newPO, ...prev])
     setSelectedForPO(new Set())
+    setShowPOModal(false)
     setGeneratingPO(false)
   }
 
@@ -678,9 +697,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                   <span className="text-[#C8622A] text-sm font-semibold">{selectedForPO.size} item{selectedForPO.size !== 1 ? 's' : ''} selected</span>
                   <div className="flex gap-2">
                     <button onClick={() => setSelectedForPO(new Set())} className="text-[#8A9AB0] hover:text-white text-sm transition-colors px-3">Clear</button>
-                    <button onClick={generatePO} disabled={generatingPO}
-                      className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                      {generatingPO ? 'Generating...' : `Generate PO for ${selectedForPO.size} item${selectedForPO.size !== 1 ? 's' : ''}`}
+                    <button onClick={openPOModal}
+                      className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                      {`Generate PO for ${selectedForPO.size} item${selectedForPO.size !== 1 ? 's' : ''} →`}
                     </button>
                   </div>
                 </div>
@@ -1214,6 +1233,76 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           </div>
         )}
       </div>
+
+      {/* PO Modal */}
+      {showPOModal && (() => {
+        const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
+        const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
+        const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+              <h3 className="text-white font-bold text-lg mb-4">Generate Purchase Order</h3>
+              <div className="space-y-4">
+
+                {/* Vendor email */}
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">
+                    Vendor Email <span className="text-[#8A9AB0] font-normal">(for your records)</span>
+                  </label>
+                  {vendorNames.length > 1 && (
+                    <p className="text-yellow-400 text-xs mb-1">Items from multiple vendors: {vendorNames.join(', ')}</p>
+                  )}
+                  <input type="email" value={poVendorEmail} onChange={e => setPOVendorEmail(e.target.value)}
+                    placeholder="vendor@company.com"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+
+                {/* PO number */}
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
+                  <div className="flex gap-2 mb-2">
+                    <button onClick={() => setPOAutoNumber(true)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                      Auto-Generate
+                    </button>
+                    <button onClick={() => setPOAutoNumber(false)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${!poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                      Enter Manually
+                    </button>
+                  </div>
+                  {!poAutoNumber && (
+                    <input type="text" value={poNumber} onChange={e => setPONumber(e.target.value)}
+                      placeholder="e.g. PO-2026-001"
+                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                  )}
+                </div>
+
+                {/* Items preview */}
+                <div className="bg-[#0F1C2E] rounded-lg p-3">
+                  <p className="text-[#8A9AB0] text-xs mb-2">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} · Your cost: ${fmt(poTotal)}</p>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {selectedItems.map(item => (
+                      <div key={item.id} className="flex justify-between text-xs">
+                        <span className="text-white">{item.item_name}</span>
+                        <span className="text-[#8A9AB0]">{item.vendor ? `${item.vendor} · ` : ''}Qty: {item.quantity} {item.unit}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-1">
+                  <button onClick={() => setShowPOModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                  <button onClick={generatePO} disabled={generatingPO || (!poAutoNumber && !poNumber.trim())}
+                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                    {generatingPO ? 'Generating...' : 'Generate PO'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Notify Customer Modal */}
       {showNotifyModal && (
