@@ -384,11 +384,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
     let finalPONumber = poNumber.trim()
     if (poAutoNumber || !finalPONumber) {
-      const { count } = await supabase
-        .from('purchase_orders')
-        .select('id', { count: 'exact', head: true })
-        .eq('org_id', profile.org_id)
-      finalPONumber = `PO-${String((count || 0) + 1).padStart(4, '0')}`
+      const { data: org } = await supabase.from('organizations').select('po_counter').eq('id', profile.org_id).single()
+      finalPONumber = `PO-${org.po_counter}`
+      await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profile.org_id)
     }
 
     const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
@@ -400,9 +398,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       org_id: profile.org_id,
       po_number: finalPONumber,
       status: 'Sent',
-      total: poTotal,
-      vendor: vendorNames || null,
-      vendor_email: poVendorEmail.trim() || null,
+      total_amount: poTotal,
+      vendor_name: vendorNames || null,
     }).select().single()
 
     for (const itemId of selectedForPO) {
@@ -940,8 +937,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                           <div className="flex justify-between items-start">
                             <div>
                               <p className="text-white font-semibold font-mono">{po.po_number}</p>
-                              {po.vendor && <p className="text-[#8A9AB0] text-sm mt-0.5">{po.vendor}</p>}
-                              <p className="text-[#8A9AB0] text-xs mt-1">{poItems.length} item{poItems.length !== 1 ? 's' : ''} · ${fmt(po.total)}</p>
+                              {po.vendor_name && <p className="text-[#8A9AB0] text-sm mt-0.5">{po.vendor_name}</p>}
+                              <p className="text-[#8A9AB0] text-xs mt-1">{poItems.length} item{poItems.length !== 1 ? 's' : ''} · ${fmt(po.total_amount)}</p>
                             </div>
                             <span className={`text-xs px-2 py-1 rounded font-semibold ${allReceived ? 'bg-green-500/20 text-green-400' : 'bg-blue-500/20 text-blue-400'}`}>
                               {allReceived ? 'All Received' : 'On Order'}
