@@ -26,6 +26,7 @@ import ManufacturerOrders from './pages/ManufacturerOrders'
 import InvoiceDetail from './pages/InvoiceDetail'
 import NewInvoice from './pages/NewInvoice'
 import Jobs from './pages/Jobs'
+import SignProposal from './pages/SignProposal'
 import JobDetail from './pages/JobDetail'
 
 function App() {
@@ -142,6 +143,7 @@ function App() {
   return (
     <Routes>
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/sign/:token" element={<SignProposal />} />
       {!session ? (
         <Route path="*" element={<Login />} />
       ) : (
