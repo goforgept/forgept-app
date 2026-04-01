@@ -23,6 +23,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [saving, setSaving] = useState(false)
   const [generatingSOW, setGeneratingSOW] = useState(false)
   const [showPOModal, setShowPOModal] = useState(false)
+  const [selectedForPO, setSelectedForPO] = useState(new Set())
   const [poVendor, setPOVendor] = useState(null)
   const [poNumber, setPONumber] = useState('')
   const [poAutoNumber, setPOAutoNumber] = useState(true)
@@ -711,89 +712,96 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   }
 
   const generatePO = async () => {
+    if (selectedForPO.size === 0) return
     setGeneratingPO(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('org_id, company_name, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip')
-      .eq('id', user.id)
-      .single()
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('org_id, company_name, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip')
+        .eq('id', user.id)
+        .single()
 
-    let finalPONumber = poNumber
-    if (poAutoNumber) {
-      const { data: org } = await supabase.from('organizations').select('po_counter, name').eq('id', profileData.org_id).single()
-      finalPONumber = `PO-${org.po_counter}`
-      await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profileData.org_id)
+      let finalPONumber = poNumber
+      if (poAutoNumber) {
+        const { data: org } = await supabase.from('organizations').select('po_counter').eq('id', profileData.org_id).single()
+        finalPONumber = `PO-${org.po_counter}`
+        await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profileData.org_id)
+      }
+
+      const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
+      const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))].join(', ')
+      const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
+      const doc = new jsPDF()
+      const pageWidth = doc.internal.pageSize.getWidth()
+
+      doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.rect(0, 0, pageWidth, 40, 'F')
+
+      if (profile?.logo_url) {
+        const img = new Image()
+        img.src = profile.logo_url
+        await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+        const maxW = 50, maxH = 26
+        const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+        const logoW = img.naturalWidth * ratio
+        const logoH = img.naturalHeight * ratio
+        const logoY = 8 + (maxH - logoH) / 2
+        doc.addImage(img, 'PNG', 14, logoY, logoW, logoH)
+      } else {
+        doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+        doc.text(profile?.company_name || 'ForgePt.', 14, 22)
+      }
+
+      doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+      doc.text('PURCHASE ORDER', pageWidth - 14, 18, { align: 'right' })
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+      doc.text(finalPONumber, pageWidth - 14, 28, { align: 'right' })
+
+      const billToLines = [profileData?.company_name || '', profileData?.bill_to_address || '', [profileData?.bill_to_city, profileData?.bill_to_state, profileData?.bill_to_zip].filter(Boolean).join(', ')].filter(Boolean)
+      const shipToLines = [profileData?.company_name || '', profileData?.ship_to_address || '', [profileData?.ship_to_city, profileData?.ship_to_state, profileData?.ship_to_zip].filter(Boolean).join(', ')].filter(Boolean)
+
+      doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52)
+      doc.text(`Project: ${proposal?.proposal_name || ''}`, 14, 60)
+
+      const col1 = 14, col2 = pageWidth / 2 - 10, col3 = pageWidth / 2 + 30
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('VENDOR', col1, 74); doc.text('BILL TO', col2, 74); doc.text('SHIP TO', col3, 74)
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40); doc.setFontSize(9)
+      doc.text(vendorNames || poVendorEmail || '—', col1, 81)
+      billToLines.forEach((line, i) => doc.text(line, col2, 81 + i * 6))
+      shipToLines.forEach((line, i) => doc.text(line, col3, 81 + i * 6))
+
+      const tableStart = 81 + Math.max(billToLines.length, shipToLines.length) * 6 + 6
+      doc.setDrawColor(220, 220, 220)
+      doc.line(14, tableStart - 2, pageWidth - 14, tableStart - 2)
+
+      autoTable(doc, {
+        startY: tableStart,
+        head: [['Item', 'Part #', 'Qty', 'Unit', 'Unit Cost', 'Total']],
+        body: selectedItems.map(item => [item.item_name, item.part_number_sku || '—', item.quantity, item.unit || 'ea', `$${(item.your_cost_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${((item.your_cost_unit || 0) * (item.quantity || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
+        foot: [['', '', '', '', 'Total', `$${selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        styles: { fontSize: 9 }, showFoot: 'lastPage'
+      })
+
+      const totalAmount = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
+      await supabase.from('purchase_orders').insert({ po_number: finalPONumber, proposal_id: id, org_id: profileData.org_id, vendor_name: vendorNames || null, status: 'Sent', total_amount: totalAmount })
+      for (const item of selectedItems) {
+        await supabase.from('bom_line_items').update({ po_number: finalPONumber, po_status: 'PO Sent' }).eq('id', item.id)
+      }
+
+      await fetchLineItems()
+      logActivity(`Purchase Order ${finalPONumber} generated — ${selectedItems.length} items`)
+      doc.save(`${finalPONumber}.pdf`)
+      setSelectedForPO(new Set())
+      setShowPOModal(false)
+    } catch (err) {
+      alert('Error generating PO: ' + err.message)
     }
-
-    const vendorItems = lineItems.filter(l => l.vendor === poVendor)
-    const doc = new jsPDF()
-    const pageWidth = doc.internal.pageSize.getWidth()
-    const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
-
-    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.rect(0, 0, pageWidth, 40, 'F')
-
-    if (profile?.logo_url) {
-      const img = new Image()
-      img.src = profile.logo_url
-      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
-      const maxW = 50, maxH = 26
-      const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
-      const logoW = img.naturalWidth * ratio
-      const logoH = img.naturalHeight * ratio
-      const logoY = 8 + (maxH - logoH) / 2
-      doc.addImage(img, 'PNG', 14, logoY, logoW, logoH)
-    } else {
-      doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
-      doc.text(profile?.company_name || 'ForgePt.', 14, 22)
-    }
-
-    doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-    doc.text('PURCHASE ORDER', pageWidth - 14, 18, { align: 'right' })
-    doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-    doc.text(finalPONumber, pageWidth - 14, 28, { align: 'right' })
-
-    const billToLines = [profileData?.company_name || profile?.company_name || '', profileData?.bill_to_address || '', [profileData?.bill_to_city, profileData?.bill_to_state, profileData?.bill_to_zip].filter(Boolean).join(', ')].filter(Boolean)
-    const shipToLines = [profileData?.company_name || profile?.company_name || '', profileData?.ship_to_address || '', [profileData?.ship_to_city, profileData?.ship_to_state, profileData?.ship_to_zip].filter(Boolean).join(', ')].filter(Boolean)
-
-    doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52)
-    doc.text(`Project: ${proposal?.proposal_name || ''}`, 14, 60)
-
-    const col1 = 14, col2 = pageWidth / 2 - 10, col3 = pageWidth / 2 + 30
-    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.text('VENDOR', col1, 74); doc.text('BILL TO', col2, 74); doc.text('SHIP TO', col3, 74)
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40); doc.setFontSize(9)
-    doc.text(poVendor, col1, 81)
-    billToLines.forEach((line, i) => doc.text(line, col2, 81 + i * 6))
-    shipToLines.forEach((line, i) => doc.text(line, col3, 81 + i * 6))
-
-    const tableStart = 81 + Math.max(billToLines.length, shipToLines.length) * 6 + 6
-    doc.setDrawColor(220, 220, 220)
-    doc.line(14, tableStart - 2, pageWidth - 14, tableStart - 2)
-
-    autoTable(doc, {
-      startY: tableStart,
-      head: [['Item', 'Part #', 'Qty', 'Unit', 'Unit Cost', 'Total']],
-      body: vendorItems.map(item => [item.item_name, item.part_number_sku || '—', item.quantity, item.unit || 'ea', `$${(item.your_cost_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${((item.your_cost_unit || 0) * (item.quantity || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
-      foot: [['', '', '', '', 'Total', `$${vendorItems.reduce((sum, item) => sum + ((item.your_cost_unit || 0) * (item.quantity || 0)), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
-      headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-      footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-      styles: { fontSize: 9 }, showFoot: 'lastPage'
-    })
-
-    const totalAmount = vendorItems.reduce((sum, item) => sum + ((item.your_cost_unit || 0) * (item.quantity || 0)), 0)
-    await supabase.from('purchase_orders').insert({ po_number: finalPONumber, proposal_id: id, org_id: profileData.org_id, vendor_name: poVendor, status: 'Sent', total_amount: totalAmount })
-    for (const item of vendorItems) {
-      await supabase.from('bom_line_items').update({ po_number: finalPONumber, po_status: 'PO Sent' }).eq('id', item.id)
-    }
-
-    await fetchLineItems()
-    logActivity(`Purchase Order ${finalPONumber} generated for ${poVendor}`)
-    doc.save(`${finalPONumber} - ${poVendor}.pdf`)
-    setShowPOModal(false)
     setGeneratingPO(false)
   }
 
@@ -1490,8 +1498,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 {proposal?.status === 'Won' && lineItems.length > 0 && orgType === 'manufacturer' && (
                   <button onClick={() => setShowOrderModal(true)} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">🏭 Convert to Order</button>
                 )}
-                {orgType !== 'manufacturer' && (
-                  <button onClick={() => setShowPOModal(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Generate PO</button>
+                {orgType !== 'manufacturer' && selectedForPO.size > 0 && (
+                  <button onClick={() => setShowPOModal(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                    Generate PO ({selectedForPO.size})
+                  </button>
                 )}
                 {orgType !== 'manufacturer' && (
                   <button onClick={openRFQModal} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Send All RFQs</button>
@@ -1523,6 +1533,19 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[#2a3d55]">
+                      <th className="py-2 pr-2 w-8">
+                        <input type="checkbox" className="accent-[#C8622A]"
+                          checked={lineItems.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing').every(l => selectedForPO.has(l.id)) && lineItems.some(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')}
+                          onChange={() => {
+                            const orderable = lineItems.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')
+                            const allSelected = orderable.every(l => selectedForPO.has(l.id))
+                            setSelectedForPO(prev => {
+                              const next = new Set(prev)
+                              orderable.forEach(l => allSelected ? next.delete(l.id) : next.add(l.id))
+                              return next
+                            })
+                          }} />
+                      </th>
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Item</th>
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Mfr</th>
                       <th className="text-[#8A9AB0] text-left py-2 pr-4">Part #</th>
@@ -1536,8 +1559,21 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                     </tr>
                   </thead>
                   <tbody>
-                    {lineItems.map((item) => (
-                      <tr key={item.id} className="border-b border-[#2a3d55]/50">
+                    {lineItems.map((item) => {
+                      const isOrdered = item.po_status === 'PO Sent' || item.po_status === 'Received'
+                      return (
+                      <tr key={item.id} className={`border-b border-[#2a3d55]/50 ${selectedForPO.has(item.id) ? 'bg-[#C8622A]/5' : ''}`}>
+                        <td className="pr-2 py-3">
+                          {!isOrdered && (
+                            <input type="checkbox" className="accent-[#C8622A] cursor-pointer"
+                              checked={selectedForPO.has(item.id)}
+                              onChange={() => setSelectedForPO(prev => {
+                                const next = new Set(prev)
+                                next.has(item.id) ? next.delete(item.id) : next.add(item.id)
+                                return next
+                              })} />
+                          )}
+                        </td>
                         <td className="text-white py-3 pr-4">{item.item_name}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.manufacturer || '—'}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
@@ -1567,7 +1603,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                   <tfoot>
                     {(() => {
@@ -2155,47 +2191,53 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       )}
 
       {/* PO Modal */}
-      {showPOModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-4">Generate Purchase Order</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Select Vendor</label>
-                <select value={poVendor || ''} onChange={e => { setPOVendor(e.target.value); const found = vendors.find(v => v.vendor_name === e.target.value); setPOVendorEmail(found?.contact_email || '') }}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                  <option value="">— Select vendor —</option>
-                  {[...new Set(lineItems.filter(l => l.vendor).map(l => l.vendor))].map(v => <option key={v} value={v}>{v} ({lineItems.filter(l => l.vendor === v).length} items)</option>)}
-                </select>
-                {poVendor && (
-                  <div className="mt-2">
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor Email (for your records)</label>
-                    <input type="email" value={poVendorEmail} onChange={e => setPOVendorEmail(e.target.value)} placeholder="vendor@company.com" className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+      {showPOModal && (() => {
+        const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
+        const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
+        const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+              <h3 className="text-white font-bold text-lg mb-4">Generate Purchase Order</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor Email <span className="font-normal text-[#8A9AB0]">(optional — for your records)</span></label>
+                  {vendorNames.length > 0 && <p className="text-[#8A9AB0] text-xs mb-1">Vendors: {vendorNames.join(', ')}</p>}
+                  <input type="email" value={poVendorEmail} onChange={e => setPOVendorEmail(e.target.value)} placeholder="vendor@company.com"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
+                  <div className="flex gap-2 mb-2">
+                    <button onClick={() => setPOAutoNumber(true)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Auto-Generate</button>
+                    <button onClick={() => setPOAutoNumber(false)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${!poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Enter Manually</button>
                   </div>
-                )}
-              </div>
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
-                <div className="flex gap-2 mb-2">
-                  <button onClick={() => setPOAutoNumber(true)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Auto-Generate</button>
-                  <button onClick={() => setPOAutoNumber(false)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${!poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Enter Manually</button>
+                  {!poAutoNumber && <input type="text" value={poNumber} onChange={e => setPONumber(e.target.value)} placeholder="e.g. PO-2026-001"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />}
                 </div>
-                {!poAutoNumber && <input type="text" value={poNumber} onChange={e => setPONumber(e.target.value)} placeholder="e.g. PO-2026-001" className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />}
-              </div>
-              {poVendor && (
                 <div className="bg-[#0F1C2E] rounded-lg p-3">
-                  <p className="text-[#8A9AB0] text-xs mb-2">Items for {poVendor}:</p>
-                  {lineItems.filter(l => l.vendor === poVendor).map(item => <div key={item.id} className="flex justify-between text-xs py-1"><span className="text-white">{item.item_name}</span><span className="text-[#8A9AB0]">Qty: {item.quantity}</span></div>)}
+                  <p className="text-[#8A9AB0] text-xs mb-2">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} · Your cost: ${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {selectedItems.map(item => (
+                      <div key={item.id} className="flex justify-between text-xs py-0.5">
+                        <span className="text-white">{item.item_name}</span>
+                        <span className="text-[#8A9AB0]">{item.vendor ? `${item.vendor} · ` : ''}Qty: {item.quantity} {item.unit}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowPOModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={generatePO} disabled={!poVendor || generatingPO || (!poAutoNumber && !poNumber)} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{generatingPO ? 'Generating...' : 'Generate PO'}</button>
+                <div className="flex gap-3 pt-2">
+                  <button onClick={() => setShowPOModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                  <button onClick={generatePO} disabled={generatingPO || selectedItems.length === 0 || (!poAutoNumber && !poNumber)}
+                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                    {generatingPO ? 'Generating...' : `Generate PO (${selectedItems.length} items)`}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
