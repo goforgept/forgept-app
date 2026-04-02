@@ -569,7 +569,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     const children = [
       new Paragraph({ children: [new TextRun({ text: profile?.company_name || proposal?.company || 'ForgePt.', bold: true, size: 36, color: primaryColor })] }),
-      new Paragraph({ children: [new TextRun({ text: proposal?.proposal_name || 'Proposal', bold: true, size: 48 })] }),
+      new Paragraph({ children: [new TextRun({ text: proposal?.proposal_name || 'Proposal', bold: true, size: 48 }), ...(proposal?.quote_number ? [new TextRun({ text: `  ${proposal.quote_number}`, size: 24, color: '999999' })] : [])] }),
       new Paragraph({ children: [new TextRun({ text: `Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, size: 20, color: '666666' })] }),
       new Paragraph({ children: [new TextRun({ text: clientAddress ? `Address: ${clientAddress}` : `Email: ${proposal?.client_email || ''}`, size: 20, color: '666666' })] }),
       new Paragraph({ children: [new TextRun({ text: `Date: ${new Date().toLocaleDateString()}`, size: 20, color: '666666' })] }),
@@ -1220,6 +1220,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     doc.setTextColor(0, 0, 0); doc.setFontSize(18); doc.setFont('helvetica', 'bold')
     doc.text(proposal?.proposal_name || 'Proposal', 14, 55)
+    if (proposal?.quote_number) {
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(150, 150, 150)
+      doc.text(proposal.quote_number, pageWidth - 14, 55, { align: 'right' })
+    }
     doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
     doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
     if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, 72)
@@ -1390,7 +1394,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
+                {proposal?.quote_number && (
+                  <span className="text-[#8A9AB0] text-xs font-mono bg-[#2a3d55] px-2 py-0.5 rounded">{proposal.quote_number}</span>
+                )}
+              </div>
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-[#8A9AB0]">{proposal?.company} · {proposal?.client_name}</p>
                 <button onClick={openEditClientModal} className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors" title="Edit client info">✏️</button>
