@@ -85,6 +85,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [bulkSelectedLines, setBulkSelectedLines] = useState(new Set())
   // E-signing
   const [requestingSignature, setRequestingSignature] = useState(false)
+  const [editingQuoteNumber, setEditingQuoteNumber] = useState(false)
+  const [quoteNumberDraft, setQuoteNumberDraft] = useState('')
+  const [quoteNumberError, setQuoteNumberError] = useState('')
   const [editingSOW, setEditingSOW] = useState(false)
   const [sowDraft, setSowDraft] = useState('')
 
@@ -300,6 +303,27 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setBulkField('')
     setBulkValue('')
     setBulkSelectedLines(new Set())
+  }
+
+  const saveQuoteNumber = async () => {
+    const trimmed = quoteNumberDraft.trim()
+    if (!trimmed) { setQuoteNumberError('Quote number cannot be empty'); return }
+    // Check for duplicates within org
+    const { data: existing } = await supabase
+      .from('proposals')
+      .select('id')
+      .eq('org_id', proposal.org_id)
+      .eq('quote_number', trimmed)
+      .neq('id', id)
+    if (existing && existing.length > 0) {
+      setQuoteNumberError(`Quote number "${trimmed}" is already in use`)
+      return
+    }
+    await supabase.from('proposals').update({ quote_number: trimmed }).eq('id', id)
+    setProposal(prev => ({ ...prev, quote_number: trimmed }))
+    setEditingQuoteNumber(false)
+    setQuoteNumberError('')
+    logActivity(`Quote number updated to ${trimmed}`)
   }
 
   const saveSOW = async () => {
@@ -569,7 +593,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     const children = [
       new Paragraph({ children: [new TextRun({ text: profile?.company_name || proposal?.company || 'ForgePt.', bold: true, size: 36, color: primaryColor })] }),
-      new Paragraph({ children: [new TextRun({ text: proposal?.proposal_name || 'Proposal', bold: true, size: 48 }), ...(proposal?.quote_number ? [new TextRun({ text: `  ${proposal.quote_number}`, size: 24, color: '999999' })] : [])] }),
+      new Paragraph({ children: [new TextRun({ text: proposal?.proposal_name || 'Proposal', bold: true, size: 48 })] }),
       new Paragraph({ children: [new TextRun({ text: `Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, size: 20, color: '666666' })] }),
       new Paragraph({ children: [new TextRun({ text: clientAddress ? `Address: ${clientAddress}` : `Email: ${proposal?.client_email || ''}`, size: 20, color: '666666' })] }),
       new Paragraph({ children: [new TextRun({ text: `Date: ${new Date().toLocaleDateString()}`, size: 20, color: '666666' })] }),
@@ -1220,10 +1244,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     doc.setTextColor(0, 0, 0); doc.setFontSize(18); doc.setFont('helvetica', 'bold')
     doc.text(proposal?.proposal_name || 'Proposal', 14, 55)
-    if (proposal?.quote_number) {
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(150, 150, 150)
-      doc.text(proposal.quote_number, pageWidth - 14, 55, { align: 'right' })
-    }
     doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
     doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
     if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, 72)
@@ -1394,12 +1414,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-start">
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
-                {proposal?.quote_number && (
-                  <span className="text-[#8A9AB0] text-xs font-mono bg-[#2a3d55] px-2 py-0.5 rounded">{proposal.quote_number}</span>
-                )}
-              </div>
+              <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-[#8A9AB0]">{proposal?.company} · {proposal?.client_name}</p>
                 <button onClick={openEditClientModal} className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors" title="Edit client info">✏️</button>
@@ -1433,6 +1448,34 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           </div>
           <div className="grid grid-cols-6 gap-4 mt-6">
             <div><p className="text-[#8A9AB0] text-xs">Rep</p><p className="text-white text-sm font-medium">{proposal?.rep_name}</p></div>
+            <div>
+              <p className="text-[#8A9AB0] text-xs mb-1">Quote #</p>
+              {editingQuoteNumber ? (
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="text"
+                      value={quoteNumberDraft}
+                      onChange={e => { setQuoteNumberDraft(e.target.value); setQuoteNumberError('') }}
+                      onKeyDown={e => { if (e.key === 'Enter') saveQuoteNumber(); if (e.key === 'Escape') { setEditingQuoteNumber(false); setQuoteNumberError('') } }}
+                      className="w-24 bg-[#0F1C2E] text-white border border-[#C8622A]/50 rounded px-2 py-0.5 text-sm focus:outline-none focus:border-[#C8622A]"
+                      autoFocus
+                    />
+                    <button onClick={saveQuoteNumber} className="text-green-400 hover:text-green-300 text-xs">✓</button>
+                    <button onClick={() => { setEditingQuoteNumber(false); setQuoteNumberError('') }} className="text-[#8A9AB0] hover:text-white text-xs">✕</button>
+                  </div>
+                  {quoteNumberError && <p className="text-red-400 text-xs">{quoteNumberError}</p>}
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setQuoteNumberDraft(proposal?.quote_number || ''); setEditingQuoteNumber(true) }}
+                  className="text-white text-sm font-medium hover:text-[#C8622A] transition-colors group flex items-center gap-1"
+                  title="Click to edit quote number">
+                  {proposal?.quote_number || <span className="text-[#8A9AB0] italic">Add #</span>}
+                  <span className="text-[#2a3d55] group-hover:text-[#C8622A] text-xs transition-colors">✏️</span>
+                </button>
+              )}
+            </div>
             <div>
               <p className="text-[#8A9AB0] text-xs">Close Date</p>
               <input type="date" value={proposal?.close_date || ''} onChange={e => updateCloseDate(e.target.value)} className="bg-transparent text-white text-sm font-medium focus:outline-none focus:border-b focus:border-[#C8622A] cursor-pointer" />

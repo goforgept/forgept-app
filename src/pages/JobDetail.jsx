@@ -106,8 +106,10 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [poAutoNumber, setPOAutoNumber] = useState(true)
   const [generatingPO, setGeneratingPO] = useState(false)
 
-  // Change order modal
+ // Change order modal
   const [showCOModal, setShowCOModal] = useState(false)
+  const [coForm, setCoForm] = useState({ name: '', description: '', line_items: [], labor_items: [] })
+  const [savingCO, setSavingCO] = useState(false)
 
 
   // Checklist add
