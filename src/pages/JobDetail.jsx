@@ -124,7 +124,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
     const { data: jobData } = await supabase
       .from('jobs')
-      .select('*, clients(company, email, client_name), pm:profiles!jobs_user_id_fkey(full_name, email), tech:profiles!jobs_tech_id_fkey(full_name, email)')
+      .select('*, clients(company, email, client_name), profiles(full_name, email)')
       .eq('id', id)
       .single()
     setJob(jobData)
@@ -336,14 +336,13 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const assignPM = async (userId) => {
     await supabase.from('jobs').update({ user_id: userId || null }).eq('id', id)
     const pm = orgProfiles.find(p => p.id === userId) || null
-    setJob(prev => ({ ...prev, user_id: userId, pm }))
+    setJob(prev => ({ ...prev, user_id: userId, profiles: pm }))
     if (userId) await addToProposalCollaborators(userId)
   }
 
   const assignTech = async (userId) => {
     await supabase.from('jobs').update({ tech_id: userId || null }).eq('id', id)
-    const tech = orgProfiles.find(p => p.id === userId) || null
-    setJob(prev => ({ ...prev, tech_id: userId, tech }))
+    setJob(prev => ({ ...prev, tech_id: userId }))
     if (userId) await addToProposalCollaborators(userId)
   }
 
@@ -512,7 +511,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 <div className="flex items-center gap-1.5">
                   <span className="text-[#8A9AB0] text-xs">👤 PM:</span>
                   <select
-                    value={job?.user_id || ''}
+                    value={job?.user_id || job?.profiles?.id || ''}
                     onChange={e => assignPM(e.target.value)}
                     className="bg-[#0F1C2E] text-white text-xs border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]"
                   >
