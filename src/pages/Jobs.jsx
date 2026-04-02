@@ -28,7 +28,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
 
     const { data } = await supabase
       .from('jobs')
-      .select('*, proposals(proposal_name, proposal_value), clients(company), profiles(full_name), job_checklist_items(id, completed)')
+      .select('*, proposals(proposal_name, proposal_value), clients(company), profiles!jobs_user_id_fkey(full_name), job_checklist_items(id, completed)')
       .eq('org_id', profileData.org_id)
       .order('created_at', { ascending: false })
 
@@ -120,7 +120,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
                       </div>
                       <div className="flex items-center gap-4 text-sm text-[#8A9AB0]">
                         {job.clients?.company && <span>🏢 {job.clients.company}</span>}
-                        {job.profiles?.full_name && <span>👤 PM: {job.profiles.full_name}</span>}
+                        {job.profiles?.full_name && <span>👤 {job.profiles.full_name}</span>}
                         {job.start_date && <span>📅 {new Date(job.start_date).toLocaleDateString()}</span>}
                         {job.end_date && <span>→ {new Date(job.end_date).toLocaleDateString()}</span>}
                       </div>

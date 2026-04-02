@@ -131,7 +131,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
     const { data: jobData } = await supabase
       .from('jobs')
-      .select('*, clients(company, email, client_name), profiles(full_name, email)')
+      .select('*, clients(company, email, client_name), profiles!jobs_user_id_fkey(full_name, email)')
       .eq('id', id)
       .single()
     setJob(jobData)
