@@ -35,7 +35,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
 
     const { data, error } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id')
+      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number')
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
 
@@ -65,7 +65,8 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
         p.proposal_name?.toLowerCase().includes(s) ||
         p.company?.toLowerCase().includes(s) ||
         p.rep_name?.toLowerCase().includes(s) ||
-        p.client_name?.toLowerCase().includes(s)
+        p.client_name?.toLowerCase().includes(s) ||
+        p.quote_number?.toLowerCase().includes(s)
       )
     })
 
@@ -117,7 +118,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
         <div className="flex gap-3 mb-4">
           <input
             type="text"
-            placeholder="Search by name, company, rep..."
+            placeholder="Search by name, company, rep, quote #..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
