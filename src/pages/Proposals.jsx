@@ -43,10 +43,18 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
     setLoading(false)
   }
 
+  const sixtyDaysAgo = new Date()
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
+
   const filtered = proposals
     .filter(p => {
+      const isClosed = p.status === 'Won' || p.status === 'Lost'
+      if (isClosed) {
+        const refDate = new Date(p.close_date || p.created_at)
+        if (refDate < sixtyDaysAgo) return false
+      }
       if (statusFilter === 'All') return true
-      if (statusFilter === 'Active') return p.status !== 'Won' && p.status !== 'Lost'
+      if (statusFilter === 'Active') return !isClosed
       return p.status === statusFilter
     })
     .filter(p => {
