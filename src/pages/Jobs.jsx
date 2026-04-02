@@ -28,7 +28,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
 
     const { data } = await supabase
       .from('jobs')
-      .select('*, proposals(proposal_name, proposal_value), clients(company), profiles!jobs_user_id_fkey(full_name), job_checklist_items(id, completed)')
+      .select('*, proposals(proposal_name, proposal_value), clients(company), profiles!jobs_assigned_pm_fkey(full_name), job_checklist_items(id, completed)')
       .eq('org_id', profileData.org_id)
       .order('created_at', { ascending: false })
 
