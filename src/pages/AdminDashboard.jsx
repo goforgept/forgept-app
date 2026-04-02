@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
-export default function AdminDashboard({ isAdmin, featureProposals = true, featureCRM = false }) {
+export default function AdminDashboard({ isAdmin, featureProposals = true, featureCRM = false, role = 'admin', isSalesManager = false, isPM = false, defaultMode = null }) {
   const [proposals, setProposals] = useState([])
-  const [dashboardMode, setDashboardMode] = useState(() => localStorage.getItem('dashboardMode') || 'sales')
+  const [dashboardMode, setDashboardMode] = useState(() => defaultMode || localStorage.getItem('dashboardMode') || (isPM ? 'pm' : 'sales'))
   const [jobs, setJobs] = useState([])
   const [techLogs, setTechLogs] = useState([])
   const [pendingCOs, setPendingCOs] = useState([])
@@ -24,8 +24,6 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const [recurringItems, setRecurringItems] = useState([])
   const [targetPeriod, setTargetPeriod] = useState('monthly')
   const [recurringModal, setRecurringModal] = useState(null) // 'revenue' | 'quoting' | 'all'
-  const [expiredPricingCount, setExpiredPricingCount] = useState(0)
-  const [expiredPricingProposals, setExpiredPricingProposals] = useState([])
   const navigate = useNavigate()
 
   useEffect(() => { fetchOrgData() }, [])
@@ -208,6 +206,9 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     }).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
   , [proposals])
 
+  const [expiredPricingCount, setExpiredPricingCount] = useState(0)
+  const [expiredPricingProposals, setExpiredPricingProposals] = useState([])
+
   const laborStats = useMemo(() => {
     const getLaborTotal = (ps) => ps.reduce((sum, p) => sum + (p.labor_items || []).reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0), 0)
     const getLaborHours = (ps) => ps.reduce((sum, p) => sum + (p.labor_items || []).reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0), 0)
@@ -355,18 +356,27 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
         {/* Dashboard Mode Toggle */}
         <div className="flex justify-end mb-2">
-          <div className="flex bg-[#0F1C2E] rounded-lg p-1 gap-1">
-            <button
-              onClick={() => { setDashboardMode('sales'); localStorage.setItem('dashboardMode', 'sales') }}
-              className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'sales' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
-              📊 Sales
-            </button>
-            <button
-              onClick={() => { setDashboardMode('pm'); localStorage.setItem('dashboardMode', 'pm') }}
-              className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'pm' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
-              🔨 PM
-            </button>
-          </div>
+          {!isPM && (
+            <div className="flex bg-[#0F1C2E] rounded-lg p-1 gap-1">
+              {!isPM && (
+                <button
+                  onClick={() => { setDashboardMode('sales'); localStorage.setItem('dashboardMode', 'sales') }}
+                  className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'sales' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                  📊 Sales
+                </button>
+              )}
+              {(isAdmin || isPM) && (
+                <button
+                  onClick={() => { setDashboardMode('pm'); localStorage.setItem('dashboardMode', 'pm') }}
+                  className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'pm' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                  🔨 PM
+                </button>
+              )}
+            </div>
+          )}
+          {isPM && (
+            <span className="text-[#8A9AB0] text-sm font-semibold">🔨 PM Dashboard</span>
+          )}
         </div>
 
         {/* PM Dashboard */}

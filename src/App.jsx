@@ -139,7 +139,11 @@ function App() {
     </div>
   )
 
-  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail, featurePurchaseOrders, featureInvoices, featureAiBom, featureSitePhotos }
+  const role = profile?.org_role || profile?.role || 'rep'
+  const isSalesManager = role === 'sales_manager'
+  const isPM = role === 'project_manager'
+  const isTechnician = role === 'technician'
+  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail, featurePurchaseOrders, featureInvoices, featureAiBom, featureSitePhotos, role, isSalesManager, isPM, isTechnician }
 
   return (
     <Routes>
@@ -149,10 +153,15 @@ function App() {
         <Route path="*" element={<Login />} />
       ) : (
         <>
-          <Route path="/" element={isAdmin
-            ? <AdminDashboard {...sharedProps} />
-            : <Dashboard {...sharedProps} />}
-          />
+          <Route path="/" element={
+            isAdmin || isSalesManager
+              ? <AdminDashboard {...sharedProps} />
+              : isPM
+              ? <AdminDashboard {...sharedProps} defaultMode="pm" />
+              : isTechnician
+              ? <TechLog {...sharedProps} />
+              : <Dashboard {...sharedProps} />
+          } />
           <Route path="/admin" element={<AdminDashboard {...sharedProps} />} />
           <Route path="/rep" element={<Dashboard {...sharedProps} />} />
           <Route path="/new" element={<NewProposal featureAiBom={featureAiBom} />} />
@@ -184,4 +193,4 @@ function App() {
   )
 }
 
-export default App// Wed Apr  1 14:11:03 CDT 2026
+export default App

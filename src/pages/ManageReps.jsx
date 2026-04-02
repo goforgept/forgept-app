@@ -3,10 +3,11 @@ import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
 const ROLES = [
-  { value: 'admin', label: 'Admin', color: 'bg-[#C8622A]/20 text-[#C8622A]', desc: 'Full access — manages team, settings, and all proposals' },
-  { value: 'rep', label: 'Rep', color: 'bg-[#8A9AB0]/20 text-[#8A9AB0]', desc: 'Creates and manages their own proposals' },
-  { value: 'sales_engineer', label: 'Sales Engineer', color: 'bg-blue-500/20 text-blue-400', desc: 'Tagged on deals, gets notified on assignment' },
-  { value: 'project_manager', label: 'Project Manager', color: 'bg-purple-500/20 text-purple-400', desc: 'Manages fulfillment on Won proposals and orders' },
+  { value: 'admin', label: 'Admin', color: 'bg-[#C8622A]/20 text-[#C8622A]', desc: 'Full access — manages team, settings, billing, and all features' },
+  { value: 'sales_manager', label: 'Sales Manager', color: 'bg-yellow-500/20 text-yellow-400', desc: 'Full sales access — leaderboard, all proposals, team pipeline' },
+  { value: 'rep', label: 'Sales Rep', color: 'bg-blue-500/20 text-blue-400', desc: 'Creates and manages their own proposals and clients' },
+  { value: 'project_manager', label: 'Project Manager', color: 'bg-purple-500/20 text-purple-400', desc: 'Manages active jobs, POs, change orders, and tech logs' },
+  { value: 'technician', label: 'Technician', color: 'bg-green-500/20 text-green-400', desc: 'Field access only — tech daily log and job viewing' },
 ]
 
 const getRoleStyle = (role) => ROLES.find(r => r.value === role)?.color || 'bg-[#8A9AB0]/20 text-[#8A9AB0]'

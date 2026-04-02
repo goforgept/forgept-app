@@ -75,7 +75,7 @@ function JobPOList({ proposalId }) {
   )
 }
 
-export default function JobDetail({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true }) {
+export default function JobDetail({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [job, setJob] = useState(null)
@@ -98,10 +98,17 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [savingBOM, setSavingBOM] = useState(false)
   const [vendors, setVendors] = useState([])
 
+  // PO generation
+  const [selectedForPO, setSelectedForPO] = useState(new Set())
+  const [showPOModal, setShowPOModal] = useState(false)
+  const [poVendorEmail, setPOVendorEmail] = useState('')
+  const [poNumber, setPONumber] = useState('')
+  const [poAutoNumber, setPOAutoNumber] = useState(true)
+  const [generatingPO, setGeneratingPO] = useState(false)
+
   // Change order modal
   const [showCOModal, setShowCOModal] = useState(false)
-  const [coForm, setCoForm] = useState({ name: '', description: '', amount: '' })
-  const [savingCO, setSavingCO] = useState(false)
+
 
   // Checklist add
   const [newCheckItem, setNewCheckItem] = useState('')
@@ -423,6 +430,90 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     })
   }
 
+  const hexToRgb = (hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+    return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
+  }
+
+  const generatePO = async () => {
+    if (selectedForPO.size === 0) return
+    setGeneratingPO(true)
+    try {
+      let finalPONumber = poNumber.trim()
+      if (poAutoNumber || !finalPONumber) {
+        const { data: org } = await supabase.from('organizations').select('po_counter').eq('id', profile.org_id).single()
+        finalPONumber = `PO-${org.po_counter}`
+        await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profile.org_id)
+      }
+      const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
+      const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))].join(', ')
+      const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('company_name, logo_url, primary_color, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip')
+        .eq('id', profile.id).single()
+      const { default: jsPDF } = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const primaryRgb = hexToRgb(profileData?.primary_color || '#0F1C2E')
+      const doc = new jsPDF()
+      const pageWidth = doc.internal.pageSize.getWidth()
+      doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.rect(0, 0, pageWidth, 40, 'F')
+      if (profileData?.logo_url) {
+        const img = new Image()
+        img.src = profileData.logo_url
+        await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+        const maxW = 50, maxH = 26
+        const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+        doc.addImage(img, 'PNG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+      } else {
+        doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+        doc.text(profileData?.company_name || 'ForgePt.', 14, 22)
+      }
+      doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+      doc.text('PURCHASE ORDER', pageWidth - 14, 18, { align: 'right' })
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+      doc.text(finalPONumber, pageWidth - 14, 28, { align: 'right' })
+      doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52)
+      doc.text(`Project: ${job?.name || ''}`, 14, 60)
+      const billLines = [profileData?.company_name || '', profileData?.bill_to_address || '', [profileData?.bill_to_city, profileData?.bill_to_state, profileData?.bill_to_zip].filter(Boolean).join(', ')].filter(Boolean)
+      const shipLines = [profileData?.company_name || '', profileData?.ship_to_address || '', [profileData?.ship_to_city, profileData?.ship_to_state, profileData?.ship_to_zip].filter(Boolean).join(', ')].filter(Boolean)
+      const col2 = pageWidth / 2 - 10, col3 = pageWidth / 2 + 30
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('VENDOR', 14, 74); doc.text('BILL TO', col2, 74); doc.text('SHIP TO', col3, 74)
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40); doc.setFontSize(9)
+      doc.text(vendorNames || '—', 14, 81)
+      billLines.forEach((line, i) => doc.text(line, col2, 81 + i * 6))
+      shipLines.forEach((line, i) => doc.text(line, col3, 81 + i * 6))
+      const tableStart = 81 + Math.max(billLines.length, shipLines.length) * 6 + 6
+      doc.setDrawColor(220, 220, 220)
+      doc.line(14, tableStart - 2, pageWidth - 14, tableStart - 2)
+      autoTable(doc, {
+        startY: tableStart,
+        head: [['Item', 'Part #', 'Qty', 'Unit', 'Unit Cost', 'Total']],
+        body: selectedItems.map(item => [item.item_name, item.part_number_sku || '—', item.quantity, item.unit || 'ea', `$${(item.your_cost_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${((item.your_cost_unit || 0) * (item.quantity || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
+        foot: [['', '', '', '', 'Total', `$${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        styles: { fontSize: 9 }, showFoot: 'lastPage'
+      })
+      await supabase.from('purchase_orders').insert({
+        po_number: finalPONumber, proposal_id: job?.proposal_id || null,
+        org_id: profile.org_id, vendor_name: vendorNames || null, status: 'Sent', total_amount: poTotal
+      })
+      for (const item of selectedItems) {
+        await supabase.from('bom_line_items').update({ po_number: finalPONumber, po_status: 'PO Sent' }).eq('id', item.id)
+      }
+      setLineItems(prev => prev.map(l => selectedForPO.has(l.id) ? { ...l, po_number: finalPONumber, po_status: 'PO Sent' } : l))
+      setSelectedForPO(new Set())
+      setShowPOModal(false)
+      doc.save(`${finalPONumber}.pdf`)
+    } catch (err) { alert('Error generating PO: ' + err.message) }
+    setGeneratingPO(false)
+  }
+
   const saveChangeOrder = async () => {
     if (!coForm.name.trim()) return
     setSavingCO(true)
@@ -490,7 +581,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} role={role} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-6">
 
@@ -888,13 +979,78 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-white font-bold text-lg">Purchase Orders</h3>
-              {job?.proposal_id && (
-                <button onClick={() => navigate(`/proposal/${job.proposal_id}`)}
-                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                  Generate PO in Proposal →
-                </button>
-              )}
+              <button
+                onClick={() => selectedForPO.size > 0 && setShowPOModal(true)}
+                disabled={selectedForPO.size === 0}
+                title={selectedForPO.size === 0 ? 'Check items below to select for PO' : `Generate PO for ${selectedForPO.size} items`}
+                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                {selectedForPO.size > 0 ? `Generate PO (${selectedForPO.size})` : 'Generate PO'}
+              </button>
             </div>
+
+            {lineItems.length === 0 ? (
+              <p className="text-[#8A9AB0] text-sm">No materials on this job's BOM.</p>
+            ) : (
+              <div className="overflow-x-auto mb-4">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#2a3d55]">
+                      <th className="py-2 pr-2 w-8">
+                        <input type="checkbox" className="accent-[#C8622A]"
+                          checked={lineItems.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing').every(l => selectedForPO.has(l.id)) && lineItems.some(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')}
+                          onChange={() => {
+                            const orderable = lineItems.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')
+                            const allSelected = orderable.every(l => selectedForPO.has(l.id))
+                            setSelectedForPO(prev => {
+                              const next = new Set(prev)
+                              orderable.forEach(l => allSelected ? next.delete(l.id) : next.add(l.id))
+                              return next
+                            })
+                          }} />
+                      </th>
+                      {['Item', 'Vendor', 'Qty', 'Your Cost', 'PO #', 'Status'].map(h => (
+                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lineItems.map(item => {
+                      const isOrdered = item.po_status === 'PO Sent' || item.po_status === 'Received'
+                      return (
+                        <tr key={item.id} className={`border-b border-[#2a3d55]/50 ${selectedForPO.has(item.id) ? 'bg-[#C8622A]/5' : ''}`}>
+                          <td className="pr-2 py-3">
+                            {!isOrdered && (
+                              <input type="checkbox" className="accent-[#C8622A] cursor-pointer"
+                                checked={selectedForPO.has(item.id)}
+                                onChange={() => setSelectedForPO(prev => {
+                                  const next = new Set(prev)
+                                  next.has(item.id) ? next.delete(item.id) : next.add(item.id)
+                                  return next
+                                })} />
+                            )}
+                          </td>
+                          <td className="py-3 pr-4">
+                            <p className="text-white text-sm">{item.item_name}</p>
+                            {item.part_number_sku && <p className="text-[#8A9AB0] text-xs">{item.part_number_sku}</p>}
+                          </td>
+                          <td className="text-[#8A9AB0] py-3 pr-4 text-sm">{item.vendor || '—'}</td>
+                          <td className="text-white py-3 pr-4 text-sm">{item.quantity} {item.unit}</td>
+                          <td className="text-white py-3 pr-4 text-sm">${fmt((item.your_cost_unit || 0) * (item.quantity || 0))}</td>
+                          <td className="py-3 pr-4">
+                            {item.po_number ? <span className="text-[#8A9AB0] text-xs font-mono">{item.po_number}</span> : <span className="text-[#2a3d55]">—</span>}
+                          </td>
+                          <td className="py-3">
+                            <span className={`text-xs px-2 py-1 rounded font-semibold ${item.po_status === 'Received' ? 'bg-green-500/20 text-green-400' : item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                              {item.po_status || 'Not Ordered'}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <JobPOList proposalId={job?.proposal_id} />
           </div>
         )}
@@ -1076,6 +1232,55 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           </div>
         )}
       </div>
+
+{/* PO Modal */}
+      {showPOModal && (() => {
+        const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
+        const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
+        const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
+        return (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+              <h3 className="text-white font-bold text-lg mb-4">Generate Purchase Order</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor Email <span className="font-normal text-[#8A9AB0]">(optional)</span></label>
+                  {vendorNames.length > 0 && <p className="text-[#8A9AB0] text-xs mb-1">Vendors: {vendorNames.join(', ')}</p>}
+                  <input type="email" value={poVendorEmail} onChange={e => setPOVendorEmail(e.target.value)} placeholder="vendor@company.com"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
+                  <div className="flex gap-2 mb-2">
+                    <button onClick={() => setPOAutoNumber(true)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Auto-Generate</button>
+                    <button onClick={() => setPOAutoNumber(false)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${!poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Enter Manually</button>
+                  </div>
+                  {!poAutoNumber && <input type="text" value={poNumber} onChange={e => setPONumber(e.target.value)} placeholder="e.g. PO-2026-001"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />}
+                </div>
+                <div className="bg-[#0F1C2E] rounded-lg p-3">
+                  <p className="text-[#8A9AB0] text-xs mb-2">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} · Your cost: ${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                    {selectedItems.map(item => (
+                      <div key={item.id} className="flex justify-between text-xs py-0.5">
+                        <span className="text-white">{item.item_name}</span>
+                        <span className="text-[#8A9AB0]">{item.vendor ? `${item.vendor} · ` : ''}Qty: {item.quantity}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <button onClick={() => setShowPOModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                  <button onClick={generatePO} disabled={generatingPO || (!poAutoNumber && !poNumber.trim())}
+                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                    {generatingPO ? 'Generating...' : `Generate PO (${selectedItems.length} items)`}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Notify Customer Modal */}
       {showNotifyModal && (

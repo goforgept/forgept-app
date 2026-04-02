@@ -49,6 +49,47 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
   }
 ]
 
+const NAV_GROUPS_PM = (featurePurchaseOrders, featureInvoices) => [
+  {
+    key: 'operations',
+    label: 'Operations',
+    links: [
+      { label: 'Dashboard', path: '/', icon: '📊' },
+      { label: 'Jobs', path: '/jobs', icon: '🔨' },
+      { label: 'Tech Log', path: '/tech-log', icon: '📋' },
+      ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
+      ...(featurePurchaseOrders ? [{ label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' }] : []),
+      { label: 'Vendors', path: '/vendors', icon: '🏭' },
+    ]
+  },
+  {
+    key: 'manage',
+    label: 'Manage',
+    links: [
+      { label: 'Settings', path: '/settings', icon: '⚙️' },
+      { label: 'Help', path: '/faq', icon: '❓' },
+    ]
+  }
+]
+
+const NAV_GROUPS_TECH = () => [
+  {
+    key: 'operations',
+    label: 'Operations',
+    links: [
+      { label: 'Tech Log', path: '/tech-log', icon: '📋' },
+      { label: 'Jobs', path: '/jobs', icon: '🔨' },
+    ]
+  },
+  {
+    key: 'manage',
+    label: 'Manage',
+    links: [
+      { label: 'Settings', path: '/settings', icon: '⚙️' },
+    ]
+  }
+]
+
 const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType) => [
   {
     key: 'sales',
@@ -88,7 +129,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType) 
   }
 ]
 
-export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true }) {
+export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
   const location = useLocation()
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
@@ -128,8 +169,12 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
     await supabase.auth.signOut()
   }
 
-  const groups = isAdmin
+  const groups = isAdmin || isSalesManager
     ? NAV_GROUPS_ADMIN(featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType)
+    : isPM
+    ? NAV_GROUPS_PM(featurePurchaseOrders, featureInvoices)
+    : isTechnician
+    ? NAV_GROUPS_TECH()
     : NAV_GROUPS_REP(featureProposals, featureCRM, featureInvoices, orgType)
 
   const visibleGroups = groups.filter(g => g.links.length > 0)
@@ -145,9 +190,9 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
             <h1 className="text-white text-xl font-bold">
               ForgePt<span className="text-[#C8622A]">.</span>
             </h1>
-            {isAdmin && (
+            {(isAdmin || isSalesManager || isPM || isTechnician) && (
               <span className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-semibold mt-1 inline-block">
-                Admin
+                {isAdmin ? 'Admin' : isSalesManager ? 'Sales Mgr' : isPM ? 'PM' : 'Technician'}
               </span>
             )}
           </div>
