@@ -87,6 +87,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('checklist')
   const [savingStatus, setSavingStatus] = useState(false)
+  const [orgProfiles, setOrgProfiles] = useState([])
 
   // Bulk BOM edit
   const [editingBOM, setEditingBOM] = useState(false)
@@ -123,10 +124,19 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
     const { data: jobData } = await supabase
       .from('jobs')
-      .select('*, clients(company, email, client_name), profiles(full_name, email)')
+      .select('*, clients(company, email, client_name), pm:profiles!jobs_user_id_fkey(full_name, email), tech:profiles!jobs_tech_id_fkey(full_name, email)')
       .eq('id', id)
       .single()
     setJob(jobData)
+
+    if (profileData?.org_id) {
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, role')
+        .eq('org_id', profileData.org_id)
+        .order('full_name')
+      setOrgProfiles(profilesData || [])
+    }
 
     if (jobData?.proposal_id) {
       const { data: propData } = await supabase
@@ -314,6 +324,29 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     }
   }
 
+  const addToProposalCollaborators = async (userId) => {
+    if (!proposal?.id || !userId) return
+    const { data: propData } = await supabase.from('proposals').select('collaborator_ids').eq('id', proposal.id).single()
+    const existing = propData?.collaborator_ids || []
+    if (!existing.includes(userId)) {
+      await supabase.from('proposals').update({ collaborator_ids: [...existing, userId] }).eq('id', proposal.id)
+    }
+  }
+
+  const assignPM = async (userId) => {
+    await supabase.from('jobs').update({ user_id: userId || null }).eq('id', id)
+    const pm = orgProfiles.find(p => p.id === userId) || null
+    setJob(prev => ({ ...prev, user_id: userId, pm }))
+    if (userId) await addToProposalCollaborators(userId)
+  }
+
+  const assignTech = async (userId) => {
+    await supabase.from('jobs').update({ tech_id: userId || null }).eq('id', id)
+    const tech = orgProfiles.find(p => p.id === userId) || null
+    setJob(prev => ({ ...prev, tech_id: userId, tech }))
+    if (userId) await addToProposalCollaborators(userId)
+  }
+
   // Bulk BOM edit
   const toggleLineSelect = (id) => {
     setSelectedLines(prev => {
@@ -473,8 +506,31 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
               </div>
               <div className="flex items-center gap-4 mt-1 text-sm text-[#8A9AB0]">
                 {job?.clients?.company && <span>🏢 {job.clients.company}</span>}
-                {job?.profiles?.full_name && <span>👤 PM: {job.profiles.full_name}</span>}
                 {proposal?.quote_number && <span className="font-mono">#{proposal.quote_number}</span>}
+              </div>
+              <div className="flex items-center gap-3 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#8A9AB0] text-xs">👤 PM:</span>
+                  <select
+                    value={job?.user_id || ''}
+                    onChange={e => assignPM(e.target.value)}
+                    className="bg-[#0F1C2E] text-white text-xs border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]"
+                  >
+                    <option value="">Unassigned</option>
+                    {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#8A9AB0] text-xs">🔧 Tech:</span>
+                  <select
+                    value={job?.tech_id || ''}
+                    onChange={e => assignTech(e.target.value)}
+                    className="bg-[#0F1C2E] text-white text-xs border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]"
+                  >
+                    <option value="">Unassigned</option>
+                    {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
