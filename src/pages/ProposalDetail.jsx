@@ -85,6 +85,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [bulkSelectedLines, setBulkSelectedLines] = useState(new Set())
   // E-signing
   const [requestingSignature, setRequestingSignature] = useState(false)
+  const [editingSOW, setEditingSOW] = useState(false)
+  const [sowDraft, setSowDraft] = useState('')
 
   useEffect(() => {
     fetchProposal()
@@ -298,6 +300,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setBulkField('')
     setBulkValue('')
     setBulkSelectedLines(new Set())
+  }
+
+  const saveSOW = async () => {
+    await supabase.from('proposals').update({ scope_of_work: sowDraft }).eq('id', id)
+    setProposal(prev => ({ ...prev, scope_of_work: sowDraft }))
+    setEditingSOW(false)
+    logActivity('Scope of Work edited manually')
   }
 
   const requestSignature = async () => {
@@ -1493,8 +1502,28 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] min-h-[100px]" />
           </div>
 
-          {proposal?.scope_of_work ? (
-            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
+          {editingSOW ? (
+            <div className="space-y-3">
+              <textarea
+                value={sowDraft}
+                onChange={e => setSowDraft(e.target.value)}
+                rows={14}
+                className="w-full bg-[#0F1C2E] text-white border border-[#C8622A]/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-y leading-relaxed"
+              />
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setEditingSOW(false)} className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={saveSOW} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save SOW</button>
+              </div>
+            </div>
+          ) : proposal?.scope_of_work ? (
+            <div className="relative group">
+              <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
+              <button
+                onClick={() => { setSowDraft(proposal.scope_of_work); setEditingSOW(true) }}
+                className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[#2a3d55] text-[#8A9AB0] hover:text-white px-2 py-1 rounded text-xs">
+                ✏️ Edit
+              </button>
+            </div>
           ) : (
             <p className="text-[#8A9AB0] text-sm">No Scope of Work yet. Click Generate SOW to create one.</p>
           )}
