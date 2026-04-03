@@ -33,7 +33,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   const [form, setForm] = useState({
     title: '', description: '', client_id: '', job_id: '',
     assigned_tech_id: '', priority: 'Normal', status: 'Open',
-    scheduled_date: '', scheduled_time: '', notes: ''
+    scheduled_date: '', scheduled_time: ''
   })
   const [clientJobs, setClientJobs] = useState([])
 
@@ -91,7 +91,6 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
         status: form.status,
         scheduled_date: form.scheduled_date || null,
         scheduled_time: form.scheduled_time || null,
-        notes: form.notes.trim() || null,
       })
 
       if (error) {
@@ -101,7 +100,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
 
       setShowModal(false)
       setSaveError('')
-      setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '', notes: '' })
+      setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '' })
       setClientJobs([])
       fetchAll()
     } catch (err) {
@@ -267,12 +266,6 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Scheduled Time</label>
                   <input type="time" value={form.scheduled_time} onChange={e => setForm(p => ({ ...p, scheduled_time: e.target.value }))} className={inputClass} />
                 </div>
-              </div>
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Notes</label>
-                <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-                  rows={2} placeholder="Access instructions, special requirements..."
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
               </div>
               {saveError && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{saveError}</p>}
               <div className="flex gap-3 pt-2">
