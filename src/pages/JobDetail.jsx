@@ -1127,8 +1127,92 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 { label: 'Quoted Labor', quoted: quotedLabor, cost: costLabor, color: 'text-white' },
                 ...(approvedCOs > 0 ? [{ label: 'Approved Change Orders', quoted: approvedCOs, cost: 0, color: 'text-[#C8622A]' }] : []),
               ]
+              // True progress calculations
+              const usedByItemId = {}
+              techLogs.forEach(log => {
+                if (!log.materials_used) return
+                try {
+                  const parsed = JSON.parse(log.materials_used)
+                  if (Array.isArray(parsed)) parsed.forEach(m => {
+                    usedByItemId[m.id] = (usedByItemId[m.id] || 0) + (parseFloat(m.qty) || 0)
+                  })
+                } catch {}
+              })
+              const totalPlannedUnits = lineItems.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0)
+              const totalUsedUnits = lineItems.reduce((sum, i) => sum + (usedByItemId[i.id] || 0), 0)
+              const materialsPct = totalPlannedUnits > 0 ? Math.min((totalUsedUnits / totalPlannedUnits) * 100, 100) : 0
+              const materialsOver = totalUsedUnits > totalPlannedUnits
+
+              const estimatedHours = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.quantity) || 0), 0)
+              const laborPct = estimatedHours > 0 ? Math.min((hoursLogged / estimatedHours) * 100, 100) : 0
+              const laborOver = hoursLogged > estimatedHours
+
+              const checklistTotal = checklist.length
+              const checklistDone = checklist.filter(c => c.completed).length
+              const checklistPct = checklistTotal > 0 ? (checklistDone / checklistTotal) * 100 : 0
+
+              const actualMaterialCost = lineItems.reduce((sum, i) => sum + ((usedByItemId[i.id] || 0) * (i.your_cost_unit || 0)), 0)
+              const laborRate = estimatedHours > 0 ? costLabor / estimatedHours : 0
+              const actualLaborCost = hoursLogged * laborRate
+              const actualCostTotal = actualMaterialCost + actualLaborCost
+              const costBurnPct = costTotal > 0 ? Math.min((actualCostTotal / costTotal) * 100, 100) : 0
+
               return (
                 <div className="space-y-5">
+                  {/* True Progress */}
+                  <div className="bg-[#0F1C2E] rounded-xl p-5 space-y-4">
+                    <p className="text-white font-semibold text-sm">Job Progress</p>
+                    {[
+                      {
+                        label: 'Materials Used',
+                        pct: materialsPct,
+                        detail: totalPlannedUnits > 0
+                          ? `${totalUsedUnits} of ${totalPlannedUnits} units${materialsOver ? ` (+${(totalUsedUnits - totalPlannedUnits).toFixed(1)} over)` : ''}`
+                          : 'No materials logged',
+                        over: materialsOver,
+                        color: materialsOver ? 'bg-red-500' : 'bg-[#C8622A]',
+                      },
+                      {
+                        label: 'Labor Hours',
+                        pct: laborPct,
+                        detail: estimatedHours > 0
+                          ? `${hoursLogged.toFixed(1)} of ${estimatedHours.toFixed(1)} hrs est.${laborOver ? ` (+${(hoursLogged - estimatedHours).toFixed(1)} over)` : ''}`
+                          : `${hoursLogged.toFixed(1)} hrs logged (no estimate)`,
+                        over: laborOver,
+                        color: laborOver ? 'bg-red-500' : 'bg-blue-500',
+                      },
+                      {
+                        label: 'Checklist',
+                        pct: checklistPct,
+                        detail: `${checklistDone} of ${checklistTotal} items complete`,
+                        over: false,
+                        color: 'bg-green-500',
+                      },
+                      {
+                        label: 'Cost Burned',
+                        pct: costBurnPct,
+                        detail: costTotal > 0
+                          ? `$${fmt(actualCostTotal)} of $${fmt(costTotal)} budgeted`
+                          : 'No cost data',
+                        over: actualCostTotal > costTotal,
+                        color: actualCostTotal > costTotal ? 'bg-red-500' : 'bg-purple-500',
+                      },
+                    ].map(({ label, pct, detail, over, color }) => (
+                      <div key={label}>
+                        <div className="flex justify-between items-baseline mb-1">
+                          <span className="text-[#8A9AB0] text-xs">{label}</span>
+                          <span className={`text-xs font-semibold ${over ? 'text-red-400' : 'text-white'}`}>
+                            {pct.toFixed(0)}%{over ? ' ⚠' : ''}
+                          </span>
+                        </div>
+                        <div className="w-full bg-[#1a2d45] rounded-full h-2 mb-1">
+                          <div className={`h-2 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <p className={`text-xs ${over ? 'text-red-400' : 'text-[#8A9AB0]'}`}>{detail}</p>
+                      </div>
+                    ))}
+                  </div>
+
                   {/* Summary cards */}
                   <div className="grid grid-cols-4 gap-4">
                     <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Total Revenue</p><p className="text-white font-bold text-xl">${fmt(totalRevenue)}</p></div>
