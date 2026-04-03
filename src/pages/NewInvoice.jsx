@@ -6,12 +6,16 @@ import Sidebar from '../components/Sidebar'
 export default function NewInvoice({ isAdmin, featureProposals = true, featureCRM = false }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const [sourceType, setSourceType] = useState('proposal') // 'proposal' | 'ticket'
   const [proposals, setProposals] = useState([])
   const [selectedProposal, setSelectedProposal] = useState(null)
+  const [serviceTickets, setServiceTickets] = useState([])
+  const [selectedTicket, setSelectedTicket] = useState(null)
   const [profile, setProfile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({
     proposal_id: '',
+    service_ticket_id: '',
     issued_date: new Date().toISOString().split('T')[0],
     due_date: '',
     tax_percent: '0',
@@ -21,9 +25,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   const [lineItems, setLineItems] = useState([])
   const [includedCOs, setIncludedCOs] = useState([])
 
-  useEffect(() => {
-    fetchData()
-  }, [])
+  useEffect(() => { fetchData() }, [])
 
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -38,6 +40,14 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       .order('created_at', { ascending: false })
     setProposals(props || [])
 
+    const { data: tickets } = await supabase
+      .from('service_tickets')
+      .select('id, ticket_number, title, status, line_items, labor_items, clients(company, client_name)')
+      .eq('org_id', prof.org_id)
+      .neq('status', 'Cancelled')
+      .order('created_at', { ascending: false })
+    setServiceTickets(tickets || [])
+
     // Pre-select if proposalId passed in URL
     const preId = searchParams.get('proposalId')
     if (preId) {
@@ -49,16 +59,15 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   const loadProposalItems = async (proposalId, propsList) => {
     const prop = (propsList.length ? propsList : proposals).find(p => p.id === proposalId)
     setSelectedProposal(prop || null)
+    setSelectedTicket(null)
 
     const { data: bomItems } = await supabase
       .from('bom_line_items')
       .select('*')
       .eq('proposal_id', proposalId)
 
-    // Pre-fill description from proposal
     if (prop) {
-      const desc = prop.job_description || prop.proposal_name || ''
-      setForm(prev => ({ ...prev, description: desc }))
+      setForm(prev => ({ ...prev, description: prop.job_description || prop.proposal_name || '' }))
     }
 
     const items = []
@@ -83,7 +92,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       })
     })
 
-    // Load approved change orders for the job linked to this proposal
+    // Load approved change orders
     const { data: jobData } = await supabase
       .from('jobs')
       .select('id')
@@ -100,7 +109,6 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       setIncludedCOs(approved)
       approved.forEach(co => {
         if (co.line_items?.length || co.labor_items?.length) {
-          // Expand individual CO line items
           ;(co.line_items || []).forEach(l => {
             if (l.item_name) items.push({
               description: `CO: ${co.name} — ${l.item_name}`,
@@ -118,7 +126,6 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
             })
           })
         } else {
-          // Flat-amount CO (legacy)
           items.push({
             description: `Change Order: ${co.name}`,
             quantity: 1,
@@ -134,10 +141,53 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     setLineItems(items)
   }
 
+  const loadTicketItems = (ticketId) => {
+    const ticket = serviceTickets.find(t => t.id === ticketId)
+    setSelectedTicket(ticket || null)
+    setSelectedProposal(null)
+    setIncludedCOs([])
+
+    if (!ticket) { setLineItems([]); return }
+
+    setForm(prev => ({ ...prev, description: ticket.title || '' }))
+
+    const items = []
+
+    // Materials — use customer_price_unit (marked-up price)
+    ;(ticket.line_items || []).forEach(l => {
+      if (l.item_name) items.push({
+        description: l.item_name,
+        quantity: parseFloat(l.quantity) || 1,
+        unit_price: parseFloat(l.customer_price_unit) || 0,
+        total: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 1)
+      })
+    })
+
+    // Labor — use customer_price (marked-up total for that labor line)
+    ;(ticket.labor_items || []).forEach(l => {
+      if (l.role) items.push({
+        description: l.role,
+        quantity: parseFloat(l.quantity) || 1,
+        unit_price: parseFloat(l.quantity) > 0
+          ? (parseFloat(l.customer_price) || 0) / parseFloat(l.quantity)
+          : parseFloat(l.customer_price) || 0,
+        total: parseFloat(l.customer_price) || 0
+      })
+    })
+
+    setLineItems(items)
+  }
+
   const handleProposalChange = (proposalId) => {
-    setForm(prev => ({ ...prev, proposal_id: proposalId }))
+    setForm(prev => ({ ...prev, proposal_id: proposalId, service_ticket_id: '' }))
     if (proposalId) loadProposalItems(proposalId, proposals)
     else { setSelectedProposal(null); setLineItems([]) }
+  }
+
+  const handleTicketChange = (ticketId) => {
+    setForm(prev => ({ ...prev, service_ticket_id: ticketId, proposal_id: '' }))
+    if (ticketId) loadTicketItems(ticketId)
+    else { setSelectedTicket(null); setLineItems([]) }
   }
 
   const updateLine = (i, field, value) => {
@@ -170,6 +220,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     const { data: inv, error } = await supabase.from('invoices').insert({
       org_id: prof.org_id,
       proposal_id: form.proposal_id || null,
+      service_ticket_id: form.service_ticket_id || null,
       invoice_number: invoiceNumber,
       status: 'Draft',
       issued_date: form.issued_date,
@@ -218,21 +269,64 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <h3 className="text-white font-bold mb-4">Invoice Details</h3>
           <div className="grid grid-cols-2 gap-4">
+
+            {/* Source type toggle */}
             <div className="col-span-2">
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Link to Won Proposal (optional)</label>
-              <select value={form.proposal_id} onChange={e => handleProposalChange(e.target.value)} className={inputClass}>
-                <option value="">— Select a proposal or create manually —</option>
-                {proposals.map(p => (
-                  <option key={p.id} value={p.id}>{p.proposal_name} — {p.company}</option>
-                ))}
-              </select>
-              {selectedProposal && (
-                <p className="text-green-400 text-xs mt-1">
-                  ✓ Line items loaded from proposal
-                  {includedCOs.length > 0 && ` + ${includedCOs.length} approved change order${includedCOs.length !== 1 ? 's' : ''}`}
-                </p>
-              )}
+              <label className="text-[#8A9AB0] text-xs mb-2 block">Invoice Source</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setSourceType('proposal'); setSelectedTicket(null); setForm(p => ({ ...p, service_ticket_id: '' })); setLineItems([]) }}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${sourceType === 'proposal' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white border border-[#2a3d55]'}`}>
+                  Won Proposal / Job
+                </button>
+                <button
+                  onClick={() => { setSourceType('ticket'); setSelectedProposal(null); setForm(p => ({ ...p, proposal_id: '' })); setLineItems([]) }}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${sourceType === 'ticket' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white border border-[#2a3d55]'}`}>
+                  Service Ticket
+                </button>
+              </div>
             </div>
+
+            {/* Proposal selector */}
+            {sourceType === 'proposal' && (
+              <div className="col-span-2">
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Link to Won Proposal (optional)</label>
+                <select value={form.proposal_id} onChange={e => handleProposalChange(e.target.value)} className={inputClass}>
+                  <option value="">— Select a proposal or create manually —</option>
+                  {proposals.map(p => (
+                    <option key={p.id} value={p.id}>{p.proposal_name} — {p.company}</option>
+                  ))}
+                </select>
+                {selectedProposal && (
+                  <p className="text-green-400 text-xs mt-1">
+                    ✓ Line items loaded from proposal
+                    {includedCOs.length > 0 && ` + ${includedCOs.length} approved change order${includedCOs.length !== 1 ? 's' : ''}`}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Service ticket selector */}
+            {sourceType === 'ticket' && (
+              <div className="col-span-2">
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Select Service Ticket</label>
+                <select value={form.service_ticket_id} onChange={e => handleTicketChange(e.target.value)} className={inputClass}>
+                  <option value="">— Select a service ticket —</option>
+                  {serviceTickets.map(t => (
+                    <option key={t.id} value={t.id}>
+                      {t.ticket_number ? `${t.ticket_number} — ` : ''}{t.title}{t.clients?.company ? ` · ${t.clients.company}` : ''} [{t.status}]
+                    </option>
+                  ))}
+                </select>
+                {selectedTicket && (
+                  <p className="text-green-400 text-xs mt-1">
+                    ✓ Line items loaded from ticket
+                    {(!selectedTicket.line_items?.length && !selectedTicket.labor_items?.length) && ' — no labor or materials logged yet on this ticket'}
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="col-span-2">
               <label className="text-[#8A9AB0] text-xs mb-1 block">Description of Work</label>
               <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
@@ -284,6 +378,9 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
                   <td className="py-1"><button onClick={() => removeLine(i)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button></td>
                 </tr>
               ))}
+              {lineItems.length === 0 && (
+                <tr><td colSpan="5" className="py-4 text-[#8A9AB0] text-xs italic">No line items yet. Select a source above or add manually.</td></tr>
+              )}
             </tbody>
           </table>
           <button onClick={addLine} className="text-[#C8622A] hover:text-white text-sm transition-colors">+ Add Line</button>
