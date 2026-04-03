@@ -28,6 +28,8 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const [newNote, setNewNote] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [ticketNotes, setTicketNotes] = useState([])
+  const [editingTicketNumber, setEditingTicketNumber] = useState(false)
+  const [ticketNumberDraft, setTicketNumberDraft] = useState('')
 
   useEffect(() => { fetchAll() }, [id])
 
@@ -95,6 +97,32 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
           <div className="flex justify-between items-start mb-4">
             <div>
               <button onClick={() => navigate('/service-tickets')} className="text-[#8A9AB0] hover:text-white text-xs mb-2 transition-colors">← Service Tickets</button>
+              <div className="flex items-center gap-3 mb-1">
+                {editingTicketNumber ? (
+                  <input
+                    autoFocus
+                    value={ticketNumberDraft}
+                    onChange={e => setTicketNumberDraft(e.target.value)}
+                    onBlur={async () => {
+                      const val = ticketNumberDraft.trim()
+                      if (val && val !== ticket.ticket_number) {
+                        await supabase.from('service_tickets').update({ ticket_number: val }).eq('id', id)
+                        setTicket(prev => ({ ...prev, ticket_number: val }))
+                      }
+                      setEditingTicketNumber(false)
+                    }}
+                    onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingTicketNumber(false) }}
+                    className="text-xs font-mono bg-[#0F1C2E] text-white border border-[#C8622A] rounded px-2 py-0.5 w-32 focus:outline-none"
+                  />
+                ) : (
+                  <button
+                    onClick={() => { setTicketNumberDraft(ticket.ticket_number || ''); setEditingTicketNumber(true) }}
+                    className="text-[#8A9AB0] text-xs font-mono bg-[#0F1C2E] px-2 py-0.5 rounded hover:border-[#C8622A] border border-transparent transition-colors"
+                    title="Click to edit ticket number">
+                    {ticket.ticket_number || 'No #'}
+                  </button>
+                )}
+              </div>
               <h2 className="text-white text-2xl font-bold">{ticket.title}</h2>
               <div className="flex items-center gap-3 mt-2 flex-wrap">
                 <span className={`text-xs px-2 py-1 rounded font-semibold ${PRIORITY_COLORS[ticket.priority] || PRIORITY_COLORS.Normal}`}>{ticket.priority}</span>

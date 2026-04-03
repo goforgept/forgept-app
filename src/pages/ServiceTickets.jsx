@@ -80,8 +80,14 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
     setSaving(true)
     setSaveError('')
     try {
+      const { data: orgData } = await supabase.from('organizations').select('ticket_counter').eq('id', profile.org_id).single()
+      const counter = orgData?.ticket_counter || 1000
+      const ticketNumber = `TKT-${counter}`
+      await supabase.from('organizations').update({ ticket_counter: counter + 1 }).eq('id', profile.org_id)
+
       const { error } = await supabase.from('service_tickets').insert({
         org_id: profile.org_id,
+        ticket_number: ticketNumber,
         title: form.title.trim(),
         description: form.description.trim() || null,
         client_id: form.client_id || null,
@@ -181,6 +187,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1 flex-wrap">
+                      {ticket.ticket_number && <span className="text-[#8A9AB0] text-xs font-mono bg-[#0F1C2E] px-2 py-0.5 rounded">{ticket.ticket_number}</span>}
                       <h3 className="text-white font-semibold group-hover:text-[#C8622A] transition-colors">{ticket.title}</h3>
                       <span className={`text-xs px-2 py-0.5 rounded font-semibold ${PRIORITY_COLORS[ticket.priority] || PRIORITY_COLORS.Normal}`}>{ticket.priority}</span>
                       <span className={`text-xs px-2 py-0.5 rounded font-semibold ${STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>{ticket.status}</span>
