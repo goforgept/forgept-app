@@ -29,6 +29,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [form, setForm] = useState({
     title: '', description: '', client_id: '', job_id: '',
     assigned_tech_id: '', priority: 'Normal', status: 'Open',
@@ -77,6 +78,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   const saveTicket = async () => {
     if (!form.title.trim() || !profile) return
     setSaving(true)
+    setSaveError('')
     try {
       const { error } = await supabase.from('service_tickets').insert({
         org_id: profile.org_id,
@@ -93,17 +95,17 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
       })
 
       if (error) {
-        console.error('Failed to create ticket:', error)
-        setSaving(false)
+        setSaveError(error.message)
         return
       }
 
       setShowModal(false)
+      setSaveError('')
       setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '', notes: '' })
       setClientJobs([])
       fetchAll()
     } catch (err) {
-      console.error('Unexpected error creating ticket:', err)
+      setSaveError(err.message || 'Unexpected error')
     } finally {
       setSaving(false)
     }
@@ -272,6 +274,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
                   rows={2} placeholder="Access instructions, special requirements..."
                   className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
               </div>
+              {saveError && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{saveError}</p>}
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
                 <button onClick={saveTicket} disabled={saving || !form.title.trim()}
