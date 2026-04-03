@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -30,6 +30,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const [ticketNotes, setTicketNotes] = useState([])
   const [editingTicketNumber, setEditingTicketNumber] = useState(false)
   const [ticketNumberDraft, setTicketNumberDraft] = useState('')
+  const cancelTicketNumberEdit = useRef(false)
 
   useEffect(() => { fetchAll() }, [id])
 
@@ -104,14 +105,19 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                     value={ticketNumberDraft}
                     onChange={e => setTicketNumberDraft(e.target.value)}
                     onBlur={async () => {
-                      const val = ticketNumberDraft.trim()
-                      if (val && val !== ticket.ticket_number) {
-                        await supabase.from('service_tickets').update({ ticket_number: val }).eq('id', id)
-                        setTicket(prev => ({ ...prev, ticket_number: val }))
+                      if (!cancelTicketNumberEdit.current) {
+                        const val = ticketNumberDraft.trim()
+                        if (val && val !== ticket.ticket_number) {
+                          await updateTicket('ticket_number', val)
+                        }
                       }
+                      cancelTicketNumberEdit.current = false
                       setEditingTicketNumber(false)
                     }}
-                    onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingTicketNumber(false) }}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') e.target.blur()
+                      if (e.key === 'Escape') { cancelTicketNumberEdit.current = true; e.target.blur() }
+                    }}
                     className="text-xs font-mono bg-[#0F1C2E] text-white border border-[#C8622A] rounded px-2 py-0.5 w-32 focus:outline-none"
                   />
                 ) : (

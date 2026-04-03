@@ -187,8 +187,8 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1 flex-wrap">
-                      {ticket.ticket_number && <span className="text-[#8A9AB0] text-xs font-mono bg-[#0F1C2E] px-2 py-0.5 rounded">{ticket.ticket_number}</span>}
                       <h3 className="text-white font-semibold group-hover:text-[#C8622A] transition-colors">{ticket.title}</h3>
+                      {ticket.ticket_number && <span className="text-[#8A9AB0] text-xs font-mono bg-[#2a3d55] px-2 py-0.5 rounded">{ticket.ticket_number}</span>}
                       <span className={`text-xs px-2 py-0.5 rounded font-semibold ${PRIORITY_COLORS[ticket.priority] || PRIORITY_COLORS.Normal}`}>{ticket.priority}</span>
                       <span className={`text-xs px-2 py-0.5 rounded font-semibold ${STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>{ticket.status}</span>
                     </div>
