@@ -75,33 +75,38 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   }
 
   const saveTicket = async () => {
-    if (!form.title.trim()) return
+    if (!form.title.trim() || !profile) return
     setSaving(true)
-    const { error } = await supabase.from('service_tickets').insert({
-      org_id: profile.org_id,
-      title: form.title.trim(),
-      description: form.description.trim() || null,
-      client_id: form.client_id || null,
-      job_id: form.job_id || null,
-      assigned_tech_id: form.assigned_tech_id || null,
-      priority: form.priority,
-      status: form.status,
-      scheduled_date: form.scheduled_date || null,
-      scheduled_time: form.scheduled_time || null,
-      notes: form.notes.trim() || null,
-    })
+    try {
+      const { error } = await supabase.from('service_tickets').insert({
+        org_id: profile.org_id,
+        title: form.title.trim(),
+        description: form.description.trim() || null,
+        client_id: form.client_id || null,
+        job_id: form.job_id || null,
+        assigned_tech_id: form.assigned_tech_id || null,
+        priority: form.priority,
+        status: form.status,
+        scheduled_date: form.scheduled_date || null,
+        scheduled_time: form.scheduled_time || null,
+        notes: form.notes.trim() || null,
+      })
 
-    if (error) {
-      console.error('Failed to create ticket:', error)
+      if (error) {
+        console.error('Failed to create ticket:', error)
+        setSaving(false)
+        return
+      }
+
+      setShowModal(false)
+      setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '', notes: '' })
+      setClientJobs([])
+      fetchAll()
+    } catch (err) {
+      console.error('Unexpected error creating ticket:', err)
+    } finally {
       setSaving(false)
-      return
     }
-
-    setShowModal(false)
-    setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '', notes: '' })
-    setClientJobs([])
-    setSaving(false)
-    fetchAll()
   }
 
   const filtered = tickets.filter(t => {
