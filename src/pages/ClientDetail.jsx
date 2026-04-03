@@ -361,7 +361,10 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
                     className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] cursor-pointer hover:border-[#C8622A]/40 transition-colors">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="text-white font-semibold text-sm mb-1">{ticket.title}</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          {ticket.ticket_number && <span className="text-[#8A9AB0] text-xs font-mono bg-[#1a2d45] px-2 py-0.5 rounded">{ticket.ticket_number}</span>}
+                          <p className="text-white font-semibold text-sm">{ticket.title}</p>
+                        </div>
                         <div className="flex items-center gap-3 text-xs text-[#8A9AB0] flex-wrap">
                           <span className={`px-2 py-0.5 rounded font-semibold ${ticket.priority === 'Urgent' ? 'bg-red-500/20 text-red-400' : ticket.priority === 'High' ? 'bg-orange-500/20 text-orange-400' : ticket.priority === 'Normal' ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{ticket.priority}</span>
                           <span className={`px-2 py-0.5 rounded font-semibold ${ticket.status === 'Open' ? 'bg-blue-500/20 text-blue-400' : ticket.status === 'In Progress' ? 'bg-yellow-500/20 text-yellow-400' : ticket.status === 'Resolved' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{ticket.status}</span>

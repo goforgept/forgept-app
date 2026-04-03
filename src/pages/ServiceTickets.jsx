@@ -120,7 +120,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
     const matchStatus = statusFilter === 'All' || t.status === statusFilter
     const matchPriority = priorityFilter === 'All' || t.priority === priorityFilter
     const q = search.toLowerCase()
-    const matchSearch = !q || t.title?.toLowerCase().includes(q) || t.clients?.company?.toLowerCase().includes(q)
+    const matchSearch = !q || t.title?.toLowerCase().includes(q) || t.clients?.company?.toLowerCase().includes(q) || t.ticket_number?.toLowerCase().includes(q)
     return matchStatus && matchPriority && matchSearch
   })
 
