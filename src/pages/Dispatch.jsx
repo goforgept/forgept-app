@@ -58,15 +58,12 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
     setLoading(false)
   }
 
-  // Scheduled for selected date, grouped by tech
-  const scheduledToday = tickets.filter(t => t.scheduled_date === selectedDate)
-  const unscheduled = tickets.filter(t => !t.scheduled_date)
-  const scheduledOtherDays = tickets.filter(t => t.scheduled_date && t.scheduled_date !== selectedDate)
+  // All tickets for the board, grouped by assignment
+  const unscheduled = tickets.filter(t => !t.scheduled_date && !t.assigned_tech_id)
+  const unassignedScheduledToday = tickets.filter(t => t.scheduled_date === selectedDate && !t.assigned_tech_id)
 
   const getTicketsForTech = (techId) =>
-    scheduledToday.filter(t => t.assigned_tech_id === techId)
-
-  const unassignedToday = scheduledToday.filter(t => !t.assigned_tech_id)
+    tickets.filter(t => t.assigned_tech_id === techId)
 
   // Drag & drop handlers
   const handleDragStart = (e, ticketId) => {
@@ -138,7 +135,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
         <div className="flex justify-between items-center flex-wrap gap-3">
           <div>
             <h2 className="text-white text-2xl font-bold">Dispatch Board</h2>
-            <p className="text-[#8A9AB0] text-sm mt-0.5">{scheduledToday.length} scheduled · {unscheduled.length} unscheduled · {saving && <span className="text-[#C8622A]">Saving...</span>}</p>
+            <p className="text-[#8A9AB0] text-sm mt-0.5">{tickets.filter(t => t.assigned_tech_id).length} assigned · {unscheduled.length} unscheduled · {saving && <span className="text-[#C8622A]">Saving...</span>}</p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
@@ -158,15 +155,15 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
             <p className="text-[#8A9AB0] text-sm">{dateLabel} — drag tickets between columns to reassign</p>
 
             {/* Unassigned drop zone for today */}
-            {unassignedToday.length > 0 && (
+            {unassignedScheduledToday.length > 0 && (
               <div className="bg-[#1a2d45] rounded-xl p-4 border border-dashed border-[#2a3d55]"
                 onDragOver={e => handleDragOver(e, null)}
                 onDrop={e => handleDrop(e, null)}
                 onDragLeave={() => setDragOver(null)}>
-                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">⚠ Scheduled but Unassigned ({unassignedToday.length})</p>
+                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">⚠ Scheduled but Unassigned ({unassignedScheduledToday.length})</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {unassignedToday.map(ticket => (
-                    <TicketCard key={ticket.id} ticket={ticket} onDragStart={handleDragStart} onClick={() => openTicketModal(ticket)} />
+                  {unassignedScheduledToday.map(ticket => (
+                    <TicketCard key={ticket.id} ticket={ticket} selectedDate={selectedDate} onDragStart={handleDragStart} onClick={() => openTicketModal(ticket)} />
                   ))}
                 </div>
               </div>
@@ -202,9 +199,9 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                         </div>
                       ) : (
                         techTickets
-                          .sort((a, b) => (a.scheduled_time || '99:99').localeCompare(b.scheduled_time || '99:99'))
+                          .sort((a, b) => (a.scheduled_date || '9999').localeCompare(b.scheduled_date || '9999') || (a.scheduled_time || '99:99').localeCompare(b.scheduled_time || '99:99'))
                           .map(ticket => (
-                            <TicketCard key={ticket.id} ticket={ticket} onDragStart={handleDragStart} onClick={() => openTicketModal(ticket)} />
+                            <TicketCard key={ticket.id} ticket={ticket} selectedDate={selectedDate} onDragStart={handleDragStart} onClick={() => openTicketModal(ticket)} />
                           ))
                       )}
                     </div>
@@ -219,26 +216,6 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
               )}
             </div>
 
-            {/* Other days section */}
-            {scheduledOtherDays.length > 0 && (
-              <div className="bg-[#1a2d45] rounded-xl p-4">
-                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Other Scheduled Tickets</p>
-                <div className="space-y-2">
-                  {scheduledOtherDays.slice(0, 5).map(ticket => (
-                    <div key={ticket.id} onClick={() => navigate(`/service-tickets/${ticket.id}`)}
-                      className="flex items-center justify-between bg-[#0F1C2E] rounded-lg px-4 py-2 cursor-pointer hover:bg-[#0a1628] transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[ticket.priority] || PRIORITY_DOT.Normal}`} />
-                        <span className="text-white text-sm">{ticket.title}</span>
-                        {ticket.clients?.company && <span className="text-[#8A9AB0] text-xs">· {ticket.clients.company}</span>}
-                      </div>
-                      <span className="text-[#8A9AB0] text-xs">{new Date(ticket.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                    </div>
-                  ))}
-                  {scheduledOtherDays.length > 5 && <p className="text-[#8A9AB0] text-xs text-center pt-1">+{scheduledOtherDays.length - 5} more</p>}
-                </div>
-              </div>
-            )}
           </>
         )}
 
@@ -324,19 +301,26 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
   )
 }
 
-function TicketCard({ ticket, onDragStart, onClick }) {
+function TicketCard({ ticket, selectedDate, onDragStart, onClick }) {
+  const isOtherDay = ticket.scheduled_date && ticket.scheduled_date !== selectedDate
+  const dateLabel = isOtherDay
+    ? new Date(ticket.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : null
+
   return (
     <div
       draggable
       onDragStart={e => onDragStart(e, ticket.id)}
       onClick={onClick}
-      className={`p-3 rounded-lg border cursor-grab active:cursor-grabbing hover:border-[#C8622A]/40 transition-colors ${STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>
+      className={`p-3 rounded-lg border cursor-grab active:cursor-grabbing hover:border-[#C8622A]/40 transition-colors ${isOtherDay ? 'border-[#2a3d55] bg-[#0F1C2E]/60 opacity-70' : STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>
       <div className="flex items-start gap-2">
         <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${PRIORITY_DOT[ticket.priority] || PRIORITY_DOT.Normal}`} />
         <div className="flex-1 min-w-0">
           <p className="text-white text-xs font-medium leading-snug line-clamp-2">{ticket.title}</p>
           {ticket.clients?.company && <p className="text-[#8A9AB0] text-xs mt-0.5 truncate">{ticket.clients.company}</p>}
-          {ticket.scheduled_time && <p className="text-[#C8622A] text-xs mt-0.5">{ticket.scheduled_time.slice(0, 5)}</p>}
+          {dateLabel
+            ? <p className="text-[#8A9AB0] text-xs mt-0.5">📅 {dateLabel}</p>
+            : ticket.scheduled_time && <p className="text-[#C8622A] text-xs mt-0.5">{ticket.scheduled_time.slice(0, 5)}</p>}
         </div>
       </div>
     </div>
