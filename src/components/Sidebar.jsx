@@ -29,10 +29,6 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
       { label: 'Tech Log', path: '/tech-log', icon: '📋' },
       { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
       { label: 'Dispatch', path: '/dispatch', icon: '🗺' },
-      { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
-      { label: 'Dispatch', path: '/dispatch', icon: '🗺' },
-      { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
-      { label: 'Dispatch', path: '/dispatch', icon: '📍' },
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(orgType !== 'manufacturer' && featureProposals ? [
         { label: 'Vendors', path: '/vendors', icon: '🏭' },
