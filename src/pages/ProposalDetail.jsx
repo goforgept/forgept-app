@@ -1591,7 +1591,16 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   <button onClick={() => setShowOrderModal(true)} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">🏭 Convert to Order</button>
                 )}
                 {orgType !== 'manufacturer' && (
-                  <button onClick={() => selectedForPO.size > 0 && setShowPOModal(true)}
+                  <button onClick={() => {
+                    if (selectedForPO.size === 0) return
+                    const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
+                    const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
+                    const matchedEmail = vendorNames.length === 1
+                      ? (vendors.find(v => v.vendor_name === vendorNames[0])?.contact_email || '')
+                      : ''
+                    setPOVendorEmail(matchedEmail)
+                    setShowPOModal(true)
+                  }}
                     disabled={selectedForPO.size === 0}
                     title={selectedForPO.size === 0 ? 'Check items below to select for PO' : `Generate PO for ${selectedForPO.size} items`}
                     className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
