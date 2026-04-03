@@ -27,6 +27,12 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
     links: [
       { label: 'Jobs', path: '/jobs', icon: '🔨' },
       { label: 'Tech Log', path: '/tech-log', icon: '📋' },
+      { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
+      { label: 'Dispatch', path: '/dispatch', icon: '🗺' },
+      { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
+      { label: 'Dispatch', path: '/dispatch', icon: '🗺' },
+      { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
+      { label: 'Dispatch', path: '/dispatch', icon: '📍' },
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(orgType !== 'manufacturer' && featureProposals ? [
         { label: 'Vendors', path: '/vendors', icon: '🏭' },
@@ -57,6 +63,8 @@ const NAV_GROUPS_PM = (featurePurchaseOrders, featureInvoices) => [
       { label: 'Dashboard', path: '/', icon: '📊' },
       { label: 'Jobs', path: '/jobs', icon: '🔨' },
       { label: 'Tech Log', path: '/tech-log', icon: '📋' },
+      { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
+      { label: 'Dispatch', path: '/dispatch', icon: '📍' },
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(featurePurchaseOrders ? [{ label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' }] : []),
       { label: 'Vendors', path: '/vendors', icon: '🏭' },
@@ -78,6 +86,7 @@ const NAV_GROUPS_TECH = () => [
     label: 'Operations',
     links: [
       { label: 'Tech Log', path: '/tech-log', icon: '📋' },
+      { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
       { label: 'Jobs', path: '/jobs', icon: '🔨' },
     ]
   },
@@ -113,6 +122,8 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType) 
     links: [
       { label: 'Jobs', path: '/jobs', icon: '🔨' },
       { label: 'Tech Log', path: '/tech-log', icon: '📋' },
+      { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
+      { label: 'Dispatch', path: '/dispatch', icon: '📍' },
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(orgType === 'manufacturer' ? [
         { label: 'Catalog', path: '/catalog', icon: '📦' },
