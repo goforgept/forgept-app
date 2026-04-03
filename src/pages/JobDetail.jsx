@@ -517,6 +517,180 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     } catch (err) { alert('Error generating PO: ' + err.message) }
     setGeneratingPO(false)
   }
+const exportCostReport = async () => {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('company_name, logo_url, primary_color')
+      .eq('id', profile.id).single()
+
+    const primaryRgb = hexToRgb(profileData?.primary_color || '#0F1C2E')
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+
+    // Header bar
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.rect(0, 0, pageWidth, 36, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(18); doc.setFont('helvetica', 'bold')
+    doc.text('Job Cost Report', 14, 16)
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+    doc.text(`Generated ${new Date().toLocaleDateString()}`, 14, 26)
+    doc.text(profileData?.company_name || '', pageWidth - 14, 16, { align: 'right' })
+
+    // Job info
+    doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+    doc.text(`Job: ${job?.name || ''}`, 14, 48)
+    if (job?.job_number) doc.text(`Job #: ${job.job_number}`, 14, 55)
+    if (job?.clients?.company) doc.text(`Client: ${job.clients.company}`, 14, 62)
+    if (proposal?.quote_number) doc.text(`Quote #: ${proposal.quote_number}`, pageWidth / 2, 48)
+    if (job?.start_date) doc.text(`Start: ${new Date(job.start_date).toLocaleDateString()}`, pageWidth / 2, 55)
+
+    // Compute values
+    const usedByItemId = {}
+    techLogs.forEach(log => {
+      if (!log.materials_used) return
+      try {
+        const parsed = JSON.parse(log.materials_used)
+        if (Array.isArray(parsed)) parsed.forEach(m => {
+          usedByItemId[m.id] = (usedByItemId[m.id] || 0) + (parseFloat(m.qty) || 0)
+        })
+      } catch {}
+    })
+    const quotedMaterials = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
+    const quotedLabor = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+    const costMaterials = lineItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
+    const costLabor = (proposal?.labor_items || []).reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+    const approvedCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, c) => sum + (c.amount || 0), 0)
+    const totalRevenue = quotedMaterials + quotedLabor + approvedCOs
+    const totalCost = costMaterials + costLabor
+    const grossMargin = totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue * 100).toFixed(1) : '0.0'
+    const hoursLogged = techLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0)
+    const estimatedHours = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.quantity) || 0), 0)
+
+    // Summary boxes
+    let y = 74
+    const boxW = (pageWidth - 28 - 9) / 4
+    const summaryBoxes = [
+      { label: 'Contract Value', value: `$${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
+      { label: 'Total Cost', value: `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
+      { label: 'Gross Margin', value: `${grossMargin}%` },
+      { label: 'Hours Logged', value: `${hoursLogged.toFixed(1)} / ${estimatedHours > 0 ? estimatedHours.toFixed(1) : '—'} est` },
+    ]
+    summaryBoxes.forEach((box, i) => {
+      const x = 14 + i * (boxW + 3)
+      doc.setFillColor(245, 247, 250)
+      doc.rect(x, y, boxW, 22, 'F')
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
+      doc.text(box.label.toUpperCase(), x + 4, y + 7)
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text(box.value, x + 4, y + 17)
+    })
+    y += 30
+
+    // Financial summary table
+    autoTable(doc, {
+      startY: y,
+      head: [['Category', 'Revenue (Customer)', 'Your Cost', 'Margin $', 'Margin %']],
+      body: [
+        ['Materials', `$${quotedMaterials.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${costMaterials.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(quotedMaterials - costMaterials).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, quotedMaterials > 0 ? `${((quotedMaterials - costMaterials) / quotedMaterials * 100).toFixed(1)}%` : '—'],
+        ['Labor', `$${quotedLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${costLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(quotedLabor - costLabor).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, quotedLabor > 0 ? `${((quotedLabor - costLabor) / quotedLabor * 100).toFixed(1)}%` : '—'],
+        ...(approvedCOs > 0 ? [['Change Orders (Approved)', `$${approvedCOs.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, '$0.00', `$${approvedCOs.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, '100.0%']] : []),
+        ['TOTAL', `$${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(totalRevenue - totalCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `${grossMargin}%`],
+      ],
+      headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+      footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+      bodyStyles: { fontSize: 9 },
+      styles: { fontSize: 9 },
+      didParseCell: (data) => {
+        if (data.row.index === (approvedCOs > 0 ? 3 : 2) - 0) {
+          data.cell.styles.fontStyle = 'bold'
+        }
+      }
+    })
+
+    y = doc.lastAutoTable.finalY + 10
+
+    // Materials breakdown per line item
+    if (lineItems.length > 0) {
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Materials — Line Item Detail', 14, y)
+      y += 4
+      autoTable(doc, {
+        startY: y,
+        head: [['Item', 'Vendor', 'Planned Qty', 'Used Qty', 'Remaining', 'Unit Cost', 'Customer Price', 'Margin']],
+        body: lineItems.map(item => {
+          const used = usedByItemId[item.id] || 0
+          const planned = parseFloat(item.quantity) || 0
+          const remaining = planned - used
+          const cost = (item.your_cost_unit || 0) * planned
+          const revenue = item.customer_price_total || 0
+          return [
+            item.item_name,
+            item.vendor || '—',
+            `${planned} ${item.unit || ''}`,
+            used > 0 ? `${used} ${item.unit || ''}` : '—',
+            used > 0 ? (remaining < 0 ? `${Math.abs(remaining).toFixed(1)} over` : `${remaining.toFixed(1)} left`) : '—',
+            `$${(item.your_cost_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+            `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+            `$${(revenue - cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+          ]
+        }),
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        styles: { fontSize: 8 },
+        columnStyles: { 4: { textColor: (cell) => cell.raw?.includes('over') ? [220, 50, 50] : [50, 180, 50] } }
+      })
+      y = doc.lastAutoTable.finalY + 10
+    }
+
+    // Labor breakdown
+    if ((proposal?.labor_items || []).length > 0) {
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Labor — Line Item Detail', 14, y)
+      y += 4
+      autoTable(doc, {
+        startY: y,
+        head: [['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price', 'Margin']],
+        body: (proposal.labor_items || []).map(l => [
+          l.role || '—',
+          l.quantity || '—',
+          l.unit || 'hr',
+          `$${(parseFloat(l.your_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+          `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+          `$${((parseFloat(l.customer_price) || 0) - (parseFloat(l.your_cost) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+        ]),
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        styles: { fontSize: 8 }
+      })
+      y = doc.lastAutoTable.finalY + 10
+    }
+
+    // Change orders
+    if (changeOrders.length > 0) {
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Change Orders', 14, y)
+      y += 4
+      autoTable(doc, {
+        startY: y,
+        head: [['Name', 'Status', 'Amount']],
+        body: changeOrders.map(co => [co.name, co.status, `$${(co.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        styles: { fontSize: 8 }
+      })
+    }
+
+    // Footer
+    const pageHeight = doc.internal.pageSize.getHeight()
+    doc.setFontSize(8); doc.setTextColor(150, 150, 150); doc.setFont('helvetica', 'normal')
+    doc.text(`${profileData?.company_name || 'ForgePt.'} · Confidential`, pageWidth / 2, pageHeight - 10, { align: 'center' })
+
+    doc.save(`Cost-Report-${job?.job_number || job?.name || 'job'}.pdf`)
+  }
 
   const saveChangeOrder = async () => {
     if (!coForm.name.trim()) return
@@ -1110,7 +1284,14 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         {/* COST REPORT TAB */}
         {activeTab === 'costReport' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-5">Job Cost Report</h3>
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-white font-bold text-lg">Job Cost Report</h3>
+              <button
+                onClick={exportCostReport}
+                className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                ↓ Export PDF
+              </button>
+            </div>
             {(() => {
               const quotedMaterials = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
               const quotedLabor = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
