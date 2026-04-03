@@ -31,6 +31,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const [editingTicketNumber, setEditingTicketNumber] = useState(false)
   const [ticketNumberDraft, setTicketNumberDraft] = useState('')
   const cancelTicketNumberEdit = useRef(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => { fetchAll() }, [id])
 
@@ -54,6 +55,11 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     // Notes stored as JSON array in ticket.notes field — or we can use activities
     // For now parse notes as a simple array stored in a separate fetch
     setLoading(false)
+  }
+
+  const deleteTicket = async () => {
+    await supabase.from('service_tickets').delete().eq('id', id)
+    navigate('/service-tickets')
   }
 
   const updateTicket = async (field, value) => {
@@ -140,6 +146,17 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                   <button onClick={() => navigate(`/jobs/${ticket.jobs.id}`)} className="text-[#8A9AB0] text-sm hover:text-[#C8622A] transition-colors">🔨 {ticket.jobs.job_number ? `${ticket.jobs.job_number} — ` : ''}{ticket.jobs.name}</button>
                 )}
               </div>
+            </div>
+            <div>
+              {confirmDelete ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[#8A9AB0] text-xs">Delete ticket?</span>
+                  <button onClick={deleteTicket} className="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors">Yes, delete</button>
+                  <button onClick={() => setConfirmDelete(false)} className="text-[#8A9AB0] hover:text-white text-xs px-3 py-1.5 transition-colors">Cancel</button>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmDelete(true)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Delete</button>
+              )}
             </div>
           </div>
 
