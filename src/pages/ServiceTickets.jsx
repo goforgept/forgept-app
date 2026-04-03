@@ -77,7 +77,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   const saveTicket = async () => {
     if (!form.title.trim()) return
     setSaving(true)
-    const { data } = await supabase.from('service_tickets').insert({
+    const { error } = await supabase.from('service_tickets').insert({
       org_id: profile.org_id,
       title: form.title.trim(),
       description: form.description.trim() || null,
@@ -89,13 +89,19 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
       scheduled_date: form.scheduled_date || null,
       scheduled_time: form.scheduled_time || null,
       notes: form.notes.trim() || null,
-    }).select('*, clients(company, client_name), profiles!service_tickets_assigned_tech_id_fkey(full_name), jobs(name, job_number)').single()
+    })
 
-    if (data) setTickets(prev => [data, ...prev])
+    if (error) {
+      console.error('Failed to create ticket:', error)
+      setSaving(false)
+      return
+    }
+
     setShowModal(false)
     setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '', notes: '' })
     setClientJobs([])
     setSaving(false)
+    fetchAll()
   }
 
   const filtered = tickets.filter(t => {

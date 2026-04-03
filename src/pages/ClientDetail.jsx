@@ -42,6 +42,8 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [editingLocation, setEditingLocation] = useState(null)
   const [locationForm, setLocationForm] = useState(emptyLocation)
   const [savingLocation, setSavingLocation] = useState(false)
+  // Service Tickets
+  const [clientTickets, setClientTickets] = useState([])
 
   const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE'
 
@@ -50,6 +52,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     fetchProposals()
     fetchProfile()
     fetchLocations()
+    fetchClientTickets()
   }, [])
 
   const fetchClient = async () => {
@@ -83,6 +86,15 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const fetchLocations = async () => {
     const { data } = await supabase.from('client_locations').select('*').eq('client_id', id).order('site_name', { ascending: true })
     setLocations(data || [])
+  }
+
+  const fetchClientTickets = async () => {
+    const { data } = await supabase
+      .from('service_tickets')
+      .select('*, profiles!service_tickets_assigned_tech_id_fkey(full_name)')
+      .eq('client_id', id)
+      .order('created_at', { ascending: false })
+    setClientTickets(data || [])
   }
 
   const openAddLocation = () => {
@@ -241,6 +253,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
           {[
             { key: 'proposals', label: `Proposals (${proposals.length})` },
             { key: 'locations', label: `Locations (${locations.length})` },
+            { key: 'tickets', label: `Service Tickets (${clientTickets.length})` },
             { key: 'activity', label: 'Activity' },
             { key: 'tasks', label: 'Tasks' },
             { key: 'emails', label: `Emails (${clientEmails.length})` },
@@ -328,6 +341,38 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
                     </div>
                   )
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'tickets' && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white font-bold text-lg">Service Tickets</h3>
+              <button onClick={() => navigate('/service-tickets')} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">+ New Ticket</button>
+            </div>
+            {clientTickets.length === 0 ? (
+              <p className="text-[#8A9AB0] text-sm">No service tickets for this client yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {clientTickets.map(ticket => (
+                  <div key={ticket.id} onClick={() => navigate(`/service-tickets/${ticket.id}`)}
+                    className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] cursor-pointer hover:border-[#C8622A]/40 transition-colors">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-white font-semibold text-sm mb-1">{ticket.title}</p>
+                        <div className="flex items-center gap-3 text-xs text-[#8A9AB0] flex-wrap">
+                          <span className={`px-2 py-0.5 rounded font-semibold ${ticket.priority === 'Urgent' ? 'bg-red-500/20 text-red-400' : ticket.priority === 'High' ? 'bg-orange-500/20 text-orange-400' : ticket.priority === 'Normal' ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{ticket.priority}</span>
+                          <span className={`px-2 py-0.5 rounded font-semibold ${ticket.status === 'Open' ? 'bg-blue-500/20 text-blue-400' : ticket.status === 'In Progress' ? 'bg-yellow-500/20 text-yellow-400' : ticket.status === 'Resolved' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{ticket.status}</span>
+                          {ticket.profiles?.full_name && <span>🔧 {ticket.profiles.full_name}</span>}
+                          {ticket.scheduled_date && <span>📅 {new Date(ticket.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                        </div>
+                      </div>
+                      <span className="text-[#8A9AB0] text-xs ml-4">{new Date(ticket.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
