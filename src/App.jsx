@@ -32,9 +32,6 @@ import JobDetail from './pages/JobDetail'
 import ServiceTickets from './pages/ServiceTickets'
 import ServiceTicketDetail from './pages/ServiceTicketDetail'
 import Dispatch from './pages/Dispatch'
-import ServiceTickets from './pages/ServiceTickets'
-import ServiceTicketDetail from './pages/ServiceTicketDetail'
-import Dispatch from './pages/Dispatch'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -193,9 +190,6 @@ function App() {
           <Route path="/jobs" element={<Jobs {...sharedProps} />} />
           <Route path="/jobs/:id" element={<JobDetail {...sharedProps} />} />
           <Route path="/tech-log" element={<TechLog {...sharedProps} />} />
-          <Route path="/service-tickets" element={<ServiceTickets {...sharedProps} />} />
-          <Route path="/service-tickets/:id" element={<ServiceTicketDetail {...sharedProps} />} />
-          <Route path="/dispatch" element={<Dispatch {...sharedProps} />} />
           <Route path="/service-tickets" element={<ServiceTickets {...sharedProps} />} />
           <Route path="/service-tickets/:id" element={<ServiceTicketDetail {...sharedProps} />} />
           <Route path="/dispatch" element={<Dispatch {...sharedProps} />} />
