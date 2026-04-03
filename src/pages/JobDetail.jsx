@@ -1437,29 +1437,91 @@ const exportCostReport = async () => {
                   {/* Materials breakdown */}
                   {lineItems.length > 0 && (
                     <div>
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Materials Breakdown</p>
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Materials — Line Item Detail</p>
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="border-b border-[#2a3d55]">
-                              {['Item', 'Vendor', 'Qty', 'Your Cost', 'Customer Price', 'Margin'].map(h => (
+                              {['Item', 'Vendor', 'Planned', 'Used', 'Remaining', 'Your Cost', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
                                 <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
                             {lineItems.map(item => {
-                              const cost = (item.your_cost_unit || 0) * (item.quantity || 0)
+                              const planned = parseFloat(item.quantity) || 0
+                              const used = usedByItemId[item.id] || 0
+                              const remaining = planned - used
+                              const cost = (item.your_cost_unit || 0) * planned
                               const revenue = item.customer_price_total || 0
                               const margin = revenue - cost
+                              const marginPct = revenue > 0 ? ((margin / revenue) * 100).toFixed(1) : '—'
+                              const isOver = used > 0 && remaining < 0
+                              const isLow = !isOver && used > 0 && planned > 0 && remaining / planned < 0.2
                               return (
                                 <tr key={item.id} className="border-b border-[#2a3d55]/30">
-                                  <td className="text-white py-2 pr-3">{item.item_name}</td>
+                                  <td className="text-white py-2 pr-3 font-medium">{item.item_name}</td>
                                   <td className="text-[#8A9AB0] py-2 pr-3">{item.vendor || '—'}</td>
-                                  <td className="text-white py-2 pr-3">{item.quantity}</td>
+                                  <td className="text-white py-2 pr-3">{planned} {item.unit}</td>
+                                  <td className="py-2 pr-3">
+                                    {used > 0 ? <span className="text-[#C8622A] font-semibold">{used} {item.unit}</span> : <span className="text-[#2a3d55]">—</span>}
+                                  </td>
+                                  <td className="py-2 pr-3">
+                                    {used === 0 ? <span className="text-[#8A9AB0]">—</span>
+                                      : isOver ? <span className="text-red-400 font-semibold">{Math.abs(remaining).toFixed(1)} over ⚠</span>
+                                      : isLow ? <span className="text-yellow-400 font-semibold">{remaining.toFixed(1)} left ↓</span>
+                                      : <span className="text-green-400">{remaining.toFixed(1)} left</span>}
+                                  </td>
                                   <td className="text-white py-2 pr-3">${fmt(cost)}</td>
                                   <td className="text-white py-2 pr-3">${fmt(revenue)}</td>
-                                  <td className={`py-2 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(margin)}</td>
+                                  <td className={`py-2 pr-3 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(margin)}</td>
+                                  <td className={`py-2 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{marginPct}{marginPct !== '—' ? '%' : ''}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t border-[#2a3d55]">
+                              <td colSpan="5" className="text-[#8A9AB0] pt-2 font-semibold">Totals</td>
+                              <td className="text-white pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0))}</td>
+                              <td className="text-white pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + (i.customer_price_total || 0), 0))}</td>
+                              <td className="text-green-400 pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + ((i.customer_price_total || 0) - ((i.your_cost_unit || 0) * (i.quantity || 0))), 0))}</td>
+                              <td></td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                      </div>
+                  )}
+
+                  {/* Labor detail */}
+                  {(proposal?.labor_items || []).length > 0 && (
+                    <div>
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Labor — Line Item Detail</p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-[#2a3d55]">
+                              {['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
+                                <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {(proposal.labor_items || []).map((l, i) => {
+                              const cost = parseFloat(l.your_cost) || 0
+                              const revenue = parseFloat(l.customer_price) || 0
+                              const margin = revenue - cost
+                              const marginPct = revenue > 0 ? ((margin / revenue) * 100).toFixed(1) : '—'
+                              return (
+                                <tr key={i} className="border-b border-[#2a3d55]/30">
+                                  <td className="text-white py-2 pr-3 font-medium">{l.role || '—'}</td>
+                                  <td className="text-white py-2 pr-3">{l.quantity || '—'}</td>
+                                  <td className="text-[#8A9AB0] py-2 pr-3">{l.unit || 'hr'}</td>
+                                  <td className="text-white py-2 pr-3">${fmt(cost)}</td>
+                                  <td className="text-white py-2 pr-3">${fmt(revenue)}</td>
+                                  <td className={`py-2 pr-3 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(margin)}</td>
+                                  <td className={`py-2 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{marginPct}{marginPct !== '—' ? '%' : ''}</td>
                                 </tr>
                               )
                             })}
@@ -1468,12 +1530,43 @@ const exportCostReport = async () => {
                       </div>
                     </div>
                   )}
+
+                  {/* Change orders detail */}
+                  {changeOrders.length > 0 && (
+                    <div>
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Change Orders</p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-[#2a3d55]">
+                              {['Name', 'Status', 'Amount'].map(h => (
+                                <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {changeOrders.map(co => (
+                              <tr key={co.id} className="border-b border-[#2a3d55]/30">
+                                <td className="text-white py-2 pr-3">{co.name}</td>
+                                <td className="py-2 pr-3">
+                                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : co.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                    {co.status}
+                                  </span>
+                                </td>
+                                <td className="text-[#C8622A] py-2 font-semibold">${fmt(co.amount)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               )
             })()}
           </div>
         )}
-
         {/* TECH LOG TAB */}
         {activeTab === 'techlog' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
