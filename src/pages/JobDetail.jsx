@@ -166,7 +166,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       if (profileData?.org_id) {
         const { data: vendorData } = await supabase
           .from('vendors')
-          .select('id, vendor_name, default_markup_percent')
+          .select('id, vendor_name, default_markup_percent, contact_email')
           .eq('org_id', profileData.org_id)
           .eq('active', true)
           .order('vendor_name')
@@ -1245,6 +1245,11 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
         const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
         const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
+        const vendorEmailSuggestion = (() => {
+          if (vendorNames.length !== 1) return null
+          const v = vendors.find(v => v.vendor_name === vendorNames[0])
+          return v?.contact_email || null
+        })()
         return (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
             <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
@@ -1253,7 +1258,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor Email <span className="font-normal text-[#8A9AB0]">(optional)</span></label>
                   {vendorNames.length > 0 && <p className="text-[#8A9AB0] text-xs mb-1">Vendors: {vendorNames.join(', ')}</p>}
-                  <input type="email" value={poVendorEmail} onChange={e => setPOVendorEmail(e.target.value)} placeholder="vendor@company.com"
+                  <input type="email" value={poVendorEmail || vendorEmailSuggestion || ''} onChange={e => setPOVendorEmail(e.target.value)} placeholder={vendorEmailSuggestion || 'vendor@company.com'}
                     className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
                 <div>
