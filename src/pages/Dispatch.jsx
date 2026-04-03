@@ -59,8 +59,8 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
   }
 
   // All tickets for the board, grouped by assignment
+  const unassignedTickets = tickets.filter(t => !t.assigned_tech_id)
   const unscheduled = tickets.filter(t => !t.scheduled_date && !t.assigned_tech_id)
-  const unassignedScheduledToday = tickets.filter(t => t.scheduled_date === selectedDate && !t.assigned_tech_id)
 
   const getTicketsForTech = (techId) =>
     tickets.filter(t => t.assigned_tech_id === techId)
@@ -81,14 +81,12 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
     e.preventDefault()
     if (!dragging) return
     setSaving(true)
-    await supabase.from('service_tickets').update({
-      assigned_tech_id: techId || null,
-      scheduled_date: selectedDate
-    }).eq('id', dragging.ticketId)
+    const updates = techId
+      ? { assigned_tech_id: techId, scheduled_date: selectedDate }
+      : { assigned_tech_id: null }
+    await supabase.from('service_tickets').update(updates).eq('id', dragging.ticketId)
     setTickets(prev => prev.map(t =>
-      t.id === dragging.ticketId
-        ? { ...t, assigned_tech_id: techId || null, scheduled_date: selectedDate }
-        : t
+      t.id === dragging.ticketId ? { ...t, ...updates } : t
     ))
     setDragging(null)
     setDragOver(null)
@@ -154,23 +152,32 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
           <>
             <p className="text-[#8A9AB0] text-sm">{dateLabel} — drag tickets between columns to reassign</p>
 
-            {/* Unassigned drop zone for today */}
-            {unassignedScheduledToday.length > 0 && (
-              <div className="bg-[#1a2d45] rounded-xl p-4 border border-dashed border-[#2a3d55]"
-                onDragOver={e => handleDragOver(e, null)}
-                onDrop={e => handleDrop(e, null)}
+            {/* Columns */}
+            <div className="flex gap-4 overflow-x-auto pb-4" style={{ minWidth: 'max-content' }}>
+              {/* Unassigned column */}
+              <div
+                className={`w-72 flex-shrink-0 rounded-xl border-2 transition-colors ${dragOver?.techId === 'unassigned' ? 'border-[#C8622A]/50 bg-[#C8622A]/5' : 'border-dashed border-[#2a3d55] bg-[#1a2d45]'}`}
+                onDragOver={e => handleDragOver(e, 'unassigned')}
+                onDrop={e => { handleDrop(e, null); setDragOver(null) }}
                 onDragLeave={() => setDragOver(null)}>
-                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">⚠ Scheduled but Unassigned ({unassignedScheduledToday.length})</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {unassignedScheduledToday.map(ticket => (
-                    <TicketCard key={ticket.id} ticket={ticket} selectedDate={selectedDate} onDragStart={handleDragStart} onClick={() => openTicketModal(ticket)} />
-                  ))}
+                <div className="p-4 border-b border-[#2a3d55]">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[#8A9AB0] font-semibold text-sm">Unassigned</p>
+                    <span className="bg-[#0F1C2E] text-[#8A9AB0] text-xs px-2 py-1 rounded font-semibold">{unassignedTickets.length}</span>
+                  </div>
+                </div>
+                <div className="p-3 space-y-2 min-h-32">
+                  {unassignedTickets.length === 0 ? (
+                    <div className="flex items-center justify-center h-24 text-[#2a3d55] text-sm">
+                      {dragOver?.techId === 'unassigned' ? <span className="text-[#C8622A]">Drop to unassign</span> : 'All assigned'}
+                    </div>
+                  ) : (
+                    unassignedTickets.map(ticket => (
+                      <TicketCard key={ticket.id} ticket={ticket} selectedDate={selectedDate} onDragStart={handleDragStart} onClick={() => openTicketModal(ticket)} />
+                    ))
+                  )}
                 </div>
               </div>
-            )}
-
-            {/* Tech columns */}
-            <div className="flex gap-4 overflow-x-auto pb-4" style={{ minWidth: 'max-content' }}>
               {techs.map(tech => {
                 const techTickets = getTicketsForTech(tech.id)
                 const isOver = dragOver?.techId === tech.id
