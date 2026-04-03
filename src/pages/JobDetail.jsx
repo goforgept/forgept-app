@@ -903,22 +903,52 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
               </div>
             ) : (
               <div className="overflow-x-auto">
+                {(() => {
+                  const usedByItemId = {}
+                  techLogs.forEach(log => {
+                    if (!log.materials_used) return
+                    try {
+                      const parsed = JSON.parse(log.materials_used)
+                      if (Array.isArray(parsed)) {
+                        parsed.forEach(m => {
+                          usedByItemId[m.id] = (usedByItemId[m.id] || 0) + (parseFloat(m.qty) || 0)
+                        })
+                      }
+                    } catch {}
+                  })
+                  const anyUsage = Object.keys(usedByItemId).length > 0
+                  return (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[#2a3d55]">
-                      {['Item', 'Mfr', 'Part #', 'Vendor', 'Qty', 'Unit Price', 'Total', 'Status'].map(h => (
+                      {['Item', 'Mfr', 'Part #', 'Vendor', 'Planned', ...(anyUsage ? ['Used', 'Remaining'] : []), 'Unit Price', 'Total', 'Status'].map(h => (
                         <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {lineItems.map(item => (
+                    {lineItems.map(item => {
+                      const planned = parseFloat(item.quantity) || 0
+                      const used = usedByItemId[item.id] || 0
+                      const remaining = planned - used
+                      const isOver = used > 0 && remaining < 0
+                      const isExact = used > 0 && remaining === 0
+                      return (
                       <tr key={item.id} className="border-b border-[#2a3d55]/50">
                         <td className="text-white py-3 pr-4">{item.item_name}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.manufacturer || '—'}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
                         <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor || '—'}</td>
-                        <td className="text-white py-3 pr-4">{item.quantity}</td>
+                        <td className="text-white py-3 pr-4">{item.quantity} {item.unit}</td>
+                        {anyUsage && <td className="text-white py-3 pr-4">{used > 0 ? `${used} ${item.unit}` : '—'}</td>}
+                        {anyUsage && (
+                          <td className="py-3 pr-4">
+                            {used === 0 ? <span className="text-[#8A9AB0]">—</span>
+                              : isOver ? <span className="text-red-400 font-semibold">{Math.abs(remaining)} over</span>
+                              : isExact ? <span className="text-green-400 font-semibold">All used</span>
+                              : <span className="text-[#D6E4F0]">{remaining} {item.unit} left</span>}
+                          </td>
+                        )}
                         <td className="text-white py-3 pr-4">${fmt(item.customer_price_unit)}</td>
                         <td className="text-white py-3 pr-4">${fmt(item.customer_price_total)}</td>
                         <td className="py-3">
@@ -927,16 +957,18 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                           </span>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                   <tfoot>
                     <tr>
-                      <td colSpan="5" className="text-[#8A9AB0] pt-4 text-right font-semibold">Total</td>
+                      <td colSpan={anyUsage ? 7 : 5} className="text-[#8A9AB0] pt-4 text-right font-semibold">Total</td>
                       <td className="text-[#C8622A] pt-4 font-bold pr-4 text-right">${fmt(lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0))}</td>
                       <td></td><td></td>
                     </tr>
                   </tfoot>
                 </table>
+                  )
+                })()}
               </div>
             )}
           </div>
@@ -1211,7 +1243,26 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                       <span className="text-[#C8622A] font-bold">{log.hours_worked || 0} hrs</span>
                     </div>
                     <p className="text-[#D6E4F0] text-sm">{log.work_summary}</p>
-                    {log.materials_used && <p className="text-[#8A9AB0] text-xs mt-1">📦 {log.materials_used}</p>}
+                    {log.materials_used && (() => {
+                      let parsed = null
+                      try { parsed = JSON.parse(log.materials_used) } catch {}
+                      if (Array.isArray(parsed) && parsed.length > 0) {
+                        return (
+                          <div className="mt-2">
+                            <p className="text-[#8A9AB0] text-xs font-semibold mb-1">📦 Materials Used</p>
+                            <div className="space-y-0.5">
+                              {parsed.map((m, i) => (
+                                <p key={i} className="text-[#8A9AB0] text-xs">
+                                  · {m.name} — {m.qty} {m.unit}
+                                  {m.planned && m.qty !== m.planned ? <span className="text-yellow-500/70"> (planned: {m.planned})</span> : null}
+                                </p>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      }
+                      return <p className="text-[#8A9AB0] text-xs mt-1">📦 {log.materials_used}</p>
+                    })()}
                     {log.issues && <p className="text-red-400 text-xs mt-1">⚠ {log.issues}</p>}
                   </div>
                 ))}
