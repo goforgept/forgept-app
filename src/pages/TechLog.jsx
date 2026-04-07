@@ -31,6 +31,11 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
   const [jobRunningTotals, setJobRunningTotals] = useState({}) // { [item_id]: qty_used_total }
   const [jobTotalHours, setJobTotalHours] = useState(0)
 
+  // Change order state
+  const [jobChangeOrders, setJobChangeOrders] = useState([])
+  const [selectedCOId, setSelectedCOId] = useState('')
+  const [coBomUsage, setCoBomUsage] = useState({})
+
   useEffect(() => { fetchAll() }, [])
 
   const fetchAll = async () => {
@@ -104,6 +109,17 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     setJobRunningTotals(runningTotals)
     setJobTotalHours(totalHours)
 
+    // Fetch change orders for this job
+    const { data: coData } = await supabase
+      .from('change_orders')
+      .select('id, name, status, line_items, labor_items')
+      .eq('job_id', jobId)
+      .in('status', ['Approved', 'Pending'])
+      .order('created_at', { ascending: true })
+    setJobChangeOrders(coData || [])
+    setSelectedCOId('')
+    setCoBomUsage({})
+
     setFetchingBom(false)
   }
 
@@ -122,6 +138,9 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     setBomUsage({})
     setJobRunningTotals({})
     setJobTotalHours(0)
+    setJobChangeOrders([])
+    setSelectedCOId('')
+    setCoBomUsage({})
     setShowForm(true)
     if (jobId) handleJobSelect(jobId)
   }
@@ -131,21 +150,39 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     setSaving(true)
 
     let materialsValue = null
-    if (jobBom.length > 0) {
-      const usedItems = Object.entries(bomUsage)
-        .filter(([, qty]) => qty !== '' && !isNaN(parseFloat(qty)) && parseFloat(qty) > 0)
-        .map(([id, qty]) => {
-          const item = jobBom.find(b => b.id === id)
-          return {
-            id,
-            name: item?.item_name,
-            qty: parseFloat(qty),
-            unit: item?.unit,
-            planned: item?.quantity
-          }
-        })
-      if (usedItems.length > 0) materialsValue = JSON.stringify(usedItems)
-    } else {
+    const mainBomItems = jobBom.length > 0
+      ? Object.entries(bomUsage)
+          .filter(([, qty]) => qty !== '' && !isNaN(parseFloat(qty)) && parseFloat(qty) > 0)
+          .map(([id, qty]) => {
+            const item = jobBom.find(b => b.id === id)
+            return { id, name: item?.item_name, qty: parseFloat(qty), unit: item?.unit, planned: item?.quantity }
+          })
+      : []
+
+    const co = selectedCOId ? jobChangeOrders.find(c => c.id === selectedCOId) : null
+    const coItems = co?.line_items
+      ? Object.entries(coBomUsage)
+          .filter(([, qty]) => qty !== '' && !isNaN(parseFloat(qty)) && parseFloat(qty) > 0)
+          .map(([key, qty]) => {
+            const idx = parseInt(key.split('_').pop())
+            const item = co.line_items[idx]
+            return {
+              id: `co_${selectedCOId}_${idx}`,
+              name: item?.item_name,
+              qty: parseFloat(qty),
+              unit: item?.unit,
+              planned: item?.quantity,
+              source: 'co',
+              co_id: selectedCOId,
+              co_name: co.name
+            }
+          })
+      : []
+
+    const allUsed = [...mainBomItems, ...coItems]
+    if (allUsed.length > 0) {
+      materialsValue = JSON.stringify(allUsed)
+    } else if (jobBom.length === 0 && !selectedCOId) {
       materialsValue = form.materials_used.trim() || null
     }
 
@@ -414,6 +451,20 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                 </select>
               </div>
 
+              {form.job_id && jobChangeOrders.length > 0 && (
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Logging Against</label>
+                  <select value={selectedCOId} onChange={e => { setSelectedCOId(e.target.value); setCoBomUsage({}) }} className={inputClass}>
+                    <option value="">Main Job BOM</option>
+                    {jobChangeOrders.map(co => (
+                      <option key={co.id} value={co.id}>
+                        CO: {co.name}{co.status !== 'Approved' ? ` (${co.status})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Date <span className="text-[#C8622A]">*</span></label>
@@ -470,7 +521,72 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
               {fetchingBom && <p className="text-[#8A9AB0] text-xs">Loading job materials...</p>}
 
-              {!fetchingBom && jobBom.length > 0 && (
+              {/* Change Order BOM */}
+              {!fetchingBom && selectedCOId && (() => {
+                const co = jobChangeOrders.find(c => c.id === selectedCOId)
+                if (!co) return null
+                return (
+                  <div className="space-y-3">
+                    <div className="bg-[#C8622A]/10 border border-[#C8622A]/30 rounded-lg px-3 py-2">
+                      <p className="text-[#C8622A] text-xs font-semibold">Logging against Change Order: {co.name}</p>
+                      {co.status === 'Pending' && <p className="text-yellow-400 text-xs mt-0.5">⚠ This CO is still Pending approval</p>}
+                    </div>
+
+                    {co.labor_items?.length > 0 && (
+                      <div className="bg-[#0F1C2E] rounded-lg p-3">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">CO Labor</p>
+                        <div className="space-y-1">
+                          {co.labor_items.map((l, i) => (
+                            <div key={i} className="flex justify-between text-xs">
+                              <span className="text-[#D6E4F0]">{l.role}</span>
+                              <span className="text-[#8A9AB0]">{l.quantity} {l.unit || 'hr'} planned</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {co.line_items?.length > 0 && (
+                      <div>
+                        <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">
+                          CO Materials Used Today
+                          <span className="text-[#8A9AB0] font-normal normal-case ml-1">(enter qty used today)</span>
+                        </label>
+                        <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                          {co.line_items.map((item, idx) => {
+                            const key = `co_${selectedCOId}_${idx}`
+                            const planned = parseFloat(item.quantity) || 0
+                            return (
+                              <div key={idx} className="bg-[#0F1C2E] border border-transparent rounded-lg px-3 py-2">
+                                <div className="flex items-center gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-[#D6E4F0] text-sm block truncate">{item.item_name}</span>
+                                    <div className="flex items-center gap-3 mt-0.5">
+                                      {item.category && <span className="text-[#8A9AB0] text-xs">{item.category}</span>}
+                                      <span className="text-[#8A9AB0] text-xs">Planned: {planned} {item.unit}</span>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    <input
+                                      type="number" min="0" step="any" placeholder="0"
+                                      value={coBomUsage[key] || ''}
+                                      onChange={e => setCoBomUsage(p => ({ ...p, [key]: e.target.value }))}
+                                      className="w-20 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#C8622A] text-right"
+                                    />
+                                    <span className="text-[#8A9AB0] text-xs w-6 shrink-0">{item.unit}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {!fetchingBom && !selectedCOId && jobBom.length > 0 && (
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">
                     Materials Used Today
@@ -518,7 +634,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                 </div>
               )}
 
-              {!fetchingBom && jobBom.length === 0 && (
+              {!fetchingBom && jobBom.length === 0 && !selectedCOId && (
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Materials Used <span className="text-[#8A9AB0]">(optional)</span></label>
                   <textarea value={form.materials_used} onChange={e => setForm(p => ({ ...p, materials_used: e.target.value }))} rows={2}

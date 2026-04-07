@@ -669,7 +669,7 @@ const exportCostReport = async () => {
       y = doc.lastAutoTable.finalY + 10
     }
 
-    // Change orders
+    // Change orders summary
     if (changeOrders.length > 0) {
       doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Change Orders', 14, y)
@@ -681,6 +681,62 @@ const exportCostReport = async () => {
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         alternateRowStyles: { fillColor: [245, 245, 245] },
         styles: { fontSize: 8 }
+      })
+      y = doc.lastAutoTable.finalY + 10
+
+      // CO materials line item detail (from tech log entries)
+      const cosWithItems = changeOrders.filter(co => co.line_items?.length > 0)
+      cosWithItems.forEach(co => {
+        const coRows = co.line_items.map((item, idx) => {
+          const key = `co_${co.id}_${idx}`
+          const used = usedByItemId[key] || 0
+          const planned = parseFloat(item.quantity) || 0
+          const remaining = planned - used
+          return [
+            item.item_name || '—',
+            `${planned} ${item.unit || ''}`,
+            used > 0 ? `${used} ${item.unit || ''}` : '—',
+            used > 0
+              ? (remaining < 0 ? `${Math.abs(remaining).toFixed(1)} over` : `${remaining.toFixed(1)} left`)
+              : '—',
+            `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+          ]
+        })
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+        doc.text(`CO Materials — ${co.name} (${co.status})`, 14, y)
+        y += 4
+        autoTable(doc, {
+          startY: y,
+          head: [['Item', 'Planned Qty', 'Used Qty', 'Remaining', 'Customer Price']],
+          body: coRows,
+          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
+          styles: { fontSize: 8 },
+        })
+        y = doc.lastAutoTable.finalY + 8
+      })
+
+      // CO labor detail
+      const cosWithLabor = changeOrders.filter(co => co.labor_items?.length > 0)
+      cosWithLabor.forEach(co => {
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+        doc.text(`CO Labor — ${co.name} (${co.status})`, 14, y)
+        y += 4
+        autoTable(doc, {
+          startY: y,
+          head: [['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price']],
+          body: co.labor_items.map(l => [
+            l.role || '—',
+            l.quantity || '—',
+            l.unit || 'hr',
+            `$${(parseFloat(l.your_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+            `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+          ]),
+          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+          alternateRowStyles: { fillColor: [245, 245, 245] },
+          styles: { fontSize: 8 },
+        })
+        y = doc.lastAutoTable.finalY + 8
       })
     }
 
@@ -1533,8 +1589,8 @@ const exportCostReport = async () => {
 
                   {/* Change orders detail */}
                   {changeOrders.length > 0 && (
-                    <div>
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Change Orders</p>
+                    <div className="space-y-4">
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Change Orders</p>
                       <div className="overflow-x-auto">
                         <table className="w-full text-xs">
                           <thead>
@@ -1559,6 +1615,91 @@ const exportCostReport = async () => {
                           </tbody>
                         </table>
                       </div>
+
+                      {/* CO Materials line item detail */}
+                      {changeOrders.filter(co => co.line_items?.length > 0).map(co => (
+                        <div key={`co-mat-${co.id}`}>
+                          <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">
+                            CO Materials — {co.name}
+                            <span className={`ml-2 px-2 py-0.5 rounded font-semibold normal-case ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{co.status}</span>
+                          </p>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b border-[#2a3d55]">
+                                  {['Item', 'Planned', 'Used', 'Remaining', 'Customer Price'].map(h => (
+                                    <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {co.line_items.map((item, idx) => {
+                                  const key = `co_${co.id}_${idx}`
+                                  const planned = parseFloat(item.quantity) || 0
+                                  const used = usedByItemId[key] || 0
+                                  const remaining = planned - used
+                                  const isOver = used > 0 && remaining < 0
+                                  const isLow = !isOver && used > 0 && planned > 0 && remaining / planned < 0.2
+                                  return (
+                                    <tr key={idx} className="border-b border-[#2a3d55]/30">
+                                      <td className="text-white py-2 pr-3 font-medium">{item.item_name}</td>
+                                      <td className="text-white py-2 pr-3">{planned} {item.unit}</td>
+                                      <td className="py-2 pr-3">
+                                        {used > 0 ? <span className="text-[#C8622A] font-semibold">{used} {item.unit}</span> : <span className="text-[#2a3d55]">—</span>}
+                                      </td>
+                                      <td className="py-2 pr-3">
+                                        {used === 0 ? <span className="text-[#8A9AB0]">—</span>
+                                          : isOver ? <span className="text-red-400 font-semibold">{Math.abs(remaining).toFixed(1)} over ⚠</span>
+                                          : isLow ? <span className="text-yellow-400 font-semibold">{remaining.toFixed(1)} left ↓</span>
+                                          : <span className="text-green-400">{remaining.toFixed(1)} left</span>}
+                                      </td>
+                                      <td className="text-white py-2">${fmt(item.customer_price_unit || 0)}</td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* CO Labor line item detail */}
+                      {changeOrders.filter(co => co.labor_items?.length > 0).map(co => (
+                        <div key={`co-lab-${co.id}`}>
+                          <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">
+                            CO Labor — {co.name}
+                            <span className={`ml-2 px-2 py-0.5 rounded font-semibold normal-case ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{co.status}</span>
+                          </p>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b border-[#2a3d55]">
+                                  {['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price', 'Margin $'].map(h => (
+                                    <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {co.labor_items.map((l, i) => {
+                                  const cost = parseFloat(l.your_cost) || 0
+                                  const revenue = parseFloat(l.customer_price) || 0
+                                  const margin = revenue - cost
+                                  return (
+                                    <tr key={i} className="border-b border-[#2a3d55]/30">
+                                      <td className="text-white py-2 pr-3 font-medium">{l.role || '—'}</td>
+                                      <td className="text-white py-2 pr-3">{l.quantity || '—'}</td>
+                                      <td className="text-[#8A9AB0] py-2 pr-3">{l.unit || 'hr'}</td>
+                                      <td className="text-white py-2 pr-3">${fmt(cost)}</td>
+                                      <td className="text-white py-2 pr-3">${fmt(revenue)}</td>
+                                      <td className={`py-2 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(margin)}</td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
 
