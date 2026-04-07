@@ -1467,6 +1467,77 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const s3 = s2 + 20; doc.text('Title:', 14, s3); doc.line(30, s3, pageWidth - 14, s3)
     }
 
+    if (slaContract) {
+      doc.addPage()
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text(slaContract.name || 'Service Level Agreement', 14, 20)
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(14, 24, pageWidth - 14, 24)
+      let slaY = 34
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
+      const slaDetails = [
+        ['Response Time', `${slaContract.response_time_hours || 8} hours`],
+        ['Uptime Guarantee', `${slaContract.uptime_percent || 99}%`],
+        ['Billing Frequency', slaContract.billing_frequency || 'Quarterly'],
+        ['Labor Rate', `$${slaContract.labor_rate || 100}/hr`],
+        ['Emergency Rate', `$${slaContract.emergency_rate || 150}/hr`],
+      ]
+      slaDetails.forEach(([label, value]) => {
+        doc.setFont('helvetica', 'bold'); doc.text(`${label}:`, 14, slaY)
+        doc.setFont('helvetica', 'normal'); doc.text(value, 70, slaY)
+        slaY += 7
+      })
+      if (slaContract.body) {
+        slaY += 4
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
+        const bodyLines = doc.splitTextToSize(slaContract.body, pageWidth - 28)
+        doc.text(bodyLines, 14, slaY)
+        slaY += bodyLines.length * 4.5 + 10
+      } else { slaY += 10 }
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('SLA Acceptance', 14, slaY)
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
+      const ss1 = slaY + 14
+      doc.text('Client Signature:', 14, ss1); doc.line(50, ss1, 140, ss1)
+      doc.text('Date:', 150, ss1); doc.line(163, ss1, pageWidth - 14, ss1)
+      const ss2 = ss1 + 16; doc.text('Printed Name:', 14, ss2); doc.line(50, ss2, pageWidth - 14, ss2)
+    }
+
+    if (monitoringContract) {
+      doc.addPage()
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text(monitoringContract.name || 'Monitoring Contract', 14, 20)
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(14, 24, pageWidth - 14, 24)
+      let monY = 34
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
+      const monDetails = [
+        ['Monthly Fee', `$${monitoringContract.monthly_fee || 49}/mo`],
+        ['Monitored Systems', monitoringContract.monitored_systems || '—'],
+        ['Billing Frequency', monitoringContract.billing_frequency || 'Monthly'],
+        ['Escalation Contacts', monitoringContract.escalation_contacts || '2'],
+      ]
+      monDetails.forEach(([label, value]) => {
+        doc.setFont('helvetica', 'bold'); doc.text(`${label}:`, 14, monY)
+        doc.setFont('helvetica', 'normal'); doc.text(String(value), 70, monY)
+        monY += 7
+      })
+      if (monitoringContract.body) {
+        monY += 4
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
+        const monBodyLines = doc.splitTextToSize(monitoringContract.body, pageWidth - 28)
+        doc.text(monBodyLines, 14, monY)
+        monY += monBodyLines.length * 4.5 + 10
+      } else { monY += 10 }
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Monitoring Contract Acceptance', 14, monY)
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
+      const ms1 = monY + 14
+      doc.text('Client Signature:', 14, ms1); doc.line(50, ms1, 140, ms1)
+      doc.text('Date:', 150, ms1); doc.line(163, ms1, pageWidth - 14, ms1)
+      const ms2 = ms1 + 16; doc.text('Printed Name:', 14, ms2); doc.line(50, ms2, pageWidth - 14, ms2)
+    }
+
     if (photos && photos.length > 0) {
       doc.addPage()
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
