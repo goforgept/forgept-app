@@ -1563,6 +1563,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               )}
             </div>
             <div className="flex items-center gap-2">
+              <button onClick={() => setShowShareModal(true)} className="bg-[#2a3d55] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-1">
+                👥 Share{collaborators.length > 0 ? ` (${collaborators.length})` : ''}
+              </button>
               {isAdmin && proposal?.status !== 'Won' && (
                 <button onClick={() => { setDeleteConfirmText(''); setShowDeleteModal(true) }} className="bg-red-900/30 text-red-400 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-red-900/50 transition-colors">Delete</button>
               )}
@@ -1632,9 +1635,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-white font-bold text-lg">Scope of Work</h3>
             <div className="flex gap-2 flex-wrap">
-              <button onClick={() => setShowShareModal(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-2">
-                👥 Share{collaborators.length > 0 ? ` (${collaborators.length})` : ''}
-              </button>
               {featureSendProposal && proposal?.client_email && (
                 <button onClick={() => { setSendForm({ subject: `Proposal: ${proposal.proposal_name}`, message: `Hi ${proposal.client_name || 'there'},\n\nPlease find your proposal attached. Don't hesitate to reach out with any questions.\n\nLooking forward to working with you.` }); setShowSendModal(true) }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
