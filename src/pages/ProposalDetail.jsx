@@ -421,17 +421,38 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   }
 
   const openSLAModal = () => {
-    const tmpl = orgSLASettings?.sla_templates?.[proposal?.industry] || {}
-    const existing = slaContract || tmpl
-    setEditSLAForm({
-      name: existing.name || 'Service Level Agreement',
-      response_time_hours: existing.response_time_hours || 8,
-      uptime_percent: existing.uptime_percent || 99.0,
-      billing_frequency: existing.billing_frequency || 'Quarterly',
-      labor_rate: existing.labor_rate || 100,
-      emergency_rate: existing.emergency_rate || 150,
-      body: existing.body || '',
-    })
+    const industryConfig = orgSLASettings?.sla_templates?.[proposal?.industry] || {}
+    const tiers = industryConfig.tiers || []
+    if (slaContract) {
+      setEditSLAForm({
+        tier_id: slaContract.tier_id || '',
+        tier_name: slaContract.tier_name || slaContract.name || '',
+        name: slaContract.name || 'Service Level Agreement',
+        response_time_hours: slaContract.response_time_hours ?? '',
+        billing_frequency: slaContract.billing_frequency || 'Quarterly',
+        labor_rate: slaContract.labor_rate || 100,
+        emergency_rate: slaContract.emergency_rate ?? '',
+        maintenance_calls_per_year: slaContract.maintenance_calls_per_year || 0,
+        initial_fee: slaContract.initial_fee || 0,
+        recurring_fee: slaContract.recurring_fee || 0,
+        body: slaContract.body || '',
+      })
+    } else {
+      const first = tiers[0] || {}
+      setEditSLAForm({
+        tier_id: first.id || '',
+        tier_name: first.name || '',
+        name: first.name || 'Service Level Agreement',
+        response_time_hours: first.response_time_hours ?? '',
+        billing_frequency: first.billing_frequency || 'Quarterly',
+        labor_rate: first.labor_rate || 100,
+        emergency_rate: first.emergency_rate ?? '',
+        maintenance_calls_per_year: first.maintenance_calls_per_year || 0,
+        initial_fee: first.initial_fee || 0,
+        recurring_fee: first.recurring_fee || 0,
+        body: first.body || '',
+      })
+    }
     setShowSLAModal(true)
   }
 
@@ -831,6 +852,84 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       new Paragraph({ children: [new TextRun({ text: 'Title', size: 18, color: '888888' })] }),
       sigLine(),
     )
+
+    if (slaContract) {
+      const resolvedSLABody = (slaContract.body || '')
+        .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
+        .replace(/\{\{clientName\}\}/g, proposal?.company || '')
+        .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
+        .replace(/\{\{responseTime\}\}/g, slaContract.response_time_hours ? `${slaContract.response_time_hours} hours` : 'as scheduled')
+        .replace(/\{\{billingFrequency\}\}/g, slaContract.billing_frequency || 'Quarterly')
+        .replace(/\{\{laborRate\}\}/g, `${slaContract.labor_rate || 100}`)
+        .replace(/\{\{emergencyRate\}\}/g, `${slaContract.emergency_rate || 150}`)
+        .replace(/\{\{tierName\}\}/g, slaContract.tier_name || slaContract.name || '')
+        .replace(/\{\{maintenanceCalls\}\}/g, `${slaContract.maintenance_calls_per_year || 0}`)
+        .replace(/\{\{initialFee\}\}/g, `${slaContract.initial_fee || 0}`)
+        .replace(/\{\{recurringFee\}\}/g, `${slaContract.recurring_fee || 0}`)
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: slaContract.name || 'Service Level Agreement', bold: true, size: 28, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        ...[
+          slaContract.response_time_hours ? `Response Time: ${slaContract.response_time_hours} hours` : null,
+          `Billing: ${slaContract.billing_frequency || 'Quarterly'}`,
+          `Standard Rate: $${slaContract.labor_rate || 100}/hr`,
+          slaContract.emergency_rate ? `Emergency Rate: $${slaContract.emergency_rate}/hr` : null,
+          slaContract.maintenance_calls_per_year > 0 ? `Included Maintenance Visits: ${slaContract.maintenance_calls_per_year}/year` : null,
+          slaContract.recurring_fee > 0 ? `Recurring Fee: $${slaContract.recurring_fee} (${slaContract.billing_frequency || 'Quarterly'})` : null,
+        ].filter(Boolean).map(t => new Paragraph({ children: [new TextRun({ text: t, size: 18 })] })),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        ...resolvedSLABody.split('\n').map(line => new Paragraph({ children: [new TextRun({ text: line, size: 18, color: '444444' })] })),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'SLA Acceptance', bold: true, size: 22, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Client Signature', size: 18, color: '888888' })] }),
+        sigLine(),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Date', size: 18, color: '888888' })] }),
+        sigLine(),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Printed Name', size: 18, color: '888888' })] }),
+        sigLine(),
+      )
+    }
+
+    if (monitoringContract) {
+      const resolvedMonBody = (monitoringContract.body || '')
+        .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
+        .replace(/\{\{clientName\}\}/g, proposal?.company || '')
+        .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
+        .replace(/\{\{monthlyFee\}\}/g, `${monitoringContract.monthly_fee || 49}`)
+        .replace(/\{\{monitoredSystems\}\}/g, monitoringContract.monitored_systems || '')
+        .replace(/\{\{billingFrequency\}\}/g, monitoringContract.billing_frequency || 'Monthly')
+        .replace(/\{\{escalationContacts\}\}/g, `${monitoringContract.escalation_contacts || 2}`)
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: monitoringContract.name || 'Monitoring Contract', bold: true, size: 28, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        ...[
+          `Monthly Fee: $${monitoringContract.monthly_fee || 49}/mo`,
+          `Billing: ${monitoringContract.billing_frequency || 'Monthly'}`,
+          monitoringContract.monitored_systems ? `Monitored Systems: ${monitoringContract.monitored_systems}` : null,
+          `Escalation Contacts: ${monitoringContract.escalation_contacts || 2}`,
+        ].filter(Boolean).map(t => new Paragraph({ children: [new TextRun({ text: t, size: 18 })] })),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        ...resolvedMonBody.split('\n').map(line => new Paragraph({ children: [new TextRun({ text: line, size: 18, color: '444444' })] })),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Monitoring Contract Acceptance', bold: true, size: 22, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Client Signature', size: 18, color: '888888' })] }),
+        sigLine(),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Date', size: 18, color: '888888' })] }),
+        sigLine(),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Printed Name', size: 18, color: '888888' })] }),
+        sigLine(),
+      )
+    }
 
     if (photos && photos.length > 0) {
       const { ImageRun } = await import('docx')
@@ -1476,12 +1575,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       let slaY = 34
       doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
       const slaDetails = [
-        ['Response Time', `${slaContract.response_time_hours || 8} hours`],
-        ['Uptime Guarantee', `${slaContract.uptime_percent || 99}%`],
-        ['Billing Frequency', slaContract.billing_frequency || 'Quarterly'],
+        slaContract.response_time_hours ? ['Response Time', `${slaContract.response_time_hours} hours`] : null,
+        ['Billing', slaContract.billing_frequency || 'Quarterly'],
         ['Labor Rate', `$${slaContract.labor_rate || 100}/hr`],
-        ['Emergency Rate', `$${slaContract.emergency_rate || 150}/hr`],
-      ]
+        slaContract.emergency_rate ? ['Emergency Rate', `$${slaContract.emergency_rate}/hr`] : null,
+        slaContract.maintenance_calls_per_year > 0 ? ['Maintenance Visits', `${slaContract.maintenance_calls_per_year}/year included`] : null,
+        slaContract.initial_fee > 0 ? ['Initial Fee', `$${slaContract.initial_fee} (billed with job)`] : null,
+        slaContract.recurring_fee > 0 ? ['Recurring Fee', `$${slaContract.recurring_fee} (${slaContract.billing_frequency || 'Quarterly'})`] : null,
+      ].filter(Boolean)
       slaDetails.forEach(([label, value]) => {
         doc.setFont('helvetica', 'bold'); doc.text(`${label}:`, 14, slaY)
         doc.setFont('helvetica', 'normal'); doc.text(value, 70, slaY)
@@ -1494,11 +1595,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
           .replace(/\{\{clientName\}\}/g, proposal?.company || '')
           .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-          .replace(/\{\{responseTime\}\}/g, `${slaContract.response_time_hours || 8} hours`)
-          .replace(/\{\{uptime\}\}/g, `${slaContract.uptime_percent || 99}`)
+          .replace(/\{\{tierName\}\}/g, slaContract.tier_name || slaContract.name || '')
+          .replace(/\{\{responseTime\}\}/g, slaContract.response_time_hours ? `${slaContract.response_time_hours} hours` : 'as scheduled')
           .replace(/\{\{billingFrequency\}\}/g, slaContract.billing_frequency || 'Quarterly')
           .replace(/\{\{laborRate\}\}/g, `${slaContract.labor_rate || 100}`)
           .replace(/\{\{emergencyRate\}\}/g, `${slaContract.emergency_rate || 150}`)
+          .replace(/\{\{maintenanceCalls\}\}/g, `${slaContract.maintenance_calls_per_year || 0}`)
+          .replace(/\{\{initialFee\}\}/g, `${slaContract.initial_fee || 0}`)
+          .replace(/\{\{recurringFee\}\}/g, `${slaContract.recurring_fee || 0}`)
         const bodyLines = doc.splitTextToSize(resolvedSLABody, pageWidth - 28)
         doc.text(bodyLines, 14, slaY)
         slaY += bodyLines.length * 4.5 + 10
@@ -2183,15 +2287,16 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             </div>
             {slaContract ? (
               <div className="space-y-3">
+                {slaContract.tier_name && (
+                  <span className="inline-block bg-[#C8622A]/20 text-[#C8622A] text-xs font-semibold px-3 py-1 rounded-full">{slaContract.tier_name}</span>
+                )}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <div className="bg-[#0F1C2E] rounded-lg p-3">
-                    <p className="text-[#8A9AB0] text-xs mb-1">Response Time</p>
-                    <p className="text-white text-sm font-semibold">{slaContract.response_time_hours} hours</p>
-                  </div>
-                  <div className="bg-[#0F1C2E] rounded-lg p-3">
-                    <p className="text-[#8A9AB0] text-xs mb-1">Uptime Guarantee</p>
-                    <p className="text-white text-sm font-semibold">{slaContract.uptime_percent}%</p>
-                  </div>
+                  {slaContract.response_time_hours && (
+                    <div className="bg-[#0F1C2E] rounded-lg p-3">
+                      <p className="text-[#8A9AB0] text-xs mb-1">Response Time</p>
+                      <p className="text-white text-sm font-semibold">{slaContract.response_time_hours} hours</p>
+                    </div>
+                  )}
                   <div className="bg-[#0F1C2E] rounded-lg p-3">
                     <p className="text-[#8A9AB0] text-xs mb-1">Billing</p>
                     <p className="text-white text-sm font-semibold">{slaContract.billing_frequency}</p>
@@ -2200,10 +2305,30 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                     <p className="text-[#8A9AB0] text-xs mb-1">Standard Rate</p>
                     <p className="text-white text-sm font-semibold">${slaContract.labor_rate}/hr</p>
                   </div>
-                  <div className="bg-[#0F1C2E] rounded-lg p-3">
-                    <p className="text-[#8A9AB0] text-xs mb-1">Emergency Rate</p>
-                    <p className="text-white text-sm font-semibold">${slaContract.emergency_rate}/hr</p>
-                  </div>
+                  {slaContract.emergency_rate && (
+                    <div className="bg-[#0F1C2E] rounded-lg p-3">
+                      <p className="text-[#8A9AB0] text-xs mb-1">Emergency Rate</p>
+                      <p className="text-white text-sm font-semibold">${slaContract.emergency_rate}/hr</p>
+                    </div>
+                  )}
+                  {slaContract.maintenance_calls_per_year > 0 && (
+                    <div className="bg-[#0F1C2E] rounded-lg p-3">
+                      <p className="text-[#8A9AB0] text-xs mb-1">Maintenance Visits/Year</p>
+                      <p className="text-white text-sm font-semibold">{slaContract.maintenance_calls_per_year}</p>
+                    </div>
+                  )}
+                  {slaContract.recurring_fee > 0 && (
+                    <div className="bg-[#0F1C2E] rounded-lg p-3">
+                      <p className="text-[#8A9AB0] text-xs mb-1">Recurring Fee</p>
+                      <p className="text-white text-sm font-semibold">${slaContract.recurring_fee}/{slaContract.billing_frequency}</p>
+                    </div>
+                  )}
+                  {slaContract.initial_fee > 0 && (
+                    <div className="bg-[#0F1C2E] rounded-lg p-3">
+                      <p className="text-[#8A9AB0] text-xs mb-1">Initial Fee</p>
+                      <p className="text-white text-sm font-semibold">${slaContract.initial_fee} <span className="text-[#8A9AB0] font-normal text-xs">billed with job</span></p>
+                    </div>
+                  )}
                 </div>
                 {slaContract.body && (
                   <div className="bg-[#0F1C2E] rounded-lg p-4">
@@ -2212,11 +2337,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                       .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
                       .replace(/\{\{clientName\}\}/g, proposal?.company || '')
                       .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-                      .replace(/\{\{responseTime\}\}/g, `${slaContract.response_time_hours || 8} hours`)
-                      .replace(/\{\{uptime\}\}/g, `${slaContract.uptime_percent || 99}`)
+                      .replace(/\{\{tierName\}\}/g, slaContract.tier_name || slaContract.name || '')
+                      .replace(/\{\{responseTime\}\}/g, slaContract.response_time_hours ? `${slaContract.response_time_hours} hours` : 'as scheduled')
                       .replace(/\{\{billingFrequency\}\}/g, slaContract.billing_frequency || 'Quarterly')
                       .replace(/\{\{laborRate\}\}/g, `${slaContract.labor_rate || 100}`)
                       .replace(/\{\{emergencyRate\}\}/g, `${slaContract.emergency_rate || 150}`)
+                      .replace(/\{\{maintenanceCalls\}\}/g, `${slaContract.maintenance_calls_per_year || 0}`)
+                      .replace(/\{\{initialFee\}\}/g, `${slaContract.initial_fee || 0}`)
+                      .replace(/\{\{recurringFee\}\}/g, `${slaContract.recurring_fee || 0}`)
                     }</p>
                   </div>
                 )}
@@ -2563,6 +2691,23 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               <button onClick={() => setShowSLAModal(false)} className="text-[#8A9AB0] hover:text-white text-2xl leading-none">×</button>
             </div>
             <div className="space-y-4">
+              {/* Tier selector */}
+              {(orgSLASettings?.sla_templates?.[proposal?.industry]?.tiers || []).length > 0 && (
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Agreement Tier</label>
+                  <select value={editSLAForm.tier_id || ''} onChange={e => {
+                    const tiers = orgSLASettings?.sla_templates?.[proposal?.industry]?.tiers || []
+                    const tier = tiers.find(t => t.id === e.target.value)
+                    if (tier) setEditSLAForm({ tier_id: tier.id, tier_name: tier.name, name: tier.name, response_time_hours: tier.response_time_hours ?? '', labor_rate: tier.labor_rate || 100, emergency_rate: tier.emergency_rate ?? '', billing_frequency: tier.billing_frequency || 'Quarterly', maintenance_calls_per_year: tier.maintenance_calls_per_year || 0, initial_fee: tier.initial_fee || 0, recurring_fee: tier.recurring_fee || 0, body: tier.body || '' })
+                  }} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                    <option value="">— Select tier —</option>
+                    {(orgSLASettings?.sla_templates?.[proposal?.industry]?.tiers || []).map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[#8A9AB0] text-xs mt-1">Selecting a tier pre-fills the fields below. You can still edit before saving.</p>
+                </div>
+              )}
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Agreement Name</label>
                 <input type="text" value={editSLAForm.name || ''} onChange={e => setEditSLAForm(p => ({ ...p, name: e.target.value }))}
@@ -2570,36 +2715,46 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Response Time (hours)</label>
-                  <input type="number" value={editSLAForm.response_time_hours || ''} onChange={e => setEditSLAForm(p => ({ ...p, response_time_hours: e.target.value }))}
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Response Time (hours) <span className="text-[#8A9AB0] font-normal">— blank = N/A</span></label>
+                  <input type="number" value={editSLAForm.response_time_hours ?? ''} placeholder="N/A" onChange={e => setEditSLAForm(p => ({ ...p, response_time_hours: e.target.value }))}
                     className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Uptime Guarantee (%)</label>
-                  <input type="number" step="0.1" value={editSLAForm.uptime_percent || ''} onChange={e => setEditSLAForm(p => ({ ...p, uptime_percent: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Frequency</label>
+                  <select value={editSLAForm.billing_frequency || 'Quarterly'} onChange={e => setEditSLAForm(p => ({ ...p, billing_frequency: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                    <option>Monthly</option><option>Quarterly</option><option>Annually</option>
+                  </select>
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Standard Labor Rate ($/hr)</label>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Labor Rate ($/hr)</label>
                   <input type="number" value={editSLAForm.labor_rate || ''} onChange={e => setEditSLAForm(p => ({ ...p, labor_rate: e.target.value }))}
                     className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Emergency Rate ($/hr)</label>
-                  <input type="number" value={editSLAForm.emergency_rate || ''} onChange={e => setEditSLAForm(p => ({ ...p, emergency_rate: e.target.value }))}
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Emergency Rate ($/hr) <span className="text-[#8A9AB0] font-normal">— blank = N/A</span></label>
+                  <input type="number" value={editSLAForm.emergency_rate ?? ''} placeholder="N/A" onChange={e => setEditSLAForm(p => ({ ...p, emergency_rate: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Maintenance Visits/Year</label>
+                  <input type="number" min="0" value={editSLAForm.maintenance_calls_per_year ?? 0} onChange={e => setEditSLAForm(p => ({ ...p, maintenance_calls_per_year: Number(e.target.value) }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Initial Fee ($) <span className="text-[#8A9AB0] font-normal">billed with job</span></label>
+                  <input type="number" min="0" value={editSLAForm.initial_fee ?? 0} onChange={e => setEditSLAForm(p => ({ ...p, initial_fee: Number(e.target.value) }))}
                     className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Frequency</label>
-                  <select value={editSLAForm.billing_frequency || 'Quarterly'} onChange={e => setEditSLAForm(p => ({ ...p, billing_frequency: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                    <option>Monthly</option><option>Quarterly</option><option>Annual</option>
-                  </select>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Recurring Fee ($) <span className="text-[#8A9AB0] font-normal">per billing cycle</span></label>
+                  <input type="number" min="0" value={editSLAForm.recurring_fee ?? 0} onChange={e => setEditSLAForm(p => ({ ...p, recurring_fee: Number(e.target.value) }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Language</label>
-                <textarea rows={12} value={editSLAForm.body || ''} onChange={e => setEditSLAForm(p => ({ ...p, body: e.target.value }))}
+                <textarea rows={10} value={editSLAForm.body || ''} onChange={e => setEditSLAForm(p => ({ ...p, body: e.target.value }))}
                   className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none font-mono" />
               </div>
               <div className="flex gap-3 pt-2">

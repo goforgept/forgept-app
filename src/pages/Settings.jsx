@@ -5,20 +5,64 @@ import Sidebar from '../components/Sidebar'
 const SLA_INDUSTRIES = ['Security','Audio/Visual','IT / Networking','Low Voltage','Fire Protection','HVAC','Electrical','Telecom','Solar','Mechanical','Plumbing','General Contractor','Other']
 const MONITORING_INDUSTRIES = ['Security','IT / Networking','Fire Protection','Low Voltage','Telecom','Audio/Visual','HVAC']
 
-const SLA_DEFAULTS = {
-  'Security':           { enabled: true,  name: 'Security Systems SLA',        response_time_hours: 4,  uptime_percent: 99.9, billing_frequency: 'Monthly',   labor_rate: 125, emergency_rate: 175, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all service requests.\n\nUPTIME: Provider guarantees {{uptime}}% system uptime, excluding scheduled maintenance windows.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency/after-hours calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'Audio/Visual':       { enabled: true,  name: 'AV Systems SLA',               response_time_hours: 8,  uptime_percent: 99.0, billing_frequency: 'Quarterly', labor_rate: 115, emergency_rate: 165, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all AV service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed AV systems.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'IT / Networking':    { enabled: true,  name: 'IT & Network SLA',              response_time_hours: 2,  uptime_percent: 99.9, billing_frequency: 'Monthly',   labor_rate: 135, emergency_rate: 195, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for critical issues; 4 hours for non-critical requests.\n\nUPTIME: Provider guarantees {{uptime}}% network uptime, excluding maintenance windows communicated 24 hours in advance.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'Low Voltage':        { enabled: true,  name: 'Low Voltage Systems SLA',       response_time_hours: 8,  uptime_percent: 99.0, billing_frequency: 'Quarterly', labor_rate: 110, emergency_rate: 155, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed low voltage systems.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'Fire Protection':    { enabled: true,  name: 'Fire Protection SLA',           response_time_hours: 4,  uptime_percent: 99.9, billing_frequency: 'Monthly',   labor_rate: 130, emergency_rate: 185, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time. Life-safety emergencies receive immediate priority dispatch.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all fire protection systems.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'HVAC':               { enabled: true,  name: 'HVAC Service SLA',              response_time_hours: 24, uptime_percent: 97.0, billing_frequency: 'Quarterly', labor_rate: 120, emergency_rate: 170, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time. Emergency HVAC failures receive priority scheduling.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed HVAC equipment.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'Electrical':         { enabled: true,  name: 'Electrical Systems SLA',        response_time_hours: 8,  uptime_percent: 98.0, billing_frequency: 'Quarterly', labor_rate: 125, emergency_rate: 180, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all electrical service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed electrical systems.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'Telecom':            { enabled: true,  name: 'Telecom Systems SLA',           response_time_hours: 4,  uptime_percent: 99.9, billing_frequency: 'Monthly',   labor_rate: 120, emergency_rate: 170, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all telecom service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed telecom infrastructure.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'Solar':              { enabled: false, name: 'Solar Systems SLA',             response_time_hours: 24, uptime_percent: 98.0, billing_frequency: 'Quarterly', labor_rate: 110, emergency_rate: 155, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all solar system service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed solar equipment.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'Mechanical':         { enabled: false, name: 'Mechanical Systems SLA',        response_time_hours: 24, uptime_percent: 97.0, billing_frequency: 'Quarterly', labor_rate: 115, emergency_rate: 165, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for standard mechanical service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed mechanical systems.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'Plumbing':           { enabled: false, name: 'Plumbing Systems SLA',          response_time_hours: 24, uptime_percent: 97.0, billing_frequency: 'Quarterly', labor_rate: 110, emergency_rate: 160, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for standard plumbing service requests.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'General Contractor': { enabled: false, name: 'General Contractor SLA',        response_time_hours: 48, uptime_percent: 95.0, billing_frequency: 'Quarterly', labor_rate: 105, emergency_rate: 150, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all service requests.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
-  'Other':              { enabled: false, name: 'Service Agreement SLA',         response_time_hours: 24, uptime_percent: 97.0, billing_frequency: 'Quarterly', labor_rate: 100, emergency_rate: 150, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all service requests.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+const _MAINT_BODY = 'This Preventive Maintenance Agreement is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nSERVICES: Provider will perform {{maintenanceCalls}} scheduled maintenance visit(s) per year including inspection, testing, and minor adjustments.\n\nBILLING: Initial fee of ${{initialFee}} billed with project. Recurring service billed at ${{recurringFee}} ({{billingFrequency}}).\n\nLABOR: Additional service calls billed at ${{laborRate}}/hr during standard business hours.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.'
+const _STD_BODY = 'This Service Level Agreement is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all service requests.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr. Emergency/after-hours calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.'
+const _PRI_BODY = 'This Priority Service Level Agreement is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} priority response for all service requests.\n\nINCLUDED MAINTENANCE: {{maintenanceCalls}} included maintenance visit(s) per year. Recurring fee: ${{recurringFee}} ({{billingFrequency}}).\n\nBILLING: Labor at ${{laborRate}}/hr. Emergency calls at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.'
+
+const SLA_TIER_DEFAULTS = {
+  'Security':           { enabled: true,  tiers: [
+    { id: 'maintenance', name: 'Preventive Maintenance',  response_time_hours: null, labor_rate: 110, emergency_rate: null, billing_frequency: 'Annually',  maintenance_calls_per_year: 2, initial_fee: 0, recurring_fee: 199, body: _MAINT_BODY },
+    { id: 'standard',   name: 'Standard SLA',             response_time_hours: 4,    labor_rate: 125, emergency_rate: 175,  billing_frequency: 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+    { id: 'priority',   name: 'Priority SLA',             response_time_hours: 2,    labor_rate: 125, emergency_rate: 155,  billing_frequency: 'Monthly',   maintenance_calls_per_year: 1, initial_fee: 0, recurring_fee: 349, body: _PRI_BODY },
+  ]},
+  'Audio/Visual':       { enabled: true,  tiers: [
+    { id: 'maintenance', name: 'Preventive Maintenance',  response_time_hours: null, labor_rate: 100, emergency_rate: null, billing_frequency: 'Annually',  maintenance_calls_per_year: 2, initial_fee: 0, recurring_fee: 149, body: _MAINT_BODY },
+    { id: 'standard',   name: 'Standard SLA',             response_time_hours: 8,    labor_rate: 115, emergency_rate: 165,  billing_frequency: 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+  ]},
+  'IT / Networking':    { enabled: true,  tiers: [
+    { id: 'maintenance', name: 'Preventive Maintenance',  response_time_hours: null, labor_rate: 120, emergency_rate: null, billing_frequency: 'Monthly',   maintenance_calls_per_year: 4, initial_fee: 0, recurring_fee: 299, body: _MAINT_BODY },
+    { id: 'standard',   name: 'Standard SLA',             response_time_hours: 4,    labor_rate: 135, emergency_rate: 195,  billing_frequency: 'Monthly',   maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+    { id: 'priority',   name: 'Priority SLA',             response_time_hours: 2,    labor_rate: 135, emergency_rate: 175,  billing_frequency: 'Monthly',   maintenance_calls_per_year: 2, initial_fee: 0, recurring_fee: 499, body: _PRI_BODY },
+  ]},
+  'Low Voltage':        { enabled: true,  tiers: [
+    { id: 'maintenance', name: 'Preventive Maintenance',  response_time_hours: null, labor_rate: 95,  emergency_rate: null, billing_frequency: 'Annually',  maintenance_calls_per_year: 1, initial_fee: 0, recurring_fee: 149, body: _MAINT_BODY },
+    { id: 'standard',   name: 'Standard SLA',             response_time_hours: 8,    labor_rate: 110, emergency_rate: 155,  billing_frequency: 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+  ]},
+  'Fire Protection':    { enabled: true,  tiers: [
+    { id: 'maintenance', name: 'Preventive Maintenance',  response_time_hours: null, labor_rate: 115, emergency_rate: null, billing_frequency: 'Annually',  maintenance_calls_per_year: 2, initial_fee: 0, recurring_fee: 249, body: _MAINT_BODY },
+    { id: 'standard',   name: 'Standard SLA',             response_time_hours: 4,    labor_rate: 130, emergency_rate: 185,  billing_frequency: 'Monthly',   maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+    { id: 'priority',   name: 'Priority SLA',             response_time_hours: 2,    labor_rate: 130, emergency_rate: 165,  billing_frequency: 'Monthly',   maintenance_calls_per_year: 2, initial_fee: 0, recurring_fee: 449, body: _PRI_BODY },
+  ]},
+  'HVAC':               { enabled: true,  tiers: [
+    { id: 'maintenance', name: 'Preventive Maintenance',  response_time_hours: null, labor_rate: 105, emergency_rate: null, billing_frequency: 'Annually',  maintenance_calls_per_year: 2, initial_fee: 0, recurring_fee: 199, body: _MAINT_BODY },
+    { id: 'standard',   name: 'Standard SLA',             response_time_hours: 24,   labor_rate: 120, emergency_rate: 170,  billing_frequency: 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+  ]},
+  'Electrical':         { enabled: true,  tiers: [
+    { id: 'maintenance', name: 'Preventive Maintenance',  response_time_hours: null, labor_rate: 110, emergency_rate: null, billing_frequency: 'Annually',  maintenance_calls_per_year: 1, initial_fee: 0, recurring_fee: 149, body: _MAINT_BODY },
+    { id: 'standard',   name: 'Standard SLA',             response_time_hours: 8,    labor_rate: 125, emergency_rate: 180,  billing_frequency: 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+  ]},
+  'Telecom':            { enabled: true,  tiers: [
+    { id: 'maintenance', name: 'Preventive Maintenance',  response_time_hours: null, labor_rate: 105, emergency_rate: null, billing_frequency: 'Annually',  maintenance_calls_per_year: 2, initial_fee: 0, recurring_fee: 199, body: _MAINT_BODY },
+    { id: 'standard',   name: 'Standard SLA',             response_time_hours: 4,    labor_rate: 120, emergency_rate: 170,  billing_frequency: 'Monthly',   maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+    { id: 'priority',   name: 'Priority SLA',             response_time_hours: 2,    labor_rate: 120, emergency_rate: 150,  billing_frequency: 'Monthly',   maintenance_calls_per_year: 1, initial_fee: 0, recurring_fee: 399, body: _PRI_BODY },
+  ]},
+  'Solar':              { enabled: false, tiers: [
+    { id: 'maintenance', name: 'Preventive Maintenance',  response_time_hours: null, labor_rate: 95,  emergency_rate: null, billing_frequency: 'Annually',  maintenance_calls_per_year: 2, initial_fee: 0, recurring_fee: 149, body: _MAINT_BODY },
+    { id: 'standard',   name: 'Standard SLA',             response_time_hours: 24,   labor_rate: 110, emergency_rate: 155,  billing_frequency: 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+  ]},
+  'Mechanical':         { enabled: false, tiers: [
+    { id: 'maintenance', name: 'Preventive Maintenance',  response_time_hours: null, labor_rate: 100, emergency_rate: null, billing_frequency: 'Annually',  maintenance_calls_per_year: 2, initial_fee: 0, recurring_fee: 179, body: _MAINT_BODY },
+    { id: 'standard',   name: 'Standard SLA',             response_time_hours: 24,   labor_rate: 115, emergency_rate: 165,  billing_frequency: 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+  ]},
+  'Plumbing':           { enabled: false, tiers: [
+    { id: 'standard',   name: 'Standard Service Agreement', response_time_hours: 24,  labor_rate: 110, emergency_rate: 160,  billing_frequency: 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+  ]},
+  'General Contractor': { enabled: false, tiers: [
+    { id: 'standard',   name: 'Standard Service Agreement', response_time_hours: 48,  labor_rate: 105, emergency_rate: 150,  billing_frequency: 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+  ]},
+  'Other':              { enabled: false, tiers: [
+    { id: 'standard',   name: 'Standard Service Agreement', response_time_hours: 24,  labor_rate: 100, emergency_rate: 150,  billing_frequency: 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0,   body: _STD_BODY },
+  ]},
 }
 
 const MONITORING_DEFAULTS = {
@@ -99,6 +143,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [monitoringTemplates, setMonitoringTemplates] = useState({})
   const [savingSLA, setSavingSLA] = useState(false)
   const [expandedSLAIndustry, setExpandedSLAIndustry] = useState(null)
+  const [expandedSLATier, setExpandedSLATier] = useState({})
   const [expandedMonIndustry, setExpandedMonIndustry] = useState(null)
 
   useEffect(() => {
@@ -168,7 +213,24 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         setMonitoringAutoAttach(orgData?.monitoring_auto_attach || false)
         const savedSLA = orgData?.sla_templates || {}
         const mergedSLA = {}
-        SLA_INDUSTRIES.forEach(ind => { mergedSLA[ind] = savedSLA[ind] ? { ...SLA_DEFAULTS[ind], ...savedSLA[ind] } : { ...(SLA_DEFAULTS[ind] || { enabled: false, name: `${ind} SLA`, response_time_hours: 8, uptime_percent: 99.0, billing_frequency: 'Quarterly', labor_rate: 100, emergency_rate: 150, body: '' }) } })
+        SLA_INDUSTRIES.forEach(ind => {
+          const saved = savedSLA[ind]
+          const defaults = SLA_TIER_DEFAULTS[ind] || { enabled: false, tiers: [] }
+          if (!saved) {
+            mergedSLA[ind] = defaults
+          } else if (Array.isArray(saved.tiers)) {
+            mergedSLA[ind] = saved
+          } else {
+            // Migrate old flat format → single migrated tier + rest of defaults
+            mergedSLA[ind] = {
+              enabled: saved.enabled ?? defaults.enabled,
+              tiers: [
+                { id: 'migrated', name: saved.name || 'Service Agreement', response_time_hours: saved.response_time_hours || null, labor_rate: saved.labor_rate || 100, emergency_rate: saved.emergency_rate || null, billing_frequency: saved.billing_frequency || 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0, body: (saved.body || '').replace(/UPTIME:[^\n]*/g, '').trim() },
+                ...defaults.tiers.slice(1),
+              ]
+            }
+          }
+        })
         setSlaTemplates(mergedSLA)
         const savedMon = orgData?.monitoring_templates || {}
         const mergedMon = {}
@@ -285,6 +347,22 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setPasswordSuccess('Password updated successfully')
     setPasswordForm({ current: '', newPass: '', confirm: '' })
     setSavingPassword(false)
+  }
+
+  const addSLATier = (ind) => {
+    const newTier = { id: crypto.randomUUID(), name: 'New Tier', response_time_hours: 8, labor_rate: 100, emergency_rate: 150, billing_frequency: 'Quarterly', maintenance_calls_per_year: 0, initial_fee: 0, recurring_fee: 0, body: _STD_BODY }
+    setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], tiers: [...(p[ind]?.tiers || []), newTier] } }))
+    setExpandedSLATier(p => ({ ...p, [ind]: newTier.id }))
+  }
+
+  const removeSLATier = (ind, tierId) => {
+    if (!window.confirm('Remove this tier?')) return
+    setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], tiers: (p[ind]?.tiers || []).filter(t => t.id !== tierId) } }))
+    setExpandedSLATier(p => ({ ...p, [ind]: null }))
+  }
+
+  const updateSLATier = (ind, tierId, field, value) => {
+    setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], tiers: (p[ind]?.tiers || []).map(t => t.id === tierId ? { ...t, [field]: value } : t) } }))
   }
 
   const handleSaveSLA = async () => {
@@ -727,15 +805,17 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
             {slaEnabled && (
               <div>
                 <div className="mb-3">
-                  <h3 className="text-white font-bold">SLA Templates by Industry</h3>
-                  <p className="text-[#8A9AB0] text-sm mt-1">Enable and customize the SLA contract for each industry. Variables: <span className="font-mono text-[#C8622A] text-xs">{'{{clientName}} {{companyName}} {{proposalName}} {{responseTime}} {{uptime}} {{billingFrequency}} {{laborRate}} {{emergencyRate}}'}</span></p>
+                  <h3 className="text-white font-bold">SLA Tiers by Industry</h3>
+                  <p className="text-[#8A9AB0] text-sm mt-1">Each industry can have multiple tiers (e.g. Maintenance, Standard, Priority). Variables: <span className="font-mono text-[#C8622A] text-xs">{'{{clientName}} {{companyName}} {{proposalName}} {{responseTime}} {{tierName}} {{billingFrequency}} {{laborRate}} {{emergencyRate}} {{maintenanceCalls}} {{initialFee}} {{recurringFee}}'}</span></p>
                 </div>
                 <div className="space-y-2">
                   {SLA_INDUSTRIES.map(ind => {
-                    const t = slaTemplates[ind] || {}
+                    const t = slaTemplates[ind] || { enabled: false, tiers: [] }
+                    const tiers = t.tiers || []
                     const isOpen = expandedSLAIndustry === ind
                     return (
                       <div key={ind} className="bg-[#1a2d45] rounded-xl overflow-hidden border border-[#2a3d55]">
+                        {/* Industry header */}
                         <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-[#1f3550] transition-colors"
                           onClick={() => setExpandedSLAIndustry(isOpen ? null : ind)}>
                           <div className="flex items-center gap-3">
@@ -745,50 +825,91 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                             </button>
                             <div>
                               <p className="text-white text-sm font-semibold">{ind}</p>
-                              {t.name && <p className="text-[#8A9AB0] text-xs">{t.name}</p>}
+                              <p className="text-[#8A9AB0] text-xs">{tiers.length} tier{tiers.length !== 1 ? 's' : ''}{tiers.length > 0 ? ` · ${tiers.map(t => t.name).join(', ')}` : ''}</p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-4 text-xs text-[#8A9AB0]">
-                            {t.response_time_hours && <span>{t.response_time_hours}hr response</span>}
-                            {t.uptime_percent && <span>{t.uptime_percent}% uptime</span>}
-                            <span>{isOpen ? '▲' : '▼'}</span>
-                          </div>
+                          <span className="text-[#8A9AB0] text-xs">{isOpen ? '▲' : '▼'}</span>
                         </div>
+
+                        {/* Tier list */}
                         {isOpen && (
-                          <div className="border-t border-[#2a3d55] p-5 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                <label className="text-[#8A9AB0] text-xs mb-1 block">Template Name</label>
-                                <input type="text" value={t.name || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], name: e.target.value } }))} className={inputClass} />
-                              </div>
-                              <div>
-                                <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Frequency</label>
-                                <select value={t.billing_frequency || 'Quarterly'} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], billing_frequency: e.target.value } }))} className={inputClass}>
-                                  <option>Monthly</option><option>Quarterly</option><option>Annual</option>
-                                </select>
-                              </div>
-                              <div>
-                                <label className="text-[#8A9AB0] text-xs mb-1 block">Response Time (hours)</label>
-                                <input type="number" value={t.response_time_hours || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], response_time_hours: e.target.value } }))} className={inputClass} />
-                              </div>
-                              <div>
-                                <label className="text-[#8A9AB0] text-xs mb-1 block">Uptime Guarantee (%)</label>
-                                <input type="number" step="0.1" value={t.uptime_percent || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], uptime_percent: e.target.value } }))} className={inputClass} />
-                              </div>
-                              <div>
-                                <label className="text-[#8A9AB0] text-xs mb-1 block">Standard Labor Rate ($/hr)</label>
-                                <input type="number" value={t.labor_rate || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], labor_rate: e.target.value } }))} className={inputClass} />
-                              </div>
-                              <div>
-                                <label className="text-[#8A9AB0] text-xs mb-1 block">Emergency / Overtime Rate ($/hr)</label>
-                                <input type="number" value={t.emergency_rate || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], emergency_rate: e.target.value } }))} className={inputClass} />
-                              </div>
-                            </div>
-                            <div>
-                              <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Language</label>
-                              <textarea rows={10} value={t.body || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], body: e.target.value } }))}
-                                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none font-mono" />
-                            </div>
+                          <div className="border-t border-[#2a3d55] p-4 space-y-2">
+                            {tiers.map(tier => {
+                              const isTierOpen = expandedSLATier[ind] === tier.id
+                              return (
+                                <div key={tier.id} className="bg-[#0F1C2E] rounded-lg overflow-hidden">
+                                  {/* Tier row */}
+                                  <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[#0a1828] transition-colors"
+                                    onClick={() => setExpandedSLATier(p => ({ ...p, [ind]: isTierOpen ? null : tier.id }))}>
+                                    <div className="flex items-center gap-3">
+                                      <span className="bg-[#C8622A]/20 text-[#C8622A] text-xs font-semibold px-2 py-0.5 rounded">{tier.name || 'Untitled'}</span>
+                                      <span className="text-[#8A9AB0] text-xs">
+                                        {tier.response_time_hours ? `${tier.response_time_hours}hr response` : 'Maintenance'}
+                                        {tier.recurring_fee > 0 ? ` · $${tier.recurring_fee}/${tier.billing_frequency}` : ''}
+                                        {tier.maintenance_calls_per_year > 0 ? ` · ${tier.maintenance_calls_per_year} visits/yr` : ''}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <button onClick={e => { e.stopPropagation(); removeSLATier(ind, tier.id) }}
+                                        className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Remove</button>
+                                      <span className="text-[#8A9AB0] text-xs">{isTierOpen ? '▲' : '▼'}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Tier edit form */}
+                                  {isTierOpen && (
+                                    <div className="border-t border-[#2a3d55] px-4 py-4 space-y-4">
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div className="col-span-2">
+                                          <label className="text-[#8A9AB0] text-xs mb-1 block">Tier Name</label>
+                                          <input type="text" value={tier.name || ''} onChange={e => updateSLATier(ind, tier.id, 'name', e.target.value)} className={inputClass} />
+                                        </div>
+                                        <div>
+                                          <label className="text-[#8A9AB0] text-xs mb-1 block">Response Time (hrs) <span className="text-[#8A9AB0] font-normal">— blank = N/A</span></label>
+                                          <input type="number" value={tier.response_time_hours || ''} placeholder="N/A" onChange={e => updateSLATier(ind, tier.id, 'response_time_hours', e.target.value ? Number(e.target.value) : null)} className={inputClass} />
+                                        </div>
+                                        <div>
+                                          <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Frequency</label>
+                                          <select value={tier.billing_frequency || 'Quarterly'} onChange={e => updateSLATier(ind, tier.id, 'billing_frequency', e.target.value)} className={inputClass}>
+                                            <option>Monthly</option><option>Quarterly</option><option>Annually</option>
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <label className="text-[#8A9AB0] text-xs mb-1 block">Labor Rate ($/hr)</label>
+                                          <input type="number" value={tier.labor_rate || ''} onChange={e => updateSLATier(ind, tier.id, 'labor_rate', Number(e.target.value))} className={inputClass} />
+                                        </div>
+                                        <div>
+                                          <label className="text-[#8A9AB0] text-xs mb-1 block">Emergency Rate ($/hr) <span className="text-[#8A9AB0] font-normal">— blank = N/A</span></label>
+                                          <input type="number" value={tier.emergency_rate || ''} placeholder="N/A" onChange={e => updateSLATier(ind, tier.id, 'emergency_rate', e.target.value ? Number(e.target.value) : null)} className={inputClass} />
+                                        </div>
+                                        <div>
+                                          <label className="text-[#8A9AB0] text-xs mb-1 block">Maintenance Visits/Year</label>
+                                          <input type="number" min="0" value={tier.maintenance_calls_per_year ?? 0} onChange={e => updateSLATier(ind, tier.id, 'maintenance_calls_per_year', Number(e.target.value))} className={inputClass} />
+                                        </div>
+                                        <div>
+                                          <label className="text-[#8A9AB0] text-xs mb-1 block">Initial Fee ($) <span className="text-[#8A9AB0] font-normal">billed with job</span></label>
+                                          <input type="number" min="0" value={tier.initial_fee ?? 0} onChange={e => updateSLATier(ind, tier.id, 'initial_fee', Number(e.target.value))} className={inputClass} />
+                                        </div>
+                                        <div>
+                                          <label className="text-[#8A9AB0] text-xs mb-1 block">Recurring Fee ($) <span className="text-[#8A9AB0] font-normal">per billing cycle</span></label>
+                                          <input type="number" min="0" value={tier.recurring_fee ?? 0} onChange={e => updateSLATier(ind, tier.id, 'recurring_fee', Number(e.target.value))} className={inputClass} />
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Language</label>
+                                        <textarea rows={8} value={tier.body || ''} onChange={e => updateSLATier(ind, tier.id, 'body', e.target.value)}
+                                          className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-[#C8622A] resize-none font-mono" />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+
+                            <button onClick={() => addSLATier(ind)}
+                              className="w-full py-2 border border-dashed border-[#2a3d55] text-[#8A9AB0] hover:text-white hover:border-[#C8622A] rounded-lg text-sm transition-colors">
+                              + Add Tier
+                            </button>
                           </div>
                         )}
                       </div>

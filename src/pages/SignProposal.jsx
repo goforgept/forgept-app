@@ -16,6 +16,8 @@ export default function SignProposal() {
   const [terms, setTerms] = useState('')
   const [orgProfile, setOrgProfile] = useState(null)
   const [signedAt, setSignedAt] = useState(null)
+  const [slaContract, setSlaContract] = useState(null)
+  const [monitoringContract, setMonitoringContract] = useState(null)
 
   useEffect(() => { fetchProposal() }, [token])
 
@@ -24,7 +26,7 @@ export default function SignProposal() {
 
     const { data, error: fetchError } = await supabase
       .from('proposals')
-      .select('id, proposal_name, company, client_name, client_email, scope_of_work, proposal_value, total_gross_margin_percent, labor_items, signature_name, signature_at, signing_token, org_id, lump_sum_pricing, tax_rate, tax_exempt, signed_pdf_url')
+      .select('id, proposal_name, company, client_name, client_email, scope_of_work, proposal_value, total_gross_margin_percent, labor_items, signature_name, signature_at, signing_token, org_id, lump_sum_pricing, tax_rate, tax_exempt, signed_pdf_url, sla_contract, monitoring_contract')
       .eq('signing_token', token)
       .single()
 
@@ -35,6 +37,8 @@ export default function SignProposal() {
     }
 
     setProposal(data)
+    setSlaContract(data.sla_contract || null)
+    setMonitoringContract(data.monitoring_contract || null)
 
     const { data: items } = await supabase
       .from('bom_line_items')
@@ -150,6 +154,102 @@ export default function SignProposal() {
       doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
       const termsLines = doc.splitTextToSize(orgProf.terms_and_conditions, pageWidth - 28)
       doc.text(termsLines, 14, 32)
+    }
+
+    // SLA Contract page
+    const slaCon = prop.sla_contract
+    if (slaCon) {
+      doc.addPage()
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text(slaCon.name || 'Service Level Agreement', 14, 20)
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(14, 24, pageWidth - 14, 24)
+      let slaY = 34
+      const slaDetails = [
+        slaCon.response_time_hours ? ['Response Time', `${slaCon.response_time_hours} hours`] : null,
+        ['Billing', slaCon.billing_frequency || 'Quarterly'],
+        ['Standard Rate', `$${slaCon.labor_rate || 100}/hr`],
+        slaCon.emergency_rate ? ['Emergency Rate', `$${slaCon.emergency_rate}/hr`] : null,
+        slaCon.maintenance_calls_per_year > 0 ? ['Maintenance Visits', `${slaCon.maintenance_calls_per_year}/year included`] : null,
+        slaCon.recurring_fee > 0 ? ['Recurring Fee', `$${slaCon.recurring_fee} (${slaCon.billing_frequency || 'Quarterly'})`] : null,
+      ].filter(Boolean)
+      slaDetails.forEach(([label, value]) => {
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
+        doc.text(`${label}:`, 14, slaY)
+        doc.setFont('helvetica', 'normal'); doc.text(value, 70, slaY)
+        slaY += 7
+      })
+      if (slaCon.body) {
+        slaY += 4
+        const resolvedSLABody = slaCon.body
+          .replace(/\{\{companyName\}\}/g, orgProf?.company_name || prop.company || '')
+          .replace(/\{\{clientName\}\}/g, prop.company || '')
+          .replace(/\{\{proposalName\}\}/g, prop.proposal_name || '')
+          .replace(/\{\{responseTime\}\}/g, slaCon.response_time_hours ? `${slaCon.response_time_hours} hours` : 'as scheduled')
+          .replace(/\{\{billingFrequency\}\}/g, slaCon.billing_frequency || 'Quarterly')
+          .replace(/\{\{laborRate\}\}/g, `${slaCon.labor_rate || 100}`)
+          .replace(/\{\{emergencyRate\}\}/g, `${slaCon.emergency_rate || 150}`)
+          .replace(/\{\{tierName\}\}/g, slaCon.tier_name || slaCon.name || '')
+          .replace(/\{\{maintenanceCalls\}\}/g, `${slaCon.maintenance_calls_per_year || 0}`)
+          .replace(/\{\{initialFee\}\}/g, `${slaCon.initial_fee || 0}`)
+          .replace(/\{\{recurringFee\}\}/g, `${slaCon.recurring_fee || 0}`)
+        doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+        const slaBodyLines = doc.splitTextToSize(resolvedSLABody, pageWidth - 28)
+        doc.text(slaBodyLines, 14, slaY)
+        slaY += slaBodyLines.length * 4.5 + 10
+      } else { slaY += 10 }
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('SLA Acceptance', 14, slaY)
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
+      const ss1 = slaY + 14
+      doc.text('Client Signature:', 14, ss1); doc.line(50, ss1, 140, ss1)
+      doc.text('Date:', 150, ss1); doc.line(163, ss1, pageWidth - 14, ss1)
+      const ss2 = ss1 + 16; doc.text('Printed Name:', 14, ss2); doc.line(50, ss2, pageWidth - 14, ss2)
+    }
+
+    // Monitoring Contract page
+    const monCon = prop.monitoring_contract
+    if (monCon) {
+      doc.addPage()
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text(monCon.name || 'Monitoring Contract', 14, 20)
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(14, 24, pageWidth - 14, 24)
+      let monY = 34
+      const monDetails = [
+        ['Monthly Fee', `$${monCon.monthly_fee || 49}/mo`],
+        ['Billing', monCon.billing_frequency || 'Monthly'],
+        monCon.monitored_systems ? ['Monitored Systems', monCon.monitored_systems] : null,
+        ['Escalation Contacts', `${monCon.escalation_contacts || 2}`],
+      ].filter(Boolean)
+      monDetails.forEach(([label, value]) => {
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
+        doc.text(`${label}:`, 14, monY)
+        doc.setFont('helvetica', 'normal'); doc.text(String(value), 70, monY)
+        monY += 7
+      })
+      if (monCon.body) {
+        monY += 4
+        const resolvedMonBody = monCon.body
+          .replace(/\{\{companyName\}\}/g, orgProf?.company_name || prop.company || '')
+          .replace(/\{\{clientName\}\}/g, prop.company || '')
+          .replace(/\{\{proposalName\}\}/g, prop.proposal_name || '')
+          .replace(/\{\{monthlyFee\}\}/g, `${monCon.monthly_fee || 49}`)
+          .replace(/\{\{monitoredSystems\}\}/g, monCon.monitored_systems || '')
+          .replace(/\{\{billingFrequency\}\}/g, monCon.billing_frequency || 'Monthly')
+          .replace(/\{\{escalationContacts\}\}/g, `${monCon.escalation_contacts || 2}`)
+        doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+        const monBodyLines = doc.splitTextToSize(resolvedMonBody, pageWidth - 28)
+        doc.text(monBodyLines, 14, monY)
+        monY += monBodyLines.length * 4.5 + 10
+      } else { monY += 10 }
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Monitoring Contract Acceptance', 14, monY)
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
+      const ms1 = monY + 14
+      doc.text('Client Signature:', 14, ms1); doc.line(50, ms1, 140, ms1)
+      doc.text('Date:', 150, ms1); doc.line(163, ms1, pageWidth - 14, ms1)
+      const ms2 = ms1 + 16; doc.text('Printed Name:', 14, ms2); doc.line(50, ms2, pageWidth - 14, ms2)
     }
 
     // Signature confirmation page
@@ -312,6 +412,98 @@ export default function SignProposal() {
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Terms and Conditions</h3>
             <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{terms}</p>
+          </div>
+        )}
+
+        {slaContract && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <h3 className="text-white font-bold text-lg mb-4">📋 {slaContract.name || 'Service Level Agreement'}</h3>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {slaContract.response_time_hours && (
+                <div className="bg-[#0F1C2E] rounded-lg p-3">
+                  <p className="text-[#8A9AB0] text-xs mb-1">Response Time</p>
+                  <p className="text-white text-sm font-semibold">{slaContract.response_time_hours} hours</p>
+                </div>
+              )}
+              <div className="bg-[#0F1C2E] rounded-lg p-3">
+                <p className="text-[#8A9AB0] text-xs mb-1">Billing</p>
+                <p className="text-white text-sm font-semibold">{slaContract.billing_frequency || 'Quarterly'}</p>
+              </div>
+              <div className="bg-[#0F1C2E] rounded-lg p-3">
+                <p className="text-[#8A9AB0] text-xs mb-1">Standard Rate</p>
+                <p className="text-white text-sm font-semibold">${slaContract.labor_rate || 100}/hr</p>
+              </div>
+              {slaContract.emergency_rate && (
+                <div className="bg-[#0F1C2E] rounded-lg p-3">
+                  <p className="text-[#8A9AB0] text-xs mb-1">Emergency Rate</p>
+                  <p className="text-white text-sm font-semibold">${slaContract.emergency_rate}/hr</p>
+                </div>
+              )}
+              {slaContract.maintenance_calls_per_year > 0 && (
+                <div className="bg-[#0F1C2E] rounded-lg p-3">
+                  <p className="text-[#8A9AB0] text-xs mb-1">Included Visits/Year</p>
+                  <p className="text-white text-sm font-semibold">{slaContract.maintenance_calls_per_year}</p>
+                </div>
+              )}
+              {slaContract.recurring_fee > 0 && (
+                <div className="bg-[#0F1C2E] rounded-lg p-3">
+                  <p className="text-[#8A9AB0] text-xs mb-1">Recurring Fee</p>
+                  <p className="text-white text-sm font-semibold">${slaContract.recurring_fee}/{slaContract.billing_frequency || 'Quarterly'}</p>
+                </div>
+              )}
+            </div>
+            {slaContract.body && (
+              <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{slaContract.body
+                .replace(/\{\{companyName\}\}/g, orgProfile?.company_name || proposal?.company || '')
+                .replace(/\{\{clientName\}\}/g, proposal?.company || '')
+                .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
+                .replace(/\{\{responseTime\}\}/g, slaContract.response_time_hours ? `${slaContract.response_time_hours} hours` : 'as scheduled')
+                .replace(/\{\{billingFrequency\}\}/g, slaContract.billing_frequency || 'Quarterly')
+                .replace(/\{\{laborRate\}\}/g, `${slaContract.labor_rate || 100}`)
+                .replace(/\{\{emergencyRate\}\}/g, `${slaContract.emergency_rate || 150}`)
+                .replace(/\{\{tierName\}\}/g, slaContract.tier_name || slaContract.name || '')
+                .replace(/\{\{maintenanceCalls\}\}/g, `${slaContract.maintenance_calls_per_year || 0}`)
+                .replace(/\{\{initialFee\}\}/g, `${slaContract.initial_fee || 0}`)
+                .replace(/\{\{recurringFee\}\}/g, `${slaContract.recurring_fee || 0}`)
+              }</p>
+            )}
+          </div>
+        )}
+
+        {monitoringContract && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <h3 className="text-white font-bold text-lg mb-4">📡 {monitoringContract.name || 'Monitoring Contract'}</h3>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-[#0F1C2E] rounded-lg p-3">
+                <p className="text-[#8A9AB0] text-xs mb-1">Monthly Fee</p>
+                <p className="text-white text-sm font-semibold">${monitoringContract.monthly_fee || 49}/mo</p>
+              </div>
+              <div className="bg-[#0F1C2E] rounded-lg p-3">
+                <p className="text-[#8A9AB0] text-xs mb-1">Billing</p>
+                <p className="text-white text-sm font-semibold">{monitoringContract.billing_frequency || 'Monthly'}</p>
+              </div>
+              {monitoringContract.monitored_systems && (
+                <div className="bg-[#0F1C2E] rounded-lg p-3 col-span-2">
+                  <p className="text-[#8A9AB0] text-xs mb-1">Monitored Systems</p>
+                  <p className="text-white text-sm">{monitoringContract.monitored_systems}</p>
+                </div>
+              )}
+              <div className="bg-[#0F1C2E] rounded-lg p-3">
+                <p className="text-[#8A9AB0] text-xs mb-1">Escalation Contacts</p>
+                <p className="text-white text-sm font-semibold">{monitoringContract.escalation_contacts || 2}</p>
+              </div>
+            </div>
+            {monitoringContract.body && (
+              <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{monitoringContract.body
+                .replace(/\{\{companyName\}\}/g, orgProfile?.company_name || proposal?.company || '')
+                .replace(/\{\{clientName\}\}/g, proposal?.company || '')
+                .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
+                .replace(/\{\{monthlyFee\}\}/g, `${monitoringContract.monthly_fee || 49}`)
+                .replace(/\{\{monitoredSystems\}\}/g, monitoringContract.monitored_systems || '')
+                .replace(/\{\{billingFrequency\}\}/g, monitoringContract.billing_frequency || 'Monthly')
+                .replace(/\{\{escalationContacts\}\}/g, `${monitoringContract.escalation_contacts || 2}`)
+              }</p>
+            )}
           </div>
         )}
 
