@@ -19,6 +19,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
   const [jobs, setJobs] = useState([])
   const [serviceTickets, setServiceTickets] = useState([])
   const [generatingPO, setGeneratingPO] = useState(false)
+  const [jobBudget, setJobBudget] = useState(null) // { totalCost, totalPOs, remaining }
   const [poForm, setPOForm] = useState({
     vendor_id: '',
     vendor_name: '',
@@ -28,6 +29,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     ticket_id: '',
     po_number_mode: 'auto',
     po_number_manual: '',
+    description: '',
     notes: '',
   })
   const [poLines, setPOLines] = useState([
@@ -107,6 +109,22 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     const total = items.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0)
     const received = items.reduce((sum, i) => sum + (parseFloat(i.received_qty) || 0), 0)
     return { total, received }
+  }
+
+  const fetchJobBudget = async (jobId) => {
+    if (!jobId) { setJobBudget(null); return }
+    const job = jobs.find(j => j.id === jobId)
+    if (!job) { setJobBudget(null); return }
+    // Get proposal cost budget
+    let totalCost = 0
+    if (job.proposal_id) {
+      const { data: prop } = await supabase.from('proposals').select('total_your_cost').eq('id', job.proposal_id).single()
+      totalCost = prop?.total_your_cost || 0
+    }
+    // Get existing POs for this job
+    const { data: existingPOs } = await supabase.from('purchase_orders').select('total_amount').eq('job_id', jobId)
+    const totalPOs = (existingPOs || []).reduce((sum, p) => sum + (p.total_amount || 0), 0)
+    setJobBudget({ totalCost, totalPOs, remaining: totalCost - totalPOs })
   }
 
   const handleVendorChange = (vendorId) => {
@@ -238,23 +256,41 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
       doc.text(`${profileData?.company_name || 'ForgePt.'} · Thank you for your business.`, pageWidth / 2, pageHeight - 10, { align: 'center' })
 
       // Save PO to DB
-      await supabase.from('purchase_orders').insert({
+      const { data: newPO, error: poInsertError } = await supabase.from('purchase_orders').insert({
         po_number: finalPONumber,
         org_id: profile.org_id,
         proposal_id: linkedJob?.proposal_id || null,
+        job_id: poForm.link_type === 'job' && poForm.job_id ? poForm.job_id : null,
         vendor_name: poForm.vendor_name || null,
         status: 'Sent',
         total_amount: poTotal,
+        description: poForm.description || null,
         notes: poForm.notes || null,
-      })
+      }).select().single()
+
+      // Save line items to purchase_order_line_items
+      if (newPO && validLines.length > 0) {
+        await supabase.from('purchase_order_line_items').insert(
+          validLines.map(l => ({
+            po_id: newPO.id,
+            item_name: l.item_name,
+            part_number: l.part_number || null,
+            quantity: parseFloat(l.quantity) || 0,
+            unit: l.unit || 'ea',
+            unit_cost: parseFloat(l.unit_cost) || 0,
+            total: (parseFloat(l.unit_cost) || 0) * (parseFloat(l.quantity) || 0),
+          }))
+        )
+      }
 
       // Download PDF
       doc.save(`${finalPONumber}.pdf`)
 
       // Reset and close
       setShowNewPO(false)
-      setPOForm({ vendor_id: '', vendor_name: '', vendor_email: '', link_type: 'none', job_id: '', ticket_id: '', po_number_mode: 'auto', po_number_manual: '', notes: '' })
+      setPOForm({ vendor_id: '', vendor_name: '', vendor_email: '', link_type: 'none', job_id: '', ticket_id: '', po_number_mode: 'auto', po_number_manual: '', description: '', notes: '' })
       setPOLines([{ id: crypto.randomUUID(), item_name: '', part_number: '', quantity: 1, unit: 'ea', unit_cost: '' }])
+      setJobBudget(null)
       fetchAll()
     } catch (err) {
       alert('Error generating PO: ' + err.message)
@@ -462,10 +498,42 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                   ))}
                 </div>
                 {poForm.link_type === 'job' && (
-                  <select value={poForm.job_id} onChange={e => setPOForm(p => ({ ...p, job_id: e.target.value }))} className={inputClass}>
-                    <option value="">— Select job —</option>
-                    {jobs.map(j => <option key={j.id} value={j.id}>{j.job_number ? `${j.job_number} — ` : ''}{j.name}</option>)}
-                  </select>
+                  <>
+                    <select value={poForm.job_id} onChange={e => { setPOForm(p => ({ ...p, job_id: e.target.value })); fetchJobBudget(e.target.value) }} className={inputClass}>
+                      <option value="">— Select job —</option>
+                      {jobs.map(j => <option key={j.id} value={j.id}>{j.job_number ? `${j.job_number} — ` : ''}{j.name}</option>)}
+                    </select>
+                    {jobBudget && poForm.job_id && (
+                      <div className={`mt-2 rounded-lg px-4 py-3 text-xs ${jobBudget.totalCost > 0 ? (poTotal + jobBudget.totalPOs > jobBudget.totalCost ? 'bg-red-500/10 border border-red-500/30' : jobBudget.remaining - poTotal < jobBudget.totalCost * 0.1 ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-green-500/10 border border-green-500/30') : 'bg-[#0F1C2E] border border-[#2a3d55]'}`}>
+                        {jobBudget.totalCost > 0 ? (
+                          <div className="space-y-0.5">
+                            <div className="flex justify-between">
+                              <span className="text-[#8A9AB0]">Material budget (cost)</span>
+                              <span className="text-white">${jobBudget.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#8A9AB0]">POs already issued</span>
+                              <span className="text-white">${jobBudget.totalPOs.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-[#8A9AB0]">This PO</span>
+                              <span className="text-white">${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                            <div className="flex justify-between border-t border-[#2a3d55] pt-1 mt-1">
+                              <span className="font-semibold">
+                                {poTotal + jobBudget.totalPOs > jobBudget.totalCost ? '⚠ Over budget by' : 'Remaining after this PO'}
+                              </span>
+                              <span className={`font-bold ${poTotal + jobBudget.totalPOs > jobBudget.totalCost ? 'text-red-400' : jobBudget.remaining - poTotal < jobBudget.totalCost * 0.1 ? 'text-yellow-400' : 'text-green-400'}`}>
+                                ${Math.abs(jobBudget.remaining - poTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-[#8A9AB0]">No material cost budget found for this job.</p>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
                 {poForm.link_type === 'ticket' && (
                   <select value={poForm.ticket_id} onChange={e => setPOForm(p => ({ ...p, ticket_id: e.target.value }))} className={inputClass}>
@@ -473,6 +541,14 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                     {serviceTickets.map(t => <option key={t.id} value={t.id}>{t.title}{t.clients?.company ? ` — ${t.clients.company}` : ''}</option>)}
                   </select>
                 )}
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Description <span className="text-[#8A9AB0] font-normal">(optional)</span></label>
+                <input type="text" value={poForm.description} onChange={e => setPOForm(p => ({ ...p, description: e.target.value }))}
+                  placeholder="e.g. Camera system materials, Phase 1..."
+                  className={inputClass} />
               </div>
 
               {/* Line items */}
@@ -548,7 +624,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
               </div>
 
               <div className="flex gap-3 pt-1">
-                <button onClick={() => setShowNewPO(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={() => { setShowNewPO(false); setJobBudget(null) }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
                 <button onClick={generateNewPO} disabled={generatingPO || (!poForm.vendor_name && !poForm.vendor_id) || poLines.filter(l => l.item_name.trim()).length === 0}
                   className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {generatingPO ? 'Generating...' : `Generate PO — $${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}

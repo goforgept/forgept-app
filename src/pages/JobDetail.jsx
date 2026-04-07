@@ -30,7 +30,6 @@ const STATUS_COLORS = {
   'Cancelled': 'bg-red-500/20 text-red-400',
 }
 
-// Inline PO list for JobDetail — queries by proposal_id
 function JobPOList({ proposalId }) {
   const [pos, setPos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -88,6 +87,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [activeTab, setActiveTab] = useState('checklist')
   const [savingStatus, setSavingStatus] = useState(false)
   const [orgProfiles, setOrgProfiles] = useState([])
+  // Freeform PO line items (from purchase_order_line_items where job_id = id)
+  const [freeformPOItems, setFreeformPOItems] = useState([])
 
   // Bulk BOM edit
   const [editingBOM, setEditingBOM] = useState(false)
@@ -106,11 +107,10 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [poAutoNumber, setPOAutoNumber] = useState(true)
   const [generatingPO, setGeneratingPO] = useState(false)
 
- // Change order modal
+  // Change order modal
   const [showCOModal, setShowCOModal] = useState(false)
   const [coForm, setCoForm] = useState({ name: '', description: '', line_items: [], labor_items: [] })
   const [savingCO, setSavingCO] = useState(false)
-
 
   // Checklist add
   const [newCheckItem, setNewCheckItem] = useState('')
@@ -162,7 +162,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       setLineItems(lineData || [])
       setEditLines(lineData || [])
 
-      // Fetch vendors for bulk edit
       if (profileData?.org_id) {
         const { data: vendorData } = await supabase
           .from('vendors')
@@ -172,6 +171,22 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           .order('vendor_name')
         setVendors(vendorData || [])
       }
+    }
+
+    // Fetch freeform PO line items linked to this job
+    const { data: poData } = await supabase
+      .from('purchase_orders')
+      .select('id, po_number, vendor_name, total_amount, description')
+      .eq('job_id', id)
+    if (poData && poData.length > 0) {
+      const poIds = poData.map(p => p.id)
+      const { data: poLineData } = await supabase
+        .from('purchase_order_line_items')
+        .select('*, purchase_orders(po_number, vendor_name, description)')
+        .in('po_id', poIds)
+      setFreeformPOItems(poLineData || [])
+    } else {
+      setFreeformPOItems([])
     }
 
     // Fetch checklist
@@ -184,7 +199,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     if (checkData && checkData.length > 0) {
       setChecklist(checkData)
     } else {
-      // Auto-create default checklist
       await createDefaultChecklist(id, profileData?.org_id)
       const { data: freshCheck } = await supabase
         .from('job_checklist_items')
@@ -210,7 +224,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       .order('log_date', { ascending: false })
     setTechLogs(logData || [])
 
-    // Auto-check checklist items based on system data
     await autoCheckItems(id, jobData)
 
     setLoading(false)
@@ -218,13 +231,11 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
   const createDefaultChecklist = async (jobId, orgId) => {
     const items = [
-      // Auto items
       ...AUTO_CHECK_TYPES.map((a, i) => ({
         job_id: jobId, org_id: orgId, label: a.label,
         is_auto: true, auto_check_type: a.type,
         completed: false, sort_order: i
       })),
-      // Manual items
       ...MANUAL_DEFAULTS.map((label, i) => ({
         job_id: jobId, org_id: orgId, label,
         is_auto: false, auto_check_type: null,
@@ -236,37 +247,22 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
   const autoCheckItems = async (jobId, jobData) => {
     if (!jobData?.proposal_id) return
-
-    // Check each auto type
     const checks = {}
-
-    // Materials ordered — only complete when ALL bom lines are PO Sent or Received
     const { data: allBomItems } = await supabase.from('bom_line_items').select('po_status').eq('proposal_id', jobData.proposal_id)
     const orderedItems = (allBomItems || []).filter(l => l.po_status === 'PO Sent' || l.po_status === 'Received')
     checks['po_generated'] = (allBomItems || []).length > 0 && orderedItems.length === (allBomItems || []).length
-
-    // Parts received — all PO line items received
     const { data: bomItems } = await supabase.from('bom_line_items').select('po_status').eq('proposal_id', jobData.proposal_id)
     const hasPOs = (bomItems || []).some(l => l.po_status === 'PO Sent')
     checks['parts_received'] = hasPOs && (bomItems || []).every(l => !l.po_status || l.po_status === 'Received')
-
-    // Invoice sent
     const { data: invoices } = await supabase.from('invoices').select('id, status').eq('proposal_id', jobData.proposal_id)
     checks['invoice_sent'] = (invoices || []).some(i => i.status === 'Sent' || i.status === 'Paid')
     checks['payment_received'] = (invoices || []).some(i => i.status === 'Paid')
-
-    // Photos uploaded
     const { data: photos } = await supabase.from('proposal_photos').select('id').eq('proposal_id', jobData.proposal_id)
     checks['photos_uploaded'] = (photos || []).length > 0
-
-    // Email sent (any activity of type email)
     const { data: activities } = await supabase.from('activities').select('type').eq('proposal_id', jobData.proposal_id)
     checks['email_sent'] = (activities || []).some(a => a.type === 'email')
-
-    // Scheduled — job has a start date
     checks['scheduled'] = !!jobData.start_date
 
-    // Update auto items
     for (const [checkType, isComplete] of Object.entries(checks)) {
       if (isComplete) {
         await supabase.from('job_checklist_items')
@@ -279,7 +275,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   }
 
   const toggleCheckItem = async (item) => {
-    if (item.is_auto) return // auto items can't be manually toggled
+    if (item.is_auto) return
     const newVal = !item.completed
     await supabase.from('job_checklist_items').update({
       completed: newVal,
@@ -287,8 +283,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       completed_by: profile?.id || null
     }).eq('id', item.id)
     setChecklist(prev => prev.map(c => c.id === item.id ? { ...c, completed: newVal } : c))
-
-    // Check if scheduled and prompt notify
     if (item.auto_check_type === 'scheduled' || item.label.toLowerCase().includes('schedul')) {
       if (newVal && job?.clients?.email) {
         setNotifyMessage(`Hi ${job.clients.client_name || job.clients.company},\n\nYour job has been scheduled. Our team will be on site as planned. Please don't hesitate to reach out if you have any questions.\n\nThank you for your business.`)
@@ -301,12 +295,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     if (!newCheckItem.trim()) return
     setSavingCheck(true)
     const { data } = await supabase.from('job_checklist_items').insert({
-      job_id: id,
-      org_id: profile?.org_id,
-      label: newCheckItem.trim(),
-      is_auto: false,
-      completed: false,
-      sort_order: checklist.length
+      job_id: id, org_id: profile?.org_id, label: newCheckItem.trim(),
+      is_auto: false, completed: false, sort_order: checklist.length
     }).select().single()
     if (data) setChecklist(prev => [...prev, data])
     setNewCheckItem('')
@@ -356,11 +346,10 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     if (userId) await addToProposalCollaborators(userId)
   }
 
-  // Bulk BOM edit
-  const toggleLineSelect = (id) => {
+  const toggleLineSelect = (lineId) => {
     setSelectedLines(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      next.has(lineId) ? next.delete(lineId) : next.add(lineId)
       return next
     })
   }
@@ -378,12 +367,10 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     setEditLines(prev => prev.map(l => {
       if (!selectedLines.has(l.id)) return l
       const updated = { ...l, [bulkField]: bulkValue }
-      // Auto-apply vendor markup
       if (bulkField === 'vendor') {
         const vendor = vendors.find(v => v.vendor_name === bulkValue)
         if (vendor?.default_markup_percent) updated.markup_percent = vendor.default_markup_percent
       }
-      // Recalculate price if cost/markup changed
       if (bulkField === 'markup_percent' && l.your_cost_unit) {
         updated.customer_price_unit = (parseFloat(l.your_cost_unit) * (1 + parseFloat(bulkValue) / 100)).toFixed(2)
         updated.customer_price_total = (parseFloat(updated.customer_price_unit) * parseFloat(l.quantity || 0)).toFixed(2)
@@ -399,13 +386,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     setSavingBOM(true)
     for (const line of editLines) {
       await supabase.from('bom_line_items').update({
-        item_name: line.item_name,
-        manufacturer: line.manufacturer || null,
-        part_number_sku: line.part_number_sku || null,
-        quantity: parseFloat(line.quantity) || 0,
-        unit: line.unit,
-        category: line.category,
-        vendor: line.vendor,
+        item_name: line.item_name, manufacturer: line.manufacturer || null,
+        part_number_sku: line.part_number_sku || null, quantity: parseFloat(line.quantity) || 0,
+        unit: line.unit, category: line.category, vendor: line.vendor,
         your_cost_unit: parseFloat(line.your_cost_unit) || null,
         markup_percent: parseFloat(line.markup_percent) || null,
         customer_price_unit: parseFloat(line.customer_price_unit) || null,
@@ -517,20 +500,15 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     } catch (err) { alert('Error generating PO: ' + err.message) }
     setGeneratingPO(false)
   }
-const exportCostReport = async () => {
+
+  const exportCostReport = async () => {
     const { default: jsPDF } = await import('jspdf')
     const { default: autoTable } = await import('jspdf-autotable')
-
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('company_name, logo_url, primary_color')
-      .eq('id', profile.id).single()
-
+    const { data: profileData } = await supabase.from('profiles').select('company_name, logo_url, primary_color').eq('id', profile.id).single()
     const primaryRgb = hexToRgb(profileData?.primary_color || '#0F1C2E')
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
 
-    // Header bar
     doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
     doc.rect(0, 0, pageWidth, 36, 'F')
     doc.setTextColor(255, 255, 255)
@@ -540,7 +518,6 @@ const exportCostReport = async () => {
     doc.text(`Generated ${new Date().toLocaleDateString()}`, 14, 26)
     doc.text(profileData?.company_name || '', pageWidth - 14, 16, { align: 'right' })
 
-    // Job info
     doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
     doc.text(`Job: ${job?.name || ''}`, 14, 48)
     if (job?.job_number) doc.text(`Job #: ${job.job_number}`, 14, 55)
@@ -548,7 +525,6 @@ const exportCostReport = async () => {
     if (proposal?.quote_number) doc.text(`Quote #: ${proposal.quote_number}`, pageWidth / 2, 48)
     if (job?.start_date) doc.text(`Start: ${new Date(job.start_date).toLocaleDateString()}`, pageWidth / 2, 55)
 
-    // Compute values
     const usedByItemId = {}
     techLogs.forEach(log => {
       if (!log.materials_used) return
@@ -559,18 +535,24 @@ const exportCostReport = async () => {
         })
       } catch {}
     })
+
     const quotedMaterials = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
     const quotedLabor = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
     const costMaterials = lineItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
     const costLabor = (proposal?.labor_items || []).reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
     const approvedCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, c) => sum + (c.amount || 0), 0)
+    const costCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, co) => {
+      const matCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+      const labCost = (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+      return sum + matCost + labCost
+    }, 0)
+    const freeformPOCost = freeformPOItems.reduce((sum, l) => sum + (l.total || 0), 0)
     const totalRevenue = quotedMaterials + quotedLabor + approvedCOs
-    const totalCost = costMaterials + costLabor
+    const totalCost = costMaterials + costLabor + costCOs + freeformPOCost
     const grossMargin = totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue * 100).toFixed(1) : '0.0'
     const hoursLogged = techLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0)
     const estimatedHours = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.quantity) || 0), 0)
 
-    // Summary boxes
     let y = 74
     const boxW = (pageWidth - 28 - 9) / 4
     const summaryBoxes = [
@@ -581,8 +563,7 @@ const exportCostReport = async () => {
     ]
     summaryBoxes.forEach((box, i) => {
       const x = 14 + i * (boxW + 3)
-      doc.setFillColor(245, 247, 250)
-      doc.rect(x, y, boxW, 22, 'F')
+      doc.setFillColor(245, 247, 250); doc.rect(x, y, boxW, 22, 'F')
       doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
       doc.text(box.label.toUpperCase(), x + 4, y + 7)
       doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -590,161 +571,74 @@ const exportCostReport = async () => {
     })
     y += 30
 
-    // Financial summary table
+    const pdfRows = [
+      ['Materials', `$${quotedMaterials.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${costMaterials.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(quotedMaterials - costMaterials).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, quotedMaterials > 0 ? `${((quotedMaterials - costMaterials) / quotedMaterials * 100).toFixed(1)}%` : '—'],
+      ['Labor', `$${quotedLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${costLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(quotedLabor - costLabor).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, quotedLabor > 0 ? `${((quotedLabor - costLabor) / quotedLabor * 100).toFixed(1)}%` : '—'],
+      ...(approvedCOs > 0 ? [['Change Orders (Approved)', `$${approvedCOs.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${costCOs.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(approvedCOs - costCOs).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, approvedCOs > 0 ? `${((approvedCOs - costCOs) / approvedCOs * 100).toFixed(1)}%` : '—']] : []),
+      ...(freeformPOCost > 0 ? [['Freeform POs (Job-linked)', '—', `$${freeformPOCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, '—', '—']] : []),
+      ['TOTAL', `$${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(totalRevenue - totalCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `${grossMargin}%`],
+    ]
     autoTable(doc, {
-      startY: y,
-      head: [['Category', 'Revenue (Customer)', 'Your Cost', 'Margin $', 'Margin %']],
-      body: [
-        ['Materials', `$${quotedMaterials.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${costMaterials.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(quotedMaterials - costMaterials).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, quotedMaterials > 0 ? `${((quotedMaterials - costMaterials) / quotedMaterials * 100).toFixed(1)}%` : '—'],
-        ['Labor', `$${quotedLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${costLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(quotedLabor - costLabor).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, quotedLabor > 0 ? `${((quotedLabor - costLabor) / quotedLabor * 100).toFixed(1)}%` : '—'],
-        ...(approvedCOs > 0 ? [['Change Orders (Approved)', `$${approvedCOs.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, '$0.00', `$${approvedCOs.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, '100.0%']] : []),
-        ['TOTAL', `$${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(totalRevenue - totalCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `${grossMargin}%`],
-      ],
-      headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-      footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-      bodyStyles: { fontSize: 9 },
-      styles: { fontSize: 9 },
-      didParseCell: (data) => {
-        if (data.row.index === (approvedCOs > 0 ? 3 : 2) - 0) {
-          data.cell.styles.fontStyle = 'bold'
-        }
-      }
+      startY: y, head: [['Category', 'Revenue (Customer)', 'Your Cost', 'Margin $', 'Margin %']],
+      body: pdfRows, headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+      bodyStyles: { fontSize: 9 }, styles: { fontSize: 9 }
     })
-
     y = doc.lastAutoTable.finalY + 10
 
-    // Materials breakdown per line item
     if (lineItems.length > 0) {
       doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Materials — Line Item Detail', 14, y)
-      y += 4
+      doc.text('Materials — Line Item Detail', 14, y); y += 4
       autoTable(doc, {
-        startY: y,
-        head: [['Item', 'Vendor', 'Planned Qty', 'Used Qty', 'Remaining', 'Unit Cost', 'Customer Price', 'Margin']],
+        startY: y, head: [['Item', 'Vendor', 'Planned Qty', 'Used Qty', 'Remaining', 'Unit Cost', 'Customer Price', 'Margin']],
         body: lineItems.map(item => {
-          const used = usedByItemId[item.id] || 0
-          const planned = parseFloat(item.quantity) || 0
-          const remaining = planned - used
-          const cost = (item.your_cost_unit || 0) * planned
-          const revenue = item.customer_price_total || 0
-          return [
-            item.item_name,
-            item.vendor || '—',
-            `${planned} ${item.unit || ''}`,
-            used > 0 ? `${used} ${item.unit || ''}` : '—',
-            used > 0 ? (remaining < 0 ? `${Math.abs(remaining).toFixed(1)} over` : `${remaining.toFixed(1)} left`) : '—',
-            `$${(item.your_cost_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-            `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-            `$${(revenue - cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-          ]
+          const used = usedByItemId[item.id] || 0; const planned = parseFloat(item.quantity) || 0
+          const remaining = planned - used; const cost = (item.your_cost_unit || 0) * planned; const revenue = item.customer_price_total || 0
+          return [item.item_name, item.vendor || '—', `${planned} ${item.unit || ''}`, used > 0 ? `${used} ${item.unit || ''}` : '—', used > 0 ? (remaining < 0 ? `${Math.abs(remaining).toFixed(1)} over` : `${remaining.toFixed(1)} left`) : '—', `$${(item.your_cost_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(revenue - cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
         }),
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        styles: { fontSize: 8 },
-        columnStyles: { 4: { textColor: (cell) => cell.raw?.includes('over') ? [220, 50, 50] : [50, 180, 50] } }
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 8 }
       })
       y = doc.lastAutoTable.finalY + 10
     }
 
-    // Labor breakdown
     if ((proposal?.labor_items || []).length > 0) {
       doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Labor — Line Item Detail', 14, y)
-      y += 4
+      doc.text('Labor — Line Item Detail', 14, y); y += 4
       autoTable(doc, {
-        startY: y,
-        head: [['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price', 'Margin']],
-        body: (proposal.labor_items || []).map(l => [
-          l.role || '—',
-          l.quantity || '—',
-          l.unit || 'hr',
-          `$${(parseFloat(l.your_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-          `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-          `$${((parseFloat(l.customer_price) || 0) - (parseFloat(l.your_cost) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-        ]),
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        styles: { fontSize: 8 }
+        startY: y, head: [['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price', 'Margin']],
+        body: (proposal.labor_items || []).map(l => [l.role || '—', l.quantity || '—', l.unit || 'hr', `$${(parseFloat(l.your_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${((parseFloat(l.customer_price) || 0) - (parseFloat(l.your_cost) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 8 }
       })
       y = doc.lastAutoTable.finalY + 10
     }
 
-    // Change orders summary
+    if (freeformPOItems.length > 0) {
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Freeform PO Line Items', 14, y); y += 4
+      autoTable(doc, {
+        startY: y, head: [['PO #', 'Vendor', 'Item', 'Qty', 'Unit Cost', 'Total']],
+        body: freeformPOItems.map(l => [l.purchase_orders?.po_number || '—', l.purchase_orders?.vendor_name || '—', l.item_name, `${l.quantity} ${l.unit || ''}`, `$${(l.unit_cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(l.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 8 }
+      })
+      y = doc.lastAutoTable.finalY + 10
+    }
+
     if (changeOrders.length > 0) {
       doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Change Orders', 14, y)
-      y += 4
+      doc.text('Change Orders', 14, y); y += 4
       autoTable(doc, {
-        startY: y,
-        head: [['Name', 'Status', 'Amount']],
-        body: changeOrders.map(co => [co.name, co.status, `$${(co.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        styles: { fontSize: 8 }
+        startY: y, head: [['Name', 'Status', 'Amount', 'Your Cost']],
+        body: changeOrders.map(co => {
+          const coCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0) + (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+          return [co.name, co.status, `$${(co.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, coCost > 0 ? `$${coCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—']
+        }),
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 8 }
       })
       y = doc.lastAutoTable.finalY + 10
-
-      // CO materials line item detail (from tech log entries)
-      const cosWithItems = changeOrders.filter(co => co.line_items?.length > 0)
-      cosWithItems.forEach(co => {
-        const coRows = co.line_items.map((item, idx) => {
-          const key = `co_${co.id}_${idx}`
-          const used = usedByItemId[key] || 0
-          const planned = parseFloat(item.quantity) || 0
-          const remaining = planned - used
-          return [
-            item.item_name || '—',
-            `${planned} ${item.unit || ''}`,
-            used > 0 ? `${used} ${item.unit || ''}` : '—',
-            used > 0
-              ? (remaining < 0 ? `${Math.abs(remaining).toFixed(1)} over` : `${remaining.toFixed(1)} left`)
-              : '—',
-            `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-          ]
-        })
-        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-        doc.text(`CO Materials — ${co.name} (${co.status})`, 14, y)
-        y += 4
-        autoTable(doc, {
-          startY: y,
-          head: [['Item', 'Planned Qty', 'Used Qty', 'Remaining', 'Customer Price']],
-          body: coRows,
-          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-          alternateRowStyles: { fillColor: [245, 245, 245] },
-          styles: { fontSize: 8 },
-        })
-        y = doc.lastAutoTable.finalY + 8
-      })
-
-      // CO labor detail
-      const cosWithLabor = changeOrders.filter(co => co.labor_items?.length > 0)
-      cosWithLabor.forEach(co => {
-        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-        doc.text(`CO Labor — ${co.name} (${co.status})`, 14, y)
-        y += 4
-        autoTable(doc, {
-          startY: y,
-          head: [['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price']],
-          body: co.labor_items.map(l => [
-            l.role || '—',
-            l.quantity || '—',
-            l.unit || 'hr',
-            `$${(parseFloat(l.your_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-            `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-          ]),
-          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-          alternateRowStyles: { fillColor: [245, 245, 245] },
-          styles: { fontSize: 8 },
-        })
-        y = doc.lastAutoTable.finalY + 8
-      })
     }
 
-    // Footer
     const pageHeight = doc.internal.pageSize.getHeight()
     doc.setFontSize(8); doc.setTextColor(150, 150, 150); doc.setFont('helvetica', 'normal')
     doc.text(`${profileData?.company_name || 'ForgePt.'} · Confidential`, pageWidth / 2, pageHeight - 10, { align: 'center' })
-
     doc.save(`Cost-Report-${job?.job_number || job?.name || 'job'}.pdf`)
   }
 
@@ -755,12 +649,8 @@ const exportCostReport = async () => {
     const labTotal = (coForm.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
     const total = matTotal + labTotal
     const { data } = await supabase.from('change_orders').insert({
-      job_id: id,
-      org_id: profile?.org_id,
-      proposal_id: job?.proposal_id || null,
-      name: coForm.name,
-      description: coForm.description,
-      amount: total,
+      job_id: id, org_id: profile?.org_id, proposal_id: job?.proposal_id || null,
+      name: coForm.name, description: coForm.description, amount: total,
       line_items: coForm.line_items?.length > 0 ? coForm.line_items : null,
       labor_items: coForm.labor_items?.length > 0 ? coForm.labor_items : null,
       status: 'Pending'
@@ -785,24 +675,15 @@ const exportCostReport = async () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
-          type: 'ai_email',
-          toEmail: job.clients.email,
-          toName: job.clients.client_name || job.clients.company,
-          fromName: profile?.full_name || '',
-          fromEmail: profile?.email || '',
-          subject: `Update on your job: ${job.name}`,
-          body: notifyMessage,
-          clientId: job.client_id,
-          orgId: job.org_id,
-          sentBy: profile?.id
+          type: 'ai_email', toEmail: job.clients.email, toName: job.clients.client_name || job.clients.company,
+          fromName: profile?.full_name || '', fromEmail: profile?.email || '',
+          subject: `Update on your job: ${job.name}`, body: notifyMessage,
+          clientId: job.client_id, orgId: job.org_id, sentBy: profile?.id
         })
       })
       await supabase.from('activities').insert({
-        proposal_id: job.proposal_id,
-        org_id: job.org_id,
-        user_id: profile?.id,
-        type: 'email',
-        title: `Customer notified about job update`
+        proposal_id: job.proposal_id, org_id: job.org_id, user_id: profile?.id,
+        type: 'email', title: `Customer notified about job update`
       })
     } catch (e) { console.error(e) }
     setShowNotifyModal(false)
@@ -840,22 +721,16 @@ const exportCostReport = async () => {
               <div className="flex items-center gap-3 mt-2">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[#8A9AB0] text-xs">👤 PM:</span>
-                  <select
-                    value={job?.user_id || job?.profiles?.id || ''}
-                    onChange={e => assignPM(e.target.value)}
-                    className="bg-[#0F1C2E] text-white text-xs border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]"
-                  >
+                  <select value={job?.user_id || job?.profiles?.id || ''} onChange={e => assignPM(e.target.value)}
+                    className="bg-[#0F1C2E] text-white text-xs border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]">
                     <option value="">Unassigned</option>
                     {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                   </select>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[#8A9AB0] text-xs">🔧 Tech:</span>
-                  <select
-                    value={job?.tech_id || ''}
-                    onChange={e => assignTech(e.target.value)}
-                    className="bg-[#0F1C2E] text-white text-xs border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]"
-                  >
+                  <select value={job?.tech_id || ''} onChange={e => assignTech(e.target.value)}
+                    className="bg-[#0F1C2E] text-white text-xs border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]">
                     <option value="">Unassigned</option>
                     {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                   </select>
@@ -876,7 +751,6 @@ const exportCostReport = async () => {
             </div>
           </div>
 
-          {/* Stats row */}
           <div className="grid grid-cols-5 gap-4">
             <div className="bg-[#0F1C2E] rounded-lg p-3">
               <p className="text-[#8A9AB0] text-xs mb-1">Contract Value</p>
@@ -904,7 +778,6 @@ const exportCostReport = async () => {
             </div>
           </div>
 
-          {/* Progress bar */}
           <div className="mt-4">
             <div className="flex justify-between items-center mb-1">
               <span className="text-[#8A9AB0] text-xs">Overall progress — {completedCount} of {checklist.length} complete</span>
@@ -945,8 +818,7 @@ const exportCostReport = async () => {
                   !lineItems.every(l => l.po_status === 'PO Sent' || l.po_status === 'Received')
                 return (
                   <div key={item.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${item.completed ? 'bg-green-500/5 border-green-500/20' : isPartiallyOrdered ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-[#0F1C2E] border-[#2a3d55]'}`}>
-                    <button onClick={() => toggleCheckItem(item)}
-                      disabled={item.is_auto}
+                    <button onClick={() => toggleCheckItem(item)} disabled={item.is_auto}
                       className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${item.completed ? 'bg-green-500 border-green-500' : isPartiallyOrdered ? 'border-yellow-500' : 'border-[#2a3d55] hover:border-[#C8622A]'} ${item.is_auto ? 'cursor-default' : 'cursor-pointer'}`}>
                       {item.completed && <span className="text-white text-xs">✓</span>}
                       {isPartiallyOrdered && <span className="text-yellow-400 text-xs">–</span>}
@@ -976,231 +848,14 @@ const exportCostReport = async () => {
                 )
               })}
             </div>
-
-            {/* Add custom item */}
             <div className="flex gap-2 border-t border-[#2a3d55] pt-4">
               <input type="text" value={newCheckItem} onChange={e => setNewCheckItem(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addCheckItem()}
                 placeholder="Add a custom checklist item..."
                 className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
               <button onClick={addCheckItem} disabled={savingCheck || !newCheckItem.trim()}
-                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                Add
-              </button>
+                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">Add</button>
             </div>
-          </div>
-        )}
-
-        {/* BOM TAB */}
-        {activeTab === 'bom' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-bold text-lg">Bill of Materials</h3>
-              {!editingBOM ? (
-                <button onClick={() => { setEditingBOM(true); setEditLines([...lineItems]); setSelectedLines(new Set()) }}
-                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                  Edit BOM
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button onClick={() => { setEditingBOM(false); setSelectedLines(new Set()) }}
-                    className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                  <button onClick={saveBOM} disabled={savingBOM}
-                    className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                    {savingBOM ? 'Saving...' : 'Save BOM'}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Bulk action bar */}
-            {editingBOM && selectedLines.size > 0 && (
-              <div className="bg-[#C8622A]/10 border border-[#C8622A]/30 rounded-xl px-4 py-3 mb-4 flex items-center gap-4 flex-wrap">
-                <span className="text-[#C8622A] text-sm font-semibold">{selectedLines.size} item{selectedLines.size !== 1 ? 's' : ''} selected</span>
-                <div className="flex gap-2 flex-1 flex-wrap">
-                  <select value={bulkField} onChange={e => { setBulkField(e.target.value); setBulkValue('') }}
-                    className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
-                    <option value="">— Bulk edit field —</option>
-                    <option value="vendor">Vendor</option>
-                    <option value="manufacturer">Manufacturer</option>
-                    <option value="category">Category</option>
-                    <option value="markup_percent">Markup %</option>
-                  </select>
-                  {bulkField === 'vendor' && (
-                    <select value={bulkValue} onChange={e => setBulkValue(e.target.value)}
-                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
-                      <option value="">— Select vendor —</option>
-                      {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
-                      <option value="Other">Other</option>
-                    </select>
-                  )}
-                  {bulkField === 'category' && (
-                    <select value={bulkValue} onChange={e => setBulkValue(e.target.value)}
-                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]">
-                      <option value="">— Select category —</option>
-                      {categories.map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  )}
-                  {(bulkField === 'manufacturer' || bulkField === 'markup_percent') && (
-                    <input type={bulkField === 'markup_percent' ? 'number' : 'text'} value={bulkValue}
-                      onChange={e => setBulkValue(e.target.value)}
-                      placeholder={bulkField === 'markup_percent' ? 'e.g. 35' : 'e.g. Hanwha'}
-                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]" />
-                  )}
-                  <button onClick={applyBulkEdit} disabled={!bulkField || !bulkValue}
-                    className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                    Apply
-                  </button>
-                </div>
-                <button onClick={() => setSelectedLines(new Set())} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">Clear</button>
-              </div>
-            )}
-
-            {lineItems.length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No line items on this proposal.</p>
-            ) : editingBOM ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#2a3d55]">
-                      <th className="py-2 pr-2 w-8">
-                        <input type="checkbox" checked={selectedLines.size === editLines.length && editLines.length > 0}
-                          onChange={toggleSelectAll} className="accent-[#C8622A]" />
-                      </th>
-                      {['Item', 'Mfr', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price'].map(h => (
-                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {editLines.map((line, i) => (
-                      <tr key={line.id} className={`border-b border-[#2a3d55]/30 ${selectedLines.has(line.id) ? 'bg-[#C8622A]/5' : ''}`}>
-                        <td className="pr-2 py-1">
-                          <input type="checkbox" checked={selectedLines.has(line.id)} onChange={() => toggleLineSelect(line.id)} className="accent-[#C8622A]" />
-                        </td>
-                        {[
-                          ['item_name', 'text', 'Item'],
-                          ['manufacturer', 'text', 'Mfr'],
-                          ['part_number_sku', 'text', 'Part #'],
-                          ['quantity', 'number', 'Qty'],
-                        ].map(([field, type, placeholder]) => (
-                          <td key={field} className="pr-2 py-1">
-                            <input type={type} placeholder={placeholder} value={line[field] || ''}
-                              onChange={e => updateEditLine(i, field, e.target.value)}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                          </td>
-                        ))}
-                        <td className="pr-2 py-1">
-                          <select value={line.unit || 'ea'} onChange={e => updateEditLine(i, 'unit', e.target.value)}
-                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                            {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
-                          </select>
-                        </td>
-                        <td className="pr-2 py-1">
-                          <select value={line.category || ''} onChange={e => updateEditLine(i, 'category', e.target.value)}
-                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                            <option value="">Category</option>
-                            {categories.map(c => <option key={c}>{c}</option>)}
-                          </select>
-                        </td>
-                        <td className="pr-2 py-1">
-                          <select value={line.vendor || ''} onChange={e => updateEditLine(i, 'vendor', e.target.value)}
-                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                            <option value="">— Vendor —</option>
-                            {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
-                            <option value="Other">Other</option>
-                          </select>
-                        </td>
-                        <td className="pr-2 py-1">
-                          <input type="number" placeholder="0.00" value={line.your_cost_unit || ''}
-                            onChange={e => updateEditLine(i, 'your_cost_unit', e.target.value)}
-                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                        </td>
-                        <td className="pr-2 py-1">
-                          <input type="number" placeholder="35" value={line.markup_percent || ''}
-                            onChange={e => updateEditLine(i, 'markup_percent', e.target.value)}
-                            className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                        </td>
-                        <td className="pr-2 py-1">
-                          <input type="number" placeholder="0.00" value={line.customer_price_unit || ''}
-                            onChange={e => updateEditLine(i, 'customer_price_unit', e.target.value)}
-                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                {(() => {
-                  const usedByItemId = {}
-                  techLogs.forEach(log => {
-                    if (!log.materials_used) return
-                    try {
-                      const parsed = JSON.parse(log.materials_used)
-                      if (Array.isArray(parsed)) {
-                        parsed.forEach(m => {
-                          usedByItemId[m.id] = (usedByItemId[m.id] || 0) + (parseFloat(m.qty) || 0)
-                        })
-                      }
-                    } catch {}
-                  })
-                  const anyUsage = Object.keys(usedByItemId).length > 0
-                  return (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#2a3d55]">
-                      {['Item', 'Mfr', 'Part #', 'Vendor', 'Planned', ...(anyUsage ? ['Used', 'Remaining'] : []), 'Unit Price', 'Total', 'Status'].map(h => (
-                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lineItems.map(item => {
-                      const planned = parseFloat(item.quantity) || 0
-                      const used = usedByItemId[item.id] || 0
-                      const remaining = planned - used
-                      const isOver = used > 0 && remaining < 0
-                      const isExact = used > 0 && remaining === 0
-                      return (
-                      <tr key={item.id} className="border-b border-[#2a3d55]/50">
-                        <td className="text-white py-3 pr-4">{item.item_name}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{item.manufacturer || '—'}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor || '—'}</td>
-                        <td className="text-white py-3 pr-4">{item.quantity} {item.unit}</td>
-                        {anyUsage && <td className="text-white py-3 pr-4">{used > 0 ? `${used} ${item.unit}` : '—'}</td>}
-                        {anyUsage && (
-                          <td className="py-3 pr-4">
-                            {used === 0 ? <span className="text-[#8A9AB0]">—</span>
-                              : isOver ? <span className="text-red-400 font-semibold">{Math.abs(remaining)} over</span>
-                              : isExact ? <span className="text-green-400 font-semibold">All used</span>
-                              : <span className="text-[#D6E4F0]">{remaining} {item.unit} left</span>}
-                          </td>
-                        )}
-                        <td className="text-white py-3 pr-4">${fmt(item.customer_price_unit)}</td>
-                        <td className="text-white py-3 pr-4">${fmt(item.customer_price_total)}</td>
-                        <td className="py-3">
-                          <span className={`text-xs px-2 py-1 rounded font-semibold ${item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
-                            {item.po_status || item.pricing_status}
-                          </span>
-                        </td>
-                      </tr>
-                    )})}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan={anyUsage ? 7 : 5} className="text-[#8A9AB0] pt-4 text-right font-semibold">Total</td>
-                      <td className="text-[#C8622A] pt-4 font-bold pr-4 text-right">${fmt(lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0))}</td>
-                      <td></td><td></td>
-                    </tr>
-                  </tfoot>
-                </table>
-                  )
-                })()}
-              </div>
-            )}
           </div>
         )}
 
@@ -1214,7 +869,6 @@ const exportCostReport = async () => {
                 + New Change Order
               </button>
             </div>
-
             {changeOrders.length === 0 ? (
               <div className="text-center py-8 border-2 border-dashed border-[#2a3d55] rounded-xl">
                 <p className="text-[#8A9AB0]">No change orders yet.</p>
@@ -1261,15 +915,13 @@ const exportCostReport = async () => {
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-white font-bold text-lg">Purchase Orders</h3>
-              <button
-                onClick={() => selectedForPO.size > 0 && setShowPOModal(true)}
+              <button onClick={() => selectedForPO.size > 0 && setShowPOModal(true)}
                 disabled={selectedForPO.size === 0}
                 title={selectedForPO.size === 0 ? 'Check items below to select for PO' : `Generate PO for ${selectedForPO.size} items`}
                 className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 {selectedForPO.size > 0 ? `Generate PO (${selectedForPO.size})` : 'Generate PO'}
               </button>
             </div>
-
             {lineItems.length === 0 ? (
               <p className="text-[#8A9AB0] text-sm">No materials on this job's BOM.</p>
             ) : (
@@ -1311,16 +963,11 @@ const exportCostReport = async () => {
                                 })} />
                             )}
                           </td>
-                          <td className="py-3 pr-4">
-                            <p className="text-white text-sm">{item.item_name}</p>
-                            {item.part_number_sku && <p className="text-[#8A9AB0] text-xs">{item.part_number_sku}</p>}
-                          </td>
+                          <td className="py-3 pr-4"><p className="text-white text-sm">{item.item_name}</p>{item.part_number_sku && <p className="text-[#8A9AB0] text-xs">{item.part_number_sku}</p>}</td>
                           <td className="text-[#8A9AB0] py-3 pr-4 text-sm">{item.vendor || '—'}</td>
                           <td className="text-white py-3 pr-4 text-sm">{item.quantity} {item.unit}</td>
                           <td className="text-white py-3 pr-4 text-sm">${fmt((item.your_cost_unit || 0) * (item.quantity || 0))}</td>
-                          <td className="py-3 pr-4">
-                            {item.po_number ? <span className="text-[#8A9AB0] text-xs font-mono">{item.po_number}</span> : <span className="text-[#2a3d55]">—</span>}
-                          </td>
+                          <td className="py-3 pr-4">{item.po_number ? <span className="text-[#8A9AB0] text-xs font-mono">{item.po_number}</span> : <span className="text-[#2a3d55]">—</span>}</td>
                           <td className="py-3">
                             <span className={`text-xs px-2 py-1 rounded font-semibold ${item.po_status === 'Received' ? 'bg-green-500/20 text-green-400' : item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
                               {item.po_status || 'Not Ordered'}
@@ -1342,8 +989,7 @@ const exportCostReport = async () => {
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-white font-bold text-lg">Job Cost Report</h3>
-              <button
-                onClick={exportCostReport}
+              <button onClick={exportCostReport}
                 className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
                 ↓ Export PDF
               </button>
@@ -1354,17 +1000,32 @@ const exportCostReport = async () => {
               const quotedTotal = quotedMaterials + quotedLabor
               const costMaterials = lineItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
               const costLabor = (proposal?.labor_items || []).reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
-              const costTotal = costMaterials + costLabor
-              const hoursLogged = techLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0)
               const approvedCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, c) => sum + (c.amount || 0), 0)
+              // CO your_cost side
+              const costCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, co) => {
+                const matCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
+                const labCost = (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+                return sum + matCost + labCost
+              }, 0)
+              // Freeform PO costs (job-linked POs with line items)
+              const freeformPOCost = freeformPOItems.reduce((sum, l) => sum + (l.total || 0), 0)
+              const hoursLogged = techLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0)
               const totalRevenue = quotedTotal + approvedCOs
-              const grossMargin = totalRevenue > 0 ? ((totalRevenue - costTotal) / totalRevenue * 100).toFixed(1) : '0.0'
+              const totalCost = costMaterials + costLabor + costCOs + freeformPOCost
+              const grossMargin = totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue * 100).toFixed(1) : '0.0'
+              const budgetBurnPct = totalCost > 0 && (costMaterials + costLabor) > 0
+                ? Math.min((totalCost / (costMaterials + costLabor)) * 100, 999)
+                : 0
+              const overBudget = totalRevenue > 0 && totalCost > totalRevenue
+              const nearBudget = !overBudget && totalRevenue > 0 && totalCost / totalRevenue > 0.8
+
               const rows = [
                 { label: 'Quoted Materials', quoted: quotedMaterials, cost: costMaterials, color: 'text-white' },
                 { label: 'Quoted Labor', quoted: quotedLabor, cost: costLabor, color: 'text-white' },
-                ...(approvedCOs > 0 ? [{ label: 'Approved Change Orders', quoted: approvedCOs, cost: 0, color: 'text-[#C8622A]' }] : []),
+                ...(approvedCOs > 0 ? [{ label: 'Approved Change Orders', quoted: approvedCOs, cost: costCOs, color: 'text-[#C8622A]' }] : []),
+                ...(freeformPOCost > 0 ? [{ label: 'Freeform POs (Job-linked)', quoted: 0, cost: freeformPOCost, color: 'text-blue-400' }] : []),
               ]
-              // True progress calculations
+
               const usedByItemId = {}
               techLogs.forEach(log => {
                 if (!log.materials_used) return
@@ -1379,68 +1040,57 @@ const exportCostReport = async () => {
               const totalUsedUnits = lineItems.reduce((sum, i) => sum + (usedByItemId[i.id] || 0), 0)
               const materialsPct = totalPlannedUnits > 0 ? Math.min((totalUsedUnits / totalPlannedUnits) * 100, 100) : 0
               const materialsOver = totalUsedUnits > totalPlannedUnits
-
               const estimatedHours = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.quantity) || 0), 0)
               const laborPct = estimatedHours > 0 ? Math.min((hoursLogged / estimatedHours) * 100, 100) : 0
               const laborOver = hoursLogged > estimatedHours
-
               const checklistTotal = checklist.length
               const checklistDone = checklist.filter(c => c.completed).length
               const checklistPct = checklistTotal > 0 ? (checklistDone / checklistTotal) * 100 : 0
-
               const actualMaterialCost = lineItems.reduce((sum, i) => sum + ((usedByItemId[i.id] || 0) * (i.your_cost_unit || 0)), 0)
               const laborRate = estimatedHours > 0 ? costLabor / estimatedHours : 0
               const actualLaborCost = hoursLogged * laborRate
               const actualCostTotal = actualMaterialCost + actualLaborCost
-              const costBurnPct = costTotal > 0 ? Math.min((actualCostTotal / costTotal) * 100, 100) : 0
+              const costBurnPct = totalCost > 0 ? Math.min((actualCostTotal / totalCost) * 100, 100) : 0
 
               return (
                 <div className="space-y-5">
+
+                  {/* Over-budget banner */}
+                  {(overBudget || nearBudget) && (
+                    <div className={`rounded-xl px-5 py-4 flex items-center gap-3 ${overBudget ? 'bg-red-500/10 border border-red-500/30' : 'bg-yellow-500/10 border border-yellow-500/30'}`}>
+                      <span className="text-2xl">{overBudget ? '🔴' : '🟡'}</span>
+                      <div>
+                        <p className={`font-bold text-sm ${overBudget ? 'text-red-400' : 'text-yellow-400'}`}>
+                          {overBudget
+                            ? `Over budget by $${fmt(totalCost - totalRevenue)}`
+                            : `Approaching budget limit — ${((totalCost / totalRevenue) * 100).toFixed(0)}% of contract value spent`}
+                        </p>
+                        <p className="text-[#8A9AB0] text-xs mt-0.5">
+                          Contract value: ${fmt(totalRevenue)} · Total cost: ${fmt(totalCost)} · Remaining: ${overBudget ? '-' : ''}${fmt(Math.abs(totalRevenue - totalCost))}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {!overBudget && !nearBudget && totalRevenue > 0 && (
+                    <div className="rounded-xl px-5 py-3 flex items-center gap-3 bg-green-500/10 border border-green-500/20">
+                      <span className="text-xl">🟢</span>
+                      <p className="text-green-400 text-sm font-medium">On budget — ${fmt(totalRevenue - totalCost)} remaining ({((1 - totalCost / totalRevenue) * 100).toFixed(0)}% of contract value)</p>
+                    </div>
+                  )}
+
                   {/* True Progress */}
                   <div className="bg-[#0F1C2E] rounded-xl p-5 space-y-4">
                     <p className="text-white font-semibold text-sm">Job Progress</p>
                     {[
-                      {
-                        label: 'Materials Used',
-                        pct: materialsPct,
-                        detail: totalPlannedUnits > 0
-                          ? `${totalUsedUnits} of ${totalPlannedUnits} units${materialsOver ? ` (+${(totalUsedUnits - totalPlannedUnits).toFixed(1)} over)` : ''}`
-                          : 'No materials logged',
-                        over: materialsOver,
-                        color: materialsOver ? 'bg-red-500' : 'bg-[#C8622A]',
-                      },
-                      {
-                        label: 'Labor Hours',
-                        pct: laborPct,
-                        detail: estimatedHours > 0
-                          ? `${hoursLogged.toFixed(1)} of ${estimatedHours.toFixed(1)} hrs est.${laborOver ? ` (+${(hoursLogged - estimatedHours).toFixed(1)} over)` : ''}`
-                          : `${hoursLogged.toFixed(1)} hrs logged (no estimate)`,
-                        over: laborOver,
-                        color: laborOver ? 'bg-red-500' : 'bg-blue-500',
-                      },
-                      {
-                        label: 'Checklist',
-                        pct: checklistPct,
-                        detail: `${checklistDone} of ${checklistTotal} items complete`,
-                        over: false,
-                        color: 'bg-green-500',
-                      },
-                      {
-                        label: 'Cost Burned',
-                        pct: costBurnPct,
-                        detail: costTotal > 0
-                          ? `$${fmt(actualCostTotal)} of $${fmt(costTotal)} budgeted`
-                          : 'No cost data',
-                        over: actualCostTotal > costTotal,
-                        color: actualCostTotal > costTotal ? 'bg-red-500' : 'bg-purple-500',
-                      },
+                      { label: 'Materials Used', pct: materialsPct, detail: totalPlannedUnits > 0 ? `${totalUsedUnits} of ${totalPlannedUnits} units${materialsOver ? ` (+${(totalUsedUnits - totalPlannedUnits).toFixed(1)} over)` : ''}` : 'No materials logged', over: materialsOver, color: materialsOver ? 'bg-red-500' : 'bg-[#C8622A]' },
+                      { label: 'Labor Hours', pct: laborPct, detail: estimatedHours > 0 ? `${hoursLogged.toFixed(1)} of ${estimatedHours.toFixed(1)} hrs est.${laborOver ? ` (+${(hoursLogged - estimatedHours).toFixed(1)} over)` : ''}` : `${hoursLogged.toFixed(1)} hrs logged (no estimate)`, over: laborOver, color: laborOver ? 'bg-red-500' : 'bg-blue-500' },
+                      { label: 'Checklist', pct: checklistPct, detail: `${checklistDone} of ${checklistTotal} items complete`, over: false, color: 'bg-green-500' },
+                      { label: 'Cost Burned', pct: costBurnPct, detail: totalCost > 0 ? `$${fmt(actualCostTotal)} of $${fmt(totalCost)} budgeted` : 'No cost data', over: actualCostTotal > totalCost, color: actualCostTotal > totalCost ? 'bg-red-500' : 'bg-purple-500' },
                     ].map(({ label, pct, detail, over, color }) => (
                       <div key={label}>
                         <div className="flex justify-between items-baseline mb-1">
                           <span className="text-[#8A9AB0] text-xs">{label}</span>
-                          <span className={`text-xs font-semibold ${over ? 'text-red-400' : 'text-white'}`}>
-                            {pct.toFixed(0)}%{over ? ' ⚠' : ''}
-                          </span>
+                          <span className={`text-xs font-semibold ${over ? 'text-red-400' : 'text-white'}`}>{pct.toFixed(0)}%{over ? ' ⚠' : ''}</span>
                         </div>
                         <div className="w-full bg-[#1a2d45] rounded-full h-2 mb-1">
                           <div className={`h-2 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
@@ -1453,7 +1103,7 @@ const exportCostReport = async () => {
                   {/* Summary cards */}
                   <div className="grid grid-cols-4 gap-4">
                     <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Total Revenue</p><p className="text-white font-bold text-xl">${fmt(totalRevenue)}</p></div>
-                    <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Total Cost</p><p className="text-white font-bold text-xl">${fmt(costTotal)}</p></div>
+                    <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Total Cost</p><p className="text-white font-bold text-xl">${fmt(totalCost)}</p>{freeformPOCost > 0 && <p className="text-blue-400 text-xs mt-1">incl. ${fmt(freeformPOCost)} freeform POs</p>}</div>
                     <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Gross Margin</p><p className={`font-bold text-xl ${parseFloat(grossMargin) >= 30 ? 'text-green-400' : parseFloat(grossMargin) >= 15 ? 'text-[#C8622A]' : 'text-red-400'}`}>{grossMargin}%</p></div>
                     <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Hours Logged</p><p className="text-white font-bold text-xl">{hoursLogged.toFixed(1)}</p></div>
                   </div>
@@ -1473,9 +1123,11 @@ const exportCostReport = async () => {
                         {rows.map((row, i) => (
                           <tr key={i} className="border-b border-[#2a3d55]/50">
                             <td className={`py-3 ${row.color}`}>{row.label}</td>
-                            <td className="text-white py-3 pr-4 text-right">${fmt(row.quoted)}</td>
+                            <td className="text-white py-3 pr-4 text-right">{row.quoted > 0 ? `$${fmt(row.quoted)}` : '—'}</td>
                             <td className="text-white py-3 pr-4 text-right">${fmt(row.cost)}</td>
-                            <td className={`py-3 text-right font-semibold ${row.quoted - row.cost >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(row.quoted - row.cost)}</td>
+                            <td className={`py-3 text-right font-semibold ${row.quoted - row.cost >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {row.quoted > 0 ? `$${fmt(row.quoted - row.cost)}` : '—'}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -1483,8 +1135,8 @@ const exportCostReport = async () => {
                         <tr className="border-t border-[#2a3d55]">
                           <td className="text-white pt-3 font-bold">Total</td>
                           <td className="text-white pt-3 pr-4 text-right font-bold">${fmt(totalRevenue)}</td>
-                          <td className="text-white pt-3 pr-4 text-right font-bold">${fmt(costTotal)}</td>
-                          <td className="text-green-400 pt-3 text-right font-bold">${fmt(totalRevenue - costTotal)}</td>
+                          <td className="text-white pt-3 pr-4 text-right font-bold">${fmt(totalCost)}</td>
+                          <td className="text-green-400 pt-3 text-right font-bold">${fmt(totalRevenue - totalCost)}</td>
                         </tr>
                       </tfoot>
                     </table>
@@ -1519,9 +1171,7 @@ const exportCostReport = async () => {
                                   <td className="text-white py-2 pr-3 font-medium">{item.item_name}</td>
                                   <td className="text-[#8A9AB0] py-2 pr-3">{item.vendor || '—'}</td>
                                   <td className="text-white py-2 pr-3">{planned} {item.unit}</td>
-                                  <td className="py-2 pr-3">
-                                    {used > 0 ? <span className="text-[#C8622A] font-semibold">{used} {item.unit}</span> : <span className="text-[#2a3d55]">—</span>}
-                                  </td>
+                                  <td className="py-2 pr-3">{used > 0 ? <span className="text-[#C8622A] font-semibold">{used} {item.unit}</span> : <span className="text-[#2a3d55]">—</span>}</td>
                                   <td className="py-2 pr-3">
                                     {used === 0 ? <span className="text-[#8A9AB0]">—</span>
                                       : isOver ? <span className="text-red-400 font-semibold">{Math.abs(remaining).toFixed(1)} over ⚠</span>
@@ -1547,7 +1197,7 @@ const exportCostReport = async () => {
                           </tfoot>
                         </table>
                       </div>
-                      </div>
+                    </div>
                   )}
 
                   {/* Labor detail */}
@@ -1587,6 +1237,43 @@ const exportCostReport = async () => {
                     </div>
                   )}
 
+                  {/* Freeform PO line items */}
+                  {freeformPOItems.length > 0 && (
+                    <div>
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Freeform PO Line Items</p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-[#2a3d55]">
+                              {['PO #', 'Vendor', 'Description', 'Item', 'Qty', 'Unit Cost', 'Total'].map(h => (
+                                <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {freeformPOItems.map((l, i) => (
+                              <tr key={i} className="border-b border-[#2a3d55]/30">
+                                <td className="text-white py-2 pr-3 font-mono">{l.purchase_orders?.po_number || '—'}</td>
+                                <td className="text-[#8A9AB0] py-2 pr-3">{l.purchase_orders?.vendor_name || '—'}</td>
+                                <td className="text-[#8A9AB0] py-2 pr-3">{l.purchase_orders?.description || '—'}</td>
+                                <td className="text-white py-2 pr-3 font-medium">{l.item_name}</td>
+                                <td className="text-white py-2 pr-3">{l.quantity} {l.unit || ''}</td>
+                                <td className="text-white py-2 pr-3">${fmt(l.unit_cost)}</td>
+                                <td className="text-blue-400 py-2 font-semibold">${fmt(l.total)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t border-[#2a3d55]">
+                              <td colSpan="6" className="text-[#8A9AB0] pt-2 font-semibold">Freeform PO Total</td>
+                              <td className="text-blue-400 pt-2 font-bold">${fmt(freeformPOCost)}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Change orders detail */}
                   {changeOrders.length > 0 && (
                     <div className="space-y-4">
@@ -1595,119 +1282,40 @@ const exportCostReport = async () => {
                         <table className="w-full text-xs">
                           <thead>
                             <tr className="border-b border-[#2a3d55]">
-                              {['Name', 'Status', 'Amount'].map(h => (
+                              {['Name', 'Status', 'Amount', 'Your Cost', 'Margin $'].map(h => (
                                 <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
                               ))}
                             </tr>
                           </thead>
                           <tbody>
-                            {changeOrders.map(co => (
-                              <tr key={co.id} className="border-b border-[#2a3d55]/30">
-                                <td className="text-white py-2 pr-3">{co.name}</td>
-                                <td className="py-2 pr-3">
-                                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : co.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                                    {co.status}
-                                  </span>
-                                </td>
-                                <td className="text-[#C8622A] py-2 font-semibold">${fmt(co.amount)}</td>
-                              </tr>
-                            ))}
+                            {changeOrders.map(co => {
+                              const coCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0) + (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+                              const coMargin = co.amount - coCost
+                              return (
+                                <tr key={co.id} className="border-b border-[#2a3d55]/30">
+                                  <td className="text-white py-2 pr-3">{co.name}</td>
+                                  <td className="py-2 pr-3">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : co.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                      {co.status}
+                                    </span>
+                                  </td>
+                                  <td className="text-[#C8622A] py-2 pr-3 font-semibold">${fmt(co.amount)}</td>
+                                  <td className="text-white py-2 pr-3">{coCost > 0 ? `$${fmt(coCost)}` : '—'}</td>
+                                  <td className={`py-2 font-semibold ${coMargin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{coCost > 0 ? `$${fmt(coMargin)}` : '—'}</td>
+                                </tr>
+                              )
+                            })}
                           </tbody>
                         </table>
                       </div>
-
-                      {/* CO Materials line item detail */}
-                      {changeOrders.filter(co => co.line_items?.length > 0).map(co => (
-                        <div key={`co-mat-${co.id}`}>
-                          <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">
-                            CO Materials — {co.name}
-                            <span className={`ml-2 px-2 py-0.5 rounded font-semibold normal-case ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{co.status}</span>
-                          </p>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="border-b border-[#2a3d55]">
-                                  {['Item', 'Planned', 'Used', 'Remaining', 'Customer Price'].map(h => (
-                                    <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {co.line_items.map((item, idx) => {
-                                  const key = `co_${co.id}_${idx}`
-                                  const planned = parseFloat(item.quantity) || 0
-                                  const used = usedByItemId[key] || 0
-                                  const remaining = planned - used
-                                  const isOver = used > 0 && remaining < 0
-                                  const isLow = !isOver && used > 0 && planned > 0 && remaining / planned < 0.2
-                                  return (
-                                    <tr key={idx} className="border-b border-[#2a3d55]/30">
-                                      <td className="text-white py-2 pr-3 font-medium">{item.item_name}</td>
-                                      <td className="text-white py-2 pr-3">{planned} {item.unit}</td>
-                                      <td className="py-2 pr-3">
-                                        {used > 0 ? <span className="text-[#C8622A] font-semibold">{used} {item.unit}</span> : <span className="text-[#2a3d55]">—</span>}
-                                      </td>
-                                      <td className="py-2 pr-3">
-                                        {used === 0 ? <span className="text-[#8A9AB0]">—</span>
-                                          : isOver ? <span className="text-red-400 font-semibold">{Math.abs(remaining).toFixed(1)} over ⚠</span>
-                                          : isLow ? <span className="text-yellow-400 font-semibold">{remaining.toFixed(1)} left ↓</span>
-                                          : <span className="text-green-400">{remaining.toFixed(1)} left</span>}
-                                      </td>
-                                      <td className="text-white py-2">${fmt(item.customer_price_unit || 0)}</td>
-                                    </tr>
-                                  )
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* CO Labor line item detail */}
-                      {changeOrders.filter(co => co.labor_items?.length > 0).map(co => (
-                        <div key={`co-lab-${co.id}`}>
-                          <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">
-                            CO Labor — {co.name}
-                            <span className={`ml-2 px-2 py-0.5 rounded font-semibold normal-case ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>{co.status}</span>
-                          </p>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="border-b border-[#2a3d55]">
-                                  {['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price', 'Margin $'].map(h => (
-                                    <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {co.labor_items.map((l, i) => {
-                                  const cost = parseFloat(l.your_cost) || 0
-                                  const revenue = parseFloat(l.customer_price) || 0
-                                  const margin = revenue - cost
-                                  return (
-                                    <tr key={i} className="border-b border-[#2a3d55]/30">
-                                      <td className="text-white py-2 pr-3 font-medium">{l.role || '—'}</td>
-                                      <td className="text-white py-2 pr-3">{l.quantity || '—'}</td>
-                                      <td className="text-[#8A9AB0] py-2 pr-3">{l.unit || 'hr'}</td>
-                                      <td className="text-white py-2 pr-3">${fmt(cost)}</td>
-                                      <td className="text-white py-2 pr-3">${fmt(revenue)}</td>
-                                      <td className={`py-2 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(margin)}</td>
-                                    </tr>
-                                  )
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      ))}
                     </div>
                   )}
-
                 </div>
               )
             })()}
           </div>
         )}
+
         {/* TECH LOG TAB */}
         {activeTab === 'techlog' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
@@ -1751,10 +1359,7 @@ const exportCostReport = async () => {
                             <p className="text-[#8A9AB0] text-xs font-semibold mb-1">📦 Materials Used</p>
                             <div className="space-y-0.5">
                               {parsed.map((m, i) => (
-                                <p key={i} className="text-[#8A9AB0] text-xs">
-                                  · {m.name} — {m.qty} {m.unit}
-                                  {m.planned && m.qty !== m.planned ? <span className="text-yellow-500/70"> (planned: {m.planned})</span> : null}
-                                </p>
+                                <p key={i} className="text-[#8A9AB0] text-xs">· {m.name} — {m.qty} {m.unit}{m.planned && m.qty !== m.planned ? <span className="text-yellow-500/70"> (planned: {m.planned})</span> : null}</p>
                               ))}
                             </div>
                           </div>
@@ -1803,7 +1408,7 @@ const exportCostReport = async () => {
         )}
       </div>
 
-{/* PO Modal */}
+      {/* PO Modal */}
       {showPOModal && (() => {
         const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
         const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
@@ -1887,7 +1492,6 @@ const exportCostReport = async () => {
             <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
               <h3 className="text-white font-bold text-lg mb-5">New Change Order</h3>
               <div className="space-y-5">
-
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-[#8A9AB0] text-xs mb-1 block">Name <span className="text-[#C8622A]">*</span></label>
@@ -1926,11 +1530,7 @@ const exportCostReport = async () => {
                                 <tr key={line.id} className="border-b border-[#2a3d55]/30">
                                   <td className="pr-2 py-1"><input value={line.item_name} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; li[i] = {...li[i], item_name: e.target.value}; return {...p, line_items: li} })} placeholder="Item name" className={`w-36 ${coInputClass}`} /></td>
                                   <td className="pr-2 py-1"><input type="number" min="0" value={line.quantity} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; li[i] = {...li[i], quantity: e.target.value}; return {...p, line_items: li} })} className={`w-14 ${coInputClass}`} /></td>
-                                  <td className="pr-2 py-1">
-                                    <select value={line.unit} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; li[i] = {...li[i], unit: e.target.value}; return {...p, line_items: li} })} className={coInputClass}>
-                                      {['ea','ft','lot','hr','box','roll'].map(u => <option key={u}>{u}</option>)}
-                                    </select>
-                                  </td>
+                                  <td className="pr-2 py-1"><select value={line.unit} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; li[i] = {...li[i], unit: e.target.value}; return {...p, line_items: li} })} className={coInputClass}>{['ea','ft','lot','hr','box','roll'].map(u => <option key={u}>{u}</option>)}</select></td>
                                   <td className="pr-2 py-1"><input type="number" min="0" step="0.01" placeholder="0.00" value={line.your_cost_unit} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; const cost = parseFloat(e.target.value)||0; const mkp = parseFloat(li[i].markup_percent)||0; li[i] = {...li[i], your_cost_unit: e.target.value, customer_price_unit: (cost*(1+mkp/100)).toFixed(2)}; return {...p, line_items: li} })} className={`w-20 ${coInputClass}`} /></td>
                                   <td className="pr-2 py-1"><input type="number" min="0" placeholder="35" value={line.markup_percent} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; const mkp = parseFloat(e.target.value)||0; const cost = parseFloat(li[i].your_cost_unit)||0; li[i] = {...li[i], markup_percent: e.target.value, customer_price_unit: (cost*(1+mkp/100)).toFixed(2)}; return {...p, line_items: li} })} className={`w-14 ${coInputClass}`} /></td>
                                   <td className="pr-2 py-1"><input type="number" min="0" step="0.01" placeholder="0.00" value={line.customer_price_unit} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; li[i] = {...li[i], customer_price_unit: e.target.value}; return {...p, line_items: li} })} className={`w-20 ${coInputClass}`} /></td>
@@ -1941,11 +1541,7 @@ const exportCostReport = async () => {
                             })}
                           </tbody>
                           <tfoot>
-                            <tr>
-                              <td colSpan="6" className="text-[#8A9AB0] text-right pt-2 pr-2 font-semibold">Materials Total</td>
-                              <td className="text-[#C8622A] font-bold pt-2">${matTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                              <td></td>
-                            </tr>
+                            <tr><td colSpan="6" className="text-[#8A9AB0] text-right pt-2 pr-2 font-semibold">Materials Total</td><td className="text-[#C8622A] font-bold pt-2">${matTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</td><td></td></tr>
                           </tfoot>
                         </table>
                       </div>
@@ -1976,11 +1572,7 @@ const exportCostReport = async () => {
                               <tr key={labor.id} className="border-b border-[#2a3d55]/30">
                                 <td className="pr-2 py-1"><input value={labor.role} onChange={e => setCoForm(p => { const li = [...(p.labor_items||[])]; li[i] = {...li[i], role: e.target.value}; return {...p, labor_items: li} })} placeholder="e.g. Electrician" className={`w-36 ${coInputClass}`} /></td>
                                 <td className="pr-2 py-1"><input type="number" min="0" step="0.5" value={labor.quantity} onChange={e => setCoForm(p => { const li = [...(p.labor_items||[])]; const qty=parseFloat(e.target.value)||0; const cost=parseFloat(li[i].your_cost)||0; const mkp=parseFloat(li[i].markup)||0; li[i]={...li[i],quantity:e.target.value,customer_price:(cost*(1+mkp/100)*qty).toFixed(2)}; return {...p,labor_items:li} })} className={`w-14 ${coInputClass}`} /></td>
-                                <td className="pr-2 py-1">
-                                  <select value={labor.unit} onChange={e => setCoForm(p => { const li=[...(p.labor_items||[])]; li[i]={...li[i],unit:e.target.value}; return {...p,labor_items:li} })} className={coInputClass}>
-                                    {['hr','day','lot'].map(u => <option key={u}>{u}</option>)}
-                                  </select>
-                                </td>
+                                <td className="pr-2 py-1"><select value={labor.unit} onChange={e => setCoForm(p => { const li=[...(p.labor_items||[])]; li[i]={...li[i],unit:e.target.value}; return {...p,labor_items:li} })} className={coInputClass}>{['hr','day','lot'].map(u => <option key={u}>{u}</option>)}</select></td>
                                 <td className="pr-2 py-1"><input type="number" min="0" step="0.01" placeholder="0.00" value={labor.your_cost} onChange={e => setCoForm(p => { const li=[...(p.labor_items||[])]; const cost=parseFloat(e.target.value)||0; const mkp=parseFloat(li[i].markup)||0; const qty=parseFloat(li[i].quantity)||0; li[i]={...li[i],your_cost:e.target.value,customer_price:(cost*(1+mkp/100)*qty).toFixed(2)}; return {...p,labor_items:li} })} className={`w-20 ${coInputClass}`} /></td>
                                 <td className="pr-2 py-1"><input type="number" min="0" placeholder="35" value={labor.markup} onChange={e => setCoForm(p => { const li=[...(p.labor_items||[])]; const mkp=parseFloat(e.target.value)||0; const cost=parseFloat(li[i].your_cost)||0; const qty=parseFloat(li[i].quantity)||0; li[i]={...li[i],markup:e.target.value,customer_price:(cost*(1+mkp/100)*qty).toFixed(2)}; return {...p,labor_items:li} })} className={`w-14 ${coInputClass}`} /></td>
                                 <td className="pr-2 py-1 text-white font-medium">${(parseFloat(labor.customer_price)||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
@@ -1989,11 +1581,7 @@ const exportCostReport = async () => {
                             ))}
                           </tbody>
                           <tfoot>
-                            <tr>
-                              <td colSpan="5" className="text-[#8A9AB0] text-right pt-2 pr-2 font-semibold">Labor Total</td>
-                              <td className="text-[#C8622A] font-bold pt-2">${labTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                              <td></td>
-                            </tr>
+                            <tr><td colSpan="5" className="text-[#8A9AB0] text-right pt-2 pr-2 font-semibold">Labor Total</td><td className="text-[#C8622A] font-bold pt-2">${labTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</td><td></td></tr>
                           </tfoot>
                         </table>
                       </div>

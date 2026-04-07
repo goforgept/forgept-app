@@ -1492,7 +1492,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
         const resolvedSLABody = slaContract.body
           .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
-          .replace(/\{\{clientName\}\}/g, proposal?.client_name || '')
+          .replace(/\{\{clientName\}\}/g, proposal?.company || '')
           .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
           .replace(/\{\{responseTime\}\}/g, `${slaContract.response_time_hours || 8} hours`)
           .replace(/\{\{uptime\}\}/g, `${slaContract.uptime_percent || 99}`)
@@ -1536,7 +1536,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
         const resolvedMonBody = monitoringContract.body
           .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
-          .replace(/\{\{clientName\}\}/g, proposal?.client_name || '')
+          .replace(/\{\{clientName\}\}/g, proposal?.company || '')
           .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
           .replace(/\{\{monthlyFee\}\}/g, `${monitoringContract.monthly_fee || 49}`)
           .replace(/\{\{monitoredSystems\}\}/g, monitoringContract.monitored_systems || '')
@@ -2210,7 +2210,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                     <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
                     <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{slaContract.body
                       .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
-                      .replace(/\{\{clientName\}\}/g, proposal?.client_name || '')
+                      .replace(/\{\{clientName\}\}/g, proposal?.company || '')
                       .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
                       .replace(/\{\{responseTime\}\}/g, `${slaContract.response_time_hours || 8} hours`)
                       .replace(/\{\{uptime\}\}/g, `${slaContract.uptime_percent || 99}`)
@@ -2274,7 +2274,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                     <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
                     <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{monitoringContract.body
                       .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
-                      .replace(/\{\{clientName\}\}/g, proposal?.client_name || '')
+                      .replace(/\{\{clientName\}\}/g, proposal?.company || '')
                       .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
                       .replace(/\{\{monthlyFee\}\}/g, `${monitoringContract.monthly_fee || 49}`)
                       .replace(/\{\{monitoredSystems\}\}/g, monitoringContract.monitored_systems || '')
