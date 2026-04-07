@@ -2,6 +2,35 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
+const SLA_INDUSTRIES = ['Security','Audio/Visual','IT / Networking','Low Voltage','Fire Protection','HVAC','Electrical','Telecom','Solar','Mechanical','Plumbing','General Contractor','Other']
+const MONITORING_INDUSTRIES = ['Security','IT / Networking','Fire Protection','Low Voltage','Telecom','Audio/Visual','HVAC']
+
+const SLA_DEFAULTS = {
+  'Security':           { enabled: true,  name: 'Security Systems SLA',        response_time_hours: 4,  uptime_percent: 99.9, billing_frequency: 'Monthly',   labor_rate: 125, emergency_rate: 175, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all service requests.\n\nUPTIME: Provider guarantees {{uptime}}% system uptime, excluding scheduled maintenance windows.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency/after-hours calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Audio/Visual':       { enabled: true,  name: 'AV Systems SLA',               response_time_hours: 8,  uptime_percent: 99.0, billing_frequency: 'Quarterly', labor_rate: 115, emergency_rate: 165, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all AV service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed AV systems.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'IT / Networking':    { enabled: true,  name: 'IT & Network SLA',              response_time_hours: 2,  uptime_percent: 99.9, billing_frequency: 'Monthly',   labor_rate: 135, emergency_rate: 195, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for critical issues; 4 hours for non-critical requests.\n\nUPTIME: Provider guarantees {{uptime}}% network uptime, excluding maintenance windows communicated 24 hours in advance.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Low Voltage':        { enabled: true,  name: 'Low Voltage Systems SLA',       response_time_hours: 8,  uptime_percent: 99.0, billing_frequency: 'Quarterly', labor_rate: 110, emergency_rate: 155, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed low voltage systems.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Fire Protection':    { enabled: true,  name: 'Fire Protection SLA',           response_time_hours: 4,  uptime_percent: 99.9, billing_frequency: 'Monthly',   labor_rate: 130, emergency_rate: 185, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time. Life-safety emergencies receive immediate priority dispatch.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all fire protection systems.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'HVAC':               { enabled: true,  name: 'HVAC Service SLA',              response_time_hours: 24, uptime_percent: 97.0, billing_frequency: 'Quarterly', labor_rate: 120, emergency_rate: 170, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time. Emergency HVAC failures receive priority scheduling.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed HVAC equipment.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Electrical':         { enabled: true,  name: 'Electrical Systems SLA',        response_time_hours: 8,  uptime_percent: 98.0, billing_frequency: 'Quarterly', labor_rate: 125, emergency_rate: 180, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all electrical service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed electrical systems.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Telecom':            { enabled: true,  name: 'Telecom Systems SLA',           response_time_hours: 4,  uptime_percent: 99.9, billing_frequency: 'Monthly',   labor_rate: 120, emergency_rate: 170, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all telecom service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed telecom infrastructure.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Solar':              { enabled: false, name: 'Solar Systems SLA',             response_time_hours: 24, uptime_percent: 98.0, billing_frequency: 'Quarterly', labor_rate: 110, emergency_rate: 155, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all solar system service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed solar equipment.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Mechanical':         { enabled: false, name: 'Mechanical Systems SLA',        response_time_hours: 24, uptime_percent: 97.0, billing_frequency: 'Quarterly', labor_rate: 115, emergency_rate: 165, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for standard mechanical service requests.\n\nUPTIME: Provider guarantees {{uptime}}% uptime for all installed mechanical systems.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Plumbing':           { enabled: false, name: 'Plumbing Systems SLA',          response_time_hours: 24, uptime_percent: 97.0, billing_frequency: 'Quarterly', labor_rate: 110, emergency_rate: 160, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for standard plumbing service requests.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'General Contractor': { enabled: false, name: 'General Contractor SLA',        response_time_hours: 48, uptime_percent: 95.0, billing_frequency: 'Quarterly', labor_rate: 105, emergency_rate: 150, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all service requests.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Other':              { enabled: false, name: 'Service Agreement SLA',         response_time_hours: 24, uptime_percent: 97.0, billing_frequency: 'Quarterly', labor_rate: 100, emergency_rate: 150, body: 'This Service Level Agreement ("SLA") is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nRESPONSE TIME: Provider guarantees a {{responseTime}} response time for all service requests.\n\nBILLING: Services billed {{billingFrequency}} at ${{laborRate}}/hr standard rate. Emergency calls billed at ${{emergencyRate}}/hr.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+}
+
+const MONITORING_DEFAULTS = {
+  'Security':        { enabled: true,  name: 'Security Monitoring Contract',   monthly_fee: 49,  monitored_systems: 'Cameras, Access Control, Intrusion Alarm',            billing_frequency: 'Monthly', escalation_contacts: 2, body: 'This Monitoring Contract is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nSERVICES: Provider will provide continuous monitoring of {{monitoredSystems}}.\n\nBILLING: Monitoring services billed at ${{monthlyFee}}/month, invoiced {{billingFrequency}}.\n\nESCALATION: Client shall designate {{escalationContacts}} authorized contact(s) for alerts and dispatch authorization.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'IT / Networking': { enabled: true,  name: 'Network Monitoring Contract',    monthly_fee: 99,  monitored_systems: 'Network Infrastructure, Servers, Endpoints',            billing_frequency: 'Monthly', escalation_contacts: 2, body: 'This Monitoring Contract is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nSERVICES: Provider will provide 24/7 monitoring of {{monitoredSystems}} with proactive alerting for critical events.\n\nBILLING: Monitoring services billed at ${{monthlyFee}}/month, invoiced {{billingFrequency}}.\n\nESCALATION: Client shall designate {{escalationContacts}} authorized contact(s) for alert notification and response.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Fire Protection': { enabled: true,  name: 'Fire Alarm Monitoring Contract', monthly_fee: 35,  monitored_systems: 'Fire Alarms, Smoke Detectors, Suppression Systems',      billing_frequency: 'Monthly', escalation_contacts: 3, body: 'This Monitoring Contract is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nSERVICES: Provider will provide central station monitoring of {{monitoredSystems}} with immediate dispatch protocols.\n\nBILLING: Monitoring services billed at ${{monthlyFee}}/month, invoiced {{billingFrequency}}.\n\nESCALATION: Client shall designate {{escalationContacts}} authorized contacts for alarm notification and dispatch.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Low Voltage':     { enabled: true,  name: 'Systems Monitoring Contract',    monthly_fee: 45,  monitored_systems: 'Low Voltage Systems, Access Control, AV Equipment',     billing_frequency: 'Monthly', escalation_contacts: 2, body: 'This Monitoring Contract is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nSERVICES: Provider will provide remote monitoring of {{monitoredSystems}} with proactive issue identification.\n\nBILLING: Monitoring services billed at ${{monthlyFee}}/month, invoiced {{billingFrequency}}.\n\nESCALATION: Client shall designate {{escalationContacts}} authorized contact(s) for notification and dispatch.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Telecom':         { enabled: true,  name: 'Telecom Monitoring Contract',    monthly_fee: 75,  monitored_systems: 'Voice Systems, Data Infrastructure, Network Equipment', billing_frequency: 'Monthly', escalation_contacts: 2, body: 'This Monitoring Contract is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nSERVICES: Provider will provide continuous monitoring of {{monitoredSystems}} with alerting for outages and performance degradation.\n\nBILLING: Monitoring services billed at ${{monthlyFee}}/month, invoiced {{billingFrequency}}.\n\nESCALATION: Client shall designate {{escalationContacts}} authorized contact(s) for notification.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'Audio/Visual':    { enabled: false, name: 'AV Systems Monitoring',          monthly_fee: 39,  monitored_systems: 'AV Systems, Displays, Control Systems',                  billing_frequency: 'Monthly', escalation_contacts: 1, body: 'This Monitoring Contract is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nSERVICES: Provider will provide remote monitoring of {{monitoredSystems}} with proactive alerts for system failures.\n\nBILLING: Monitoring services billed at ${{monthlyFee}}/month, invoiced {{billingFrequency}}.\n\nESCALATION: Client shall designate {{escalationContacts}} authorized contact(s) for notification.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+  'HVAC':            { enabled: false, name: 'HVAC Monitoring Contract',       monthly_fee: 59,  monitored_systems: 'HVAC Units, Thermostats, Air Quality Sensors',           billing_frequency: 'Monthly', escalation_contacts: 1, body: 'This Monitoring Contract is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nSERVICES: Provider will provide remote monitoring of {{monitoredSystems}} with alerts for performance issues.\n\nBILLING: Monitoring services billed at ${{monthlyFee}}/month, invoiced {{billingFrequency}}.\n\nESCALATION: Client shall designate {{escalationContacts}} authorized contact(s) for notification.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
+}
+
 export default function Settings({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [profile, setProfile] = useState(null)
   const [activeTab, setActiveTab] = useState('general')
@@ -62,6 +91,15 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     payment_instructions_notes: '',
   })
   const [savingInvoicing, setSavingInvoicing] = useState(false)
+  const [slaEnabled, setSlaEnabled] = useState(false)
+  const [slaAutoAttach, setSlaAutoAttach] = useState(false)
+  const [monitoringEnabled, setMonitoringEnabled] = useState(false)
+  const [monitoringAutoAttach, setMonitoringAutoAttach] = useState(false)
+  const [slaTemplates, setSlaTemplates] = useState({})
+  const [monitoringTemplates, setMonitoringTemplates] = useState({})
+  const [savingSLA, setSavingSLA] = useState(false)
+  const [expandedSLAIndustry, setExpandedSLAIndustry] = useState(null)
+  const [expandedMonIndustry, setExpandedMonIndustry] = useState(null)
 
   useEffect(() => {
     fetchProfile()
@@ -119,11 +157,23 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     // Fetch org data (tax rate + QBO status)
     if (data?.org_id) {
       try {
-        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, qbo_connected, qbo_company_name').eq('id', data.org_id).single()
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
         setOrgId(data.org_id)
         setQboConnected(orgData?.qbo_connected || false)
         setQboCompanyName(orgData?.qbo_company_name || '')
+        setSlaEnabled(orgData?.feature_sla || false)
+        setSlaAutoAttach(orgData?.sla_auto_attach || false)
+        setMonitoringEnabled(orgData?.feature_monitoring || false)
+        setMonitoringAutoAttach(orgData?.monitoring_auto_attach || false)
+        const savedSLA = orgData?.sla_templates || {}
+        const mergedSLA = {}
+        SLA_INDUSTRIES.forEach(ind => { mergedSLA[ind] = savedSLA[ind] ? { ...SLA_DEFAULTS[ind], ...savedSLA[ind] } : { ...(SLA_DEFAULTS[ind] || { enabled: false, name: `${ind} SLA`, response_time_hours: 8, uptime_percent: 99.0, billing_frequency: 'Quarterly', labor_rate: 100, emergency_rate: 150, body: '' }) } })
+        setSlaTemplates(mergedSLA)
+        const savedMon = orgData?.monitoring_templates || {}
+        const mergedMon = {}
+        MONITORING_INDUSTRIES.forEach(ind => { mergedMon[ind] = savedMon[ind] ? { ...MONITORING_DEFAULTS[ind], ...savedMon[ind] } : { ...(MONITORING_DEFAULTS[ind] || { enabled: false, name: `${ind} Monitoring`, monthly_fee: 49, monitored_systems: '', billing_frequency: 'Monthly', escalation_contacts: 2, body: '' }) } })
+        setMonitoringTemplates(mergedMon)
       } catch (e) { /* ignore */ }
     }
   }
@@ -237,6 +287,21 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setSavingPassword(false)
   }
 
+  const handleSaveSLA = async () => {
+    setSavingSLA(true)
+    setSuccess(null)
+    await supabase.from('organizations').update({
+      feature_sla: slaEnabled,
+      sla_auto_attach: slaAutoAttach,
+      sla_templates: slaTemplates,
+      feature_monitoring: monitoringEnabled,
+      monitoring_auto_attach: monitoringAutoAttach,
+      monitoring_templates: monitoringTemplates,
+    }).eq('id', orgId)
+    setSuccess('SLA & Monitoring settings saved')
+    setSavingSLA(false)
+  }
+
   const insertVariable = (stageKey, field, variable) => {
     const key = `${stageKey}_${field}`
     setEmailTemplates(prev => ({ ...prev, [key]: (prev[key] || '') + variable }))
@@ -266,6 +331,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
             ...(isAdmin ? [{ key: 'integrations', label: 'Integrations' }] : []),
             ...(isAdmin ? [{ key: 'email', label: 'Email Templates' }] : []),
             ...(isAdmin ? [{ key: 'invoicing', label: 'Invoicing' }] : []),
+            ...(isAdmin ? [{ key: 'sla', label: 'SLA & Contracts' }] : []),
           ].map(tab => (
             <button key={tab.key} onClick={() => { setActiveTab(tab.key); setSuccess(null) }}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === tab.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
@@ -597,6 +663,216 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                 <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs font-semibold px-3 py-1 rounded-full">Coming Soon</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── SLA & CONTRACTS TAB ── */}
+        {activeTab === 'sla' && isAdmin && (
+          <div className="space-y-6">
+
+            {/* Feature Toggles */}
+            <div className="bg-[#1a2d45] rounded-xl p-6 space-y-5">
+              <h3 className="text-white font-bold">Feature Settings</h3>
+
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-white text-sm font-semibold">Enable SLA Contracts</p>
+                  <p className="text-[#8A9AB0] text-xs mt-0.5">Show a Service Level Agreement section on proposals and allow templates per industry.</p>
+                </div>
+                <button onClick={() => setSlaEnabled(p => !p)}
+                  className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${slaEnabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                  <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${slaEnabled ? 'left-7' : 'left-1'}`} />
+                </button>
+              </div>
+
+              {slaEnabled && (
+                <div className="flex items-start justify-between pl-4 border-l-2 border-[#C8622A]/30">
+                  <div>
+                    <p className="text-white text-sm font-semibold">Auto-attach SLA to New Proposals</p>
+                    <p className="text-[#8A9AB0] text-xs mt-0.5">When a proposal is opened, automatically attach the matching industry SLA template if one exists.</p>
+                  </div>
+                  <button onClick={() => setSlaAutoAttach(p => !p)}
+                    className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${slaAutoAttach ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${slaAutoAttach ? 'left-7' : 'left-1'}`} />
+                  </button>
+                </div>
+              )}
+
+              <div className="border-t border-[#2a3d55] pt-5 flex items-start justify-between">
+                <div>
+                  <p className="text-white text-sm font-semibold">Enable Monitoring Contracts</p>
+                  <p className="text-[#8A9AB0] text-xs mt-0.5">Show a separate Monitoring Contract section on proposals. Disable for industries that don't use monitoring (roofing, painting, etc.).</p>
+                </div>
+                <button onClick={() => setMonitoringEnabled(p => !p)}
+                  className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${monitoringEnabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                  <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${monitoringEnabled ? 'left-7' : 'left-1'}`} />
+                </button>
+              </div>
+
+              {monitoringEnabled && (
+                <div className="flex items-start justify-between pl-4 border-l-2 border-[#C8622A]/30">
+                  <div>
+                    <p className="text-white text-sm font-semibold">Auto-attach Monitoring to New Proposals</p>
+                    <p className="text-[#8A9AB0] text-xs mt-0.5">Automatically attach the matching monitoring contract template when a proposal is opened.</p>
+                  </div>
+                  <button onClick={() => setMonitoringAutoAttach(p => !p)}
+                    className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${monitoringAutoAttach ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${monitoringAutoAttach ? 'left-7' : 'left-1'}`} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* SLA Templates */}
+            {slaEnabled && (
+              <div>
+                <div className="mb-3">
+                  <h3 className="text-white font-bold">SLA Templates by Industry</h3>
+                  <p className="text-[#8A9AB0] text-sm mt-1">Enable and customize the SLA contract for each industry. Variables: <span className="font-mono text-[#C8622A] text-xs">{'{{clientName}} {{companyName}} {{proposalName}} {{responseTime}} {{uptime}} {{billingFrequency}} {{laborRate}} {{emergencyRate}}'}</span></p>
+                </div>
+                <div className="space-y-2">
+                  {SLA_INDUSTRIES.map(ind => {
+                    const t = slaTemplates[ind] || {}
+                    const isOpen = expandedSLAIndustry === ind
+                    return (
+                      <div key={ind} className="bg-[#1a2d45] rounded-xl overflow-hidden border border-[#2a3d55]">
+                        <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-[#1f3550] transition-colors"
+                          onClick={() => setExpandedSLAIndustry(isOpen ? null : ind)}>
+                          <div className="flex items-center gap-3">
+                            <button onClick={e => { e.stopPropagation(); setSlaTemplates(prev => ({ ...prev, [ind]: { ...prev[ind], enabled: !prev[ind]?.enabled } })) }}
+                              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${t.enabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${t.enabled ? 'left-5' : 'left-0.5'}`} />
+                            </button>
+                            <div>
+                              <p className="text-white text-sm font-semibold">{ind}</p>
+                              {t.name && <p className="text-[#8A9AB0] text-xs">{t.name}</p>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs text-[#8A9AB0]">
+                            {t.response_time_hours && <span>{t.response_time_hours}hr response</span>}
+                            {t.uptime_percent && <span>{t.uptime_percent}% uptime</span>}
+                            <span>{isOpen ? '▲' : '▼'}</span>
+                          </div>
+                        </div>
+                        {isOpen && (
+                          <div className="border-t border-[#2a3d55] p-5 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="text-[#8A9AB0] text-xs mb-1 block">Template Name</label>
+                                <input type="text" value={t.name || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], name: e.target.value } }))} className={inputClass} />
+                              </div>
+                              <div>
+                                <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Frequency</label>
+                                <select value={t.billing_frequency || 'Quarterly'} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], billing_frequency: e.target.value } }))} className={inputClass}>
+                                  <option>Monthly</option><option>Quarterly</option><option>Annual</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[#8A9AB0] text-xs mb-1 block">Response Time (hours)</label>
+                                <input type="number" value={t.response_time_hours || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], response_time_hours: e.target.value } }))} className={inputClass} />
+                              </div>
+                              <div>
+                                <label className="text-[#8A9AB0] text-xs mb-1 block">Uptime Guarantee (%)</label>
+                                <input type="number" step="0.1" value={t.uptime_percent || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], uptime_percent: e.target.value } }))} className={inputClass} />
+                              </div>
+                              <div>
+                                <label className="text-[#8A9AB0] text-xs mb-1 block">Standard Labor Rate ($/hr)</label>
+                                <input type="number" value={t.labor_rate || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], labor_rate: e.target.value } }))} className={inputClass} />
+                              </div>
+                              <div>
+                                <label className="text-[#8A9AB0] text-xs mb-1 block">Emergency / Overtime Rate ($/hr)</label>
+                                <input type="number" value={t.emergency_rate || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], emergency_rate: e.target.value } }))} className={inputClass} />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Language</label>
+                              <textarea rows={10} value={t.body || ''} onChange={e => setSlaTemplates(p => ({ ...p, [ind]: { ...p[ind], body: e.target.value } }))}
+                                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none font-mono" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Monitoring Templates */}
+            {monitoringEnabled && (
+              <div>
+                <div className="mb-3">
+                  <h3 className="text-white font-bold">Monitoring Contract Templates by Industry</h3>
+                  <p className="text-[#8A9AB0] text-sm mt-1">Configure monitoring contracts per industry. Variables: <span className="font-mono text-[#C8622A] text-xs">{'{{clientName}} {{companyName}} {{proposalName}} {{monitoredSystems}} {{monthlyFee}} {{billingFrequency}} {{escalationContacts}}'}</span></p>
+                </div>
+                <div className="space-y-2">
+                  {MONITORING_INDUSTRIES.map(ind => {
+                    const t = monitoringTemplates[ind] || {}
+                    const isOpen = expandedMonIndustry === ind
+                    return (
+                      <div key={ind} className="bg-[#1a2d45] rounded-xl overflow-hidden border border-[#2a3d55]">
+                        <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-[#1f3550] transition-colors"
+                          onClick={() => setExpandedMonIndustry(isOpen ? null : ind)}>
+                          <div className="flex items-center gap-3">
+                            <button onClick={e => { e.stopPropagation(); setMonitoringTemplates(prev => ({ ...prev, [ind]: { ...prev[ind], enabled: !prev[ind]?.enabled } })) }}
+                              className={`relative w-10 h-5 rounded-full transition-colors shrink-0 ${t.enabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                              <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${t.enabled ? 'left-5' : 'left-0.5'}`} />
+                            </button>
+                            <div>
+                              <p className="text-white text-sm font-semibold">{ind}</p>
+                              {t.name && <p className="text-[#8A9AB0] text-xs">{t.name}</p>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs text-[#8A9AB0]">
+                            {t.monthly_fee && <span>${t.monthly_fee}/mo</span>}
+                            {t.billing_frequency && <span>{t.billing_frequency}</span>}
+                            <span>{isOpen ? '▲' : '▼'}</span>
+                          </div>
+                        </div>
+                        {isOpen && (
+                          <div className="border-t border-[#2a3d55] p-5 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="text-[#8A9AB0] text-xs mb-1 block">Template Name</label>
+                                <input type="text" value={t.name || ''} onChange={e => setMonitoringTemplates(p => ({ ...p, [ind]: { ...p[ind], name: e.target.value } }))} className={inputClass} />
+                              </div>
+                              <div>
+                                <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Frequency</label>
+                                <select value={t.billing_frequency || 'Monthly'} onChange={e => setMonitoringTemplates(p => ({ ...p, [ind]: { ...p[ind], billing_frequency: e.target.value } }))} className={inputClass}>
+                                  <option>Monthly</option><option>Quarterly</option><option>Annual</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-[#8A9AB0] text-xs mb-1 block">Monthly Fee ($)</label>
+                                <input type="number" value={t.monthly_fee || ''} onChange={e => setMonitoringTemplates(p => ({ ...p, [ind]: { ...p[ind], monthly_fee: e.target.value } }))} className={inputClass} />
+                              </div>
+                              <div>
+                                <label className="text-[#8A9AB0] text-xs mb-1 block">Escalation Contacts</label>
+                                <input type="number" min="1" value={t.escalation_contacts || ''} onChange={e => setMonitoringTemplates(p => ({ ...p, [ind]: { ...p[ind], escalation_contacts: e.target.value } }))} className={inputClass} />
+                              </div>
+                            </div>
+                            <div>
+                              <label className="text-[#8A9AB0] text-xs mb-1 block">Monitored Systems</label>
+                              <input type="text" value={t.monitored_systems || ''} onChange={e => setMonitoringTemplates(p => ({ ...p, [ind]: { ...p[ind], monitored_systems: e.target.value } }))} placeholder="e.g. Cameras, Access Control, Alarm" className={inputClass} />
+                            </div>
+                            <div>
+                              <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Language</label>
+                              <textarea rows={10} value={t.body || ''} onChange={e => setMonitoringTemplates(p => ({ ...p, [ind]: { ...p[ind], body: e.target.value } }))}
+                                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none font-mono" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            <button onClick={handleSaveSLA} disabled={savingSLA}
+              className="bg-[#C8622A] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+              {savingSLA ? 'Saving...' : 'Save SLA & Monitoring Settings'}
+            </button>
           </div>
         )}
 

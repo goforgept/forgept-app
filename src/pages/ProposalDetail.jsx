@@ -90,6 +90,16 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [quoteNumberError, setQuoteNumberError] = useState('')
   const [editingSOW, setEditingSOW] = useState(false)
   const [sowDraft, setSowDraft] = useState('')
+  const [uploadingSignedPDF, setUploadingSignedPDF] = useState(false)
+  const [slaContract, setSlaContract] = useState(null)
+  const [monitoringContract, setMonitoringContract] = useState(null)
+  const [orgSLASettings, setOrgSLASettings] = useState(null)
+  const [contractNotification, setContractNotification] = useState(null)
+  const [showSLAModal, setShowSLAModal] = useState(false)
+  const [showMonitoringModal, setShowMonitoringModal] = useState(false)
+  const [editSLAForm, setEditSLAForm] = useState({})
+  const [editMonitoringForm, setEditMonitoringForm] = useState({})
+  const [savingContract, setSavingContract] = useState(false)
 
   useEffect(() => {
     fetchProposal()
@@ -103,13 +113,38 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contract,monitoring_contract')
       .eq('id', id)
       .single()
 
     setProposal(data)
     setCollaborators(data?.collaborator_ids || [])
     setQboInvoiceId(data?.qbo_invoice_id || null)
+    setSlaContract(data?.sla_contract || null)
+    setMonitoringContract(data?.monitoring_contract || null)
+
+    // Load org SLA settings and auto-attach if applicable
+    if (data?.org_id) {
+      const { data: orgSLA } = await supabase.from('organizations')
+        .select('feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates')
+        .eq('id', data.org_id).single()
+      setOrgSLASettings(orgSLA)
+      const notifications = []
+      const updates = {}
+      if (orgSLA?.feature_sla && orgSLA?.sla_auto_attach && !data.sla_contract) {
+        const tmpl = orgSLA.sla_templates?.[data.industry]
+        if (tmpl?.enabled) { updates.sla_contract = tmpl; setSlaContract(tmpl); notifications.push('SLA contract') }
+      }
+      if (orgSLA?.feature_monitoring && orgSLA?.monitoring_auto_attach && !data.monitoring_contract) {
+        const tmpl = orgSLA.monitoring_templates?.[data.industry]
+        if (tmpl?.enabled) { updates.monitoring_contract = tmpl; setMonitoringContract(tmpl); notifications.push('Monitoring contract') }
+      }
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('proposals').update(updates).eq('id', data.id)
+        setContractNotification(`${notifications.join(' and ')} auto-attached based on industry (${data.industry}).`)
+        setTimeout(() => setContractNotification(null), 8000)
+      }
+    }
 
     if (data?.labor_items && data.labor_items.length > 0) {
       setLaborItems(data.labor_items)
@@ -363,6 +398,87 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       alert(`Could not send email. Share this link manually:\n${signingUrl}`)
     }
     setRequestingSignature(false)
+  }
+
+  const uploadSignedPDF = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setUploadingSignedPDF(true)
+    try {
+      const fileName = `${id}/uploaded-signed-${Date.now()}.pdf`
+      const { error: uploadError } = await supabase.storage
+        .from('signed-proposals')
+        .upload(fileName, file, { contentType: 'application/pdf', upsert: true })
+      if (uploadError) throw uploadError
+      const { data: urlData } = supabase.storage.from('signed-proposals').getPublicUrl(fileName)
+      await supabase.from('proposals').update({ signed_pdf_url: urlData.publicUrl }).eq('id', id)
+      setProposal(prev => ({ ...prev, signed_pdf_url: urlData.publicUrl }))
+      logActivity('Signed agreement uploaded manually')
+    } catch (err) {
+      alert('Error uploading signed PDF: ' + err.message)
+    }
+    setUploadingSignedPDF(false)
+  }
+
+  const openSLAModal = () => {
+    const tmpl = orgSLASettings?.sla_templates?.[proposal?.industry] || {}
+    const existing = slaContract || tmpl
+    setEditSLAForm({
+      name: existing.name || 'Service Level Agreement',
+      response_time_hours: existing.response_time_hours || 8,
+      uptime_percent: existing.uptime_percent || 99.0,
+      billing_frequency: existing.billing_frequency || 'Quarterly',
+      labor_rate: existing.labor_rate || 100,
+      emergency_rate: existing.emergency_rate || 150,
+      body: existing.body || '',
+    })
+    setShowSLAModal(true)
+  }
+
+  const saveSLAContract = async () => {
+    setSavingContract(true)
+    await supabase.from('proposals').update({ sla_contract: editSLAForm }).eq('id', id)
+    setSlaContract(editSLAForm)
+    setShowSLAModal(false)
+    logActivity('SLA contract attached/updated')
+    setSavingContract(false)
+  }
+
+  const removeSLAContract = async () => {
+    if (!window.confirm('Remove SLA contract from this proposal?')) return
+    await supabase.from('proposals').update({ sla_contract: null }).eq('id', id)
+    setSlaContract(null)
+    logActivity('SLA contract removed')
+  }
+
+  const openMonitoringModal = () => {
+    const tmpl = orgSLASettings?.monitoring_templates?.[proposal?.industry] || {}
+    const existing = monitoringContract || tmpl
+    setEditMonitoringForm({
+      name: existing.name || 'Monitoring Contract',
+      monthly_fee: existing.monthly_fee || 49,
+      monitored_systems: existing.monitored_systems || '',
+      billing_frequency: existing.billing_frequency || 'Monthly',
+      escalation_contacts: existing.escalation_contacts || 2,
+      body: existing.body || '',
+    })
+    setShowMonitoringModal(true)
+  }
+
+  const saveMonitoringContract = async () => {
+    setSavingContract(true)
+    await supabase.from('proposals').update({ monitoring_contract: editMonitoringForm }).eq('id', id)
+    setMonitoringContract(editMonitoringForm)
+    setShowMonitoringModal(false)
+    logActivity('Monitoring contract attached/updated')
+    setSavingContract(false)
+  }
+
+  const removeMonitoringContract = async () => {
+    if (!window.confirm('Remove monitoring contract from this proposal?')) return
+    await supabase.from('proposals').update({ monitoring_contract: null }).eq('id', id)
+    setMonitoringContract(null)
+    logActivity('Monitoring contract removed')
   }
 
   const generateSOW = async () => {
@@ -1409,6 +1525,15 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     <div className="flex min-h-screen bg-[#0F1C2E]">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
       <div className="flex-1 p-6 space-y-6">
+        {contractNotification && (
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-5 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-blue-400 text-lg">ℹ</span>
+              <p className="text-blue-300 text-sm font-medium">{contractNotification}</p>
+            </div>
+            <button onClick={() => setContractNotification(null)} className="text-[#8A9AB0] hover:text-white text-xl leading-none">×</button>
+          </div>
+        )}
 
         {/* Header */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
@@ -1522,6 +1647,17 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   {requestingSignature ? 'Sending...' : '✍️ Request Signature'}
                 </button>
               )}
+              {proposal?.signed_pdf_url && (
+                <a href={proposal.signed_pdf_url} target="_blank" rel="noopener noreferrer"
+                  className="bg-green-600/20 text-green-400 border border-green-600/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-600/30 transition-colors flex items-center gap-1">
+                  ⬇ Signed Copy
+                </a>
+              )}
+              <label className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1 ${uploadingSignedPDF ? 'bg-[#2a3d55] text-[#8A9AB0] opacity-50 cursor-not-allowed' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}
+                title="Upload a physically signed or externally signed agreement PDF">
+                {uploadingSignedPDF ? 'Uploading...' : '📎 Upload Signed'}
+                <input type="file" accept=".pdf" onChange={uploadSignedPDF} className="hidden" disabled={uploadingSignedPDF} />
+              </label>
               {qboConnected && proposal?.status === 'Won' && (
                 <button onClick={sendToQBO} disabled={sendingToQBO}
                   className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${qboInvoiceId ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-[#2CA01C] text-white hover:bg-[#259018]'}`}>
@@ -1591,16 +1727,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   <button onClick={() => setShowOrderModal(true)} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">🏭 Convert to Order</button>
                 )}
                 {orgType !== 'manufacturer' && (
-                  <button onClick={() => {
-                    if (selectedForPO.size === 0) return
-                    const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
-                    const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
-                    const matchedEmail = vendorNames.length === 1
-                      ? (vendors.find(v => v.vendor_name === vendorNames[0])?.contact_email || '')
-                      : ''
-                    setPOVendorEmail(matchedEmail)
-                    setShowPOModal(true)
-                  }}
+                  <button onClick={() => selectedForPO.size > 0 && setShowPOModal(true)}
                     disabled={selectedForPO.size === 0}
                     title={selectedForPO.size === 0 ? 'Check items below to select for PO' : `Generate PO for ${selectedForPO.size} items`}
                     className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
@@ -1946,6 +2073,118 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           </div>
         )}
 
+        {/* SLA Contract Section */}
+        {orgSLASettings?.feature_sla && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-3">
+                <span className="text-lg">📋</span>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Service Level Agreement</h3>
+                  {slaContract && <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-2 py-0.5 rounded-full ml-2">Attached</span>}
+                </div>
+              </div>
+              <div className="flex gap-2 items-center">
+                {slaContract && (
+                  <button onClick={removeSLAContract} className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors">Remove</button>
+                )}
+                <button onClick={openSLAModal} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                  {slaContract ? 'Edit SLA' : 'Attach SLA'}
+                </button>
+              </div>
+            </div>
+            {slaContract ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="bg-[#0F1C2E] rounded-lg p-3">
+                    <p className="text-[#8A9AB0] text-xs mb-1">Response Time</p>
+                    <p className="text-white text-sm font-semibold">{slaContract.response_time_hours} hours</p>
+                  </div>
+                  <div className="bg-[#0F1C2E] rounded-lg p-3">
+                    <p className="text-[#8A9AB0] text-xs mb-1">Uptime Guarantee</p>
+                    <p className="text-white text-sm font-semibold">{slaContract.uptime_percent}%</p>
+                  </div>
+                  <div className="bg-[#0F1C2E] rounded-lg p-3">
+                    <p className="text-[#8A9AB0] text-xs mb-1">Billing</p>
+                    <p className="text-white text-sm font-semibold">{slaContract.billing_frequency}</p>
+                  </div>
+                  <div className="bg-[#0F1C2E] rounded-lg p-3">
+                    <p className="text-[#8A9AB0] text-xs mb-1">Standard Rate</p>
+                    <p className="text-white text-sm font-semibold">${slaContract.labor_rate}/hr</p>
+                  </div>
+                  <div className="bg-[#0F1C2E] rounded-lg p-3">
+                    <p className="text-[#8A9AB0] text-xs mb-1">Emergency Rate</p>
+                    <p className="text-white text-sm font-semibold">${slaContract.emergency_rate}/hr</p>
+                  </div>
+                </div>
+                {slaContract.body && (
+                  <div className="bg-[#0F1C2E] rounded-lg p-4">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
+                    <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{slaContract.body}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-[#8A9AB0] text-sm">No SLA attached. Click "Attach SLA" to add one based on your {proposal?.industry} template.</p>
+            )}
+          </div>
+        )}
+
+        {/* Monitoring Contract Section */}
+        {orgSLASettings?.feature_monitoring && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <div className="flex items-center gap-3">
+                <span className="text-lg">📡</span>
+                <div>
+                  <h3 className="text-white font-bold text-lg">Monitoring Contract</h3>
+                  {monitoringContract && <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-2 py-0.5 rounded-full ml-2">Attached</span>}
+                </div>
+              </div>
+              <div className="flex gap-2 items-center">
+                {monitoringContract && (
+                  <button onClick={removeMonitoringContract} className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors">Remove</button>
+                )}
+                <button onClick={openMonitoringModal} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                  {monitoringContract ? 'Edit Contract' : 'Attach Monitoring'}
+                </button>
+              </div>
+            </div>
+            {monitoringContract ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="bg-[#0F1C2E] rounded-lg p-3">
+                    <p className="text-[#8A9AB0] text-xs mb-1">Monthly Fee</p>
+                    <p className="text-white text-sm font-semibold">${monitoringContract.monthly_fee}/mo</p>
+                  </div>
+                  <div className="bg-[#0F1C2E] rounded-lg p-3">
+                    <p className="text-[#8A9AB0] text-xs mb-1">Billing</p>
+                    <p className="text-white text-sm font-semibold">{monitoringContract.billing_frequency}</p>
+                  </div>
+                  <div className="bg-[#0F1C2E] rounded-lg p-3">
+                    <p className="text-[#8A9AB0] text-xs mb-1">Escalation Contacts</p>
+                    <p className="text-white text-sm font-semibold">{monitoringContract.escalation_contacts}</p>
+                  </div>
+                </div>
+                {monitoringContract.monitored_systems && (
+                  <div className="bg-[#0F1C2E] rounded-lg p-3">
+                    <p className="text-[#8A9AB0] text-xs mb-1">Monitored Systems</p>
+                    <p className="text-white text-sm">{monitoringContract.monitored_systems}</p>
+                  </div>
+                )}
+                {monitoringContract.body && (
+                  <div className="bg-[#0F1C2E] rounded-lg p-4">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
+                    <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{monitoringContract.body}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-[#8A9AB0] text-sm">No monitoring contract attached. Click "Attach Monitoring" to add one.</p>
+            )}
+          </div>
+        )}
+
         {/* Activity Feed */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <h3 className="text-white font-bold text-lg mb-4">Activity</h3>
@@ -2204,6 +2443,119 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowOrderModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
                 <button onClick={createOrder} disabled={creatingOrder || (!orderAutoNumber && !orderNumber)} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{creatingOrder ? 'Creating...' : 'Create Order'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SLA Edit Modal */}
+      {showSLAModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-white font-bold text-lg">📋 {slaContract ? 'Edit' : 'Attach'} Service Level Agreement</h3>
+              <button onClick={() => setShowSLAModal(false)} className="text-[#8A9AB0] hover:text-white text-2xl leading-none">×</button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Agreement Name</label>
+                <input type="text" value={editSLAForm.name || ''} onChange={e => setEditSLAForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Response Time (hours)</label>
+                  <input type="number" value={editSLAForm.response_time_hours || ''} onChange={e => setEditSLAForm(p => ({ ...p, response_time_hours: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Uptime Guarantee (%)</label>
+                  <input type="number" step="0.1" value={editSLAForm.uptime_percent || ''} onChange={e => setEditSLAForm(p => ({ ...p, uptime_percent: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Standard Labor Rate ($/hr)</label>
+                  <input type="number" value={editSLAForm.labor_rate || ''} onChange={e => setEditSLAForm(p => ({ ...p, labor_rate: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Emergency Rate ($/hr)</label>
+                  <input type="number" value={editSLAForm.emergency_rate || ''} onChange={e => setEditSLAForm(p => ({ ...p, emergency_rate: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Frequency</label>
+                  <select value={editSLAForm.billing_frequency || 'Quarterly'} onChange={e => setEditSLAForm(p => ({ ...p, billing_frequency: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                    <option>Monthly</option><option>Quarterly</option><option>Annual</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Language</label>
+                <textarea rows={12} value={editSLAForm.body || ''} onChange={e => setEditSLAForm(p => ({ ...p, body: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none font-mono" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowSLAModal(false)} className="flex-1 bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">Cancel</button>
+                <button onClick={saveSLAContract} disabled={savingContract} className="flex-1 bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {savingContract ? 'Saving...' : 'Save SLA'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Monitoring Contract Edit Modal */}
+      {showMonitoringModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="text-white font-bold text-lg">📡 {monitoringContract ? 'Edit' : 'Attach'} Monitoring Contract</h3>
+              <button onClick={() => setShowMonitoringModal(false)} className="text-[#8A9AB0] hover:text-white text-2xl leading-none">×</button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Name</label>
+                <input type="text" value={editMonitoringForm.name || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Monthly Fee ($)</label>
+                  <input type="number" value={editMonitoringForm.monthly_fee || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, monthly_fee: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Escalation Contacts</label>
+                  <input type="number" min="1" value={editMonitoringForm.escalation_contacts || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, escalation_contacts: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Frequency</label>
+                  <select value={editMonitoringForm.billing_frequency || 'Monthly'} onChange={e => setEditMonitoringForm(p => ({ ...p, billing_frequency: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                    <option>Monthly</option><option>Quarterly</option><option>Annual</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Monitored Systems</label>
+                  <input type="text" value={editMonitoringForm.monitored_systems || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, monitored_systems: e.target.value }))}
+                    placeholder="e.g. Cameras, Access Control, Alarm" className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Language</label>
+                <textarea rows={12} value={editMonitoringForm.body || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, body: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none font-mono" />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowMonitoringModal(false)} className="flex-1 bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">Cancel</button>
+                <button onClick={saveMonitoringContract} disabled={savingContract} className="flex-1 bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {savingContract ? 'Saving...' : 'Save Contract'}
+                </button>
               </div>
             </div>
           </div>
