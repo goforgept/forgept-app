@@ -1490,7 +1490,16 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       if (slaContract.body) {
         slaY += 4
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
-        const bodyLines = doc.splitTextToSize(slaContract.body, pageWidth - 28)
+        const resolvedSLABody = slaContract.body
+          .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
+          .replace(/\{\{clientName\}\}/g, proposal?.client_name || '')
+          .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
+          .replace(/\{\{responseTime\}\}/g, `${slaContract.response_time_hours || 8} hours`)
+          .replace(/\{\{uptime\}\}/g, `${slaContract.uptime_percent || 99}`)
+          .replace(/\{\{billingFrequency\}\}/g, slaContract.billing_frequency || 'Quarterly')
+          .replace(/\{\{laborRate\}\}/g, `${slaContract.labor_rate || 100}`)
+          .replace(/\{\{emergencyRate\}\}/g, `${slaContract.emergency_rate || 150}`)
+        const bodyLines = doc.splitTextToSize(resolvedSLABody, pageWidth - 28)
         doc.text(bodyLines, 14, slaY)
         slaY += bodyLines.length * 4.5 + 10
       } else { slaY += 10 }
@@ -1525,7 +1534,15 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       if (monitoringContract.body) {
         monY += 4
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
-        const monBodyLines = doc.splitTextToSize(monitoringContract.body, pageWidth - 28)
+        const resolvedMonBody = monitoringContract.body
+          .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
+          .replace(/\{\{clientName\}\}/g, proposal?.client_name || '')
+          .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
+          .replace(/\{\{monthlyFee\}\}/g, `${monitoringContract.monthly_fee || 49}`)
+          .replace(/\{\{monitoredSystems\}\}/g, monitoringContract.monitored_systems || '')
+          .replace(/\{\{billingFrequency\}\}/g, monitoringContract.billing_frequency || 'Monthly')
+          .replace(/\{\{escalationContacts\}\}/g, `${monitoringContract.escalation_contacts || 2}`)
+        const monBodyLines = doc.splitTextToSize(resolvedMonBody, pageWidth - 28)
         doc.text(monBodyLines, 14, monY)
         monY += monBodyLines.length * 4.5 + 10
       } else { monY += 10 }
@@ -2191,7 +2208,16 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 {slaContract.body && (
                   <div className="bg-[#0F1C2E] rounded-lg p-4">
                     <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
-                    <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{slaContract.body}</p>
+                    <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{slaContract.body
+                      .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
+                      .replace(/\{\{clientName\}\}/g, proposal?.client_name || '')
+                      .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
+                      .replace(/\{\{responseTime\}\}/g, `${slaContract.response_time_hours || 8} hours`)
+                      .replace(/\{\{uptime\}\}/g, `${slaContract.uptime_percent || 99}`)
+                      .replace(/\{\{billingFrequency\}\}/g, slaContract.billing_frequency || 'Quarterly')
+                      .replace(/\{\{laborRate\}\}/g, `${slaContract.labor_rate || 100}`)
+                      .replace(/\{\{emergencyRate\}\}/g, `${slaContract.emergency_rate || 150}`)
+                    }</p>
                   </div>
                 )}
               </div>
@@ -2246,7 +2272,15 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 {monitoringContract.body && (
                   <div className="bg-[#0F1C2E] rounded-lg p-4">
                     <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
-                    <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{monitoringContract.body}</p>
+                    <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{monitoringContract.body
+                      .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
+                      .replace(/\{\{clientName\}\}/g, proposal?.client_name || '')
+                      .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
+                      .replace(/\{\{monthlyFee\}\}/g, `${monitoringContract.monthly_fee || 49}`)
+                      .replace(/\{\{monitoredSystems\}\}/g, monitoringContract.monitored_systems || '')
+                      .replace(/\{\{billingFrequency\}\}/g, monitoringContract.billing_frequency || 'Monthly')
+                      .replace(/\{\{escalationContacts\}\}/g, `${monitoringContract.escalation_contacts || 2}`)
+                    }</p>
                   </div>
                 )}
               </div>
