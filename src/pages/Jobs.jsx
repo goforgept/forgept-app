@@ -43,6 +43,13 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
     return matchStatus && matchSearch
   })
 
+  const deleteJob = async (e, jobId) => {
+    e.stopPropagation()
+    if (!window.confirm('Delete this job? This cannot be undone.')) return
+    await supabase.from('jobs').delete().eq('id', jobId)
+    setJobs(prev => prev.filter(j => j.id !== jobId))
+  }
+
   const getProgress = (job) => {
     const items = job.job_checklist_items || []
     if (items.length === 0) return null
@@ -135,6 +142,9 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[job.status] || 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
                         {job.status}
                       </span>
+                      {isAdmin && (
+                        <button onClick={e => deleteJob(e, job.id)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors opacity-0 group-hover:opacity-100">Delete</button>
+                      )}
                       <span className="text-[#8A9AB0] group-hover:text-white transition-colors">→</span>
                     </div>
                   </div>
