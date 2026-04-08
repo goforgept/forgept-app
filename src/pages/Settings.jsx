@@ -75,7 +75,7 @@ const MONITORING_DEFAULTS = {
   'HVAC':            { enabled: false, name: 'HVAC Monitoring Contract',       monthly_fee: 59,  monitored_systems: 'HVAC Units, Thermostats, Air Quality Sensors',           billing_frequency: 'Monthly', escalation_contacts: 1, body: 'This Monitoring Contract is between {{companyName}} ("Provider") and {{clientName}} ("Client") for {{proposalName}}.\n\nSERVICES: Provider will provide remote monitoring of {{monitoredSystems}} with alerts for performance issues.\n\nBILLING: Monitoring services billed at ${{monthlyFee}}/month, invoiced {{billingFrequency}}.\n\nESCALATION: Client shall designate {{escalationContacts}} authorized contact(s) for notification.\n\nTERM: One (1) year from execution, auto-renewing unless cancelled with 30-days written notice.\n\nClient Signature: ___________________________      Date: ___________' },
 }
 
-export default function Settings({ isAdmin, featureProposals = true, featureCRM = false }) {
+export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, role, isSalesManager, isPM, isTechnician }) {
   const [profile, setProfile] = useState(null)
   const [activeTab, setActiveTab] = useState('general')
   const [form, setForm] = useState({
@@ -397,7 +397,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureSla={featureSla} featureMonitoring={featureMonitoring} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 max-w-4xl">
         <h2 className="text-white text-2xl font-bold mb-6">Settings</h2>
