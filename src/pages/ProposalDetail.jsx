@@ -570,13 +570,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         org_id: proposal?.org_id, proposal_id: id, client_id: proposal?.client_id || null,
         user_id: profile?.id, type: 'sla', name: c.name || 'Service Level Agreement',
         status: 'Active', start_date: c.start_date || null, end_date: c.end_date || null,
-        auto_renew: c.auto_renew || false, params: c,
+        auto_renew: c.auto_renew || false,
       })),
       ...(monArr || []).map(c => ({
         org_id: proposal?.org_id, proposal_id: id, client_id: proposal?.client_id || null,
         user_id: profile?.id, type: 'monitoring', name: c.name || 'Monitoring Contract',
         status: 'Active', start_date: c.start_date || null, end_date: c.end_date || null,
-        auto_renew: c.auto_renew || false, params: c,
+        auto_renew: c.auto_renew || false,
       })),
     ]
     if (rows.length > 0) {
