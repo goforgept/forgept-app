@@ -579,7 +579,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         auto_renew: c.auto_renew || false, params: c,
       })),
     ]
-    if (rows.length > 0) await supabase.from('contracts').insert(rows)
+    if (rows.length > 0) {
+      const { error } = await supabase.from('contracts').insert(rows)
+      if (error) alert('Contract insert error: ' + error.message)
+    }
   }
 
   const saveContractStartDates = async () => {
