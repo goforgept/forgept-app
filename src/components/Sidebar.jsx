@@ -138,10 +138,12 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
   }
 ]
 
-export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
+export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
   const location = useLocation()
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
+  const featureSla = featurSlaProp || sessionStorage.getItem('featureSla') === 'true'
+  const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featureMonitoring') === 'true'
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sidebarCollapsed') || '{}') } catch { return {} }
   })

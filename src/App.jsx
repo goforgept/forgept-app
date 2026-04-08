@@ -124,6 +124,8 @@ function App() {
   const featureSitePhotos = profile?.organizations?.feature_site_photos !== false
   const featureSla = profile?.organizations?.feature_sla || false
   const featureMonitoring = profile?.organizations?.feature_monitoring || false
+  sessionStorage.setItem('featureSla', featureSla)
+  sessionStorage.setItem('featureMonitoring', featureMonitoring)
 
   if (session && isPending) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
