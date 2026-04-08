@@ -168,7 +168,10 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     ;(propFull?.monitoring_contracts || []).forEach((c, i) => {
       if (c.monthly_fee > 0) {
         const key = `mon_${i}`
-        fees.push({ key, label: `${c.name || 'Monitoring Contract'} — ${c.billing_frequency || 'Monthly'} Fee`, amount: parseFloat(c.monthly_fee) || 0 })
+        const freq = c.billing_frequency || 'Monthly'
+        const multiplier = freq === 'Annual' || freq === 'Annually' ? 12 : freq === 'Quarterly' ? 3 : 1
+        const amount = (parseFloat(c.monthly_fee) || 0) * multiplier
+        fees.push({ key, label: `${c.name || 'Monitoring Contract'} — ${freq} Fee`, amount })
         initIncluded[key] = false
       }
     })
