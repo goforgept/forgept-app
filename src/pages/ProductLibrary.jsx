@@ -17,7 +17,7 @@ const AgeBadge = ({ days }) => {
   return <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">Stale — RFQ</span>
 }
 
-export default function ProductLibrary({ isAdmin, featureProposals = true, featureCRM = false }) {
+export default function ProductLibrary({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, isSalesManager = false, isPM = false, isTechnician = false }) {
   const [products, setProducts] = useState([])   // product_library rows
   const [pricing, setPricing] = useState({})      // { product_id: [pricing rows] }
   const [loading, setLoading] = useState(true)
@@ -202,7 +202,20 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
     })
     if (err) { setError(err.message); setSaving(false); return }
     setAddForm({ item_name: '', manufacturer: '', part_number: '', category: '', unit: 'ea', description: '' })
-    setShowAddForm(false); setSaving(false); fetchAll()
+    setShowAddForm(false); setSaving(false)
+    const { data: newProd } = await supabase
+      .from('product_library')
+      .select('id')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    await fetchAll()
+    if (newProd?.id) {
+      setExpandedId(newProd.id)
+      setAddingPriceFor(newProd.id)
+      setPriceForm({ vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] })
+    }
   }
 
   // ─── Add vendor price ─────────────────────────────────────────────────────
@@ -252,7 +265,7 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureSla={featureSla} featureMonitoring={featureMonitoring} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-6">
 
@@ -312,7 +325,7 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
               </div>
               <div><label className="text-[#8A9AB0] text-xs mb-1 block">Description</label><input type="text" value={addForm.description} onChange={e => setAddForm(p => ({ ...p, description: e.target.value }))} className={inputCls} /></div>
             </div>
-            <p className="text-[#8A9AB0] text-xs mb-4">After saving you can add vendor pricing to this product.</p>
+            <p className="text-[#8A9AB0] text-xs mb-4">After saving, the vendor pricing form will open automatically so you can add costs right away.</p>
             <button onClick={handleAddProduct} disabled={saving || !addForm.item_name}
               className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
               {saving ? 'Saving...' : 'Save Product'}

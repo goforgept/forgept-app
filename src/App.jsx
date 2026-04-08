@@ -199,7 +199,7 @@ function App() {
           <Route path="/service-tickets" element={<ServiceTickets {...sharedProps} />} />
           <Route path="/service-tickets/:id" element={<ServiceTicketDetail {...sharedProps} />} />
           <Route path="/dispatch" element={<Dispatch {...sharedProps} />} />
-          <Route path="/product-library" element={<ProductLibrary isAdmin={isAdmin} />} />
+          <Route path="/product-library" element={<ProductLibrary {...sharedProps} />} />
           {(featureSla || featureMonitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
         </>
       )}
