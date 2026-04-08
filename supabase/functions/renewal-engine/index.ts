@@ -177,6 +177,74 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── Contract renewals ──────────────────────────────────────────
+    const contractsRes = await fetch(
+      `${supabaseUrl}/rest/v1/contracts?status=eq.Active&end_date=gte.${todayStr}&end_date=lte.${in90Str}&select=*,proposals(*)`,
+      { headers: dbHeaders }
+    )
+    const expiringContracts = await contractsRes.json()
+
+    for (const contract of expiringContracts) {
+      const proposal = contract.proposals
+      if (!proposal) continue
+
+      const daysUntilEnd = Math.ceil((new Date(contract.end_date).getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+      if (![90, 60, 30, 7].includes(daysUntilEnd)) continue
+
+      // Get rep profile
+      const repRes = await fetch(
+        `${supabaseUrl}/rest/v1/profiles?id=eq.${proposal.user_id}&select=*`,
+        { headers: dbHeaders }
+      )
+      const reps = await repRes.json()
+      const rep = reps[0]
+      if (!rep?.email) continue
+
+      const typeLabel = contract.type === 'sla' ? 'Service Agreement' : 'Monitoring Contract'
+      const autoRenewNote = contract.auto_renew
+        ? '<p style="color:#16a34a;font-weight:bold;">✓ This contract is set to auto-renew.</p>'
+        : '<p style="color:#C8622A;font-weight:bold;">⚠ This contract is NOT set to auto-renew. Action may be required.</p>'
+
+      await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+        body: JSON.stringify({
+          sender: { name: 'ForgePt.', email: 'followups@goforgept.com' },
+          to: [{ email: rep.email, name: rep.full_name }],
+          subject: `${typeLabel} expiring in ${daysUntilEnd} days — ${proposal.company}`,
+          htmlContent: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+              <div style="background:#0F1C2E;padding:20px 28px;">
+                <span style="color:#ffffff;font-size:20px;font-weight:bold;">ForgePt.</span>
+              </div>
+              <div style="padding:28px;">
+                <h2 style="color:#0F1C2E;">📋 ${typeLabel} Expiring — ${daysUntilEnd} Days</h2>
+                <p>Hi ${rep.full_name},</p>
+                <p><strong>${proposal.company}</strong>'s ${typeLabel} <strong>"${contract.name}"</strong> expires on <strong>${new Date(contract.end_date).toLocaleDateString()}</strong>.</p>
+                ${autoRenewNote}
+                <p><a href="https://app.goforgept.com/proposal/${proposal.id}" style="background:#C8622A;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">View Proposal →</a></p>
+              </div>
+            </div>
+          `
+        })
+      })
+
+      // Log activity on the proposal
+      await fetch(`${supabaseUrl}/rest/v1/activities`, {
+        method: 'POST',
+        headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          proposal_id: proposal.id,
+          org_id: proposal.org_id,
+          type: 'note',
+          title: `${typeLabel} "${contract.name}" expiring in ${daysUntilEnd} days (${new Date(contract.end_date).toLocaleDateString()})`,
+        })
+      })
+
+      notified++
+    }
+    // ── End contract renewals ──────────────────────────────────────
+
     return new Response(JSON.stringify({ success: true, created, notified }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })

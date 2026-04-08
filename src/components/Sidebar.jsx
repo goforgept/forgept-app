@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import NotificationBell from './NotificationBell'
 
-const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType) => [
+const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring) => [
   {
     key: 'sales',
     label: 'Sales',
@@ -38,6 +38,7 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
         { label: 'Catalog', path: '/catalog', icon: '📦' },
         { label: 'Orders', path: '/orders', icon: '📦' },
       ] : []),
+      ...((featureSla || featureMonitoring) ? [{ label: 'Contracts', path: '/contracts', icon: '📋' }] : []),
     ].filter(l => l)
   },
   {
@@ -95,7 +96,7 @@ const NAV_GROUPS_TECH = () => [
   }
 ]
 
-const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType) => [
+const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, featureSla, featureMonitoring) => [
   {
     key: 'sales',
     label: 'Sales',
@@ -124,6 +125,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType) 
       ...(orgType === 'manufacturer' ? [
         { label: 'Catalog', path: '/catalog', icon: '📦' },
       ] : []),
+      ...((featureSla || featureMonitoring) ? [{ label: 'Contracts', path: '/contracts', icon: '📋' }] : []),
     ].filter(l => l)
   },
   {
@@ -136,7 +138,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType) 
   }
 ]
 
-export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
+export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
   const location = useLocation()
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
@@ -177,12 +179,12 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
   }
 
   const groups = isAdmin || isSalesManager
-    ? NAV_GROUPS_ADMIN(featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType)
+    ? NAV_GROUPS_ADMIN(featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring)
     : isPM
     ? NAV_GROUPS_PM(featurePurchaseOrders, featureInvoices)
     : isTechnician
     ? NAV_GROUPS_TECH()
-    : NAV_GROUPS_REP(featureProposals, featureCRM, featureInvoices, orgType)
+    : NAV_GROUPS_REP(featureProposals, featureCRM, featureInvoices, orgType, featureSla, featureMonitoring)
 
   const visibleGroups = groups.filter(g => g.links.length > 0)
 

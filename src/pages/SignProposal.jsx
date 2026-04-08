@@ -16,8 +16,8 @@ export default function SignProposal() {
   const [terms, setTerms] = useState('')
   const [orgProfile, setOrgProfile] = useState(null)
   const [signedAt, setSignedAt] = useState(null)
-  const [slaContract, setSlaContract] = useState(null)
-  const [monitoringContract, setMonitoringContract] = useState(null)
+  const [slaContracts, setSlaContracts] = useState([])
+  const [monitoringContracts, setMonitoringContracts] = useState([])
 
   useEffect(() => { fetchProposal() }, [token])
 
@@ -26,7 +26,7 @@ export default function SignProposal() {
 
     const { data, error: fetchError } = await supabase
       .from('proposals')
-      .select('id, proposal_name, company, client_name, client_email, scope_of_work, proposal_value, total_gross_margin_percent, labor_items, signature_name, signature_at, signing_token, org_id, lump_sum_pricing, tax_rate, tax_exempt, signed_pdf_url, sla_contract, monitoring_contract')
+      .select('id, proposal_name, company, client_name, client_email, scope_of_work, proposal_value, total_gross_margin_percent, labor_items, signature_name, signature_at, signing_token, org_id, lump_sum_pricing, tax_rate, tax_exempt, signed_pdf_url, sla_contracts, monitoring_contracts, sla_contract, monitoring_contract')
       .eq('signing_token', token)
       .single()
 
@@ -37,8 +37,10 @@ export default function SignProposal() {
     }
 
     setProposal(data)
-    setSlaContract(data.sla_contract || null)
-    setMonitoringContract(data.monitoring_contract || null)
+    const slaArr = (data?.sla_contracts?.length > 0) ? data.sla_contracts : (data?.sla_contract ? [data.sla_contract] : [])
+    const monArr = (data?.monitoring_contracts?.length > 0) ? data.monitoring_contracts : (data?.monitoring_contract ? [data.monitoring_contract] : [])
+    setSlaContracts(slaArr)
+    setMonitoringContracts(monArr)
 
     const { data: items } = await supabase
       .from('bom_line_items')
@@ -156,9 +158,9 @@ export default function SignProposal() {
       doc.text(termsLines, 14, 32)
     }
 
-    // SLA Contract page
-    const slaCon = prop.sla_contract
-    if (slaCon) {
+    // Service Agreement pages (one per agreement)
+    const slaArr = (prop.sla_contracts?.length > 0) ? prop.sla_contracts : (prop.sla_contract ? [prop.sla_contract] : [])
+    for (const slaCon of slaArr) {
       doc.addPage()
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text(slaCon.name || 'Service Level Agreement', 14, 20)
@@ -172,6 +174,8 @@ export default function SignProposal() {
         slaCon.emergency_rate ? ['Emergency Rate', `$${slaCon.emergency_rate}/hr`] : null,
         slaCon.maintenance_calls_per_year > 0 ? ['Maintenance Visits', `${slaCon.maintenance_calls_per_year}/year included`] : null,
         slaCon.recurring_fee > 0 ? ['Recurring Fee', `$${slaCon.recurring_fee} (${slaCon.billing_frequency || 'Quarterly'})`] : null,
+        slaCon.start_date ? ['Term', `${new Date(slaCon.start_date).toLocaleDateString()} – ${slaCon.end_date ? new Date(slaCon.end_date).toLocaleDateString() : 'TBD'}`] : null,
+        slaCon.auto_renew ? ['Auto-Renew', 'Yes'] : null,
       ].filter(Boolean)
       slaDetails.forEach(([label, value]) => {
         doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
@@ -199,7 +203,7 @@ export default function SignProposal() {
         slaY += slaBodyLines.length * 4.5 + 10
       } else { slaY += 10 }
       doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('SLA Acceptance', 14, slaY)
+      doc.text('Service Agreement Acceptance', 14, slaY)
       doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
       const ss1 = slaY + 14
       doc.text('Client Signature:', 14, ss1); doc.line(50, ss1, 140, ss1)
@@ -207,9 +211,9 @@ export default function SignProposal() {
       const ss2 = ss1 + 16; doc.text('Printed Name:', 14, ss2); doc.line(50, ss2, pageWidth - 14, ss2)
     }
 
-    // Monitoring Contract page
-    const monCon = prop.monitoring_contract
-    if (monCon) {
+    // Monitoring Contract pages (one per contract)
+    const monArr = (prop.monitoring_contracts?.length > 0) ? prop.monitoring_contracts : (prop.monitoring_contract ? [prop.monitoring_contract] : [])
+    for (const monCon of monArr) {
       doc.addPage()
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text(monCon.name || 'Monitoring Contract', 14, 20)
@@ -221,6 +225,8 @@ export default function SignProposal() {
         ['Billing', monCon.billing_frequency || 'Monthly'],
         monCon.monitored_systems ? ['Monitored Systems', monCon.monitored_systems] : null,
         ['Escalation Contacts', `${monCon.escalation_contacts || 2}`],
+        monCon.start_date ? ['Term', `${new Date(monCon.start_date).toLocaleDateString()} – ${monCon.end_date ? new Date(monCon.end_date).toLocaleDateString() : 'TBD'}`] : null,
+        monCon.auto_renew ? ['Auto-Renew', 'Yes'] : null,
       ].filter(Boolean)
       monDetails.forEach(([label, value]) => {
         doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
@@ -415,97 +421,75 @@ export default function SignProposal() {
           </div>
         )}
 
-        {slaContract && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">📋 {slaContract.name || 'Service Level Agreement'}</h3>
+        {slaContracts.map((slaC, idx) => (
+          <div key={idx} className="bg-[#1a2d45] rounded-xl p-6">
+            <h3 className="text-white font-bold text-lg mb-4">📋 {slaC.name || 'Service Level Agreement'}</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
-              {slaContract.response_time_hours && (
-                <div className="bg-[#0F1C2E] rounded-lg p-3">
-                  <p className="text-[#8A9AB0] text-xs mb-1">Response Time</p>
-                  <p className="text-white text-sm font-semibold">{slaContract.response_time_hours} hours</p>
-                </div>
-              )}
-              <div className="bg-[#0F1C2E] rounded-lg p-3">
-                <p className="text-[#8A9AB0] text-xs mb-1">Billing</p>
-                <p className="text-white text-sm font-semibold">{slaContract.billing_frequency || 'Quarterly'}</p>
-              </div>
-              <div className="bg-[#0F1C2E] rounded-lg p-3">
-                <p className="text-[#8A9AB0] text-xs mb-1">Standard Rate</p>
-                <p className="text-white text-sm font-semibold">${slaContract.labor_rate || 100}/hr</p>
-              </div>
-              {slaContract.emergency_rate && (
-                <div className="bg-[#0F1C2E] rounded-lg p-3">
-                  <p className="text-[#8A9AB0] text-xs mb-1">Emergency Rate</p>
-                  <p className="text-white text-sm font-semibold">${slaContract.emergency_rate}/hr</p>
-                </div>
-              )}
-              {slaContract.maintenance_calls_per_year > 0 && (
-                <div className="bg-[#0F1C2E] rounded-lg p-3">
-                  <p className="text-[#8A9AB0] text-xs mb-1">Included Visits/Year</p>
-                  <p className="text-white text-sm font-semibold">{slaContract.maintenance_calls_per_year}</p>
-                </div>
-              )}
-              {slaContract.recurring_fee > 0 && (
-                <div className="bg-[#0F1C2E] rounded-lg p-3">
-                  <p className="text-[#8A9AB0] text-xs mb-1">Recurring Fee</p>
-                  <p className="text-white text-sm font-semibold">${slaContract.recurring_fee}/{slaContract.billing_frequency || 'Quarterly'}</p>
-                </div>
-              )}
+              {slaC.response_time_hours && <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Response Time</p><p className="text-white text-sm font-semibold">{slaC.response_time_hours} hours</p></div>}
+              <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Billing</p><p className="text-white text-sm font-semibold">{slaC.billing_frequency || 'Quarterly'}</p></div>
+              <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Standard Rate</p><p className="text-white text-sm font-semibold">${slaC.labor_rate || 100}/hr</p></div>
+              {slaC.emergency_rate && <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Emergency Rate</p><p className="text-white text-sm font-semibold">${slaC.emergency_rate}/hr</p></div>}
+              {slaC.maintenance_calls_per_year > 0 && <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Included Visits/Year</p><p className="text-white text-sm font-semibold">{slaC.maintenance_calls_per_year}</p></div>}
+              {slaC.recurring_fee > 0 && <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Recurring Fee</p><p className="text-white text-sm font-semibold">${slaC.recurring_fee}/{slaC.billing_frequency || 'Quarterly'}</p></div>}
+              {slaC.start_date && <div className="bg-[#0F1C2E] rounded-lg p-3 col-span-2"><p className="text-[#8A9AB0] text-xs mb-1">Term</p><p className="text-white text-sm font-semibold">{new Date(slaC.start_date).toLocaleDateString()} – {slaC.end_date ? new Date(slaC.end_date).toLocaleDateString() : 'TBD'}</p></div>}
             </div>
-            {slaContract.body && (
-              <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{slaContract.body
+            {slaC.body && (
+              <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{slaC.body
                 .replace(/\{\{companyName\}\}/g, orgProfile?.company_name || proposal?.company || '')
                 .replace(/\{\{clientName\}\}/g, proposal?.company || '')
                 .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-                .replace(/\{\{responseTime\}\}/g, slaContract.response_time_hours ? `${slaContract.response_time_hours} hours` : 'as scheduled')
-                .replace(/\{\{billingFrequency\}\}/g, slaContract.billing_frequency || 'Quarterly')
-                .replace(/\{\{laborRate\}\}/g, `${slaContract.labor_rate || 100}`)
-                .replace(/\{\{emergencyRate\}\}/g, `${slaContract.emergency_rate || 150}`)
-                .replace(/\{\{tierName\}\}/g, slaContract.tier_name || slaContract.name || '')
-                .replace(/\{\{maintenanceCalls\}\}/g, `${slaContract.maintenance_calls_per_year || 0}`)
-                .replace(/\{\{initialFee\}\}/g, `${slaContract.initial_fee || 0}`)
-                .replace(/\{\{recurringFee\}\}/g, `${slaContract.recurring_fee || 0}`)
+                .replace(/\{\{responseTime\}\}/g, slaC.response_time_hours ? `${slaC.response_time_hours} hours` : 'as scheduled')
+                .replace(/\{\{billingFrequency\}\}/g, slaC.billing_frequency || 'Quarterly')
+                .replace(/\{\{laborRate\}\}/g, `${slaC.labor_rate || 100}`)
+                .replace(/\{\{emergencyRate\}\}/g, `${slaC.emergency_rate || 150}`)
+                .replace(/\{\{tierName\}\}/g, slaC.tier_name || slaC.name || '')
+                .replace(/\{\{maintenanceCalls\}\}/g, `${slaC.maintenance_calls_per_year || 0}`)
+                .replace(/\{\{initialFee\}\}/g, `${slaC.initial_fee || 0}`)
+                .replace(/\{\{recurringFee\}\}/g, `${slaC.recurring_fee || 0}`)
               }</p>
             )}
+            <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Service Agreement Acceptance</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-[#8A9AB0] text-xs mb-1">Client Signature</p><div className="border-b border-[#2a3d55] h-8" /></div>
+                <div><p className="text-[#8A9AB0] text-xs mb-1">Date</p><div className="border-b border-[#2a3d55] h-8" /></div>
+                <div className="col-span-2"><p className="text-[#8A9AB0] text-xs mb-1">Printed Name</p><div className="border-b border-[#2a3d55] h-8" /></div>
+              </div>
+            </div>
           </div>
-        )}
+        ))}
 
-        {monitoringContract && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">📡 {monitoringContract.name || 'Monitoring Contract'}</h3>
+        {monitoringContracts.map((monC, idx) => (
+          <div key={idx} className="bg-[#1a2d45] rounded-xl p-6">
+            <h3 className="text-white font-bold text-lg mb-4">📡 {monC.name || 'Monitoring Contract'}</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-[#0F1C2E] rounded-lg p-3">
-                <p className="text-[#8A9AB0] text-xs mb-1">Monthly Fee</p>
-                <p className="text-white text-sm font-semibold">${monitoringContract.monthly_fee || 49}/mo</p>
-              </div>
-              <div className="bg-[#0F1C2E] rounded-lg p-3">
-                <p className="text-[#8A9AB0] text-xs mb-1">Billing</p>
-                <p className="text-white text-sm font-semibold">{monitoringContract.billing_frequency || 'Monthly'}</p>
-              </div>
-              {monitoringContract.monitored_systems && (
-                <div className="bg-[#0F1C2E] rounded-lg p-3 col-span-2">
-                  <p className="text-[#8A9AB0] text-xs mb-1">Monitored Systems</p>
-                  <p className="text-white text-sm">{monitoringContract.monitored_systems}</p>
-                </div>
-              )}
-              <div className="bg-[#0F1C2E] rounded-lg p-3">
-                <p className="text-[#8A9AB0] text-xs mb-1">Escalation Contacts</p>
-                <p className="text-white text-sm font-semibold">{monitoringContract.escalation_contacts || 2}</p>
-              </div>
+              <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Monthly Fee</p><p className="text-white text-sm font-semibold">${monC.monthly_fee || 49}/mo</p></div>
+              <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Billing</p><p className="text-white text-sm font-semibold">{monC.billing_frequency || 'Monthly'}</p></div>
+              {monC.monitored_systems && <div className="bg-[#0F1C2E] rounded-lg p-3 col-span-2"><p className="text-[#8A9AB0] text-xs mb-1">Monitored Systems</p><p className="text-white text-sm">{monC.monitored_systems}</p></div>}
+              <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Escalation Contacts</p><p className="text-white text-sm font-semibold">{monC.escalation_contacts || 2}</p></div>
+              {monC.start_date && <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Term</p><p className="text-white text-sm font-semibold">{new Date(monC.start_date).toLocaleDateString()} – {monC.end_date ? new Date(monC.end_date).toLocaleDateString() : 'TBD'}</p></div>}
             </div>
-            {monitoringContract.body && (
-              <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{monitoringContract.body
+            {monC.body && (
+              <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{monC.body
                 .replace(/\{\{companyName\}\}/g, orgProfile?.company_name || proposal?.company || '')
                 .replace(/\{\{clientName\}\}/g, proposal?.company || '')
                 .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-                .replace(/\{\{monthlyFee\}\}/g, `${monitoringContract.monthly_fee || 49}`)
-                .replace(/\{\{monitoredSystems\}\}/g, monitoringContract.monitored_systems || '')
-                .replace(/\{\{billingFrequency\}\}/g, monitoringContract.billing_frequency || 'Monthly')
-                .replace(/\{\{escalationContacts\}\}/g, `${monitoringContract.escalation_contacts || 2}`)
+                .replace(/\{\{monthlyFee\}\}/g, `${monC.monthly_fee || 49}`)
+                .replace(/\{\{monitoredSystems\}\}/g, monC.monitored_systems || '')
+                .replace(/\{\{billingFrequency\}\}/g, monC.billing_frequency || 'Monthly')
+                .replace(/\{\{escalationContacts\}\}/g, `${monC.escalation_contacts || 2}`)
               }</p>
             )}
+            <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Monitoring Contract Acceptance</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-[#8A9AB0] text-xs mb-1">Client Signature</p><div className="border-b border-[#2a3d55] h-8" /></div>
+                <div><p className="text-[#8A9AB0] text-xs mb-1">Date</p><div className="border-b border-[#2a3d55] h-8" /></div>
+                <div className="col-span-2"><p className="text-[#8A9AB0] text-xs mb-1">Printed Name</p><div className="border-b border-[#2a3d55] h-8" /></div>
+              </div>
+            </div>
           </div>
-        )}
+        ))}
 
         <div className="bg-[#1a2d45] rounded-xl p-6">
           {signed ? (

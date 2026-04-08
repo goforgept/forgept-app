@@ -91,15 +91,20 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [editingSOW, setEditingSOW] = useState(false)
   const [sowDraft, setSowDraft] = useState('')
   const [uploadingSignedPDF, setUploadingSignedPDF] = useState(false)
-  const [slaContract, setSlaContract] = useState(null)
-  const [monitoringContract, setMonitoringContract] = useState(null)
+  const [slaContracts, setSlaContracts] = useState([])
+  const [monitoringContracts, setMonitoringContracts] = useState([])
   const [orgSLASettings, setOrgSLASettings] = useState(null)
   const [contractNotification, setContractNotification] = useState(null)
   const [showSLAModal, setShowSLAModal] = useState(false)
   const [showMonitoringModal, setShowMonitoringModal] = useState(false)
   const [editSLAForm, setEditSLAForm] = useState({})
   const [editMonitoringForm, setEditMonitoringForm] = useState({})
+  const [editingAgreementIdx, setEditingAgreementIdx] = useState(null)
   const [savingContract, setSavingContract] = useState(false)
+  const [showContractStartModal, setShowContractStartModal] = useState(false)
+  const [pendingContractItems, setPendingContractItems] = useState([])
+  const [pendingContractDates, setPendingContractDates] = useState({})
+  const [savingContractDates, setSavingContractDates] = useState(false)
 
   useEffect(() => {
     fetchProposal()
@@ -113,15 +118,19 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contract,monitoring_contract')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract')
       .eq('id', id)
       .single()
 
     setProposal(data)
     setCollaborators(data?.collaborator_ids || [])
     setQboInvoiceId(data?.qbo_invoice_id || null)
-    setSlaContract(data?.sla_contract || null)
-    setMonitoringContract(data?.monitoring_contract || null)
+
+    // Backward-compat: fall back to old singular columns if new arrays are empty
+    let slaArr = (data?.sla_contracts?.length > 0) ? data.sla_contracts : (data?.sla_contract ? [data.sla_contract] : [])
+    let monArr = (data?.monitoring_contracts?.length > 0) ? data.monitoring_contracts : (data?.monitoring_contract ? [data.monitoring_contract] : [])
+    setSlaContracts(slaArr)
+    setMonitoringContracts(monArr)
 
     // Load org SLA settings and auto-attach if applicable
     if (data?.org_id) {
@@ -131,13 +140,19 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       setOrgSLASettings(orgSLA)
       const notifications = []
       const updates = {}
-      if (orgSLA?.feature_sla && orgSLA?.sla_auto_attach && !data.sla_contract) {
+      if (orgSLA?.feature_sla && orgSLA?.sla_auto_attach && slaArr.length === 0) {
         const tmpl = orgSLA.sla_templates?.[data.industry]
-        if (tmpl?.enabled) { updates.sla_contract = tmpl; setSlaContract(tmpl); notifications.push('SLA contract') }
+        if (tmpl?.enabled) {
+          const newArr = [{ ...tmpl }]
+          updates.sla_contracts = newArr; setSlaContracts(newArr); slaArr = newArr; notifications.push('SLA contract')
+        }
       }
-      if (orgSLA?.feature_monitoring && orgSLA?.monitoring_auto_attach && !data.monitoring_contract) {
+      if (orgSLA?.feature_monitoring && orgSLA?.monitoring_auto_attach && monArr.length === 0) {
         const tmpl = orgSLA.monitoring_templates?.[data.industry]
-        if (tmpl?.enabled) { updates.monitoring_contract = tmpl; setMonitoringContract(tmpl); notifications.push('Monitoring contract') }
+        if (tmpl?.enabled) {
+          const newArr = [{ ...tmpl }]
+          updates.monitoring_contracts = newArr; setMonitoringContracts(newArr); monArr = newArr; notifications.push('Monitoring contract')
+        }
       }
       if (Object.keys(updates).length > 0) {
         await supabase.from('proposals').update(updates).eq('id', data.id)
@@ -276,6 +291,24 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         setProposal(prev => ({ ...prev, status: newStatus }))
         return
       }
+      // Check agreements missing a start date
+      const allAgreements = [
+        ...slaContracts.map((c, i) => ({ ...c, _type: 'sla', _idx: i })),
+        ...monitoringContracts.map((c, i) => ({ ...c, _type: 'monitoring', _idx: i })),
+      ]
+      const agreementsMissingDate = allAgreements.filter(c => !c.start_date)
+      if (agreementsMissingDate.length > 0) {
+        const initialDates = {}
+        agreementsMissingDate.forEach(c => { initialDates[`${c._type}_${c._idx}`] = '' })
+        setPendingContractItems(agreementsMissingDate)
+        setPendingContractDates(initialDates)
+        await supabase.from('proposals').update({ status: newStatus }).eq('id', id)
+        setProposal(prev => ({ ...prev, status: newStatus }))
+        setShowContractStartModal(true)
+        return
+      }
+      // All agreements have dates — create contract rows now
+      await createContractRows(slaContracts, monitoringContracts)
     }
     await supabase.from('proposals').update({ status: newStatus }).eq('id', id)
     setProposal(prev => ({ ...prev, status: newStatus }))
@@ -420,37 +453,49 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setUploadingSignedPDF(false)
   }
 
-  const openSLAModal = () => {
-    const industryConfig = orgSLASettings?.sla_templates?.[proposal?.industry] || {}
-    const tiers = industryConfig.tiers || []
-    if (slaContract) {
+  // Collect all enabled SLA tiers across all industries
+  const allSLATiers = () => {
+    const tiers = []
+    Object.entries(orgSLASettings?.sla_templates || {}).forEach(([industry, tmpl]) => {
+      if (tmpl?.tiers) tmpl.tiers.forEach(t => tiers.push({ ...t, _industry: industry }))
+    })
+    return tiers
+  }
+
+  const allMonitoringTemplates = () => {
+    const templates = []
+    Object.entries(orgSLASettings?.monitoring_templates || {}).forEach(([industry, tmpl]) => {
+      if (tmpl?.enabled) templates.push({ ...tmpl, _industry: industry })
+    })
+    return templates
+  }
+
+  const openSLAModal = (idx = null) => {
+    setEditingAgreementIdx(idx)
+    if (idx !== null) {
+      const c = slaContracts[idx]
       setEditSLAForm({
-        tier_id: slaContract.tier_id || '',
-        tier_name: slaContract.tier_name || slaContract.name || '',
-        name: slaContract.name || 'Service Level Agreement',
-        response_time_hours: slaContract.response_time_hours ?? '',
-        billing_frequency: slaContract.billing_frequency || 'Quarterly',
-        labor_rate: slaContract.labor_rate || 100,
-        emergency_rate: slaContract.emergency_rate ?? '',
-        maintenance_calls_per_year: slaContract.maintenance_calls_per_year || 0,
-        initial_fee: slaContract.initial_fee || 0,
-        recurring_fee: slaContract.recurring_fee || 0,
-        body: slaContract.body || '',
+        tier_id: c.tier_id || '', tier_name: c.tier_name || c.name || '',
+        name: c.name || 'Service Level Agreement',
+        response_time_hours: c.response_time_hours ?? '',
+        billing_frequency: c.billing_frequency || 'Quarterly',
+        labor_rate: c.labor_rate || 100, emergency_rate: c.emergency_rate ?? '',
+        maintenance_calls_per_year: c.maintenance_calls_per_year || 0,
+        initial_fee: c.initial_fee || 0, recurring_fee: c.recurring_fee || 0,
+        body: c.body || '', start_date: c.start_date || '', end_date: c.end_date || '', auto_renew: c.auto_renew || false,
       })
     } else {
+      const tiers = allSLATiers()
       const first = tiers[0] || {}
       setEditSLAForm({
-        tier_id: first.id || '',
-        tier_name: first.name || '',
+        tier_id: first.id || '', tier_name: first.name || '',
         name: first.name || 'Service Level Agreement',
         response_time_hours: first.response_time_hours ?? '',
         billing_frequency: first.billing_frequency || 'Quarterly',
-        labor_rate: first.labor_rate || 100,
-        emergency_rate: first.emergency_rate ?? '',
+        labor_rate: first.labor_rate || 100, emergency_rate: first.emergency_rate ?? '',
         maintenance_calls_per_year: first.maintenance_calls_per_year || 0,
-        initial_fee: first.initial_fee || 0,
-        recurring_fee: first.recurring_fee || 0,
-        body: first.body || '',
+        initial_fee: first.initial_fee || 0, recurring_fee: first.recurring_fee || 0,
+        body: first.body || '', start_date: '', end_date: '', auto_renew: false,
       })
     }
     setShowSLAModal(true)
@@ -458,48 +503,110 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
   const saveSLAContract = async () => {
     setSavingContract(true)
-    await supabase.from('proposals').update({ sla_contract: editSLAForm }).eq('id', id)
-    setSlaContract(editSLAForm)
+    const newArr = editingAgreementIdx !== null
+      ? slaContracts.map((c, i) => i === editingAgreementIdx ? editSLAForm : c)
+      : [...slaContracts, editSLAForm]
+    await supabase.from('proposals').update({ sla_contracts: newArr }).eq('id', id)
+    setSlaContracts(newArr)
     setShowSLAModal(false)
-    logActivity('SLA contract attached/updated')
+    logActivity(editingAgreementIdx !== null ? 'Service agreement updated' : 'Service agreement added')
     setSavingContract(false)
   }
 
-  const removeSLAContract = async () => {
-    if (!window.confirm('Remove SLA contract from this proposal?')) return
-    await supabase.from('proposals').update({ sla_contract: null }).eq('id', id)
-    setSlaContract(null)
-    logActivity('SLA contract removed')
+  const removeSLAContract = async (idx) => {
+    if (!window.confirm('Remove this service agreement?')) return
+    const newArr = slaContracts.filter((_, i) => i !== idx)
+    await supabase.from('proposals').update({ sla_contracts: newArr }).eq('id', id)
+    setSlaContracts(newArr)
+    logActivity('Service agreement removed')
   }
 
-  const openMonitoringModal = () => {
-    const tmpl = orgSLASettings?.monitoring_templates?.[proposal?.industry] || {}
-    const existing = monitoringContract || tmpl
-    setEditMonitoringForm({
-      name: existing.name || 'Monitoring Contract',
-      monthly_fee: existing.monthly_fee || 49,
-      monitored_systems: existing.monitored_systems || '',
-      billing_frequency: existing.billing_frequency || 'Monthly',
-      escalation_contacts: existing.escalation_contacts || 2,
-      body: existing.body || '',
-    })
+  const openMonitoringModal = (idx = null) => {
+    setEditingAgreementIdx(idx)
+    if (idx !== null) {
+      const c = monitoringContracts[idx]
+      setEditMonitoringForm({
+        name: c.name || 'Monitoring Contract', monthly_fee: c.monthly_fee || 49,
+        monitored_systems: c.monitored_systems || '', billing_frequency: c.billing_frequency || 'Monthly',
+        escalation_contacts: c.escalation_contacts || 2, body: c.body || '',
+        start_date: c.start_date || '', end_date: c.end_date || '', auto_renew: c.auto_renew || false,
+      })
+    } else {
+      const tmpls = allMonitoringTemplates()
+      const first = tmpls[0] || {}
+      setEditMonitoringForm({
+        name: first.name || 'Monitoring Contract', monthly_fee: first.monthly_fee || 49,
+        monitored_systems: first.monitored_systems || '', billing_frequency: first.billing_frequency || 'Monthly',
+        escalation_contacts: first.escalation_contacts || 2, body: first.body || '',
+        start_date: '', end_date: '', auto_renew: false,
+      })
+    }
     setShowMonitoringModal(true)
   }
 
   const saveMonitoringContract = async () => {
     setSavingContract(true)
-    await supabase.from('proposals').update({ monitoring_contract: editMonitoringForm }).eq('id', id)
-    setMonitoringContract(editMonitoringForm)
+    const newArr = editingAgreementIdx !== null
+      ? monitoringContracts.map((c, i) => i === editingAgreementIdx ? editMonitoringForm : c)
+      : [...monitoringContracts, editMonitoringForm]
+    await supabase.from('proposals').update({ monitoring_contracts: newArr }).eq('id', id)
+    setMonitoringContracts(newArr)
     setShowMonitoringModal(false)
-    logActivity('Monitoring contract attached/updated')
+    logActivity(editingAgreementIdx !== null ? 'Monitoring contract updated' : 'Monitoring contract added')
     setSavingContract(false)
   }
 
-  const removeMonitoringContract = async () => {
-    if (!window.confirm('Remove monitoring contract from this proposal?')) return
-    await supabase.from('proposals').update({ monitoring_contract: null }).eq('id', id)
-    setMonitoringContract(null)
+  const removeMonitoringContract = async (idx) => {
+    if (!window.confirm('Remove this monitoring contract?')) return
+    const newArr = monitoringContracts.filter((_, i) => i !== idx)
+    await supabase.from('proposals').update({ monitoring_contracts: newArr }).eq('id', id)
+    setMonitoringContracts(newArr)
     logActivity('Monitoring contract removed')
+  }
+
+  const createContractRows = async (slaArr, monArr) => {
+    const rows = [
+      ...(slaArr || []).map(c => ({
+        org_id: proposal?.org_id, proposal_id: id, client_id: proposal?.client_id || null,
+        user_id: profile?.id, type: 'sla', name: c.name || 'Service Level Agreement',
+        status: 'Active', start_date: c.start_date || null, end_date: c.end_date || null,
+        auto_renew: c.auto_renew || false, params: c,
+      })),
+      ...(monArr || []).map(c => ({
+        org_id: proposal?.org_id, proposal_id: id, client_id: proposal?.client_id || null,
+        user_id: profile?.id, type: 'monitoring', name: c.name || 'Monitoring Contract',
+        status: 'Active', start_date: c.start_date || null, end_date: c.end_date || null,
+        auto_renew: c.auto_renew || false, params: c,
+      })),
+    ]
+    if (rows.length > 0) await supabase.from('contracts').insert(rows)
+  }
+
+  const saveContractStartDates = async () => {
+    setSavingContractDates(true)
+    const newSla = slaContracts.map((c, i) => {
+      const key = `sla_${i}`
+      if (!pendingContractDates[key]) return c
+      const start = pendingContractDates[key]
+      const endDate = new Date(start); endDate.setFullYear(endDate.getFullYear() + 1)
+      return { ...c, start_date: start, end_date: endDate.toISOString().split('T')[0] }
+    })
+    const newMon = monitoringContracts.map((c, i) => {
+      const key = `monitoring_${i}`
+      if (!pendingContractDates[key]) return c
+      const start = pendingContractDates[key]
+      const endDate = new Date(start); endDate.setFullYear(endDate.getFullYear() + 1)
+      return { ...c, start_date: start, end_date: endDate.toISOString().split('T')[0] }
+    })
+    await supabase.from('proposals').update({ sla_contracts: newSla, monitoring_contracts: newMon }).eq('id', id)
+    setSlaContracts(newSla)
+    setMonitoringContracts(newMon)
+    await createContractRows(newSla, newMon)
+    setShowContractStartModal(false)
+    setPendingContractItems([])
+    setPendingContractDates({})
+    setSavingContractDates(false)
+    logActivity('Contract start dates set')
   }
 
   const generateSOW = async () => {
@@ -853,36 +960,38 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       sigLine(),
     )
 
-    if (slaContract) {
-      const resolvedSLABody = (slaContract.body || '')
+    for (const slaC of slaContracts) {
+      const resolvedSLABody = (slaC.body || '')
         .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
         .replace(/\{\{clientName\}\}/g, proposal?.company || '')
         .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-        .replace(/\{\{responseTime\}\}/g, slaContract.response_time_hours ? `${slaContract.response_time_hours} hours` : 'as scheduled')
-        .replace(/\{\{billingFrequency\}\}/g, slaContract.billing_frequency || 'Quarterly')
-        .replace(/\{\{laborRate\}\}/g, `${slaContract.labor_rate || 100}`)
-        .replace(/\{\{emergencyRate\}\}/g, `${slaContract.emergency_rate || 150}`)
-        .replace(/\{\{tierName\}\}/g, slaContract.tier_name || slaContract.name || '')
-        .replace(/\{\{maintenanceCalls\}\}/g, `${slaContract.maintenance_calls_per_year || 0}`)
-        .replace(/\{\{initialFee\}\}/g, `${slaContract.initial_fee || 0}`)
-        .replace(/\{\{recurringFee\}\}/g, `${slaContract.recurring_fee || 0}`)
+        .replace(/\{\{responseTime\}\}/g, slaC.response_time_hours ? `${slaC.response_time_hours} hours` : 'as scheduled')
+        .replace(/\{\{billingFrequency\}\}/g, slaC.billing_frequency || 'Quarterly')
+        .replace(/\{\{laborRate\}\}/g, `${slaC.labor_rate || 100}`)
+        .replace(/\{\{emergencyRate\}\}/g, `${slaC.emergency_rate || 150}`)
+        .replace(/\{\{tierName\}\}/g, slaC.tier_name || slaC.name || '')
+        .replace(/\{\{maintenanceCalls\}\}/g, `${slaC.maintenance_calls_per_year || 0}`)
+        .replace(/\{\{initialFee\}\}/g, `${slaC.initial_fee || 0}`)
+        .replace(/\{\{recurringFee\}\}/g, `${slaC.recurring_fee || 0}`)
       children.push(
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
-        new Paragraph({ children: [new TextRun({ text: slaContract.name || 'Service Level Agreement', bold: true, size: 28, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: slaC.name || 'Service Level Agreement', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         ...[
-          slaContract.response_time_hours ? `Response Time: ${slaContract.response_time_hours} hours` : null,
-          `Billing: ${slaContract.billing_frequency || 'Quarterly'}`,
-          `Standard Rate: $${slaContract.labor_rate || 100}/hr`,
-          slaContract.emergency_rate ? `Emergency Rate: $${slaContract.emergency_rate}/hr` : null,
-          slaContract.maintenance_calls_per_year > 0 ? `Included Maintenance Visits: ${slaContract.maintenance_calls_per_year}/year` : null,
-          slaContract.recurring_fee > 0 ? `Recurring Fee: $${slaContract.recurring_fee} (${slaContract.billing_frequency || 'Quarterly'})` : null,
+          slaC.response_time_hours ? `Response Time: ${slaC.response_time_hours} hours` : null,
+          `Billing: ${slaC.billing_frequency || 'Quarterly'}`,
+          `Standard Rate: $${slaC.labor_rate || 100}/hr`,
+          slaC.emergency_rate ? `Emergency Rate: $${slaC.emergency_rate}/hr` : null,
+          slaC.maintenance_calls_per_year > 0 ? `Included Maintenance Visits: ${slaC.maintenance_calls_per_year}/year` : null,
+          slaC.recurring_fee > 0 ? `Recurring Fee: $${slaC.recurring_fee} (${slaC.billing_frequency || 'Quarterly'})` : null,
+          slaC.start_date ? `Term: ${new Date(slaC.start_date).toLocaleDateString()} – ${slaC.end_date ? new Date(slaC.end_date).toLocaleDateString() : 'TBD'}` : null,
+          slaC.auto_renew ? 'Auto-Renew: Yes' : null,
         ].filter(Boolean).map(t => new Paragraph({ children: [new TextRun({ text: t, size: 18 })] })),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         ...resolvedSLABody.split('\n').map(line => new Paragraph({ children: [new TextRun({ text: line, size: 18, color: '444444' })] })),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
-        new Paragraph({ children: [new TextRun({ text: 'SLA Acceptance', bold: true, size: 22, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Service Agreement Acceptance', bold: true, size: 22, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         new Paragraph({ children: [new TextRun({ text: 'Client Signature', size: 18, color: '888888' })] }),
         sigLine(),
@@ -895,25 +1004,27 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       )
     }
 
-    if (monitoringContract) {
-      const resolvedMonBody = (monitoringContract.body || '')
+    for (const monC of monitoringContracts) {
+      const resolvedMonBody = (monC.body || '')
         .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
         .replace(/\{\{clientName\}\}/g, proposal?.company || '')
         .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-        .replace(/\{\{monthlyFee\}\}/g, `${monitoringContract.monthly_fee || 49}`)
-        .replace(/\{\{monitoredSystems\}\}/g, monitoringContract.monitored_systems || '')
-        .replace(/\{\{billingFrequency\}\}/g, monitoringContract.billing_frequency || 'Monthly')
-        .replace(/\{\{escalationContacts\}\}/g, `${monitoringContract.escalation_contacts || 2}`)
+        .replace(/\{\{monthlyFee\}\}/g, `${monC.monthly_fee || 49}`)
+        .replace(/\{\{monitoredSystems\}\}/g, monC.monitored_systems || '')
+        .replace(/\{\{billingFrequency\}\}/g, monC.billing_frequency || 'Monthly')
+        .replace(/\{\{escalationContacts\}\}/g, `${monC.escalation_contacts || 2}`)
       children.push(
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
-        new Paragraph({ children: [new TextRun({ text: monitoringContract.name || 'Monitoring Contract', bold: true, size: 28, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: monC.name || 'Monitoring Contract', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         ...[
-          `Monthly Fee: $${monitoringContract.monthly_fee || 49}/mo`,
-          `Billing: ${monitoringContract.billing_frequency || 'Monthly'}`,
-          monitoringContract.monitored_systems ? `Monitored Systems: ${monitoringContract.monitored_systems}` : null,
-          `Escalation Contacts: ${monitoringContract.escalation_contacts || 2}`,
+          `Monthly Fee: $${monC.monthly_fee || 49}/mo`,
+          `Billing: ${monC.billing_frequency || 'Monthly'}`,
+          monC.monitored_systems ? `Monitored Systems: ${monC.monitored_systems}` : null,
+          `Escalation Contacts: ${monC.escalation_contacts || 2}`,
+          monC.start_date ? `Term: ${new Date(monC.start_date).toLocaleDateString()} – ${monC.end_date ? new Date(monC.end_date).toLocaleDateString() : 'TBD'}` : null,
+          monC.auto_renew ? 'Auto-Renew: Yes' : null,
         ].filter(Boolean).map(t => new Paragraph({ children: [new TextRun({ text: t, size: 18 })] })),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         ...resolvedMonBody.split('\n').map(line => new Paragraph({ children: [new TextRun({ text: line, size: 18, color: '444444' })] })),
@@ -1566,49 +1677,51 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const s3 = s2 + 20; doc.text('Title:', 14, s3); doc.line(30, s3, pageWidth - 14, s3)
     }
 
-    if (slaContract) {
+    for (const slaC of slaContracts) {
       doc.addPage()
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text(slaContract.name || 'Service Level Agreement', 14, 20)
+      doc.text(slaC.name || 'Service Level Agreement', 14, 20)
       doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.line(14, 24, pageWidth - 14, 24)
       let slaY = 34
       doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
       const slaDetails = [
-        slaContract.response_time_hours ? ['Response Time', `${slaContract.response_time_hours} hours`] : null,
-        ['Billing', slaContract.billing_frequency || 'Quarterly'],
-        ['Labor Rate', `$${slaContract.labor_rate || 100}/hr`],
-        slaContract.emergency_rate ? ['Emergency Rate', `$${slaContract.emergency_rate}/hr`] : null,
-        slaContract.maintenance_calls_per_year > 0 ? ['Maintenance Visits', `${slaContract.maintenance_calls_per_year}/year included`] : null,
-        slaContract.initial_fee > 0 ? ['Initial Fee', `$${slaContract.initial_fee} (billed with job)`] : null,
-        slaContract.recurring_fee > 0 ? ['Recurring Fee', `$${slaContract.recurring_fee} (${slaContract.billing_frequency || 'Quarterly'})`] : null,
+        slaC.response_time_hours ? ['Response Time', `${slaC.response_time_hours} hours`] : null,
+        ['Billing', slaC.billing_frequency || 'Quarterly'],
+        ['Labor Rate', `$${slaC.labor_rate || 100}/hr`],
+        slaC.emergency_rate ? ['Emergency Rate', `$${slaC.emergency_rate}/hr`] : null,
+        slaC.maintenance_calls_per_year > 0 ? ['Maintenance Visits', `${slaC.maintenance_calls_per_year}/year included`] : null,
+        slaC.initial_fee > 0 ? ['Initial Fee', `$${slaC.initial_fee} (billed with job)`] : null,
+        slaC.recurring_fee > 0 ? ['Recurring Fee', `$${slaC.recurring_fee} (${slaC.billing_frequency || 'Quarterly'})`] : null,
+        slaC.start_date ? ['Term', `${new Date(slaC.start_date).toLocaleDateString()} – ${slaC.end_date ? new Date(slaC.end_date).toLocaleDateString() : 'TBD'}`] : null,
+        slaC.auto_renew ? ['Auto-Renew', 'Yes'] : null,
       ].filter(Boolean)
       slaDetails.forEach(([label, value]) => {
         doc.setFont('helvetica', 'bold'); doc.text(`${label}:`, 14, slaY)
         doc.setFont('helvetica', 'normal'); doc.text(value, 70, slaY)
         slaY += 7
       })
-      if (slaContract.body) {
+      if (slaC.body) {
         slaY += 4
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
-        const resolvedSLABody = slaContract.body
+        const resolvedSLABody = slaC.body
           .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
           .replace(/\{\{clientName\}\}/g, proposal?.company || '')
           .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-          .replace(/\{\{tierName\}\}/g, slaContract.tier_name || slaContract.name || '')
-          .replace(/\{\{responseTime\}\}/g, slaContract.response_time_hours ? `${slaContract.response_time_hours} hours` : 'as scheduled')
-          .replace(/\{\{billingFrequency\}\}/g, slaContract.billing_frequency || 'Quarterly')
-          .replace(/\{\{laborRate\}\}/g, `${slaContract.labor_rate || 100}`)
-          .replace(/\{\{emergencyRate\}\}/g, `${slaContract.emergency_rate || 150}`)
-          .replace(/\{\{maintenanceCalls\}\}/g, `${slaContract.maintenance_calls_per_year || 0}`)
-          .replace(/\{\{initialFee\}\}/g, `${slaContract.initial_fee || 0}`)
-          .replace(/\{\{recurringFee\}\}/g, `${slaContract.recurring_fee || 0}`)
+          .replace(/\{\{tierName\}\}/g, slaC.tier_name || slaC.name || '')
+          .replace(/\{\{responseTime\}\}/g, slaC.response_time_hours ? `${slaC.response_time_hours} hours` : 'as scheduled')
+          .replace(/\{\{billingFrequency\}\}/g, slaC.billing_frequency || 'Quarterly')
+          .replace(/\{\{laborRate\}\}/g, `${slaC.labor_rate || 100}`)
+          .replace(/\{\{emergencyRate\}\}/g, `${slaC.emergency_rate || 150}`)
+          .replace(/\{\{maintenanceCalls\}\}/g, `${slaC.maintenance_calls_per_year || 0}`)
+          .replace(/\{\{initialFee\}\}/g, `${slaC.initial_fee || 0}`)
+          .replace(/\{\{recurringFee\}\}/g, `${slaC.recurring_fee || 0}`)
         const bodyLines = doc.splitTextToSize(resolvedSLABody, pageWidth - 28)
         doc.text(bodyLines, 14, slaY)
         slaY += bodyLines.length * 4.5 + 10
       } else { slaY += 10 }
       doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('SLA Acceptance', 14, slaY)
+      doc.text('Service Agreement Acceptance', 14, slaY)
       doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
       const ss1 = slaY + 14
       doc.text('Client Signature:', 14, ss1); doc.line(50, ss1, 140, ss1)
@@ -1616,36 +1729,38 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const ss2 = ss1 + 16; doc.text('Printed Name:', 14, ss2); doc.line(50, ss2, pageWidth - 14, ss2)
     }
 
-    if (monitoringContract) {
+    for (const monC of monitoringContracts) {
       doc.addPage()
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text(monitoringContract.name || 'Monitoring Contract', 14, 20)
+      doc.text(monC.name || 'Monitoring Contract', 14, 20)
       doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.line(14, 24, pageWidth - 14, 24)
       let monY = 34
       doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
       const monDetails = [
-        ['Monthly Fee', `$${monitoringContract.monthly_fee || 49}/mo`],
-        ['Monitored Systems', monitoringContract.monitored_systems || '—'],
-        ['Billing Frequency', monitoringContract.billing_frequency || 'Monthly'],
-        ['Escalation Contacts', monitoringContract.escalation_contacts || '2'],
-      ]
+        ['Monthly Fee', `$${monC.monthly_fee || 49}/mo`],
+        ['Monitored Systems', monC.monitored_systems || '—'],
+        ['Billing Frequency', monC.billing_frequency || 'Monthly'],
+        ['Escalation Contacts', monC.escalation_contacts || '2'],
+        monC.start_date ? ['Term', `${new Date(monC.start_date).toLocaleDateString()} – ${monC.end_date ? new Date(monC.end_date).toLocaleDateString() : 'TBD'}`] : null,
+        monC.auto_renew ? ['Auto-Renew', 'Yes'] : null,
+      ].filter(Boolean)
       monDetails.forEach(([label, value]) => {
         doc.setFont('helvetica', 'bold'); doc.text(`${label}:`, 14, monY)
         doc.setFont('helvetica', 'normal'); doc.text(String(value), 70, monY)
         monY += 7
       })
-      if (monitoringContract.body) {
+      if (monC.body) {
         monY += 4
         doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
-        const resolvedMonBody = monitoringContract.body
+        const resolvedMonBody = monC.body
           .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
           .replace(/\{\{clientName\}\}/g, proposal?.company || '')
           .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-          .replace(/\{\{monthlyFee\}\}/g, `${monitoringContract.monthly_fee || 49}`)
-          .replace(/\{\{monitoredSystems\}\}/g, monitoringContract.monitored_systems || '')
-          .replace(/\{\{billingFrequency\}\}/g, monitoringContract.billing_frequency || 'Monthly')
-          .replace(/\{\{escalationContacts\}\}/g, `${monitoringContract.escalation_contacts || 2}`)
+          .replace(/\{\{monthlyFee\}\}/g, `${monC.monthly_fee || 49}`)
+          .replace(/\{\{monitoredSystems\}\}/g, monC.monitored_systems || '')
+          .replace(/\{\{billingFrequency\}\}/g, monC.billing_frequency || 'Monthly')
+          .replace(/\{\{escalationContacts\}\}/g, `${monC.escalation_contacts || 2}`)
         const monBodyLines = doc.splitTextToSize(resolvedMonBody, pageWidth - 28)
         doc.text(monBodyLines, 14, monY)
         monY += monBodyLines.length * 4.5 + 10
@@ -2265,92 +2380,65 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           </div>
         )}
 
-        {/* SLA Contract Section */}
+        {/* Service Agreement Section */}
         {orgSLASettings?.feature_sla && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
                 <span className="text-lg">📋</span>
-                <div>
-                  <h3 className="text-white font-bold text-lg">Service Level Agreement</h3>
-                  {slaContract && <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-2 py-0.5 rounded-full ml-2">Attached</span>}
-                </div>
+                <h3 className="text-white font-bold text-lg">Service Agreements</h3>
+                {slaContracts.length > 0 && <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-2 py-0.5 rounded-full">{slaContracts.length} attached</span>}
               </div>
-              <div className="flex gap-2 items-center">
-                {slaContract && (
-                  <button onClick={removeSLAContract} className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors">Remove</button>
-                )}
-                <button onClick={openSLAModal} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-                  {slaContract ? 'Edit SLA' : 'Attach SLA'}
-                </button>
-              </div>
+              <button onClick={() => openSLAModal(null)} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Service Agreement</button>
             </div>
-            {slaContract ? (
-              <div className="space-y-3">
-                {slaContract.tier_name && (
-                  <span className="inline-block bg-[#C8622A]/20 text-[#C8622A] text-xs font-semibold px-3 py-1 rounded-full">{slaContract.tier_name}</span>
-                )}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {slaContract.response_time_hours && (
-                    <div className="bg-[#0F1C2E] rounded-lg p-3">
-                      <p className="text-[#8A9AB0] text-xs mb-1">Response Time</p>
-                      <p className="text-white text-sm font-semibold">{slaContract.response_time_hours} hours</p>
-                    </div>
-                  )}
-                  <div className="bg-[#0F1C2E] rounded-lg p-3">
-                    <p className="text-[#8A9AB0] text-xs mb-1">Billing</p>
-                    <p className="text-white text-sm font-semibold">{slaContract.billing_frequency}</p>
-                  </div>
-                  <div className="bg-[#0F1C2E] rounded-lg p-3">
-                    <p className="text-[#8A9AB0] text-xs mb-1">Standard Rate</p>
-                    <p className="text-white text-sm font-semibold">${slaContract.labor_rate}/hr</p>
-                  </div>
-                  {slaContract.emergency_rate && (
-                    <div className="bg-[#0F1C2E] rounded-lg p-3">
-                      <p className="text-[#8A9AB0] text-xs mb-1">Emergency Rate</p>
-                      <p className="text-white text-sm font-semibold">${slaContract.emergency_rate}/hr</p>
-                    </div>
-                  )}
-                  {slaContract.maintenance_calls_per_year > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-lg p-3">
-                      <p className="text-[#8A9AB0] text-xs mb-1">Maintenance Visits/Year</p>
-                      <p className="text-white text-sm font-semibold">{slaContract.maintenance_calls_per_year}</p>
-                    </div>
-                  )}
-                  {slaContract.recurring_fee > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-lg p-3">
-                      <p className="text-[#8A9AB0] text-xs mb-1">Recurring Fee</p>
-                      <p className="text-white text-sm font-semibold">${slaContract.recurring_fee}/{slaContract.billing_frequency}</p>
-                    </div>
-                  )}
-                  {slaContract.initial_fee > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-lg p-3">
-                      <p className="text-[#8A9AB0] text-xs mb-1">Initial Fee</p>
-                      <p className="text-white text-sm font-semibold">${slaContract.initial_fee} <span className="text-[#8A9AB0] font-normal text-xs">billed with job</span></p>
-                    </div>
-                  )}
-                </div>
-                {slaContract.body && (
-                  <div className="bg-[#0F1C2E] rounded-lg p-4">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
-                    <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{slaContract.body
-                      .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
-                      .replace(/\{\{clientName\}\}/g, proposal?.company || '')
-                      .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-                      .replace(/\{\{tierName\}\}/g, slaContract.tier_name || slaContract.name || '')
-                      .replace(/\{\{responseTime\}\}/g, slaContract.response_time_hours ? `${slaContract.response_time_hours} hours` : 'as scheduled')
-                      .replace(/\{\{billingFrequency\}\}/g, slaContract.billing_frequency || 'Quarterly')
-                      .replace(/\{\{laborRate\}\}/g, `${slaContract.labor_rate || 100}`)
-                      .replace(/\{\{emergencyRate\}\}/g, `${slaContract.emergency_rate || 150}`)
-                      .replace(/\{\{maintenanceCalls\}\}/g, `${slaContract.maintenance_calls_per_year || 0}`)
-                      .replace(/\{\{initialFee\}\}/g, `${slaContract.initial_fee || 0}`)
-                      .replace(/\{\{recurringFee\}\}/g, `${slaContract.recurring_fee || 0}`)
-                    }</p>
-                  </div>
-                )}
-              </div>
+            {slaContracts.length === 0 ? (
+              <p className="text-[#8A9AB0] text-sm">No service agreements attached. Click "Add Service Agreement" to add one.</p>
             ) : (
-              <p className="text-[#8A9AB0] text-sm">No SLA attached. Click "Attach SLA" to add one based on your {proposal?.industry} template.</p>
+              <div className="space-y-4">
+                {slaContracts.map((slaC, idx) => (
+                  <div key={idx} className="bg-[#0F1C2E] rounded-xl p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-white font-semibold">{slaC.name || 'Service Level Agreement'}</p>
+                        {slaC.tier_name && <span className="inline-block bg-[#C8622A]/20 text-[#C8622A] text-xs font-semibold px-2 py-0.5 rounded-full mt-1">{slaC.tier_name}</span>}
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => openSLAModal(idx)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Edit</button>
+                        <button onClick={() => removeSLAContract(idx)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Remove</button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {slaC.response_time_hours && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Response Time</p><p className="text-white text-sm font-semibold">{slaC.response_time_hours} hours</p></div>}
+                      <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Billing</p><p className="text-white text-sm font-semibold">{slaC.billing_frequency}</p></div>
+                      <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Standard Rate</p><p className="text-white text-sm font-semibold">${slaC.labor_rate}/hr</p></div>
+                      {slaC.emergency_rate && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Emergency Rate</p><p className="text-white text-sm font-semibold">${slaC.emergency_rate}/hr</p></div>}
+                      {slaC.maintenance_calls_per_year > 0 && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Maintenance/Year</p><p className="text-white text-sm font-semibold">{slaC.maintenance_calls_per_year}</p></div>}
+                      {slaC.recurring_fee > 0 && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Recurring Fee</p><p className="text-white text-sm font-semibold">${slaC.recurring_fee}/{slaC.billing_frequency}</p></div>}
+                      {slaC.initial_fee > 0 && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Initial Fee</p><p className="text-white text-sm font-semibold">${slaC.initial_fee} <span className="text-[#8A9AB0] font-normal text-xs">w/ job</span></p></div>}
+                      {slaC.start_date && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Term</p><p className="text-white text-sm font-semibold">{new Date(slaC.start_date).toLocaleDateString()} – {slaC.end_date ? new Date(slaC.end_date).toLocaleDateString() : 'TBD'}</p></div>}
+                      {slaC.auto_renew && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Auto-Renew</p><p className="text-green-400 text-sm font-semibold">Yes</p></div>}
+                    </div>
+                    {slaC.body && (
+                      <div className="border-t border-[#2a3d55] pt-3">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
+                        <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{slaC.body
+                          .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
+                          .replace(/\{\{clientName\}\}/g, proposal?.company || '')
+                          .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
+                          .replace(/\{\{tierName\}\}/g, slaC.tier_name || slaC.name || '')
+                          .replace(/\{\{responseTime\}\}/g, slaC.response_time_hours ? `${slaC.response_time_hours} hours` : 'as scheduled')
+                          .replace(/\{\{billingFrequency\}\}/g, slaC.billing_frequency || 'Quarterly')
+                          .replace(/\{\{laborRate\}\}/g, `${slaC.labor_rate || 100}`)
+                          .replace(/\{\{emergencyRate\}\}/g, `${slaC.emergency_rate || 150}`)
+                          .replace(/\{\{maintenanceCalls\}\}/g, `${slaC.maintenance_calls_per_year || 0}`)
+                          .replace(/\{\{initialFee\}\}/g, `${slaC.initial_fee || 0}`)
+                          .replace(/\{\{recurringFee\}\}/g, `${slaC.recurring_fee || 0}`)
+                        }</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -2361,59 +2449,49 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-3">
                 <span className="text-lg">📡</span>
-                <div>
-                  <h3 className="text-white font-bold text-lg">Monitoring Contract</h3>
-                  {monitoringContract && <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-2 py-0.5 rounded-full ml-2">Attached</span>}
-                </div>
+                <h3 className="text-white font-bold text-lg">Monitoring Contracts</h3>
+                {monitoringContracts.length > 0 && <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-2 py-0.5 rounded-full">{monitoringContracts.length} attached</span>}
               </div>
-              <div className="flex gap-2 items-center">
-                {monitoringContract && (
-                  <button onClick={removeMonitoringContract} className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors">Remove</button>
-                )}
-                <button onClick={openMonitoringModal} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-                  {monitoringContract ? 'Edit Contract' : 'Attach Monitoring'}
-                </button>
-              </div>
+              <button onClick={() => openMonitoringModal(null)} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Monitoring Contract</button>
             </div>
-            {monitoringContract ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <div className="bg-[#0F1C2E] rounded-lg p-3">
-                    <p className="text-[#8A9AB0] text-xs mb-1">Monthly Fee</p>
-                    <p className="text-white text-sm font-semibold">${monitoringContract.monthly_fee}/mo</p>
-                  </div>
-                  <div className="bg-[#0F1C2E] rounded-lg p-3">
-                    <p className="text-[#8A9AB0] text-xs mb-1">Billing</p>
-                    <p className="text-white text-sm font-semibold">{monitoringContract.billing_frequency}</p>
-                  </div>
-                  <div className="bg-[#0F1C2E] rounded-lg p-3">
-                    <p className="text-[#8A9AB0] text-xs mb-1">Escalation Contacts</p>
-                    <p className="text-white text-sm font-semibold">{monitoringContract.escalation_contacts}</p>
-                  </div>
-                </div>
-                {monitoringContract.monitored_systems && (
-                  <div className="bg-[#0F1C2E] rounded-lg p-3">
-                    <p className="text-[#8A9AB0] text-xs mb-1">Monitored Systems</p>
-                    <p className="text-white text-sm">{monitoringContract.monitored_systems}</p>
-                  </div>
-                )}
-                {monitoringContract.body && (
-                  <div className="bg-[#0F1C2E] rounded-lg p-4">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
-                    <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{monitoringContract.body
-                      .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
-                      .replace(/\{\{clientName\}\}/g, proposal?.company || '')
-                      .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-                      .replace(/\{\{monthlyFee\}\}/g, `${monitoringContract.monthly_fee || 49}`)
-                      .replace(/\{\{monitoredSystems\}\}/g, monitoringContract.monitored_systems || '')
-                      .replace(/\{\{billingFrequency\}\}/g, monitoringContract.billing_frequency || 'Monthly')
-                      .replace(/\{\{escalationContacts\}\}/g, `${monitoringContract.escalation_contacts || 2}`)
-                    }</p>
-                  </div>
-                )}
-              </div>
+            {monitoringContracts.length === 0 ? (
+              <p className="text-[#8A9AB0] text-sm">No monitoring contracts attached. Click "Add Monitoring Contract" to add one.</p>
             ) : (
-              <p className="text-[#8A9AB0] text-sm">No monitoring contract attached. Click "Attach Monitoring" to add one.</p>
+              <div className="space-y-4">
+                {monitoringContracts.map((monC, idx) => (
+                  <div key={idx} className="bg-[#0F1C2E] rounded-xl p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <p className="text-white font-semibold">{monC.name || 'Monitoring Contract'}</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => openMonitoringModal(idx)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Edit</button>
+                        <button onClick={() => removeMonitoringContract(idx)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Remove</button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Monthly Fee</p><p className="text-white text-sm font-semibold">${monC.monthly_fee}/mo</p></div>
+                      <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Billing</p><p className="text-white text-sm font-semibold">{monC.billing_frequency}</p></div>
+                      <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Escalation Contacts</p><p className="text-white text-sm font-semibold">{monC.escalation_contacts}</p></div>
+                      {monC.monitored_systems && <div className="bg-[#1a2d45] rounded-lg p-2 col-span-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Monitored Systems</p><p className="text-white text-sm">{monC.monitored_systems}</p></div>}
+                      {monC.start_date && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Term</p><p className="text-white text-sm font-semibold">{new Date(monC.start_date).toLocaleDateString()} – {monC.end_date ? new Date(monC.end_date).toLocaleDateString() : 'TBD'}</p></div>}
+                      {monC.auto_renew && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Auto-Renew</p><p className="text-green-400 text-sm font-semibold">Yes</p></div>}
+                    </div>
+                    {monC.body && (
+                      <div className="border-t border-[#2a3d55] pt-3">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
+                        <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{monC.body
+                          .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
+                          .replace(/\{\{clientName\}\}/g, proposal?.company || '')
+                          .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
+                          .replace(/\{\{monthlyFee\}\}/g, `${monC.monthly_fee || 49}`)
+                          .replace(/\{\{monitoredSystems\}\}/g, monC.monitored_systems || '')
+                          .replace(/\{\{billingFrequency\}\}/g, monC.billing_frequency || 'Monthly')
+                          .replace(/\{\{escalationContacts\}\}/g, `${monC.escalation_contacts || 2}`)
+                        }</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -2682,30 +2760,29 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         </div>
       )}
 
-      {/* SLA Edit Modal */}
+      {/* SLA Agreement Modal */}
       {showSLAModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5">
-              <h3 className="text-white font-bold text-lg">📋 {slaContract ? 'Edit' : 'Attach'} Service Level Agreement</h3>
+              <h3 className="text-white font-bold text-lg">📋 {editingAgreementIdx !== null ? 'Edit' : 'Add'} Service Agreement</h3>
               <button onClick={() => setShowSLAModal(false)} className="text-[#8A9AB0] hover:text-white text-2xl leading-none">×</button>
             </div>
             <div className="space-y-4">
-              {/* Tier selector */}
-              {(orgSLASettings?.sla_templates?.[proposal?.industry]?.tiers || []).length > 0 && (
+              {/* Template picker — all enabled tiers across all industries */}
+              {allSLATiers().length > 0 && (
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Agreement Tier</label>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start from a template</label>
                   <select value={editSLAForm.tier_id || ''} onChange={e => {
-                    const tiers = orgSLASettings?.sla_templates?.[proposal?.industry]?.tiers || []
-                    const tier = tiers.find(t => t.id === e.target.value)
-                    if (tier) setEditSLAForm({ tier_id: tier.id, tier_name: tier.name, name: tier.name, response_time_hours: tier.response_time_hours ?? '', labor_rate: tier.labor_rate || 100, emergency_rate: tier.emergency_rate ?? '', billing_frequency: tier.billing_frequency || 'Quarterly', maintenance_calls_per_year: tier.maintenance_calls_per_year || 0, initial_fee: tier.initial_fee || 0, recurring_fee: tier.recurring_fee || 0, body: tier.body || '' })
+                    const tier = allSLATiers().find(t => t.id === e.target.value)
+                    if (tier) setEditSLAForm(p => ({ ...p, tier_id: tier.id, tier_name: tier.name, name: tier.name, response_time_hours: tier.response_time_hours ?? '', labor_rate: tier.labor_rate || 100, emergency_rate: tier.emergency_rate ?? '', billing_frequency: tier.billing_frequency || 'Quarterly', maintenance_calls_per_year: tier.maintenance_calls_per_year || 0, initial_fee: tier.initial_fee || 0, recurring_fee: tier.recurring_fee || 0, body: tier.body || '' }))
                   }} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                    <option value="">— Select tier —</option>
-                    {(orgSLASettings?.sla_templates?.[proposal?.industry]?.tiers || []).map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
+                    <option value="">— Pick a template to pre-fill —</option>
+                    {allSLATiers().map(t => (
+                      <option key={t.id} value={t.id}>{t.name} {t._industry ? `(${t._industry})` : ''}</option>
                     ))}
                   </select>
-                  <p className="text-[#8A9AB0] text-xs mt-1">Selecting a tier pre-fills the fields below. You can still edit before saving.</p>
+                  <p className="text-[#8A9AB0] text-xs mt-1">All fields below remain editable after selecting a template.</p>
                 </div>
               )}
               <div>
@@ -2751,6 +2828,20 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   <input type="number" min="0" value={editSLAForm.recurring_fee ?? 0} onChange={e => setEditSLAForm(p => ({ ...p, recurring_fee: Number(e.target.value) }))}
                     className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start Date</label>
+                  <input type="date" value={editSLAForm.start_date || ''} onChange={e => setEditSLAForm(p => ({ ...p, start_date: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">End Date</label>
+                  <input type="date" value={editSLAForm.end_date || ''} onChange={e => setEditSLAForm(p => ({ ...p, end_date: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div className="col-span-2 flex items-center gap-3">
+                  <input type="checkbox" id="sla-autorenew" checked={!!editSLAForm.auto_renew} onChange={e => setEditSLAForm(p => ({ ...p, auto_renew: e.target.checked }))} className="w-4 h-4 accent-[#C8622A]" />
+                  <label htmlFor="sla-autorenew" className="text-[#8A9AB0] text-sm">Auto-renew when term ends</label>
+                </div>
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Language</label>
@@ -2760,7 +2851,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowSLAModal(false)} className="flex-1 bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">Cancel</button>
                 <button onClick={saveSLAContract} disabled={savingContract} className="flex-1 bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {savingContract ? 'Saving...' : 'Save SLA'}
+                  {savingContract ? 'Saving...' : editingAgreementIdx !== null ? 'Save Changes' : 'Add Agreement'}
                 </button>
               </div>
             </div>
@@ -2768,15 +2859,31 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         </div>
       )}
 
-      {/* Monitoring Contract Edit Modal */}
+      {/* Monitoring Contract Modal */}
       {showMonitoringModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5">
-              <h3 className="text-white font-bold text-lg">📡 {monitoringContract ? 'Edit' : 'Attach'} Monitoring Contract</h3>
+              <h3 className="text-white font-bold text-lg">📡 {editingAgreementIdx !== null ? 'Edit' : 'Add'} Monitoring Contract</h3>
               <button onClick={() => setShowMonitoringModal(false)} className="text-[#8A9AB0] hover:text-white text-2xl leading-none">×</button>
             </div>
             <div className="space-y-4">
+              {/* Template picker */}
+              {allMonitoringTemplates().length > 0 && (
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start from a template</label>
+                  <select onChange={e => {
+                    const tmpl = allMonitoringTemplates().find(t => t._industry === e.target.value)
+                    if (tmpl) setEditMonitoringForm(p => ({ ...p, name: tmpl.name || 'Monitoring Contract', monthly_fee: tmpl.monthly_fee || 49, monitored_systems: tmpl.monitored_systems || '', billing_frequency: tmpl.billing_frequency || 'Monthly', escalation_contacts: tmpl.escalation_contacts || 2, body: tmpl.body || '' }))
+                  }} defaultValue="" className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                    <option value="">— Pick a template to pre-fill —</option>
+                    {allMonitoringTemplates().map(t => (
+                      <option key={t._industry} value={t._industry}>{t.name || 'Monitoring Contract'} ({t._industry})</option>
+                    ))}
+                  </select>
+                  <p className="text-[#8A9AB0] text-xs mt-1">All fields remain editable after selecting.</p>
+                </div>
+              )}
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Name</label>
                 <input type="text" value={editMonitoringForm.name || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, name: e.target.value }))}
@@ -2805,6 +2912,20 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   <input type="text" value={editMonitoringForm.monitored_systems || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, monitored_systems: e.target.value }))}
                     placeholder="e.g. Cameras, Access Control, Alarm" className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start Date</label>
+                  <input type="date" value={editMonitoringForm.start_date || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, start_date: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">End Date</label>
+                  <input type="date" value={editMonitoringForm.end_date || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, end_date: e.target.value }))}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div className="col-span-2 flex items-center gap-3">
+                  <input type="checkbox" id="mon-autorenew" checked={!!editMonitoringForm.auto_renew} onChange={e => setEditMonitoringForm(p => ({ ...p, auto_renew: e.target.checked }))} className="w-4 h-4 accent-[#C8622A]" />
+                  <label htmlFor="mon-autorenew" className="text-[#8A9AB0] text-sm">Auto-renew when term ends</label>
+                </div>
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Language</label>
@@ -2814,9 +2935,41 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowMonitoringModal(false)} className="flex-1 bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">Cancel</button>
                 <button onClick={saveMonitoringContract} disabled={savingContract} className="flex-1 bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {savingContract ? 'Saving...' : 'Save Contract'}
+                  {savingContract ? 'Saving...' : editingAgreementIdx !== null ? 'Save Changes' : 'Add Contract'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contract Start Date Modal */}
+      {showContractStartModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+            <div className="w-12 h-12 rounded-full bg-[#C8622A]/20 flex items-center justify-center mx-auto mb-4"><span className="text-2xl">📋</span></div>
+            <h3 className="text-white font-bold text-lg mb-1 text-center">Set Contract Start Dates</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5 text-center">Set a start date for each agreement. End date will be auto-set to 1 year later.</p>
+            <div className="space-y-3 mb-5">
+              {pendingContractItems.map(item => (
+                <div key={`${item._type}_${item._idx}`} className="bg-[#0F1C2E] rounded-lg px-4 py-3">
+                  <div className="flex justify-between items-center gap-3">
+                    <div>
+                      <p className="text-white text-sm font-medium">{item.name || (item._type === 'sla' ? 'Service Agreement' : 'Monitoring Contract')}</p>
+                      <p className="text-[#8A9AB0] text-xs capitalize">{item._type}</p>
+                    </div>
+                    <input type="date" value={pendingContractDates[`${item._type}_${item._idx}`] || ''}
+                      onChange={e => setPendingContractDates(prev => ({ ...prev, [`${item._type}_${item._idx}`]: e.target.value }))}
+                      className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowContractStartModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Skip for now</button>
+              <button onClick={saveContractStartDates} disabled={savingContractDates} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                {savingContractDates ? 'Saving...' : 'Save Start Dates'}
+              </button>
             </div>
           </div>
         </div>

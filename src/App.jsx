@@ -32,6 +32,7 @@ import JobDetail from './pages/JobDetail'
 import ServiceTickets from './pages/ServiceTickets'
 import ServiceTicketDetail from './pages/ServiceTicketDetail'
 import Dispatch from './pages/Dispatch'
+import Contracts from './pages/Contracts'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -80,7 +81,7 @@ function App() {
     for (let i = 0; i < 5; i++) {
       const { data } = await supabase
         .from('profiles')
-        .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos)')
+        .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring)')
         .eq('id', userId)
         .single()
 
@@ -95,7 +96,7 @@ function App() {
 
     const { data } = await supabase
       .from('profiles')
-      .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos)')
+      .select('*, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring)')
       .eq('id', userId)
       .single()
     setProfile(data)
@@ -121,6 +122,8 @@ function App() {
   const featureInvoices = profile?.organizations?.feature_invoices !== false
   const featureAiBom = profile?.organizations?.feature_ai_bom || false
   const featureSitePhotos = profile?.organizations?.feature_site_photos !== false
+  const featureSla = profile?.organizations?.feature_sla || false
+  const featureMonitoring = profile?.organizations?.feature_monitoring || false
 
   if (session && isPending) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
@@ -146,7 +149,7 @@ function App() {
   const isSalesManager = role === 'sales_manager'
   const isPM = role === 'project_manager'
   const isTechnician = role === 'technician'
-  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail, featurePurchaseOrders, featureInvoices, featureAiBom, featureSitePhotos, role, isSalesManager, isPM, isTechnician }
+  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail, featurePurchaseOrders, featureInvoices, featureAiBom, featureSitePhotos, featureSla, featureMonitoring, role, isSalesManager, isPM, isTechnician }
 
   return (
     <Routes>
@@ -193,6 +196,7 @@ function App() {
           <Route path="/service-tickets" element={<ServiceTickets {...sharedProps} />} />
           <Route path="/service-tickets/:id" element={<ServiceTicketDetail {...sharedProps} />} />
           <Route path="/dispatch" element={<Dispatch {...sharedProps} />} />
+          {(featureSla || featureMonitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
         </>
       )}
     </Routes>
