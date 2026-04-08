@@ -24,6 +24,8 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   })
   const [lineItems, setLineItems] = useState([])
   const [includedCOs, setIncludedCOs] = useState([])
+  const [contractFees, setContractFees] = useState([]) // { label, amount, included }
+  const [includedContractFees, setIncludedContractFees] = useState({})
 
   useEffect(() => { fetchData() }, [])
 
@@ -60,6 +62,8 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     const prop = (propsList.length ? propsList : proposals).find(p => p.id === proposalId)
     setSelectedProposal(prop || null)
     setSelectedTicket(null)
+    setContractFees([])
+    setIncludedContractFees({})
 
     const { data: bomItems } = await supabase
       .from('bom_line_items')
@@ -139,6 +143,37 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     }
 
     setLineItems(items)
+
+    // Load SLA & monitoring contract fees
+    const { data: propFull } = await supabase
+      .from('proposals')
+      .select('sla_contracts, monitoring_contracts')
+      .eq('id', proposalId)
+      .single()
+
+    const fees = []
+    const initIncluded = {}
+    ;(propFull?.sla_contracts || []).forEach((c, i) => {
+      if (c.initial_fee > 0) {
+        const key = `sla_init_${i}`
+        fees.push({ key, label: `${c.name || 'Service Agreement'} — Initial Fee`, amount: c.initial_fee })
+        initIncluded[key] = false
+      }
+      if (c.recurring_fee > 0) {
+        const key = `sla_rec_${i}`
+        fees.push({ key, label: `${c.name || 'Service Agreement'} — ${c.billing_frequency || 'Recurring'} Fee`, amount: c.recurring_fee })
+        initIncluded[key] = false
+      }
+    })
+    ;(propFull?.monitoring_contracts || []).forEach((c, i) => {
+      if (c.monthly_fee > 0) {
+        const key = `mon_${i}`
+        fees.push({ key, label: `${c.name || 'Monitoring Contract'} — ${c.billing_frequency || 'Monthly'} Fee`, amount: parseFloat(c.monthly_fee) || 0 })
+        initIncluded[key] = false
+      }
+    })
+    setContractFees(fees)
+    setIncludedContractFees(initIncluded)
   }
 
   const loadTicketItems = (ticketId) => {
@@ -204,7 +239,8 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   const addLine = () => setLineItems(prev => [...prev, { description: '', quantity: 1, unit_price: 0, total: 0 }])
   const removeLine = (i) => setLineItems(prev => prev.filter((_, idx) => idx !== i))
 
-  const subtotal = lineItems.reduce((sum, i) => sum + (parseFloat(i.total) || 0), 0)
+  const contractFeesTotal = contractFees.filter(f => includedContractFees[f.key]).reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0)
+  const subtotal = lineItems.reduce((sum, i) => sum + (parseFloat(i.total) || 0), 0) + contractFeesTotal
   const taxAmount = subtotal * ((parseFloat(form.tax_percent) || 0) / 100)
   const total = subtotal + taxAmount
 
@@ -237,9 +273,14 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
     if (error) { alert('Error creating invoice'); setSaving(false); return }
 
-    if (lineItems.length > 0) {
+    const selectedFeeItems = contractFees
+      .filter(f => includedContractFees[f.key])
+      .map(f => ({ description: f.label, quantity: 1, unit_price: f.amount, total: f.amount }))
+
+    const allItems = [...lineItems.filter(i => i.description), ...selectedFeeItems]
+    if (allItems.length > 0) {
       await supabase.from('invoice_line_items').insert(
-        lineItems.filter(i => i.description).map(i => ({
+        allItems.map(i => ({
           invoice_id: inv.id,
           description: i.description,
           quantity: parseFloat(i.quantity) || 1,
@@ -384,6 +425,30 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
             </tbody>
           </table>
           <button onClick={addLine} className="text-[#C8622A] hover:text-white text-sm transition-colors">+ Add Line</button>
+
+          {/* Contract fees */}
+          {contractFees.length > 0 && (
+            <div className="mt-5 border-t border-[#2a3d55] pt-4">
+              <p className="text-white text-sm font-semibold mb-2">Service Agreement & Monitoring Fees</p>
+              <p className="text-[#8A9AB0] text-xs mb-3">Select any fees to include on this invoice.</p>
+              <div className="space-y-2">
+                {contractFees.map(f => (
+                  <label key={f.key} className="flex items-center justify-between bg-[#0F1C2E] rounded-lg px-4 py-2.5 cursor-pointer hover:bg-[#0a1828] transition-colors">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={includedContractFees[f.key] || false}
+                        onChange={e => setIncludedContractFees(prev => ({ ...prev, [f.key]: e.target.checked }))}
+                        className="accent-[#C8622A]"
+                      />
+                      <span className="text-white text-sm">{f.label}</span>
+                    </div>
+                    <span className="text-[#C8622A] text-sm font-semibold">${parseFloat(f.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mt-6 border-t border-[#2a3d55] pt-4 space-y-2 max-w-xs ml-auto">
             <div className="flex justify-between text-sm"><span className="text-[#8A9AB0]">Subtotal</span><span className="text-white">${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
