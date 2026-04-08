@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
-export default function Contracts({ isAdmin, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, role, isSalesManager, isPM, isTechnician }) {
+export default function Contracts({ isAdmin, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, featureSla, featureMonitoring, role, isSalesManager, isPM, isTechnician }) {
   const navigate = useNavigate()
   const [contracts, setContracts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [filterType, setFilterType] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
   const [profile, setProfile] = useState(null)
@@ -34,7 +35,8 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       query = query.eq('user_id', prof.id)
     }
 
-    const { data } = await query
+    const { data, error } = await query
+    if (error) setError(error.message)
     setContracts(data || [])
     setLoading(false)
   }
@@ -63,7 +65,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureSla={featureSla} featureMonitoring={featureMonitoring} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
       <div className="flex-1 p-6 md:p-8 overflow-auto">
         <div className="max-w-6xl mx-auto">
 
@@ -113,6 +115,9 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
           </div>
 
           {/* Table */}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 mb-4 text-red-400 text-sm">{error}</div>
+          )}
           {loading ? (
             <div className="text-center py-16"><p className="text-[#8A9AB0]">Loading contracts...</p></div>
           ) : filtered.length === 0 ? (
