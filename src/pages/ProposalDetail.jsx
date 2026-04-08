@@ -695,8 +695,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         pricing_status: isStale ? 'Needs Pricing' : 'Confirmed',
       })
     })
-    setEditLines(prev => [...prev, ...newLines])
-    if (!editingBOM) setEditingBOM(true)
+    if (!editingBOM) {
+      setEditLines([...lineItems.map(l => ({ ...l })), ...newLines])
+      setEditingBOM(true)
+    } else {
+      setEditLines(prev => [...prev, ...newLines])
+    }
     setShowLibrarySearch(false)
     setLibrarySearch('')
     setLibraryResults([])
