@@ -46,6 +46,7 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
     label: 'Manage',
     links: [
       { label: 'Team', path: '/reps', icon: '👥' },
+      { label: 'Product Library', path: '/product-library', icon: '📦' },
       { label: 'Settings', path: '/settings', icon: '⚙️' },
       { label: 'Help', path: '/faq', icon: '❓' },
     ]

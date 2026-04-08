@@ -33,6 +33,7 @@ import ServiceTickets from './pages/ServiceTickets'
 import ServiceTicketDetail from './pages/ServiceTicketDetail'
 import Dispatch from './pages/Dispatch'
 import Contracts from './pages/Contracts'
+import ProductLibrary from './pages/ProductLibrary'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -198,6 +199,7 @@ function App() {
           <Route path="/service-tickets" element={<ServiceTickets {...sharedProps} />} />
           <Route path="/service-tickets/:id" element={<ServiceTicketDetail {...sharedProps} />} />
           <Route path="/dispatch" element={<Dispatch {...sharedProps} />} />
+          <Route path="/product-library" element={<ProductLibrary isAdmin={isAdmin} />} />
           {(featureSla || featureMonitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
         </>
       )}

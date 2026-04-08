@@ -59,6 +59,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [pendingRenewalItems, setPendingRenewalItems] = useState([])
   const [pendingRenewalDates, setPendingRenewalDates] = useState({})
   const [showRFQModal, setShowRFQModal] = useState(false)
+  const [showLibrarySearch, setShowLibrarySearch] = useState(false)
+  const [librarySearch, setLibrarySearch] = useState('')
+  const [libraryResults, setLibraryResults] = useState([])
+  const [libraryLoading, setLibraryLoading] = useState(false)
+  const [librarySelectedVendor, setLibrarySelectedVendor] = useState({})
+  const [librarySelectedItems, setLibrarySelectedItems] = useState(new Set())
   const [rfqVendorData, setRfqVendorData] = useState({})
   const [sendingRFQs, setSendingRFQs] = useState(false)
   const [showAIBOMModal, setShowAIBOMModal] = useState(false)
@@ -644,6 +650,58 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       console.log('SOW generation error:', err)
     }
     setGeneratingSOW(false)
+  }
+
+  const searchLibrary = async (q) => {
+    setLibrarySearch(q)
+    if (!q.trim()) { setLibraryResults([]); return }
+    setLibraryLoading(true)
+    const { data: prods } = await supabase
+      .from('product_library')
+      .select('*, product_library_pricing(*)')
+      .eq('org_id', proposal?.org_id)
+      .eq('active', true)
+      .or(`item_name.ilike.%${q}%,part_number.ilike.%${q}%,manufacturer.ilike.%${q}%,category.ilike.%${q}%`)
+      .limit(30)
+    setLibraryResults(prods || [])
+    setLibraryLoading(false)
+  }
+
+  const addLibraryItemsToBOM = () => {
+    const STALE_DAYS = 120
+    const newLines = []
+    libraryResults.forEach(prod => {
+      if (!librarySelectedItems.has(prod.id)) return
+      const selectedPricing = librarySelectedVendor[prod.id] || prod.product_library_pricing?.[0]
+      if (!selectedPricing) return
+      const days = selectedPricing.pricing_date
+        ? Math.floor((new Date() - new Date(selectedPricing.pricing_date)) / (1000 * 60 * 60 * 24))
+        : null
+      const isStale = days === null || days > STALE_DAYS
+      const cost = parseFloat(selectedPricing.your_cost) || 0
+      newLines.push({
+        proposal_id: id,
+        item_name: prod.item_name,
+        manufacturer: prod.manufacturer || '',
+        part_number_sku: prod.part_number || '',
+        quantity: '1',
+        unit: prod.unit || 'ea',
+        category: prod.category || '',
+        vendor: selectedPricing.vendor || '',
+        your_cost_unit: isStale ? '' : String(cost),
+        markup_percent: '35',
+        customer_price_unit: isStale ? '' : (cost * 1.35).toFixed(2),
+        customer_price_total: '',
+        pricing_status: isStale ? 'Needs Pricing' : 'Confirmed',
+      })
+    })
+    setEditLines(prev => [...prev, ...newLines])
+    if (!editingBOM) setEditingBOM(true)
+    setShowLibrarySearch(false)
+    setLibrarySearch('')
+    setLibraryResults([])
+    setLibrarySelectedItems(new Set())
+    setLibrarySelectedVendor({})
   }
 
   const openRFQModal = () => {
@@ -2029,7 +2087,95 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
         {/* BOM */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
-          <div className="flex justify-between items-center mb-4">
+          <div className="mb-4 relative">
+          <input
+            type="text"
+            placeholder="🔍 Search product library..."
+            value={librarySearch}
+            onChange={e => { setShowLibrarySearch(true); searchLibrary(e.target.value) }}
+            onFocus={() => setShowLibrarySearch(true)}
+            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
+          />
+          {librarySearch && (
+            <button onClick={() => { setLibrarySearch(''); setLibraryResults([]); setShowLibrarySearch(false) }}
+              className="absolute right-3 top-2.5 text-[#8A9AB0] hover:text-white text-lg leading-none">×</button>
+          )}
+          {showLibrarySearch && (libraryLoading || libraryResults.length > 0) && (
+            <div className="absolute top-full left-0 right-0 z-40 bg-[#1a2d45] border border-[#2a3d55] rounded-xl mt-1 max-h-96 overflow-y-auto shadow-2xl">
+              {libraryLoading ? (
+                <p className="text-[#8A9AB0] text-sm p-4">Searching...</p>
+              ) : (
+                <>
+                  <div className="p-3 space-y-1">
+                    {libraryResults.map(prod => {
+                      const prices = (prod.product_library_pricing || []).sort((a, b) => a.your_cost - b.your_cost)
+                      const selected = librarySelectedVendor[prod.id] || prices[0]
+                      const isChecked = librarySelectedItems.has(prod.id)
+                      return (
+                        <div key={prod.id}
+                          className={`rounded-lg p-3 border transition-colors cursor-pointer ${isChecked ? 'border-[#C8622A] bg-[#C8622A]/5' : 'border-[#2a3d55] hover:border-[#3a4d65]'}`}
+                          onClick={() => setLibrarySelectedItems(prev => { const next = new Set(prev); next.has(prod.id) ? next.delete(prod.id) : next.add(prod.id); return next })}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <input type="checkbox" checked={isChecked} readOnly className="accent-[#C8622A] mt-0.5 shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-white text-sm font-semibold truncate">{prod.item_name}</p>
+                                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                  {prod.manufacturer && <span className="text-[#8A9AB0] text-xs">{prod.manufacturer}</span>}
+                                  {prod.part_number && <span className="text-[#8A9AB0] text-xs font-mono bg-[#0F1C2E] px-1.5 py-0.5 rounded">{prod.part_number}</span>}
+                                  {prod.category && <span className="text-[#8A9AB0] text-xs">{prod.category}</span>}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="shrink-0 text-right" onClick={e => e.stopPropagation()}>
+                              {prices.length === 0 ? (
+                                <span className="text-[#2a3d55] text-xs">No pricing</span>
+                              ) : prices.length === 1 ? (
+                                <div>
+                                  <p className="text-[#C8622A] text-sm font-semibold">${Number(prices[0].your_cost).toFixed(2)}</p>
+                                  <p className="text-[#8A9AB0] text-xs">{prices[0].vendor}</p>
+                                  {(() => { const days = prices[0].pricing_date ? Math.floor((new Date() - new Date(prices[0].pricing_date)) / (1000 * 60 * 60 * 24)) : null; if (days > 120) return <span className="text-xs text-red-400">⚠ Stale — will RFQ</span>; if (days > 30) return <span className="text-xs text-yellow-400">{days}d old</span>; return <span className="text-xs text-green-400">Current</span> })()}
+                                </div>
+                              ) : (
+                                <div>
+                                  <select
+                                    value={selected?.id || ''}
+                                    onChange={e => { const picked = prices.find(p => p.id === e.target.value); setLibrarySelectedVendor(prev => ({ ...prev, [prod.id]: picked })) }}
+                                    className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] mb-1"
+                                  >
+                                    {prices.map(p => <option key={p.id} value={p.id}>{p.vendor} — ${Number(p.your_cost).toFixed(2)}</option>)}
+                                  </select>
+                                  {(() => {
+                                    if (!selected || prices.length < 2) return null
+                                    const best = prices[0]
+                                    if (best.id === selected.id) return null
+                                    const pct = ((selected.your_cost - best.your_cost) / best.your_cost * 100)
+                                    if (pct > 5) return null
+                                    return <p className="text-blue-400 text-xs">💡 {best.vendor} is {pct.toFixed(1)}% less (${Number(best.your_cost).toFixed(2)})</p>
+                                  })()}
+                                  {(() => { const days = selected?.pricing_date ? Math.floor((new Date() - new Date(selected.pricing_date)) / (1000 * 60 * 60 * 24)) : null; if (days > 120) return <span className="text-xs text-red-400 block">⚠ Stale — will RFQ</span>; if (days > 30) return <span className="text-xs text-yellow-400 block">{days}d old</span>; return <span className="text-xs text-green-400 block">Current</span> })()}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  {librarySelectedItems.size > 0 && (
+                    <div className="border-t border-[#2a3d55] px-4 py-3 flex items-center justify-between sticky bottom-0 bg-[#1a2d45]">
+                      <p className="text-[#8A9AB0] text-xs">{librarySelectedItems.size} item{librarySelectedItems.size !== 1 ? 's' : ''} selected</p>
+                      <button onClick={addLibraryItemsToBOM} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Add to BOM →</button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-between items-center mb-4">
             <h3 className="text-white font-bold text-lg">BOM Line Items ({lineItems.length})</h3>
             {!editingBOM ? (
               <div className="flex gap-2 flex-wrap">
