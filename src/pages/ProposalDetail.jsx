@@ -91,6 +91,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [bulkSelectedLines, setBulkSelectedLines] = useState(new Set())
   // E-signing
   const [requestingSignature, setRequestingSignature] = useState(false)
+  const [editingProposalName, setEditingProposalName] = useState(false)
+  const [proposalNameDraft, setProposalNameDraft] = useState('')
   const [editingQuoteNumber, setEditingQuoteNumber] = useState(false)
   const [quoteNumberDraft, setQuoteNumberDraft] = useState('')
   const [quoteNumberError, setQuoteNumberError] = useState('')
@@ -350,6 +352,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     const newVal = !proposal?.lump_sum_pricing
     await supabase.from('proposals').update({ lump_sum_pricing: newVal }).eq('id', id)
     setProposal(prev => ({ ...prev, lump_sum_pricing: newVal }))
+  }
+
+  const saveProposalName = async () => {
+    const trimmed = proposalNameDraft.trim()
+    if (!trimmed || trimmed === proposal?.proposal_name) { setEditingProposalName(false); return }
+    await supabase.from('proposals').update({ proposal_name: trimmed }).eq('id', id)
+    setProposal(prev => ({ ...prev, proposal_name: trimmed }))
+    setEditingProposalName(false)
   }
 
   const updateTaxRate = async (val) => {
@@ -1926,7 +1936,26 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <div className="flex justify-between items-start">
             <div>
-              <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
+              {editingProposalName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={proposalNameDraft}
+                    onChange={e => setProposalNameDraft(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveProposalName(); if (e.key === 'Escape') setEditingProposalName(false) }}
+                    className="bg-[#0F1C2E] text-white text-2xl font-bold border-b-2 border-[#C8622A] focus:outline-none px-1 w-96"
+                  />
+                  <button onClick={saveProposalName} className="text-[#C8622A] text-sm font-semibold hover:text-white transition-colors">Save</button>
+                  <button onClick={() => setEditingProposalName(false)} className="text-[#8A9AB0] text-sm hover:text-white transition-colors">Cancel</button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 group">
+                  <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
+                  <button onClick={() => { setProposalNameDraft(proposal?.proposal_name || ''); setEditingProposalName(true) }}
+                    className="opacity-0 group-hover:opacity-100 text-[#8A9AB0] hover:text-white text-xs transition-all">✏️</button>
+                </div>
+              )}
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-[#8A9AB0]">{proposal?.company} · {proposal?.client_name}</p>
                 <button onClick={openEditClientModal} className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors" title="Edit client info">✏️</button>
