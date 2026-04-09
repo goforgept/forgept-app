@@ -78,6 +78,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const { id } = useParams()
   const navigate = useNavigate()
   const [job, setJob] = useState(null)
+  const [editingJobName, setEditingJobName] = useState(false)
+  const [jobNameDraft, setJobNameDraft] = useState('')
   const [proposal, setProposal] = useState(null)
   const [lineItems, setLineItems] = useState([])
   const [checklist, setChecklist] = useState([])
@@ -331,6 +333,14 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     if (!existing.includes(userId)) {
       await supabase.from('proposals').update({ collaborator_ids: [...existing, userId] }).eq('id', proposal.id)
     }
+  }
+
+  const saveJobName = async () => {
+    const trimmed = jobNameDraft.trim()
+    if (!trimmed || trimmed === job?.name) { setEditingJobName(false); return }
+    await supabase.from('jobs').update({ name: trimmed }).eq('id', id)
+    setJob(prev => ({ ...prev, name: trimmed }))
+    setEditingJobName(false)
   }
 
   const assignPM = async (userId) => {
@@ -712,7 +722,26 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
               <button onClick={() => navigate('/jobs')} className="text-[#8A9AB0] hover:text-white text-xs mb-2 transition-colors">← Jobs</button>
               <div className="flex items-center gap-3">
                 {job?.job_number && <span className="text-[#8A9AB0] text-sm font-mono bg-[#0F1C2E] px-2 py-0.5 rounded">{job.job_number}</span>}
-                <h2 className="text-white text-2xl font-bold">{job?.name}</h2>
+                {editingJobName ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={jobNameDraft}
+                      onChange={e => setJobNameDraft(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveJobName(); if (e.key === 'Escape') setEditingJobName(false) }}
+                      className="bg-[#0F1C2E] text-white text-2xl font-bold border-b-2 border-[#C8622A] focus:outline-none px-1"
+                    />
+                    <button onClick={saveJobName} className="text-[#C8622A] text-sm font-semibold hover:text-white transition-colors">Save</button>
+                    <button onClick={() => setEditingJobName(false)} className="text-[#8A9AB0] text-sm hover:text-white transition-colors">Cancel</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 group">
+                    <h2 className="text-white text-2xl font-bold">{job?.name}</h2>
+                    <button onClick={() => { setJobNameDraft(job?.name || ''); setEditingJobName(true) }}
+                      className="opacity-0 group-hover:opacity-100 text-[#8A9AB0] hover:text-white text-xs transition-all">✏️</button>
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-4 mt-1 text-sm text-[#8A9AB0]">
                 {job?.clients?.company && <span>🏢 {job.clients.company}</span>}

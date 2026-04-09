@@ -900,6 +900,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       ]
     })
 
+    const docxTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
+    const docxMatTotal = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
+    const docxTaxAmt = docxMatTotal * (docxTaxRate / 100)
+
     const children = [
       new Paragraph({ children: [new TextRun({ text: profile?.company_name || proposal?.company || 'ForgePt.', bold: true, size: 36, color: primaryColor })] }),
       new Paragraph({ children: [new TextRun({ text: proposal?.proposal_name || 'Proposal', bold: true, size: 48 })] }),
@@ -921,12 +925,22 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     }
 
     if (lineItems.length > 0) {
+      const hasDocxLabor = (proposal?.labor_items || []).some(l => l.role)
       children.push(
         new Paragraph({ children: [new TextRun({ text: 'Materials & Pricing', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         new Table({ width: { size: 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: [headerRow, ...itemRows, totalRow] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
       )
+      if (!hasDocxLabor) {
+        if (docxTaxRate > 0) {
+          children.push(new Paragraph({ children: [new TextRun({ text: `Tax (${docxTaxRate}% on materials): $${docxTaxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] }))
+        }
+        children.push(
+          new Paragraph({ children: [new TextRun({ text: `Grand Total: $${(docxMatTotal + docxTaxAmt).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 24, color: primaryColor })] }),
+          new Paragraph({ children: [new TextRun({ text: '' })] }),
+        )
+      }
     }
 
     const docxLaborItems = proposal?.labor_items || []
@@ -962,7 +976,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
       const laborTotal = docxLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
       const materialsTotal = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
-      const grandTotal = materialsTotal + laborTotal
+      const grandTotal = materialsTotal + laborTotal + docxTaxAmt
 
       const lTotalRow = new TableRow({
         children: [
@@ -987,6 +1001,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         new Table({ width: { size: 7800, type: WidthType.DXA }, columnWidths: lcw, rows: [lHeaderRow, ...lRows, lTotalRow] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
+        ...(docxTaxRate > 0 ? [new Paragraph({ children: [new TextRun({ text: `Tax (${docxTaxRate}% on materials): $${docxTaxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] })] : []),
         new Paragraph({ children: [new TextRun({ text: `Grand Total: $${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 24, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
       )

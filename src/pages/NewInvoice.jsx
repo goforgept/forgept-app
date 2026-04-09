@@ -13,6 +13,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   const [selectedTicket, setSelectedTicket] = useState(null)
   const [profile, setProfile] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [orgDefaultTaxRate, setOrgDefaultTaxRate] = useState('')
   const [form, setForm] = useState({
     proposal_id: '',
     service_ticket_id: '',
@@ -31,8 +32,11 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    const { data: prof } = await supabase.from('profiles').select('*, organizations(org_type)').eq('id', user.id).single()
+    const { data: prof } = await supabase.from('profiles').select('*, organizations(org_type, default_tax_rate)').eq('id', user.id).single()
     setProfile(prof)
+    const defaultRate = prof?.organizations?.default_tax_rate ?? ''
+    setOrgDefaultTaxRate(String(defaultRate))
+    setForm(prev => ({ ...prev, tax_percent: String(defaultRate || '0') }))
 
     const { data: props } = await supabase
       .from('proposals')
@@ -147,9 +151,15 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     // Load SLA & monitoring contract fees
     const { data: propFull } = await supabase
       .from('proposals')
-      .select('sla_contracts, monitoring_contracts')
+      .select('sla_contracts, monitoring_contracts, tax_rate, tax_exempt')
       .eq('id', proposalId)
       .single()
+
+    // Apply proposal tax rate, or fall back to org default
+    const proposalTaxRate = (!propFull?.tax_exempt && propFull?.tax_rate)
+      ? String(propFull.tax_rate)
+      : propFull?.tax_exempt ? '0' : orgDefaultTaxRate
+    setForm(prev => ({ ...prev, tax_percent: proposalTaxRate }))
 
     const fees = []
     const initIncluded = {}
@@ -187,7 +197,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
     if (!ticket) { setLineItems([]); return }
 
-    setForm(prev => ({ ...prev, description: ticket.title || '' }))
+    setForm(prev => ({ ...prev, description: ticket.title || '', tax_percent: orgDefaultTaxRate || '0' }))
 
     const items = []
 
