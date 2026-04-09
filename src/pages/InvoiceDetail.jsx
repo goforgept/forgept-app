@@ -25,6 +25,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   const [notesValue, setNotesValue] = useState('')
   const [editingDescription, setEditingDescription] = useState(false)
   const [descriptionValue, setDescriptionValue] = useState('')
+  const [squareConnected, setSquareConnected] = useState(false)
+  const [sendingToSquare, setSendingToSquare] = useState(false)
+  const [squareError, setSquareError] = useState(null)
+  const [copiedLink, setCopiedLink] = useState(false)
 
   useEffect(() => {
     fetchAll()
@@ -47,6 +51,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setInvoice(inv)
     setNotesValue(inv?.notes || '')
     setDescriptionValue(inv?.description || '')
+    if (inv?.org_id) {
+      const { data: orgData } = await supabase.from('organizations').select('square_connected').eq('id', inv.org_id).single()
+      setSquareConnected(orgData?.square_connected || false)
+    }
 
     const { data: items } = await supabase
       .from('invoice_line_items')
@@ -288,6 +296,28 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setSendingInvoice(false)
   }
 
+  const sendToSquare = async () => {
+    setSendingToSquare(true); setSquareError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/square-create-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ invoiceId: id }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      await fetchAll()
+    } catch (err) { setSquareError(err.message) }
+    setSendingToSquare(false)
+  }
+
+  const copyPaymentLink = async () => {
+    if (!invoice?.square_payment_url) return
+    await navigator.clipboard.writeText(invoice.square_payment_url)
+    setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000)
+  }
+
   const saveDescription = async () => {
     await supabase.from('invoices').update({ description: descriptionValue }).eq('id', id)
     setInvoice(prev => ({ ...prev, description: descriptionValue }))
@@ -332,6 +362,12 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
               <p className="text-[#8A9AB0] text-xs mt-0.5">{invoice.proposals?.proposal_name}</p>
             </div>
             <div className="flex gap-2">
+              {squareConnected && !invoice?.square_invoice_id && (
+                <button onClick={sendToSquare} disabled={sendingToSquare}
+                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors disabled:opacity-50">
+                  {sendingToSquare ? 'Creating...' : '💳 Send to Square'}
+                </button>
+              )}
               <button onClick={() => {
                 setSendForm({ subject: `Invoice ${invoice.invoice_number}`, message: `Hi ${invoice.proposals?.client_name || 'there'},\n\nPlease find your invoice attached. Payment instructions are included on the invoice.\n\nThank you for your business.\n\n${invoice.proposals?.rep_name || profile?.full_name || ''}` })
                 setShowSendModal(true)
@@ -346,6 +382,34 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
               </button>
             </div>
           </div>
+
+          {squareError && (
+            <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 flex items-center justify-between">
+              <p className="text-red-400 text-sm">Square error: {squareError}</p>
+              <button onClick={() => setSquareError(null)} className="text-[#8A9AB0] hover:text-white text-lg leading-none">×</button>
+            </div>
+          )}
+          {invoice?.square_payment_url && (
+            <div className="mt-4 bg-[#1a2d45] border border-[#2a3d55] rounded-xl px-5 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white text-sm font-semibold">💳 Square Payment Link</p>
+                  <p className="text-[#8A9AB0] text-xs mt-0.5">Share this with your client so they can pay by card or ACH online.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a href={invoice.square_payment_url} target="_blank" rel="noopener noreferrer"
+                    className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors">
+                    Open ↗
+                  </a>
+                  <button onClick={copyPaymentLink}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${copiedLink ? 'bg-green-600/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+                    {copiedLink ? '✓ Copied!' : 'Copy Link'}
+                  </button>
+                </div>
+              </div>
+              <p className="text-[#8A9AB0] text-xs mt-2 font-mono truncate">{invoice.square_payment_url}</p>
+            </div>
+          )}
 
           <div className="grid grid-cols-4 gap-4 mt-6">
             <div><p className="text-[#8A9AB0] text-xs">Invoice Date</p><p className="text-white text-sm font-medium">{invoice.issued_date ? new Date(invoice.issued_date).toLocaleDateString() : '—'}</p></div>
@@ -474,7 +538,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Method</label>
                 <select value={paymentForm.method} onChange={e => setPaymentForm(p => ({ ...p, method: e.target.value }))}
                   className={inputClass}>
-                  {['Check', 'ACH', 'Wire', 'Zelle', 'Venmo', 'Cash', 'Credit Card', 'Other'].map(m => <option key={m}>{m}</option>)}
+                  {['Check', 'ACH', 'Wire', 'Zelle', 'Venmo', 'Cash', 'Credit Card', 'Square', 'Other'].map(m => <option key={m}>{m}</option>)}
                 </select>
               </div>
               <div>

@@ -145,6 +145,10 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [expandedSLAIndustry, setExpandedSLAIndustry] = useState(null)
   const [expandedSLATier, setExpandedSLATier] = useState({})
   const [expandedMonIndustry, setExpandedMonIndustry] = useState(null)
+  const [squareConnected, setSquareConnected] = useState(false)
+  const [squareMerchantId, setSquareMerchantId] = useState('')
+  const [connectingSquare, setConnectingSquare] = useState(false)
+  const [squareMessage, setSquareMessage] = useState(null)
 
   useEffect(() => {
     fetchProfile()
@@ -153,6 +157,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     if (params.get('tab') === 'integrations') setActiveTab('integrations')
     if (params.get('qbo_success')) setQboMessage({ type: 'success', text: 'QuickBooks connected successfully!' })
     if (params.get('qbo_error')) setQboMessage({ type: 'error', text: `QuickBooks connection failed: ${params.get('qbo_error')}` })
+    if (params.get('square_success')) setSquareMessage({ type: 'success', text: 'Square connected successfully! You can now generate payment links on invoices.' })
+    if (params.get('square_error')) setSquareMessage({ type: 'error', text: `Square connection failed: ${params.get('square_error')}` })
   }, [])
 
   const fetchProfile = async () => {
@@ -202,11 +208,13 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     // Fetch org data (tax rate + QBO status)
     if (data?.org_id) {
       try {
-        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates').eq('id', data.org_id).single()
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
         setOrgId(data.org_id)
         setQboConnected(orgData?.qbo_connected || false)
         setQboCompanyName(orgData?.qbo_company_name || '')
+        setSquareConnected(orgData?.square_connected || false)
+        setSquareMerchantId(orgData?.square_merchant_id || '')
         setSlaEnabled(orgData?.feature_sla || false)
         setSlaAutoAttach(orgData?.sla_auto_attach || false)
         setMonitoringEnabled(orgData?.feature_monitoring || false)
@@ -347,6 +355,36 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setPasswordSuccess('Password updated successfully')
     setPasswordForm({ current: '', newPass: '', confirm: '' })
     setSavingPassword(false)
+  }
+
+  const connectSquare = async () => {
+    setConnectingSquare(true); setSquareMessage(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      if (!profileData?.org_id) throw new Error('Could not find your organization.')
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/square-oauth-start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE` },
+        body: JSON.stringify({ org_id: profileData.org_id }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else setSquareMessage({ type: 'error', text: data.error || 'Could not start Square connection.' })
+    } catch (err) { setSquareMessage({ type: 'error', text: err.message }) }
+    setConnectingSquare(false)
+  }
+
+  const disconnectSquare = async () => {
+    if (!window.confirm('Disconnect Square? Existing payment links will still work, but you won\'t be able to create new ones.')) return
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+    await supabase.from('organizations').update({
+      square_connected: false, square_access_token: null, square_refresh_token: null,
+      square_merchant_id: null, square_location_id: null,
+    }).eq('id', profileData.org_id)
+    setSquareConnected(false); setSquareMerchantId('')
+    setSquareMessage({ type: 'success', text: 'Square disconnected.' })
   }
 
   const addSLATier = (ind) => {
@@ -728,18 +766,49 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
               </div>
             </div>
 
-            {/* Square — Coming Soon */}
-            <div className="bg-[#1a2d45] rounded-xl p-6 opacity-60">
-              <div className="flex justify-between items-center">
+            {squareMessage && (
+              <div className={`rounded-xl px-5 py-4 text-sm font-medium ${squareMessage.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                {squareMessage.text}
+              </div>
+            )}
+            <div className="bg-[#1a2d45] rounded-xl p-6">
+              <div className="flex justify-between items-start">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-[#3E4348]/30 rounded-xl flex items-center justify-center text-2xl">💳</div>
                   <div>
                     <h3 className="text-white font-bold">Square Payments</h3>
-                    <p className="text-[#8A9AB0] text-sm mt-0.5">Generate Square payment links on invoices so clients can pay online.</p>
+                    <p className="text-[#8A9AB0] text-sm mt-0.5">Generate Square payment links on invoices so clients can pay by card or ACH online.</p>
+                    {squareConnected && squareMerchantId && <p className="text-green-400 text-xs mt-1">✓ Connected · Merchant <span className="font-semibold font-mono">{squareMerchantId}</span></p>}
                   </div>
                 </div>
-                <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs font-semibold px-3 py-1 rounded-full">Coming Soon</span>
+                <div className="flex items-center gap-3">
+                  {squareConnected ? (
+                    <div className="flex items-center gap-3">
+                      <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-3 py-1 rounded-full">✓ Connected</span>
+                      <button onClick={disconnectSquare} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Disconnect</button>
+                    </div>
+                  ) : (
+                    <button onClick={connectSquare} disabled={connectingSquare}
+                      className="bg-[#3E4348] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#4E5358] transition-colors disabled:opacity-50">
+                      {connectingSquare ? 'Connecting...' : 'Connect Square'}
+                    </button>
+                  )}
+                </div>
               </div>
+              {squareConnected ? (
+                <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">What syncs</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-[#8A9AB0]">
+                    {['Invoice → Square Invoice','Line items + tax','Payment link on invoice detail','Auto-create customer in Square','Card + ACH accepted','Due date synced'].map(t => (
+                      <div key={t} className="flex items-center gap-2"><span className="text-green-400">✓</span> {t}</div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+                  <p className="text-[#8A9AB0] text-xs">You'll be redirected to Square to authorize ForgePt. to create invoices and accept payments on your behalf.</p>
+                </div>
+              )}
             </div>
           </div>
         )}

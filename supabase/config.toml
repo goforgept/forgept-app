@@ -75,3 +75,36 @@ entrypoint = "./functions/approve-request/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/approve-request/*.html" ]
+
+[functions.square-oauth-start]
+enabled = true
+verify_jwt = true
+import_map = "./functions/square-oauth-start/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/square-oauth-start/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/square-oauth-start/*.html" ]
+
+[functions.square-oauth-callback]
+enabled = true
+verify_jwt = true
+import_map = "./functions/square-oauth-callback/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/square-oauth-callback/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/square-oauth-callback/*.html" ]
+
+[functions.square-create-invoice]
+enabled = true
+verify_jwt = true
+import_map = "./functions/square-create-invoice/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/square-create-invoice/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/square-create-invoice/*.html" ]
