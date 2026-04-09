@@ -848,10 +848,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     const border = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
     const borders = { top: border, bottom: border, left: border, right: border }
-    const colWidths = [2800, 1400, 800, 1000, 1000]
+    const isLumpSum = proposal?.lump_sum_pricing
+    const colWidths = isLumpSum ? [4200, 1400, 1200] : [2800, 1400, 800, 1000, 1000]
+    const headers = isLumpSum ? ['Item', 'Part #', 'Qty'] : ['Item', 'Part #', 'Qty', 'Unit Price', 'Total']
 
     const headerRow = new TableRow({
-      children: ['Item', 'Part #', 'Qty', 'Unit Price', 'Total'].map((h, i) =>
+      children: headers.map((h, i) =>
         new TableCell({
           borders,
           width: { size: colWidths[i], type: WidthType.DXA },
@@ -866,13 +868,16 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     const itemRows = lineItems.map(item =>
       new TableRow({
-        children: [
-          item.item_name,
-          item.part_number_sku || '—',
-          String(item.quantity || 0),
-          `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-          `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-        ].map((val, i) =>
+        children: (isLumpSum
+          ? [item.item_name, item.part_number_sku || '—', String(item.quantity || 0)]
+          : [
+              item.item_name,
+              item.part_number_sku || '—',
+              String(item.quantity || 0),
+              `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+              `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+            ]
+        ).map((val, i) =>
           new TableCell({
             borders,
             width: { size: colWidths[i], type: WidthType.DXA },
@@ -885,10 +890,11 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       })
     )
 
+    const matTotal = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
     const totalRow = new TableRow({
       children: [
         new TableCell({
-          borders, columnSpan: 4,
+          borders, columnSpan: isLumpSum ? 2 : 4,
           margins: { top: 80, bottom: 80, left: 120, right: 120 },
           shading: { fill: primaryColor, type: ShadingType.CLEAR },
           children: [new Paragraph({
@@ -897,12 +903,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           })]
         }),
         new TableCell({
-          borders, width: { size: 1000, type: WidthType.DXA },
+          borders, width: { size: isLumpSum ? 1200 : 1000, type: WidthType.DXA },
           margins: { top: 80, bottom: 80, left: 120, right: 120 },
           shading: { fill: primaryColor, type: ShadingType.CLEAR },
           children: [new Paragraph({
             children: [new TextRun({
-              text: `$${lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+              text: `$${matTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
               bold: true, color: 'FFFFFF', size: 18
             })]
           })]
@@ -911,8 +917,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     })
 
     const docxTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
-    const docxMatTotal = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
-    const docxTaxAmt = docxMatTotal * (docxTaxRate / 100)
+    const docxTaxAmt = matTotal * (docxTaxRate / 100)
 
     const children = [
       new Paragraph({ children: [new TextRun({ text: profile?.company_name || proposal?.company || 'ForgePt.', bold: true, size: 36, color: primaryColor })] }),
@@ -939,7 +944,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       children.push(
         new Paragraph({ children: [new TextRun({ text: 'Materials & Pricing', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
-        new Table({ width: { size: 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: [headerRow, ...itemRows, totalRow] }),
+        new Table({ width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: [headerRow, ...itemRows, totalRow] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
       )
       if (!hasDocxLabor) {
