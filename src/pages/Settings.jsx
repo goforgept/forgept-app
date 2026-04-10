@@ -1052,7 +1052,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                       </button>
                     </div>
                     <p className="text-[#8A9AB0] text-xs mt-1">
-                      Emails forwarded to <span className="text-white font-mono">tickets@goforgept.com</span> from this domain will create tickets automatically.
+                      Enter <span className="text-white">your company's domain</span> e.g. <span className="text-white font-mono">acmeav.com</span> — not ForgePt.'s domain. Emails forwarded to <span className="text-white font-mono">tickets@goforgept.com</span> from this domain will create tickets under your account automatically.
                     </p>
                   </div>
                   <div>
@@ -1069,10 +1069,10 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                   <div className="bg-[#0F1C2E] rounded-xl p-4">
                     <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Setup Instructions</p>
                     <div className="space-y-1.5 text-xs text-[#8A9AB0]">
-                      <p>1. Enter your domain above and click <span className="text-white">Send Verification</span></p>
-                      <p>2. Click the verification link sent to <span className="text-white">{profile?.email}</span></p>
-                      <p>3. Set up a forward rule in your email client to forward support emails to <span className="text-white font-mono">tickets@goforgept.com</span></p>
-                      <p>4. Your clients email your support address → tickets are created automatically</p>
+                      <p>1. Enter <span className="text-white">your company's domain</span> above (e.g. <span className="text-white font-mono">acmeav.com</span>) and click <span className="text-white">Send Verification</span></p>
+                      <p>2. Click the verification link sent to <span className="text-white">{profile?.email}</span> to confirm you own the domain</p>
+                      <p>3. In your email client, set up a forward rule so your support inbox (e.g. <span className="text-white font-mono">support@acmeav.com</span>) forwards to <span className="text-white font-mono">tickets@goforgept.com</span></p>
+                      <p>4. When your clients email your support address, tickets are created automatically under your account</p>
                     </div>
                   </div>
                   <button onClick={saveInboundSettings} disabled={savingInbound}
