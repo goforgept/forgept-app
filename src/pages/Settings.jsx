@@ -157,6 +157,13 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [microsoftEmail, setMicrosoftEmail] = useState('')
   const [connectingMicrosoft, setConnectingMicrosoft] = useState(false)
   const [microsoftMessage, setMicrosoftMessage] = useState(null)
+  const [inboundEnabled, setInboundEnabled] = useState(false)
+  const [inboundDomain, setInboundDomain] = useState('')
+  const [inboundVerified, setInboundVerified] = useState(false)
+  const [inboundAutoReply, setInboundAutoReply] = useState('')
+  const [savingInbound, setSavingInbound] = useState(false)
+  const [inboundMessage, setInboundMessage] = useState(null)
+  const [verifyingInbound, setVerifyingInbound] = useState(false)
 
   useEffect(() => {
     fetchProfile()
@@ -171,6 +178,35 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     if (params.get('google_error')) setGoogleMessage({ type: 'error', text: `Google connection failed: ${params.get('google_error')}` })
     if (params.get('microsoft_success')) setMicrosoftMessage({ type: 'success', text: 'Microsoft Calendar connected successfully!' })
     if (params.get('microsoft_error')) setMicrosoftMessage({ type: 'error', text: `Microsoft connection failed: ${params.get('microsoft_error')}` })
+    // Handle inbound email domain verification click
+    const verifyToken = params.get('verify_inbound')
+    if (verifyToken) {
+      setActiveTab('integrations')
+      try {
+        const decoded = JSON.parse(atob(verifyToken))
+        if (Date.now() > decoded.expires) {
+          setInboundMessage({ type: 'error', text: 'Verification link has expired. Please send a new one.' })
+        } else {
+          // Verify the token matches what's stored on the org
+          supabase.from('organizations')
+            .update({ inbound_email_verified: true, inbound_verification_token: null })
+            .eq('id', decoded.org_id)
+            .eq('inbound_verification_token', verifyToken)
+            .then(({ error }) => {
+              if (error) {
+                setInboundMessage({ type: 'error', text: 'Verification failed. Please try again.' })
+              } else {
+                setInboundVerified(true)
+                setInboundDomain(decoded.domain)
+                setInboundEnabled(true)
+                setInboundMessage({ type: 'success', text: `✓ Domain @${decoded.domain} verified! Inbound email routing is now active.` })
+              }
+            })
+        }
+      } catch {
+        setInboundMessage({ type: 'error', text: 'Invalid verification link.' })
+      }
+    }
   }, [])
 
   const fetchProfile = async () => {
@@ -220,13 +256,17 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     // Fetch org data (tax rate + QBO status)
     if (data?.org_id) {
       try {
-        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id').eq('id', data.org_id).single()
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
         setOrgId(data.org_id)
         setQboConnected(orgData?.qbo_connected || false)
         setQboCompanyName(orgData?.qbo_company_name || '')
         setSquareConnected(orgData?.square_connected || false)
         setSquareMerchantId(orgData?.square_merchant_id || '')
+        setInboundEnabled(orgData?.inbound_email_enabled || false)
+        setInboundDomain(orgData?.inbound_email_domain || '')
+        setInboundVerified(orgData?.inbound_email_verified || false)
+        setInboundAutoReply(orgData?.inbound_email_auto_reply || '')
         // Load Google calendar state from profiles (per-user not per-org)
         setGoogleConnected(data?.google_calendar_connected || false)
         setGoogleEmail(data?.google_email || '')
@@ -440,6 +480,51 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setGoogleConnected(false)
     setGoogleEmail('')
     setGoogleMessage({ type: 'success', text: 'Google Calendar disconnected.' })
+  }
+
+  const saveInboundSettings = async () => {
+    setSavingInbound(true)
+    setInboundMessage(null)
+    await supabase.from('organizations').update({
+      inbound_email_enabled: inboundEnabled,
+      inbound_email_domain: inboundDomain.trim().toLowerCase() || null,
+      inbound_email_auto_reply: inboundAutoReply.trim() || null,
+    }).eq('id', orgId)
+    setInboundMessage({ type: 'success', text: 'Inbound email settings saved.' })
+    setSavingInbound(false)
+  }
+
+  const sendVerificationEmail = async () => {
+    if (!inboundDomain.trim()) return
+    setVerifyingInbound(true)
+    setInboundMessage(null)
+    try {
+      // Check domain isn't already claimed by another org
+      const { data: existing } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('inbound_email_domain', inboundDomain.trim().toLowerCase())
+        .neq('id', orgId)
+        .single()
+      if (existing) {
+        setInboundMessage({ type: 'error', text: 'This domain is already registered to another organization.' })
+        setVerifyingInbound(false)
+        return
+      }
+      // Send verification email to the org admin via Brevo edge function
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-inbound-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ org_id: orgId, domain: inboundDomain.trim().toLowerCase() })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setInboundMessage({ type: 'success', text: `Verification email sent to ${profile?.email}. Click the link to activate inbound routing for ${inboundDomain}.` })
+    } catch (err) {
+      setInboundMessage({ type: 'error', text: err.message })
+    }
+    setVerifyingInbound(false)
   }
 
   const connectMicrosoft = async () => {
@@ -913,6 +998,87 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                       <div key={t} className="flex items-center gap-2"><span className="text-green-400">✓</span> {t}</div>
                     ))}
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Inbound Email */}
+            {inboundMessage && (
+              <div className={`rounded-xl px-5 py-4 text-sm font-medium ${inboundMessage.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                {inboundMessage.text}
+              </div>
+            )}
+            <div className="bg-[#1a2d45] rounded-xl p-6">
+              <div className="flex justify-between items-start mb-5">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center text-2xl">📨</div>
+                  <div>
+                    <h3 className="text-white font-bold">Inbound Email → Tickets</h3>
+                    <p className="text-[#8A9AB0] text-sm mt-0.5">Automatically create service tickets from emails sent to tickets@goforgept.com.</p>
+                    {inboundVerified && inboundDomain && (
+                      <p className="text-green-400 text-xs mt-1">✓ Verified · Routing emails from <span className="font-semibold">@{inboundDomain}</span></p>
+                    )}
+                    {inboundDomain && !inboundVerified && (
+                      <p className="text-yellow-400 text-xs mt-1">⏳ Pending verification for <span className="font-semibold">@{inboundDomain}</span></p>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => setInboundEnabled(p => !p)}
+                  className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${inboundEnabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                  <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${inboundEnabled ? 'left-7' : 'left-1'}`} />
+                </button>
+              </div>
+              {inboundEnabled && (
+                <div className="space-y-4 border-t border-[#2a3d55] pt-5">
+                  <div>
+                    <label className="text-[#8A9AB0] text-xs mb-1 block">Your Company Domain</label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8A9AB0] text-sm">@</span>
+                        <input
+                          type="text"
+                          value={inboundDomain}
+                          onChange={e => { setInboundDomain(e.target.value); setInboundVerified(false) }}
+                          placeholder="acmeav.com"
+                          className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                        />
+                      </div>
+                      <button
+                        onClick={sendVerificationEmail}
+                        disabled={verifyingInbound || !inboundDomain.trim() || inboundVerified}
+                        className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors disabled:opacity-50 whitespace-nowrap"
+                      >
+                        {verifyingInbound ? 'Sending...' : inboundVerified ? '✓ Verified' : 'Send Verification'}
+                      </button>
+                    </div>
+                    <p className="text-[#8A9AB0] text-xs mt-1">
+                      Emails forwarded to <span className="text-white font-mono">tickets@goforgept.com</span> from this domain will create tickets automatically.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-[#8A9AB0] text-xs mb-1 block">Auto-Reply Message <span className="font-normal">(optional)</span></label>
+                    <textarea
+                      value={inboundAutoReply}
+                      onChange={e => setInboundAutoReply(e.target.value)}
+                      rows={4}
+                      placeholder={`Hi there,\n\nThank you for reaching out. We've received your request and will be in touch shortly.\n\nThank you for your patience.`}
+                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none"
+                    />
+                    <p className="text-[#8A9AB0] text-xs mt-1">Sent to the client when their ticket is created. Leave blank to use the default message.</p>
+                  </div>
+                  <div className="bg-[#0F1C2E] rounded-xl p-4">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Setup Instructions</p>
+                    <div className="space-y-1.5 text-xs text-[#8A9AB0]">
+                      <p>1. Enter your domain above and click <span className="text-white">Send Verification</span></p>
+                      <p>2. Click the verification link sent to <span className="text-white">{profile?.email}</span></p>
+                      <p>3. Set up a forward rule in your email client to forward support emails to <span className="text-white font-mono">tickets@goforgept.com</span></p>
+                      <p>4. Your clients email your support address → tickets are created automatically</p>
+                    </div>
+                  </div>
+                  <button onClick={saveInboundSettings} disabled={savingInbound}
+                    className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                    {savingInbound ? 'Saving...' : 'Save Inbound Settings'}
+                  </button>
                 </div>
               )}
             </div>
