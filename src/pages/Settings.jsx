@@ -153,6 +153,10 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [googleEmail, setGoogleEmail] = useState('')
   const [connectingGoogle, setConnectingGoogle] = useState(false)
   const [googleMessage, setGoogleMessage] = useState(null)
+  const [microsoftConnected, setMicrosoftConnected] = useState(false)
+  const [microsoftEmail, setMicrosoftEmail] = useState('')
+  const [connectingMicrosoft, setConnectingMicrosoft] = useState(false)
+  const [microsoftMessage, setMicrosoftMessage] = useState(null)
 
   useEffect(() => {
     fetchProfile()
@@ -165,6 +169,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     if (params.get('square_error')) setSquareMessage({ type: 'error', text: `Square connection failed: ${params.get('square_error')}` })
     if (params.get('google_success')) setGoogleMessage({ type: 'success', text: 'Google Calendar connected successfully!' })
     if (params.get('google_error')) setGoogleMessage({ type: 'error', text: `Google connection failed: ${params.get('google_error')}` })
+    if (params.get('microsoft_success')) setMicrosoftMessage({ type: 'success', text: 'Microsoft Calendar connected successfully!' })
+    if (params.get('microsoft_error')) setMicrosoftMessage({ type: 'error', text: `Microsoft connection failed: ${params.get('microsoft_error')}` })
   }, [])
 
   const fetchProfile = async () => {
@@ -224,6 +230,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         // Load Google calendar state from profiles (per-user not per-org)
         setGoogleConnected(data?.google_calendar_connected || false)
         setGoogleEmail(data?.google_email || '')
+        setMicrosoftConnected(data?.microsoft_calendar_connected || false)
+        setMicrosoftEmail(data?.microsoft_email || '')
         setSlaEnabled(orgData?.feature_sla || false)
         setSlaAutoAttach(orgData?.sla_auto_attach || false)
         setMonitoringEnabled(orgData?.feature_monitoring || false)
@@ -432,6 +440,42 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setGoogleConnected(false)
     setGoogleEmail('')
     setGoogleMessage({ type: 'success', text: 'Google Calendar disconnected.' })
+  }
+
+  const connectMicrosoft = async () => {
+    setConnectingMicrosoft(true)
+    setMicrosoftMessage(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      if (!profileData?.org_id) throw new Error('Could not find your organization.')
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/microsoft-oauth-start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ org_id: profileData.org_id, user_id: user.id })
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else setMicrosoftMessage({ type: 'error', text: data.error || 'Could not start Microsoft connection.' })
+    } catch (err) {
+      setMicrosoftMessage({ type: 'error', text: err.message })
+    }
+    setConnectingMicrosoft(false)
+  }
+
+  const disconnectMicrosoft = async () => {
+    if (!window.confirm('Disconnect Microsoft Calendar? Existing events will remain but new schedules won\'t sync.')) return
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('profiles').update({
+      microsoft_calendar_connected: false,
+      microsoft_access_token: null,
+      microsoft_refresh_token: null,
+      microsoft_email: null,
+      microsoft_display_name: null,
+    }).eq('id', user.id)
+    setMicrosoftConnected(false)
+    setMicrosoftEmail('')
+    setMicrosoftMessage({ type: 'success', text: 'Microsoft Calendar disconnected.' })
   }
 
   const addSLATier = (ind) => {
@@ -829,18 +873,48 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
               )}
             </div>
 
-            {/* Microsoft — Coming Soon */}
-            <div className="bg-[#1a2d45] rounded-xl p-6 opacity-60">
-              <div className="flex justify-between items-center">
+            {/* Microsoft Calendar */}
+            {microsoftMessage && (
+              <div className={`rounded-xl px-5 py-4 text-sm font-medium ${microsoftMessage.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                {microsoftMessage.text}
+              </div>
+            )}
+            <div className="bg-[#1a2d45] rounded-xl p-6">
+              <div className="flex justify-between items-start">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-blue-600/10 rounded-xl flex items-center justify-center text-2xl">🗓</div>
                   <div>
                     <h3 className="text-white font-bold">Microsoft Outlook & Teams</h3>
-                    <p className="text-[#8A9AB0] text-sm mt-0.5">Sync proposals to Outlook calendar and create Teams meetings automatically.</p>
+                    <p className="text-[#8A9AB0] text-sm mt-0.5">Sync job schedules, service tickets, and rep meetings to Outlook. Create Teams meeting links automatically.</p>
+                    {microsoftConnected && microsoftEmail && (
+                      <p className="text-green-400 text-xs mt-1">✓ Connected as <span className="font-semibold">{microsoftEmail}</span></p>
+                    )}
                   </div>
                 </div>
-                <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs font-semibold px-3 py-1 rounded-full">Coming Soon</span>
+                <div className="flex items-center gap-3">
+                  {microsoftConnected ? (
+                    <div className="flex items-center gap-3">
+                      <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-3 py-1 rounded-full">✓ Connected</span>
+                      <button onClick={disconnectMicrosoft} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Disconnect</button>
+                    </div>
+                  ) : (
+                    <button onClick={connectMicrosoft} disabled={connectingMicrosoft}
+                      className="bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50">
+                      {connectingMicrosoft ? 'Connecting...' : 'Connect Microsoft'}
+                    </button>
+                  )}
+                </div>
               </div>
+              {microsoftConnected && (
+                <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">What syncs</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-[#8A9AB0]">
+                    {['Job schedules → Outlook events', 'Service ticket appointments', 'Tech daily schedules', 'Rep meetings with Teams links', 'Customer reminders via email', 'Auto-updates when rescheduled'].map(t => (
+                      <div key={t} className="flex items-center gap-2"><span className="text-green-400">✓</span> {t}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {squareMessage && (
