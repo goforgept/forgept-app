@@ -323,6 +323,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       // Keep followup_days in sync
       followup_days: `${emailTemplates.early_days},${emailTemplates.day14_days},${emailTemplates.day7_days},0`
     }).eq('id', user.id)
+    const syncedFollowupDays = `${emailTemplates.early_days},${emailTemplates.day14_days},${emailTemplates.day7_days},0`
+    setForm(prev => ({ ...prev, followup_days: syncedFollowupDays }))
     setSuccess('Email templates saved successfully')
     setSavingTemplates(false)
   }

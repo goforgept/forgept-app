@@ -56,17 +56,30 @@ Deno.serve(async (req) => {
           .split(',')
           .map((d: string) => parseInt(d.trim()))
           .filter((d: number) => !isNaN(d))
+          .sort((a: number, b: number) => a - b) // ascending: [0, 7, 14, 30]
 
-        const closeDate = new Date(proposal.close_date)
-        closeDate.setHours(0, 0, 0, 0)
+        const closeDate = new Date(proposal.close_date + 'T00:00:00Z')
         const daysUntilClose = Math.round(
           (closeDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
         )
 
-        if (!followupDays.includes(daysUntilClose)) continue
+        // Find which threshold "window" this day belongs to.
+        // Each threshold owns the range (prev_threshold, threshold].
+        // This ensures a missed exact day still gets caught on the next cron run.
+        let activeThreshold: number | null = null
+        for (let i = 0; i < followupDays.length; i++) {
+          const threshold = followupDays[i]
+          const prevThreshold = i > 0 ? followupDays[i - 1] : -1
+          if (daysUntilClose <= threshold && daysUntilClose > prevThreshold) {
+            activeThreshold = threshold
+            break
+          }
+        }
+
+        if (activeThreshold === null) continue
 
         const logRes = await fetch(
-          `${supabaseUrl}/rest/v1/followup_log?proposal_id=eq.${proposal.id}&days_until_close=eq.${daysUntilClose}`,
+          `${supabaseUrl}/rest/v1/followup_log?proposal_id=eq.${proposal.id}&days_until_close=eq.${activeThreshold}`,
           { headers: dbHeaders }
         )
         const log = await logRes.json()
@@ -205,7 +218,7 @@ Deno.serve(async (req) => {
         await fetch(`${supabaseUrl}/rest/v1/followup_log`, {
           method: 'POST',
           headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
-          body: JSON.stringify({ proposal_id: proposal.id, days_until_close: daysUntilClose })
+          body: JSON.stringify({ proposal_id: proposal.id, days_until_close: activeThreshold })
         })
 
       } catch (proposalErr) {
