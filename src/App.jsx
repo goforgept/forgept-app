@@ -11,6 +11,7 @@ import Proposals from './pages/Proposals'
 import Vendors from './pages/Vendors'
 import Settings from './pages/Settings'
 import SquareCallback from './pages/SquareCallback'
+import GoogleCallback from './pages/GoogleCallback'
 import ResetPassword from './pages/ResetPassword'
 import Clients from './pages/Clients'
 import SuperAdmin from './pages/SuperAdmin'
@@ -201,6 +202,7 @@ function App() {
           <Route path="/service-tickets/:id" element={<ServiceTicketDetail {...sharedProps} />} />
           <Route path="/dispatch" element={<Dispatch {...sharedProps} />} />
           <Route path="/integrations/square/callback" element={<SquareCallback />} />
+          <Route path="/integrations/google/callback" element={<GoogleCallback />} />
           <Route path="/product-library" element={<ProductLibrary {...sharedProps} />} />
           {(featureSla || featureMonitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
         </>

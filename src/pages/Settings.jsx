@@ -149,6 +149,10 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [squareMerchantId, setSquareMerchantId] = useState('')
   const [connectingSquare, setConnectingSquare] = useState(false)
   const [squareMessage, setSquareMessage] = useState(null)
+  const [googleConnected, setGoogleConnected] = useState(false)
+  const [googleEmail, setGoogleEmail] = useState('')
+  const [connectingGoogle, setConnectingGoogle] = useState(false)
+  const [googleMessage, setGoogleMessage] = useState(null)
 
   useEffect(() => {
     fetchProfile()
@@ -159,6 +163,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     if (params.get('qbo_error')) setQboMessage({ type: 'error', text: `QuickBooks connection failed: ${params.get('qbo_error')}` })
     if (params.get('square_success')) setSquareMessage({ type: 'success', text: 'Square connected successfully! You can now generate payment links on invoices.' })
     if (params.get('square_error')) setSquareMessage({ type: 'error', text: `Square connection failed: ${params.get('square_error')}` })
+    if (params.get('google_success')) setGoogleMessage({ type: 'success', text: 'Google Calendar connected successfully!' })
+    if (params.get('google_error')) setGoogleMessage({ type: 'error', text: `Google connection failed: ${params.get('google_error')}` })
   }, [])
 
   const fetchProfile = async () => {
@@ -215,6 +221,9 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         setQboCompanyName(orgData?.qbo_company_name || '')
         setSquareConnected(orgData?.square_connected || false)
         setSquareMerchantId(orgData?.square_merchant_id || '')
+        // Load Google calendar state from profiles (per-user not per-org)
+        setGoogleConnected(data?.google_calendar_connected || false)
+        setGoogleEmail(data?.google_email || '')
         setSlaEnabled(orgData?.feature_sla || false)
         setSlaAutoAttach(orgData?.sla_auto_attach || false)
         setMonitoringEnabled(orgData?.feature_monitoring || false)
@@ -387,6 +396,42 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     }).eq('id', profileData.org_id)
     setSquareConnected(false); setSquareMerchantId('')
     setSquareMessage({ type: 'success', text: 'Square disconnected.' })
+  }
+
+  const connectGoogle = async () => {
+    setConnectingGoogle(true)
+    setGoogleMessage(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      if (!profileData?.org_id) throw new Error('Could not find your organization.')
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/google-oauth-start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ org_id: profileData.org_id, user_id: user.id })
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else setGoogleMessage({ type: 'error', text: data.error || 'Could not start Google connection.' })
+    } catch (err) {
+      setGoogleMessage({ type: 'error', text: err.message })
+    }
+    setConnectingGoogle(false)
+  }
+
+  const disconnectGoogle = async () => {
+    if (!window.confirm('Disconnect Google Calendar? Existing events will remain but new schedules won\'t sync.')) return
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('profiles').update({
+      google_calendar_connected: false,
+      google_access_token: null,
+      google_refresh_token: null,
+      google_calendar_id: null,
+      google_email: null,
+    }).eq('id', user.id)
+    setGoogleConnected(false)
+    setGoogleEmail('')
+    setGoogleMessage({ type: 'success', text: 'Google Calendar disconnected.' })
   }
 
   const addSLATier = (ind) => {
@@ -740,18 +785,48 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
               )}
             </div>
 
-            {/* Google — Coming Soon */}
-            <div className="bg-[#1a2d45] rounded-xl p-6 opacity-60">
-              <div className="flex justify-between items-center">
+            {/* Google Calendar */}
+            {googleMessage && (
+              <div className={`rounded-xl px-5 py-4 text-sm font-medium ${googleMessage.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                {googleMessage.text}
+              </div>
+            )}
+            <div className="bg-[#1a2d45] rounded-xl p-6">
+              <div className="flex justify-between items-start">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center text-2xl">📅</div>
                   <div>
                     <h3 className="text-white font-bold">Google Calendar & Meet</h3>
-                    <p className="text-[#8A9AB0] text-sm mt-0.5">Auto-create calendar events and Meet links when proposals are Won.</p>
+                    <p className="text-[#8A9AB0] text-sm mt-0.5">Sync job schedules, service tickets, and rep meetings to Google Calendar. Create Meet links automatically.</p>
+                    {googleConnected && googleEmail && (
+                      <p className="text-green-400 text-xs mt-1">✓ Connected as <span className="font-semibold">{googleEmail}</span></p>
+                    )}
                   </div>
                 </div>
-                <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs font-semibold px-3 py-1 rounded-full">Coming Soon</span>
+                <div className="flex items-center gap-3">
+                  {googleConnected ? (
+                    <div className="flex items-center gap-3">
+                      <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-3 py-1 rounded-full">✓ Connected</span>
+                      <button onClick={disconnectGoogle} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Disconnect</button>
+                    </div>
+                  ) : (
+                    <button onClick={connectGoogle} disabled={connectingGoogle}
+                      className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
+                      {connectingGoogle ? 'Connecting...' : 'Connect Google'}
+                    </button>
+                  )}
+                </div>
               </div>
+              {googleConnected && (
+                <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">What syncs</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-[#8A9AB0]">
+                    {['Job schedules → Calendar events', 'Service ticket appointments', 'Tech daily schedules', 'Rep meetings with Meet links', 'Customer reminders via email', 'Auto-updates when rescheduled'].map(t => (
+                      <div key={t} className="flex items-center gap-2"><span className="text-green-400">✓</span> {t}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Microsoft — Coming Soon */}
