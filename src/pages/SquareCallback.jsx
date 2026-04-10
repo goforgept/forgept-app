@@ -5,12 +5,19 @@ export default function SquareCallback() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // The actual OAuth exchange happens in the Edge Function
-    // This page just shows a brief loading state then redirects
-    // The Edge Function itself redirects to /settings?tab=integrations&square_success=1
-    // so this page should never actually render in normal flow
-    // but handle it gracefully in case of direct navigation
-    navigate('/settings?tab=integrations')
+    const params = new URLSearchParams(window.location.search)
+    const code = params.get('code')
+    const state = params.get('state')
+    const error = params.get('error')
+
+    if (!code || error) {
+      navigate(`/settings?tab=integrations&square_error=${error || 'missing_code'}`)
+      return
+    }
+
+    // Forward params to the edge function as query params — matches how it reads them
+    const edgeFnUrl = `https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/square-oauth-callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`
+    window.location.href = edgeFnUrl
   }, [])
 
   return (
@@ -18,6 +25,7 @@ export default function SquareCallback() {
       <div className="text-center">
         <h1 className="text-white text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
         <p className="text-[#8A9AB0] text-sm">Connecting Square...</p>
+        <div className="mt-4 w-6 h-6 border-2 border-[#C8622A] border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     </div>
   )
