@@ -126,6 +126,14 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [notifyMessage, setNotifyMessage] = useState('')
   const [sendingNotify, setSendingNotify] = useState(false)
 
+  // Schedule tech modal
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [schedTechId, setSchedTechId] = useState('')
+  const [schedDate, setSchedDate] = useState('')
+  const [schedHours, setSchedHours] = useState('4')
+  const [savingSchedule, setSavingSchedule] = useState(false)
+  const [jobSchedules, setJobSchedules] = useState([])
+
   useEffect(() => { fetchAll() }, [id])
 
   const fetchAll = async () => {
@@ -227,6 +235,15 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     setTechLogs(logData || [])
 
     await autoCheckItems(id, jobData)
+
+    // Fetch existing tech schedules for this job
+    const { data: schedData } = await supabase
+      .from('job_tech_schedules')
+      .select('*, profiles(full_name)')
+      .eq('job_id', id)
+      .gte('date', new Date().toISOString().split('T')[0])
+      .order('date', { ascending: true })
+    setJobSchedules(schedData || [])
 
     setLoading(false)
   }
@@ -674,6 +691,36 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     setChangeOrders(prev => prev.map(c => c.id === coId ? { ...c, status } : c))
   }
 
+  const saveSchedule = async () => {
+    if (!schedTechId || !schedDate) return
+    setSavingSchedule(true)
+    await supabase.from('job_tech_schedules').insert({
+      job_id: id,
+      tech_id: schedTechId,
+      org_id: profile?.org_id,
+      date: schedDate,
+      hours_allocated: parseFloat(schedHours) || 4,
+    })
+    // Refresh schedules
+    const { data: schedData } = await supabase
+      .from('job_tech_schedules')
+      .select('*, profiles(full_name)')
+      .eq('job_id', id)
+      .gte('date', new Date().toISOString().split('T')[0])
+      .order('date', { ascending: true })
+    setJobSchedules(schedData || [])
+    setSchedTechId('')
+    setSchedDate('')
+    setSchedHours('4')
+    setShowScheduleModal(false)
+    setSavingSchedule(false)
+  }
+
+  const removeSchedule = async (scheduleId) => {
+    await supabase.from('job_tech_schedules').delete().eq('id', scheduleId)
+    setJobSchedules(prev => prev.filter(s => s.id !== scheduleId))
+  }
+
   const sendNotification = async () => {
     if (!job?.clients?.email || !notifyMessage) return
     setSendingNotify(true)
@@ -765,6 +812,12 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {(isAdmin || isPM) && (
+                <button onClick={() => setShowScheduleModal(true)}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
+                  📅 Schedule Tech
+                </button>
+              )}
               {job?.clients?.email && (
                 <button onClick={() => setShowNotifyModal(true)}
                   className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
@@ -814,6 +867,25 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
               <div className={`h-2 rounded-full transition-all ${progress === 100 ? 'bg-green-400' : 'bg-[#C8622A]'}`} style={{ width: `${progress}%` }} />
             </div>
           </div>
+        {/* Upcoming tech schedules */}
+          {jobSchedules.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Upcoming Tech Schedule</p>
+              <div className="flex flex-wrap gap-2">
+                {jobSchedules.map(s => (
+                  <div key={s.id} className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-1.5 group">
+                    <span className="text-blue-300 text-xs font-semibold">{s.profiles?.full_name}</span>
+                    <span className="text-blue-400/70 text-xs">·</span>
+                    <span className="text-blue-400/70 text-xs">{new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                    <span className="text-blue-400/70 text-xs">· {s.hours_allocated}h</span>
+                    {(isAdmin || isPM) && (
+                      <button onClick={() => removeSchedule(s.id)} className="opacity-0 group-hover:opacity-100 text-[#8A9AB0] hover:text-red-400 text-xs transition-all ml-1">✕</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -1488,6 +1560,58 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           </div>
         )
       })()}
+
+      {/* Schedule Tech Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-white font-bold text-lg mb-1">Schedule Tech</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">{job?.name}</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Technician <span className="text-[#C8622A]">*</span></label>
+                <select value={schedTechId} onChange={e => setSchedTechId(e.target.value)} className={`w-full ${inputClass}`}>
+                  <option value="">— Select tech —</option>
+                  {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Date <span className="text-[#C8622A]">*</span></label>
+                  <input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)} className={`w-full ${inputClass}`} />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Hours on this job</label>
+                  <select value={schedHours} onChange={e => setSchedHours(e.target.value)} className={`w-full ${inputClass}`}>
+                    {['1','2','3','4','5','6','7','8'].map(h => <option key={h} value={h}>{h} {parseInt(h) === 1 ? 'hour' : 'hours'}</option>)}
+                  </select>
+                </div>
+              </div>
+              <p className="text-[#8A9AB0] text-xs">You can add multiple techs or multiple days by saving and adding again.</p>
+              {jobSchedules.length > 0 && (
+                <div className="bg-[#0F1C2E] rounded-lg p-3">
+                  <p className="text-[#8A9AB0] text-xs font-semibold mb-2">Already scheduled</p>
+                  <div className="space-y-1">
+                    {jobSchedules.map(s => (
+                      <div key={s.id} className="flex items-center justify-between text-xs">
+                        <span className="text-white">{s.profiles?.full_name} · {new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {s.hours_allocated}h</span>
+                        <button onClick={() => removeSchedule(s.id)} className="text-[#8A9AB0] hover:text-red-400 transition-colors ml-2">✕</button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowScheduleModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Close</button>
+                <button onClick={saveSchedule} disabled={savingSchedule || !schedTechId || !schedDate}
+                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
+                  {savingSchedule ? 'Saving...' : 'Add to Schedule'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Notify Customer Modal */}
       {showNotifyModal && (
