@@ -67,6 +67,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
   const [editJobDate, setEditJobDate] = useState('')
   const [editJobHours, setEditJobHours] = useState('4')
 
+  const [orgTimezone, setOrgTimezone] = useState('America/Chicago')
   const today = new Date().toISOString().split('T')[0]
   const weekDates = getWeekDates(selectedDate)
 
@@ -76,6 +77,8 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profileData } = await supabase.from('profiles').select('*, organizations(org_type)').eq('id', user.id).single()
     setProfile(profileData)
+    const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', profileData.org_id).single()
+    setOrgTimezone(orgData?.timezone || 'America/Chicago')
 
     const { data: techData } = await supabase
       .from('profiles').select('id, full_name, dispatch_zone, role')
@@ -266,6 +269,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
           record_id: ticket.id,
           existing_google_event_id: ticket.google_event_id || null,
           existing_microsoft_event_id: ticket.microsoft_event_id || null,
+          timezone: orgTimezone,
         }),
       })
     } catch (e) { console.error('Calendar push error:', e) }
@@ -289,6 +293,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
           record_id: scheduleRow.id,
           existing_google_event_id: scheduleRow.google_event_id || null,
           existing_microsoft_event_id: scheduleRow.microsoft_event_id || null,
+          timezone: orgTimezone,
         }),
       })
     } catch (e) { console.error('Calendar push error:', e) }

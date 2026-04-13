@@ -89,6 +89,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [activeTab, setActiveTab] = useState('checklist')
   const [savingStatus, setSavingStatus] = useState(false)
   const [orgProfiles, setOrgProfiles] = useState([])
+  const [orgTimezone, setOrgTimezone] = useState('America/Chicago')
   // Freeform PO line items (from purchase_order_line_items where job_id = id)
   const [freeformPOItems, setFreeformPOItems] = useState([])
 
@@ -155,6 +156,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         .eq('org_id', profileData.org_id)
         .order('full_name')
       setOrgProfiles(profilesData || [])
+      const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', profileData.org_id).single()
+      setOrgTimezone(orgData?.timezone || 'America/Chicago')
     }
 
     if (jobData?.proposal_id) {
@@ -742,6 +745,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           record_id: scheduleRow.id,
           existing_google_event_id: scheduleRow.google_event_id || null,
           existing_microsoft_event_id: scheduleRow.microsoft_event_id || null,
+          timezone: orgTimezone,
         }),
       })
     } catch (e) { console.error('Calendar push error:', e) }

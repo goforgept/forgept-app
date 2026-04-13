@@ -120,6 +120,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [sameAsShipTo, setSameAsShipTo] = useState(false)
   const [expandedStage, setExpandedStage] = useState('early')
   const [orgTaxRate, setOrgTaxRate] = useState('')
+  const [orgTimezone, setOrgTimezone] = useState('America/Chicago')
   const [savingTaxRate, setSavingTaxRate] = useState(false)
   const [orgId, setOrgId] = useState(null)
   const [qboConnected, setQboConnected] = useState(false)
@@ -258,6 +259,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       try {
         const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
+        setOrgTimezone(orgData?.timezone || 'America/Chicago')
         setOrgId(data.org_id)
         setQboConnected(orgData?.qbo_connected || false)
         setQboCompanyName(orgData?.qbo_company_name || '')
@@ -355,7 +357,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       ship_to_zip: form.ship_to_zip,
     }).eq('id', user.id)
     if (orgId) {
-      await supabase.from('organizations').update({ default_tax_rate: parseFloat(orgTaxRate) || null }).eq('id', orgId)
+      await supabase.from('organizations').update({ default_tax_rate: parseFloat(orgTaxRate) || null, timezone: orgTimezone }).eq('id', orgId)
     }
     setSuccess('Settings saved successfully')
     setSaving(false)
@@ -700,6 +702,21 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Default Markup %</label>
                   <input type="number" value={form.default_markup_percent} onChange={e => setForm(prev => ({ ...prev, default_markup_percent: e.target.value }))} className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Timezone</label>
+                  <select value={orgTimezone} onChange={e => setOrgTimezone(e.target.value)} className={inputClass}>
+                    {[
+                      'America/New_York',
+                      'America/Chicago',
+                      'America/Denver',
+                      'America/Phoenix',
+                      'America/Los_Angeles',
+                      'America/Anchorage',
+                      'Pacific/Honolulu',
+                    ].map(tz => <option key={tz} value={tz}>{tz.replace('America/', '').replace('Pacific/', '').replace(/_/g, ' ')}</option>)}
+                  </select>
+                  <p className="text-[#8A9AB0] text-xs mt-1">Used for calendar event scheduling.</p>
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Default Tax Rate %</label>

@@ -35,6 +35,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const [lineItems, setLineItems] = useState([])
   const [laborItems, setLaborItems] = useState([])
   const [savingItems, setSavingItems] = useState(false)
+  const [orgTimezone, setOrgTimezone] = useState('America/Chicago')
 
   useEffect(() => { fetchAll() }, [id])
 
@@ -42,6 +43,8 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profileData } = await supabase.from('profiles').select('*, organizations(org_type)').eq('id', user.id).single()
     setProfile(profileData)
+    const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', profileData.org_id).single()
+    setOrgTimezone(orgData?.timezone || 'America/Chicago')
 
     const { data: ticketData } = await supabase
       .from('service_tickets')
@@ -83,6 +86,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
           record_id: updatedTicket.id,
           existing_google_event_id: updatedTicket.google_event_id || null,
           existing_microsoft_event_id: updatedTicket.microsoft_event_id || null,
+          timezone: orgTimezone,
         }),
       })
     } catch (e) { console.error('Calendar push error:', e) }
