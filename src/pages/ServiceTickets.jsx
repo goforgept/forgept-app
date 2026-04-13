@@ -33,7 +33,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   const [form, setForm] = useState({
     title: '', description: '', client_id: '', job_id: '',
     assigned_tech_id: '', priority: 'Normal', status: 'Open',
-    scheduled_date: '', scheduled_time: ''
+    scheduled_date: '', scheduled_time: '', duration_hours: '2'
   })
   const [clientJobs, setClientJobs] = useState([])
 
@@ -94,6 +94,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
         status: form.status,
         scheduled_date: form.scheduled_date || null,
         scheduled_time: form.scheduled_time || null,
+        duration_hours: parseFloat(form.duration_hours) || 2,
       })
 
       if (error) {
@@ -261,7 +262,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
                   {techs.map(t => <option key={t.id} value={t.id}>{t.full_name}{t.dispatch_zone ? ` · ${t.dispatch_zone}` : ''}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Scheduled Date</label>
                   <input type="date" value={form.scheduled_date} onChange={e => setForm(p => ({ ...p, scheduled_date: e.target.value }))} className={inputClass} />
@@ -269,6 +270,14 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Scheduled Time</label>
                   <input type="time" value={form.scheduled_time} onChange={e => setForm(p => ({ ...p, scheduled_time: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Duration</label>
+                  <select value={form.duration_hours} onChange={e => setForm(p => ({ ...p, duration_hours: e.target.value }))} className={inputClass}>
+                    {['0.5','1','1.5','2','2.5','3','3.5','4','5','6','7','8'].map(h => (
+                      <option key={h} value={h}>{h} {parseFloat(h) === 1 ? 'hr' : 'hrs'}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               {saveError && <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{saveError}</p>}

@@ -219,7 +219,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
           </div>
 
           {/* Quick controls */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
             <div>
               <p className="text-[#8A9AB0] text-xs mb-1">Status</p>
               <select value={ticket.status} onChange={e => updateTicket('status', e.target.value)} disabled={saving} className={`w-full ${inputClass}`}>
@@ -242,6 +242,14 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
             <div>
               <p className="text-[#8A9AB0] text-xs mb-1">Scheduled</p>
               <input type="date" value={ticket.scheduled_date || ''} onChange={e => updateTicket('scheduled_date', e.target.value)} className={`w-full ${inputClass}`} />
+            </div>
+            <div>
+              <p className="text-[#8A9AB0] text-xs mb-1">Duration</p>
+              <select value={ticket.duration_hours || '2'} onChange={e => updateTicket('duration_hours', parseFloat(e.target.value))} className={`w-full ${inputClass}`}>
+                {['0.5','1','1.5','2','2.5','3','3.5','4','5','6','7','8'].map(h => (
+                  <option key={h} value={h}>{h} {parseFloat(h) === 1 ? 'hr' : 'hrs'}</option>
+                ))}
+              </select>
             </div>
           </div>
 
