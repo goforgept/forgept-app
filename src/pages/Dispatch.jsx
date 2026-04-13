@@ -385,6 +385,29 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
               </div>
             ) : (
               /* Week view — techs as rows, dates as columns */
+              <div className="space-y-4">
+              {/* Unassigned tickets — draggable source for week view */}
+              {unassignedTickets.length > 0 && (
+                <div className="bg-[#1a2d45] rounded-xl p-4">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Unassigned Tickets — drag to a day below</p>
+                  <div className="flex flex-wrap gap-2">
+                    {unassignedTickets.map(ticket => (
+                      <div
+                        key={ticket.id}
+                        draggable
+                        onDragStart={e => handleDragStart(e, ticket.id)}
+                        onClick={() => openTicketModal(ticket)}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-grab active:cursor-grabbing hover:border-[#C8622A]/40 transition-colors ${STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[ticket.priority] || PRIORITY_DOT.Normal}`} />
+                        <div>
+                          <p className="text-white text-xs font-medium">{ticket.title}</p>
+                          {ticket.clients?.company && <p className="text-[#8A9AB0] text-xs">{ticket.clients.company}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="overflow-x-auto pb-4">
                 <table className="w-full" style={{ minWidth: `${techs.length > 0 ? 200 + weekDates.length * 180 : 800}px` }}>
                   <thead>
@@ -455,7 +478,10 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                                     onClick={() => openTicketModal(ticket)}
                                     className="bg-green-500/10 border border-green-500/30 rounded p-1.5 text-xs cursor-grab hover:bg-green-500/20 transition-colors">
                                     <p className="text-green-300 font-semibold truncate">🎫 {ticket.title}</p>
-                                    {ticket.scheduled_time && <p className="text-green-400/70">{ticket.scheduled_time.slice(0, 5)}</p>}
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                      {ticket.scheduled_time && <p className="text-green-400/70">{ticket.scheduled_time.slice(0, 5)}</p>}
+                                      {ticket.duration_hours && <p className="text-green-400/70">{ticket.duration_hours}h</p>}
+                                    </div>
                                   </div>
                                 ))}
                                 {isEmpty && (
@@ -471,6 +497,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                     ))}
                   </tbody>
                 </table>
+              </div>
               </div>
             )}
           </>
