@@ -65,6 +65,29 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     navigate('/service-tickets')
   }
 
+  const pushToCalendar = async (updatedTicket) => {
+    if (!updatedTicket?.assigned_tech_id || !updatedTicket?.scheduled_date) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/push-calendar-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          tech_id: updatedTicket.assigned_tech_id,
+          title: `🎫 ${updatedTicket.title}`,
+          description: `Service ticket via ForgePt.\n${updatedTicket.clients?.company ? `Client: ${updatedTicket.clients.company}` : ''}`,
+          date: updatedTicket.scheduled_date,
+          start_time: updatedTicket.scheduled_time || null,
+          duration_hours: updatedTicket.duration_hours || 2,
+          record_type: 'ticket',
+          record_id: updatedTicket.id,
+          existing_google_event_id: updatedTicket.google_event_id || null,
+          existing_microsoft_event_id: updatedTicket.microsoft_event_id || null,
+        }),
+      })
+    } catch (e) { console.error('Calendar push error:', e) }
+  }
+
   const updateTicket = async (field, value) => {
     setSaving(true)
     const updates = { [field]: value || null }
@@ -72,7 +95,12 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
       updates.resolved_at = new Date().toISOString()
     }
     await supabase.from('service_tickets').update(updates).eq('id', id)
-    setTicket(prev => ({ ...prev, ...updates }))
+    const updatedTicket = { ...ticket, ...updates }
+    setTicket(updatedTicket)
+    // Push to calendar when date, tech, or duration changes and all three are set
+    if (['scheduled_date', 'assigned_tech_id', 'duration_hours'].includes(field)) {
+      pushToCalendar(updatedTicket)
+    }
     setSaving(false)
   }
 

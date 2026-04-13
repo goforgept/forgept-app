@@ -200,11 +200,9 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
       scheduled_time: editTime || null,
       duration_hours: parseFloat(editDuration) || 2,
     }).eq('id', selectedTicket.id)
-    setTickets(prev => prev.map(t =>
-      t.id === selectedTicket.id
-        ? { ...t, assigned_tech_id: editTechId || null, scheduled_date: editDate || null, scheduled_time: editTime || null, duration_hours: parseFloat(editDuration) || 2 }
-        : t
-    ))
+    const updatedTicket = { ...selectedTicket, assigned_tech_id: editTechId || null, scheduled_date: editDate || null, scheduled_time: editTime || null, duration_hours: parseFloat(editDuration) || 2 }
+    setTickets(prev => prev.map(t => t.id === selectedTicket.id ? updatedTicket : t))
+    if (editTechId && editDate) pushTicketToCalendar(updatedTicket, editTechId)
     setShowTicketModal(false)
     setSaving(false)
   }
@@ -227,7 +225,20 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
       date: editJobDate,
       hours_allocated: parseFloat(editJobHours) || 4,
     })
-    if (!error) await fetchAll()
+    if (!error) {
+      await fetchAll()
+      // Find the newly inserted schedule to get its ID
+      const { data: newSched } = await supabase
+        .from('job_tech_schedules')
+        .select('*')
+        .eq('job_id', selectedJob.id)
+        .eq('tech_id', editJobTechId)
+        .eq('date', editJobDate)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+      if (newSched) pushJobScheduleToCalendar(newSched, selectedJob.name, selectedJob.clients?.company)
+    }
     setShowJobModal(false)
     setSaving(false)
   }
@@ -235,6 +246,52 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
   const removeJobSchedule = async (scheduleId) => {
     await supabase.from('job_tech_schedules').delete().eq('id', scheduleId)
     setJobSchedules(prev => prev.filter(s => s.id !== scheduleId))
+  }
+
+  const pushTicketToCalendar = async (ticket, techId) => {
+    if (!techId || !ticket?.scheduled_date) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/push-calendar-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          tech_id: techId,
+          title: `🎫 ${ticket.title}`,
+          description: `Service ticket via ForgePt.\n${ticket.clients?.company ? `Client: ${ticket.clients.company}` : ''}`,
+          date: ticket.scheduled_date,
+          start_time: ticket.scheduled_time || null,
+          duration_hours: ticket.duration_hours || 2,
+          record_type: 'ticket',
+          record_id: ticket.id,
+          existing_google_event_id: ticket.google_event_id || null,
+          existing_microsoft_event_id: ticket.microsoft_event_id || null,
+        }),
+      })
+    } catch (e) { console.error('Calendar push error:', e) }
+  }
+
+  const pushJobScheduleToCalendar = async (scheduleRow, jobName, clientCompany) => {
+    if (!scheduleRow?.id || !scheduleRow?.tech_id) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/push-calendar-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          tech_id: scheduleRow.tech_id,
+          title: `🔨 ${jobName || 'Job'}`,
+          description: `Job scheduled via ForgePt.\n${clientCompany ? `Client: ${clientCompany}` : ''}\nHours: ${scheduleRow.hours_allocated}`,
+          date: scheduleRow.date,
+          start_time: null,
+          duration_hours: scheduleRow.hours_allocated,
+          record_type: 'job_schedule',
+          record_id: scheduleRow.id,
+          existing_google_event_id: scheduleRow.google_event_id || null,
+          existing_microsoft_event_id: scheduleRow.microsoft_event_id || null,
+        }),
+      })
+    } catch (e) { console.error('Calendar push error:', e) }
   }
 
   const techColorMap = {}

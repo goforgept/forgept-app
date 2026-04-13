@@ -709,6 +709,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       .gte('date', new Date().toISOString().split('T')[0])
       .order('date', { ascending: true })
     setJobSchedules(schedData || [])
+    // Push to calendar (fire and forget — don't block UI)
+    const newRow = schedData?.find(s => s.tech_id === schedTechId && s.date === schedDate)
+    if (newRow) pushJobScheduleToCalendar(newRow)
     setSchedTechId('')
     setSchedDate('')
     setSchedHours('4')
@@ -719,6 +722,29 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const removeSchedule = async (scheduleId) => {
     await supabase.from('job_tech_schedules').delete().eq('id', scheduleId)
     setJobSchedules(prev => prev.filter(s => s.id !== scheduleId))
+  }
+
+  const pushJobScheduleToCalendar = async (scheduleRow) => {
+    if (!scheduleRow?.id || !scheduleRow?.tech_id) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/push-calendar-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          tech_id: scheduleRow.tech_id,
+          title: `🔨 ${job?.name || 'Job'}`,
+          description: `Job scheduled via ForgePt.\n${job?.clients?.company ? `Client: ${job.clients.company}` : ''}\nHours: ${scheduleRow.hours_allocated}`,
+          date: scheduleRow.date,
+          start_time: null,
+          duration_hours: scheduleRow.hours_allocated,
+          record_type: 'job_schedule',
+          record_id: scheduleRow.id,
+          existing_google_event_id: scheduleRow.google_event_id || null,
+          existing_microsoft_event_id: scheduleRow.microsoft_event_id || null,
+        }),
+      })
+    } catch (e) { console.error('Calendar push error:', e) }
   }
 
   const sendNotification = async () => {
