@@ -92,17 +92,39 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     } catch (e) { console.error('Calendar push error:', e) }
   }
 
+  const deleteCalendarEvent = async (techId, googleEventId, microsoftEventId) => {
+    if (!techId || (!googleEventId && !microsoftEventId)) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/delete-calendar-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ tech_id: techId, google_event_id: googleEventId || null, microsoft_event_id: microsoftEventId || null }),
+      })
+    } catch (e) { console.error('Calendar delete error:', e) }
+  }
+
   const updateTicket = async (field, value) => {
     setSaving(true)
     const updates = { [field]: value || null }
     if (field === 'status' && value === 'Resolved') {
       updates.resolved_at = new Date().toISOString()
     }
+    // If unassigning tech or clearing date, delete the calendar event first
+    const isClearing = !value
+    if (isClearing && ['assigned_tech_id', 'scheduled_date'].includes(field)) {
+      const techId = ticket.assigned_tech_id
+      if (ticket.google_event_id || ticket.microsoft_event_id) {
+        deleteCalendarEvent(techId, ticket.google_event_id, ticket.microsoft_event_id)
+        updates.google_event_id = null
+        updates.microsoft_event_id = null
+      }
+    }
     await supabase.from('service_tickets').update(updates).eq('id', id)
     const updatedTicket = { ...ticket, ...updates }
     setTicket(updatedTicket)
-    // Push to calendar when date, tech, or duration changes and all three are set
-    if (['scheduled_date', 'assigned_tech_id', 'duration_hours'].includes(field)) {
+    // Push to calendar when date, tech, or duration changes and all are set
+    if (['scheduled_date', 'assigned_tech_id', 'duration_hours'].includes(field) && !isClearing) {
       pushToCalendar(updatedTicket)
     }
     setSaving(false)

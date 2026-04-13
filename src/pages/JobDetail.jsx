@@ -722,7 +722,23 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     setSavingSchedule(false)
   }
 
+  const deleteCalendarEvent = async (techId, googleEventId, microsoftEventId) => {
+    if (!techId || (!googleEventId && !microsoftEventId)) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/delete-calendar-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ tech_id: techId, google_event_id: googleEventId || null, microsoft_event_id: microsoftEventId || null }),
+      })
+    } catch (e) { console.error('Calendar delete error:', e) }
+  }
+
   const removeSchedule = async (scheduleId) => {
+    const schedule = jobSchedules.find(s => s.id === scheduleId)
+    if (schedule?.google_event_id || schedule?.microsoft_event_id) {
+      deleteCalendarEvent(schedule.tech_id, schedule.google_event_id, schedule.microsoft_event_id)
+    }
     await supabase.from('job_tech_schedules').delete().eq('id', scheduleId)
     setJobSchedules(prev => prev.filter(s => s.id !== scheduleId))
   }
