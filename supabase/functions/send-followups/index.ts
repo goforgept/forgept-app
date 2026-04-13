@@ -86,8 +86,8 @@ Deno.serve(async (req) => {
         if (log.length > 0) { skipped++; continue }
 
         const companyName = profile.company_name || proposal.company || 'our team'
-        const repName = proposal.rep_name || 'Your representative'
-        const repEmail = proposal.rep_email || SENDER_EMAIL
+        const repName = profile.full_name || proposal.rep_name || 'Your representative'
+        const repEmail = profile.email || proposal.rep_email || SENDER_EMAIL
         const clientName = proposal.client_name || 'there'
         const proposalValue = (
           proposal.total_customer_value || proposal.proposal_value || 0
