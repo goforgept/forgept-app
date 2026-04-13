@@ -80,10 +80,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
     setSaving(true)
     setSaveError('')
     try {
-      const { data: orgData } = await supabase.from('organizations').select('ticket_counter').eq('id', profile.org_id).single()
-      const counter = orgData?.ticket_counter || 1000
-      const ticketNumber = `TKT-${counter}`
-      await supabase.from('organizations').update({ ticket_counter: counter + 1 }).eq('id', profile.org_id)
+      const { data: ticketNumber } = await supabase.rpc('get_next_ticket_number', { org_id_input: profile.org_id })
 
       const { error } = await supabase.from('service_tickets').insert({
         org_id: profile.org_id,

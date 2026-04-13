@@ -262,9 +262,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     const { data: { user } } = await supabase.auth.getUser()
     const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
 
-    const { data: org } = await supabase.from('organizations').select('invoice_counter').eq('id', prof.org_id).single()
-    const invoiceNumber = `INV-${String(org.invoice_counter).padStart(4, '0')}`
-    await supabase.from('organizations').update({ invoice_counter: org.invoice_counter + 1 }).eq('id', prof.org_id)
+    const { data: invoiceNumber } = await supabase.rpc('get_next_invoice_number', { org_id_input: prof.org_id })
 
     const { data: inv, error } = await supabase.from('invoices').insert({
       org_id: prof.org_id,

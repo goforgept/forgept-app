@@ -437,9 +437,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     try {
       let finalPONumber = poNumber.trim()
       if (poAutoNumber || !finalPONumber) {
-        const { data: org } = await supabase.from('organizations').select('po_counter').eq('id', profile.org_id).single()
-        finalPONumber = `PO-${org.po_counter}`
-        await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profile.org_id)
+        finalPONumber = (await supabase.rpc('get_next_po_number', { org_id_input: profile.org_id })).data
       }
       const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
       const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))].join(', ')
