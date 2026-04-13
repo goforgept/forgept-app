@@ -220,10 +220,12 @@ export default function SuperAdmin() {
       await supabase.from('profiles').delete().eq('org_id', orgId)
       await supabase.from('organizations').delete().eq('id', orgId)
 
+      const deletedId = deleteModal.id
       setDeleteModal(null)
       setDeleteConfirmText('')
-      fetchData()
-      alert(`Organization "${deleteModal.name}" and all data deleted.`)
+      setOrgs(prev => prev.filter(o => o.id !== deletedId))
+      setAllProposals(prev => prev.filter(p => p.org_id !== deletedId))
+      setAllClients(prev => prev.filter(c => c.org_id !== deletedId))
     } catch (err) {
       alert('Error deleting org: ' + err.message)
     }
