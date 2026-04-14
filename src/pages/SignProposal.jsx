@@ -134,7 +134,11 @@ export default function SignProposal() {
       const afterY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : yPos + 10
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Labor', 14, afterY)
-      autoTable(doc, { startY: afterY + 5, head: [['Role', 'Qty', 'Unit', 'Total Labor']], body: pdfLabor.map(l => [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]), foot: [['', '', 'Total Labor', `$${lTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' })
+      if (prop.hide_labor_breakdown) {
+        autoTable(doc, { startY: afterY + 5, head: [['Role', 'Qty', 'Unit']], body: pdfLabor.map(l => [l.role, l.quantity, l.unit || 'hr']), foot: [['', '', `Total Labor: $${lTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' })
+      } else {
+        autoTable(doc, { startY: afterY + 5, head: [['Role', 'Qty', 'Unit', 'Total Labor']], body: pdfLabor.map(l => [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]), foot: [['', '', 'Total Labor', `$${lTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' })
+      }
     }
 
     // Grand total
@@ -414,6 +418,41 @@ export default function SignProposal() {
           </div>
         )}
 
+{(proposal?.labor_items || []).some(l => l.role) && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <h3 className="text-white font-bold text-lg mb-4">Labor</h3>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#2a3d55]">
+                  <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Role</th>
+                  <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
+                  <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Unit</th>
+                  {!proposal?.hide_labor_breakdown && (
+                    <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {(proposal?.labor_items || []).filter(l => l.role).map((l, i) => (
+                  <tr key={i} className="border-b border-[#2a3d55]/50">
+                    <td className="text-white py-3 pr-4">{l.role}</td>
+                    <td className="text-white py-3 pr-4 text-right">{l.quantity}</td>
+                    <td className="text-[#8A9AB0] py-3 pr-4">{l.unit || 'hr'}</td>
+                    {!proposal?.hide_labor_breakdown && (
+                      <td className="text-white py-3 text-right">${fmt(parseFloat(l.customer_price) || 0)}</td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-[#2a3d55]">
+                  <td colSpan={proposal?.hide_labor_breakdown ? 3 : 3} className="text-[#8A9AB0] pt-3 text-right font-semibold">Total Labor</td>
+                  <td className="text-white pt-3 text-right font-bold">${fmt(laborTotal)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
         {terms && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Terms and Conditions</h3>
