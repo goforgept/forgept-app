@@ -31,8 +31,45 @@ Deno.serve(async (req) => {
     'Authorization': `Bearer ${supabaseKey}`,
     'Content-Type': 'application/json'
   }
+try {
+    const body = await req.json().catch(() => ({}))
 
-  try {
+    // ── Direct send: ai_email, meeting confirmation, share notifications etc ──
+    if (body.type === 'ai_email' || body.type === 'share_notification' || body.type === 'meeting_confirmation') {
+      const { toEmail, toName, fromName, fromEmail, subject, body: emailBody, orgId } = body
+
+      if (!toEmail || !subject || !emailBody) {
+        return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
+        body: JSON.stringify({
+          sender: { name: fromName || 'ForgePt.', email: SENDER_EMAIL },
+          to: [{ email: toEmail, name: toName || toEmail }],
+          replyTo: fromEmail ? { email: fromEmail } : undefined,
+          subject,
+          htmlContent: emailBody,
+        })
+      })
+
+      const result = await res.json()
+      if (!res.ok) {
+        console.error('Brevo direct send error:', result)
+        return new Response(JSON.stringify({ error: result.message || 'Brevo error' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      return new Response(JSON.stringify({ success: true, messageId: result.messageId }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // ── Scheduled follow-up flow below ──
     const proposalsRes = await fetch(
       `${supabaseUrl}/rest/v1/proposals?status=eq.Sent&select=*`,
       { headers: dbHeaders }
