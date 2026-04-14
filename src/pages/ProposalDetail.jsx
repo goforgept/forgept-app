@@ -1668,6 +1668,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   }
 
   const generatePDFDoc = async () => {
+    const { data: freshProposal } = await supabase
+      .from('proposals')
+      .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
+      .eq('id', id)
+      .single()
+    if (freshProposal) {
+      Object.assign(proposal, freshProposal)
+    }
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
