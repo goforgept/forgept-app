@@ -48,6 +48,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [clientMeetings, setClientMeetings] = useState([])
   const [showMeetingModal, setShowMeetingModal] = useState(false)
   const [savingMeeting, setSavingMeeting] = useState(false)
+  const [orgTimezone, setOrgTimezone] = useState('America/Chicago')
   const [editingMeeting, setEditingMeeting] = useState(null)
   const [meetingForm, setMeetingForm] = useState({
     title: '', due_date: '', start_time: '', duration_minutes: 60,
@@ -85,6 +86,8 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     if (data?.org_id) {
       const { data: team } = await supabase.from('profiles').select('id, full_name').eq('org_id', data.org_id)
       setTeamProfiles(team || [])
+      const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', data.org_id).single()
+      if (orgData?.timezone) setOrgTimezone(orgData.timezone)
     }
     fetchClientEmails(user.id)
   }
@@ -401,6 +404,7 @@ const deleteMeeting = async (meetingId) => {
               meetingNotes: meetingForm.meeting_notes || '',
               organizerName: profile?.full_name || '',
               organizerEmail: profile?.email || '',
+              orgTimezone: orgTimezone,
             }),
           })
         }

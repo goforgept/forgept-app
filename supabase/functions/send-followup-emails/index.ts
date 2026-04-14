@@ -54,10 +54,15 @@ try {
         const durationMins = parseInt(meetingDuration) || 60
 
         const startDate = new Date(`${meetingDate}T${startTime}:00`)
-        const endDate = new Date(startDate.getTime() + durationMins * 60 * 1000)
+        const timezone = body.orgTimezone || 'America/Chicago'
 
-        const formatICS = (d: Date) =>
-          d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+        const formatICSLocal = (d: Date) => {
+          const pad = (n: number) => String(n).padStart(2, '0')
+          return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
+        }
+
+        const startDateLocal = new Date(`${meetingDate}T${startTime}:00`)
+        const endDateLocal = new Date(startDateLocal.getTime() + durationMins * 60 * 1000)
 
         const uid = body.meetingUid || `forgept-${Date.now()}@goforgept.com`
 
@@ -69,9 +74,9 @@ try {
           body.type === 'meeting_cancellation' ? 'METHOD:CANCEL' : 'METHOD:REQUEST',
           'BEGIN:VEVENT',
           `UID:${uid}`,
-          `DTSTAMP:${formatICS(new Date())}`,
-          `DTSTART:${formatICS(startDate)}`,
-          `DTEND:${formatICS(endDate)}`,
+          `DTSTAMP:${formatICSLocal(new Date())}`,
+          `DTSTART;TZID=${timezone}:${formatICSLocal(startDateLocal)}`,
+          `DTEND;TZID=${timezone}:${formatICSLocal(endDateLocal)}`,
           `SUMMARY:${meetingTitle || 'Meeting'}`,
           `DESCRIPTION:${(meetingNotes || '').replace(/\n/g, '\\n')}${meetingLink ? `\\n\\nJoin: ${meetingLink}` : ''}`,
           meetingLink ? `URL:${meetingLink}` : '',
