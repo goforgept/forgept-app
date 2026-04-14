@@ -48,6 +48,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [clientMeetings, setClientMeetings] = useState([])
   const [showMeetingModal, setShowMeetingModal] = useState(false)
   const [savingMeeting, setSavingMeeting] = useState(false)
+  const [editingMeeting, setEditingMeeting] = useState(null)
   const [meetingForm, setMeetingForm] = useState({
     title: '', due_date: '', start_time: '', duration_minutes: 60,
     meeting_type: 'Sales Call', is_virtual: false, assigned_to: '',
@@ -213,10 +214,51 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     setSavingClient(false)
   }
 
+const deleteMeeting = async (meetingId) => {
+    if (!window.confirm('Delete this meeting?')) return
+    await supabase.from('tasks').delete().eq('id', meetingId)
+    fetchClientMeetings()
+  }
+
+  const openEditMeeting = (meeting) => {
+    setEditingMeeting(meeting.id)
+    setMeetingForm({
+      title: meeting.title || '',
+      due_date: meeting.due_date || '',
+      start_time: meeting.start_time || '',
+      duration_minutes: meeting.duration_minutes || 60,
+      meeting_type: meeting.meeting_type || 'Sales Call',
+      is_virtual: meeting.is_virtual || false,
+      assigned_to: meeting.assigned_to || profile.id,
+      meeting_notes: meeting.meeting_notes || '',
+      customer_notified: meeting.customer_notified || false,
+    })
+    setShowMeetingModal(true)
+  }
+
   const saveMeeting = async () => {
     if (!meetingForm.title || !meetingForm.due_date || !meetingForm.meeting_type) return
     setSavingMeeting(true)
     try {
+      if (editingMeeting) {
+        await supabase.from('tasks').update({
+          title: meetingForm.title,
+          due_date: meetingForm.due_date,
+          start_time: meetingForm.start_time || null,
+          assigned_to: meetingForm.assigned_to || profile.id,
+          meeting_type: meetingForm.meeting_type,
+          duration_minutes: meetingForm.duration_minutes,
+          is_virtual: meetingForm.is_virtual,
+          meeting_notes: meetingForm.meeting_notes || null,
+          customer_notified: meetingForm.customer_notified,
+        }).eq('id', editingMeeting)
+        setEditingMeeting(null)
+        setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false })
+        setShowMeetingModal(false)
+        fetchClientMeetings()
+        setSavingMeeting(false)
+        return
+      }
       const { data: newTask } = await supabase.from('tasks').insert({
         org_id: profile.org_id,
         title: meetingForm.title,
@@ -299,6 +341,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
         }
       }
 
+      setEditingMeeting(null)
       setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false })
       setShowMeetingModal(false)
       fetchClientMeetings()
@@ -501,7 +544,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-white font-bold text-lg">Meetings</h3>
-              <button onClick={() => { setShowMeetingModal(true); setMeetingForm(p => ({ ...p, assigned_to: profile.id })) }}
+              <button onClick={() => { setEditingMeeting(null); setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false }); setShowMeetingModal(true) }}
                 className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                 + Schedule Meeting
               </button>
@@ -536,6 +579,8 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
                         </div>
                         <div className="flex items-center gap-2">
                           {meeting.customer_notified && <span className="text-xs text-green-400">✉ Notified</span>}
+                          <button onClick={() => openEditMeeting(meeting)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Edit</button>
+                          <button onClick={() => deleteMeeting(meeting.id)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Delete</button>
                         </div>
                       </div>
                     </div>
@@ -591,7 +636,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
       {showMeetingModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-5">📅 Schedule Meeting</h3>
+            <h3 className="text-white font-bold text-lg mb-5">📅 {editingMeeting ? 'Edit Meeting' : 'Schedule Meeting'}</h3>
             <div className="space-y-4">
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Meeting Title <span className="text-[#C8622A]">*</span></label>
@@ -652,10 +697,10 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
                 </button>
               )}
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowMeetingModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={() => { setShowMeetingModal(false); setEditingMeeting(null) }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
                 <button onClick={saveMeeting} disabled={savingMeeting || !meetingForm.title || !meetingForm.due_date}
                   className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {savingMeeting ? 'Scheduling...' : 'Schedule Meeting'}
+                  {savingMeeting ? 'Saving...' : editingMeeting ? 'Save Changes' : 'Schedule Meeting'}
                 </button>
               </div>
             </div>
