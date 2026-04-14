@@ -188,7 +188,7 @@ function App() {
           } />
           <Route path="/admin" element={<AdminDashboard {...sharedProps} />} />
           <Route path="/rep" element={<Dashboard {...sharedProps} />} />
-          <Route path="/new" element={<NewProposal featureAiBom={featureAiBom} />} />
+          <Route path="/new" element={<NewProposal />} />
           <Route path="/proposal/:id" element={<ProposalDetail {...sharedProps} />} />
           <Route path="/reps" element={<ManageReps {...sharedProps} />} />
           <Route path="/proposals" element={<Proposals {...sharedProps} />} />
