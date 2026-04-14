@@ -992,12 +992,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       }
     }
 
-    const hideLabor = p?.hide_labor_breakdown
+    const docxLaborItems = p?.labor_items || []
+    const docxMatTotal = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
     if (docxLaborItems.length > 0 && docxLaborItems.some(l => l.role)) {
       const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
       const lbs = { top: lb, bottom: lb, left: lb, right: lb }
 
-      const hideLabor = proposal?.hide_labor_breakdown
+      const hideLabor = p?.hide_labor_breakdown
       const lHeaders = hideLabor ? ['Role', 'Qty', 'Unit'] : ['Role', 'Qty', 'Unit', 'Total Labor']
       const lcw = hideLabor ? [4800, 1200, 1200] : [3000, 1200, 1200, 2400]
 
