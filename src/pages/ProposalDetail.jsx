@@ -99,6 +99,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [editingSOW, setEditingSOW] = useState(false)
   const [sowDraft, setSowDraft] = useState('')
   const [uploadingSignedPDF, setUploadingSignedPDF] = useState(false)
+  const [sections, setSections] = useState([])
+  const [showPricingModal, setShowPricingModal] = useState(false)
   const [slaContracts, setSlaContracts] = useState([])
   const [monitoringContracts, setMonitoringContracts] = useState([])
   const [orgSLASettings, setOrgSLASettings] = useState(null)
@@ -117,6 +119,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   useEffect(() => {
     fetchProposal()
     fetchLineItems()
+    fetchSections()
     fetchProfile()
     fetchActivity()
     fetchPhotos()
@@ -126,7 +129,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract')
       .eq('id', id)
       .single()
 
@@ -206,9 +209,19 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       .select('*')
       .eq('proposal_id', id)
     setLineItems(data || [])
+    setEditLines(data || [])
     const dates = {}
     ;(data || []).forEach(l => { if (l.renewal_date) dates[l.id] = l.renewal_date })
     setRenewalDates(dates)
+  }
+
+  const fetchSections = async () => {
+    const { data } = await supabase
+      .from('proposal_sections')
+      .select('*')
+      .eq('proposal_id', id)
+      .order('sort_order', { ascending: true })
+    setSections(data || [])
   }
 
   const fetchProfile = async () => {
@@ -352,6 +365,18 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     const newVal = !proposal?.lump_sum_pricing
     await supabase.from('proposals').update({ lump_sum_pricing: newVal }).eq('id', id)
     setProposal(prev => ({ ...prev, lump_sum_pricing: newVal }))
+  }
+
+  const toggleHideMaterialPrices = async () => {
+    const newVal = !proposal?.hide_material_prices
+    await supabase.from('proposals').update({ hide_material_prices: newVal }).eq('id', id)
+    setProposal(prev => ({ ...prev, hide_material_prices: newVal }))
+  }
+
+  const toggleHideLaborBreakdown = async () => {
+    const newVal = !proposal?.hide_labor_breakdown
+    await supabase.from('proposals').update({ hide_labor_breakdown: newVal }).eq('id', id)
+    setProposal(prev => ({ ...prev, hide_labor_breakdown: newVal }))
   }
 
   const saveProposalName = async () => {
@@ -2085,13 +2110,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   {sendingToQBO ? 'Sending...' : qboInvoiceId ? '✓ In QuickBooks' : '🟢 Send to QuickBooks'}
                 </button>
               )}
-              <button onClick={toggleLumpSum}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${proposal?.lump_sum_pricing ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}
-                title="Hide per-item pricing on PDF — show lump sum only">
-                Lump Sum
+              <button onClick={() => setShowPricingModal(true)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${(proposal?.hide_material_prices || proposal?.hide_labor_breakdown || proposal?.lump_sum_pricing) ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+                ⚙ Pricing
               </button>
-              <button onClick={downloadPDF} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">↓ Download PDF</button>
-              <button onClick={downloadDOCX} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">↓ Download DOCX</button>
+              <button onClick={downloadPDF} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">↓ PDF</button>
+              <button onClick={downloadDOCX} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">↓ DOCX</button>
               {featureSitePhotos && (
                 <button onClick={() => setShowPhotosModal(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-2">
                   📷 Photos{photos.length > 0 ? ` (${photos.length})` : ''}
@@ -3266,6 +3290,52 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 <button onClick={sendProposal} disabled={sendingProposal || !sendForm.subject || !sendForm.message} className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50">{sendingProposal ? 'Sending...' : 'Send Proposal →'}</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+{/* Pricing Options Modal */}
+      {showPricingModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="text-white font-bold text-lg mb-1">⚙ Pricing Options</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">Controls what clients see on PDF, DOCX, and the signing page. Internal view always shows full detail.</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between bg-[#0F1C2E] rounded-xl px-4 py-3">
+                <div>
+                  <p className="text-white text-sm font-semibold">Hide Material Unit Prices</p>
+                  <p className="text-[#8A9AB0] text-xs mt-0.5">Show item names and qty only — no unit price or line total</p>
+                </div>
+                <button onClick={toggleHideMaterialPrices}
+                  className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.hide_material_prices ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.hide_material_prices ? 'left-6' : 'left-1'}`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between bg-[#0F1C2E] rounded-xl px-4 py-3">
+                <div>
+                  <p className="text-white text-sm font-semibold">Hide Labor Breakdown</p>
+                  <p className="text-[#8A9AB0] text-xs mt-0.5">Show Role, Qty, Total only — no hourly rate</p>
+                </div>
+                <button onClick={toggleHideLaborBreakdown}
+                  className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.hide_labor_breakdown ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.hide_labor_breakdown ? 'left-6' : 'left-1'}`} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between bg-[#0F1C2E] rounded-xl px-4 py-3">
+                <div>
+                  <p className="text-white text-sm font-semibold">Lump Sum Materials</p>
+                  <p className="text-[#8A9AB0] text-xs mt-0.5">Show item list with no pricing — materials total only</p>
+                </div>
+                <button onClick={toggleLumpSum}
+                  className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.lump_sum_pricing ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.lump_sum_pricing ? 'left-6' : 'left-1'}`} />
+                </button>
+              </div>
+            </div>
+            <button onClick={() => setShowPricingModal(false)}
+              className="mt-5 w-full py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+              Done
+            </button>
           </div>
         </div>
       )}
