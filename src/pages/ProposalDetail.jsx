@@ -873,7 +873,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     const border = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
     const borders = { top: border, bottom: border, left: border, right: border }
-    const isLumpSum = proposal?.lump_sum_pricing
+    const isLumpSum = proposal?.hide_material_prices || proposal?.lump_sum_pricing
     const colWidths = isLumpSum ? [4200, 1400, 1200] : [2800, 1400, 800, 1000, 1000]
     const headers = isLumpSum ? ['Item', 'Part #', 'Qty'] : ['Item', 'Part #', 'Qty', 'Unit Price', 'Total']
 
@@ -987,10 +987,13 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     if (docxLaborItems.length > 0 && docxLaborItems.some(l => l.role)) {
       const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
       const lbs = { top: lb, bottom: lb, left: lb, right: lb }
-      const lcw = [3000, 1200, 1200, 2400]
+
+      const hideLabor = proposal?.hide_labor_breakdown
+      const lHeaders = hideLabor ? ['Role', 'Qty', 'Total'] : ['Role', 'Qty', 'Unit', 'Total Labor']
+      const lcw = hideLabor ? [3600, 1200, 3000] : [3000, 1200, 1200, 2400]
 
       const lHeaderRow = new TableRow({
-        children: ['Role', 'Qty', 'Unit', 'Total Labor'].map((h, i) =>
+        children: lHeaders.map((h, i) =>
           new TableCell({
             borders: lbs, width: { size: lcw[i], type: WidthType.DXA },
             shading: { fill: primaryColor, type: ShadingType.CLEAR },
@@ -1002,9 +1005,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
       const lRows = docxLaborItems.filter(l => l.role).map(l =>
         new TableRow({
-          children: [l.role, String(l.quantity || ''), l.unit || 'hr',
-            `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-          ].map((val, i) =>
+          children: (hideLabor
+            ? [l.role, `${l.quantity || ''} ${l.unit || 'hr'}`, `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+            : [l.role, String(l.quantity || ''), l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+          ).map((val, i) =>
             new TableCell({
               borders: lbs, width: { size: lcw[i], type: WidthType.DXA },
               margins: { top: 80, bottom: 80, left: 120, right: 120 },
@@ -1713,7 +1717,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       doc.text('Materials & Pricing', 14, yPos)
       yPos += 6
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
-      if (proposal?.lump_sum_pricing) {
+      if (proposal?.hide_material_prices || proposal?.lump_sum_pricing) {
         autoTable(doc, {
           startY: yPos,
           head: [['Item', 'Part #', 'Qty']],
@@ -1746,15 +1750,27 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const pdfTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
       const pdfTaxAmount = materialsTotal * (pdfTaxRate / 100)
       const grandTotal = materialsTotal + laborTotal + pdfTaxAmount
-      autoTable(doc, {
-        startY: tableEnd + 6,
-        head: [['Role', 'Qty', 'Unit', 'Total Labor']],
-        body: pdfLaborItems.filter(l => l.role).map(l => [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
-        foot: [['', '', 'Total Labor', `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
-      })
+      if (proposal?.hide_labor_breakdown) {
+        autoTable(doc, {
+          startY: tableEnd + 6,
+          head: [['Role', 'Qty', 'Total']],
+          body: pdfLaborItems.filter(l => l.role).map(l => [l.role, `${l.quantity} ${l.unit || 'hr'}`, `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
+          foot: [['', 'Total Labor', `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+          footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
+        })
+      } else {
+        autoTable(doc, {
+          startY: tableEnd + 6,
+          head: [['Role', 'Qty', 'Unit', 'Total Labor']],
+          body: pdfLaborItems.filter(l => l.role).map(l => [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
+          foot: [['', '', 'Total Labor', `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+          footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
+        })
+      }
       let afterLabor = doc.lastAutoTable.finalY + 6
       if (pdfTaxRate > 0) {
         doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
@@ -2111,7 +2127,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 </button>
               )}
               <button onClick={() => setShowPricingModal(true)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${(proposal?.hide_material_prices || proposal?.hide_labor_breakdown || proposal?.lump_sum_pricing) ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${(proposal?.hide_material_prices || proposal?.hide_labor_breakdown) ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
                 ⚙ Pricing
               </button>
               <button onClick={downloadPDF} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">↓ PDF</button>
@@ -3321,16 +3337,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.hide_labor_breakdown ? 'left-6' : 'left-1'}`} />
                 </button>
               </div>
-              <div className="flex items-center justify-between bg-[#0F1C2E] rounded-xl px-4 py-3">
-                <div>
-                  <p className="text-white text-sm font-semibold">Lump Sum Materials</p>
-                  <p className="text-[#8A9AB0] text-xs mt-0.5">Show item list with no pricing — materials total only</p>
-                </div>
-                <button onClick={toggleLumpSum}
-                  className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.lump_sum_pricing ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
-                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.lump_sum_pricing ? 'left-6' : 'left-1'}`} />
-                </button>
-              </div>
+              
             </div>
             <button onClick={() => setShowPricingModal(false)}
               className="mt-5 w-full py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">

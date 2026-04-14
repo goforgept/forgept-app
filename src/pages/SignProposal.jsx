@@ -26,7 +26,7 @@ export default function SignProposal() {
 
     const { data, error: fetchError } = await supabase
       .from('proposals')
-      .select('id, proposal_name, company, client_name, client_email, scope_of_work, proposal_value, total_gross_margin_percent, labor_items, signature_name, signature_at, signing_token, org_id, lump_sum_pricing, tax_rate, tax_exempt, signed_pdf_url, sla_contracts, monitoring_contracts, sla_contract, monitoring_contract')
+      .select('id, proposal_name, company, client_name, client_email, scope_of_work, proposal_value, total_gross_margin_percent, labor_items, signature_name, signature_at, signing_token, org_id, lump_sum_pricing, hide_material_prices, hide_labor_breakdown, tax_rate, tax_exempt, signed_pdf_url, sla_contracts, monitoring_contracts, sla_contract, monitoring_contract')
       .eq('signing_token', token)
       .single()
 
@@ -121,7 +121,7 @@ export default function SignProposal() {
     if (items.length > 0) {
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Materials & Pricing', 14, yPos); yPos += 5
-      if (prop.lump_sum_pricing) {
+      if (prop.hide_material_prices || prop.lump_sum_pricing) {
         autoTable(doc, { startY: yPos, head: [['Item', 'Part #', 'Qty']], body: items.map(i => [i.item_name, i.part_number_sku || '—', i.quantity]), foot: [['', 'Materials Total', `$${mTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' })
       } else {
         autoTable(doc, { startY: yPos, head: [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']], body: items.map(i => [i.item_name, i.part_number_sku || '—', i.quantity, `$${(i.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(i.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]), foot: [['', '', '', 'Total', `$${mTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' })
@@ -384,7 +384,7 @@ export default function SignProposal() {
                     <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Item</th>
                     <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Part #</th>
                     <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
-                    {!proposal?.lump_sum_pricing && <>
+                    {!(proposal?.hide_material_prices || proposal?.lump_sum_pricing) && <>
                       <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Unit Price</th>
                       <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>
                     </>}
@@ -396,7 +396,7 @@ export default function SignProposal() {
                       <td className="text-white py-3 pr-4">{item.item_name}</td>
                       <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
                       <td className="text-white py-3 pr-4 text-right">{item.quantity} {item.unit || 'ea'}</td>
-                      {!proposal?.lump_sum_pricing && <>
+                      {!(proposal?.hide_material_prices || proposal?.lump_sum_pricing) && <>
                         <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
                         <td className="text-white py-3 text-right">${fmt(item.customer_price_total)}</td>
                       </>}
@@ -404,10 +404,10 @@ export default function SignProposal() {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr><td colSpan={proposal?.lump_sum_pricing ? 2 : 4} className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td><td className="text-white pt-4 text-right font-bold">${fmt(materialsTotal)}</td></tr>
-                  {laborTotal > 0 && <tr><td colSpan={proposal?.lump_sum_pricing ? 2 : 4} className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td><td className="text-white pt-1 text-right font-bold">${fmt(laborTotal)}</td></tr>}
-                  {taxRate > 0 && <tr><td colSpan={proposal?.lump_sum_pricing ? 2 : 4} className="text-[#8A9AB0] pt-1 text-right font-semibold">Tax ({taxRate}%)</td><td className="text-white pt-1 text-right font-bold">${fmt(taxAmount)}</td></tr>}
-                  <tr className="border-t border-[#2a3d55]"><td colSpan={proposal?.lump_sum_pricing ? 2 : 4} className="text-white pt-3 text-right font-bold text-base">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg">${fmt(grandTotal)}</td></tr>
+                  <tr><td colSpan={(proposal?.hide_material_prices || proposal?.lump_sum_pricing) ? 2 : 4} className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td><td className="text-white pt-4 text-right font-bold">${fmt(materialsTotal)}</td></tr>
+                  {laborTotal > 0 && <tr><td colSpan={(proposal?.hide_material_prices || proposal?.lump_sum_pricing) ? 2 : 4} className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td><td className="text-white pt-1 text-right font-bold">${fmt(laborTotal)}</td></tr>}
+                  {taxRate > 0 && <tr><td colSpan={(proposal?.hide_material_prices || proposal?.lump_sum_pricing) ? 2 : 4} className="text-[#8A9AB0] pt-1 text-right font-semibold">Tax ({taxRate}%)</td><td className="text-white pt-1 text-right font-bold">${fmt(taxAmount)}</td></tr>}
+                  <tr className="border-t border-[#2a3d55]"><td colSpan={(proposal?.hide_material_prices || proposal?.lump_sum_pricing) ? 2 : 4} className="text-white pt-3 text-right font-bold text-base">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg">${fmt(grandTotal)}</td></tr>
                 </tfoot>
               </table>
             </div>
