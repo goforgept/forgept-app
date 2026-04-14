@@ -1,0 +1,2 @@
+[functions.push-calendar-event]
+verify_jwt = false

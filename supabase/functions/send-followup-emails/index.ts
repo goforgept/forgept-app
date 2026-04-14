@@ -44,16 +44,67 @@ try {
         })
       }
 
+      // Build .ics attachment for meeting confirmations
+      let attachment = undefined
+      if (body.type === 'meeting_confirmation' && body.meetingDate) {
+        const { meetingDate, meetingTime, meetingDuration, meetingTitle, meetingLink, meetingNotes, organizerName, organizerEmail } = body
+
+        const startTime = meetingTime || '09:00'
+        const [startHour, startMin] = startTime.split(':').map(Number)
+        const durationMins = parseInt(meetingDuration) || 60
+
+        const startDate = new Date(`${meetingDate}T${startTime}:00`)
+        const endDate = new Date(startDate.getTime() + durationMins * 60 * 1000)
+
+        const formatICS = (d: Date) =>
+          d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
+
+        const uid = `forgept-${Date.now()}@goforgept.com`
+
+        const icsLines = [
+          'BEGIN:VCALENDAR',
+          'VERSION:2.0',
+          'PRODID:-//ForgePt//Meeting//EN',
+          'CALSCALE:GREGORIAN',
+          'METHOD:REQUEST',
+          'BEGIN:VEVENT',
+          `UID:${uid}`,
+          `DTSTAMP:${formatICS(new Date())}`,
+          `DTSTART:${formatICS(startDate)}`,
+          `DTEND:${formatICS(endDate)}`,
+          `SUMMARY:${meetingTitle || 'Meeting'}`,
+          `DESCRIPTION:${(meetingNotes || '').replace(/\n/g, '\\n')}${meetingLink ? `\\n\\nJoin: ${meetingLink}` : ''}`,
+          meetingLink ? `URL:${meetingLink}` : '',
+          `ORGANIZER;CN=${organizerName || 'ForgePt'}:mailto:${organizerEmail || SENDER_EMAIL}`,
+          `ATTENDEE;CN=${toName || toEmail}:mailto:${toEmail}`,
+          'STATUS:CONFIRMED',
+          'SEQUENCE:0',
+          'END:VEVENT',
+          'END:VCALENDAR',
+        ].filter(Boolean).join('\r\n')
+
+        const icsBase64 = btoa(unescape(encodeURIComponent(icsLines)))
+        attachment = [{
+          content: icsBase64,
+          name: 'meeting.ics',
+          type: 'text/calendar; method=REQUEST',
+        }]
+      }
+
+      const brevoPayload: Record<string, unknown> = {
+        sender: { name: fromName || 'ForgePt.', email: SENDER_EMAIL },
+        to: [{ email: toEmail, name: toName || toEmail }],
+        replyTo: fromEmail ? { email: fromEmail } : undefined,
+        subject,
+        htmlContent: emailBody,
+      }
+
+      if (attachment) brevoPayload.attachment = attachment
+
       const res = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
-        body: JSON.stringify({
-          sender: { name: fromName || 'ForgePt.', email: SENDER_EMAIL },
-          to: [{ email: toEmail, name: toName || toEmail }],
-          replyTo: fromEmail ? { email: fromEmail } : undefined,
-          subject,
-          htmlContent: emailBody,
-        })
+        body: JSON.stringify(brevoPayload)
       })
 
       const result = await res.json()
