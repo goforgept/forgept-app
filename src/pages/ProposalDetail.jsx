@@ -989,8 +989,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const lbs = { top: lb, bottom: lb, left: lb, right: lb }
 
       const hideLabor = proposal?.hide_labor_breakdown
-      const lHeaders = hideLabor ? ['Role', 'Qty', 'Total'] : ['Role', 'Qty', 'Unit', 'Total Labor']
-      const lcw = hideLabor ? [3600, 1200, 3000] : [3000, 1200, 1200, 2400]
+      const lHeaders = hideLabor ? ['Role', 'Qty', 'Unit'] : ['Role', 'Qty', 'Unit', 'Total Labor']
+      const lcw = hideLabor ? [4800, 1200, 1200] : [3000, 1200, 1200, 2400]
 
       const lHeaderRow = new TableRow({
         children: lHeaders.map((h, i) =>
@@ -1006,7 +1006,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const lRows = docxLaborItems.filter(l => l.role).map(l =>
         new TableRow({
           children: (hideLabor
-            ? [l.role, `${l.quantity || ''} ${l.unit || 'hr'}`, `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+            ? [l.role, String(l.quantity || ''), l.unit || 'hr']
             : [l.role, String(l.quantity || ''), l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
           ).map((val, i) =>
             new TableCell({
@@ -1761,9 +1761,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       if (proposal?.hide_labor_breakdown) {
         autoTable(doc, {
           startY: tableEnd + 6,
-          head: [['Role', 'Qty', 'Total']],
-          body: pdfLaborItems.filter(l => l.role).map(l => [l.role, `${l.quantity} ${l.unit || 'hr'}`, `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
-          foot: [['', 'Total Labor', `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+          head: [['Role', 'Qty', 'Unit']],
+          body: pdfLaborItems.filter(l => l.role).map(l => [l.role, l.quantity, l.unit || 'hr']),
+          foot: [['', '', `Total Labor: $${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
           footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
