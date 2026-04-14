@@ -942,7 +942,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     })
 
     const docxTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
-    const docxTaxAmt = matTotal * (docxTaxRate / 100)
+    const docxTaxAmt = Math.round(matTotal * (docxTaxRate / 100) * 100) / 100
 
     const children = [
       new Paragraph({ children: [new TextRun({ text: profile?.company_name || proposal?.company || 'ForgePt.', bold: true, size: 36, color: primaryColor })] }),
@@ -1025,7 +1025,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const lTotalRow = new TableRow({
         children: [
           new TableCell({
-            borders: lbs, columnSpan: 3,
+            borders: lbs, columnSpan: hideLabor ? 2 : 3,
             margins: { top: 80, bottom: 80, left: 120, right: 120 },
             shading: { fill: primaryColor, type: ShadingType.CLEAR },
             children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: 'Total Labor', bold: true, color: 'FFFFFF', size: 18 })] })]
@@ -1748,7 +1748,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const laborTotal = pdfLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
       const pdfTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
-      const pdfTaxAmount = materialsTotal * (pdfTaxRate / 100)
+      const pdfTaxAmount = Math.round(materialsTotal * (pdfTaxRate / 100) * 100) / 100
       const grandTotal = materialsTotal + laborTotal + pdfTaxAmount
       if (proposal?.hide_labor_breakdown) {
         autoTable(doc, {
