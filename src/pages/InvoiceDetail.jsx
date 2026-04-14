@@ -5,7 +5,6 @@ import Sidebar from '../components/Sidebar'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
-const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE'
 
 export default function InvoiceDetail({ isAdmin, featureProposals = true, featureCRM = false }) {
   const { id } = useParams()
@@ -269,9 +268,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
       const doc = generateInvoicePDF(descriptionValue)
       const pdfBase64 = doc.output('datauristring').split(',')[1]
 
+      const { data: { session } } = await supabase.auth.getSession()
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           proposalId: invoice.proposal_id,
           clientEmail: invoice.proposals.client_email,

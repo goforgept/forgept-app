@@ -164,7 +164,7 @@ export default function SuperAdmin() {
   const approveRequest = async (request) => {
     const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/approve-request', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE` },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
       body: JSON.stringify({ requestId: request.id, fullName: request.full_name, email: request.email, companyName: request.company_name })
     })
     const result = await res.json()
@@ -299,7 +299,7 @@ export default function SuperAdmin() {
     try {
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-create-subscription', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeModal.admin?.email || '', plan: stripeForm.plan, chargeOnboarding: stripeForm.chargeOnboarding })
       })
       const result = await res.json()

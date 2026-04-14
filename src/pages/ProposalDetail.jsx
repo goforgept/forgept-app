@@ -459,9 +459,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         .from('signed-proposals')
         .upload(fileName, file, { contentType: 'application/pdf', upsert: true })
       if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from('signed-proposals').getPublicUrl(fileName)
-      await supabase.from('proposals').update({ signed_pdf_url: urlData.publicUrl }).eq('id', id)
-      setProposal(prev => ({ ...prev, signed_pdf_url: urlData.publicUrl }))
+      const { data: urlData } = await supabase.storage.from('signed-proposals').createSignedUrl(fileName, 60 * 60 * 24 * 365)
+      await supabase.from('proposals').update({ signed_pdf_url: urlData.signedUrl }).eq('id', id)
+      setProposal(prev => ({ ...prev, signed_pdf_url: urlData.signedUrl }))
       logActivity('Signed agreement uploaded manually')
     } catch (err) {
       alert('Error uploading signed PDF: ' + err.message)
@@ -635,7 +635,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+          'Authorization': `Bearer ${session?.access_token}`
         },
         body: JSON.stringify({
           proposalId: id,
@@ -785,7 +785,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE`
+            'Authorization': `Bearer ${session?.access_token}`
           },
           body: JSON.stringify({
             lineItemIds: items.map(i => i.id),
@@ -1451,7 +1451,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         try {
           await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-followup-emails', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
             body: JSON.stringify({ type: 'share_notification', toEmail: sharedWith.email, toName: sharedWith.full_name, fromName: profile?.full_name || 'A teammate', proposalName: proposal?.proposal_name, proposalId: id })
           })
         } catch (e) { console.log('Share notification error', e) }
@@ -1577,7 +1577,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     try {
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-build-bom', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ description: aiBOMPrompt, industry: proposal?.industry || '' })
       })
       const data = await res.json()
@@ -1902,7 +1902,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const pdfBase64 = pdfDoc.output('datauristring').split(',')[1]
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           proposalId: id, clientEmail: proposal.client_email, clientName: proposal.client_name || 'there',
           repName: proposal.rep_name || profile?.full_name || '', repEmail: proposal.rep_email || profile?.email || '',

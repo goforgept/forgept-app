@@ -309,8 +309,8 @@ export default function SignProposal() {
         const fileName = `${proposal.id}/signed-${Date.now()}.pdf`
         const { error: uploadError } = await supabase.storage.from('signed-proposals').upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true })
         if (!uploadError) {
-          const { data: urlData } = supabase.storage.from('signed-proposals').getPublicUrl(fileName)
-          signedPdfUrl = urlData.publicUrl
+          const { data: urlData } = await supabase.storage.from('signed-proposals').createSignedUrl(fileName, 60 * 60 * 24 * 365)
+          signedPdfUrl = urlData.signedUrl
         }
       } catch (pdfErr) { console.log('PDF generation error (non-fatal):', pdfErr) }
 

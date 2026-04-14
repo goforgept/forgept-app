@@ -45,7 +45,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   // Service Tickets
   const [clientTickets, setClientTickets] = useState([])
 
-  const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4eXBhZXB2bXRta2hic3NlZGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyMzE0MTcsImV4cCI6MjA4ODgwNzQxN30.kCZjM-wR8GbRC4K2A8-r1EBVgkzRD1shx3Vl3EEyELE'
+  
 
   useEffect(() => {
     fetchClient()
@@ -144,9 +144,10 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     setGeneratingEmail(true)
     setDraftedEmail('')
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-draft-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ company: client?.company, clientName: client?.client_name, industry: client?.industry, context: emailForm.context, repName: profile?.full_name })
       })
       const text = await res.text()
@@ -165,9 +166,10 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     if (!draftedEmail || !emailForm.subject) { alert('Subject and email body required.'); return }
     setSendingEmail(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-followup-emails', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${ANON_KEY}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ type: 'ai_email', toEmail: client.email, toName: client.client_name || client.company, fromName: profile?.full_name || '', fromEmail: profile?.email || '', subject: emailForm.subject, body: draftedEmail, clientId: id, orgId: profile?.org_id, sentBy: profile?.id })
       })
       const result = await res.json()
