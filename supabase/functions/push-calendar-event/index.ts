@@ -15,7 +15,6 @@ const MICROSOFT_CLIENT_SECRET = Deno.env.get('MICROSOFT_CLIENT_SECRET')!
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-// Refresh Google access token using refresh token
 async function refreshGoogleToken(refreshToken: string): Promise<string | null> {
   try {
     const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -35,7 +34,6 @@ async function refreshGoogleToken(refreshToken: string): Promise<string | null> 
   }
 }
 
-// Refresh Microsoft access token using refresh token
 async function refreshMicrosoftToken(refreshToken: string): Promise<string | null> {
   try {
     const res = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
@@ -56,19 +54,16 @@ async function refreshMicrosoftToken(refreshToken: string): Promise<string | nul
   }
 }
 
-// Build ISO datetime strings for calendar events
 function buildEventTimes(date: string, startTime: string | null, durationHours: number) {
-  const baseDate = date // YYYY-MM-DD
-  const start = startTime
-    ? `${baseDate}T${startTime}:00`
-    : `${baseDate}T08:00:00`
+  const baseDate = date
+  const start = startTime ? `${baseDate}T${startTime}:00` : `${baseDate}T08:00:00`
   const startMs = new Date(start).getTime()
   const endMs = startMs + durationHours * 60 * 60 * 1000
   const end = new Date(endMs).toISOString().slice(0, 19)
   return { start, end }
 }
 
-// Push or update a Google Calendar event
+// Returns { eventId, meetingLink }
 async function pushGoogleEvent(
   accessToken: string,
   calendarId: string,
@@ -78,23 +73,35 @@ async function pushGoogleEvent(
   startTime: string | null,
   durationHours: number,
   existingEventId: string | null,
-  timezone: string
-): Promise<string | null> {
+  timezone: string,
+  isVirtual: boolean
+): Promise<{ eventId: string | null; meetingLink: string | null }> {
   const { start, end } = buildEventTimes(date, startTime, durationHours)
 
-  const event = {
+  const event: Record<string, unknown> = {
     summary: title,
     description,
     start: { dateTime: start, timeZone: timezone || 'America/Chicago' },
     end: { dateTime: end, timeZone: timezone || 'America/Chicago' },
   }
 
-  const cal = calendarId || 'primary'
-  const url = existingEventId
-    ? `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal)}/events/${existingEventId}`
-    : `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal)}/events`
+  // Request Google Meet link
+  if (isVirtual) {
+    event.conferenceData = {
+      createRequest: {
+        requestId: `forgept-${Date.now()}`,
+        conferenceSolutionKey: { type: 'hangoutsMeet' },
+      },
+    }
+  }
 
-  const res = await fetch(url, {
+  const cal = calendarId || 'primary'
+  // Must include conferenceDataVersion=1 for Meet links to be generated
+  const baseUrl = existingEventId
+    ? `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal)}/events/${existingEventId}?conferenceDataVersion=1`
+    : `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal)}/events?conferenceDataVersion=1`
+
+  const res = await fetch(baseUrl, {
     method: existingEventId ? 'PUT' : 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -106,14 +113,18 @@ async function pushGoogleEvent(
   if (!res.ok) {
     const err = await res.text()
     console.error('Google Calendar error:', err)
-    return null
+    return { eventId: null, meetingLink: null }
   }
 
   const data = await res.json()
-  return data.id || null
+  const meetingLink = data.conferenceData?.entryPoints?.find(
+    (ep: { entryPointType: string; uri: string }) => ep.entryPointType === 'video'
+  )?.uri || null
+
+  return { eventId: data.id || null, meetingLink }
 }
 
-// Push or update a Microsoft Calendar event
+// Returns { eventId, meetingLink }
 async function pushMicrosoftEvent(
   accessToken: string,
   title: string,
@@ -122,15 +133,22 @@ async function pushMicrosoftEvent(
   startTime: string | null,
   durationHours: number,
   existingEventId: string | null,
-  timezone: string
-): Promise<string | null> {
+  timezone: string,
+  isVirtual: boolean
+): Promise<{ eventId: string | null; meetingLink: string | null }> {
   const { start, end } = buildEventTimes(date, startTime, durationHours)
 
-  const event = {
+  const event: Record<string, unknown> = {
     subject: title,
     body: { contentType: 'text', content: description },
     start: { dateTime: start, timeZone: timezone || 'America/Chicago' },
     end: { dateTime: end, timeZone: timezone || 'America/Chicago' },
+  }
+
+  // Request Teams meeting link
+  if (isVirtual) {
+    event.isOnlineMeeting = true
+    event.onlineMeetingProvider = 'teamsForBusiness'
   }
 
   const url = existingEventId
@@ -149,11 +167,13 @@ async function pushMicrosoftEvent(
   if (!res.ok) {
     const err = await res.text()
     console.error('Microsoft Calendar error:', err)
-    return null
+    return { eventId: null, meetingLink: null }
   }
 
   const data = await res.json()
-  return data.id || null
+  const meetingLink = data.onlineMeeting?.joinUrl || null
+
+  return { eventId: data.id || null, meetingLink }
 }
 
 serve(async (req) => {
@@ -162,17 +182,18 @@ serve(async (req) => {
   try {
     const body = await req.json()
     const {
-      tech_id,           // UUID of the technician
-      title,             // Event title
-      description,       // Event description
-      date,              // YYYY-MM-DD
-      start_time,        // HH:MM or null
-      duration_hours,    // number
-      record_type,       // 'job_schedule' | 'ticket'
-      record_id,         // UUID of the job_tech_schedules or service_tickets row
-      existing_google_event_id,   // string | null
-      existing_microsoft_event_id, // string | null
-      timezone,                    // string e.g. 'America/New_York'
+      tech_id,
+      title,
+      description,
+      date,
+      start_time,
+      duration_hours,
+      record_type,
+      record_id,
+      existing_google_event_id,
+      existing_microsoft_event_id,
+      timezone,
+      is_virtual,        // NEW: boolean
     } = body
 
     if (!tech_id || !title || !date || !record_type || !record_id) {
@@ -182,7 +203,6 @@ serve(async (req) => {
       })
     }
 
-    // Fetch tech's calendar tokens
     const { data: techProfile, error: profileError } = await supabase
       .from('profiles')
       .select('google_calendar_connected, google_access_token, google_refresh_token, google_calendar_id, microsoft_calendar_connected, microsoft_access_token, microsoft_refresh_token')
@@ -200,17 +220,16 @@ serve(async (req) => {
     const results: Record<string, string | null> = {
       google_event_id: existing_google_event_id || null,
       microsoft_event_id: existing_microsoft_event_id || null,
+      meeting_link: null,
     }
 
     // ── Google Calendar ──
     if (techProfile.google_calendar_connected && techProfile.google_refresh_token) {
-      // Always refresh — tokens expire in 1 hour
       const freshToken = await refreshGoogleToken(techProfile.google_refresh_token)
       if (freshToken) {
-        // Save refreshed token
         await supabase.from('profiles').update({ google_access_token: freshToken }).eq('id', tech_id)
 
-        const googleEventId = await pushGoogleEvent(
+        const { eventId, meetingLink } = await pushGoogleEvent(
           freshToken,
           techProfile.google_calendar_id || 'primary',
           title,
@@ -219,9 +238,11 @@ serve(async (req) => {
           start_time || null,
           hours,
           existing_google_event_id || null,
-          timezone || 'America/Chicago'
+          timezone || 'America/Chicago',
+          !!is_virtual
         )
-        results.google_event_id = googleEventId
+        results.google_event_id = eventId
+        if (meetingLink) results.meeting_link = meetingLink
       }
     }
 
@@ -231,7 +252,7 @@ serve(async (req) => {
       if (freshToken) {
         await supabase.from('profiles').update({ microsoft_access_token: freshToken }).eq('id', tech_id)
 
-        const msEventId = await pushMicrosoftEvent(
+        const { eventId, meetingLink } = await pushMicrosoftEvent(
           freshToken,
           title,
           description,
@@ -239,9 +260,11 @@ serve(async (req) => {
           start_time || null,
           hours,
           existing_microsoft_event_id || null,
-          timezone || 'America/Chicago'
+          timezone || 'America/Chicago',
+          !!is_virtual
         )
-        results.microsoft_event_id = msEventId
+        results.microsoft_event_id = eventId
+        if (meetingLink) results.meeting_link = meetingLink
       }
     }
 
@@ -255,6 +278,11 @@ serve(async (req) => {
       await supabase.from('service_tickets').update({
         google_event_id: results.google_event_id,
         microsoft_event_id: results.microsoft_event_id,
+      }).eq('id', record_id)
+    } else if (record_type === 'task') {
+      // Save event IDs and meeting link back to task
+      await supabase.from('tasks').update({
+        meeting_link: results.meeting_link,
       }).eq('id', record_id)
     }
 

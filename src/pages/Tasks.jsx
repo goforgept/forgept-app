@@ -19,7 +19,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
   const [form, setForm] = useState({
     title: '', due_date: '', priority: 'normal',
     assigned_to: '', client_id: '', notes: '',
-    meeting_type: '', meeting_link: '', duration_minutes: 60,
+    meeting_type: '', meeting_link: '', duration_minutes: 60, is_virtual: false,
     customer_notified: false, attendee_ids: [], attendee_emails: [],
     meeting_notes: ''
   })
@@ -47,12 +47,13 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
     setLoading(false)
   }
 
-  const pushMeetingToCalendar = async (taskId, assignedTo, title, dueDate, durationMinutes, meetingType, attendeeIds) => {
+  const pushMeetingToCalendar = async (taskId, assignedTo, title, dueDate, durationMinutes, meetingType, attendeeIds, isVirtual) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const allTechIds = [assignedTo, ...(attendeeIds || [])].filter(Boolean)
+      let meetingLink = null
       for (const techId of allTechIds) {
-        await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/push-calendar-event', {
+        const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/push-calendar-event', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
           body: JSON.stringify({
@@ -62,14 +63,21 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
             date: dueDate,
             start_time: null,
             duration_hours: (durationMinutes || 60) / 60,
-            record_type: 'ticket',
+            record_type: 'task',
             record_id: taskId,
             existing_google_event_id: null,
             existing_microsoft_event_id: null,
+            is_virtual: !!isVirtual,
           }),
         })
+        const data = await res.json()
+        if (data.meeting_link && !meetingLink) meetingLink = data.meeting_link
       }
-    } catch (e) { console.error('Calendar push error:', e) }
+      return meetingLink
+    } catch (e) {
+      console.log('Calendar push error:', e)
+      return null
+    }
   }
 
   const sendMeetingConfirmation = async (task, clientEmail, clientName) => {
@@ -136,13 +144,17 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
     }).select('*, clients(company, client_name, email)').single()
 
     if (newTask && isMeeting && form.due_date) {
-      pushMeetingToCalendar(newTask.id, form.assigned_to || profile.id, form.title, form.due_date, form.duration_minutes, form.meeting_type, form.attendee_ids)
+      const meetingLink = await pushMeetingToCalendar(newTask.id, form.assigned_to || profile.id, form.title, form.due_date, form.duration_minutes, form.meeting_type, form.attendee_ids, form.is_virtual)
+      if (meetingLink) {
+        await supabase.from('tasks').update({ meeting_link: meetingLink }).eq('id', newTask.id)
+        newTask.meeting_link = meetingLink
+      }
       if (form.customer_notified && newTask.clients?.email) {
         sendMeetingConfirmation(newTask, newTask.clients.email, newTask.clients.client_name || newTask.clients.company)
       }
     }
 
-    setForm({ title: '', due_date: '', priority: 'normal', assigned_to: profile.id, client_id: '', notes: '', meeting_type: '', meeting_link: '', duration_minutes: 60, customer_notified: false, attendee_ids: [], attendee_emails: [], meeting_notes: '' })
+    setForm({ title: '', due_date: '', priority: 'normal', assigned_to: profile.id, client_id: '', notes: '', meeting_type: '', meeting_link: '', duration_minutes: 60, is_virtual: false, customer_notified: false, attendee_ids: [], attendee_emails: [], meeting_notes: '' })
     setShowMeeting(false)
     setShowForm(false)
     fetchData()
@@ -306,6 +318,12 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 </div>
                 <div className="col-span-2">
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Meeting Link (optional)</label>
+                  <div className="flex items-center gap-3 mt-2">
+                    <button type="button" onClick={() => setForm(p => ({ ...p, is_virtual: !p.is_virtual }))}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${form.is_virtual ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+                      🎥 {form.is_virtual ? 'Virtual Meeting — link will be auto-generated' : 'Make Virtual'}
+                    </button>
+                  </div>
                   <input type="url" value={form.meeting_link} onChange={e => setForm(p => ({ ...p, meeting_link: e.target.value }))}
                     placeholder="https://meet.google.com/..." className={inputClass} />
                 </div>
