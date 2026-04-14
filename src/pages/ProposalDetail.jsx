@@ -369,8 +369,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
   const toggleHideMaterialPrices = async () => {
     const newVal = !proposal?.hide_material_prices
-    await supabase.from('proposals').update({ hide_material_prices: newVal }).eq('id', id)
-    setProposal(prev => ({ ...prev, hide_material_prices: newVal }))
+    await supabase.from('proposals').update({ hide_material_prices: newVal, lump_sum_pricing: newVal }).eq('id', id)
+    setProposal(prev => ({ ...prev, hide_material_prices: newVal, lump_sum_pricing: newVal }))
   }
 
   const toggleHideLaborBreakdown = async () => {
