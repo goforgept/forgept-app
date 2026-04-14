@@ -280,9 +280,10 @@ serve(async (req) => {
         microsoft_event_id: results.microsoft_event_id,
       }).eq('id', record_id)
     } else if (record_type === 'task') {
-      // Save event IDs and meeting link back to task
       await supabase.from('tasks').update({
         meeting_link: results.meeting_link,
+        google_event_id: results.google_event_id,
+        microsoft_event_id: results.microsoft_event_id,
       }).eq('id', record_id)
     }
 

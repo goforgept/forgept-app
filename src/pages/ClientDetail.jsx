@@ -215,7 +215,64 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   }
 
 const deleteMeeting = async (meetingId) => {
-    if (!window.confirm('Delete this meeting?')) return
+    if (!window.confirm('Delete this meeting and notify the client?')) return
+    
+    // Fetch the full task before deleting
+    const { data: task } = await supabase
+      .from('tasks')
+      .select('*, profiles!tasks_assigned_to_fkey(full_name)')
+      .eq('id', meetingId)
+      .single()
+
+    // Delete calendar event for assigned user
+    if (task?.google_event_id || task?.microsoft_event_id) {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/delete-calendar-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          tech_id: task.assigned_to,
+          google_event_id: task.google_event_id || null,
+          microsoft_event_id: task.microsoft_event_id || null,
+        }),
+      }).catch(e => console.log('Calendar delete error:', e))
+    }
+
+    // Send cancellation email with .ics to client
+    if (task?.customer_notified && client?.email) {
+      const { data: { session } } = await supabase.auth.getSession()
+      const meetingDate = task.due_date ? new Date(task.due_date + 'T12:00:00').toLocaleDateString('en-US', {
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+      }) : ''
+      const html = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1a2d45;">Meeting Cancelled</h2>
+          <p>Hi ${client?.client_name || client?.company},</p>
+          <p>Your <strong>${task.meeting_type}</strong> scheduled for ${meetingDate} has been cancelled.</p>
+          <p>Please remove it from your calendar. If you have any questions, feel free to reach out.</p>
+          <p style="color: #888; font-size: 12px; margin-top: 32px;">Sent via ForgePt.</p>
+        </div>
+      `
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-followup-emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          type: 'meeting_cancellation',
+          toEmail: client.email,
+          toName: client?.client_name || client?.company,
+          fromName: profile?.full_name || '',
+          fromEmail: profile?.email || '',
+          subject: `Meeting cancelled — ${task.title}`,
+          body: html,
+          meetingDate: task.due_date,
+          meetingTime: task.start_time || '09:00',
+          meetingDuration: task.duration_minutes || 60,
+          meetingTitle: `${task.meeting_type}: ${task.title}`,
+          meetingUid: `forgept-${meetingId}@goforgept.com`,
+        }),
+      }).catch(e => console.log('Cancellation email error:', e))
+    }
+
     await supabase.from('tasks').delete().eq('id', meetingId)
     fetchClientMeetings()
   }
@@ -327,7 +384,7 @@ const deleteMeeting = async (meetingId) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
             body: JSON.stringify({
-              type: 'ai_email',
+              type: 'meeting_confirmation',
               toEmail: client.email,
               toName: client?.client_name || client?.company,
               fromName: profile?.full_name || '',
@@ -336,6 +393,14 @@ const deleteMeeting = async (meetingId) => {
               body: html,
               orgId: profile?.org_id,
               sentBy: profile?.id,
+              meetingTitle: `${meetingForm.meeting_type}: ${meetingForm.title}`,
+              meetingDate: meetingForm.due_date,
+              meetingTime: meetingForm.start_time || '09:00',
+              meetingDuration: meetingForm.duration_minutes || 60,
+              meetingLink: newTask.meeting_link || '',
+              meetingNotes: meetingForm.meeting_notes || '',
+              organizerName: profile?.full_name || '',
+              organizerEmail: profile?.email || '',
             }),
           })
         }

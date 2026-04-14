@@ -35,7 +35,7 @@ try {
     const body = await req.json().catch(() => ({}))
 
     // ── Direct send: ai_email, meeting confirmation, share notifications etc ──
-    if (body.type === 'ai_email' || body.type === 'share_notification' || body.type === 'meeting_confirmation') {
+    if (body.type === 'ai_email' || body.type === 'share_notification' || body.type === 'meeting_confirmation' || body.type === 'meeting_cancellation') {
       const { toEmail, toName, fromName, fromEmail, subject, body: emailBody, orgId } = body
 
       if (!toEmail || !subject || !emailBody) {
@@ -46,7 +46,7 @@ try {
 
       // Build .ics attachment for meeting confirmations
       let attachment = undefined
-      if (body.type === 'meeting_confirmation' && body.meetingDate) {
+      if ((body.type === 'meeting_confirmation' || body.type === 'meeting_cancellation') && body.meetingDate) {
         const { meetingDate, meetingTime, meetingDuration, meetingTitle, meetingLink, meetingNotes, organizerName, organizerEmail } = body
 
         const startTime = meetingTime || '09:00'
@@ -59,14 +59,14 @@ try {
         const formatICS = (d: Date) =>
           d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z'
 
-        const uid = `forgept-${Date.now()}@goforgept.com`
+        const uid = body.meetingUid || `forgept-${Date.now()}@goforgept.com`
 
         const icsLines = [
           'BEGIN:VCALENDAR',
           'VERSION:2.0',
           'PRODID:-//ForgePt//Meeting//EN',
           'CALSCALE:GREGORIAN',
-          'METHOD:REQUEST',
+          body.type === 'meeting_cancellation' ? 'METHOD:CANCEL' : 'METHOD:REQUEST',
           'BEGIN:VEVENT',
           `UID:${uid}`,
           `DTSTAMP:${formatICS(new Date())}`,
@@ -77,7 +77,7 @@ try {
           meetingLink ? `URL:${meetingLink}` : '',
           `ORGANIZER;CN=${organizerName || 'ForgePt'}:mailto:${organizerEmail || SENDER_EMAIL}`,
           `ATTENDEE;CN=${toName || toEmail}:mailto:${toEmail}`,
-          'STATUS:CONFIRMED',
+          body.type === 'meeting_cancellation' ? 'STATUS:CANCELLED' : 'STATUS:CONFIRMED',
           'SEQUENCE:0',
           'END:VEVENT',
           'END:VCALENDAR',
