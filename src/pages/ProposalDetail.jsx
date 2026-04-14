@@ -1673,9 +1673,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
       .eq('id', id)
       .single()
-    if (freshProposal) {
-      Object.assign(proposal, freshProposal)
-    }
+    const p = freshProposal ? { ...proposal, ...freshProposal } : proposal
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
@@ -1709,12 +1707,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
     let yPos = 92
 
-    if (proposal?.scope_of_work) {
+    if (p?.scope_of_work) {
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Scope of Work', 14, yPos)
       yPos += 8
       doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
-      const cleanSOW = proposal.scope_of_work.replace(/^\*\*Scope of Work\*\*\s*/i, '').replace(/\*\*(.*?)\*\*/g, '$1').trim()
+      const cleanSOW = p.scope_of_work.replace(/^\*\*Scope of Work\*\*\s*/i, '').replace(/\*\*(.*?)\*\*/g, '$1').trim()
       const sowLines = doc.splitTextToSize(cleanSOW, pageWidth - 28)
       doc.text(sowLines, 14, yPos)
       yPos += sowLines.length * 5 + 12
@@ -1725,7 +1723,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       doc.text('Materials & Pricing', 14, yPos)
       yPos += 6
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
-      if (proposal?.hide_material_prices || proposal?.lump_sum_pricing) {
+      if (p?.hide_material_prices || p?.lump_sum_pricing) {
         autoTable(doc, {
           startY: yPos,
           head: [['Item', 'Part #', 'Qty']],
@@ -1748,17 +1746,17 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       }
     }
 
-    const pdfLaborItems = proposal?.labor_items || []
+    const pdfLaborItems = p?.labor_items || []
     if (pdfLaborItems.length > 0 && pdfLaborItems.some(l => l.role)) {
       const tableEnd = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Labor', 14, tableEnd)
       const laborTotal = pdfLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
-      const pdfTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
+      const pdfTaxRate = (!p?.tax_exempt && p?.tax_rate) ? parseFloat(p.tax_rate) : 0
       const pdfTaxAmount = Math.round(materialsTotal * (pdfTaxRate / 100) * 100) / 100
       const grandTotal = materialsTotal + laborTotal + pdfTaxAmount
-      if (proposal?.hide_labor_breakdown) {
+      if (p?.hide_labor_breakdown) {
         autoTable(doc, {
           startY: tableEnd + 6,
           head: [['Role', 'Qty', 'Unit']],
