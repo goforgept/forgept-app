@@ -869,11 +869,19 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
   const downloadDOCX = async () => {
     if (proposal?.status === 'Draft') setShowSentPrompt(true)
+
+    const { data: freshProposal } = await supabase
+      .from('proposals')
+      .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
+      .eq('id', id)
+      .single()
+    const p = freshProposal ? { ...proposal, ...freshProposal } : proposal
+
     const primaryColor = (profile?.primary_color || '#0F1C2E').replace('#', '')
 
     const border = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
     const borders = { top: border, bottom: border, left: border, right: border }
-    const isLumpSum = proposal?.hide_material_prices || proposal?.lump_sum_pricing
+    const isLumpSum = p?.hide_material_prices || p?.lump_sum_pricing
     const colWidths = isLumpSum ? [4200, 1400, 1200] : [2800, 1400, 800, 1000, 1000]
     const headers = isLumpSum ? ['Item', 'Part #', 'Qty'] : ['Item', 'Part #', 'Qty', 'Unit Price', 'Total']
 
@@ -941,7 +949,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       ]
     })
 
-    const docxTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
+    const docxTaxRate = (!p?.tax_exempt && p?.tax_rate) ? parseFloat(p.tax_rate) : 0
     const docxTaxAmt = Math.round(matTotal * (docxTaxRate / 100) * 100) / 100
 
     const children = [
@@ -953,7 +961,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       new Paragraph({ children: [new TextRun({ text: '' })] }),
     ]
 
-    if (proposal?.scope_of_work) {
+    if (p?.scope_of_work) {
       children.push(
         new Paragraph({ children: [new TextRun({ text: 'Scope of Work', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
@@ -965,7 +973,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     }
 
     if (lineItems.length > 0) {
-      const hasDocxLabor = (proposal?.labor_items || []).some(l => l.role)
+      const hasDocxLabor = (p?.labor_items || []).some(l => l.role)
       children.push(
         new Paragraph({ children: [new TextRun({ text: 'Materials & Pricing', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
@@ -983,7 +991,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       }
     }
 
-    const docxLaborItems = proposal?.labor_items || []
+    const hideLabor = p?.hide_labor_breakdown
     if (docxLaborItems.length > 0 && docxLaborItems.some(l => l.role)) {
       const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
       const lbs = { top: lb, bottom: lb, left: lb, right: lb }
