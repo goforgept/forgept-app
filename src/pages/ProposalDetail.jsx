@@ -875,6 +875,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
       .eq('id', id)
       .single()
+      .single()
     const p = freshProposal ? { ...proposal, ...freshProposal } : proposal
 
     const primaryColor = (profile?.primary_color || '#0F1C2E').replace('#', '')
