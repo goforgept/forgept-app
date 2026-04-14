@@ -333,7 +333,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                     placeholder="https://meet.google.com/..." className={inputClass} />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Additional Attendees</label>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Invite Team Members & Guests</label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {profiles.filter(p => p.id !== form.assigned_to).map(p => (
                       <button key={p.id} onClick={() => setForm(prev => ({
@@ -355,7 +355,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                           setNewAttendeeEmail('')
                         }
                       }}
-                      placeholder="Add external email and press Enter"
+                      placeholder="Invite by email and press Enter"
                       className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
                   </div>
                   {form.attendee_emails.length > 0 && (
