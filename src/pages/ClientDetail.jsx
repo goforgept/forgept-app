@@ -44,6 +44,15 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [savingLocation, setSavingLocation] = useState(false)
   // Service Tickets
   const [clientTickets, setClientTickets] = useState([])
+  // Meetings
+  const [clientMeetings, setClientMeetings] = useState([])
+  const [showMeetingModal, setShowMeetingModal] = useState(false)
+  const [savingMeeting, setSavingMeeting] = useState(false)
+  const [meetingForm, setMeetingForm] = useState({
+    title: '', due_date: '', start_time: '', duration_minutes: 60,
+    meeting_type: 'Sales Call', is_virtual: false, assigned_to: '',
+    meeting_notes: '', customer_notified: false
+  })
 
   
 
@@ -53,6 +62,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     fetchProfile()
     fetchLocations()
     fetchClientTickets()
+    fetchClientMeetings()
   }, [])
 
   const fetchClient = async () => {
@@ -86,6 +96,16 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const fetchLocations = async () => {
     const { data } = await supabase.from('client_locations').select('*').eq('client_id', id).order('site_name', { ascending: true })
     setLocations(data || [])
+  }
+
+  const fetchClientMeetings = async () => {
+    const { data } = await supabase
+      .from('tasks')
+      .select('*, profiles!tasks_assigned_to_fkey(full_name)')
+      .eq('client_id', id)
+      .not('meeting_type', 'is', null)
+      .order('due_date', { ascending: false })
+    setClientMeetings(data || [])
   }
 
   const fetchClientTickets = async () => {
@@ -193,8 +213,102 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     setSavingClient(false)
   }
 
-  const handleNewProposal = () => navigate(`/new?clientId=${id}`)
+  const saveMeeting = async () => {
+    if (!meetingForm.title || !meetingForm.due_date || !meetingForm.meeting_type) return
+    setSavingMeeting(true)
+    try {
+      const { data: newTask } = await supabase.from('tasks').insert({
+        org_id: profile.org_id,
+        title: meetingForm.title,
+        due_date: meetingForm.due_date,
+        start_time: meetingForm.start_time || null,
+        priority: 'normal',
+        assigned_to: meetingForm.assigned_to || profile.id,
+        created_by: profile.id,
+        client_id: id,
+        completed: false,
+        meeting_type: meetingForm.meeting_type,
+        duration_minutes: meetingForm.duration_minutes,
+        is_virtual: meetingForm.is_virtual,
+        customer_notified: meetingForm.customer_notified,
+        meeting_notes: meetingForm.meeting_notes || null,
+      }).select('*, clients(company, client_name, email)').single()
 
+      if (newTask) {
+        // Push to calendar
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/push-calendar-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+          body: JSON.stringify({
+            tech_id: meetingForm.assigned_to || profile.id,
+            title: `📅 ${meetingForm.meeting_type}: ${meetingForm.title}`,
+            description: `Meeting with ${client?.company || ''}\n${meetingForm.meeting_notes || ''}`,
+            date: meetingForm.due_date,
+            start_time: meetingForm.start_time || null,
+            duration_hours: meetingForm.duration_minutes / 60,
+            record_type: 'task',
+            record_id: newTask.id,
+            existing_google_event_id: null,
+            existing_microsoft_event_id: null,
+            is_virtual: meetingForm.is_virtual,
+          }),
+        })
+        const calData = await res.json()
+        if (calData.meeting_link) {
+          await supabase.from('tasks').update({ meeting_link: calData.meeting_link }).eq('id', newTask.id)
+          newTask.meeting_link = calData.meeting_link
+        }
+
+        // Send Brevo confirmation if requested
+        if (meetingForm.customer_notified && client?.email) {
+          const meetingDate = new Date(meetingForm.due_date + 'T12:00:00').toLocaleDateString('en-US', {
+            weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
+          })
+          const html = `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #1a2d45;">Meeting Scheduled</h2>
+              <p>Hi ${client?.client_name || client?.company},</p>
+              <p>A <strong>${meetingForm.meeting_type}</strong> has been scheduled with you.</p>
+              <table style="border-collapse: collapse; width: 100%; margin: 20px 0;">
+                <tr><td style="padding: 8px; color: #666;">Meeting</td><td style="padding: 8px; font-weight: bold;">${meetingForm.title}</td></tr>
+                <tr style="background: #f5f5f5;"><td style="padding: 8px; color: #666;">Date</td><td style="padding: 8px;">${meetingDate}</td></tr>
+                ${meetingForm.start_time ? `<tr><td style="padding: 8px; color: #666;">Time</td><td style="padding: 8px;">${meetingForm.start_time}</td></tr>` : ''}
+                ${meetingForm.duration_minutes ? `<tr style="background: #f5f5f5;"><td style="padding: 8px; color: #666;">Duration</td><td style="padding: 8px;">${meetingForm.duration_minutes} minutes</td></tr>` : ''}
+                ${newTask.meeting_link ? `<tr><td style="padding: 8px; color: #666;">Link</td><td style="padding: 8px;"><a href="${newTask.meeting_link}" style="color: #C8622A;">${newTask.meeting_link}</a></td></tr>` : ''}
+              </table>
+              ${meetingForm.meeting_notes ? `<p style="color: #444;">${meetingForm.meeting_notes}</p>` : ''}
+              <p style="color: #888; font-size: 12px; margin-top: 32px;">You will receive a reminder the day before. Sent via ForgePt.</p>
+            </div>
+          `
+          await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-followup-emails', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+            body: JSON.stringify({
+              type: 'ai_email',
+              toEmail: client.email,
+              toName: client?.client_name || client?.company,
+              fromName: profile?.full_name || '',
+              fromEmail: profile?.email || '',
+              subject: `${meetingForm.meeting_type} scheduled — ${meetingForm.title}`,
+              body: html,
+              orgId: profile?.org_id,
+              sentBy: profile?.id,
+            }),
+          })
+        }
+      }
+
+      setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false })
+      setShowMeetingModal(false)
+      fetchClientMeetings()
+    } catch (err) {
+      alert('Error saving meeting: ' + err.message)
+    }
+    setSavingMeeting(false)
+  }
+
+  const handleNewProposal = () => navigate(`/new?clientId=${id}`)
   const totalPipeline = proposals.filter(p => p.status !== 'Lost').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
   const wonPipeline = proposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
   const winRate = proposals.length > 0 ? Math.round((proposals.filter(p => p.status === 'Won').length / proposals.length) * 100) : 0
@@ -256,6 +370,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
             { key: 'proposals', label: `Proposals (${proposals.length})` },
             { key: 'locations', label: `Locations (${locations.length})` },
             { key: 'tickets', label: `Service Tickets (${clientTickets.length})` },
+            { key: 'meetings', label: `Meetings (${clientMeetings.length})` },
             { key: 'activity', label: 'Activity' },
             { key: 'tasks', label: 'Tasks' },
             { key: 'emails', label: `Emails (${clientEmails.length})` },
@@ -382,6 +497,54 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
             )}
           </div>
         )}
+{activeTab === 'meetings' && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white font-bold text-lg">Meetings</h3>
+              <button onClick={() => { setShowMeetingModal(true); setMeetingForm(p => ({ ...p, assigned_to: profile.id })) }}
+                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                + Schedule Meeting
+              </button>
+            </div>
+            {clientMeetings.length === 0 ? (
+              <p className="text-[#8A9AB0] text-sm">No meetings scheduled yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {clientMeetings.map(meeting => {
+                  const isPast = meeting.due_date < new Date().toISOString().split('T')[0]
+                  return (
+                    <div key={meeting.id} className={`bg-[#0F1C2E] rounded-xl p-4 border ${isPast ? 'border-[#2a3d55]/30 opacity-70' : 'border-[#2a3d55]'}`}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 font-semibold">📅 {meeting.meeting_type}</span>
+                            {meeting.is_virtual && <span className="text-xs px-2 py-0.5 rounded bg-purple-500/15 text-purple-400 font-semibold">🎥 Virtual</span>}
+                            {isPast && <span className="text-xs px-2 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0]">Past</span>}
+                            {meeting.completed && <span className="text-xs px-2 py-0.5 rounded bg-green-500/15 text-green-400">✓ Done</span>}
+                          </div>
+                          <p className="text-white font-semibold text-sm">{meeting.title}</p>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-[#8A9AB0]">
+                            <span>📆 {meeting.due_date}{meeting.start_time ? ` at ${meeting.start_time}` : ''}</span>
+                            {meeting.duration_minutes && <span>⏱ {meeting.duration_minutes} min</span>}
+                            {meeting.profiles?.full_name && <span>👤 {meeting.profiles.full_name}</span>}
+                          </div>
+                          {meeting.meeting_notes && <p className="text-[#8A9AB0] text-xs mt-1 italic">{meeting.meeting_notes}</p>}
+                          {meeting.meeting_link && (
+                            <a href={meeting.meeting_link} target="_blank" rel="noopener noreferrer"
+                              className="text-[#C8622A] text-xs hover:underline mt-1 block">🔗 Join Meeting</a>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {meeting.customer_notified && <span className="text-xs text-green-400">✉ Notified</span>}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {activeTab === 'activity' && <ActivityTimeline clientId={id} orgId={client?.org_id} userId={profile?.id} />}
         {activeTab === 'tasks' && <TaskList clientId={id} orgId={client?.org_id} userId={profile?.id} profiles={teamProfiles} />}
@@ -424,6 +587,81 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
           </div>
         )}
       </div>
+{/* Schedule Meeting Modal */}
+      {showMeetingModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-white font-bold text-lg mb-5">📅 Schedule Meeting</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Meeting Title <span className="text-[#C8622A]">*</span></label>
+                <input type="text" value={meetingForm.title} onChange={e => setMeetingForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="e.g. Security System Proposal Review" className={inputClass} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Meeting Type <span className="text-[#C8622A]">*</span></label>
+                  <select value={meetingForm.meeting_type} onChange={e => setMeetingForm(p => ({ ...p, meeting_type: e.target.value }))} className={inputClass}>
+                    {['Site Visit', 'Sales Call', 'Follow-up Call', 'Proposal Review', 'Kickoff Meeting'].map(t => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Assigned To</label>
+                  <select value={meetingForm.assigned_to} onChange={e => setMeetingForm(p => ({ ...p, assigned_to: e.target.value }))} className={inputClass}>
+                    {teamProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Date <span className="text-[#C8622A]">*</span></label>
+                  <input type="date" value={meetingForm.due_date} onChange={e => setMeetingForm(p => ({ ...p, due_date: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start Time</label>
+                  <input type="time" value={meetingForm.start_time} onChange={e => setMeetingForm(p => ({ ...p, start_time: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Duration</label>
+                  <select value={meetingForm.duration_minutes} onChange={e => setMeetingForm(p => ({ ...p, duration_minutes: parseInt(e.target.value) }))} className={inputClass}>
+                    {[15, 30, 45, 60, 90, 120].map(m => <option key={m} value={m}>{m} min</option>)}
+                  </select>
+                </div>
+                <div className="flex items-end pb-2">
+                  <button type="button" onClick={() => setMeetingForm(p => ({ ...p, is_virtual: !p.is_virtual }))}
+                    className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${meetingForm.is_virtual ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+                    🎥 {meetingForm.is_virtual ? 'Virtual — link auto-generated' : 'Make Virtual'}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Notes (optional)</label>
+                <textarea value={meetingForm.meeting_notes} onChange={e => setMeetingForm(p => ({ ...p, meeting_notes: e.target.value }))}
+                  rows={2} placeholder="Agenda, location details, prep notes..."
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+              </div>
+              {client?.email && (
+                <button onClick={() => setMeetingForm(p => ({ ...p, customer_notified: !p.customer_notified }))}
+                  className="flex items-center gap-2 text-sm transition-colors">
+                  <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${meetingForm.customer_notified ? 'bg-[#C8622A] border-[#C8622A]' : 'border-[#2a3d55]'}`}>
+                    {meetingForm.customer_notified && <span className="text-white text-xs">✓</span>}
+                  </span>
+                  <span className={meetingForm.customer_notified ? 'text-white' : 'text-[#8A9AB0]'}>
+                    Send confirmation email to {client?.client_name || client?.company} + 24hr reminder
+                  </span>
+                </button>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowMeetingModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={saveMeeting} disabled={savingMeeting || !meetingForm.title || !meetingForm.due_date}
+                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {savingMeeting ? 'Scheduling...' : 'Schedule Meeting'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Location Modal */}
       {showLocationModal && (

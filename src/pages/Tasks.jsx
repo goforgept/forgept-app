@@ -19,7 +19,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
   const [form, setForm] = useState({
     title: '', due_date: '', priority: 'normal',
     assigned_to: '', client_id: '', notes: '',
-    meeting_type: '', meeting_link: '', duration_minutes: 60, is_virtual: false,
+    meeting_type: '', meeting_link: '', start_time: '', duration_minutes: 60, is_virtual: false,
     customer_notified: false, attendee_ids: [], attendee_emails: [],
     meeting_notes: ''
   })
@@ -47,7 +47,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
     setLoading(false)
   }
 
-  const pushMeetingToCalendar = async (taskId, assignedTo, title, dueDate, durationMinutes, meetingType, attendeeIds, isVirtual) => {
+  const pushMeetingToCalendar = async (taskId, assignedTo, title, dueDate, durationMinutes, meetingType, attendeeIds, isVirtual, startTime) => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const allTechIds = [assignedTo, ...(attendeeIds || [])].filter(Boolean)
@@ -61,7 +61,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
             title: `📅 ${meetingType}: ${title}`,
             description: `Meeting scheduled via ForgePt.`,
             date: dueDate,
-            start_time: null,
+            start_time: startTime || null,
             duration_hours: (durationMinutes || 60) / 60,
             record_type: 'task',
             record_id: taskId,
@@ -141,10 +141,11 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
       attendee_ids: isMeeting && form.attendee_ids.length > 0 ? form.attendee_ids : null,
       attendee_emails: isMeeting && form.attendee_emails.length > 0 ? form.attendee_emails : null,
       meeting_notes: isMeeting ? form.meeting_notes || null : null,
+      start_time: isMeeting ? form.start_time || null : null,
     }).select('*, clients(company, client_name, email)').single()
 
     if (newTask && isMeeting && form.due_date) {
-      const meetingLink = await pushMeetingToCalendar(newTask.id, form.assigned_to || profile.id, form.title, form.due_date, form.duration_minutes, form.meeting_type, form.attendee_ids, form.is_virtual)
+      const meetingLink = await pushMeetingToCalendar(newTask.id, form.assigned_to || profile.id, form.title, form.due_date, form.duration_minutes, form.meeting_type, form.attendee_ids, form.is_virtual, form.start_time)
       if (meetingLink) {
         await supabase.from('tasks').update({ meeting_link: meetingLink }).eq('id', newTask.id)
         newTask.meeting_link = meetingLink
@@ -154,7 +155,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
       }
     }
 
-    setForm({ title: '', due_date: '', priority: 'normal', assigned_to: profile.id, client_id: '', notes: '', meeting_type: '', meeting_link: '', duration_minutes: 60, is_virtual: false, customer_notified: false, attendee_ids: [], attendee_emails: [], meeting_notes: '' })
+    setForm({ title: '', due_date: '', priority: 'normal', assigned_to: profile.id, client_id: '', notes: '', meeting_type: '', meeting_link: '', start_time: '', duration_minutes: 60, is_virtual: false, customer_notified: false, attendee_ids: [], attendee_emails: [], meeting_notes: '' })
     setShowMeeting(false)
     setShowForm(false)
     fetchData()
@@ -295,7 +296,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${showMeeting ? 'bg-[#C8622A] border-[#C8622A]' : 'border-[#2a3d55]'}`}>
                   {showMeeting && <span className="text-white text-xs">✓</span>}
                 </span>
-                Schedule a Meeting
+                Schedule Internal Meeting
               </button>
             </div>
 
@@ -309,6 +310,10 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start Time</label>
+                  <input type="time" value={form.start_time || ''} onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))} className={inputClass} />
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Duration (minutes)</label>
