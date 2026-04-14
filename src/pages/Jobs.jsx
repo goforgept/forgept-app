@@ -10,7 +10,7 @@ const STATUS_COLORS = {
   'Cancelled': 'bg-red-500/20 text-red-400',
 }
 
-export default function Jobs({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true }) {
+export default function Jobs({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, isTechnician = false }) {
   const navigate = useNavigate()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -117,7 +117,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
             {filtered.map(job => {
               const progress = getProgress(job)
               return (
-                <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)}
+                <div key={job.id} onClick={() => navigate(isTechnician ? `/tech/job/${job.id}` : `/jobs/${job.id}`)}
                   className="bg-[#1a2d45] rounded-xl p-5 cursor-pointer hover:bg-[#1f3552] transition-colors group border border-[#2a3d55] hover:border-[#C8622A]/30">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
