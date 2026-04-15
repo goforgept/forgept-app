@@ -2042,6 +2042,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     }
 
     // Grand total summary — always shown
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (pdfTaxRate > 0 ? 7 : 0) + 12
+    if (yPos + summaryHeight > pageHeight - 20) { doc.addPage(); yPos = 20 }
     const summaryX = pageWidth - 96
     doc.setDrawColor(200, 200, 200)
     doc.line(summaryX, yPos, pageWidth - 14, yPos)

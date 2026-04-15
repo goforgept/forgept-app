@@ -197,6 +197,9 @@ export default function SignProposal() {
 
     // Grand total summary
     let summaryY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : yPos + 8
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (taxRate > 0 ? 7 : 0) + 12
+    if (summaryY + summaryHeight > pageHeight - 20) { doc.addPage(); summaryY = 20 }
     const summaryX = pageWidth - 96
     doc.setDrawColor(200, 200, 200)
     doc.line(summaryX, summaryY, pageWidth - 14, summaryY)
