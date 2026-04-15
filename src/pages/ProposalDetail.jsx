@@ -119,6 +119,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [pendingContractItems, setPendingContractItems] = useState([])
   const [pendingContractDates, setPendingContractDates] = useState({})
   const [savingContractDates, setSavingContractDates] = useState(false)
+  const [session, setSession] = useState(null)
 
   useEffect(() => {
     fetchProposal()
@@ -229,6 +230,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   }
 
   const fetchProfile = async () => {
+    const { data: { session: currentSession } } = await supabase.auth.getSession()
+    setSession(currentSession)
     const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase
       .from('profiles')
@@ -980,6 +983,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       )
     }
 
+    const docxLaborItems = p?.labor_items || []
+    const docxMatTotal = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
+
     if (lineItems.length > 0) {
       const hasDocxLabor = (p?.labor_items || []).some(l => l.role)
       children.push(
@@ -999,8 +1005,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       }
     }
 
-    const docxLaborItems = p?.labor_items || []
-    const docxMatTotal = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
     if (docxLaborItems.length > 0 && docxLaborItems.some(l => l.role)) {
       const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
       const lbs = { top: lb, bottom: lb, left: lb, right: lb }
@@ -1872,7 +1876,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
       const pdfTaxRate = (!p?.tax_exempt && p?.tax_rate) ? parseFloat(p.tax_rate) : 0
       const pdfTaxAmount = Math.round(materialsTotal * (pdfTaxRate / 100) * 100) / 100
-      const grandTotal = materialsTotal + laborTotal + pdfTaxAmount
+      const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+      const grandTotal = materialsTotal + laborTotal + sectionLaborTotal + pdfTaxAmount
       if (p?.hide_labor_breakdown) {
         autoTable(doc, {
           startY: tableEnd + 6,
@@ -2609,14 +2614,21 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                       )}
 
                       {/* Grand totals */}
+                      {(() => {
+                        const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+                        const adjustedGrandTotal = materialsTotal + laborTotal + sectionLaborTotal + taxAmount
+                        return (
                       <table className="w-full text-sm">
                         <tfoot>
                           <tr><td colSpan="6" className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td><td className="text-white pt-4 text-right font-bold pr-4">${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
-                          {laborTotal > 0 && <tr><td colSpan="6" className="text-[#8A9AB0] pt-1 text-right font-semibold">Total Labor</td><td className="text-white pt-1 text-right font-bold pr-4">${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
+                          {laborTotal > 0 && <tr><td colSpan="6" className="text-[#8A9AB0] pt-1 text-right font-semibold">General Labor</td><td className="text-white pt-1 text-right font-bold pr-4">${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
+                          {sectionLaborTotal > 0 && <tr><td colSpan="6" className="text-[#8A9AB0] pt-1 text-right font-semibold">Section Labor</td><td className="text-white pt-1 text-right font-bold pr-4">${sectionLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
                           {taxRate > 0 && <tr><td colSpan="6" className="text-[#8A9AB0] pt-1 text-right font-semibold">Tax ({taxRate}% on materials)</td><td className="text-white pt-1 text-right font-bold pr-4">${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
-                          <tr className="border-t border-[#2a3d55]"><td colSpan="6" className="text-[#8A9AB0] pt-3 text-right font-semibold">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg pr-4">${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
+                          <tr className="border-t border-[#2a3d55]"><td colSpan="6" className="text-[#8A9AB0] pt-3 text-right font-semibold">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg pr-4">${adjustedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
                         </tfoot>
                       </table>
+                        )
+                      })()}
                     </>
                   )
                 })()}
