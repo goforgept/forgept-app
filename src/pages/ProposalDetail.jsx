@@ -1072,24 +1072,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           }
         }
 
-        // Materials total after all sections
-        children.push(
-          new Paragraph({ children: [new TextRun({ text: `Materials Total: $${docxMatTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 20, color: primaryColor })] }),
-          new Paragraph({ children: [new TextRun({ text: '' })] }),
-        )
       } else {
         // No sections — original flat table
         children.push(
           new Table({ width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: [headerRow, ...itemRows, totalRow] }),
-          new Paragraph({ children: [new TextRun({ text: '' })] }),
-        )
-      }
-      if (!hasDocxLabor && sections.length === 0) {
-        if (docxTaxRate > 0) {
-          children.push(new Paragraph({ children: [new TextRun({ text: `Tax (${docxTaxRate}% on materials): $${docxTaxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] }))
-        }
-        children.push(
-          new Paragraph({ children: [new TextRun({ text: `Grand Total: $${(docxMatTotal + docxTaxAmt).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 24, color: primaryColor })] }),
           new Paragraph({ children: [new TextRun({ text: '' })] }),
         )
       }
@@ -1129,9 +1115,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         })
       )
 
-      const laborTotal = docxLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-      const materialsTotal = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
-      const grandTotal = materialsTotal + laborTotal + docxTaxAmt
+      const laborTotal = docxLaborItems.filter(l => l.role).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
 
       const lTotalRow = new TableRow({
         children: [
@@ -1156,11 +1140,22 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         new Table({ width: { size: 7800, type: WidthType.DXA }, columnWidths: lcw, rows: [lHeaderRow, ...lRows, lTotalRow] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
-        ...(docxTaxRate > 0 ? [new Paragraph({ children: [new TextRun({ text: `Tax (${docxTaxRate}% on materials): $${docxTaxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] })] : []),
-        new Paragraph({ children: [new TextRun({ text: `Grand Total: $${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 24, color: primaryColor })] }),
-        new Paragraph({ children: [new TextRun({ text: '' })] }),
       )
     }
+
+    // Unified summary — always shown
+    const docxProposalLaborTotal = docxLaborItems.filter(l => l.role).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+    const docxSectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).filter(l => l.role).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+    const docxAllLaborTotal = docxProposalLaborTotal + docxSectionLaborTotal
+    const docxGrandTotal = docxMatTotal + docxAllLaborTotal + docxTaxAmt
+
+    children.push(
+      new Paragraph({ children: [new TextRun({ text: `Materials Total: $${docxMatTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '444444' })] }),
+      ...(docxAllLaborTotal > 0 ? [new Paragraph({ children: [new TextRun({ text: `Labor Total: $${docxAllLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '444444' })] })] : []),
+      ...(docxTaxRate > 0 ? [new Paragraph({ children: [new TextRun({ text: `Tax (${docxTaxRate}% on materials): $${docxTaxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] })] : []),
+      new Paragraph({ children: [new TextRun({ text: `Grand Total: $${docxGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 28, color: primaryColor })] }),
+      new Paragraph({ children: [new TextRun({ text: '' })] }),
+    )
 
     if (profile?.terms_and_conditions) {
       children.push(
@@ -2008,22 +2003,24 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     }
 
     const pdfLaborItems = p?.labor_items || []
+    const pdfMaterialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
+    const pdfTaxRate = (!p?.tax_exempt && p?.tax_rate) ? parseFloat(p.tax_rate) : 0
+    const pdfTaxAmount = Math.round(pdfMaterialsTotal * (pdfTaxRate / 100) * 100) / 100
+    const proposalLaborTotal = pdfLaborItems.filter(l => l.role).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+    const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).filter(l => l.role).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+    const allLaborTotal = proposalLaborTotal + sectionLaborTotal
+    const grandTotal = pdfMaterialsTotal + allLaborTotal + pdfTaxAmount
+
     if (pdfLaborItems.length > 0 && pdfLaborItems.some(l => l.role)) {
       const tableEnd = sections.length > 0 ? yPos + 6 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12)
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Labor', 14, tableEnd)
-      const laborTotal = pdfLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-      const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
-      const pdfTaxRate = (!p?.tax_exempt && p?.tax_rate) ? parseFloat(p.tax_rate) : 0
-      const pdfTaxAmount = Math.round(materialsTotal * (pdfTaxRate / 100) * 100) / 100
-      const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
-      const grandTotal = materialsTotal + laborTotal + sectionLaborTotal + pdfTaxAmount
       if (p?.hide_labor_breakdown) {
         autoTable(doc, {
           startY: tableEnd + 6,
           head: [['Role', 'Qty', 'Unit']],
           body: pdfLaborItems.filter(l => l.role).map(l => [l.role, l.quantity, l.unit || 'hr']),
-          foot: [['', '', `Total Labor: $${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+          foot: [['', '', `Total Labor: $${proposalLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
           footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
@@ -2033,24 +2030,42 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           startY: tableEnd + 6,
           head: [['Role', 'Qty', 'Unit', 'Total Labor']],
           body: pdfLaborItems.filter(l => l.role).map(l => [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
-          foot: [['', '', 'Total Labor', `$${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+          foot: [['', '', 'Total Labor', `$${proposalLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
           footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
         })
       }
-      let afterLabor = doc.lastAutoTable.finalY + 6
-      if (pdfTaxRate > 0) {
-        doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
-        doc.text(`Tax (${pdfTaxRate}% on materials):`, pageWidth - 70, afterLabor)
-        doc.text(`$${pdfTaxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterLabor, { align: 'right' })
-        afterLabor += 8
-      }
-      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Grand Total:', pageWidth - 60, afterLabor)
-      doc.setTextColor(200, 98, 42)
-      doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterLabor, { align: 'right' })
+      yPos = doc.lastAutoTable.finalY + 8
+    } else {
+      yPos = sections.length > 0 ? yPos + 4 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : yPos + 10)
     }
+
+    // Grand total summary — always shown
+    const summaryX = pageWidth - 96
+    doc.setDrawColor(200, 200, 200)
+    doc.line(summaryX, yPos, pageWidth - 14, yPos)
+    yPos += 6
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+    doc.text('Materials Total:', summaryX, yPos)
+    doc.text(`$${pdfMaterialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+    yPos += 7
+    if (allLaborTotal > 0) {
+      doc.text('Labor Total:', summaryX, yPos)
+      doc.text(`$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+      yPos += 7
+    }
+    if (pdfTaxRate > 0) {
+      doc.text(`Tax (${pdfTaxRate}% on materials):`, summaryX, yPos)
+      doc.text(`$${pdfTaxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+      yPos += 7
+    }
+    doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.line(summaryX, yPos - 2, pageWidth - 14, yPos - 2)
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text('Grand Total:', summaryX, yPos + 4)
+    doc.setTextColor(200, 98, 42)
+    doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos + 4, { align: 'right' })
 
     if (profile?.terms_and_conditions) {
       doc.addPage()
@@ -2070,7 +2085,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const s2 = s1 + 20; doc.text('Printed Name:', 14, s2); doc.line(50, s2, pageWidth - 14, s2)
       const s3 = s2 + 20; doc.text('Title:', 14, s3); doc.line(30, s3, pageWidth - 14, s3)
     } else {
-      const afterY = (doc.lastAutoTable?.finalY || 180) + 20
+      const afterY = yPos + 20
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Accepted and Agreed', 14, afterY)
       doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
