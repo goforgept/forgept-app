@@ -1144,8 +1144,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     }
 
     // Unified summary — always shown
-    const docxProposalLaborTotal = docxLaborItems.filter(l => l.role).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-    const docxSectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).filter(l => l.role).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+    const docxProposalLaborTotal = docxLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+    const docxSectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
     const docxAllLaborTotal = docxProposalLaborTotal + docxSectionLaborTotal
     const docxGrandTotal = docxMatTotal + docxAllLaborTotal + docxTaxAmt
 
@@ -2006,8 +2006,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     const pdfMaterialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
     const pdfTaxRate = (!p?.tax_exempt && p?.tax_rate) ? parseFloat(p.tax_rate) : 0
     const pdfTaxAmount = Math.round(pdfMaterialsTotal * (pdfTaxRate / 100) * 100) / 100
-    const proposalLaborTotal = pdfLaborItems.filter(l => l.role).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-    const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).filter(l => l.role).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+    const proposalLaborTotal = pdfLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+    const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
     const allLaborTotal = proposalLaborTotal + sectionLaborTotal
     const grandTotal = pdfMaterialsTotal + allLaborTotal + pdfTaxAmount
 
@@ -2015,12 +2015,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const tableEnd = sections.length > 0 ? yPos + 6 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12)
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Labor', 14, tableEnd)
+      const namedLaborItems = pdfLaborItems.filter(l => l.role)
+      const namedLaborTotal = namedLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
       if (p?.hide_labor_breakdown) {
         autoTable(doc, {
           startY: tableEnd + 6,
           head: [['Role', 'Qty', 'Unit']],
-          body: pdfLaborItems.filter(l => l.role).map(l => [l.role, l.quantity, l.unit || 'hr']),
-          foot: [['', '', `Total Labor: $${proposalLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+          body: namedLaborItems.map(l => [l.role, l.quantity, l.unit || 'hr']),
+          foot: [['', '', `Total Labor: $${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
           footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
@@ -2029,8 +2031,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
         autoTable(doc, {
           startY: tableEnd + 6,
           head: [['Role', 'Qty', 'Unit', 'Total Labor']],
-          body: pdfLaborItems.filter(l => l.role).map(l => [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
-          foot: [['', '', 'Total Labor', `$${proposalLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+          body: namedLaborItems.map(l => [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
+          foot: [['', '', 'Total Labor', `$${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
           footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
           alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
