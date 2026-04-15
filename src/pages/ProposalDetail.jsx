@@ -666,11 +666,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const generateSOW = async () => {
     setGeneratingSOW(true)
     try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/generate-sow', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
+          'Authorization': `Bearer ${currentSession?.access_token}`
         },
         body: JSON.stringify({
           proposalId: id,
