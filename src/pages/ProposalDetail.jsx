@@ -1046,7 +1046,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           )
 
           children.push(
-            new Table({ width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: [secHeaderRow, ...secItemRows] }),
+            new Table({ width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: [secHeaderRow, headerRow, ...secItemRows] }),
             new Paragraph({ children: [new TextRun({ text: '' })] }),
           )
 
