@@ -230,7 +230,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   }
 
   const fetchProfile = async () => {
-    const { data: { session: currentSession } } = await supabase.auth.getSession()
+    const { data: { session: currentSession } } = await supabase.auth.refreshSession()
     setSession(currentSession)
     const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase
@@ -457,7 +457,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setRequestingSignature(true)
     const signingUrl = `${window.location.origin}/sign/${proposal.signing_token}`
     try {
-      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      const { data: { session: currentSession } } = await supabase.auth.refreshSession()
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-signature-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
@@ -666,7 +666,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const generateSOW = async () => {
     setGeneratingSOW(true)
     try {
-      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      const { data: { session: currentSession } } = await supabase.auth.refreshSession()
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/generate-sow', {
         method: 'POST',
         headers: {
@@ -817,7 +817,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       }
 
       try {
-        const { data: { session: currentSession } } = await supabase.auth.getSession()
+        const { data: { session: currentSession } } = await supabase.auth.refreshSession()
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-rfq', {
           method: 'POST',
           headers: {
@@ -1689,7 +1689,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const sharedWith = orgProfiles.find(p => p.id === profileId)
       if (sharedWith?.email) {
         try {
-          const { data: { session: currentSession } } = await supabase.auth.getSession()
+          const { data: { session: currentSession } } = await supabase.auth.refreshSession()
           await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-followup-emails', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
@@ -1775,7 +1775,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const sendToQBO = async () => {
     setSendingToQBO(true)
     try {
-      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      const { data: { session: currentSession } } = await supabase.auth.refreshSession()
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-create-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
@@ -1816,7 +1816,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setGeneratingBOM(true)
     setAIBOMPreview([])
     try {
-      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      const { data: { session: currentSession } } = await supabase.auth.refreshSession()
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-build-bom', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
@@ -2209,7 +2209,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     try {
       const pdfDoc = await generatePDFDoc()
       const pdfBase64 = pdfDoc.output('datauristring').split(',')[1]
-      const { data: { session: currentSession } } = await supabase.auth.getSession()
+      const { data: { session: currentSession } } = await supabase.auth.refreshSession()
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
