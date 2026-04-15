@@ -101,6 +101,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [uploadingSignedPDF, setUploadingSignedPDF] = useState(false)
   const [sections, setSections] = useState([])
   const [showPricingModal, setShowPricingModal] = useState(false)
+  const [editSections, setEditSections] = useState([])
+  const [showMoveModal, setShowMoveModal] = useState(false)
+  const [moveLineIndex, setMoveLineIndex] = useState(null)
+  const [moveType, setMoveType] = useState('move') // 'move' or 'copy'
   const [slaContracts, setSlaContracts] = useState([])
   const [monitoringContracts, setMonitoringContracts] = useState([])
   const [orgSLASettings, setOrgSLASettings] = useState(null)
@@ -402,6 +406,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     if (!bulkField || !bulkValue || bulkSelectedLines.size === 0) return
     setEditLines(prev => prev.map(l => {
       if (!bulkSelectedLines.has(l.id || l.item_name + l.quantity)) return l
+      if (bulkField === 'section') {
+        return { ...l, section_id: bulkValue === 'general' ? null : bulkValue }
+      }
       const updated = { ...l, [bulkField]: bulkValue }
       if (bulkField === 'markup_percent' && l.your_cost_unit) {
         updated.customer_price_unit = (parseFloat(l.your_cost_unit) * (1 + parseFloat(bulkValue) / 100)).toFixed(2)
@@ -1358,7 +1365,72 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
   const startEditing = () => {
     setEditLines(lineItems.map(l => ({ ...l })))
+    setEditSections(sections.map(s => ({ ...s, labor_items: s.labor_items || [] })))
     setEditingBOM(true)
+  }
+
+  const addSection = () => {
+    const newSection = {
+      id: `new_${Date.now()}`,
+      proposal_id: id,
+      org_id: profile?.org_id,
+      name: '',
+      sort_order: editSections.length,
+      include_labor: false,
+      labor_items: [],
+      isNew: true,
+    }
+    setEditSections(prev => [...prev, newSection])
+  }
+
+  const updateSection = (sectionId, field, value) => {
+    setEditSections(prev => prev.map(s => s.id === sectionId ? { ...s, [field]: value } : s))
+  }
+
+  const deleteSection = (sectionId) => {
+    // Move all lines from this section to general (null section_id)
+    setEditLines(prev => prev.map(l => l.section_id === sectionId ? { ...l, section_id: null } : l))
+    setEditSections(prev => prev.filter(s => s.id !== sectionId))
+  }
+
+  const moveLineToSection = (lineIndex, targetSectionId, type = 'move') => {
+    if (type === 'copy') {
+      const lineCopy = { ...editLines[lineIndex], id: undefined, section_id: targetSectionId === 'general' ? null : targetSectionId }
+      setEditLines(prev => [...prev, lineCopy])
+    } else {
+      setEditLines(prev => prev.map((l, i) => i === lineIndex ? { ...l, section_id: targetSectionId === 'general' ? null : targetSectionId } : l))
+    }
+    setShowMoveModal(false)
+    setMoveLineIndex(null)
+  }
+
+  const updateSectionLabor = (sectionId, index, field, value) => {
+    setEditSections(prev => prev.map(s => {
+      if (s.id !== sectionId) return s
+      const updated = [...(s.labor_items || [])]
+      updated[index] = { ...updated[index], [field]: value }
+      const qty = parseFloat(updated[index].quantity) || 0
+      const cost = parseFloat(updated[index].your_cost) || 0
+      const markup = parseFloat(updated[index].markup) || 0
+      if (field === 'your_cost' || field === 'markup' || field === 'quantity') {
+        if (cost > 0 && qty > 0) updated[index].customer_price = (cost * (1 + markup / 100) * qty).toFixed(2)
+      }
+      return { ...s, labor_items: updated }
+    }))
+  }
+
+  const addSectionLaborLine = (sectionId) => {
+    setEditSections(prev => prev.map(s => s.id === sectionId
+      ? { ...s, labor_items: [...(s.labor_items || []), { role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: 0 }] }
+      : s
+    ))
+  }
+
+  const removeSectionLaborLine = (sectionId, index) => {
+    setEditSections(prev => prev.map(s => s.id === sectionId
+      ? { ...s, labor_items: (s.labor_items || []).filter((_, i) => i !== index) }
+      : s
+    ))
   }
 
   const updateEditLine = (index, field, value) => {
@@ -1410,21 +1482,54 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
   const saveBOM = async () => {
     setSaving(true)
+
+    // Save/update sections first so we have real IDs
+    const sectionIdMap = {} // maps temp 'new_xxx' ids to real db ids
+    for (const s of editSections) {
+      if (s.isNew) {
+        const { data: newSec } = await supabase.from('proposal_sections').insert({
+          proposal_id: id, org_id: profile?.org_id, name: s.name || 'Untitled Section',
+          sort_order: s.sort_order, include_labor: s.include_labor, labor_items: s.labor_items || []
+        }).select().single()
+        if (newSec) sectionIdMap[s.id] = newSec.id
+      } else {
+        await supabase.from('proposal_sections').update({
+          name: s.name, sort_order: s.sort_order,
+          include_labor: s.include_labor, labor_items: s.labor_items || []
+        }).eq('id', s.id)
+        sectionIdMap[s.id] = s.id
+      }
+    }
+    // Delete removed sections
+    const currentSectionIds = editSections.filter(s => !s.isNew).map(s => s.id)
+    const originalSectionIds = sections.map(s => s.id)
+    const deletedIds = originalSectionIds.filter(id => !currentSectionIds.includes(id))
+    for (const sid of deletedIds) {
+      await supabase.from('proposal_sections').delete().eq('id', sid)
+    }
+
     const { error: deleteError } = await supabase.from('bom_line_items').delete().eq('proposal_id', id)
     if (deleteError) { alert('Error clearing old line items'); setSaving(false); return }
 
     const validLines = editLines.filter(l => l.item_name.trim() !== '')
     if (validLines.length > 0) {
       const { error: insertError } = await supabase.from('bom_line_items').insert(
-        validLines.map(l => ({
-          proposal_id: id, item_name: l.item_name, manufacturer: l.manufacturer || null,
-          part_number_sku: l.part_number_sku, quantity: parseFloat(l.quantity) || 0, unit: l.unit, category: l.category,
-          vendor: l.vendor === '__custom__' ? null : l.vendor,
-          your_cost_unit: parseFloat(l.your_cost_unit) || null, markup_percent: parseFloat(l.markup_percent) || null,
-          customer_price_unit: parseFloat(l.customer_price_unit) || null,
-          customer_price_total: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0),
-          pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing', recurring: l.recurring || false
-        }))
+        validLines.map(l => {
+          // resolve temp section ids to real ids
+          const resolvedSectionId = l.section_id
+            ? (sectionIdMap[l.section_id] || l.section_id)
+            : null
+          return {
+            proposal_id: id, item_name: l.item_name, manufacturer: l.manufacturer || null,
+            part_number_sku: l.part_number_sku, quantity: parseFloat(l.quantity) || 0, unit: l.unit, category: l.category,
+            vendor: l.vendor === '__custom__' ? null : l.vendor,
+            your_cost_unit: parseFloat(l.your_cost_unit) || null, markup_percent: parseFloat(l.markup_percent) || null,
+            customer_price_unit: parseFloat(l.customer_price_unit) || null,
+            customer_price_total: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0),
+            pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing', recurring: l.recurring || false,
+            section_id: resolvedSectionId,
+          }
+        })
       )
       if (insertError) { alert('Error saving line items'); setSaving(false); return }
     }
@@ -1444,9 +1549,11 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     }).eq('id', id)
 
     await fetchLineItems()
+    await fetchSections()
     await fetchProposal()
     logActivity(`BOM updated — ${validLines.length} line items`)
     setBulkSelectedLines(new Set())
+    setEditSections([])
     setEditingBOM(false)
     setSaving(false)
   }
@@ -2422,9 +2529,19 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               </div>
             )
           ) : (
-            /* BOM Edit Mode */
+           /* BOM Edit Mode */
             <div>
-              {/* Bulk Edit Bar — applies to checked rows only */}
+              {/* Add Section Button */}
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[#8A9AB0] text-xs">
+                  {editSections.length > 0 ? `${editSections.length} section${editSections.length !== 1 ? 's' : ''} — items without a section appear in General` : 'No sections — add a section to group items by area or system'}
+                </p>
+                <button onClick={addSection} className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors">
+                  + Add Section
+                </button>
+              </div>
+
+              {/* Bulk Edit Bar */}
               <div className="flex items-center gap-2 mb-4 p-3 bg-[#0F1C2E] rounded-lg border border-[#2a3d55] flex-wrap">
                 <span className="text-[#8A9AB0] text-xs font-semibold whitespace-nowrap">
                   Bulk Edit {bulkSelectedLines.size > 0 ? <span className="text-[#C8622A]">({bulkSelectedLines.size} selected)</span> : <span className="text-[#2a3d55]">(check rows below)</span>}
@@ -2436,6 +2553,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   <option value="category">Category</option>
                   <option value="vendor">Vendor</option>
                   <option value="markup_percent">Markup %</option>
+                  {editSections.length > 0 && <option value="section">Move to Section</option>}
                 </select>
                 {bulkField === 'category' ? (
                   <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
@@ -2446,6 +2564,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                   <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
                     <option value="">— Vendor —</option>
                     {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
+                  </select>
+                ) : bulkField === 'section' ? (
+                  <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                    <option value="">— Section —</option>
+                    <option value="general">General (no section)</option>
+                    {editSections.map(s => <option key={s.id} value={s.id}>{s.name || 'Untitled Section'}</option>)}
                   </select>
                 ) : (
                   <input type={bulkField === 'markup_percent' ? 'number' : 'text'} placeholder={bulkField ? `Enter ${bulkField}` : ''} value={bulkValue} onChange={e => setBulkValue(e.target.value)} disabled={!bulkField}
@@ -2460,92 +2584,212 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 )}
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#2a3d55]">
-                      <th className="py-2 pr-2 w-8">
-                        <input type="checkbox" className="accent-[#C8622A]"
-                          checked={editLines.length > 0 && editLines.every(l => bulkSelectedLines.has(l.id || l.item_name + l.quantity))}
-                          onChange={() => {
-                            const allSelected = editLines.every(l => bulkSelectedLines.has(l.id || l.item_name + l.quantity))
-                            setBulkSelectedLines(allSelected ? new Set() : new Set(editLines.map(l => l.id || l.item_name + l.quantity)))
-                          }} />
-                      </th>
-                      {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', '🔄', ''].map(h => (
-                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {editLines.map((line, i) => {
-                      const rowKey = line.id || line.item_name + line.quantity
-                      return (
-                      <tr key={i} className={`border-b border-[#2a3d55]/30 ${bulkSelectedLines.has(rowKey) ? 'bg-[#C8622A]/5' : ''}`}>
-                        <td className="pr-2 py-1">
-                          <input type="checkbox" className="accent-[#C8622A] cursor-pointer"
-                            checked={bulkSelectedLines.has(rowKey)}
-                            onChange={() => setBulkSelectedLines(prev => {
-                              const next = new Set(prev)
-                              next.has(rowKey) ? next.delete(rowKey) : next.add(rowKey)
-                              return next
-                            })} />
-                        </td>
-                        {[['item_name', 'text', 'Item name'], ['manufacturer', 'text', 'Manufacturer'], ['part_number_sku', 'text', 'Part #'], ['quantity', 'number', 'Qty']].map(([field, type, placeholder]) => (
-                          <td key={field} className="pr-2 py-1">
-                            <input type={type} placeholder={placeholder} value={line[field] || ''} onChange={e => updateEditLine(i, field, e.target.value)}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                          </td>
-                        ))}
-                        <td className="pr-2 py-1">
-                          <select value={line.unit || 'ea'} onChange={e => updateEditLine(i, 'unit', e.target.value)} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                            {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
-                          </select>
-                        </td>
-                        <td className="pr-2 py-1">
-                          <select value={line.category || ''} onChange={e => updateEditLine(i, 'category', e.target.value)} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                            <option value="">Category</option>
-                            {categories.map(c => <option key={c}>{c}</option>)}
-                          </select>
-                        </td>
-                        <td className="pr-2 py-1 min-w-[120px]">
-                          <select value={vendors.some(v => v.vendor_name === line.vendor) ? line.vendor : (line.vendor ? '__other__' : '')}
-                            onChange={e => updateEditLine(i, 'vendor', e.target.value === '__other__' ? '__custom__' : e.target.value)}
-                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-                            <option value="">— Vendor —</option>
-                            {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
-                            <option value="__other__">Other...</option>
-                          </select>
-                          {line.vendor && !vendors.some(v => v.vendor_name === line.vendor) && (
-                            <input type="text" placeholder="Vendor name" value={line.vendor === '__custom__' ? '' : line.vendor}
-                              onChange={e => updateEditLine(i, 'vendor', e.target.value || '__custom__')}
-                              className="w-full mt-1 bg-[#0F1C2E] text-white border border-[#C8622A]/40 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+              {/* BOM Table Helper */}
+              {(() => {
+                const BOMTable = ({ sectionId, sectionLabel }) => {
+                  const sectionLines = editLines
+                    .map((l, i) => ({ ...l, _idx: i }))
+                    .filter(l => sectionId === 'general' ? !l.section_id : l.section_id === sectionId)
+                  return (
+                    <div className="overflow-x-auto mb-2">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-[#2a3d55]">
+                            <th className="py-2 pr-2 w-8">
+                              <input type="checkbox" className="accent-[#C8622A]"
+                                checked={sectionLines.length > 0 && sectionLines.every(l => bulkSelectedLines.has(l.id || l.item_name + l.quantity))}
+                                onChange={() => {
+                                  const keys = sectionLines.map(l => l.id || l.item_name + l.quantity)
+                                  const allSel = keys.every(k => bulkSelectedLines.has(k))
+                                  setBulkSelectedLines(prev => {
+                                    const next = new Set(prev)
+                                    keys.forEach(k => allSel ? next.delete(k) : next.add(k))
+                                    return next
+                                  })
+                                }} />
+                            </th>
+                            {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', '🔄', ''].map(h => (
+                              <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+                            ))}
+                            {editSections.length > 0 && <th className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">Move</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sectionLines.map(line => {
+                            const i = line._idx
+                            const rowKey = line.id || line.item_name + line.quantity
+                            return (
+                              <tr key={i} className={`border-b border-[#2a3d55]/30 ${bulkSelectedLines.has(rowKey) ? 'bg-[#C8622A]/5' : ''}`}>
+                                <td className="pr-2 py-1">
+                                  <input type="checkbox" className="accent-[#C8622A] cursor-pointer"
+                                    checked={bulkSelectedLines.has(rowKey)}
+                                    onChange={() => setBulkSelectedLines(prev => {
+                                      const next = new Set(prev)
+                                      next.has(rowKey) ? next.delete(rowKey) : next.add(rowKey)
+                                      return next
+                                    })} />
+                                </td>
+                                {[['item_name','text','Item name'],['manufacturer','text','Manufacturer'],['part_number_sku','text','Part #'],['quantity','number','Qty']].map(([field,type,placeholder]) => (
+                                  <td key={field} className="pr-2 py-1">
+                                    <input type={type} placeholder={placeholder} value={line[field] || ''} onChange={e => updateEditLine(i, field, e.target.value)}
+                                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                                  </td>
+                                ))}
+                                <td className="pr-2 py-1">
+                                  <select value={line.unit || 'ea'} onChange={e => updateEditLine(i, 'unit', e.target.value)} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                                    {['ea','ft','lot','hr','box','roll'].map(u => <option key={u}>{u}</option>)}
+                                  </select>
+                                </td>
+                                <td className="pr-2 py-1">
+                                  <select value={line.category || ''} onChange={e => updateEditLine(i, 'category', e.target.value)} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                                    <option value="">Category</option>
+                                    {categories.map(c => <option key={c}>{c}</option>)}
+                                  </select>
+                                </td>
+                                <td className="pr-2 py-1 min-w-[120px]">
+                                  <select value={vendors.some(v => v.vendor_name === line.vendor) ? line.vendor : (line.vendor ? '__other__' : '')}
+                                    onChange={e => updateEditLine(i, 'vendor', e.target.value === '__other__' ? '__custom__' : e.target.value)}
+                                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                                    <option value="">— Vendor —</option>
+                                    {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
+                                    <option value="__other__">Other...</option>
+                                  </select>
+                                  {line.vendor && !vendors.some(v => v.vendor_name === line.vendor) && (
+                                    <input type="text" placeholder="Vendor name" value={line.vendor === '__custom__' ? '' : line.vendor}
+                                      onChange={e => updateEditLine(i, 'vendor', e.target.value || '__custom__')}
+                                      className="w-full mt-1 bg-[#0F1C2E] text-white border border-[#C8622A]/40 rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                                  )}
+                                </td>
+                                <td className="pr-2 py-1">
+                                  <input type="number" placeholder="0.00" value={line.your_cost_unit || ''} onChange={e => updateEditLine(i, 'your_cost_unit', e.target.value)}
+                                    className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                                </td>
+                                <td className="pr-2 py-1">
+                                  <input type="number" placeholder="35" value={line.markup_percent || ''} onChange={e => updateEditLine(i, 'markup_percent', e.target.value)}
+                                    className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                                </td>
+                                <td className="pr-2 py-1">
+                                  <input type="number" placeholder="0.00" value={line.customer_price_unit || ''} onChange={e => updateEditLine(i, 'customer_price_unit', e.target.value)}
+                                    className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                                </td>
+                                <td className="py-1 text-center">
+                                  <input type="checkbox" checked={!!line.recurring} onChange={e => updateEditLine(i, 'recurring', e.target.checked)} className="accent-[#C8622A] cursor-pointer" title="Recurring" />
+                                </td>
+                                <td className="py-1">
+                                  <button onClick={() => setEditLines(prev => prev.filter((_, idx) => idx !== i))} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
+                                </td>
+                                {editSections.length > 0 && (
+                                  <td className="py-1">
+                                    <button onClick={() => { setMoveLineIndex(i); setMoveType('move'); setShowMoveModal(true) }}
+                                      className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors" title="Move to section">⇄</button>
+                                  </td>
+                                )}
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                      <button onClick={() => setEditLines(prev => [...prev, {
+                        proposal_id: id, item_name: '', part_number_sku: '', quantity: '', unit: 'ea', category: '',
+                        vendor: '', your_cost_unit: '', markup_percent: '35', customer_price_unit: '', customer_price_total: '',
+                        pricing_status: 'Needs Pricing', section_id: sectionId === 'general' ? null : sectionId
+                      }])} className="mt-2 text-[#C8622A] hover:text-white text-xs transition-colors">
+                        + Add Item{sectionLabel ? ` to ${sectionLabel}` : ''}
+                      </button>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="space-y-6">
+                    {/* General items */}
+                    <div>
+                      {editSections.length > 0 && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">General</span>
+                          <span className="text-[#2a3d55] text-xs">— items not assigned to a section</span>
+                        </div>
+                      )}
+                      <BOMTable sectionId="general" sectionLabel={null} />
+                    </div>
+
+                    {/* Section containers */}
+                    {editSections.map(section => (
+                      <div key={section.id} className="border border-[#2a3d55] rounded-xl overflow-hidden">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-[#0F1C2E] border-b border-[#2a3d55]">
+                          <div className="w-1.5 h-6 rounded-full bg-[#C8622A] flex-shrink-0" />
+                          <input type="text" value={section.name} onChange={e => updateSection(section.id, 'name', e.target.value)}
+                            placeholder="Section name (e.g. Floor 1, Server Room)"
+                            className="flex-1 bg-transparent text-white font-semibold text-sm focus:outline-none placeholder-[#2a3d55]" />
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <span className="text-[#8A9AB0] text-xs">Include Labor</span>
+                            <button onClick={() => updateSection(section.id, 'include_labor', !section.include_labor)}
+                              className={`w-9 h-5 rounded-full transition-colors relative ${section.include_labor ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                              <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${section.include_labor ? 'left-4' : 'left-0.5'}`} />
+                            </button>
+                          </label>
+                          <button onClick={() => deleteSection(section.id)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors ml-2">✕ Remove</button>
+                        </div>
+                        <div className="p-4">
+                          <BOMTable sectionId={section.id} sectionLabel={section.name || 'this section'} />
+                          {section.include_labor && (
+                            <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+                              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Section Labor</p>
+                              <table className="w-full text-sm">
+                                <thead>
+                                  <tr className="border-b border-[#2a3d55]">
+                                    {['Role','Qty','Unit','Your Cost/hr','Markup %','Total Labor',''].map(h => (
+                                      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(section.labor_items || []).map((item, idx) => (
+                                    <tr key={idx} className="border-b border-[#2a3d55]/30">
+                                      <td className="pr-2 py-1"><input type="text" placeholder="Role" value={item.role || ''} onChange={e => updateSectionLabor(section.id, idx, 'role', e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                                      <td className="pr-2 py-1"><input type="number" placeholder="0" value={item.quantity || ''} onChange={e => updateSectionLabor(section.id, idx, 'quantity', e.target.value)} className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                                      <td className="pr-2 py-1">
+                                        <select value={item.unit || 'hr'} onChange={e => updateSectionLabor(section.id, idx, 'unit', e.target.value)} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                                          {['hr','day','lot'].map(u => <option key={u}>{u}</option>)}
+                                        </select>
+                                      </td>
+                                      <td className="pr-2 py-1"><input type="number" placeholder="0.00" value={item.your_cost || ''} onChange={e => updateSectionLabor(section.id, idx, 'your_cost', e.target.value)} className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                                      <td className="pr-2 py-1"><input type="number" placeholder="35" value={item.markup || ''} onChange={e => updateSectionLabor(section.id, idx, 'markup', e.target.value)} className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                                      <td className="pr-2 py-1"><input type="number" placeholder="0.00" value={item.customer_price || ''} onChange={e => updateSectionLabor(section.id, idx, 'customer_price', e.target.value)} className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold" /></td>
+                                      <td className="py-1"><button onClick={() => removeSectionLaborLine(section.id, idx)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button></td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              <button onClick={() => addSectionLaborLine(section.id)} className="mt-2 text-[#C8622A] hover:text-white text-xs transition-colors">+ Add Labor</button>
+                            </div>
                           )}
-                        </td>
-                        <td className="pr-2 py-1">
-                          <input type="number" placeholder="0.00" value={line.your_cost_unit || ''} onChange={e => updateEditLine(i, 'your_cost_unit', e.target.value)}
-                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                        </td>
-                        <td className="pr-2 py-1">
-                          <input type="number" placeholder="35" value={line.markup_percent || ''} onChange={e => updateEditLine(i, 'markup_percent', e.target.value)}
-                            className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                        </td>
-                        <td className="pr-2 py-1">
-                          <input type="number" placeholder="0.00" value={line.customer_price_unit || ''} onChange={e => updateEditLine(i, 'customer_price_unit', e.target.value)}
-                            className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                        </td>
-                        <td className="py-1 text-center">
-                          <input type="checkbox" checked={!!line.recurring} onChange={e => updateEditLine(i, 'recurring', e.target.checked)} className="accent-[#C8622A] cursor-pointer" title="Recurring" />
-                        </td>
-                        <td className="py-1">
-                          <button onClick={() => removeEditLine(i)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
-                        </td>
-                      </tr>
-                    )})}
-                  </tbody>
-                </table>
-                <button onClick={addEditLine} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">+ Add Line Item</button>
-              </div>
+                          {(() => {
+                            const secLines = editLines.filter(l => l.section_id === section.id)
+                            const secMat = secLines.reduce((s,l) => s+((parseFloat(l.customer_price_unit)||0)*(parseFloat(l.quantity)||0)),0)
+                            const secLab = section.include_labor ? (section.labor_items||[]).reduce((s,l) => s+(parseFloat(l.customer_price)||0),0) : 0
+                            const secCostMat = secLines.reduce((s,l) => s+((parseFloat(l.your_cost_unit)||0)*(parseFloat(l.quantity)||0)),0)
+                            const secCostLab = section.include_labor ? (section.labor_items||[]).reduce((s,l) => s+((parseFloat(l.your_cost)||0)*(parseFloat(l.quantity)||0)),0) : 0
+                            const secTotal = secMat + secLab
+                            const secCost = secCostMat + secCostLab
+                            const secMargin = secTotal > 0 ? ((secTotal-secCost)/secTotal*100).toFixed(1) : '0.0'
+                            return (
+                              <div className="flex justify-between items-center mt-3 pt-3 border-t border-[#2a3d55] text-xs">
+                                <div className="flex gap-4">
+                                  <span className="text-[#8A9AB0]">Materials: <span className="text-white font-semibold">${secMat.toLocaleString('en-US',{minimumFractionDigits:2})}</span></span>
+                                  {section.include_labor && secLab > 0 && <span className="text-[#8A9AB0]">Labor: <span className="text-white font-semibold">${secLab.toLocaleString('en-US',{minimumFractionDigits:2})}</span></span>}
+                                  <span className="text-[#8A9AB0]">Margin: <span className="text-[#C8622A] font-semibold">{secMargin}%</span></span>
+                                </div>
+                                <span className="text-[#8A9AB0]">Section Total: <span className="text-white font-bold">${secTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></span>
+                              </div>
+                            )
+                          })()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
 
               {/* Labor Section */}
               <div className="mt-8">
@@ -3359,6 +3603,31 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               className="mt-5 w-full py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
               Done
             </button>
+          </div>
+        </div>
+      )}
+
+{/* Move Line Modal */}
+      {showMoveModal && moveLineIndex !== null && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="text-white font-bold text-lg mb-1">Move Item</h3>
+            <p className="text-[#8A9AB0] text-sm mb-4">{editLines[moveLineIndex]?.item_name}</p>
+            <div className="space-y-2 mb-5">
+              {[{ id: 'general', name: 'General (no section)' }, ...editSections].map(s => (
+                <button key={s.id} onClick={() => moveLineToSection(moveLineIndex, s.id, 'move')}
+                  className="w-full text-left px-4 py-3 bg-[#0F1C2E] hover:bg-[#C8622A]/10 border border-[#2a3d55] hover:border-[#C8622A]/40 rounded-xl text-white text-sm transition-colors">
+                  {s.name || 'Untitled Section'}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => { setShowMoveModal(false); setMoveLineIndex(null) }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+              <button onClick={() => { moveLineToSection(moveLineIndex, editLines[moveLineIndex]?.section_id || 'general', 'copy'); }}
+                className="flex-1 bg-[#2a3d55] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">
+                Copy Instead
+              </button>
+            </div>
           </div>
         </div>
       )}
