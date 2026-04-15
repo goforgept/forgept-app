@@ -2580,6 +2580,34 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                         )
                       })}
 
+                      {/* Global Labor — items not assigned to a section */}
+                      {proposal?.labor_items?.filter(l => l.role).length > 0 && (
+                        <div className="border border-[#2a3d55] rounded-xl overflow-hidden">
+                          <div className="px-4 py-3 bg-[#0F1C2E] border-b border-[#2a3d55]">
+                            <span className="text-white font-semibold text-sm">Labor</span>
+                          </div>
+                          <div className="p-4">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-[#2a3d55]">
+                                  {['Role','Qty','Unit','Total'].map(h => <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>)}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {proposal.labor_items.filter(l => l.role).map((l, i) => (
+                                  <tr key={i} className="border-b border-[#2a3d55]/30">
+                                    <td className="text-white py-2 pr-4">{l.role}</td>
+                                    <td className="text-[#8A9AB0] py-2 pr-4">{l.quantity}</td>
+                                    <td className="text-[#8A9AB0] py-2 pr-4">{l.unit || 'hr'}</td>
+                                    <td className="text-white py-2 pr-4">${fmt(parseFloat(l.customer_price) || 0)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Grand totals */}
                       <table className="w-full text-sm">
                         <tfoot>
