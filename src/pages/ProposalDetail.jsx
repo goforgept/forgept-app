@@ -1635,11 +1635,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     const sectionLaborCost = editSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0) : 0), 0)
     const totalCustomer = bomCustomer + laborCustomer + sectionLaborCustomer
     const totalCost = bomCost + laborCost + sectionLaborCost
+    const taxRateVal = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
+    const taxAmt = Math.round(bomCustomer * (taxRateVal / 100) * 100) / 100
+    const grandTotalWithTax = totalCustomer + taxAmt
     const grossMarginDollars = totalCustomer - totalCost
     const grossMarginPercent = totalCustomer > 0 ? (grossMarginDollars / totalCustomer) * 100 : 0
 
     await supabase.from('proposals').update({
-      proposal_value: totalCustomer, total_customer_value: totalCustomer, total_your_cost: totalCost,
+      proposal_value: grandTotalWithTax, total_customer_value: grandTotalWithTax, total_your_cost: totalCost,
       total_gross_margin_dollars: grossMarginDollars, total_gross_margin_percent: grossMarginPercent, labor_items: laborItems,
     }).eq('id', id)
 
