@@ -31,11 +31,20 @@ Deno.serve(async (req) => {
     'Authorization': `Bearer ${supabaseKey}`,
     'Content-Type': 'application/json'
   }
-try {
+
+  try {
     const body = await req.json().catch(() => ({}))
 
     // ── Direct send: ai_email, meeting confirmation, share notifications etc ──
+    // These require auth since they're called by logged-in users
     if (body.type === 'ai_email' || body.type === 'share_notification' || body.type === 'meeting_confirmation' || body.type === 'meeting_cancellation') {
+      const authHeader = req.headers.get('Authorization')
+      if (!authHeader?.startsWith('Bearer ')) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
       const { toEmail, toName, fromName, fromEmail, subject, body: emailBody, orgId } = body
 
       if (!toEmail || !subject || !emailBody) {

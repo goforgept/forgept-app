@@ -13,6 +13,14 @@ Deno.serve(async (req) => {
     return new Response('Method not allowed', { status: 405, headers: corsHeaders })
   }
 
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
   try {
     const { org_id } = await req.json()
     if (!org_id) {

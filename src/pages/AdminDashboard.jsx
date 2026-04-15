@@ -33,7 +33,10 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
     if (!profile?.org_id) { setLoading(false); return }
 
-    const [proposalsRes, lineItemsRes, clientsRes, profilesRes, targetsRes, invoicesRes, posRes, recurringRes] = await Promise.all([
+    const today = new Date().toISOString().split('T')[0]
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+    const [proposalsRes, lineItemsRes, clientsRes, profilesRes, targetsRes, invoicesRes, posRes, recurringRes, jobsRes, logsRes, coRes, expiredRes] = await Promise.all([
       supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).order('created_at', { ascending: false }),
       supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id'),
       supabase.from('clients').select('*').eq('org_id', profile.org_id),
@@ -42,43 +45,17 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       supabase.from('invoices').select('*').eq('org_id', profile.org_id),
       supabase.from('purchase_orders').select('*').eq('org_id', profile.org_id),
       supabase.from('bom_line_items').select('*, proposals(proposal_name, company, client_id, rep_name, user_id)').eq('recurring', true).not('renewal_date', 'is', null),
+      supabase.from('jobs').select('*, job_checklist_items(id, completed), clients(company)').eq('org_id', profile.org_id).order('created_at', { ascending: false }),
+      supabase.from('tech_daily_logs').select('job_id, hours_worked, log_date, user_id, profiles(full_name)').eq('org_id', profile.org_id).gte('log_date', weekAgo),
+      supabase.from('change_orders').select('*, jobs(name)').eq('org_id', profile.org_id).eq('status', 'Pending'),
+      supabase.from('bom_line_items').select('proposal_id').eq('pricing_status', 'RFQ Sent').lt('rfq_expires_at', today).not('rfq_expires_at', 'is', null),
     ])
 
     setProposals(proposalsRes.data || [])
-
-    // Fetch jobs for PM mode
-    const { data: jobsData } = await supabase
-      .from('jobs')
-      .select('*, job_checklist_items(id, completed), clients(company)')
-      .eq('org_id', profile.org_id)
-      .order('created_at', { ascending: false })
-    setJobs(jobsData || [])
-
-    // Fetch tech logs for PM mode
-    const { data: logsData } = await supabase
-      .from('tech_daily_logs')
-      .select('job_id, hours_worked, log_date, user_id, profiles(full_name)')
-      .eq('org_id', profile.org_id)
-      .gte('log_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-    setTechLogs(logsData || [])
-
-    // Fetch all change orders for PM mode
-    const { data: coData } = await supabase
-      .from('change_orders')
-      .select('*, jobs(name)')
-      .eq('org_id', profile.org_id)
-      .eq('status', 'Pending')
-    setPendingCOs(coData || [])
-
-    // Expired pricing check
-    const today = new Date().toISOString().split('T')[0]
-    const { data: expiredItems } = await supabase
-      .from('bom_line_items')
-      .select('proposal_id')
-      .eq('pricing_status', 'RFQ Sent')
-      .lt('rfq_expires_at', today)
-      .not('rfq_expires_at', 'is', null)
-    const uniqueExpired = [...new Set((expiredItems || []).map(i => i.proposal_id))]
+    setJobs(jobsRes.data || [])
+    setTechLogs(logsRes.data || [])
+    setPendingCOs(coRes.data || [])
+    const uniqueExpired = [...new Set((expiredRes.data || []).map(i => i.proposal_id))]
     setExpiredPricingCount(uniqueExpired.length)
     setExpiredPricingProposals(uniqueExpired)
     setLineItems(lineItemsRes.data || [])

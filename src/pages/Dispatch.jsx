@@ -77,49 +77,31 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profileData } = await supabase.from('profiles').select('*, organizations(org_type)').eq('id', user.id).single()
     setProfile(profileData)
-    const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', profileData.org_id).single()
-    setOrgTimezone(orgData?.timezone || 'America/Chicago')
 
-    const { data: techData } = await supabase
-      .from('profiles').select('id, full_name, dispatch_zone, role')
-      .eq('org_id', profileData.org_id)
-      .order('full_name')
-    setTechs(techData || [])
-
-    const { data: ticketData } = await supabase
-      .from('service_tickets')
-      .select('*, clients(company), profiles!service_tickets_assigned_tech_id_fkey(full_name)')
-      .eq('org_id', profileData.org_id)
-      .not('status', 'in', '("Resolved","Cancelled")')
-      .order('scheduled_date', { ascending: true, nullsFirst: false })
-    setTickets(ticketData || [])
-
-    // Fetch active jobs
-    const { data: jobData } = await supabase
-      .from('jobs')
-      .select('*, clients(company), proposals(proposal_name)')
-      .eq('org_id', profileData.org_id)
-      .eq('status', 'Active')
-      .order('created_at', { ascending: false })
-    setJobs(jobData || [])
-
-    // Fetch job tech schedules for the visible date range
     const startDate = viewMode === 'week' ? weekDates[0] : selectedDate
     const endDate = viewMode === 'week' ? weekDates[4] : selectedDate
-    const { data: scheduleData } = await supabase
-      .from('job_tech_schedules')
-      .select('*, jobs(name, job_number, clients(company)), profiles(full_name)')
-      .eq('org_id', profileData.org_id)
-      .gte('date', startDate)
-      .lte('date', endDate)
-    setJobSchedules(scheduleData || [])
 
-    // Find active jobs with no future schedules (unscheduled)
-    const { data: allSchedules } = await supabase
-      .from('job_tech_schedules')
-      .select('job_id')
-      .eq('org_id', profileData.org_id)
-      .gte('date', today)
+    const [
+      { data: orgData },
+      { data: techData },
+      { data: ticketData },
+      { data: jobData },
+      { data: scheduleData },
+      { data: allSchedules },
+    ] = await Promise.all([
+      supabase.from('organizations').select('timezone').eq('id', profileData.org_id).single(),
+      supabase.from('profiles').select('id, full_name, dispatch_zone, role').eq('org_id', profileData.org_id).order('full_name'),
+      supabase.from('service_tickets').select('*, clients(company), profiles!service_tickets_assigned_tech_id_fkey(full_name)').eq('org_id', profileData.org_id).not('status', 'in', '("Resolved","Cancelled")').order('scheduled_date', { ascending: true, nullsFirst: false }),
+      supabase.from('jobs').select('*, clients(company), proposals(proposal_name)').eq('org_id', profileData.org_id).eq('status', 'Active').order('created_at', { ascending: false }),
+      supabase.from('job_tech_schedules').select('*, jobs(name, job_number, clients(company)), profiles(full_name)').eq('org_id', profileData.org_id).gte('date', startDate).lte('date', endDate),
+      supabase.from('job_tech_schedules').select('job_id').eq('org_id', profileData.org_id).gte('date', today),
+    ])
+
+    setOrgTimezone(orgData?.timezone || 'America/Chicago')
+    setTechs(techData || [])
+    setTickets(ticketData || [])
+    setJobs(jobData || [])
+    setJobSchedules(scheduleData || [])
     const scheduledJobIds = new Set((allSchedules || []).map(s => s.job_id))
     setUnscheduledJobs((jobData || []).filter(j => !scheduledJobIds.has(j.id)))
 
