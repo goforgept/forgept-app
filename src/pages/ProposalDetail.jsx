@@ -1032,7 +1032,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
               borders, width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA },
               shading: { fill: primaryColor, type: ShadingType.CLEAR },
               margins: { top: 80, bottom: 80, left: 120, right: 120 },
-              children: [new Paragraph({ children: [new TextRun({ text: `${section.name || 'Untitled Section'}  —  $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, color: 'FFFFFF', size: 20 })] })]
+              children: [new Paragraph({ children: [new TextRun({ text: section.name || 'Untitled Section', bold: true, color: 'FFFFFF', size: 20 })] })]
             })]
           })
 
@@ -1970,7 +1970,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           doc.rect(14, yPos, pageWidth - 28, 8, 'F')
           doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
           doc.text(section.name || 'Untitled Section', 17, yPos + 5.5)
-          doc.text(`$${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 16, yPos + 5.5, { align: 'right' })
           yPos += 10
           if (secItems.length > 0) {
             autoTable(doc, { startY: yPos, head: pdfHead, body: secItems.map(pdfRow), ...tableStyles, showFoot: false })
@@ -1986,10 +1985,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             autoTable(doc, { startY: yPos, head: lHead, body: secLabor.map(lRow), ...tableStyles, showFoot: false })
             yPos = doc.lastAutoTable.finalY + 4
           }
-          // Section subtotal line
-          doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-          doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
-          yPos += 8
+          yPos += 4
         }
         // Materials total line after all sections
         doc.setDrawColor(220, 220, 220); doc.line(14, yPos, pageWidth - 14, yPos); yPos += 4

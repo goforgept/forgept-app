@@ -157,7 +157,6 @@ export default function SignProposal() {
           doc.rect(14, yPos, pageWidth - 28, 8, 'F')
           doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
           doc.text(section.name || 'Untitled Section', 17, yPos + 5.5)
-          doc.text(`$${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 16, yPos + 5.5, { align: 'right' })
           yPos += 10
           if (secItems.length > 0) {
             autoTable(doc, { startY: yPos, head: signHead, body: secItems.map(signRow), ...signStyles, showFoot: false })
@@ -174,8 +173,7 @@ export default function SignProposal() {
             yPos = doc.lastAutoTable.finalY + 4
           }
           doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-          doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
-          yPos += 8
+          yPos += 4
         }
         doc.setDrawColor(220, 220, 220); doc.line(14, yPos, pageWidth - 14, yPos); yPos += 4
         doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
@@ -546,7 +544,6 @@ export default function SignProposal() {
                               <div className="w-1.5 h-5 rounded-full bg-[#C8622A]" />
                               <span className="text-white font-semibold text-sm">{section.name || 'Untitled Section'}</span>
                             </div>
-                            <span className="text-[#8A9AB0] text-xs">Section Total: <span className="text-white font-bold">${fmt(secTotal)}</span></span>
                           </div>
                           <div className="p-4">
                             {secItems.length > 0 && <ItemTable items={secItems} />}
