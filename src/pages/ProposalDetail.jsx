@@ -457,10 +457,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setRequestingSignature(true)
     const signingUrl = `${window.location.origin}/sign/${proposal.signing_token}`
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-signature-request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
         body: JSON.stringify({
           toEmail: proposal.client_email,
           toName: proposal.client_name || '',
@@ -817,11 +817,12 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       }
 
       try {
-        await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-rfq', {
+        const { data: { session: currentSession } } = await supabase.auth.getSession()
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-rfq', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`
+            'Authorization': `Bearer ${currentSession?.access_token}`
           },
           body: JSON.stringify({
             lineItemIds: items.map(i => i.id),
@@ -1600,9 +1601,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       const sharedWith = orgProfiles.find(p => p.id === profileId)
       if (sharedWith?.email) {
         try {
+          const { data: { session: currentSession } } = await supabase.auth.getSession()
           await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-followup-emails', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
             body: JSON.stringify({ type: 'share_notification', toEmail: sharedWith.email, toName: sharedWith.full_name, fromName: profile?.full_name || 'A teammate', proposalName: proposal?.proposal_name, proposalId: id })
           })
         } catch (e) { console.log('Share notification error', e) }
@@ -1685,10 +1687,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const sendToQBO = async () => {
     setSendingToQBO(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-create-invoice', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
         body: JSON.stringify({ proposalId: id })
       })
       const data = await res.json()
@@ -1726,9 +1728,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setGeneratingBOM(true)
     setAIBOMPreview([])
     try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-build-bom', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
         body: JSON.stringify({ description: aiBOMPrompt, industry: proposal?.industry || '' })
       })
       const data = await res.json()
@@ -2070,9 +2073,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     try {
       const pdfDoc = await generatePDFDoc()
       const pdfBase64 = pdfDoc.output('datauristring').split(',')[1]
+      const { data: { session: currentSession } } = await supabase.auth.getSession()
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
         body: JSON.stringify({
           proposalId: id, clientEmail: proposal.client_email, clientName: proposal.client_name || 'there',
           repName: proposal.rep_name || profile?.full_name || '', repEmail: proposal.rep_email || profile?.email || '',
