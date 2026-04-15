@@ -18,6 +18,7 @@ export default function SignProposal() {
   const [signedAt, setSignedAt] = useState(null)
   const [slaContracts, setSlaContracts] = useState([])
   const [monitoringContracts, setMonitoringContracts] = useState([])
+  const [sections, setSections] = useState([])
 
   useEffect(() => { fetchProposal() }, [token])
 
@@ -44,9 +45,16 @@ export default function SignProposal() {
 
     const { data: items } = await supabase
       .from('bom_line_items')
-      .select('item_name, part_number_sku, quantity, unit, customer_price_unit, customer_price_total')
+      .select('id, item_name, part_number_sku, quantity, unit, customer_price_unit, customer_price_total, section_id')
       .eq('proposal_id', data.id)
     setLineItems(items || [])
+
+    const { data: sectionData } = await supabase
+      .from('proposal_sections')
+      .select('*')
+      .eq('proposal_id', data.id)
+      .order('sort_order', { ascending: true })
+    setSections(sectionData || [])
 
     if (data.org_id) {
       const { data: orgProf } = await supabase
@@ -64,7 +72,7 @@ export default function SignProposal() {
     return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
   }
 
-  const generateSignedPDF = async (name, timestamp, items, prop, orgProf) => {
+  const generateSignedPDF = async (name, timestamp, items, prop, orgProf, sectionData) => {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const primaryRgb = hexToRgb(orgProf?.primary_color || '#0F1C2E')
@@ -121,17 +129,65 @@ export default function SignProposal() {
     if (items.length > 0) {
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Materials & Pricing', 14, yPos); yPos += 5
-      if (prop.hide_material_prices || prop.lump_sum_pricing) {
-        autoTable(doc, { startY: yPos, head: [['Item', 'Part #', 'Qty']], body: items.map(i => [i.item_name, i.part_number_sku || '—', i.quantity]), foot: [['', 'Materials Total', `$${mTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' })
+      const isLumpSum = prop.hide_material_prices || prop.lump_sum_pricing
+      const signHead = isLumpSum ? [['Item', 'Part #', 'Qty']] : [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']]
+      const signRow = (i) => isLumpSum
+        ? [i.item_name, i.part_number_sku || '—', i.quantity]
+        : [i.item_name, i.part_number_sku || '—', i.quantity, `$${(i.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(i.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+      const signStyles = { headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' }
+
+      if (sectionData.length > 0) {
+        const unsectioned = items.filter(i => !i.section_id)
+        if (unsectioned.length > 0) {
+          doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(100, 100, 100)
+          doc.text('General', 14, yPos + 4); yPos += 6
+          autoTable(doc, { startY: yPos, head: signHead, body: unsectioned.map(signRow), ...signStyles, showFoot: false })
+          yPos = doc.lastAutoTable.finalY + 6
+        }
+        for (const section of sectionData) {
+          const secItems = items.filter(i => i.section_id === section.id)
+          const secLabor = section.include_labor ? (section.labor_items || []).filter(l => l.role) : []
+          if (secItems.length === 0 && secLabor.length === 0) continue
+          const secMatTotal = secItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
+          const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+          const secTotal = secMatTotal + secLaborTotal
+          doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+          doc.rect(14, yPos, pageWidth - 28, 8, 'F')
+          doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
+          doc.text(section.name || 'Untitled Section', 17, yPos + 5.5)
+          doc.text(`$${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 16, yPos + 5.5, { align: 'right' })
+          yPos += 10
+          if (secItems.length > 0) {
+            autoTable(doc, { startY: yPos, head: signHead, body: secItems.map(signRow), ...signStyles, showFoot: false })
+            yPos = doc.lastAutoTable.finalY + 4
+          }
+          if (secLabor.length > 0) {
+            const lHead = prop.hide_labor_breakdown ? [['Role', 'Qty', 'Unit']] : [['Role', 'Qty', 'Unit', 'Total Labor']]
+            const lRow = (l) => prop.hide_labor_breakdown
+              ? [l.role, l.quantity, l.unit || 'hr']
+              : [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+            doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(100, 100, 100)
+            doc.text('Section Labor', 14, yPos + 4); yPos += 6
+            autoTable(doc, { startY: yPos, head: lHead, body: secLabor.map(lRow), ...signStyles, showFoot: false })
+            yPos = doc.lastAutoTable.finalY + 4
+          }
+          doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+          doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+          yPos += 8
+        }
+        doc.setDrawColor(220, 220, 220); doc.line(14, yPos, pageWidth - 14, yPos); yPos += 4
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
+        doc.text(`Materials Total: $${mTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+        yPos += 8
       } else {
-        autoTable(doc, { startY: yPos, head: [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']], body: items.map(i => [i.item_name, i.part_number_sku || '—', i.quantity, `$${(i.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(i.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]), foot: [['', '', '', 'Total', `$${mTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' })
+        autoTable(doc, { startY: yPos, head: signHead, body: items.map(signRow), foot: isLumpSum ? [['', 'Materials Total', `$${mTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]] : [['', '', '', 'Total', `$${mTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], ...signStyles })
       }
     }
 
     // Labor
     const pdfLabor = (prop.labor_items || []).filter(l => l.role)
     if (pdfLabor.length > 0) {
-      const afterY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : yPos + 10
+      const afterY = sectionData.length > 0 ? yPos + 4 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : yPos + 10)
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Labor', 14, afterY)
       if (prop.hide_labor_breakdown) {
@@ -308,7 +364,7 @@ export default function SignProposal() {
       // Generate and upload signed PDF
       let signedPdfUrl = null
       try {
-        const doc = await generateSignedPDF(signerName.trim(), now, lineItems, proposal, orgProfile)
+        const doc = await generateSignedPDF(signerName.trim(), now, lineItems, proposal, orgProfile, sections)
         const pdfBlob = doc.output('blob')
         const fileName = `${proposal.id}/signed-${Date.now()}.pdf`
         const { error: uploadError } = await supabase.storage.from('signed-proposals').upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true })
@@ -381,40 +437,145 @@ export default function SignProposal() {
         {lineItems.length > 0 && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Materials & Pricing</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[#2a3d55]">
-                    <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Item</th>
-                    <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Part #</th>
-                    <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
-                    {!(proposal?.hide_material_prices || proposal?.lump_sum_pricing) && <>
-                      <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Unit Price</th>
-                      <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>
-                    </>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {lineItems.map((item, i) => (
-                    <tr key={i} className="border-b border-[#2a3d55]/50">
-                      <td className="text-white py-3 pr-4">{item.item_name}</td>
-                      <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
-                      <td className="text-white py-3 pr-4 text-right">{item.quantity} {item.unit || 'ea'}</td>
-                      {!(proposal?.hide_material_prices || proposal?.lump_sum_pricing) && <>
-                        <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
-                        <td className="text-white py-3 text-right">${fmt(item.customer_price_total)}</td>
+            {(() => {
+              const isLumpSum = proposal?.hide_material_prices || proposal?.lump_sum_pricing
+              const colSpan = isLumpSum ? 2 : 4
+              const ItemTable = ({ items }) => (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#2a3d55]">
+                      <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Item</th>
+                      <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Part #</th>
+                      <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
+                      {!isLumpSum && <>
+                        <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Unit Price</th>
+                        <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>
                       </>}
                     </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr><td colSpan={(proposal?.hide_material_prices || proposal?.lump_sum_pricing) ? 2 : 4} className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td><td className="text-white pt-4 text-right font-bold">${fmt(materialsTotal)}</td></tr>
-                  {laborTotal > 0 && <tr><td colSpan={(proposal?.hide_material_prices || proposal?.lump_sum_pricing) ? 2 : 4} className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td><td className="text-white pt-1 text-right font-bold">${fmt(laborTotal)}</td></tr>}
-                  {taxRate > 0 && <tr><td colSpan={(proposal?.hide_material_prices || proposal?.lump_sum_pricing) ? 2 : 4} className="text-[#8A9AB0] pt-1 text-right font-semibold">Tax ({taxRate}%)</td><td className="text-white pt-1 text-right font-bold">${fmt(taxAmount)}</td></tr>}
-                  <tr className="border-t border-[#2a3d55]"><td colSpan={(proposal?.hide_material_prices || proposal?.lump_sum_pricing) ? 2 : 4} className="text-white pt-3 text-right font-bold text-base">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg">${fmt(grandTotal)}</td></tr>
-                </tfoot>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {items.map((item, i) => (
+                      <tr key={i} className="border-b border-[#2a3d55]/50">
+                        <td className="text-white py-3 pr-4">{item.item_name}</td>
+                        <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
+                        <td className="text-white py-3 pr-4 text-right">{item.quantity} {item.unit || 'ea'}</td>
+                        {!isLumpSum && <>
+                          <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
+                          <td className="text-white py-3 text-right">${fmt(item.customer_price_total)}</td>
+                        </>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+
+              if (sections.length > 0) {
+                const unsectioned = lineItems.filter(l => !l.section_id)
+                return (
+                  <div className="space-y-4 overflow-x-auto">
+                    {unsectioned.length > 0 && (
+                      <div>
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">General</p>
+                        <ItemTable items={unsectioned} />
+                      </div>
+                    )}
+                    {sections.map(section => {
+                      const secItems = lineItems.filter(l => l.section_id === section.id)
+                      const secLabor = section.include_labor ? (section.labor_items || []).filter(l => l.role) : []
+                      if (secItems.length === 0 && secLabor.length === 0) return null
+                      const secMatTotal = secItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
+                      const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+                      const secTotal = secMatTotal + secLaborTotal
+                      return (
+                        <div key={section.id} className="border border-[#2a3d55] rounded-xl overflow-hidden">
+                          <div className="flex items-center justify-between px-4 py-3 bg-[#0F1C2E] border-b border-[#2a3d55]">
+                            <div className="flex items-center gap-2">
+                              <div className="w-1.5 h-5 rounded-full bg-[#C8622A]" />
+                              <span className="text-white font-semibold text-sm">{section.name || 'Untitled Section'}</span>
+                            </div>
+                            <span className="text-[#8A9AB0] text-xs">Section Total: <span className="text-white font-bold">${fmt(secTotal)}</span></span>
+                          </div>
+                          <div className="p-4">
+                            {secItems.length > 0 && <ItemTable items={secItems} />}
+                            {secLabor.length > 0 && (
+                              <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+                                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Section Labor</p>
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="border-b border-[#2a3d55]">
+                                      <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Role</th>
+                                      <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
+                                      <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Unit</th>
+                                      {!proposal?.hide_labor_breakdown && <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {secLabor.map((l, i) => (
+                                      <tr key={i} className="border-b border-[#2a3d55]/30">
+                                        <td className="text-white py-2 pr-4">{l.role}</td>
+                                        <td className="text-[#8A9AB0] py-2 pr-4 text-right">{l.quantity}</td>
+                                        <td className="text-[#8A9AB0] py-2 pr-4">{l.unit || 'hr'}</td>
+                                        {!proposal?.hide_labor_breakdown && <td className="text-white py-2 text-right">${fmt(parseFloat(l.customer_price) || 0)}</td>}
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    <table className="w-full text-sm">
+                      <tfoot>
+                        <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td><td className="text-white pt-4 text-right font-bold">${fmt(materialsTotal)}</td></tr>
+                        {laborTotal > 0 && <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td><td className="text-white pt-1 text-right font-bold">${fmt(laborTotal)}</td></tr>}
+                        {taxRate > 0 && <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-1 text-right font-semibold">Tax ({taxRate}%)</td><td className="text-white pt-1 text-right font-bold">${fmt(taxAmount)}</td></tr>}
+                        <tr className="border-t border-[#2a3d55]"><td colSpan={colSpan} className="text-white pt-3 text-right font-bold text-base">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg">${fmt(grandTotal)}</td></tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )
+              }
+
+              // No sections — original flat render
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[#2a3d55]">
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Item</th>
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Part #</th>
+                        <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
+                        {!isLumpSum && <>
+                          <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Unit Price</th>
+                          <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>
+                        </>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lineItems.map((item, i) => (
+                        <tr key={i} className="border-b border-[#2a3d55]/50">
+                          <td className="text-white py-3 pr-4">{item.item_name}</td>
+                          <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
+                          <td className="text-white py-3 pr-4 text-right">{item.quantity} {item.unit || 'ea'}</td>
+                          {!isLumpSum && <>
+                            <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
+                            <td className="text-white py-3 text-right">${fmt(item.customer_price_total)}</td>
+                          </>}
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td><td className="text-white pt-4 text-right font-bold">${fmt(materialsTotal)}</td></tr>
+                      {laborTotal > 0 && <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td><td className="text-white pt-1 text-right font-bold">${fmt(laborTotal)}</td></tr>}
+                      {taxRate > 0 && <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-1 text-right font-semibold">Tax ({taxRate}%)</td><td className="text-white pt-1 text-right font-bold">${fmt(taxAmount)}</td></tr>}
+                      <tr className="border-t border-[#2a3d55]"><td colSpan={colSpan} className="text-white pt-3 text-right font-bold text-base">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg">${fmt(grandTotal)}</td></tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )
+            })()}
           </div>
         )}
 

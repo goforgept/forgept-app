@@ -993,10 +993,98 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       children.push(
         new Paragraph({ children: [new TextRun({ text: 'Materials & Pricing', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
-        new Table({ width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: [headerRow, ...itemRows, totalRow] }),
-        new Paragraph({ children: [new TextRun({ text: '' })] }),
       )
-      if (!hasDocxLabor) {
+
+      if (sections.length > 0) {
+        // Unsectioned items
+        const unsectioned = lineItems.filter(l => !l.section_id)
+        if (unsectioned.length > 0) {
+          children.push(
+            new Paragraph({ children: [new TextRun({ text: 'General', bold: true, size: 22, color: primaryColor })] }),
+            new Table({
+              width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA }, columnWidths: colWidths,
+              rows: [headerRow, ...unsectioned.map(item =>
+                new TableRow({
+                  children: (isLumpSum
+                    ? [item.item_name, item.part_number_sku || '—', String(item.quantity || 0)]
+                    : [item.item_name, item.part_number_sku || '—', String(item.quantity || 0), `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+                  ).map((val, i) => new TableCell({ borders, width: { size: colWidths[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
+                })
+              )]
+            }),
+            new Paragraph({ children: [new TextRun({ text: '' })] }),
+          )
+        }
+
+        // Each section
+        for (const section of sections) {
+          const secItems = lineItems.filter(l => l.section_id === section.id)
+          const secLabor = section.include_labor ? (section.labor_items || []).filter(l => l.role) : []
+          if (secItems.length === 0 && secLabor.length === 0) continue
+          const secMatTotal = secItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
+          const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+          const secTotal = secMatTotal + secLaborTotal
+
+          // Section header row spanning full width
+          const secHeaderRow = new TableRow({
+            children: [new TableCell({
+              columnSpan: isLumpSum ? 3 : 5,
+              borders, width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA },
+              shading: { fill: primaryColor, type: ShadingType.CLEAR },
+              margins: { top: 80, bottom: 80, left: 120, right: 120 },
+              children: [new Paragraph({ children: [new TextRun({ text: `${section.name || 'Untitled Section'}  —  $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, color: 'FFFFFF', size: 20 })] })]
+            })]
+          })
+
+          const secItemRows = secItems.map(item =>
+            new TableRow({
+              children: (isLumpSum
+                ? [item.item_name, item.part_number_sku || '—', String(item.quantity || 0)]
+                : [item.item_name, item.part_number_sku || '—', String(item.quantity || 0), `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+              ).map((val, i) => new TableCell({ borders, width: { size: colWidths[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
+            })
+          )
+
+          children.push(
+            new Table({ width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: [secHeaderRow, ...secItemRows] }),
+            new Paragraph({ children: [new TextRun({ text: '' })] }),
+          )
+
+          // Section labor
+          if (secLabor.length > 0) {
+            const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
+            const lbs = { top: lb, bottom: lb, left: lb, right: lb }
+            const hideLabor = p?.hide_labor_breakdown
+            const slcw = hideLabor ? [4800, 1200, 1200] : [3000, 1200, 1200, 2400]
+            const slHeaders = hideLabor ? ['Role', 'Qty', 'Unit'] : ['Role', 'Qty', 'Unit', 'Total Labor']
+            const slHeaderRow = new TableRow({
+              children: slHeaders.map((h, i) => new TableCell({ borders: lbs, width: { size: slcw[i], type: WidthType.DXA }, shading: { fill: primaryColor, type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })] })] }))
+            })
+            const slRows = secLabor.map(l => new TableRow({
+              children: (hideLabor ? [l.role, String(l.quantity || ''), l.unit || 'hr'] : [l.role, String(l.quantity || ''), l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`])
+                .map((val, i) => new TableCell({ borders: lbs, width: { size: slcw[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
+            }))
+            children.push(
+              new Paragraph({ children: [new TextRun({ text: 'Section Labor', bold: true, size: 18, color: '666666' })] }),
+              new Table({ width: { size: 7800, type: WidthType.DXA }, columnWidths: slcw, rows: [slHeaderRow, ...slRows] }),
+              new Paragraph({ children: [new TextRun({ text: '' })] }),
+            )
+          }
+        }
+
+        // Materials total after all sections
+        children.push(
+          new Paragraph({ children: [new TextRun({ text: `Materials Total: $${docxMatTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 20, color: primaryColor })] }),
+          new Paragraph({ children: [new TextRun({ text: '' })] }),
+        )
+      } else {
+        // No sections — original flat table
+        children.push(
+          new Table({ width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: [headerRow, ...itemRows, totalRow] }),
+          new Paragraph({ children: [new TextRun({ text: '' })] }),
+        )
+      }
+      if (!hasDocxLabor && sections.length === 0) {
         if (docxTaxRate > 0) {
           children.push(new Paragraph({ children: [new TextRun({ text: `Tax (${docxTaxRate}% on materials): $${docxTaxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] }))
         }
@@ -1848,32 +1936,80 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       doc.text('Materials & Pricing', 14, yPos)
       yPos += 6
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
-      if (p?.hide_material_prices || p?.lump_sum_pricing) {
-        autoTable(doc, {
-          startY: yPos,
-          head: [['Item', 'Part #', 'Qty']],
-          body: lineItems.map(item => [item.item_name, item.part_number_sku || '—', item.quantity]),
-          foot: [['', 'Materials Total', `$${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
-          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-          footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
-        })
+      const isLumpSum = p?.hide_material_prices || p?.lump_sum_pricing
+      const pdfHead = isLumpSum ? [['Item', 'Part #', 'Qty']] : [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']]
+      const pdfRow = (item) => isLumpSum
+        ? [item.item_name, item.part_number_sku || '—', item.quantity]
+        : [item.item_name, item.part_number_sku || '—', item.quantity, `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+      const pdfFoot = (total) => isLumpSum
+        ? [['', 'Section Total', `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]]
+        : [['', '', '', 'Section Total', `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]]
+      const pdfMatFoot = (total) => isLumpSum
+        ? [['', 'Materials Total', `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]]
+        : [['', '', '', 'Materials Total', `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]]
+      const tableStyles = { headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' }
+
+      if (sections.length > 0) {
+        // Unsectioned items first
+        const unsectioned = lineItems.filter(l => !l.section_id)
+        if (unsectioned.length > 0) {
+          doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+          doc.text('General', 14, yPos + 4)
+          doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+          doc.line(14, yPos + 6, pageWidth - 14, yPos + 6)
+          yPos += 8
+          const unsecTotal = unsectioned.reduce((s, i) => s + (i.customer_price_total || 0), 0)
+          autoTable(doc, { startY: yPos, head: pdfHead, body: unsectioned.map(pdfRow), foot: pdfFoot(unsecTotal), ...tableStyles })
+          yPos = doc.lastAutoTable.finalY + 8
+        }
+        // Each section
+        for (const section of sections) {
+          const secItems = lineItems.filter(l => l.section_id === section.id)
+          const secLabor = section.include_labor ? (section.labor_items || []).filter(l => l.role) : []
+          if (secItems.length === 0 && secLabor.length === 0) continue
+          const secMatTotal = secItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
+          const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+          const secTotal = secMatTotal + secLaborTotal
+          // Section header bar
+          doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+          doc.rect(14, yPos, pageWidth - 28, 8, 'F')
+          doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
+          doc.text(section.name || 'Untitled Section', 17, yPos + 5.5)
+          doc.text(`$${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 16, yPos + 5.5, { align: 'right' })
+          yPos += 10
+          if (secItems.length > 0) {
+            autoTable(doc, { startY: yPos, head: pdfHead, body: secItems.map(pdfRow), ...tableStyles, showFoot: false })
+            yPos = doc.lastAutoTable.finalY + 4
+          }
+          if (secLabor.length > 0) {
+            doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(100, 100, 100)
+            doc.text('Section Labor', 14, yPos + 4); yPos += 6
+            const lHead = p?.hide_labor_breakdown ? [['Role', 'Qty', 'Unit']] : [['Role', 'Qty', 'Unit', 'Total Labor']]
+            const lRow = (l) => p?.hide_labor_breakdown
+              ? [l.role, l.quantity, l.unit || 'hr']
+              : [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+            autoTable(doc, { startY: yPos, head: lHead, body: secLabor.map(lRow), ...tableStyles, showFoot: false })
+            yPos = doc.lastAutoTable.finalY + 4
+          }
+          // Section subtotal line
+          doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+          doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+          yPos += 8
+        }
+        // Materials total line after all sections
+        doc.setDrawColor(220, 220, 220); doc.line(14, yPos, pageWidth - 14, yPos); yPos += 4
+        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
+        doc.text(`Materials Total: $${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+        yPos += 6
       } else {
-        autoTable(doc, {
-          startY: yPos,
-          head: [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']],
-          body: lineItems.map(item => [item.item_name, item.part_number_sku || '—', item.quantity, `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
-          foot: [['', '', '', 'Total', `$${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
-          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-          footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
-        })
+        // No sections — original flat render
+        autoTable(doc, { startY: yPos, head: pdfHead, body: lineItems.map(pdfRow), foot: pdfMatFoot(materialsTotal), ...tableStyles })
       }
     }
 
     const pdfLaborItems = p?.labor_items || []
     if (pdfLaborItems.length > 0 && pdfLaborItems.some(l => l.role)) {
-      const tableEnd = doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12
+      const tableEnd = sections.length > 0 ? yPos + 6 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12)
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Labor', 14, tableEnd)
       const laborTotal = pdfLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
