@@ -489,6 +489,39 @@ export default function SignProposal() {
                 </table>
               )
 
+              const generalLaborItems = (proposal?.labor_items || []).filter(l => l.role)
+              const generalLaborBlock = generalLaborItems.length > 0 ? (
+                <div className="border border-[#2a3d55] rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 bg-[#0F1C2E] border-b border-[#2a3d55]">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">General Labor</p>
+                  </div>
+                  <div className="p-4">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#2a3d55]">
+                          <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Role</th>
+                          <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
+                          <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Unit</th>
+                          {!proposal?.hide_labor_breakdown && <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {generalLaborItems.map((l, i) => (
+                          <tr key={i} className="border-b border-[#2a3d55]/50">
+                            <td className="text-white py-3 pr-4">{l.role}</td>
+                            <td className="text-white py-3 pr-4 text-right">{l.quantity}</td>
+                            <td className="text-[#8A9AB0] py-3 pr-4">{l.unit || 'hr'}</td>
+                            {!proposal?.hide_labor_breakdown && (
+                              <td className="text-white py-3 text-right">${fmt(parseFloat(l.customer_price) || 0)}</td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : null
+
               if (sections.length > 0) {
                 const unsectioned = lineItems.filter(l => !l.section_id)
                 return (
@@ -546,6 +579,7 @@ export default function SignProposal() {
                         </div>
                       )
                     })}
+                    {generalLaborBlock}
                     <table className="w-full text-sm">
                       <tfoot>
                         <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td><td className="text-white pt-4 text-right font-bold">${fmt(materialsTotal)}</td></tr>
@@ -558,34 +592,39 @@ export default function SignProposal() {
                 )
               }
 
-              // No sections — original flat render
+              // No sections — flat render
               return (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-[#2a3d55]">
-                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Item</th>
-                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Part #</th>
-                        <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
-                        {!isLumpSum && <>
-                          <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Unit Price</th>
-                          <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>
-                        </>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lineItems.map((item, i) => (
-                        <tr key={i} className="border-b border-[#2a3d55]/50">
-                          <td className="text-white py-3 pr-4">{item.item_name}</td>
-                          <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
-                          <td className="text-white py-3 pr-4 text-right">{item.quantity} {item.unit || 'ea'}</td>
+                <div className="space-y-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#2a3d55]">
+                          <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Item</th>
+                          <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Part #</th>
+                          <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
                           {!isLumpSum && <>
-                            <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
-                            <td className="text-white py-3 text-right">${fmt(item.customer_price_total)}</td>
+                            <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Unit Price</th>
+                            <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>
                           </>}
                         </tr>
-                      ))}
-                    </tbody>
+                      </thead>
+                      <tbody>
+                        {lineItems.map((item, i) => (
+                          <tr key={i} className="border-b border-[#2a3d55]/50">
+                            <td className="text-white py-3 pr-4">{item.item_name}</td>
+                            <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
+                            <td className="text-white py-3 pr-4 text-right">{item.quantity} {item.unit || 'ea'}</td>
+                            {!isLumpSum && <>
+                              <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
+                              <td className="text-white py-3 text-right">${fmt(item.customer_price_total)}</td>
+                            </>}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {generalLaborBlock}
+                  <table className="w-full text-sm">
                     <tfoot>
                       <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-4 text-right font-semibold">Materials Total</td><td className="text-white pt-4 text-right font-bold">${fmt(materialsTotal)}</td></tr>
                       {laborTotal > 0 && <tr><td colSpan={colSpan} className="text-[#8A9AB0] pt-1 text-right font-semibold">Labor Total</td><td className="text-white pt-1 text-right font-bold">${fmt(laborTotal)}</td></tr>}
@@ -599,41 +638,6 @@ export default function SignProposal() {
           </div>
         )}
 
-{(proposal?.labor_items || []).some(l => l.role) && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">Labor</h3>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-[#2a3d55]">
-                  <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Role</th>
-                  <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
-                  <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Unit</th>
-                  {!proposal?.hide_labor_breakdown && (
-                    <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {(proposal?.labor_items || []).filter(l => l.role).map((l, i) => (
-                  <tr key={i} className="border-b border-[#2a3d55]/50">
-                    <td className="text-white py-3 pr-4">{l.role}</td>
-                    <td className="text-white py-3 pr-4 text-right">{l.quantity}</td>
-                    <td className="text-[#8A9AB0] py-3 pr-4">{l.unit || 'hr'}</td>
-                    {!proposal?.hide_labor_breakdown && (
-                      <td className="text-white py-3 text-right">${fmt(parseFloat(l.customer_price) || 0)}</td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-[#2a3d55]">
-                  <td colSpan={proposal?.hide_labor_breakdown ? 3 : 3} className="text-[#8A9AB0] pt-3 text-right font-semibold">Total Labor</td>
-                  <td className="text-white pt-3 text-right font-bold">${fmt(laborTotal)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
         {terms && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Terms and Conditions</h3>
