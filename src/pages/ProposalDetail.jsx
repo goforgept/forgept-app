@@ -1631,8 +1631,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     const bomCost = validLines.reduce((sum, l) => sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
     const laborCustomer = laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
     const laborCost = laborItems.reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
-    const totalCustomer = bomCustomer + laborCustomer
-    const totalCost = bomCost + laborCost
+    const sectionLaborCustomer = editSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+    const sectionLaborCost = editSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0) : 0), 0)
+    const totalCustomer = bomCustomer + laborCustomer + sectionLaborCustomer
+    const totalCost = bomCost + laborCost + sectionLaborCost
     const grossMarginDollars = totalCustomer - totalCost
     const grossMarginPercent = totalCustomer > 0 ? (grossMarginDollars / totalCustomer) * 100 : 0
 
