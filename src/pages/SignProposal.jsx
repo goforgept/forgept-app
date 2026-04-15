@@ -122,9 +122,11 @@ export default function SignProposal() {
     // Materials
     const mTotal = items.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
     const lTotal = (prop.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+    const secLaborTotal = sectionData.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+    const allLaborTotal = lTotal + secLaborTotal
     const taxRate = (!prop.tax_exempt && prop.tax_rate) ? parseFloat(prop.tax_rate) : 0
-    const taxAmt = mTotal * (taxRate / 100)
-    const grandTotal = mTotal + lTotal + taxAmt
+    const taxAmt = Math.round(mTotal * (taxRate / 100) * 100) / 100
+    const grandTotal = mTotal + allLaborTotal + taxAmt
 
     if (items.length > 0) {
       doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -197,16 +199,32 @@ export default function SignProposal() {
       }
     }
 
-    // Grand total
-    const afterTable = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : yPos + 40
-    if (taxRate > 0) {
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
-      doc.text(`Tax (${taxRate}%): $${taxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterTable, { align: 'right' })
+    // Grand total summary
+    let summaryY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : yPos + 8
+    const summaryX = pageWidth - 96
+    doc.setDrawColor(200, 200, 200)
+    doc.line(summaryX, summaryY, pageWidth - 14, summaryY)
+    summaryY += 6
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+    doc.text('Materials Total:', summaryX, summaryY)
+    doc.text(`$${mTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, summaryY, { align: 'right' })
+    summaryY += 7
+    if (allLaborTotal > 0) {
+      doc.text('Labor Total:', summaryX, summaryY)
+      doc.text(`$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, summaryY, { align: 'right' })
+      summaryY += 7
     }
-    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.text('Grand Total:', pageWidth - 60, afterTable + (taxRate > 0 ? 10 : 0))
+    if (taxRate > 0) {
+      doc.text(`Tax (${taxRate}% on materials):`, summaryX, summaryY)
+      doc.text(`$${taxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, summaryY, { align: 'right' })
+      summaryY += 7
+    }
+    doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.line(summaryX, summaryY - 2, pageWidth - 14, summaryY - 2)
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text('Grand Total:', summaryX, summaryY + 4)
     doc.setTextColor(200, 98, 42)
-    doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, afterTable + (taxRate > 0 ? 10 : 0), { align: 'right' })
+    doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, summaryY + 4, { align: 'right' })
 
     // Terms
     if (orgProf?.terms_and_conditions) {
@@ -393,9 +411,11 @@ export default function SignProposal() {
 
   const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const materialsTotal = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
-  const laborTotal = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+  const proposalLaborTotal = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+  const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+  const laborTotal = proposalLaborTotal + sectionLaborTotal
   const taxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
-  const taxAmount = materialsTotal * (taxRate / 100)
+  const taxAmount = Math.round(materialsTotal * (taxRate / 100) * 100) / 100
   const grandTotal = materialsTotal + laborTotal + taxAmount
 
   if (loading) return <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center"><div className="text-center"><h1 className="text-white text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1><p className="text-[#8A9AB0] text-sm">Loading proposal...</p></div></div>
