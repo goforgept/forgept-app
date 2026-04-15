@@ -176,10 +176,7 @@ export default function SignProposal() {
           doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
           yPos += 8
         }
-        doc.setDrawColor(220, 220, 220); doc.line(14, yPos, pageWidth - 14, yPos); yPos += 4
-        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
-        doc.text(`Materials Total: $${mTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
-        yPos += 8
+        yPos += 4
       } else {
         autoTable(doc, { startY: yPos, head: signHead, body: items.map(signRow), foot: isLumpSum ? [['', 'Materials Total', `$${mTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]] : [['', '', '', 'Total', `$${mTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], ...signStyles })
       }

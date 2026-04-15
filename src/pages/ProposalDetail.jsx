@@ -1994,11 +1994,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
           yPos += 8
         }
-        // Materials total line after all sections
-        doc.setDrawColor(220, 220, 220); doc.line(14, yPos, pageWidth - 14, yPos); yPos += 4
-        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
-        doc.text(`Materials Total: $${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
-        yPos += 6
       } else {
         // No sections — original flat render
         autoTable(doc, { startY: yPos, head: pdfHead, body: lineItems.map(pdfRow), foot: pdfMatFoot(materialsTotal), ...tableStyles })
