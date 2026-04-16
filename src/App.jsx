@@ -32,6 +32,7 @@ import Jobs from './pages/Jobs'
 import TechLog from './pages/TechLog'
 import TechJobView from './pages/TechJobView'
 import SignProposal from './pages/SignProposal'
+import RFQResponse from './pages/RFQResponse'
 import JobDetail from './pages/JobDetail'
 import ServiceTickets from './pages/ServiceTickets'
 import ServiceTicketDetail from './pages/ServiceTicketDetail'
@@ -173,6 +174,7 @@ function App() {
     <Routes>
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/sign/:token" element={<SignProposal />} />
+      <Route path="/rfq-response/:token" element={<RFQResponse />} />
       {!session ? (
         <Route path="*" element={<Login />} />
       ) : (
