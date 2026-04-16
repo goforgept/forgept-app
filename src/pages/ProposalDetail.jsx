@@ -71,6 +71,11 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [aiBOMPrompt, setAIBOMPrompt] = useState('')
   const [generatingBOM, setGeneratingBOM] = useState(false)
   const [aiBOMPreview, setAIBOMPreview] = useState([])
+  const [showDrawingModal, setShowDrawingModal] = useState(false)
+  const [drawingFile, setDrawingFile] = useState(null)
+  const [drawingInstructions, setDrawingInstructions] = useState('')
+  const [drawingPreview, setDrawingPreview] = useState([])
+  const [analyzingDrawing, setAnalyzingDrawing] = useState(false)
   const [photos, setPhotos] = useState([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showPhotosModal, setShowPhotosModal] = useState(false)
@@ -1815,6 +1820,63 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setPhotos(data || [])
   }
 
+const analyzeDrawing = async () => {
+    if (!drawingFile) return
+    setAnalyzingDrawing(true)
+    setDrawingPreview([])
+    try {
+      const reader = new FileReader()
+      const fileBase64 = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result.split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(drawingFile)
+      })
+      const { data: { session: currentSession } } = await supabase.auth.refreshSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-read-drawing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
+        body: JSON.stringify({
+          fileBase64,
+          mediaType: drawingFile.type,
+          instructions: drawingInstructions || '',
+          industry: proposal?.industry || ''
+        })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setDrawingPreview(data.items || [])
+    } catch (err) { alert('Error analyzing drawing: ' + err.message) }
+    setAnalyzingDrawing(false)
+  }
+
+  const applyDrawingBOM = async () => {
+    if (drawingPreview.length === 0) return
+    const laborItems = drawingPreview.filter(i => i.category === 'Labor')
+    const materials = drawingPreview.filter(i => i.category !== 'Labor')
+    const newLines = materials.map(item => ({
+      proposal_id: id, item_name: item.item_name, part_number_sku: '', quantity: item.quantity,
+      unit: item.unit || 'ea', category: item.category || '', vendor: '', your_cost_unit: '',
+      markup_percent: '35', customer_price_unit: '', customer_price_total: '',
+      pricing_status: 'Needs Pricing', recurring: false
+    }))
+    setEditLines([...lineItems.map(l => ({ ...l })), ...newLines])
+    if (laborItems.length > 0) {
+      const newLaborItems = laborItems.map(item => ({
+        role: item.item_name, quantity: String(item.quantity),
+        unit: item.unit === 'hr' ? 'hr' : item.unit === 'day' ? 'day' : 'lot',
+        your_cost: '', markup: 35, customer_price: 0
+      }))
+      setLaborItems(prev => [...prev.filter(l => l.role), ...newLaborItems])
+    }
+    setEditingBOM(true)
+    setShowDrawingModal(false)
+    setDrawingFile(null)
+    setDrawingInstructions('')
+    setDrawingPreview([])
+    logActivity(`Drawing analyzed — ${materials.length} materials, ${laborItems.length} labor items added`)
+  }
+
+
   const generateAIBOM = async () => {
     if (!aiBOMPrompt.trim()) return
     setGeneratingBOM(true)
@@ -2580,7 +2642,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 )}
                 <button onClick={() => { setTemplateName(proposal?.proposal_name || ''); setShowSaveTemplateModal(true) }} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Save as Template</button>
                 {featureAiBom && (
+                  <>
                   <button onClick={() => setShowAIBOMModal(true)} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✨ AI Build BOM</button>
+                  <button onClick={() => { setShowDrawingModal(true); setDrawingInstructions(proposal?.industry === 'Security' ? 'Focus on cameras, access control readers, door contacts, and NVR/DVR equipment.' : proposal?.industry === 'Audio/Visual' ? 'Focus on displays, speakers, amplifiers, source equipment, and cable runs.' : '') }} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">📐 Read Drawing</button>
+                  </>
                 )}
                 <button onClick={startEditing} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Edit BOM</button>
                 <label className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors cursor-pointer">
@@ -3482,6 +3547,73 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
                 <button onClick={() => { setShowAIBOMModal(false); setAIBOMPreview([]); setAIBOMPrompt('') }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
                 {aiBOMPreview.length > 0 && (
                   <button onClick={applyAIBOM} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Add {aiBOMPreview.length} Items to BOM →</button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+{/* Drawing Reader Modal */}
+      {showDrawingModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            <h3 className="text-white font-bold text-lg mb-1">📐 Drawing Reader</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">Upload a floor plan or technical drawing and AI will count devices and build a BOM. You'll review before adding.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Upload Drawing (PDF or Image)</label>
+                <input type="file" accept=".pdf,image/jpeg,image/png,image/webp"
+                  onChange={e => setDrawingFile(e.target.files[0] || null)}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                {drawingFile && <p className="text-[#8A9AB0] text-xs mt-1">{drawingFile.name} — {(drawingFile.size / 1024 / 1024).toFixed(2)} MB</p>}
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Instructions — what to look for</label>
+                <textarea value={drawingInstructions} onChange={e => setDrawingInstructions(e.target.value)} rows={3}
+                  placeholder="e.g. Only count cameras and access control readers. Ignore data drops and AV equipment."
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+              </div>
+              <button onClick={analyzeDrawing} disabled={analyzingDrawing || !drawingFile}
+                className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
+                {analyzingDrawing ? '📐 Analyzing Drawing...' : '📐 Analyze Drawing'}
+              </button>
+              {drawingPreview.length > 0 && (
+                <div>
+                  <p className="text-white text-sm font-semibold mb-2">{drawingPreview.length} items found — review before adding</p>
+                  <div className="bg-[#0F1C2E] rounded-xl overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-[#2a3d55]">
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Item</th>
+                          <th className="text-[#8A9AB0] text-right py-2 px-3 font-normal">Qty</th>
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Category</th>
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {drawingPreview.map((item, i) => (
+                          <tr key={i} className="border-b border-[#2a3d55]/30">
+                            <td className="text-white py-2 px-3">{item.item_name}</td>
+                            <td className="text-[#8A9AB0] py-2 px-3 text-right">{item.quantity}</td>
+                            <td className="text-[#8A9AB0] py-2 px-3">{item.category}</td>
+                            <td className="text-[#8A9AB0] py-2 px-3 text-xs italic">{item.notes}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-[#8A9AB0] text-xs mt-2">Review quantities carefully — AI counts may need adjustment. Items added to BOM in Edit mode.</p>
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setShowDrawingModal(false); setDrawingFile(null); setDrawingInstructions(''); setDrawingPreview([]) }}
+                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                {drawingPreview.length > 0 && (
+                  <button onClick={applyDrawingBOM}
+                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                    Add {drawingPreview.length} Items to BOM →
+                  </button>
                 )}
               </div>
             </div>

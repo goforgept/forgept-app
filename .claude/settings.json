@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --input-type=module)",
+      "Bash(npx --yes acorn --ecma2020 --module src/pages/ProposalDetail.jsx)",
+      "Bash(npx --yes @babel/parser --help)",
+      "Bash(node -e ' *)"
+    ]
+  }
+}
