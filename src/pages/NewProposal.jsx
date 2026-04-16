@@ -16,6 +16,8 @@ export default function NewProposal() {
   const [selectedClientId, setSelectedClientId] = useState('')
   const [locations, setLocations] = useState([])
   const [selectedLocationId, setSelectedLocationId] = useState('')
+  const [clientContacts, setClientContacts] = useState([])
+  const [selectedContactId, setSelectedContactId] = useState('__main__')
   const [profile, setProfile] = useState(null)
   const [taxRate, setTaxRate] = useState('')
   const [taxExempt, setTaxExempt] = useState(false)
@@ -75,7 +77,11 @@ export default function NewProposal() {
   }
 
   const prefillClient = async (clientId, preselectedLocationId = null) => {
-    const { data } = await supabase.from('clients').select('*').eq('id', clientId).single()
+    const [{ data }, { data: locs }, { data: contacts }] = await Promise.all([
+      supabase.from('clients').select('*').eq('id', clientId).single(),
+      supabase.from('client_locations').select('*').eq('client_id', clientId).order('site_name', { ascending: true }),
+      supabase.from('client_contacts').select('*').eq('client_id', clientId).order('is_primary', { ascending: false }).order('full_name', { ascending: true }),
+    ])
     if (data) {
       setForm(prev => ({
         ...prev,
@@ -84,12 +90,9 @@ export default function NewProposal() {
         client_email: data.email || '',
         industry: data.industry || prev.industry,
       }))
+      setClientContacts(contacts || [])
+      setSelectedContactId('__main__')
     }
-    const { data: locs } = await supabase
-      .from('client_locations')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('site_name', { ascending: true })
     setLocations(locs || [])
     if (preselectedLocationId && locs?.some(l => l.id === preselectedLocationId)) {
       setSelectedLocationId(preselectedLocationId)
@@ -99,11 +102,26 @@ export default function NewProposal() {
   const handleClientSelect = async (clientId) => {
     setSelectedClientId(clientId)
     setSelectedLocationId('')
+    setSelectedContactId('__main__')
     setLocations([])
+    setClientContacts([])
     if (clientId) {
       await prefillClient(clientId)
     } else {
       setForm(prev => ({ ...prev, client_name: '', company: '', client_email: '' }))
+    }
+  }
+
+  const handleContactSelect = (value) => {
+    setSelectedContactId(value)
+    if (value === '__main__') {
+      const client = clients.find(c => c.id === selectedClientId)
+      setForm(prev => ({ ...prev, client_name: client?.client_name || '', client_email: client?.email || '' }))
+    } else if (value === '__none__') {
+      setForm(prev => ({ ...prev, client_name: '', client_email: '' }))
+    } else {
+      const contact = clientContacts.find(c => c.id === value)
+      if (contact) setForm(prev => ({ ...prev, client_name: contact.full_name || '', client_email: contact.email || '' }))
     }
   }
 
@@ -147,11 +165,14 @@ export default function NewProposal() {
 
     const taxRateVal = taxExempt ? 0 : (parseFloat(taxRate) || 0)
 
+    const resolvedContactId = selectedContactId && selectedContactId !== '__main__' && selectedContactId !== '__none__' ? selectedContactId : null
+
     const { data: proposal, error } = await supabase.from('proposals').insert({
       proposal_name: form.job_description,
       user_id: user.id,
       org_id: prof?.org_id,
       client_id: clientId || null,
+      contact_id: resolvedContactId,
       location_id: selectedLocationId || null,
       rep_name: form.rep_name,
       rep_email: form.rep_email,
@@ -263,6 +284,40 @@ export default function NewProposal() {
                     )
                   })}
                 </select>
+              </div>
+            )}
+
+            {/* Contact picker — only shows when a client is selected */}
+            {selectedClientId && (
+              <div>
+                <label className="text-[#8A9AB0] text-xs font-semibold block mb-1 uppercase tracking-wide">Deal Contact</label>
+                <select
+                  value={selectedContactId}
+                  onChange={e => handleContactSelect(e.target.value)}
+                  className="w-full bg-[#070f1a] text-white border border-[#1e3450] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#C8622A] transition-colors"
+                >
+                  {(() => {
+                    const client = clients.find(c => c.id === selectedClientId)
+                    const mainLabel = client?.client_name
+                      ? `${client.client_name}${client.email ? ` — ${client.email}` : ''} (main contact)`
+                      : '— Main client contact —'
+                    return <option value="__main__">{mainLabel}</option>
+                  })()}
+                  {clientContacts.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.full_name}{c.title ? ` · ${c.title}` : ''}{c.email ? ` — ${c.email}` : ''}
+                    </option>
+                  ))}
+                  <option value="__none__">— No specific contact —</option>
+                </select>
+                {selectedContactId && selectedContactId !== '__main__' && selectedContactId !== '__none__' && (() => {
+                  const contact = clientContacts.find(c => c.id === selectedContactId)
+                  return contact ? (
+                    <p className="text-[#8A9AB0] text-xs mt-1.5">
+                      Contact name and email on this deal will be set to <span className="text-white">{contact.full_name}</span>{contact.email ? <> · <span className="text-[#C8622A]">{contact.email}</span></> : null}
+                    </p>
+                  ) : null
+                })()}
               </div>
             )}
 
