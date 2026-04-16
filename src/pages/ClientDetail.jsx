@@ -12,9 +12,16 @@ const INDUSTRIES = [
   'Telecom', 'IT / Networking', 'Other'
 ]
 
+const LOCATION_TYPES = ['HQ', 'Main Office', 'Warehouse', 'Job Site', 'Retail', 'Branch Office', 'Other']
+
 const emptyLocation = {
-  site_name: '', address: '', city: '', state: '', zip: '',
+  site_name: '', location_type: '', address: '', city: '', state: '', zip: '',
+  floor_suite: '', access_notes: '',
   site_contact_name: '', site_contact_email: '', site_contact_phone: '', notes: ''
+}
+
+const emptyContact = {
+  full_name: '', title: '', email: '', phone: '', is_primary: false, notes: ''
 }
 
 export default function ClientDetail({ isAdmin, featureProposals = true, featureCRM = false, featureAiEmail = false }) {
@@ -42,6 +49,12 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [editingLocation, setEditingLocation] = useState(null)
   const [locationForm, setLocationForm] = useState(emptyLocation)
   const [savingLocation, setSavingLocation] = useState(false)
+  // Contacts
+  const [contacts, setContacts] = useState([])
+  const [showContactModal, setShowContactModal] = useState(false)
+  const [editingContact, setEditingContact] = useState(null)
+  const [contactForm, setContactForm] = useState(emptyContact)
+  const [savingContact, setSavingContact] = useState(false)
   // Service Tickets
   const [clientTickets, setClientTickets] = useState([])
   // Meetings
@@ -63,6 +76,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     fetchProposals()
     fetchProfile()
     fetchLocations()
+    fetchContacts()
     fetchClientTickets()
     fetchClientMeetings()
   }, [])
@@ -102,6 +116,11 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     setLocations(data || [])
   }
 
+  const fetchContacts = async () => {
+    const { data } = await supabase.from('client_contacts').select('*').eq('client_id', id).order('is_primary', { ascending: false }).order('full_name', { ascending: true })
+    setContacts(data || [])
+  }
+
   const fetchClientMeetings = async () => {
     const { data } = await supabase
       .from('tasks')
@@ -131,10 +150,13 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     setEditingLocation(loc)
     setLocationForm({
       site_name: loc.site_name || '',
+      location_type: loc.location_type || '',
       address: loc.address || '',
       city: loc.city || '',
       state: loc.state || '',
       zip: loc.zip || '',
+      floor_suite: loc.floor_suite || '',
+      access_notes: loc.access_notes || '',
       site_contact_name: loc.site_contact_name || '',
       site_contact_email: loc.site_contact_email || '',
       site_contact_phone: loc.site_contact_phone || '',
@@ -162,6 +184,46 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     if (!window.confirm('Delete this location?')) return
     await supabase.from('client_locations').delete().eq('id', locId)
     await fetchLocations()
+  }
+
+  const openAddContact = () => {
+    setEditingContact(null)
+    setContactForm(emptyContact)
+    setShowContactModal(true)
+  }
+
+  const openEditContact = (contact) => {
+    setEditingContact(contact)
+    setContactForm({
+      full_name: contact.full_name || '',
+      title: contact.title || '',
+      email: contact.email || '',
+      phone: contact.phone || '',
+      is_primary: contact.is_primary || false,
+      notes: contact.notes || '',
+    })
+    setShowContactModal(true)
+  }
+
+  const saveContact = async () => {
+    if (!contactForm.full_name.trim()) return
+    setSavingContact(true)
+    if (editingContact) {
+      await supabase.from('client_contacts').update(contactForm).eq('id', editingContact.id)
+    } else {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      await supabase.from('client_contacts').insert({ ...contactForm, client_id: id, org_id: profileData.org_id })
+    }
+    await fetchContacts()
+    setShowContactModal(false)
+    setSavingContact(false)
+  }
+
+  const deleteContact = async (contactId) => {
+    if (!window.confirm('Delete this contact?')) return
+    await supabase.from('client_contacts').delete().eq('id', contactId)
+    await fetchContacts()
   }
 
   const draftEmail = async () => {
@@ -480,6 +542,7 @@ const deleteMeeting = async (meetingId) => {
         <div className="flex gap-2 flex-wrap">
           {[
             { key: 'proposals', label: `Proposals (${proposals.length})` },
+            { key: 'contacts', label: `Contacts (${contacts.length})` },
             { key: 'locations', label: `Locations (${locations.length})` },
             { key: 'tickets', label: `Service Tickets (${clientTickets.length})` },
             { key: 'meetings', label: `Meetings (${clientMeetings.length})` },
@@ -527,6 +590,62 @@ const deleteMeeting = async (meetingId) => {
           </div>
         )}
 
+        {/* Contacts tab */}
+        {activeTab === 'contacts' && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white font-bold text-lg">Contacts</h3>
+              <button onClick={openAddContact} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Contact</button>
+            </div>
+            {contacts.length === 0 ? (
+              <div className="text-center py-8 border-2 border-dashed border-[#2a3d55] rounded-xl">
+                <p className="text-[#8A9AB0] mb-3">No contacts yet.</p>
+                <p className="text-[#8A9AB0] text-sm">Add contacts like owners, project managers, or billing contacts for this client.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {contacts.map(contact => (
+                  <div key={contact.id} className={`bg-[#0F1C2E] rounded-xl p-4 border ${contact.is_primary ? 'border-[#C8622A]/40' : 'border-[#2a3d55]'}`}>
+                    <div className="flex justify-between items-start">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-[#2a3d55] flex items-center justify-center flex-shrink-0">
+                          <span className="text-white text-sm font-bold">{(contact.full_name || '?')[0].toUpperCase()}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-white font-semibold text-sm truncate">{contact.full_name}</p>
+                            {contact.is_primary && <span className="text-[#C8622A] text-xs font-semibold flex-shrink-0">Primary</span>}
+                          </div>
+                          {contact.title && <p className="text-[#8A9AB0] text-xs">{contact.title}</p>}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0 ml-2">
+                        <button onClick={() => openEditContact(contact)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Edit</button>
+                        <button onClick={() => deleteContact(contact.id)} className="text-red-400 hover:text-red-300 text-xs transition-colors">Delete</button>
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      {contact.email && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#8A9AB0] text-xs w-10">Email</span>
+                          <a href={`mailto:${contact.email}`} className="text-[#C8622A] text-xs hover:underline truncate">{contact.email}</a>
+                        </div>
+                      )}
+                      {contact.phone && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[#8A9AB0] text-xs w-10">Phone</span>
+                          <a href={`tel:${contact.phone}`} className="text-white text-xs hover:text-[#C8622A] transition-colors">{contact.phone}</a>
+                        </div>
+                      )}
+                      {contact.notes && <p className="text-[#8A9AB0] text-xs mt-1 italic">{contact.notes}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Locations tab */}
         {activeTab === 'locations' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
@@ -542,28 +661,39 @@ const deleteMeeting = async (meetingId) => {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {locations.map(loc => {
-                  const addr = [loc.address, loc.city, loc.state, loc.zip].filter(Boolean).join(', ')
+                  const addr = [loc.address, loc.floor_suite, loc.city, loc.state, loc.zip].filter(Boolean).join(', ')
+                  const addrMapQuery = [loc.address, loc.city, loc.state, loc.zip].filter(Boolean).join(', ')
                   return (
                     <div key={loc.id} className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
                       <div className="flex justify-between items-start mb-3">
                         <div>
-                          <p className="text-white font-semibold">{loc.site_name}</p>
-                          {addr && <a href={`https://maps.google.com/?q=${encodeURIComponent(addr)}`} target="_blank" rel="noreferrer" className="text-[#8A9AB0] text-xs hover:text-[#C8622A] transition-colors mt-0.5 block">{addr}</a>}
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <p className="text-white font-semibold">{loc.site_name}</p>
+                            {loc.location_type && <span className="text-xs px-1.5 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0]">{loc.location_type}</span>}
+                          </div>
+                          {addr && <a href={`https://maps.google.com/?q=${encodeURIComponent(addrMapQuery)}`} target="_blank" rel="noreferrer" className="text-[#8A9AB0] text-xs hover:text-[#C8622A] transition-colors mt-0.5 block">{addr}</a>}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-shrink-0 ml-2">
                           <button onClick={() => openEditLocation(loc)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Edit</button>
                           <button onClick={() => deleteLocation(loc.id)} className="text-red-400 hover:text-red-300 text-xs transition-colors">Delete</button>
                         </div>
                       </div>
+                      {loc.access_notes && (
+                        <div className="bg-[#1a2d45] rounded-lg px-3 py-2 mb-2">
+                          <p className="text-[#8A9AB0] text-xs font-semibold mb-0.5">Access</p>
+                          <p className="text-white text-xs">{loc.access_notes}</p>
+                        </div>
+                      )}
                       {(loc.site_contact_name || loc.site_contact_email || loc.site_contact_phone) && (
                         <div className="border-t border-[#2a3d55] pt-2 mt-2 space-y-1">
+                          <p className="text-[#8A9AB0] text-xs font-semibold">Site Contact</p>
                           {loc.site_contact_name && <p className="text-white text-xs font-medium">{loc.site_contact_name}</p>}
                           {loc.site_contact_email && <a href={`mailto:${loc.site_contact_email}`} className="text-[#C8622A] text-xs hover:underline block">{loc.site_contact_email}</a>}
-                          {loc.site_contact_phone && <p className="text-[#8A9AB0] text-xs">{loc.site_contact_phone}</p>}
+                          {loc.site_contact_phone && <a href={`tel:${loc.site_contact_phone}`} className="text-[#8A9AB0] text-xs hover:text-white transition-colors block">{loc.site_contact_phone}</a>}
                         </div>
                       )}
                       {loc.notes && <p className="text-[#8A9AB0] text-xs mt-2 italic">{loc.notes}</p>}
-                      <div className="mt-3">
+                      <div className="mt-3 pt-2 border-t border-[#2a3d55]">
                         <button onClick={() => navigate(`/new?clientId=${id}&locationId=${loc.id}`)}
                           className="text-[#C8622A] text-xs hover:text-white transition-colors">+ Proposal for this location →</button>
                       </div>
@@ -783,18 +913,35 @@ const deleteMeeting = async (meetingId) => {
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-white font-bold text-lg mb-5">{editingLocation ? 'Edit Location' : 'Add Location'}</h3>
             <div className="space-y-3">
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Site Name <span className="text-[#C8622A]">*</span></label>
-                <input type="text" value={locationForm.site_name} onChange={e => setLocationForm(p => ({ ...p, site_name: e.target.value }))} placeholder="e.g. HQ, Warehouse, Nashville Office" className={inputClass} />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Site Name <span className="text-[#C8622A]">*</span></label>
+                  <input type="text" value={locationForm.site_name} onChange={e => setLocationForm(p => ({ ...p, site_name: e.target.value }))} placeholder="e.g. HQ, Warehouse, Nashville Office" className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Location Type</label>
+                  <select value={locationForm.location_type} onChange={e => setLocationForm(p => ({ ...p, location_type: e.target.value }))} className={inputClass}>
+                    <option value="">— Select type —</option>
+                    {LOCATION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Street Address</label>
                 <input type="text" value={locationForm.address} onChange={e => setLocationForm(p => ({ ...p, address: e.target.value }))} placeholder="123 Main St" className={inputClass} />
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">City</label><input type="text" value={locationForm.city} onChange={e => setLocationForm(p => ({ ...p, city: e.target.value }))} className={inputClass} /></div>
+              <div className="grid grid-cols-4 gap-3">
+                <div className="col-span-2"><label className="text-[#8A9AB0] text-xs mb-1 block">City</label><input type="text" value={locationForm.city} onChange={e => setLocationForm(p => ({ ...p, city: e.target.value }))} className={inputClass} /></div>
                 <div><label className="text-[#8A9AB0] text-xs mb-1 block">State</label><input type="text" value={locationForm.state} onChange={e => setLocationForm(p => ({ ...p, state: e.target.value }))} className={inputClass} /></div>
                 <div><label className="text-[#8A9AB0] text-xs mb-1 block">ZIP</label><input type="text" value={locationForm.zip} onChange={e => setLocationForm(p => ({ ...p, zip: e.target.value }))} className={inputClass} /></div>
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Floor / Suite / Unit</label>
+                <input type="text" value={locationForm.floor_suite} onChange={e => setLocationForm(p => ({ ...p, floor_suite: e.target.value }))} placeholder="e.g. Suite 200, Floor 3, Unit B" className={inputClass} />
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Access Notes</label>
+                <input type="text" value={locationForm.access_notes} onChange={e => setLocationForm(p => ({ ...p, access_notes: e.target.value }))} placeholder="Gate code, parking, building entry..." className={inputClass} />
               </div>
               <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide pt-2">Site Contact (optional)</p>
               <div className="grid grid-cols-2 gap-3">
@@ -802,10 +949,54 @@ const deleteMeeting = async (meetingId) => {
                 <div><label className="text-[#8A9AB0] text-xs mb-1 block">Contact Email</label><input type="email" value={locationForm.site_contact_email} onChange={e => setLocationForm(p => ({ ...p, site_contact_email: e.target.value }))} className={inputClass} /></div>
                 <div><label className="text-[#8A9AB0] text-xs mb-1 block">Contact Phone</label><input type="text" value={locationForm.site_contact_phone} onChange={e => setLocationForm(p => ({ ...p, site_contact_phone: e.target.value }))} className={inputClass} /></div>
               </div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Notes / Access Info</label><textarea value={locationForm.notes} onChange={e => setLocationForm(p => ({ ...p, notes: e.target.value }))} placeholder="Gate code, parking, contact info..." rows={2} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" /></div>
+              <div><label className="text-[#8A9AB0] text-xs mb-1 block">General Notes</label><textarea value={locationForm.notes} onChange={e => setLocationForm(p => ({ ...p, notes: e.target.value }))} placeholder="Additional notes about this location..." rows={2} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" /></div>
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowLocationModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
                 <button onClick={saveLocation} disabled={savingLocation || !locationForm.site_name.trim()} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingLocation ? 'Saving...' : 'Save Location'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contact Modal */}
+      {showContactModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-white font-bold text-lg mb-5">{editingContact ? 'Edit Contact' : 'Add Contact'}</h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Full Name <span className="text-[#C8622A]">*</span></label>
+                  <input type="text" value={contactForm.full_name} onChange={e => setContactForm(p => ({ ...p, full_name: e.target.value }))} placeholder="Jane Smith" className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Title / Role</label>
+                  <input type="text" value={contactForm.title} onChange={e => setContactForm(p => ({ ...p, title: e.target.value }))} placeholder="Owner, PM, Accounting..." className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Email</label>
+                  <input type="email" value={contactForm.email} onChange={e => setContactForm(p => ({ ...p, email: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Phone</label>
+                  <input type="text" value={contactForm.phone} onChange={e => setContactForm(p => ({ ...p, phone: e.target.value }))} className={inputClass} />
+                </div>
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Notes</label>
+                <input type="text" value={contactForm.notes} onChange={e => setContactForm(p => ({ ...p, notes: e.target.value }))} placeholder="Best time to call, preferences..." className={inputClass} />
+              </div>
+              <button type="button" onClick={() => setContactForm(p => ({ ...p, is_primary: !p.is_primary }))}
+                className="flex items-center gap-2 text-sm transition-colors">
+                <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${contactForm.is_primary ? 'bg-[#C8622A] border-[#C8622A]' : 'border-[#2a3d55]'}`}>
+                  {contactForm.is_primary && <span className="text-white text-xs">✓</span>}
+                </span>
+                <span className={contactForm.is_primary ? 'text-white' : 'text-[#8A9AB0]'}>Primary contact</span>
+              </button>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowContactModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={saveContact} disabled={savingContact || !contactForm.full_name.trim()} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingContact ? 'Saving...' : 'Save Contact'}</button>
               </div>
             </div>
           </div>
