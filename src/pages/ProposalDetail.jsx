@@ -1830,7 +1830,10 @@ const generateDealSummary = async () => {
     setGeneratingDealSummary(true)
     setDealSummary(null)
     try {
-      const { data: { session: currentSession } } = await supabase.auth.refreshSession()
+      const { data: { session: refreshed } } = await supabase.auth.refreshSession()
+      const { data: { session: fallback } } = refreshed ? { data: { session: refreshed } } : await supabase.auth.getSession()
+      const currentSession = refreshed || fallback
+      if (!currentSession?.access_token) throw new Error('Not authenticated — please refresh the page and try again.')
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-deal-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
