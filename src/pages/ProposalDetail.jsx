@@ -80,6 +80,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [specFile, setSpecFile] = useState(null)
   const [analyzingSpec, setAnalyzingSpec] = useState(false)
   const [specSummary, setSpecSummary] = useState(null)
+  const [showDealSummaryModal, setShowDealSummaryModal] = useState(false)
+  const [dealSummary, setDealSummary] = useState(null)
+  const [generatingDealSummary, setGeneratingDealSummary] = useState(false)
   const [photos, setPhotos] = useState([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [showPhotosModal, setShowPhotosModal] = useState(false)
@@ -1823,6 +1826,36 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     const { data } = await supabase.from('proposal_photos').select('*').eq('proposal_id', id).order('created_at', { ascending: true })
     setPhotos(data || [])
   }
+const generateDealSummary = async () => {
+    setGeneratingDealSummary(true)
+    setDealSummary(null)
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.refreshSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-deal-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
+        body: JSON.stringify({
+          proposalName: proposal?.proposal_name,
+          company: proposal?.company,
+          industry: proposal?.industry,
+          status: proposal?.status,
+          proposalValue: proposal?.proposal_value,
+          totalCost: proposal?.total_your_cost,
+          grossMarginPercent: proposal?.total_gross_margin_percent,
+          laborItems: laborItems.filter(l => l.role),
+          lineItems: lineItems,
+          scopeOfWork: proposal?.scope_of_work,
+          closeDate: proposal?.close_date,
+          sections: sections
+        })
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setDealSummary(data.summary || null)
+    } catch (err) { alert('Error generating deal summary: ' + err.message) }
+    setGeneratingDealSummary(false)
+  }
+
 const analyzeSpec = async () => {
     if (!specFile) return
     setAnalyzingSpec(true)
@@ -2678,7 +2711,8 @@ const analyzeDrawing = async () => {
                   <>
                   <button onClick={() => setShowAIBOMModal(true)} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✨ AI Build BOM</button>
                   <button onClick={() => { setShowDrawingModal(true); setDrawingInstructions(proposal?.industry === 'Security' ? 'Focus on cameras, access control readers, door contacts, and NVR/DVR equipment.' : proposal?.industry === 'Audio/Visual' ? 'Focus on displays, speakers, amplifiers, source equipment, and cable runs.' : '') }} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">📐 Read Drawing</button>
-<button onClick={() => { setShowSpecModal(true); setSpecSummary(proposal?.spec_summary || null) }} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">📋 Read Spec</button>
+                  <button onClick={() => { setShowSpecModal(true); setSpecSummary(proposal?.spec_summary || null) }} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">📋 Read Spec</button>
+<button onClick={() => { setShowDealSummaryModal(true); setDealSummary(null) }} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">🧠 Deal Summary</button>
                   </>
                 )}
                 <button onClick={startEditing} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Edit BOM</button>
@@ -3588,6 +3622,103 @@ const analyzeDrawing = async () => {
           </div>
         </div>
       )}
+{/* Deal Summary Modal */}
+      {showDealSummaryModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
+            <h3 className="text-white font-bold text-lg mb-1">🧠 Deal Summary</h3>
+            <p className="text-[#8A9AB0] text-sm mb-5">AI analyzes your proposal and returns a plain English summary with risk flags and action items.</p>
+            <div className="space-y-4">
+              {!dealSummary && (
+                <button onClick={generateDealSummary} disabled={generatingDealSummary}
+                  className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
+                  {generatingDealSummary ? '🧠 Analyzing Deal...' : '🧠 Analyze This Deal'}
+                </button>
+              )}
+              {dealSummary && (
+                <div className="space-y-4">
+                  {/* Headline */}
+                  <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#C8622A]/30">
+                    <p className="text-white font-semibold text-sm">{dealSummary.headline}</p>
+                  </div>
+
+                  {/* Readiness */}
+                  <div className={`rounded-xl p-4 border ${
+                    dealSummary.readiness === 'ready' ? 'bg-green-500/10 border-green-500/20' :
+                    dealSummary.readiness === 'needs_work' ? 'bg-yellow-500/10 border-yellow-500/20' :
+                    'bg-red-500/10 border-red-500/20'
+                  }`}>
+                    <p className={`font-semibold text-sm mb-1 ${
+                      dealSummary.readiness === 'ready' ? 'text-green-400' :
+                      dealSummary.readiness === 'needs_work' ? 'text-yellow-400' :
+                      'text-red-400'
+                    }`}>
+                      {dealSummary.readiness === 'ready' ? '✓ Ready to Send' :
+                       dealSummary.readiness === 'needs_work' ? '⚠ Needs Work' :
+                       '✗ Incomplete'}
+                    </p>
+                    <p className="text-[#8A9AB0] text-xs">{dealSummary.readiness_note}</p>
+                  </div>
+
+                  {/* Strength */}
+                  {dealSummary.strength && (
+                    <div className="bg-[#0F1C2E] rounded-xl p-4">
+                      <p className="text-green-400 font-semibold text-xs mb-1 uppercase tracking-wide">Strength</p>
+                      <p className="text-white text-sm">{dealSummary.strength}</p>
+                    </div>
+                  )}
+
+                  {/* Margin + Close */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {dealSummary.margin_note && (
+                      <div className="bg-[#0F1C2E] rounded-xl p-4">
+                        <p className="text-[#C8622A] font-semibold text-xs mb-1 uppercase tracking-wide">Margin</p>
+                        <p className="text-[#8A9AB0] text-xs">{dealSummary.margin_note}</p>
+                      </div>
+                    )}
+                    {dealSummary.close_note && (
+                      <div className="bg-[#0F1C2E] rounded-xl p-4">
+                        <p className="text-[#C8622A] font-semibold text-xs mb-1 uppercase tracking-wide">Close Timeline</p>
+                        <p className="text-[#8A9AB0] text-xs">{dealSummary.close_note}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Risks */}
+                  {dealSummary.risks?.length > 0 && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                      <p className="text-red-400 font-semibold text-xs mb-2 uppercase tracking-wide">Risks</p>
+                      {dealSummary.risks.map((r, i) => (
+                        <p key={i} className="text-red-300 text-xs mb-1">• {r}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Action Items */}
+                  {dealSummary.actions?.length > 0 && (
+                    <div className="bg-[#0F1C2E] rounded-xl p-4">
+                      <p className="text-white font-semibold text-xs mb-2 uppercase tracking-wide">Action Items</p>
+                      {dealSummary.actions.map((a, i) => (
+                        <p key={i} className="text-[#8A9AB0] text-xs mb-1">→ {a}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  <button onClick={() => { setDealSummary(null) }}
+                    className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
+                    ↺ Re-analyze
+                  </button>
+                </div>
+              )}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setShowDealSummaryModal(false); setDealSummary(null) }}
+                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 {/* Spec Reader Modal */}
       {showSpecModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
