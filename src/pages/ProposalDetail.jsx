@@ -2445,6 +2445,9 @@ const analyzeDrawing = async () => {
               )}
             </div>
             <div className="flex items-center gap-2">
+              {featureAiBom && (
+                <button onClick={() => { setShowDealSummaryModal(true); setDealSummary(null) }} className="bg-purple-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors">🧠 Deal Summary</button>
+              )}
               <button onClick={() => setShowShareModal(true)} className="bg-[#2a3d55] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-1">
                 👥 Share{collaborators.length > 0 ? ` (${collaborators.length})` : ''}
               </button>
@@ -2712,7 +2715,6 @@ const analyzeDrawing = async () => {
                   <button onClick={() => setShowAIBOMModal(true)} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✨ AI Build BOM</button>
                   <button onClick={() => { setShowDrawingModal(true); setDrawingInstructions(proposal?.industry === 'Security' ? 'Focus on cameras, access control readers, door contacts, and NVR/DVR equipment.' : proposal?.industry === 'Audio/Visual' ? 'Focus on displays, speakers, amplifiers, source equipment, and cable runs.' : '') }} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">📐 Read Drawing</button>
                   <button onClick={() => { setShowSpecModal(true); setSpecSummary(proposal?.spec_summary || null) }} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">📋 Read Spec</button>
-<button onClick={() => { setShowDealSummaryModal(true); setDealSummary(null) }} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">🧠 Deal Summary</button>
                   </>
                 )}
                 <button onClick={startEditing} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Edit BOM</button>
