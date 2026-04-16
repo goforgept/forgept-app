@@ -55,9 +55,7 @@ Deno.serve(async (req) => {
       </tr>
     `).join('')
 
-    const expiryNote = expiresAt
-      ? `<p style="color:#888;font-size:12px;margin-top:8px;">Please provide pricing by <strong>${new Date(expiresAt).toLocaleDateString()}</strong>. Quotes received after this date may not be accepted.</p>`
-      : ''
+    const expiryNote = ''
 
     const htmlContent = `
       <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:700px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
@@ -95,7 +93,7 @@ Deno.serve(async (req) => {
           </div>
           ` : ''}
 
-          <p style="color:#444;font-size:14px;margin-top:20px;">Please reply to this email with your pricing. Thank you for your time.</p>
+          <p style="color:#444;font-size:14px;margin-top:20px;">Please provide pricing at your earliest convenience. Thank you for your time.</p>
           <p style="color:#444;font-size:14px;">Best regards,<br/><strong>${repName}</strong><br/>${company}</p>
           <p style="color:#aaa;font-size:11px;margin-top:24px;">This RFQ was sent via ForgePt. — Scope it. Send it. Close it.</p>
         </div>

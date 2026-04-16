@@ -54,7 +54,7 @@ export default function RFQResponse() {
     if (data.line_item_ids?.length > 0) {
       const { data: items } = await supabase
         .from('bom_line_items')
-        .select('id, item_name, part_number_sku, manufacturer, quantity, unit')
+        .select('id, item_name, part_number_sku, manufacturer, quantity, unit, markup_percent')
         .in('id', data.line_item_ids)
       setLineItems(items || [])
       const initPrices = {}
@@ -149,8 +149,13 @@ export default function RFQResponse() {
         const unitPrice = parseFloat(price) || 0
         const item = lineItems.find(i => i.id === itemId)
         const qty = parseFloat(item?.quantity) || 1
+        const markupPercent = parseFloat(item?.markup_percent) || 35
+        const customerPriceUnit = parseFloat((unitPrice * (1 + markupPercent / 100)).toFixed(2))
+        const customerPriceTotal = parseFloat((customerPriceUnit * qty).toFixed(2))
         await supabase.from('bom_line_items').update({
           your_cost_unit: unitPrice,
+          customer_price_unit: customerPriceUnit,
+          customer_price_total: customerPriceTotal,
           rfq_quote_number: quoteNumber || null,
           pricing_status: 'Confirmed'
         }).eq('id', itemId)
