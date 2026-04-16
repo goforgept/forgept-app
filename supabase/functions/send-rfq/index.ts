@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
     const {
       lineItemIds, items, vendorEmail, vendorName,
       proposalName, repName, repEmail, company,
-      excelBase64, expiresAt
+      excelBase64, expiresAt, responseLink
     } = await req.json()
 
     // Update pricing_status to RFQ Sent on each line item
@@ -85,6 +85,15 @@ Deno.serve(async (req) => {
 
           ${expiryNote}
           ${excelBase64 ? '<p style="color:#444;font-size:13px;">An Excel spreadsheet is attached for your convenience. Please fill in your pricing and reply to this email.</p>' : ''}
+
+          ${responseLink ? `
+          <div style="margin:24px 0;padding:20px;background:#f8f9fa;border-radius:8px;border:1px solid #e0e0e0;">
+            <p style="color:#0f1c2e;font-size:14px;font-weight:600;margin:0 0 8px 0;">Submit Your Quote Online</p>
+            <p style="color:#444;font-size:13px;margin:0 0 12px 0;">Use our secure quote submission portal to enter pricing and upload your quote document.</p>
+            <a href="${responseLink}" style="background:#C8622A;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:13px;">Submit Quote →</a>
+            <p style="color:#888;font-size:11px;margin:12px 0 0 0;">Or reply to this email with your pricing.</p>
+          </div>
+          ` : ''}
 
           <p style="color:#444;font-size:14px;margin-top:20px;">Please reply to this email with your pricing. Thank you for your time.</p>
           <p style="color:#444;font-size:14px;">Best regards,<br/><strong>${repName}</strong><br/>${company}</p>

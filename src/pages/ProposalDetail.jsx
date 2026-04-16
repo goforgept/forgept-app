@@ -814,6 +814,35 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       expiresAt.setDate(expiresAt.getDate() + expiryDays)
       const expiresAtStr = expiresAt.toISOString().split('T')[0]
 
+      // Create rfq_requests row and get token
+      const { data: rfqRequest } = await supabase
+        .from('rfq_requests')
+        .insert({
+          proposal_id: proposal.id,
+          org_id: proposal.org_id,
+          vendor_name: vendorName,
+          vendor_email: vendorInfo.email,
+          line_item_ids: items.map(i => i.id),
+          expires_at: expiresAt.toISOString(),
+          status: 'pending'
+        })
+        .select('id, token')
+        .single()
+
+      const responseLink = rfqRequest?.token
+        ? `https://app.goforgept.com/rfq-response/${rfqRequest.token}`
+        : null
+
+      // Update bom_line_items with rfq_request_id
+      if (rfqRequest?.id) {
+        for (const item of items) {
+          await supabase.from('bom_line_items').update({
+            rfq_expires_at: expiresAtStr,
+            rfq_request_id: rfqRequest.id
+          }).eq('id', item.id)
+        }
+      }
+
       let excelBase64 = null
       if (vendorInfo.attachExcel) {
         const XLSX = await import('xlsx')
@@ -830,7 +859,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
       try {
         const { data: { session: currentSession } } = await supabase.auth.refreshSession()
-      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-rfq', {
+        await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-rfq', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -851,14 +880,11 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
             repName: proposal.rep_name,
             repEmail: proposal.rep_email,
             company: profile?.company_name || proposal.company,
-            excelBase64: excelBase64,
-            expiresAt: expiresAtStr
+            excelBase64,
+            expiresAt: expiresAtStr,
+            responseLink
           })
         })
-
-        for (const item of items) {
-          await supabase.from('bom_line_items').update({ rfq_expires_at: expiresAtStr }).eq('id', item.id)
-        }
       } catch (err) {
         console.log(`RFQ error for ${vendorName}:`, err)
       }
