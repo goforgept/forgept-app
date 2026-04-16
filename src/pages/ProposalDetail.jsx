@@ -2751,75 +2751,6 @@ const analyzeDrawing = async () => {
                 {orgType !== 'manufacturer' && (
                   <button onClick={openRFQModal} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Send All RFQs</button>
                 )}
-                  
-                  {/* RFQ Status */}
-{rfqRequests.length > 0 && (
-  <div className="bg-[#1a2d45] rounded-xl p-5 mt-4">
-    <div className="flex justify-between items-center mb-4">
-      <h3 className="text-white font-bold">RFQ Status</h3>
-      <span className="text-[#8A9AB0] text-xs">{rfqRequests.filter(r => r.status === 'responded').length} of {rfqRequests.length} responded</span>
-    </div>
-    <div className="space-y-3">
-      {rfqRequests.map(rfq => {
-        const isResponded = rfq.status === 'responded'
-        const isExpired = rfq.expires_at && new Date(rfq.expires_at) < new Date() && !isResponded
-        const itemCount = rfq.line_item_ids?.length || 0
-        return (
-          <div key={rfq.id} className={`rounded-xl p-4 border ${
-            isResponded ? 'bg-green-500/10 border-green-500/20' :
-            isExpired ? 'bg-red-500/10 border-red-500/20' :
-            'bg-[#0F1C2E] border-[#2a3d55]'
-          }`}>
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="text-white font-semibold text-sm">{rfq.vendor_name}</p>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                    isResponded ? 'bg-green-500/20 text-green-400' :
-                    isExpired ? 'bg-red-500/20 text-red-400' :
-                    'bg-yellow-500/20 text-yellow-400'
-                  }`}>
-                    {isResponded ? '✓ Responded' : isExpired ? '⚠ Expired' : 'Pending'}
-                  </span>
-                </div>
-                <p className="text-[#8A9AB0] text-xs">{itemCount} item{itemCount !== 1 ? 's' : ''} · Sent {new Date(rfq.sent_at || rfq.created_at).toLocaleDateString()}</p>
-                {isResponded && rfq.vendor_quote_number && (
-                  <p className="text-[#C8622A] text-xs mt-1 font-semibold">Quote # {rfq.vendor_quote_number}</p>
-                )}
-                {isResponded && rfq.vendor_quote_expiry && (
-                  <p className="text-[#8A9AB0] text-xs">Expires {new Date(rfq.vendor_quote_expiry).toLocaleDateString()}</p>
-                )}
-                {isResponded && rfq.vendor_notes && (
-                  <p className="text-[#8A9AB0] text-xs mt-1 italic">"{rfq.vendor_notes}"</p>
-                )}
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                {!isResponded && rfq.expires_at && (
-                  <p className={`text-xs ${isExpired ? 'text-red-400' : 'text-[#8A9AB0]'}`}>
-                    {isExpired ? 'Expired' : `Due ${new Date(rfq.expires_at).toLocaleDateString()}`}
-                  </p>
-                )}
-                {isResponded && rfq.vendor_response_pdf_url && (
-                  <a href={rfq.vendor_response_pdf_url} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-[#C8622A] hover:text-white transition-colors">
-                    View Quote PDF →
-                  </a>
-                )}
-                {!isResponded && (
-                  <button
-                    onClick={() => navigator.clipboard.writeText(`https://app.goforgept.com/rfq-response/${rfq.token}`)}
-                    className="text-xs text-[#8A9AB0] hover:text-white transition-colors">
-                    Copy Link
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  </div>
-)}
                 <button onClick={() => { setTemplateName(proposal?.proposal_name || ''); setShowSaveTemplateModal(true) }} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Save as Template</button>
                 {featureAiBom && (
                   <>
@@ -2841,6 +2772,75 @@ const analyzeDrawing = async () => {
               </div>
             )}
           </div>
+
+        {/* RFQ Status */}
+        {rfqRequests.length > 0 && (
+          <div className="bg-[#1a2d45] rounded-xl p-5 mb-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-white font-bold">RFQ Status</h3>
+              <span className="text-[#8A9AB0] text-xs">{rfqRequests.filter(r => r.status === 'responded').length} of {rfqRequests.length} responded</span>
+            </div>
+            <div className="space-y-3">
+              {rfqRequests.map(rfq => {
+                const isResponded = rfq.status === 'responded'
+                const isExpired = rfq.expires_at && new Date(rfq.expires_at) < new Date() && !isResponded
+                const itemCount = rfq.line_item_ids?.length || 0
+                return (
+                  <div key={rfq.id} className={`rounded-xl p-4 border ${
+                    isResponded ? 'bg-green-500/10 border-green-500/20' :
+                    isExpired ? 'bg-red-500/10 border-red-500/20' :
+                    'bg-[#0F1C2E] border-[#2a3d55]'
+                  }`}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="text-white font-semibold text-sm">{rfq.vendor_name}</p>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                            isResponded ? 'bg-green-500/20 text-green-400' :
+                            isExpired ? 'bg-red-500/20 text-red-400' :
+                            'bg-yellow-500/20 text-yellow-400'
+                          }`}>
+                            {isResponded ? '✓ Responded' : isExpired ? '⚠ Expired' : 'Pending'}
+                          </span>
+                        </div>
+                        <p className="text-[#8A9AB0] text-xs">{itemCount} item{itemCount !== 1 ? 's' : ''} · Sent {new Date(rfq.sent_at || rfq.created_at).toLocaleDateString()}</p>
+                        {isResponded && rfq.vendor_quote_number && (
+                          <p className="text-[#C8622A] text-xs mt-1 font-semibold">Quote # {rfq.vendor_quote_number}</p>
+                        )}
+                        {isResponded && rfq.vendor_quote_expiry && (
+                          <p className="text-[#8A9AB0] text-xs">Expires {new Date(rfq.vendor_quote_expiry).toLocaleDateString()}</p>
+                        )}
+                        {isResponded && rfq.vendor_notes && (
+                          <p className="text-[#8A9AB0] text-xs mt-1 italic">"{rfq.vendor_notes}"</p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        {!isResponded && rfq.expires_at && (
+                          <p className={`text-xs ${isExpired ? 'text-red-400' : 'text-[#8A9AB0]'}`}>
+                            {isExpired ? 'Expired' : `Due ${new Date(rfq.expires_at).toLocaleDateString()}`}
+                          </p>
+                        )}
+                        {isResponded && rfq.vendor_response_pdf_url && (
+                          <a href={rfq.vendor_response_pdf_url} target="_blank" rel="noopener noreferrer"
+                            className="text-xs text-[#C8622A] hover:text-white transition-colors">
+                            View Quote PDF →
+                          </a>
+                        )}
+                        {!isResponded && (
+                          <button
+                            onClick={() => navigator.clipboard.writeText(`https://app.goforgept.com/rfq-response/${rfq.token}`)}
+                            className="text-xs text-[#8A9AB0] hover:text-white transition-colors">
+                            Copy Link
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
          {/* BOM View Mode */}
           {!editingBOM ? (
