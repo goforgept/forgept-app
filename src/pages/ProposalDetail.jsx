@@ -3530,11 +3530,12 @@ const analyzeDrawing = async () => {
                   <p className="text-white text-sm font-semibold mb-2">{aiBOMPreview.length} items generated — review before adding</p>
                   <div className="bg-[#0F1C2E] rounded-xl overflow-hidden">
                     <table className="w-full text-xs">
-                      <thead><tr className="border-b border-[#2a3d55]"><th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Item</th><th className="text-[#8A9AB0] text-right py-2 px-3 font-normal">Qty</th><th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Unit</th><th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Category</th></tr></thead>
+                      <thead><tr className="border-b border-[#2a3d55]"><th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Item</th><th className="text-[#8A9AB0] text-right py-2 px-3 font-normal">Qty</th><th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Unit</th><th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Category</th><th className="py-2 px-3"></th></tr></thead>
                       <tbody>
                         {aiBOMPreview.map((item, i) => (
                           <tr key={i} className="border-b border-[#2a3d55]/30">
                             <td className="text-white py-2 px-3">{item.item_name}</td><td className="text-[#8A9AB0] py-2 px-3 text-right">{item.quantity}</td><td className="text-[#8A9AB0] py-2 px-3">{item.unit}</td><td className="text-[#8A9AB0] py-2 px-3">{item.category}</td>
+                            <td className="py-2 px-3"><button onClick={() => setAIBOMPreview(prev => prev.filter((_, idx) => idx !== i))} className="text-[#8A9AB0] hover:text-red-400 transition-colors text-base leading-none">×</button></td>
                           </tr>
                         ))}
                       </tbody>
@@ -3589,6 +3590,7 @@ const analyzeDrawing = async () => {
                           <th className="text-[#8A9AB0] text-right py-2 px-3 font-normal">Qty</th>
                           <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Category</th>
                           <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Notes</th>
+                          <th className="py-2 px-3"></th>
                         </tr>
                       </thead>
                       <tbody>
@@ -3598,6 +3600,7 @@ const analyzeDrawing = async () => {
                             <td className="text-[#8A9AB0] py-2 px-3 text-right">{item.quantity}</td>
                             <td className="text-[#8A9AB0] py-2 px-3">{item.category}</td>
                             <td className="text-[#8A9AB0] py-2 px-3 text-xs italic">{item.notes}</td>
+                            <td className="py-2 px-3"><button onClick={() => setDrawingPreview(prev => prev.filter((_, idx) => idx !== i))} className="text-[#8A9AB0] hover:text-red-400 transition-colors text-base leading-none">×</button></td>
                           </tr>
                         ))}
                       </tbody>
