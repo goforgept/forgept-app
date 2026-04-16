@@ -3226,7 +3226,7 @@ const analyzeDrawing = async () => {
                           <span className="text-[#2a3d55] text-xs">— items not assigned to a section</span>
                         </div>
                       )}
-                      <BOMTable sectionId="general" sectionLabel={null} />
+                      {BOMTable({ sectionId: "general", sectionLabel: null })}
                     </div>
 
                     {/* Section containers */}
@@ -3247,7 +3247,7 @@ const analyzeDrawing = async () => {
                           <button onClick={() => deleteSection(section.id)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors ml-2">✕ Remove</button>
                         </div>
                         <div className="p-4">
-                          <BOMTable sectionId={section.id} sectionLabel={section.name || 'this section'} />
+                          {BOMTable({ sectionId: section.id, sectionLabel: section.name || 'this section' })}
                           {section.include_labor && (
                             <div className="mt-4 pt-4 border-t border-[#2a3d55]">
                               <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Section Labor</p>
