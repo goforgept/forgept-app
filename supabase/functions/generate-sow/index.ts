@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { createClient } from "jsr:@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // Step 1: Extract auth header
   const authHeader = req.headers.get('Authorization')
   if (!authHeader?.startsWith('Bearer ')) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
@@ -18,9 +20,58 @@ Deno.serve(async (req) => {
     })
   }
 
-  try {
-    const { proposalId, company, clientName, jobDesc, industry, repName, lineItems, laborItems, aiNotes } = await req.json()
+  // Step 2: Validate JWT — user-scoped client, RLS applies
+  const userSupabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    { global: { headers: { Authorization: authHeader } } }
+  )
 
+  const { data: { user }, error: authError } = await userSupabase.auth.getUser()
+  if (authError || !user) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // Step 3: Get caller's org_id
+  const { data: profile, error: profileError } = await userSupabase
+    .from('profiles')
+    .select('org_id')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError || !profile?.org_id) {
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  try {
+    const { 
+      proposalId, company, clientName, jobDesc, 
+      industry, repName, lineItems, laborItems, aiNotes 
+    } = await req.json()
+
+    // Step 4: Verify proposal belongs to caller's org
+    // Uses user-scoped client so RLS double-checks this automatically
+    const { data: proposal, error: proposalError } = await userSupabase
+      .from('proposals')
+      .select('id, org_id')
+      .eq('id', proposalId)
+      .eq('org_id', profile.org_id)
+      .single()
+
+    if (proposalError || !proposal) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Step 5: Build prompt — same as before
     const lineItemsText = lineItems.map((l: any) =>
       `${l.itemName} - Qty: ${l.quantity} - Price: $${l.customerPriceUnit} Total: $${l.customerPriceTotal}`
     ).join('\n')
@@ -72,6 +123,7 @@ RULES:
 
 Write 2 short professional paragraphs as the Scope of Work only. Do NOT list the materials or labor items — they will be printed separately in the proposal document.`
 
+    // Step 6: Call Claude
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -89,19 +141,17 @@ Write 2 short professional paragraphs as the Scope of Work only. Do NOT list the
     const claudeData = await claudeResponse.json()
     const sow = claudeData.content[0].text
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    // Step 7: Write back using service role — but only to verified proposal
+    const adminSupabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
 
-    await fetch(`${supabaseUrl}/rest/v1/proposals?id=eq.${proposalId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({ scope_of_work: sow })
-    })
+    await adminSupabase
+      .from('proposals')
+      .update({ scope_of_work: sow })
+      .eq('id', proposalId)
+      .eq('org_id', profile.org_id) // double-check org even with service role
 
     return new Response(
       JSON.stringify({ success: true, sow }),
@@ -111,7 +161,7 @@ Write 2 short professional paragraphs as the Scope of Work only. Do NOT list the
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
 })
