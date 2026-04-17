@@ -679,39 +679,40 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   }
 
   const generateSOW = async () => {
-    setGeneratingSOW(true)
-    try {
-      const { data: { session: currentSession } } = await supabase.auth.refreshSession()
-      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/generate-sow', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${currentSession?.access_token}`
-        },
-        body: JSON.stringify({
-          proposalId: id,
-          company: profile?.company_name,
-          clientName: proposal.client_name,
-          jobDesc: proposal.job_description,
-          industry: proposal.industry,
-          repName: proposal.rep_name,
-          laborItems: laborItems,
-          aiNotes: aiNotes,
-          lineItems: lineItems.map(l => ({
-            itemName: l.item_name,
-            quantity: l.quantity,
-            customerPriceUnit: l.customer_price_unit,
-            customerPriceTotal: l.customer_price_total
-          }))
-        })
-      })
-      await fetchProposal()
-      logActivity('Scope of Work generated')
-    } catch (err) {
-      console.log('SOW generation error:', err)
-    }
-    setGeneratingSOW(false)
+  setGeneratingSOW(true)
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    console.log('Session token:', session?.access_token ? 'present' : 'MISSING')
+
+    const { error } = await supabase.functions.invoke('generate-sow', {
+      body: {
+        proposalId: id,
+        company: profile?.company_name,
+        clientName: proposal.client_name,
+        jobDesc: proposal.job_description,
+        industry: proposal.industry,
+        repName: proposal.rep_name,
+        laborItems: laborItems,
+        aiNotes: aiNotes,
+        lineItems: lineItems.map(l => ({
+          itemName: l.item_name,
+          quantity: l.quantity,
+          customerPriceUnit: l.customer_price_unit,
+          customerPriceTotal: l.customer_price_total
+        }))
+      }
+    })
+
+    if (error) throw error
+
+    await fetchProposal()
+    logActivity('Scope of Work generated')
+  } catch (err) {
+    console.error('SOW generation error:', err)
+    alert(err.message)
   }
+  setGeneratingSOW(false)
+}
 
   const searchLibrary = async (q) => {
     setLibrarySearch(q)
