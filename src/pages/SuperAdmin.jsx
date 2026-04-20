@@ -36,6 +36,7 @@ export default function SuperAdmin() {
   const [deleteModal, setDeleteModal] = useState(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deletingOrg, setDeletingOrg] = useState(false)
+  const [session, setSession] = useState(null)
 
   // New state
   const [allProposals, setAllProposals] = useState([])
@@ -53,7 +54,9 @@ export default function SuperAdmin() {
   useEffect(() => { fetchData() }, [])
 
   const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session: currentSession } } = await supabase.auth.getSession()
+    const user = currentSession?.user
+    if (currentSession) setSession(currentSession)
     if (!user) { setUnauthorized(true); setLoading(false); return }
 
     const { data: profile } = await supabase
@@ -162,14 +165,18 @@ export default function SuperAdmin() {
   const getOrgAdmin = (orgId) => profiles.find(p => p.org_id === orgId && p.org_role === 'admin')
 
   const approveRequest = async (request) => {
-    const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/approve-request', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ requestId: request.id, fullName: request.full_name, email: request.email, companyName: request.company_name })
-    })
-    const result = await res.json()
-    if (result.success) fetchData()
-    else alert('Error approving request: ' + result.error)
+    try {
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/approve-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ requestId: request.id, fullName: request.full_name, email: request.email, companyName: request.company_name })
+      })
+      const result = await res.json()
+      if (result.success) fetchData()
+      else alert('Error approving request: ' + result.error)
+    } catch (err) {
+      alert('Error approving request: ' + err.message)
+    }
   }
 
   const rejectRequest = async (requestId) => {
