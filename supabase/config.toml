@@ -1,115 +1,62 @@
-
 [functions.generate-sow]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/generate-sow/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/generate-sow/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/generate-sow/*.html" ]
 
 [functions.send-rfq]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/send-rfq/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/send-rfq/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/send-rfq/*.html" ]
 
 [functions.send-followups]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/send-followups/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/send-followups/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/send-followups/*.html" ]
 
 [functions.handle-signup]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/handle-signup/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/handle-signup/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/handle-signup/*.html" ]
 
 [functions.send-approval]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/send-approval/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/send-approval/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/send-approval/*.html" ]
 
 [functions.notify-new-request]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/notify-new-request/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/notify-new-request/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/notify-new-request/*.html" ]
 
 [functions.approve-request]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/approve-request/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/approve-request/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/approve-request/*.html" ]
 
 [functions.square-oauth-start]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/square-oauth-start/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/square-oauth-start/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/square-oauth-start/*.html" ]
 
 [functions.square-oauth-callback]
 enabled = true
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/square-oauth-callback/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
 entrypoint = "./functions/square-oauth-callback/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/square-oauth-callback/*.html" ]
 
 [functions.square-create-invoice]
 enabled = true
-verify_jwt = true
-import_map = "./functions/square-create-invoice/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/square-create-invoice/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/square-create-invoice/*.html" ]
-[functions.generate-sow]
 verify_jwt = false
+import_map = "./functions/square-create-invoice/deno.json"
+entrypoint = "./functions/square-create-invoice/index.ts"
 
 [functions.ai-build-bom]
 verify_jwt = false
@@ -129,9 +76,6 @@ verify_jwt = false
 [functions.send-proposal]
 verify_jwt = false
 
-[functions.send-rfq]
-verify_jwt = false
-
 [functions.send-signature-request]
 verify_jwt = false
 
@@ -142,12 +86,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.invite-team-member]
-verify_jwt = false
-
-[functions.send-approval]
-verify_jwt = false
-
-[functions.send-followups]
 verify_jwt = false
 
 [functions.send-followup-emails]
