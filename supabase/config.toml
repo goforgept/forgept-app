@@ -108,3 +108,50 @@ entrypoint = "./functions/square-create-invoice/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/square-create-invoice/*.html" ]
+[functions.generate-sow]
+verify_jwt = false
+
+[functions.ai-build-bom]
+verify_jwt = false
+
+[functions.ai-deal-summary]
+verify_jwt = false
+
+[functions.ai-read-spec]
+verify_jwt = false
+
+[functions.ai-read-drawing]
+verify_jwt = false
+
+[functions.ai-draft-email]
+verify_jwt = false
+
+[functions.send-proposal]
+verify_jwt = false
+
+[functions.send-rfq]
+verify_jwt = false
+
+[functions.send-signature-request]
+verify_jwt = false
+
+[functions.push-calendar-event]
+verify_jwt = false
+
+[functions.delete-calendar-event]
+verify_jwt = false
+
+[functions.invite-team-member]
+verify_jwt = false
+
+[functions.send-approval]
+verify_jwt = false
+
+[functions.send-followups]
+verify_jwt = false
+
+[functions.send-followup-emails]
+verify_jwt = false
+
+[functions.renewal-engine]
+verify_jwt = false
