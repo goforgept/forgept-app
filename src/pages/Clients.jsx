@@ -6,7 +6,7 @@ import Sidebar from '../components/Sidebar'
 const emptyForm = {
   client_name: '', company: '', email: '', phone: '',
   industry: '', crm_source: '', notes: '',
-  address: '', city: '', state: '', zip: ''
+  address: '', city: '', state: '', zip: '', store_id: ''
 }
 
 const industries = ['Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security', 'Low Voltage', 'General Contractor', 'Roofing', 'Home Improvement', 'Flooring', 'Painting', 'Landscaping', 'Solar', 'Fire Protection', 'Telecom', 'IT / Networking', 'Other']
@@ -230,6 +230,12 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                         <span className="text-[#8A9AB0] text-xs">{location}</span>
                       </div>
                     )}
+                    {primary?.store_id && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#8A9AB0] text-xs w-4">ID</span>
+                        <span className="text-[#8A9AB0] text-xs font-mono">{primary.store_id}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Footer */}
@@ -371,6 +377,15 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                     className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Store ID</label>
+                <input type="text" value={form.store_id}
+                  onChange={e => setForm(p => ({ ...p, store_id: e.target.value }))}
+                  placeholder="e.g. STR-001"
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                />
               </div>
 
               <div>
