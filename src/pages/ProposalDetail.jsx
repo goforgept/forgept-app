@@ -1991,14 +1991,10 @@ const analyzeDrawing = async () => {
     setGeneratingBOM(true)
     setAIBOMPreview([])
     try {
-      const { data: { session: currentSession } } = await supabase.auth.refreshSession()
-      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-build-bom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
-        body: JSON.stringify({ description: aiBOMPrompt, industry: proposal?.industry || '' })
+      const { data, error } = await supabase.functions.invoke('ai-build-bom', {
+        body: { description: aiBOMPrompt, industry: proposal?.industry || '' }
       })
-      const data = await res.json()
-      if (data.error) throw new Error(data.error)
+      if (error) throw error
       setAIBOMPreview(data.items || [])
     } catch (err) { alert('Error generating BOM: ' + err.message) }
     setGeneratingBOM(false)
