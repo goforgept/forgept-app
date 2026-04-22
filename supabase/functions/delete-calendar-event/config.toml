@@ -1,2 +1,0 @@
-[functions.delete-calendar-event]
-verify_jwt = false
