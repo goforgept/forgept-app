@@ -1,1 +1,2 @@
+[functions.send-followups]
 verify_jwt = false

@@ -1,1 +1,2 @@
+[functions.send-rfq]
 verify_jwt = false

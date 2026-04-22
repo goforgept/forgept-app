@@ -1,1 +1,2 @@
+[functions.send-approval]
 verify_jwt = false
