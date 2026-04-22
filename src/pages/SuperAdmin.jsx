@@ -36,7 +36,6 @@ export default function SuperAdmin() {
   const [deleteModal, setDeleteModal] = useState(null)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deletingOrg, setDeletingOrg] = useState(false)
-  const [session, setSession] = useState(null)
 
   // New state
   const [allProposals, setAllProposals] = useState([])
@@ -54,9 +53,7 @@ export default function SuperAdmin() {
   useEffect(() => { fetchData() }, [])
 
   const fetchData = async () => {
-    const { data: { session: currentSession } } = await supabase.auth.getSession()
-    const user = currentSession?.user
-    if (currentSession) setSession(currentSession)
+    const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setUnauthorized(true); setLoading(false); return }
 
     const { data: profile } = await supabase
@@ -166,14 +163,12 @@ export default function SuperAdmin() {
 
   const approveRequest = async (request) => {
     try {
-      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/approve-request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ requestId: request.id, fullName: request.full_name, email: request.email, companyName: request.company_name })
+      const { data, error } = await supabase.functions.invoke('approve-request', {
+        body: { requestId: request.id, fullName: request.full_name, email: request.email, companyName: request.company_name }
       })
-      const result = await res.json()
-      if (result.success) fetchData()
-      else alert('Error approving request: ' + result.error)
+      if (error) alert('Error approving request: ' + error.message)
+      else if (data?.success) fetchData()
+      else alert('Error approving request: ' + (data?.error || 'Unknown error'))
     } catch (err) {
       alert('Error approving request: ' + err.message)
     }
@@ -304,14 +299,12 @@ export default function SuperAdmin() {
     setCreatingSubscription(true)
     setStripeResult(null)
     try {
-      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-create-subscription', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeModal.admin?.email || '', plan: stripeForm.plan, chargeOnboarding: stripeForm.chargeOnboarding })
+      const { data: result, error } = await supabase.functions.invoke('stripe-create-subscription', {
+        body: { orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeModal.admin?.email || '', plan: stripeForm.plan, chargeOnboarding: stripeForm.chargeOnboarding }
       })
-      const result = await res.json()
-      if (result.error) setStripeResult({ success: false, message: result.error })
-      else { setStripeResult({ success: true, message: `Subscription created! Status: ${result.status}` }); fetchData() }
+      if (error) setStripeResult({ success: false, message: error.message })
+      else if (result?.error) setStripeResult({ success: false, message: result.error })
+      else { setStripeResult({ success: true, message: `Subscription created! Status: ${result?.status}` }); fetchData() }
     } catch (err) {
       setStripeResult({ success: false, message: err.message })
     }

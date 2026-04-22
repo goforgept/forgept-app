@@ -48,13 +48,8 @@ export default function Login() {
       return
     }
 
-    await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/notify-new-request', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token}`
-      },
-      body: JSON.stringify({ fullName, email, companyName, notes, role })
+    await supabase.functions.invoke('notify-new-request', {
+      body: { fullName, email, companyName, notes, role }
     })
 
     setSuccess("Request submitted! We'll be in touch within 1 business day to schedule your walkthrough.")

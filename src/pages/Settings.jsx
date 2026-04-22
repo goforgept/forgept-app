@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import DataImportTab from '../components/DataImportTab'
 
 const SLA_INDUSTRIES = ['Security','Audio/Visual','IT / Networking','Low Voltage','Fire Protection','HVAC','Electrical','Telecom','Solar','Mechanical','Plumbing','General Contractor','Other']
 const MONITORING_INDUSTRIES = ['Security','IT / Networking','Fire Protection','Low Voltage','Telecom','Audio/Visual','HVAC']
@@ -78,6 +79,15 @@ const MONITORING_DEFAULTS = {
 export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, role, isSalesManager, isPM, isTechnician }) {
   const [profile, setProfile] = useState(null)
   const [activeTab, setActiveTab] = useState('general')
+  const [importType, setImportType] = useState('clients')
+  const [importFile, setImportFile] = useState(null)
+  const [importPreview, setImportPreview] = useState([])
+  const [importHeaders, setImportHeaders] = useState([])
+  const [importing, setImporting] = useState(false)
+  const [importResults, setImportResults] = useState(null)
+  const [locationMatchType, setLocationMatchType] = useState('auto')
+  const [locationMatchClient, setLocationMatchClient] = useState('')
+  const [importClients, setImportClients] = useState([])
   const [form, setForm] = useState({
     full_name: '',
     email: '',
@@ -626,6 +636,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
             ...(isAdmin ? [{ key: 'email', label: 'Email Templates' }] : []),
             ...(isAdmin ? [{ key: 'invoicing', label: 'Invoicing' }] : []),
             ...(isAdmin ? [{ key: 'sla', label: 'SLA & Contracts' }] : []),
+            ...(isAdmin ? [{ key: 'data', label: 'Data & Import' }] : []),
           ].map(tab => (
             <button key={tab.key} onClick={() => { setActiveTab(tab.key); setSuccess(null) }}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === tab.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
@@ -1401,6 +1412,21 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         )}
 
         {/* ── EMAIL TEMPLATES TAB ── */}
+        {activeTab === 'data' && isAdmin && (
+          <DataImportTab
+            importType={importType} setImportType={setImportType}
+            importFile={importFile} setImportFile={setImportFile}
+            importPreview={importPreview} setImportPreview={setImportPreview}
+            importHeaders={importHeaders} setImportHeaders={setImportHeaders}
+            importing={importing} setImporting={setImporting}
+            importResults={importResults} setImportResults={setImportResults}
+            locationMatchType={locationMatchType} setLocationMatchType={setLocationMatchType}
+            locationMatchClient={locationMatchClient} setLocationMatchClient={setLocationMatchClient}
+            importClients={importClients} setImportClients={setImportClients}
+            supabase={supabase}
+          />
+        )}
+
         {activeTab === 'email' && isAdmin && (
           <div className="space-y-6">
             <div className="bg-[#1a2d45] rounded-xl p-5">
