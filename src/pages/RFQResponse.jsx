@@ -54,7 +54,7 @@ export default function RFQResponse() {
     if (data.line_item_ids?.length > 0) {
       const { data: items } = await supabase
         .from('bom_line_items')
-        .select('id, item_name, part_number_sku, manufacturer, quantity, unit, markup_percent')
+        .select('id, item_name, part_number_sku, manufacturer, quantity, unit')
         .in('id', data.line_item_ids)
       setLineItems(items || [])
       const initPrices = {}
@@ -143,19 +143,15 @@ export default function RFQResponse() {
           .map(([id, price]) => ({ id, price: parseFloat(price) || 0 }))
       }).eq('token', token)
 
-      // Update bom_line_items with prices and quote number
+      // Update bom_line_items with vendor cost only — markup applied by rep on review
       for (const [itemId, price] of Object.entries(prices)) {
         if (!price) continue
         const unitPrice = parseFloat(price) || 0
         const item = lineItems.find(i => i.id === itemId)
         const qty = parseFloat(item?.quantity) || 1
-        const markupPercent = parseFloat(item?.markup_percent) || 35
-        const customerPriceUnit = parseFloat((unitPrice * (1 + markupPercent / 100)).toFixed(2))
-        const customerPriceTotal = parseFloat((customerPriceUnit * qty).toFixed(2))
         await supabase.from('bom_line_items').update({
           your_cost_unit: unitPrice,
-          customer_price_unit: customerPriceUnit,
-          customer_price_total: customerPriceTotal,
+          your_cost_total: parseFloat((unitPrice * qty).toFixed(2)),
           rfq_quote_number: quoteNumber || null,
           pricing_status: 'Confirmed'
         }).eq('id', itemId)
