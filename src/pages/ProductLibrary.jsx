@@ -85,6 +85,40 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
 
         const clean = (val) => String(val || '').replace(/[$, ]/g, '').trim()
 
+// QuickBooks category → ForgePt category mapping
+const qbCategoryMap = {
+  'network camera': 'Security',
+  'dvr': 'Security',
+  'access control': 'Security',
+  'networking': 'Networking',
+  'cabling': 'Material',
+  'audio': 'Audio/Visual',
+  'music': 'Audio/Visual',
+  'digital signage': 'Audio/Visual',
+  'wifi': 'Networking',
+  'ups power supply battery backup': 'Electrical',
+  'storage': 'Material',
+  'phones': 'Other',
+  'pos': 'Other',
+  'maintenance': 'Other',
+  'service call': 'Other',
+  'camera software licensing': 'Security',
+  'computers and accessories': 'Other',
+}
+
+const mapCategory = (cat) => {
+  if (!cat) return null
+  const lower = cat.toLowerCase().trim()
+  return qbCategoryMap[lower] || null
+}
+
+// QB service types to skip — these are labor/service line items not products
+const skipTypes = ['service']
+const skipNames = [
+  'fuel', 'travel expenses', 'paypal', 'overpayment', 'discount',
+  'services', 'telephone number', 'starlink'
+]
+
         // Fetch existing products for this org to check part numbers
         const { data: existingProds } = await supabase
           .from('product_library')
@@ -98,16 +132,33 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
         const vendorsImported = new Set()
 
         for (const r of rows) {
-          const itemName = String(r['Item Name'] || r['item_name'] || r['Name'] || r['name'] || '').trim()
-          const partNumber = String(r['Part #'] || r['Part Number'] || r['part_number'] || r['SKU'] || '').trim()
-          const vendor = String(r['Vendor'] || r['vendor'] || r['Distributor'] || '').trim()
-          const costRaw = clean(r['Your Cost'] || r['Cost'] || r['your_cost'] || r['Price'] || r['Unit Cost'] || '')
-          const cost = parseFloat(costRaw) || null
-          const pricingDateRaw = r['Pricing Date'] || r['pricing_date'] || r['Date'] || ''
-          const pricingDate = pricingDateRaw ? String(pricingDateRaw).split('T')[0] : new Date().toISOString().split('T')[0]
+  const itemName = String(r['Item Name'] || r['Product/Service Name'] || r['item_name'] || r['Name'] || r['name'] || '').trim()
+  const partNumber = String(r['Part #'] || r['Part Number'] || r['part_number'] || r['SKU'] || '').trim()
+  const vendor = String(r['Vendor'] || r['vendor'] || r['Distributor'] || '').trim()
+  const itemType = String(r['Item type'] || r['Type'] || '').trim().toLowerCase()
+  const rawCategory = String(r['Category'] || r['category'] || '').trim()
+  const category = mapCategory(rawCategory) || rawCategory || null
+  const description = String(r['Sales Description'] || r['Purchase Description'] || r['Description'] || r['description'] || '').trim() || null
+  const manufacturer = String(r['Manufacturer'] || r['manufacturer'] || r['Mfr'] || '').trim() || null
 
-          if (!itemName && !partNumber) continue
-          if (!cost && cost !== 0) continue
+  // Skip pure service items from QuickBooks
+  if (itemType === 'service') continue
+
+  // Skip known non-product names
+  if (skipNames.some(s => itemName.toLowerCase().includes(s))) continue
+
+  // For QB imports, use Cost column as your_cost
+  const costRaw = clean(r['Your Cost'] || r['Cost'] || r['your_cost'] || r['Unit Cost'] || '')
+  const cost = parseFloat(costRaw) || null
+
+  // For QB imports, use Price as a fallback if no cost
+  const priceRaw = clean(r['Price'] || r['your_cost'] || '')
+  const price = parseFloat(priceRaw) || null
+
+  const pricingDateRaw = r['Pricing Date'] || r['pricing_date'] || r['Date'] || ''
+  const pricingDate = pricingDateRaw ? String(pricingDateRaw).split('T')[0] : new Date().toISOString().split('T')[0]
+
+  if (!itemName && !partNumber) continue
 
           if (vendor) vendorsImported.add(vendor)
 
@@ -117,17 +168,17 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
           if (!productId) {
             // Create new product
             const { data: newProd, error: prodErr } = await supabase
-              .from('product_library')
-              .insert({
-                org_id: orgId,
-                item_name: itemName || partNumber,
-                manufacturer: String(r['Manufacturer'] || r['manufacturer'] || r['Mfr'] || '').trim() || null,
-                part_number: partNumber || null,
-                category: String(r['Category'] || r['category'] || '').trim() || null,
-                unit: String(r['Unit'] || r['unit'] || 'ea').trim().toLowerCase() || 'ea',
-                description: String(r['Description'] || r['description'] || '').trim() || null,
-                active: true,
-              })
+  .from('product_library')
+  .insert({
+    org_id: orgId,
+    item_name: itemName || partNumber,
+    manufacturer,
+    part_number: partNumber || null,
+    category,
+    unit: String(r['Unit'] || r['unit'] || 'ea').trim().toLowerCase() || 'ea',
+    description,
+    active: true,
+  })
               .select('id')
               .single()
 
@@ -137,7 +188,12 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
             addedProducts++
           }
 
-          if (!vendor || !productId) continue
+          // For QB imports with no vendor, still import the product — just skip pricing row
+if (!vendor || !productId) continue
+
+// Use cost if available, otherwise use price as fallback
+const finalCost = cost && cost > 0 ? cost : (price && price > 0 ? price : null)
+if (!finalCost) continue
 
           // 2. Upsert vendor pricing row
           const { data: existingPrice } = await supabase
@@ -149,12 +205,12 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
 
           if (existingPrice) {
             await supabase.from('product_library_pricing')
-              .update({ your_cost: cost, pricing_date: pricingDate, source: 'excel_import', updated_at: new Date().toISOString() })
+              .update({ your_cost: finalCost, pricing_date: pricingDate, source: 'excel_import', updated_at: new Date().toISOString() })
               .eq('id', existingPrice.id)
             updatedPrices++
           } else {
             await supabase.from('product_library_pricing')
-              .insert({ product_id: productId, org_id: orgId, vendor, your_cost: cost, pricing_date: pricingDate, source: 'excel_import' })
+              .insert({ product_id: productId, org_id: orgId, vendor, your_cost: finalCost, pricing_date: pricingDate, source: 'excel_import' })
             addedPrices++
           }
         }
