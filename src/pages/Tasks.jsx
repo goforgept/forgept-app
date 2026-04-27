@@ -30,7 +30,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
 
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    const { data: profileData } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager').eq('id', user.id).single()
     setProfile(profileData)
     if (!profileData?.org_id) { setLoading(false); return }
 
