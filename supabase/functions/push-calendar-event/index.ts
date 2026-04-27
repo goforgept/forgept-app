@@ -1,19 +1,15 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { validateUser, corsHeaders } from "../_shared/auth.ts"
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')!
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')!
 const MICROSOFT_CLIENT_ID = Deno.env.get('MICROSOFT_CLIENT_ID')!
 const MICROSOFT_CLIENT_SECRET = Deno.env.get('MICROSOFT_CLIENT_SECRET')!
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+)
 
 async function refreshGoogleToken(refreshToken: string): Promise<string | null> {
   try {
@@ -176,12 +172,12 @@ async function pushMicrosoftEvent(
   return { eventId: data.id || null, meetingLink }
 }
 
-  serve(async (req) => {
+  Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+  const { profile, error } = await validateUser(req)
+  if (error) {
+    return new Response(JSON.stringify({ error }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -276,23 +272,23 @@ async function pushMicrosoftEvent(
       }
     }
 
-    // ── Persist event IDs back to the record ──
+    // ── Persist event IDs back to the record — org scoped ──
     if (record_type === 'job_schedule') {
       await supabase.from('job_tech_schedules').update({
         google_event_id: results.google_event_id,
         microsoft_event_id: results.microsoft_event_id,
-      }).eq('id', record_id)
+      }).eq('id', record_id).eq('org_id', profile.org_id)
     } else if (record_type === 'ticket') {
       await supabase.from('service_tickets').update({
         google_event_id: results.google_event_id,
         microsoft_event_id: results.microsoft_event_id,
-      }).eq('id', record_id)
+      }).eq('id', record_id).eq('org_id', profile.org_id)
     } else if (record_type === 'task') {
       await supabase.from('tasks').update({
         meeting_link: results.meeting_link,
         google_event_id: results.google_event_id,
         microsoft_event_id: results.microsoft_event_id,
-      }).eq('id', record_id)
+      }).eq('id', record_id).eq('org_id', profile.org_id)
     }
 
     return new Response(JSON.stringify({ ok: true, ...results }), {

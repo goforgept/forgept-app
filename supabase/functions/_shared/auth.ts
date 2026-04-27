@@ -24,7 +24,7 @@ export async function validateUser(req: Request) {
 
   const { data: profile, error: profileError } = await userSupabase
     .from('profiles')
-    .select('org_id, role')
+    .select('org_id, role, team_id, is_regional_vp, is_operations_manager')
     .eq('id', user.id)
     .single()
 
@@ -32,5 +32,35 @@ export async function validateUser(req: Request) {
     return { user: null, profile: null, error: 'Unauthorized' }
   }
 
-  return { user, profile, error: null }
+  // Get team members if this user is a manager or VP
+  let managedTeamIds: string[] = []
+  let managedMemberIds: string[] = []
+
+  if (profile.is_regional_vp || profile.is_operations_manager) {
+    const { data: managedTeams } = await userSupabase
+      .from('teams')
+      .select('id')
+      .eq('manager_id', user.id)
+
+    managedTeamIds = (managedTeams || []).map((t: any) => t.id)
+
+    if (managedTeamIds.length > 0) {
+      const { data: members } = await userSupabase
+        .from('team_members')
+        .select('profile_id')
+        .in('team_id', managedTeamIds)
+
+      managedMemberIds = (members || []).map((m: any) => m.profile_id)
+    }
+  }
+
+  return { 
+    user, 
+    profile: {
+      ...profile,
+      managedTeamIds,
+      managedMemberIds,
+    }, 
+    error: null 
+  }
 }

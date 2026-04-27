@@ -1,10 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
+import { validateUser, corsHeaders } from "../_shared/auth.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 const SENDER_EMAIL = 'followups@goforgept.com'
 
 Deno.serve(async (req) => {
@@ -12,9 +8,9 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+  const { profile, error } = await validateUser(req)
+  if (error) {
+    return new Response(JSON.stringify({ error }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -27,8 +23,7 @@ Deno.serve(async (req) => {
     } = await req.json()
 
     const brevoKey = Deno.env.get('BREVO_API_KEY') ?? ''
-    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    
 
     const logoHeader = logoUrl
       ? `<div style="background:#0F1C2E;padding:20px 28px;text-align:left;"><img src="${logoUrl}" alt="${companyName}" style="max-height:48px;max-width:200px;object-fit:contain;" /></div>`
@@ -73,17 +68,17 @@ Deno.serve(async (req) => {
       throw new Error(`Brevo error: ${err}`)
     }
 
-    // Mark proposal as Sent
-    await fetch(`${supabaseUrl}/rest/v1/proposals?id=eq.${proposalId}`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({ status: 'Sent' })
-    })
+    // Mark proposal as Sent — scoped to caller's org
+    const adminSupabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    await adminSupabase
+      .from('proposals')
+      .update({ status: 'Sent' })
+      .eq('id', proposalId)
+      .eq('org_id', profile.org_id)
 
     return new Response(
       JSON.stringify({ success: true }),

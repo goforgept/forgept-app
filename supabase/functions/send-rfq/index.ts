@@ -1,22 +1,17 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { validateUser, corsHeaders } from "../_shared/auth.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY') ?? ''
 const SENDER_EMAIL = 'followups@goforgept.com'
 const SENDER_NAME = 'ForgePt.'
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
-const SUPABASE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+  const { profile, error } = await validateUser(req)
+  if (error) {
+    return new Response(JSON.stringify({ error }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -29,18 +24,28 @@ Deno.serve(async (req) => {
       excelBase64, expiresAt, responseLink
     } = await req.json()
 
-    // Update pricing_status to RFQ Sent on each line item
+    // Update pricing_status to RFQ Sent — verify line items belong to caller's org
     if (lineItemIds?.length > 0) {
-      await fetch(`${SUPABASE_URL}/rest/v1/bom_line_items?id=in.(${lineItemIds.join(',')})`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({ pricing_status: 'RFQ Sent' })
-      })
+      const adminSupabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      )
+
+      // Verify line items belong to caller's org via proposal
+      const { data: validItems } = await adminSupabase
+        .from('bom_line_items')
+        .select('id, proposal_id, proposals!inner(org_id)')
+        .in('id', lineItemIds)
+        .eq('proposals.org_id', profile.org_id)
+
+      const validIds = (validItems || []).map((i: any) => i.id)
+
+      if (validIds.length > 0) {
+        await adminSupabase
+          .from('bom_line_items')
+          .update({ pricing_status: 'RFQ Sent' })
+          .in('id', validIds)
+      }
     }
 
     // Build clean HTML item table
