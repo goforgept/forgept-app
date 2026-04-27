@@ -1,10 +1,5 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { validateUser, corsHeaders } from "../_shared/auth.ts"
 
 async function refreshQBOToken(supabase: any, org: any) {
   const clientId = Deno.env.get('QBO_CLIENT_ID')!
@@ -68,36 +63,34 @@ async function findOrCreateCustomer(accessToken: string, realmId: string, propos
   return createData?.Customer?.Id
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  try {
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
+  const { profile, error: authError } = await validateUser(req)
+  if (authError) return new Response(JSON.stringify({ error: authError }), { status: 401, headers: corsHeaders })
 
-    const supabase = createClient(
+  try {
+    const adminSupabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
-    if (userError || !user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
-
     const { proposalId } = await req.json()
 
-    // Fetch proposal
-    const { data: proposal } = await supabase
+    // Fetch proposal — scoped to caller's org
+    const { data: proposal } = await adminSupabase
       .from('proposals')
       .select('*')
       .eq('id', proposalId)
+      .eq('org_id', profile.org_id)
       .single()
     if (!proposal) return new Response(JSON.stringify({ error: 'Proposal not found' }), { status: 404, headers: corsHeaders })
 
-    // Fetch org with QBO tokens
-    const { data: org } = await supabase
+    // Fetch org with QBO tokens — scoped to caller's org
+    const { data: org } = await adminSupabase
       .from('organizations')
       .select('id, qbo_access_token, qbo_refresh_token, qbo_realm_id, qbo_token_expires_at, qbo_connected')
-      .eq('id', proposal.org_id)
+      .eq('id', profile.org_id)
       .single()
 
     if (!org?.qbo_connected) return new Response(JSON.stringify({ error: 'QuickBooks not connected' }), { status: 400, headers: corsHeaders })
@@ -213,10 +206,10 @@ serve(async (req) => {
     }).eq('id', proposalId)
 
     // Log activity
-    await supabase.from('activities').insert({
+    await adminSupabase.from('activities').insert({
       proposal_id: proposalId,
-      org_id: proposal.org_id,
-      user_id: user.id,
+      org_id: profile.org_id,
+      user_id: profile.id,
       type: 'note',
       title: `Invoice created in QuickBooks${invoice.DocNumber ? ` — #${invoice.DocNumber}` : ''}`
     })

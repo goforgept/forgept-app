@@ -25,6 +25,7 @@ Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   const brevoKey = Deno.env.get('BREVO_API_KEY') ?? ''
+  const cronSecret = Deno.env.get('CRON_SECRET') ?? ''
 
   const dbHeaders = {
     'apikey': supabaseKey,
@@ -36,10 +37,13 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}))
 
     // ── Direct send: ai_email, meeting confirmation, share notifications etc ──
-    // These require auth since they're called by logged-in users
+    // These require user JWT auth since they're called by logged-in users
     if (body.type === 'ai_email' || body.type === 'share_notification' || body.type === 'meeting_confirmation' || body.type === 'meeting_cancellation') {
       const authHeader = req.headers.get('Authorization')
-      if (!authHeader?.startsWith('Bearer ')) {
+      
+      // Accept either a valid user JWT or the cron secret
+      const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`
+      if (!isCron && !authHeader?.startsWith('Bearer ')) {
         return new Response(JSON.stringify({ error: 'Unauthorized' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -135,6 +139,15 @@ Deno.serve(async (req) => {
     }
 
     // ── Scheduled follow-up flow below ──
+    // Must be called by cron with secret key
+    const authHeader = req.headers.get('Authorization')
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
     const proposalsRes = await fetch(
       `${supabaseUrl}/rest/v1/proposals?status=eq.Sent&select=*`,
       { headers: dbHeaders }

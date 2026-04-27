@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { validateUser } from "../_shared/auth.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,10 +19,19 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+  const { profile, error: authError } = await validateUser(req)
+  if (authError) {
+    return new Response(JSON.stringify({ error: authError }), {
       status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  // SuperAdmin only
+  const SUPERADMIN_ORG_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+  if (profile.org_id !== SUPERADMIN_ORG_ID) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }

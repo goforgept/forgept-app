@@ -1,13 +1,20 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://app.goforgept.com',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { validateUser, corsHeaders } from "../_shared/auth.ts"
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders })
+
+  const { profile, error: authError } = await validateUser(req)
+  if (authError) return new Response(JSON.stringify({ error: authError }), {
+    status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+
+  const adminSupabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -19,14 +26,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Verify the caller is authenticated
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
     const { invoiceId } = await req.json()
     if (!invoiceId) {
       return new Response(JSON.stringify({ error: 'invoiceId required' }), {
@@ -44,6 +43,13 @@ Deno.serve(async (req) => {
     if (!invoice) {
       return new Response(JSON.stringify({ error: 'Invoice not found' }), {
         status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Verify invoice belongs to caller's org
+    if (invoice.org_id !== profile.org_id) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 

@@ -1,20 +1,15 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { validateUser, corsHeaders } from "../_shared/auth.ts"
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
-
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')!
 const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')!
 const MICROSOFT_CLIENT_ID = Deno.env.get('MICROSOFT_CLIENT_ID')!
 const MICROSOFT_CLIENT_SECRET = Deno.env.get('MICROSOFT_CLIENT_SECRET')!
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+)
 async function refreshGoogleToken(refreshToken: string): Promise<string | null> {
   try {
     const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -39,12 +34,12 @@ async function refreshMicrosoftToken(refreshToken: string): Promise<string | nul
   } catch { return null }
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader?.startsWith('Bearer ')) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+  const { profile, error } = await validateUser(req)
+  if (error) {
+    return new Response(JSON.stringify({ error }), {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
@@ -52,6 +47,21 @@ serve(async (req) => {
 
   try {
     const { tech_id, google_event_id, microsoft_event_id, calendar_id } = await req.json()
+
+    // Verify tech belongs to caller's org
+    const { data: techCheck } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', tech_id)
+      .eq('org_id', profile.org_id)
+      .single()
+
+    if (!techCheck) {
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     if (!tech_id) return new Response(JSON.stringify({ error: 'Missing tech_id' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
 
