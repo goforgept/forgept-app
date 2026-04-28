@@ -228,6 +228,30 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       .from('bom_line_items')
       .select('*')
       .eq('proposal_id', id)
+
+    // Auto-apply margin to confirmed lines missing customer price
+    const confirmedNeedingMargin = (data || []).filter(l =>
+      l.pricing_status === 'Confirmed' &&
+      parseFloat(l.your_cost_unit) > 0 &&
+      (!l.customer_price_unit || parseFloat(l.customer_price_unit) === 0)
+    )
+
+    if (confirmedNeedingMargin.length > 0) {
+      for (const line of confirmedNeedingMargin) {
+        const cost = parseFloat(line.your_cost_unit) || 0
+        const markup = parseFloat(line.markup_percent) || 35
+        const customerPriceUnit = parseFloat((cost * (1 + markup / 100)).toFixed(2))
+        const customerPriceTotal = parseFloat((customerPriceUnit * (parseFloat(line.quantity) || 1)).toFixed(2))
+        await supabase.from('bom_line_items').update({
+          customer_price_unit: customerPriceUnit,
+          customer_price_total: customerPriceTotal,
+        }).eq('id', line.id)
+        // Update local data too
+        line.customer_price_unit = customerPriceUnit
+        line.customer_price_total = customerPriceTotal
+      }
+    }
+
     setLineItems(data || [])
     setEditLines(data || [])
     const dates = {}
