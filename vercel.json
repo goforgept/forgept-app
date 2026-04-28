@@ -20,8 +20,9 @@
           "value": "camera=(), microphone=(), geolocation=()"
         },
         {
+  
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.brevo.com; frame-ancestors 'none';"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://api.anthropic.com https://api.brevo.com https://api.brevo.com wss://*.supabase.co; frame-ancestors 'none'; object-src 'none'; base-uri 'self';"
         }
       ]
     }
