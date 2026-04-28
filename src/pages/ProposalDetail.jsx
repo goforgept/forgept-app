@@ -1855,7 +1855,20 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
   const fetchPhotos = async () => {
     const { data } = await supabase.from('proposal_photos').select('*').eq('proposal_id', id).order('created_at', { ascending: true })
-    setPhotos(data || [])
+    if (!data) { setPhotos([]); return }
+
+    // Generate fresh signed URLs for each photo
+    const photosWithUrls = await Promise.all(data.map(async (photo) => {
+      const path = photo.url.includes('/proposal-photos/') 
+        ? photo.url.split('/proposal-photos/')[1]
+        : photo.url
+      const { data: signed } = await supabase.storage
+        .from('proposal-photos')
+        .createSignedUrl(path, 60 * 60 * 24) // 24 hour signed URL
+      return { ...photo, url: signed?.signedUrl || photo.url }
+    }))
+
+    setPhotos(photosWithUrls)
   }
 const fetchRFQRequests = async () => {
     const { data } = await supabase
@@ -2026,12 +2039,12 @@ const analyzeDrawing = async () => {
     setUploadingPhoto(true)
     try {
       const fileExt = file.name.split('.').pop()
-      const fileName = `${id}/${Date.now()}.${fileExt}`
+      const fileName = `${proposal?.org_id}/${id}/${Date.now()}.${fileExt}`
       const { error: uploadError } = await supabase.storage.from('proposal-photos').upload(fileName, file, { upsert: false })
       if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from('proposal-photos').getPublicUrl(fileName)
+      const { data: urlData } = await supabase.storage.from('proposal-photos').createSignedUrl(fileName, 60 * 60 * 24 * 365)
       const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('proposal_photos').insert({ proposal_id: id, org_id: proposal?.org_id, user_id: user.id, url: urlData.publicUrl, caption: '' })
+      await supabase.from('proposal_photos').insert({ proposal_id: id, org_id: proposal?.org_id, user_id: user.id, url: urlData.signedUrl, caption: '' })
       await fetchPhotos()
       logActivity(`Site photo added`)
     } catch (err) { alert('Error uploading photo: ' + err.message) }
