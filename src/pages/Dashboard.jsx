@@ -21,7 +21,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
   const fetchAll = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profileData } = await supabase
-      .from('profiles').select('*, organizations(org_type)').eq('id', user.id).single()
+      .from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type)').eq('id', user.id).single()
     setProfile(profileData)
     if (!profileData?.org_id) { setLoading(false); return }
 
