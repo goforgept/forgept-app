@@ -32,7 +32,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    const { data: prof } = await supabase.from('profiles').select('*, organizations(org_type, default_tax_rate)').eq('id', user.id).single()
+    const { data: prof } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type, default_tax_rate)').eq('id', user.id).single()
     setProfile(prof)
     const defaultRate = prof?.organizations?.default_tax_rate ?? ''
     setOrgDefaultTaxRate(String(defaultRate))
