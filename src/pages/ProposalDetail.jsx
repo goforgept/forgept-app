@@ -2036,6 +2036,11 @@ const analyzeDrawing = async () => {
   const uploadPhoto = async (e) => {
     const file = e.target.files[0]
     if (!file) return
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic']
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please upload a JPEG, PNG, or WEBP image.')
+      return
+    }
     setUploadingPhoto(true)
     try {
       const fileExt = file.name.split('.').pop()
@@ -4011,7 +4016,7 @@ const analyzeDrawing = async () => {
               <div><h3 className="text-white font-bold text-lg">📷 Site Photos</h3><p className="text-[#8A9AB0] text-sm mt-0.5">Attach job site photos to this proposal</p></div>
               <label className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors cursor-pointer">
                 {uploadingPhoto ? 'Uploading...' : '+ Upload Photo'}
-                <input type="file" accept="image/*" onChange={uploadPhoto} className="hidden" disabled={uploadingPhoto} />
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} className="hidden" disabled={uploadingPhoto} />
               </label>
             </div>
             {photos.length === 0 ? (
