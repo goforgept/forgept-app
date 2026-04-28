@@ -24,12 +24,41 @@ Deno.serve(async (req) => {
       excelBase64, expiresAt, responseLink
     } = await req.json()
 
+    if (!vendorEmail || !vendorName) {
+      return new Response(JSON.stringify({ error: 'Missing vendor details' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(vendorEmail)) {
+      return new Response(JSON.stringify({ error: 'Invalid vendor email' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const adminSupabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    // Verify vendor email belongs to a vendor in the caller's org
+    const { data: vendor } = await adminSupabase
+      .from('vendors')
+      .select('id')
+      .eq('org_id', profile.org_id)
+      .eq('contact_email', vendorEmail)
+      .single()
+
+    if (!vendor) {
+      return new Response(JSON.stringify({ error: 'Vendor not found in your organization' }), {
+        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
     // Update pricing_status to RFQ Sent — verify line items belong to caller's org
     if (lineItemIds?.length > 0) {
-      const adminSupabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      )
 
       // Verify line items belong to caller's org via proposal
       const { data: validItems } = await adminSupabase
