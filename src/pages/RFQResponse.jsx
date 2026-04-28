@@ -112,50 +112,35 @@ export default function RFQResponse() {
   const submitQuote = async () => {
     setSubmitting(true)
     try {
-      let pdfUrl = null
-
-      // Upload PDF if provided
+      // Convert PDF to base64 if provided
+      let pdfBase64 = null
       if (quoteFile) {
         setUploadingPDF(true)
-        const fileName = `rfq-responses/${rfq.id}/${Date.now()}.pdf`
-        const { error: uploadError } = await supabase.storage
-          .from('signed-proposals')
-          .upload(fileName, quoteFile, { contentType: quoteFile.type, upsert: true })
-        if (!uploadError) {
-          const { data: urlData } = await supabase.storage
-            .from('signed-proposals')
-            .createSignedUrl(fileName, 60 * 60 * 24 * 365)
-          pdfUrl = urlData?.signedUrl
-        }
+        pdfBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result.split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(quoteFile)
+        })
         setUploadingPDF(false)
       }
 
-      // Update rfq_request with response
-      await supabase.from('rfq_requests').update({
-        status: 'responded',
-        responded_at: new Date().toISOString(),
-        vendor_quote_number: quoteNumber || null,
-        vendor_quote_expiry: quoteExpiry || null,
-        vendor_notes: vendorNotes || null,
-        vendor_response_pdf_url: pdfUrl,
-        parsed_items: Object.entries(prices)
-          .filter(([, price]) => price)
-          .map(([id, price]) => ({ id, price: parseFloat(price) || 0 }))
-      }).eq('token', token)
+      // Submit via edge function — server-side token validation
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/submit-rfq-response', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          prices,
+          quoteNumber: quoteNumber || null,
+          quoteExpiry: quoteExpiry || null,
+          vendorNotes: vendorNotes || null,
+          pdfBase64,
+        })
+      })
 
-      // Update bom_line_items with vendor cost only — markup applied by rep on review
-      for (const [itemId, price] of Object.entries(prices)) {
-        if (!price) continue
-        const unitPrice = parseFloat(price) || 0
-        const item = lineItems.find(i => i.id === itemId)
-        const qty = parseFloat(item?.quantity) || 1
-        await supabase.from('bom_line_items').update({
-          your_cost_unit: unitPrice,
-          your_cost_total: parseFloat((unitPrice * qty).toFixed(2)),
-          rfq_quote_number: quoteNumber || null,
-          pricing_status: 'Confirmed'
-        }).eq('id', itemId)
-      }
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Submission failed')
 
       setSubmitted(true)
     } catch (err) {
