@@ -2399,10 +2399,20 @@ const analyzeDrawing = async () => {
         try {
           const response = await fetch(photos[i].url)
           const blob = await response.blob()
-          const base64 = await new Promise(resolve => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(blob) })
-          const ext = photos[i].url.split('.').pop()?.split('?')[0]?.toUpperCase() || 'JPEG'
-          const imgFormat = ['PNG', 'JPG', 'JPEG', 'WEBP'].includes(ext) ? ext : 'JPEG'
-          doc.addImage(base64, imgFormat === 'JPG' ? 'JPEG' : imgFormat, photoX, photoY, photoWidth, photoHeight)
+          // Use canvas to normalize EXIF orientation
+          const base64 = await new Promise(resolve => {
+            const img = new Image()
+            img.onload = () => {
+              const canvas = document.createElement('canvas')
+              canvas.width = img.naturalWidth
+              canvas.height = img.naturalHeight
+              const ctx = canvas.getContext('2d')
+              ctx.drawImage(img, 0, 0)
+              resolve(canvas.toDataURL('image/jpeg', 0.85))
+            }
+            img.src = URL.createObjectURL(blob)
+          })
+          doc.addImage(base64, 'JPEG', photoX, photoY, photoWidth, photoHeight)
           if (photos[i].caption) { doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100); doc.text(photos[i].caption, photoX, photoY + photoHeight + 4, { maxWidth: photoWidth }) }
           if (i % 2 === 0) { photoX = photoX + photoWidth + 14 } else { photoX = 14; photoY = photoY + photoHeight + 16; if (photoY > 250) { doc.addPage(); photoY = 20 } }
         } catch (e) { console.log('Photo load error:', e) }
