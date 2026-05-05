@@ -30,6 +30,8 @@ const STATUS_COLORS = {
   'Cancelled': 'bg-red-500/20 text-red-400',
 }
 
+const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 function JobPOList({ proposalId }) {
   const [pos, setPos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -39,8 +41,6 @@ function JobPOList({ proposalId }) {
     supabase.from('purchase_orders').select('*').eq('proposal_id', proposalId).order('created_at', { ascending: false })
       .then(({ data }) => { setPos(data || []); setLoading(false) })
   }, [proposalId])
-
-  const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   if (loading) return <p className="text-[#8A9AB0] text-sm">Loading...</p>
   if (!proposalId) return <p className="text-[#8A9AB0] text-sm">No proposal linked to this job.</p>
