@@ -1044,6 +1044,10 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                   ✉️ Notify Customer
                 </button>
               )}
+              <button onClick={generateFinalJobPacket}
+                className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                📄 Final Packet
+              </button>
               <select value={job?.status || 'Active'} onChange={e => updateJobStatus(e.target.value)} disabled={savingStatus}
                 className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
                 {['Active', 'On Hold', 'Completed', 'Cancelled'].map(s => <option key={s}>{s}</option>)}
