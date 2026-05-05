@@ -859,7 +859,113 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, caption } : p))
   }
 
-  const fmt = (n) => (n || 0).toLocaleString
+  const downloadAllPhotos = async () => {
+    if (photos.length === 0) return
+    const JSZip = (await import('jszip')).default
+    const zip = new JSZip()
+    const folder = zip.folder(`${job?.name || 'Job'}-Photos`)
+
+    for (const photo of photos) {
+      try {
+        const response = await fetch(photo.url)
+        const blob = await response.blob()
+        const ext = photo.storage_path.split('.').pop() || 'jpg'
+        const fileName = `${photo.category}-${photo.caption || photo.id}.${ext}`
+          .replace(/[^a-z0-9.\-_]/gi, '_')
+        folder.file(fileName, blob)
+      } catch (e) { console.error('Photo download error:', e) }
+    }
+
+    const content = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(content)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${job?.name || 'Job'}-Photos.zip`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const generateFinalJobPacket = async () => {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
+
+    // Header
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.rect(0, 0, pageWidth, 40, 'F')
+
+    if (profile?.logo_url) {
+      const img = new Image()
+      img.src = profile.logo_url
+      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+      const maxW = 50, maxH = 26
+      const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+      doc.addImage(img, 'PNG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+    } else {
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
+      doc.text(profile?.company_name || 'ForgePt.', 14, 24)
+    }
+
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Job Completion Packet', pageWidth - 14, 20, { align: 'right' })
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.text(new Date().toLocaleDateString(), pageWidth - 14, 30, { align: 'right' })
+
+    // Job details
+    let y = 52
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(16)
+    doc.setFont('helvetica', 'bold')
+    doc.text(job?.name || '', 14, y)
+    y += 8
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100, 100, 100)
+    if (job?.clients?.company) { doc.text(`Client: ${job.clients.company}`, 14, y); y += 6 }
+    if (job?.job_number) { doc.text(`Job #: ${job.job_number}`, 14, y); y += 6 }
+    if (proposal?.quote_number) { doc.text(`Quote #: ${proposal.quote_number}`, 14, y); y += 6 }
+    if (job?.start_date) { doc.text(`Start Date: ${new Date(job.start_date).toLocaleDateString()}`, 14, y); y += 6 }
+    if (job?.end_date) { doc.text(`Completion Date: ${new Date(job.end_date).toLocaleDateString()}`, 14, y); y += 6 }
+    y += 4
+
+    // Divider
+    doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.line(14, y, pageWidth - 14, y)
+    y += 8
+
+    // Scope of Work
+    if (proposal?.scope_of_work) {
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Scope of Work', 14, y)
+      y += 6
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      const sowLines = doc.splitTextToSize(proposal.scope_of_work, pageWidth - 28)
+      const pageHeight = doc.internal.pageSize.getHeight()
+      for (const line of sowLines) {
+        if (y > pageHeight - 20) { doc.addPage(); y = 20 }
+        doc.text(line, 14, y)
+        y += 5
+      }
+      y += 6
+    }
+
+    // Approved Change Orders
+    const approvedCOs = changeOrders.filter(c => c.status === 'Approved')
+    if (approvedCOs.length > 0) {
+    }
+  }
+
   const completedCount = checklist.filter(c => c.completed).length
   const progress = checklist.length > 0 ? Math.round((completedCount / checklist.length) * 100) : 0
   const totalCOAmount = changeOrders.filter(c => c.status === 'Approved').reduce((sum, c) => sum + (c.amount || 0), 0)
@@ -1604,6 +1710,18 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
+                {photos.length > 0 && (
+                  <>
+                    <button onClick={downloadAllPhotos}
+                      className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                      ↓ Download All
+                    </button>
+                    <button onClick={generateFinalJobPacket}
+                      className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                      📄 Final Job Packet
+                    </button>
+                  </>
+                )}
                 <label className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors cursor-pointer">
                   {uploadingPhoto ? 'Uploading...' : '+ Upload Photo'}
                   <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadJobPhoto} className="hidden" disabled={uploadingPhoto} />
