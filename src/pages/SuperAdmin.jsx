@@ -47,6 +47,10 @@ export default function SuperAdmin() {
   const [orgDetail, setOrgDetail] = useState({})
   const [loadingDetail, setLoadingDetail] = useState(null)
   const [metricsSortBy, setMetricsSortBy] = useState('health')
+  const [pinQuery, setPinQuery] = useState('')
+  const [pinResult, setPinResult] = useState(null)
+  const [pinLookupLoading, setPinLookupLoading] = useState(false)
+  const [pinError, setPinError] = useState(null)
 
   const navigate = useNavigate()
 
@@ -135,6 +139,18 @@ export default function SuperAdmin() {
       userName: user.full_name,
     }))
     window.location.href = '/'
+  }
+
+  const lookupPin = async () => {
+    if (!/^\d{6}$/.test(pinQuery)) return
+    setPinLookupLoading(true)
+    setPinError(null)
+    setPinResult(null)
+    const { data, error } = await supabase.functions.invoke('superadmin-pin-lookup', { body: { pin: pinQuery } })
+    setPinLookupLoading(false)
+    if (error) { setPinError('Lookup failed. Try again.'); return }
+    if (!data?.match) { setPinError('No account found with that PIN.'); return }
+    setPinResult(data.match)
   }
 
   const getOrgHealth = (orgId) => {
@@ -395,6 +411,55 @@ export default function SuperAdmin() {
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Pending Requests</p><p className="text-yellow-400 text-2xl font-bold">{pendingRequests.length}</p></div>
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Active Paying</p><p className="text-green-400 text-2xl font-bold">{activeOrgs}</p></div>
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">MRR</p><p className="text-[#C8622A] text-2xl font-bold">${mrr.toLocaleString()}</p></div>
+        </div>
+
+        {/* Support PIN Lookup */}
+        <div className="bg-[#1a2d45] rounded-xl p-5">
+          <div className="flex items-start gap-6">
+            <div className="flex-1">
+              <p className="text-white font-semibold text-sm mb-1">Support PIN Lookup</p>
+              <p className="text-[#8A9AB0] text-xs mb-3">Enter the 6-digit PIN the user reads to you to identify their account.</p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={pinQuery}
+                  onChange={e => { setPinQuery(e.target.value.replace(/\D/g, '').slice(0, 6)); setPinResult(null); setPinError(null) }}
+                  onKeyDown={e => e.key === 'Enter' && lookupPin()}
+                  placeholder="000000"
+                  className="w-32 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm font-mono tracking-widest focus:outline-none focus:border-[#C8622A]"
+                />
+                <button onClick={lookupPin} disabled={pinLookupLoading || pinQuery.length !== 6}
+                  className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40">
+                  {pinLookupLoading ? 'Looking up...' : 'Look Up'}
+                </button>
+                {pinError && <span className="text-red-400 text-sm">{pinError}</span>}
+              </div>
+            </div>
+            {pinResult && (
+              <div className="bg-[#0F1C2E] rounded-xl p-4 flex items-center gap-6 min-w-[320px]">
+                <div className="flex-1">
+                  <p className="text-white font-semibold">{pinResult.full_name}</p>
+                  <p className="text-[#8A9AB0] text-xs">{pinResult.email}</p>
+                  <p className="text-[#C8622A] text-xs mt-1 font-medium">{pinResult.organizations?.name || pinResult.company_name}</p>
+                  {pinResult.organizations?.billing_status && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full mt-1 inline-block ${pinResult.organizations.billing_status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                      {pinResult.organizations.billing_status}
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => impersonateUser(
+                    { id: pinResult.org_id, name: pinResult.organizations?.name || pinResult.company_name },
+                    { id: pinResult.id, full_name: pinResult.full_name }
+                  )}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors whitespace-nowrap">
+                  View as User
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-2">

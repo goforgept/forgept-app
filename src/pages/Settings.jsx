@@ -127,6 +127,10 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [passwordError, setPasswordError] = useState(null)
   const [passwordSuccess, setPasswordSuccess] = useState(null)
   const [savingPassword, setSavingPassword] = useState(false)
+  const [supportPin, setSupportPin] = useState('')
+  const [pinInput, setPinInput] = useState('')
+  const [savingPin, setSavingPin] = useState(false)
+  const [pinSaved, setPinSaved] = useState(false)
   const [sameAsShipTo, setSameAsShipTo] = useState(false)
   const [expandedStage, setExpandedStage] = useState('early')
   const [orgTaxRate, setOrgTaxRate] = useState('')
@@ -222,7 +226,16 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
 
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager').eq('id', user.id).single()
+    const { data } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, support_pin').eq('id', user.id).single()
+
+    // Auto-generate a PIN if none exists
+    let pin = data?.support_pin || ''
+    if (!pin) {
+      pin = String(Math.floor(100000 + Math.random() * 900000))
+      await supabase.from('profiles').update({ support_pin: pin }).eq('id', user.id)
+    }
+    setSupportPin(pin)
+    setPinInput(pin)
     setProfile(data)
     setLogoUrl(data?.logo_url || null)
     setForm({
@@ -426,6 +439,29 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setPasswordSuccess('Password updated successfully')
     setPasswordForm({ current: '', newPass: '', confirm: '' })
     setSavingPassword(false)
+  }
+
+  const savePin = async () => {
+    if (pinInput.length !== 6) return
+    setSavingPin(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('profiles').update({ support_pin: pinInput }).eq('id', user.id)
+    setSupportPin(pinInput)
+    setSavingPin(false)
+    setPinSaved(true)
+    setTimeout(() => setPinSaved(false), 2000)
+  }
+
+  const regeneratePin = async () => {
+    const pin = String(Math.floor(100000 + Math.random() * 900000))
+    setPinInput(pin)
+    setSavingPin(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('profiles').update({ support_pin: pin }).eq('id', user.id)
+    setSupportPin(pin)
+    setSavingPin(false)
+    setPinSaved(true)
+    setTimeout(() => setPinSaved(false), 2000)
   }
 
   const connectSquare = async () => {
@@ -688,6 +724,39 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                 className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                 {savingPassword ? 'Updating...' : 'Update Password'}
               </button>
+            </div>
+
+            {/* Support PIN */}
+            <div className="bg-[#1a2d45] rounded-xl p-6">
+              <h3 className="text-white font-bold mb-1">Support PIN</h3>
+              <p className="text-[#8A9AB0] text-sm mb-5">Share this 6-digit PIN with ForgePt support when you need help. It lets us temporarily access your account to troubleshoot.</p>
+              <div className="flex items-center gap-3 mb-4">
+                {supportPin.split('').map((digit, i) => (
+                  <div key={i} className="w-10 h-12 bg-[#0F1C2E] border border-[#2a3d55] rounded-lg flex items-center justify-center text-white text-2xl font-mono font-bold select-all">
+                    {digit}
+                  </div>
+                ))}
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={pinInput}
+                  onChange={e => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="w-32 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm font-mono tracking-widest focus:outline-none focus:border-[#C8622A]"
+                  placeholder="000000"
+                />
+                <button onClick={savePin} disabled={savingPin || pinInput.length !== 6 || pinInput === supportPin}
+                  className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40">
+                  {savingPin ? 'Saving...' : 'Save PIN'}
+                </button>
+                <button onClick={regeneratePin} disabled={savingPin}
+                  className="text-[#8A9AB0] hover:text-white text-sm transition-colors disabled:opacity-40">
+                  ↺ Regenerate
+                </button>
+                {pinSaved && <span className="text-green-400 text-sm">Saved!</span>}
+              </div>
             </div>
 
             {/* Proposal Branding */}
