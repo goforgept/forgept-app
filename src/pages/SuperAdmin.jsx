@@ -66,17 +66,19 @@ export default function SuperAdmin() {
 
     const [
       { data: orgsData },
-      { data: profilesData },
+      profilesResult,
       { data: requestsData },
       { data: proposalsData },
       { data: clientsData },
     ] = await Promise.all([
       supabase.from('organizations').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, created_at, team_id, is_regional_vp, is_operations_manager').order('created_at', { ascending: false }),
+      supabase.functions.invoke('superadmin-get-data'),
       supabase.from('access_requests').select('*').order('created_at', { ascending: false }),
       supabase.from('proposals').select('id, org_id, created_at, status, proposal_value, proposal_name').order('created_at', { ascending: false }),
       supabase.from('clients').select('id, org_id'),
     ])
+
+    const profilesData = profilesResult.data?.profiles
 
     const orgsResult = orgsData || []
     setOrgs(orgsResult)

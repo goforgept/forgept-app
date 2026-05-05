@@ -84,6 +84,10 @@ function App() {
   }, [session])
 
   const fetchProfile = async (userId) => {
+    const impersonation = (() => {
+      try { return JSON.parse(localStorage.getItem('sa_impersonate') || 'null') } catch { return null }
+    })()
+
     for (let i = 0; i < 5; i++) {
       const { data } = await supabase
         .from('profiles')
@@ -92,6 +96,17 @@ function App() {
         .single()
 
       if (data?.org_role) {
+        // If superadmin is impersonating, load the target user's profile instead
+        if (data.role === 'superadmin' && impersonation?.userId) {
+          const { data: impResult } = await supabase.functions.invoke('superadmin-get-profile', {
+            body: { userId: impersonation.userId }
+          })
+          if (impResult?.profile) {
+            setProfile(impResult.profile)
+            setLoading(false)
+            return
+          }
+        }
         setProfile(data)
         setLoading(false)
         return
