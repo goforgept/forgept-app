@@ -886,6 +886,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   }
 
   const generateFinalJobPacket = async () => {
+    console.log('Generating final job packet...')
+    try {
     const { default: jsPDF } = await import('jspdf')
     const { default: autoTable } = await import('jspdf-autotable')
     const doc = new jsPDF()
@@ -963,7 +965,140 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     // Approved Change Orders
     const approvedCOs = changeOrders.filter(c => c.status === 'Approved')
     if (approvedCOs.length > 0) {
+      if (y > doc.internal.pageSize.getHeight() - 40) { doc.addPage(); y = 20 }
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(14, y, pageWidth - 14, y)
+      y += 8
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Approved Change Orders', 14, y)
+      y += 6
+      for (const co of approvedCOs) {
+        if (y > doc.internal.pageSize.getHeight() - 20) { doc.addPage(); y = 20 }
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'bold')
+        doc.setTextColor(40, 40, 40)
+        doc.text(`• ${co.name}`, 14, y)
+        y += 5
+        if (co.description) {
+          doc.setFont('helvetica', 'normal')
+          doc.setTextColor(100, 100, 100)
+          const coLines = doc.splitTextToSize(co.description, pageWidth - 32)
+          for (const line of coLines) {
+            if (y > doc.internal.pageSize.getHeight() - 20) { doc.addPage(); y = 20 }
+            doc.text(line, 20, y)
+            y += 5
+          }
+        }
+        y += 2
+      }
+      y += 4
     }
+
+    // Completion Statement
+    if (y > doc.internal.pageSize.getHeight() - 40) { doc.addPage(); y = 20 }
+    doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.line(14, y, pageWidth - 14, y)
+    y += 8
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text('Completion Statement', 14, y)
+    y += 6
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(60, 60, 60)
+    const statement = `All work has been completed per the agreed scope of work for ${job?.clients?.company || 'the client'}. ${profile?.company_name || 'The contractor'} has performed all installation, testing, and commissioning as outlined in the original proposal${approvedCOs.length > 0 ? ' and approved change orders' : ''}.`
+    const stLines = doc.splitTextToSize(statement, pageWidth - 28)
+    for (const line of stLines) {
+      if (y > doc.internal.pageSize.getHeight() - 20) { doc.addPage(); y = 20 }
+      doc.text(line, 14, y)
+      y += 5
+    }
+    y += 10
+
+    // Client signature line
+    doc.setDrawColor(180, 180, 180)
+    doc.line(14, y, 100, y)
+    doc.line(120, y, pageWidth - 14, y)
+    y += 5
+    doc.setFontSize(8)
+    doc.setTextColor(100, 100, 100)
+    doc.text('Client Signature', 14, y)
+    doc.text('Date', 120, y)
+
+    // Site Photos organized by category
+    const photoCategories = ['Before', 'During', 'After', 'Issue/Defect', 'Equipment', 'Panel/Rack', 'Cable Run', 'Other']
+    for (const category of photoCategories) {
+      const categoryPhotos = photos.filter(p => p.category === category)
+      if (categoryPhotos.length === 0) continue
+
+      doc.addPage()
+      y = 20
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text(`Site Photos — ${category}`, 14, y)
+      y += 4
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(14, y, pageWidth - 14, y)
+      y += 8
+
+      const photoWidth = (pageWidth - 42) / 2
+      const photoHeight = 65
+      let photoX = 14
+      const pageHeight = doc.internal.pageSize.getHeight()
+
+      for (let i = 0; i < categoryPhotos.length; i++) {
+        try {
+          const response = await fetch(categoryPhotos[i].url)
+          const blob = await response.blob()
+          const base64 = await new Promise(resolve => {
+            const img2 = new Image()
+            img2.onload = () => {
+              const canvas = document.createElement('canvas')
+              canvas.width = img2.naturalWidth
+              canvas.height = img2.naturalHeight
+              const ctx = canvas.getContext('2d')
+              ctx.drawImage(img2, 0, 0)
+              resolve(canvas.toDataURL('image/jpeg', 0.85))
+            }
+            img2.src = URL.createObjectURL(blob)
+          })
+
+          if (y + photoHeight + 10 > pageHeight - 20) {
+            doc.addPage()
+            y = 20
+            photoX = 14
+          }
+
+          doc.addImage(base64, 'JPEG', photoX, y, photoWidth, photoHeight)
+
+          if (categoryPhotos[i].caption) {
+            doc.setFontSize(7)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(80, 80, 80)
+            doc.text(categoryPhotos[i].caption, photoX, y + photoHeight + 4, { maxWidth: photoWidth })
+          }
+
+          if (i % 2 === 0) {
+            photoX = photoX + photoWidth + 14
+          } else {
+            photoX = 14
+            y = y + photoHeight + 14
+          }
+        } catch (e) { console.error('Photo load error:', e) }
+      }
+    }
+
+    // Footer
+    doc.setFontSize(8)
+    doc.setTextColor(150, 150, 150)
+    doc.text(`${profile?.company_name || 'ForgePt.'} · Job Completion Packet`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' })
+
+    doc.save(`${job?.name || 'Job'}-Completion-Packet.pdf`)
+  } catch (err) { console.error('Error generating final job packet:', err); alert('Error generating packet: ' + err.message) }
   }
 
   const completedCount = checklist.filter(c => c.completed).length
