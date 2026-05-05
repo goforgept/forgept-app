@@ -51,7 +51,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
 
     const { data: ticketData } = await supabase
       .from('service_tickets')
-      .select('*, clients(id, company, client_name), profiles!service_tickets_assigned_tech_id_fkey(full_name, email), jobs(id, name, job_number)')
+      .select('*, clients(id, company, client_name, email), profiles!service_tickets_assigned_tech_id_fkey(full_name, email), jobs(id, name, job_number)')
       .eq('id', id)
       .single()
     setTicket(ticketData)
@@ -260,6 +260,270 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, caption } : p))
   }
 
+  const generateServiceReport = async (sendToClient = false) => {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
+
+    // Header
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.rect(0, 0, pageWidth, 40, 'F')
+
+    if (profile?.logo_url) {
+      const img = new Image()
+      img.src = profile.logo_url
+      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+      const maxW = 50, maxH = 26
+      const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+      doc.addImage(img, 'PNG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+    } else {
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
+      doc.text(profile?.company_name || 'ForgePt.', 14, 24)
+    }
+
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Service Report', pageWidth - 14, 20, { align: 'right' })
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.text(new Date().toLocaleDateString(), pageWidth - 14, 30, { align: 'right' })
+
+    let y = 52
+    doc.setTextColor(0, 0, 0)
+    doc.setFontSize(14)
+    doc.setFont('helvetica', 'bold')
+    doc.text(ticket.title || '', 14, y)
+    y += 8
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(100, 100, 100)
+    if (ticket.ticket_number) { doc.text(`Ticket #: ${ticket.ticket_number}`, 14, y); y += 5 }
+    if (ticket.clients?.company) { doc.text(`Client: ${ticket.clients.company}`, 14, y); y += 5 }
+    if (ticket.profiles?.full_name) { doc.text(`Technician: ${ticket.profiles.full_name}`, 14, y); y += 5 }
+    if (ticket.scheduled_date) { doc.text(`Service Date: ${new Date(ticket.scheduled_date).toLocaleDateString()}`, 14, y); y += 5 }
+    if (ticket.resolved_at) { doc.text(`Resolved: ${new Date(ticket.resolved_at).toLocaleDateString()}`, 14, y); y += 5 }
+    y += 4
+
+    doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.line(14, y, pageWidth - 14, y)
+    y += 8
+
+    if (ticket.description) {
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Problem Description', 14, y)
+      y += 6
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      const descLines = doc.splitTextToSize(ticket.description, pageWidth - 28)
+      for (const line of descLines) {
+        if (y > doc.internal.pageSize.getHeight() - 20) { doc.addPage(); y = 20 }
+        doc.text(line, 14, y)
+        y += 5
+      }
+      y += 6
+    }
+
+    if (ticket.notes) {
+      if (y > doc.internal.pageSize.getHeight() - 40) { doc.addPage(); y = 20 }
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(14, y, pageWidth - 14, y)
+      y += 8
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Work Performed', 14, y)
+      y += 6
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      const noteEntries = ticket.notes.split('\n\n').filter(Boolean)
+      for (const note of noteEntries) {
+        const match = note.match(/^\[(.+?)\] (.+)$/s)
+        const body = match ? match[2] : note
+        const lines = doc.splitTextToSize(body, pageWidth - 28)
+        for (const line of lines) {
+          if (y > doc.internal.pageSize.getHeight() - 20) { doc.addPage(); y = 20 }
+          doc.text(line, 14, y)
+          y += 5
+        }
+        y += 3
+      }
+      y += 4
+    }
+
+    const hasMaterials = lineItems.length > 0
+    const hasLabor = laborItems.length > 0
+
+    if (hasMaterials || hasLabor) {
+      if (y > doc.internal.pageSize.getHeight() - 40) { doc.addPage(); y = 20 }
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(14, y, pageWidth - 14, y)
+      y += 8
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Materials & Labor', 14, y)
+      y += 6
+
+      const tableRows = []
+      if (hasMaterials) {
+        lineItems.forEach(l => {
+          const total = (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)
+          tableRows.push([l.item_name, `${l.quantity} ${l.unit || 'ea'}`, `$${(parseFloat(l.customer_price_unit) || 0).toFixed(2)}`, `$${total.toFixed(2)}`])
+        })
+      }
+      if (hasLabor) {
+        laborItems.forEach(l => {
+          tableRows.push([l.role, `${l.quantity} ${l.unit || 'hr'}`, '—', `$${(parseFloat(l.customer_price) || 0).toFixed(2)}`])
+        })
+      }
+
+      autoTable(doc, {
+        startY: y,
+        head: [['Description', 'Quantity', 'Unit Price', 'Total']],
+        body: tableRows,
+        foot: [[{ content: 'Total', colSpan: 3, styles: { halign: 'right' } }, `$${(matTotal + labTotal).toFixed(2)}`]],
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        styles: { fontSize: 9 },
+        showFoot: 'lastPage'
+      })
+      y = doc.lastAutoTable.finalY + 10
+    }
+
+    if (profile?.payment_instructions_payable_to || profile?.payment_instructions_notes) {
+      if (y > doc.internal.pageSize.getHeight() - 40) { doc.addPage(); y = 20 }
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(14, y, pageWidth - 14, y)
+      y += 8
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Payment Information', 14, y)
+      y += 6
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(60, 60, 60)
+      if (profile.payment_instructions_payable_to) { doc.text(`Payable to: ${profile.payment_instructions_payable_to}`, 14, y); y += 5 }
+      if (profile.payment_instructions_zelle) { doc.text(`Zelle: ${profile.payment_instructions_zelle}`, 14, y); y += 5 }
+      if (profile.payment_instructions_notes) { doc.text(profile.payment_instructions_notes, 14, y); y += 5 }
+      y += 4
+    }
+
+    if (y > doc.internal.pageSize.getHeight() - 40) { doc.addPage(); y = 20 }
+    doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.line(14, y, pageWidth - 14, y)
+    y += 8
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(60, 60, 60)
+    const resolution = `All service work has been completed. ${profile?.company_name || 'The technician'} has diagnosed, repaired, and tested the reported issue. Please contact us if any problems persist.`
+    const resLines = doc.splitTextToSize(resolution, pageWidth - 28)
+    for (const line of resLines) { doc.text(line, 14, y); y += 5 }
+    y += 10
+
+    doc.setDrawColor(180, 180, 180)
+    doc.line(14, y, 100, y)
+    doc.line(120, y, pageWidth - 14, y)
+    y += 5
+    doc.setFontSize(8)
+    doc.setTextColor(100, 100, 100)
+    doc.text('Client Signature', 14, y)
+    doc.text('Date', 120, y)
+
+    const photoCategories = ['Before', 'During', 'After', 'Issue/Defect', 'Equipment', 'Panel/Rack', 'Cable Run', 'Other']
+    for (const category of photoCategories) {
+      const categoryPhotos = photos.filter(p => p.category === category)
+      if (categoryPhotos.length === 0) continue
+      doc.addPage()
+      y = 20
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text(`Site Photos — ${category}`, 14, y)
+      y += 4
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(14, y, pageWidth - 14, y)
+      y += 8
+      const photoWidth = (pageWidth - 42) / 2
+      const photoHeight = 65
+      let photoX = 14
+      const pageHeight = doc.internal.pageSize.getHeight()
+      for (let i = 0; i < categoryPhotos.length; i++) {
+        try {
+          const response = await fetch(categoryPhotos[i].url)
+          const blob = await response.blob()
+          const base64 = await new Promise(resolve => {
+            const img2 = new Image()
+            img2.onload = () => {
+              const canvas = document.createElement('canvas')
+              canvas.width = img2.naturalWidth
+              canvas.height = img2.naturalHeight
+              const ctx = canvas.getContext('2d')
+              ctx.drawImage(img2, 0, 0)
+              resolve(canvas.toDataURL('image/jpeg', 0.85))
+            }
+            img2.src = URL.createObjectURL(blob)
+          })
+          if (y + photoHeight + 10 > pageHeight - 20) { doc.addPage(); y = 20; photoX = 14 }
+          doc.addImage(base64, 'JPEG', photoX, y, photoWidth, photoHeight)
+          if (categoryPhotos[i].caption) {
+            doc.setFontSize(7)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(80, 80, 80)
+            doc.text(categoryPhotos[i].caption, photoX, y + photoHeight + 4, { maxWidth: photoWidth })
+          }
+          if (i % 2 === 0) { photoX = photoX + photoWidth + 14 }
+          else { photoX = 14; y = y + photoHeight + 14 }
+        } catch (e) { console.error('Photo error:', e) }
+      }
+    }
+
+    doc.setFontSize(8)
+    doc.setTextColor(150, 150, 150)
+    doc.text(`${profile?.company_name || 'ForgePt.'} · Service Report`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' })
+
+    if (sendToClient && ticket.clients?.email) {
+      const pdfBase64 = doc.output('datauristring').split(',')[1]
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-followup-emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          type: 'ai_email',
+          toEmail: ticket.clients.email,
+          toName: ticket.clients.client_name || ticket.clients.company,
+          fromName: profile?.full_name || '',
+          fromEmail: profile?.email || '',
+          subject: `Service Report — ${ticket.title}`,
+          body: `<p>Hi ${ticket.clients.client_name || ticket.clients.company},</p><p>Please find your service report attached for ticket #${ticket.ticket_number || ''}.</p><p>Thank you for your business.</p><p>${profile?.full_name || ''}<br/>${profile?.company_name || ''}</p>`,
+        })
+      })
+      alert('Service report sent to client!')
+    } else {
+      doc.save(`Service-Report-${ticket.ticket_number || ticket.id}.pdf`)
+    }
+  }
+
+  const hexToRgb = (hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+    return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
+  }
+
+  const hexToRgb = (hex) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+    return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
+  }
+
   const inputClass = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
   const cellInput = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
 
@@ -324,7 +588,19 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
               </div>
             </div>
             <div>
-              {confirmDelete ? (
+              <div className="flex items-center gap-2 mb-3">
+                <button onClick={() => generateServiceReport(false)}
+                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                  📄 Download Report
+                </button>
+                {ticket.clients?.email && (
+                  <button onClick={() => generateServiceReport(true)}
+                    className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                    ✉️ Send to Client
+                  </button>
+                )}
+              </div>
+            {confirmDelete ? (
                 <div className="flex items-center gap-2">
                   <span className="text-[#8A9AB0] text-xs">Delete ticket?</span>
                   <button onClick={deleteTicket} className="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors">Yes, delete</button>
