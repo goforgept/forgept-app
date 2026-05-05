@@ -36,6 +36,9 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const [laborItems, setLaborItems] = useState([])
   const [savingItems, setSavingItems] = useState(false)
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago')
+  const [photos, setPhotos] = useState([])
+  const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [photoCategory, setPhotoCategory] = useState('Other')
 
   useEffect(() => { fetchAll() }, [id])
 
@@ -59,6 +62,21 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
       .from('profiles').select('id, full_name, dispatch_zone')
       .eq('org_id', profileData.org_id).order('full_name')
     setTechs(techData || [])
+
+    // Fetch ticket photos
+    const { data: photoData } = await supabase
+      .from('service_ticket_photos')
+      .select('*')
+      .eq('ticket_id', id)
+      .order('created_at', { ascending: true })
+
+    const photosWithUrls = await Promise.all((photoData || []).map(async (photo) => {
+      const { data: signed } = await supabase.storage
+        .from('job-photos')
+        .createSignedUrl(photo.storage_path, 60 * 60 * 24)
+      return { ...photo, url: signed?.signedUrl || photo.url }
+    }))
+    setPhotos(photosWithUrls)
 
     setLoading(false)
   }
@@ -196,6 +214,52 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
 
   const removeLabor = (i) => setLaborItems(prev => prev.filter((_, idx) => idx !== i))
 
+  const uploadTicketPhoto = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      alert('Please upload a JPEG, PNG, or WEBP image.')
+      return
+    }
+    setUploadingPhoto(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const storagePath = `${profile?.org_id}/${id}/${Date.now()}.${fileExt}`
+      const { error: uploadError } = await supabase.storage
+        .from('job-photos')
+        .upload(storagePath, file, { contentType: file.type, upsert: false })
+      if (uploadError) throw uploadError
+      const { data: signed } = await supabase.storage
+        .from('job-photos')
+        .createSignedUrl(storagePath, 60 * 60 * 24 * 365)
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('service_ticket_photos').insert({
+        ticket_id: id,
+        org_id: profile?.org_id,
+        uploaded_by: user.id,
+        storage_path: storagePath,
+        url: signed?.signedUrl,
+        category: photoCategory,
+        caption: ''
+      })
+      await fetchAll()
+    } catch (err) { alert('Error uploading photo: ' + err.message) }
+    setUploadingPhoto(false)
+  }
+
+  const deleteTicketPhoto = async (photoId, storagePath) => {
+    if (!window.confirm('Delete this photo?')) return
+    await supabase.storage.from('job-photos').remove([storagePath])
+    await supabase.from('service_ticket_photos').delete().eq('id', photoId)
+    setPhotos(prev => prev.filter(p => p.id !== photoId))
+  }
+
+  const updateTicketPhotoCaption = async (photoId, caption) => {
+    await supabase.from('service_ticket_photos').update({ caption }).eq('id', photoId)
+    setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, caption } : p))
+  }
+
   const inputClass = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
   const cellInput = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
 
@@ -324,6 +388,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
           {[
             { key: 'overview', label: 'Overview' },
             { key: 'labor', label: 'Labor & Materials' },
+            { key: 'photos', label: `📷 Photos (${photos.length})` },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
@@ -550,6 +615,70 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                 {savingItems ? 'Saving...' : 'Save'}
               </button>
             </div>
+          </div>
+        )}
+
+      {/* PHOTOS TAB */}
+        {activeTab === 'photos' && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="flex justify-between items-center mb-5">
+              <div>
+                <h3 className="text-white font-bold text-lg">Site Photos</h3>
+                <p className="text-[#8A9AB0] text-sm mt-0.5">{photos.length} photo{photos.length !== 1 ? 's' : ''}</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <select value={photoCategory} onChange={e => setPhotoCategory(e.target.value)}
+                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  {['Before', 'During', 'After', 'Issue/Defect', 'Equipment', 'Panel/Rack', 'Cable Run', 'Other'].map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <label className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors cursor-pointer">
+                  {uploadingPhoto ? 'Uploading...' : '+ Upload Photo'}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadTicketPhoto} className="hidden" disabled={uploadingPhoto} />
+                </label>
+              </div>
+            </div>
+
+            {photos.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed border-[#2a3d55] rounded-xl">
+                <p className="text-4xl mb-3">📷</p>
+                <p className="text-[#8A9AB0]">No photos yet.</p>
+                <p className="text-[#8A9AB0] text-sm mt-1">Upload photos to document this service ticket.</p>
+              </div>
+            ) : (
+              <div>
+                {['Before', 'During', 'After', 'Issue/Defect', 'Equipment', 'Panel/Rack', 'Cable Run', 'Other'].map(category => {
+                  const categoryPhotos = photos.filter(p => p.category === category)
+                  if (categoryPhotos.length === 0) return null
+                  return (
+                    <div key={category} className="mb-6">
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">{category} ({categoryPhotos.length})</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {categoryPhotos.map(photo => (
+                          <div key={photo.id} className="bg-[#0F1C2E] rounded-xl overflow-hidden border border-[#2a3d55]">
+                            <img src={photo.url} alt={photo.caption || category}
+                              className="w-full h-48 object-cover cursor-pointer"
+                              onClick={() => window.open(photo.url, '_blank')} />
+                            <div className="p-3 space-y-2">
+                              <input type="text" value={photo.caption || ''} placeholder="Add caption..."
+                                onChange={e => updateTicketPhotoCaption(photo.id, e.target.value)}
+                                onBlur={e => updateTicketPhotoCaption(photo.id, e.target.value)}
+                                className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                              <div className="flex justify-between items-center">
+                                <span className="text-[#8A9AB0] text-xs">{new Date(photo.created_at).toLocaleDateString()}</span>
+                                <button onClick={() => deleteTicketPhoto(photo.id, photo.storage_path)}
+                                  className="text-[#2a3d55] hover:text-red-400 text-xs transition-colors">Delete</button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         )}
 
