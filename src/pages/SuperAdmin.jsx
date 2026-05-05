@@ -129,15 +129,6 @@ export default function SuperAdmin() {
     setTimeout(() => setNoteSaved(n => n === orgId ? null : n), 2000)
   }
 
-  const impersonateUser = (org, user) => {
-    localStorage.setItem('sa_impersonate', JSON.stringify({
-      orgId: org.id,
-      orgName: org.name,
-      userId: user.id,
-      userName: user.full_name,
-    }))
-    window.location.href = '/'
-  }
 
   const lookupPin = async () => {
     if (!/^\d{6}$/.test(pinQuery)) return
@@ -447,14 +438,6 @@ export default function SuperAdmin() {
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={() => impersonateUser(
-                    { id: pinResult.org_id, name: pinResult.organizations?.name || pinResult.company_name },
-                    { id: pinResult.id, full_name: pinResult.full_name }
-                  )}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors whitespace-nowrap">
-                  View as User
-                </button>
               </div>
             )}
           </div>
@@ -700,17 +683,9 @@ export default function SuperAdmin() {
                                           <p className="text-[#8A9AB0] text-xs">{member.email}</p>
                                         </div>
                                       </div>
-                                      <div className="flex items-center gap-2">
-                                        <span className={`text-xs px-2 py-0.5 rounded font-semibold ${member.org_role === 'admin' ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
-                                          {member.org_role || 'member'}
-                                        </span>
-                                        <button
-                                          onClick={() => impersonateUser(org, member)}
-                                          className="bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded text-xs font-semibold hover:bg-blue-500/30 transition-colors"
-                                        >
-                                          Impersonate
-                                        </button>
-                                      </div>
+                                      <span className={`text-xs px-2 py-0.5 rounded font-semibold ${member.org_role === 'admin' ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                                        {member.org_role || 'member'}
+                                      </span>
                                     </div>
                                   ))}
                                   {getOrgProfiles(org.id).length === 0 && (
