@@ -1850,16 +1850,10 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                   ))}
                 </select>
                 {photos.length > 0 && (
-                  <>
-                    <button onClick={downloadAllPhotos}
-                      className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                      ↓ Download All
-                    </button>
-                    <button onClick={generateFinalJobPacket}
-                      className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                      📄 Final Job Packet
-                    </button>
-                  </>
+                  <button onClick={downloadAllPhotos}
+                    className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                    ↓ Download All
+                  </button>
                 )}
                 <label className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors cursor-pointer">
                   {uploadingPhoto ? 'Uploading...' : '+ Upload Photo'}
