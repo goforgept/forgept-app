@@ -37,6 +37,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const [savingItems, setSavingItems] = useState(false)
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago')
   const [photos, setPhotos] = useState([])
+  const [clientLocations, setClientLocations] = useState([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoCategory, setPhotoCategory] = useState('Other')
 
@@ -62,6 +63,18 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
       .from('profiles').select('id, full_name, dispatch_zone')
       .eq('org_id', profileData.org_id).order('full_name')
     setTechs(techData || [])
+
+    // Fetch client locations if client is set
+    if (ticketData?.clients?.id) {
+      const { data: locData } = await supabase
+        .from('client_locations')
+        .select('*')
+        .eq('client_id', ticketData.clients.id)
+        .order('site_name', { ascending: true })
+      setClientLocations(locData || [])
+    }
+
+    setLoading(false)
 
     // Fetch ticket photos
     const { data: photoData } = await supabase
@@ -306,6 +319,10 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     if (ticket.clients?.company) { doc.text(`Client: ${ticket.clients.company}`, 14, y); y += 5 }
     if (ticket.profiles?.full_name) { doc.text(`Technician: ${ticket.profiles.full_name}`, 14, y); y += 5 }
     if (ticket.scheduled_date) { doc.text(`Service Date: ${new Date(ticket.scheduled_date).toLocaleDateString()}`, 14, y); y += 5 }
+    if (ticket.location_id) {
+      const loc = clientLocations.find(l => l.id === ticket.location_id)
+      if (loc) { doc.text(`Site: ${loc.site_name}${loc.address ? ` — ${loc.address}, ${loc.city || ''} ${loc.state || ''}`.trim() : ''}`, 14, y); y += 5 }
+    }
     if (ticket.resolved_at) { doc.text(`Resolved: ${new Date(ticket.resolved_at).toLocaleDateString()}`, 14, y); y += 5 }
     y += 4
 
@@ -640,6 +657,19 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                 ))}
               </select>
             </div>
+            {clientLocations.length > 0 && (
+              <div>
+                <p className="text-[#8A9AB0] text-xs mb-1">Site Location</p>
+                <select value={ticket.location_id || ''} onChange={e => updateTicket('location_id', e.target.value || null)} className={`w-full ${inputClass}`}>
+                  <option value="">— Select location —</option>
+                  {clientLocations.map(loc => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.site_name}{loc.address ? ` — ${loc.address}` : ''}{loc.city ? `, ${loc.city}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
           {ticket.scheduled_time && (
