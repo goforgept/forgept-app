@@ -16,7 +16,7 @@ const LOCATION_TYPES = ['HQ', 'Main Office', 'Warehouse', 'Job Site', 'Retail', 
 
 const emptyLocation = {
   site_name: '', location_type: '', address: '', city: '', state: '', zip: '',
-  floor_suite: '', access_notes: '',
+  floor_suite: '', access_notes: '', store_id: '',
   site_contact_name: '', site_contact_email: '', site_contact_phone: '', notes: ''
 }
 
@@ -151,6 +151,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     setLocationForm({
       site_name: loc.site_name || '',
       location_type: loc.location_type || '',
+      store_id: loc.store_id || '',
       address: loc.address || '',
       city: loc.city || '',
       state: loc.state || '',
@@ -536,6 +537,7 @@ const deleteMeeting = async (meetingId) => {
           {client?.phone && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Phone</span><a href={`tel:${client.phone}`} className="text-white text-sm hover:text-[#C8622A] transition-colors">{client.phone}</a></div>}
           {client?.industry && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Industry</span><span className="text-white text-sm">{client.industry}</span></div>}
           {fullAddress && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Address</span><a href={`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`} target="_blank" rel="noreferrer" className="text-white text-sm hover:text-[#C8622A] transition-colors">{fullAddress}</a></div>}
+          {client?.store_id && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Store ID</span><span className="text-white text-sm font-mono">{client.store_id}</span></div>}
         </div>
 
         {/* Tabs */}
@@ -669,6 +671,7 @@ const deleteMeeting = async (meetingId) => {
                         <div>
                           <div className="flex items-center gap-2 mb-0.5">
                             <p className="text-white font-semibold">{loc.site_name}</p>
+                            {loc.store_id && <span className="text-xs px-1.5 py-0.5 rounded bg-[#0F1C2E] text-[#C8622A] font-mono">{loc.store_id}</span>}
                             {loc.location_type && <span className="text-xs px-1.5 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0]">{loc.location_type}</span>}
                           </div>
                           {addr && <a href={`https://maps.google.com/?q=${encodeURIComponent(addrMapQuery)}`} target="_blank" rel="noreferrer" className="text-[#8A9AB0] text-xs hover:text-[#C8622A] transition-colors mt-0.5 block">{addr}</a>}
@@ -917,6 +920,10 @@ const deleteMeeting = async (meetingId) => {
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Site Name <span className="text-[#C8622A]">*</span></label>
                   <input type="text" value={locationForm.site_name} onChange={e => setLocationForm(p => ({ ...p, site_name: e.target.value }))} placeholder="e.g. HQ, Warehouse, Nashville Office" className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Store ID</label>
+                  <input type="text" value={locationForm.store_id || ''} onChange={e => setLocationForm(p => ({ ...p, store_id: e.target.value }))} placeholder="e.g. STR-001" className={inputClass} />
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Location Type</label>
