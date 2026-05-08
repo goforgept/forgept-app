@@ -79,6 +79,13 @@ const MONITORING_DEFAULTS = {
 export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, role, isSalesManager, isPM, isTechnician }) {
   const [profile, setProfile] = useState(null)
   const [activeTab, setActiveTab] = useState('general')
+  const [laborRates, setLaborRates] = useState([])
+  const [savingRates, setSavingRates] = useState(false)
+  const [orgServiceSettings, setOrgServiceSettings] = useState({
+    trip_fee_default: '',
+    drive_time_rate_default: '',
+    service_billing_mode: 'trip_fee'
+  })
   const [importType, setImportType] = useState('clients')
   const [importFile, setImportFile] = useState(null)
   const [importPreview, setImportPreview] = useState([])
@@ -263,6 +270,29 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       payment_instructions_zelle: data?.payment_instructions_zelle || '',
       payment_instructions_notes: data?.payment_instructions_notes || '',
     })
+    // Fetch labor rates and org service settings
+    if (data?.org_id) {
+      const { data: ratesData } = await supabase
+        .from('labor_rates')
+        .select('*')
+        .eq('org_id', data.org_id)
+        .order('sort_order', { ascending: true })
+      setLaborRates(ratesData || [])
+
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('trip_fee_default, drive_time_rate_default, service_billing_mode')
+        .eq('id', data.org_id)
+        .single()
+      if (orgData) {
+        setOrgServiceSettings({
+          trip_fee_default: orgData.trip_fee_default || '',
+          drive_time_rate_default: orgData.drive_time_rate_default || '',
+          service_billing_mode: orgData.service_billing_mode || 'trip_fee'
+        })
+      }
+    }
+
     setEmailTemplates({
       early_days: data?.email_cadence_early ?? 30,
       early_subject: data?.email_template_early_subject || `Following up — {{proposalName}}`,
@@ -450,6 +480,37 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setSavingPin(false)
     setPinSaved(true)
     setTimeout(() => setPinSaved(false), 2000)
+  }
+
+  const saveRateCard = async () => {
+    setSavingRates(true)
+    try {
+      // Save labor rates — delete all and reinsert
+      await supabase.from('labor_rates').delete().eq('org_id', profile.org_id)
+      if (laborRates.length > 0) {
+        await supabase.from('labor_rates').insert(
+          laborRates.map((r, i) => ({
+            org_id: profile.org_id,
+            role: r.role,
+            cost_per_hour: parseFloat(r.cost_per_hour) || 0,
+            bill_rate_per_hour: parseFloat(r.bill_rate_per_hour) || 0,
+            unit: r.unit || 'hr',
+            sort_order: i
+          }))
+        )
+      }
+      // Save org service billing settings
+      await supabase.from('organizations').update({
+        trip_fee_default: parseFloat(orgServiceSettings.trip_fee_default) || 0,
+        drive_time_rate_default: parseFloat(orgServiceSettings.drive_time_rate_default) || 0,
+        service_billing_mode: orgServiceSettings.service_billing_mode
+      }).eq('id', profile.org_id)
+
+      setSuccess('Rate card saved.')
+    } catch (err) {
+      alert('Error saving rate card: ' + err.message)
+    }
+    setSavingRates(false)
   }
 
   const regeneratePin = async () => {
@@ -668,6 +729,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         <div className="flex gap-2 mb-6">
           {[
             { key: 'general', label: 'General' },
+            ...(isAdmin ? [{ key: 'ratecard', label: 'Rate Card' }] : []),
             ...(isAdmin ? [{ key: 'integrations', label: 'Integrations' }] : []),
             ...(isAdmin ? [{ key: 'email', label: 'Email Templates' }] : []),
             ...(isAdmin ? [{ key: 'invoicing', label: 'Invoicing' }] : []),
@@ -1477,6 +1539,170 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
               className="bg-[#C8622A] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
               {savingSLA ? 'Saving...' : 'Save SLA & Monitoring Settings'}
             </button>
+          </div>
+        )}
+
+        {/* ── RATE CARD TAB ── */}
+        {activeTab === 'ratecard' && isAdmin && (
+          <div className="space-y-6">
+
+            {/* Labor Rates */}
+            <div className="bg-[#1a2d45] rounded-xl p-6">
+              <div className="flex justify-between items-center mb-5">
+                <div>
+                  <h3 className="text-white font-bold text-lg">Labor Rates</h3>
+                  <p className="text-[#8A9AB0] text-sm mt-0.5">Set your cost and bill rates per role. These auto-populate in proposals and service tickets.</p>
+                </div>
+                <button onClick={() => setLaborRates(prev => [...prev, { id: crypto.randomUUID(), role: '', cost_per_hour: '', bill_rate_per_hour: '', unit: 'hr' }])}
+                  className="text-[#C8622A] text-sm hover:text-white transition-colors">+ Add Role</button>
+              </div>
+
+              {laborRates.length === 0 ? (
+                <div className="text-center py-8 border-2 border-dashed border-[#2a3d55] rounded-xl">
+                  <p className="text-[#8A9AB0]">No labor rates set yet.</p>
+                  <p className="text-[#8A9AB0] text-sm mt-1">Add roles to auto-populate labor in proposals and service tickets.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[#2a3d55]">
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Role</th>
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Unit</th>
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Your Cost</th>
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Bill Rate</th>
+                        <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Margin %</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {laborRates.map((rate, i) => {
+                        const cost = parseFloat(rate.cost_per_hour) || 0
+                        const bill = parseFloat(rate.bill_rate_per_hour) || 0
+                        const margin = bill > 0 ? (((bill - cost) / bill) * 100).toFixed(1) : '—'
+                        return (
+                          <tr key={rate.id || i} className="border-b border-[#2a3d55]/50">
+                            <td className="py-2 pr-4">
+                              <input type="text" value={rate.role} placeholder="e.g. Lead Tech"
+                                onChange={e => setLaborRates(prev => prev.map((r, idx) => idx === i ? { ...r, role: e.target.value } : r))}
+                                className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#C8622A] w-44" />
+                            </td>
+                            <td className="py-2 pr-4">
+                              <select value={rate.unit || 'hr'}
+                                onChange={e => setLaborRates(prev => prev.map((r, idx) => idx === i ? { ...r, unit: e.target.value } : r))}
+                                className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#C8622A]">
+                                {['hr', 'day', 'lot'].map(u => <option key={u}>{u}</option>)}
+                              </select>
+                            </td>
+                            <td className="py-2 pr-4">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[#8A9AB0] text-sm">$</span>
+                                <input type="number" min="0" step="0.01" value={rate.cost_per_hour} placeholder="0.00"
+                                  onChange={e => setLaborRates(prev => prev.map((r, idx) => idx === i ? { ...r, cost_per_hour: e.target.value } : r))}
+                                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#C8622A] w-24" />
+                              </div>
+                            </td>
+                            <td className="py-2 pr-4">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[#8A9AB0] text-sm">$</span>
+                                <input type="number" min="0" step="0.01" value={rate.bill_rate_per_hour} placeholder="0.00"
+                                  onChange={e => setLaborRates(prev => prev.map((r, idx) => idx === i ? { ...r, bill_rate_per_hour: e.target.value } : r))}
+                                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#C8622A] w-24" />
+                              </div>
+                            </td>
+                            <td className="py-2 pr-4">
+                              <span className={`text-sm font-semibold ${parseFloat(margin) >= 30 ? 'text-green-400' : parseFloat(margin) >= 15 ? 'text-[#C8622A]' : bill > 0 ? 'text-red-400' : 'text-[#8A9AB0]'}`}>
+                                {margin}{margin !== '—' ? '%' : ''}
+                              </span>
+                            </td>
+                            <td className="py-2">
+                              <button onClick={() => setLaborRates(prev => prev.filter((_, idx) => idx !== i))}
+                                className="text-[#2a3d55] hover:text-red-400 text-sm transition-colors">✕</button>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Material Markup */}
+            <div className="bg-[#1a2d45] rounded-xl p-6">
+              <h3 className="text-white font-bold text-lg mb-2">Material Markup</h3>
+              <p className="text-[#8A9AB0] text-sm mb-5">Default markup applied to all materials. Can be overridden per line item.</p>
+              <div className="flex items-center gap-3">
+                <label className="text-[#8A9AB0] text-sm">Default Markup %</label>
+                <input type="number" min="0" max="200" value={form.default_markup_percent}
+                  onChange={e => setForm(prev => ({ ...prev, default_markup_percent: e.target.value }))}
+                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] w-24" />
+                <span className="text-[#8A9AB0] text-sm">%</span>
+              </div>
+            </div>
+
+            {/* Service Billing */}
+            <div className="bg-[#1a2d45] rounded-xl p-6">
+              <h3 className="text-white font-bold text-lg mb-2">Service Billing</h3>
+              <p className="text-[#8A9AB0] text-sm mb-5">How do you bill for service calls? These defaults apply to all new service tickets.</p>
+
+              <div className="space-y-5">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-2 block">Billing Mode</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { value: 'trip_fee', label: 'Trip Fee' },
+                      { value: 'drive_time', label: 'Drive Time' },
+                      { value: 'both', label: 'Both' },
+                      { value: 'none', label: 'Neither' },
+                    ].map(opt => (
+                      <button key={opt.value}
+                        onClick={() => setOrgServiceSettings(prev => ({ ...prev, service_billing_mode: opt.value }))}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${orgServiceSettings.service_billing_mode === opt.value ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {(orgServiceSettings.service_billing_mode === 'trip_fee' || orgServiceSettings.service_billing_mode === 'both') && (
+                  <div className="flex items-center gap-3">
+                    <label className="text-[#8A9AB0] text-sm w-40">Default Trip Fee</label>
+                    <span className="text-[#8A9AB0] text-sm">$</span>
+                    <input type="number" min="0" step="0.01" value={orgServiceSettings.trip_fee_default} placeholder="0.00"
+                      onChange={e => setOrgServiceSettings(prev => ({ ...prev, trip_fee_default: e.target.value }))}
+                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] w-28" />
+                  </div>
+                )}
+
+                {(orgServiceSettings.service_billing_mode === 'drive_time' || orgServiceSettings.service_billing_mode === 'both') && (
+                  <div className="flex items-center gap-3">
+                    <label className="text-[#8A9AB0] text-sm w-40">Drive Time Rate</label>
+                    <span className="text-[#8A9AB0] text-sm">$</span>
+                    <input type="number" min="0" step="0.01" value={orgServiceSettings.drive_time_rate_default} placeholder="0.00"
+                      onChange={e => setOrgServiceSettings(prev => ({ ...prev, drive_time_rate_default: e.target.value }))}
+                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] w-28" />
+                    <span className="text-[#8A9AB0] text-sm">/ hr</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Save Button */}
+            <div className="flex justify-end gap-3">
+              <button onClick={async () => {
+                // Also save default markup when saving rate card
+                await supabase.from('profiles').update({
+                  default_markup_percent: parseFloat(form.default_markup_percent) || 35
+                }).eq('id', profile.id)
+                await saveRateCard()
+              }}
+                disabled={savingRates}
+                className="bg-[#C8622A] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                {savingRates ? 'Saving...' : 'Save Rate Card'}
+              </button>
+            </div>
+
           </div>
         )}
 

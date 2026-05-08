@@ -130,6 +130,16 @@ export default function SuperAdmin() {
   }
 
 
+  const impersonateUser = (org, user) => {
+    localStorage.setItem('sa_impersonate', JSON.stringify({
+      orgId: org.id,
+      orgName: org.name,
+      userId: user.id,
+      userName: user.full_name,
+    }))
+    window.location.href = '/'
+  }
+
   const lookupPin = async () => {
     if (!/^\d{6}$/.test(pinQuery)) return
     setPinLookupLoading(true)
@@ -438,6 +448,14 @@ export default function SuperAdmin() {
                     </span>
                   )}
                 </div>
+                <button
+                  onClick={() => impersonateUser(
+                    { id: pinResult.org_id, name: pinResult.organizations?.name || pinResult.company_name },
+                    { id: pinResult.id, full_name: pinResult.full_name }
+                  )}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors whitespace-nowrap">
+                  View as User
+                </button>
               </div>
             )}
           </div>

@@ -84,6 +84,10 @@ function App() {
   }, [session])
 
   const fetchProfile = async (userId) => {
+    const impersonation = (() => {
+      try { return JSON.parse(localStorage.getItem('sa_impersonate') || 'null') } catch { return null }
+    })()
+
     for (let i = 0; i < 5; i++) {
       const { data } = await supabase
         .from('profiles')
@@ -92,6 +96,16 @@ function App() {
         .single()
 
       if (data?.org_role) {
+        if (data.role === 'superadmin' && impersonation?.userId) {
+          const { data: impResult } = await supabase.functions.invoke('superadmin-get-profile', {
+            body: { userId: impersonation.userId }
+          })
+          if (impResult?.profile) {
+            setProfile(impResult.profile)
+            setLoading(false)
+            return
+          }
+        }
         setProfile(data)
         setLoading(false)
         return
@@ -108,6 +122,10 @@ function App() {
     setProfile(data)
     setLoading(false)
   }
+
+  const impersonation = (() => {
+    try { return JSON.parse(localStorage.getItem('sa_impersonate') || 'null') } catch { return null }
+  })()
 
   if (loading) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
@@ -161,6 +179,12 @@ function App() {
 
   return (
     <>
+      {impersonation && (
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-white text-xs flex items-center justify-between px-4 py-1.5">
+          <span>Superadmin viewing as <strong>{impersonation.orgName}</strong> · {impersonation.userName}</span>
+          <button onClick={() => { localStorage.removeItem('sa_impersonate'); window.location.reload() }} className="underline hover:no-underline ml-4">Exit</button>
+        </div>
+      )}
     <Routes>
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/sign/:token" element={<SignProposal />} />
