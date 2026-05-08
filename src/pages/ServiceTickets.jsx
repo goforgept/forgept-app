@@ -33,9 +33,10 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   const [form, setForm] = useState({
     title: '', description: '', client_id: '', job_id: '',
     assigned_tech_id: '', priority: 'Normal', status: 'Open',
-    scheduled_date: '', scheduled_time: '', duration_hours: '2'
+    scheduled_date: '', scheduled_time: '', duration_hours: '2', location_id: ''
   })
   const [clientJobs, setClientJobs] = useState([])
+  const [clientLocations, setClientLocations] = useState([])
 
   useEffect(() => { fetchAll() }, [])
 
@@ -65,14 +66,19 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   }
 
   const handleClientChange = async (clientId) => {
-    setForm(p => ({ ...p, client_id: clientId, job_id: '' }))
+    setForm(p => ({ ...p, client_id: clientId, job_id: '', location_id: '' }))
     setClientJobs([])
+    setClientLocations([])
     if (!clientId) return
     const { data } = await supabase
       .from('jobs').select('id, name, job_number')
       .eq('client_id', clientId).in('status', ['Active', 'On Hold'])
       .order('created_at', { ascending: false })
     setClientJobs(data || [])
+    const { data: locData } = await supabase
+      .from('client_locations').select('*')
+      .eq('client_id', clientId).order('site_name', { ascending: true })
+    setClientLocations(locData || [])
   }
 
   const saveTicket = async () => {
@@ -95,6 +101,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
         scheduled_date: form.scheduled_date || null,
         scheduled_time: form.scheduled_time || null,
         duration_hours: parseFloat(form.duration_hours) || 2,
+        location_id: form.location_id || null,
       })
 
       if (error) {
@@ -104,8 +111,9 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
 
       setShowModal(false)
       setSaveError('')
-      setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '' })
+      setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '', duration_hours: '2', location_id: '' })
       setClientJobs([])
+      setClientLocations([])
       fetchAll()
     } catch (err) {
       setSaveError(err.message || 'Unexpected error')
@@ -252,6 +260,19 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
                   <select value={form.job_id} onChange={e => setForm(p => ({ ...p, job_id: e.target.value }))} className={inputClass}>
                     <option value="">— No job —</option>
                     {clientJobs.map(j => <option key={j.id} value={j.id}>{j.job_number ? `${j.job_number} — ` : ''}{j.name}</option>)}
+                  </select>
+                </div>
+              )}
+              {clientLocations.length > 0 && (
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Site Location (optional)</label>
+                  <select value={form.location_id} onChange={e => setForm(p => ({ ...p, location_id: e.target.value }))} className={inputClass}>
+                    <option value="">— No location —</option>
+                    {clientLocations.map(loc => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.site_name}{loc.address ? ` — ${loc.address}, ${loc.city || ''}` : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
               )}
