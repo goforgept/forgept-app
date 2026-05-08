@@ -746,6 +746,15 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                 {ticket.profiles?.full_name && <div><p className="text-[#8A9AB0] text-xs mb-0.5">Assigned To</p><p className="text-white">{ticket.profiles.full_name}</p></div>}
                 {ticket.clients?.company && <div><p className="text-[#8A9AB0] text-xs mb-0.5">Client</p><p className="text-white">{ticket.clients.company}</p></div>}
                 {ticket.jobs?.name && <div><p className="text-[#8A9AB0] text-xs mb-0.5">Job</p><p className="text-white">{ticket.jobs.name}</p></div>}
+                {ticket.location_id && (() => {
+                  const loc = clientLocations.find(l => l.id === ticket.location_id)
+                  return loc ? (
+                    <div className="col-span-2">
+                      <p className="text-[#8A9AB0] text-xs mb-0.5">Site Location</p>
+                      <p className="text-white">{loc.site_name}{loc.store_id ? <span className="text-[#C8622A] font-mono text-xs ml-2">{loc.store_id}</span> : ''}{loc.address ? ` — ${loc.address}, ${loc.city || ''} ${loc.state || ''}`.trim() : ''}</p>
+                    </div>
+                  ) : null
+                })()}
               </div>
             </div>
           </>
