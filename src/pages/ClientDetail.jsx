@@ -273,7 +273,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     setSavingClient(true)
     await supabase.from('clients').update({
       company: editForm.company, client_name: editForm.client_name, email: editForm.email, phone: editForm.phone,
-      industry: editForm.industry, address: editForm.address, city: editForm.city, state: editForm.state, zip: editForm.zip, notes: editForm.notes,
+      industry: editForm.industry, address: editForm.address, city: editForm.city, state: editForm.state, zip: editForm.zip, notes: editForm.notes, store_id: editForm.store_id || null,
     }).eq('id', id)
     await fetchClient()
     setEditingClient(false)
@@ -1047,6 +1047,7 @@ const deleteMeeting = async (meetingId) => {
                 <div><label className="text-[#8A9AB0] text-xs mb-1 block">Email</label><input type="email" value={editForm.email || ''} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} className={inputClass} /></div>
                 <div><label className="text-[#8A9AB0] text-xs mb-1 block">Phone</label><input type="text" value={editForm.phone || ''} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} className={inputClass} /></div>
                 <div><label className="text-[#8A9AB0] text-xs mb-1 block">Industry</label><select value={editForm.industry || ''} onChange={e => setEditForm(p => ({ ...p, industry: e.target.value }))} className={inputClass}><option value="">Select industry</option>{INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}</select></div>
+                <div><label className="text-[#8A9AB0] text-xs mb-1 block">Store ID</label><input type="text" value={editForm.store_id || ''} onChange={e => setEditForm(p => ({ ...p, store_id: e.target.value }))} placeholder="e.g. STR-001" className={inputClass} /></div>
               </div>
               <div><label className="text-[#8A9AB0] text-xs mb-1 block">Street Address</label><input type="text" value={editForm.address || ''} onChange={e => setEditForm(p => ({ ...p, address: e.target.value }))} className={inputClass} /></div>
               <div className="grid grid-cols-3 gap-3">
