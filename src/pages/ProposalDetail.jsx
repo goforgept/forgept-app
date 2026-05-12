@@ -7,8 +7,9 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } from 'docx'
+import DrawingToolSummary from '../components/drawing/DrawingToolSummary'
 
-export default function ProposalDetail({ isAdmin, featureProposals = true, featureCRM = false, featureAiBom = false, featureSitePhotos = true }) {
+export default function ProposalDetail({ isAdmin, featureProposals = true, featureCRM = false, featureAiBom = false, featureSitePhotos = true, featureDrawingTool = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const [proposal, setProposal] = useState(null)
@@ -3585,7 +3586,11 @@ const analyzeDrawing = async () => {
             )}
           </div>
         )}
-
+        
+        <DrawingToolSummary
+  proposalId={id}
+  featureEnabled={featureDrawingTool}
+/>
         {/* Activity Feed */}
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <h3 className="text-white font-bold text-lg mb-4">Activity</h3>

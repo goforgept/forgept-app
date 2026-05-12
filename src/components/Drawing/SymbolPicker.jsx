@@ -1,0 +1,206 @@
+import { useState, useEffect } from 'react'
+import { supabase } from '../../supabase'
+
+const INDUSTRY_LABELS = {
+  security:    'Security',
+  av:          'AV',
+  hvac:        'HVAC',
+  electrical:  'Electrical',
+  low_voltage: 'Low Voltage',
+}
+
+export default function SymbolPicker({ selectedSymbol, onSelect }) {
+  const [industry,      setIndustry]      = useState('security')
+  const [manufacturer,  setManufacturer]  = useState('Generic')
+  const [category,      setCategory]      = useState(null)
+  const [search,        setSearch]        = useState('')
+  const [manufacturers, setManufacturers] = useState([])
+  const [categories,    setCategories]    = useState([])
+  const [symbols,       setSymbols]       = useState([])
+  const [loading,       setLoading]       = useState(false)
+
+  useEffect(() => {
+    setManufacturer('Generic')
+    setCategory(null)
+    loadManufacturers(industry)
+  }, [industry])
+
+  useEffect(() => {
+    setCategory(null)
+    loadCategories(industry, manufacturer)
+  }, [manufacturer])
+
+  useEffect(() => {
+    loadSymbols(industry, manufacturer, category)
+  }, [category, industry, manufacturer])
+
+  const loadManufacturers = async (ind) => {
+    const { data } = await supabase.from('global_products').select('manufacturer').eq('industry', ind).eq('is_active', true)
+    if (data) {
+      const unique = [...new Set(data.map(r => r.manufacturer))].sort()
+      setManufacturers(['Generic', ...unique.filter(m => m !== 'Generic')])
+    }
+  }
+
+  const loadCategories = async (ind, mfr) => {
+    const { data } = await supabase.from('global_products').select('category').eq('industry', ind).eq('manufacturer', mfr).eq('is_active', true)
+    if (data) setCategories([...new Set(data.map(r => r.category))].sort())
+  }
+
+  const loadSymbols = async (ind, mfr, cat) => {
+    setLoading(true)
+    let query = supabase.from('global_products').select('*').eq('industry', ind).eq('manufacturer', mfr).eq('is_active', true).order('category').order('name')
+    if (cat) query = query.eq('category', cat)
+    const { data } = await query
+    setSymbols(data || [])
+    setLoading(false)
+  }
+
+  const filtered = search.trim()
+    ? symbols.filter(s =>
+        s.name.toLowerCase().includes(search.toLowerCase()) ||
+        s.part_number.toLowerCase().includes(search.toLowerCase()) ||
+        s.model_number?.toLowerCase().includes(search.toLowerCase())
+      )
+    : symbols
+
+  return (
+    <div className="flex flex-col h-full bg-[#0F1C2E]">
+
+      {/* Industry */}
+      <div className="px-3 pt-3 pb-2 border-b border-[#2a3d55]">
+        <p className="text-xs font-medium text-[#8A9AB0] mb-2">Industry</p>
+        <div className="flex flex-wrap gap-1">
+          {Object.entries(INDUSTRY_LABELS).map(([key, label]) => (
+            <button key={key} onClick={() => setIndustry(key)}
+              className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                industry === key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Manufacturer */}
+      <div className="px-3 py-2 border-b border-[#2a3d55]">
+        <p className="text-xs font-medium text-[#8A9AB0] mb-2">Manufacturer</p>
+        <select value={manufacturer} onChange={e => setManufacturer(e.target.value)}
+          className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white focus:outline-none focus:border-[#C8622A]">
+          {manufacturers.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+      </div>
+
+      {/* Category */}
+      {categories.length > 0 && (
+        <div className="px-3 py-2 border-b border-[#2a3d55]">
+          <p className="text-xs font-medium text-[#8A9AB0] mb-2">Category</p>
+          <div className="flex flex-wrap gap-1">
+            <button onClick={() => setCategory(null)}
+              className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                category === null ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/40' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
+              }`}>
+              All
+            </button>
+            {categories.map(cat => (
+              <button key={cat} onClick={() => setCategory(cat)}
+                className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                  category === cat ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/40' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
+                }`}>
+                {cat}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="px-3 py-2 border-b border-[#2a3d55]">
+        <input type="text" placeholder="Search name or part #..."
+          value={search} onChange={e => setSearch(e.target.value)}
+          className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white placeholder-[#8A9AB0] focus:outline-none focus:border-[#C8622A]" />
+      </div>
+
+      {/* Symbol grid */}
+      <div className="flex-1 overflow-y-auto p-3">
+        {loading ? (
+          <div className="flex items-center justify-center h-24 text-xs text-[#8A9AB0]">Loading...</div>
+        ) : filtered.length === 0 ? (
+          <div className="flex items-center justify-center h-24 text-xs text-[#8A9AB0]">No symbols found</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {filtered.map(symbol => (
+              <SymbolCard key={symbol.id} symbol={symbol}
+                isSelected={selectedSymbol?.id === symbol.id}
+                onSelect={() => onSelect(selectedSymbol?.id === symbol.id ? null : symbol)} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Selected info */}
+      {selectedSymbol && (
+        <div className="px-3 py-2 border-t border-[#2a3d55] bg-[#C8622A]/10">
+          <p className="text-xs font-medium text-[#C8622A] truncate">{selectedSymbol.name}</p>
+          <p className="text-xs text-[#C8622A]/70 font-mono truncate">{selectedSymbol.part_number}</p>
+          <p className="text-xs text-[#8A9AB0] mt-0.5">Click floor plan to place</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SymbolCard({ symbol, isSelected, onSelect }) {
+  return (
+    <button onClick={onSelect} title={`${symbol.name}\n${symbol.part_number}`}
+      className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-center transition-all cursor-pointer ${
+        isSelected
+          ? 'border-[#C8622A]/60 bg-[#C8622A]/10'
+          : 'border-[#2a3d55] bg-[#1a2d45] hover:border-[#C8622A]/40 hover:bg-[#C8622A]/5'
+      }`}>
+      <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${isSelected ? 'text-[#C8622A]' : 'text-[#8A9AB0]'}`}>
+        <CategoryIcon category={symbol.category} />
+      </div>
+      <span className="text-xs text-white leading-tight line-clamp-2">{symbol.name}</span>
+      <span className="text-xs font-mono text-[#8A9AB0] truncate w-full text-center">{symbol.part_number}</span>
+    </button>
+  )
+}
+
+function CategoryIcon({ category }) {
+  const props = { className: 'w-10 h-10', fill: 'none', stroke: 'currentColor', viewBox: '0 0 40 40' }
+  switch (category) {
+    case 'Dome Camera':
+      return <svg {...props}><ellipse cx="20" cy="24" rx="14" ry="6" strokeWidth="1.5"/><path d="M6 24 Q6 10 20 10 Q34 10 34 24" strokeWidth="1.5" fill="none"/><circle cx="20" cy="20" r="4" strokeWidth="1.5"/></svg>
+    case 'Bullet Camera':
+      return <svg {...props}><rect x="8" y="16" width="20" height="8" rx="2" strokeWidth="1.5"/><path d="M28 18 L34 16 L34 24 L28 22 Z" strokeWidth="1.5" fill="none"/><circle cx="13" cy="20" r="2" strokeWidth="1.5"/></svg>
+    case 'PTZ Camera':
+      return <svg {...props}><circle cx="20" cy="20" r="10" strokeWidth="1.5"/><circle cx="20" cy="20" r="4" strokeWidth="1.5"/><path d="M20 8 L20 4 M20 36 L20 32 M8 20 L4 20 M36 20 L32 20" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Access Reader':
+      return <svg {...props}><rect x="10" y="8" width="20" height="24" rx="3" strokeWidth="1.5"/><rect x="15" y="13" width="10" height="7" rx="1" strokeWidth="1.5"/><circle cx="20" cy="26" r="2" strokeWidth="1.5"/></svg>
+    case 'Controller':
+      return <svg {...props}><rect x="6" y="12" width="28" height="16" rx="2" strokeWidth="1.5"/><circle cx="13" cy="20" r="2" fill="currentColor"/><circle cx="20" cy="20" r="2" fill="currentColor"/><circle cx="27" cy="20" r="2" fill="currentColor"/></svg>
+    case 'Motion Sensor':
+      return <svg {...props}><path d="M20 20 L8 10 M20 20 L8 30 M20 20 L32 20" strokeWidth="1.5" strokeLinecap="round"/><circle cx="20" cy="20" r="3" strokeWidth="1.5"/><path d="M26 14 Q32 20 26 26" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>
+    case 'NVR':
+      return <svg {...props}><rect x="6" y="10" width="28" height="20" rx="2" strokeWidth="1.5"/><rect x="10" y="14" width="8" height="6" rx="1" strokeWidth="1.5"/><rect x="22" y="14" width="8" height="6" rx="1" strokeWidth="1.5"/></svg>
+    case 'Display':
+      return <svg {...props}><rect x="6" y="8" width="28" height="20" rx="2" strokeWidth="1.5"/><path d="M16 32 L24 32 M20 28 L20 32" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Speaker':
+      return <svg {...props}><circle cx="20" cy="20" r="12" strokeWidth="1.5"/><circle cx="20" cy="20" r="5" strokeWidth="1.5"/><circle cx="20" cy="20" r="2" fill="currentColor"/></svg>
+    case 'Network':
+      return <svg {...props}><rect x="8" y="14" width="24" height="12" rx="2" strokeWidth="1.5"/><path d="M20 10 Q14 14 14 18 M20 10 Q26 14 26 18" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>
+    case 'Thermostat':
+      return <svg {...props}><circle cx="20" cy="20" r="12" strokeWidth="1.5"/><path d="M20 14 L20 20 L24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="20" cy="20" r="2" fill="currentColor"/></svg>
+    case 'Diffuser':
+      return <svg {...props}><rect x="8" y="8" width="24" height="24" rx="2" strokeWidth="1.5"/><path d="M14 14 L26 14 M14 20 L26 20 M14 26 L26 26" strokeWidth="1" strokeDasharray="2 2"/><path d="M14 14 L14 26 M20 14 L20 26 M26 14 L26 26" strokeWidth="1" strokeDasharray="2 2"/></svg>
+    case 'Outlet':
+      return <svg {...props}><rect x="10" y="8" width="20" height="24" rx="3" strokeWidth="1.5"/><path d="M17 16 L17 20 M23 16 L23 20" strokeWidth="2" strokeLinecap="round"/><path d="M17 24 Q20 27 23 24" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>
+    case 'Panel':
+      return <svg {...props}><rect x="10" y="6" width="20" height="28" rx="2" strokeWidth="1.5"/><path d="M14 12 L26 12 M14 16 L26 16 M14 20 L26 20 M14 24 L26 24 M14 28 L22 28" strokeWidth="1" strokeLinecap="round"/></svg>
+    case 'Lighting':
+      return <svg {...props}><circle cx="20" cy="18" r="8" strokeWidth="1.5"/><path d="M17 26 L23 26 M18 29 L22 29" strokeWidth="1.5" strokeLinecap="round"/><path d="M20 6 L20 4 M28 10 L30 8 M32 18 L34 18 M12 10 L10 8 M8 18 L6 18" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    default:
+      return <svg {...props}><rect x="10" y="10" width="20" height="20" rx="4" strokeWidth="1.5"/><circle cx="20" cy="20" r="4" strokeWidth="1.5"/></svg>
+  }
+}

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import NotificationBell from './NotificationBell'
 
-const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring) => [
+const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool) => [
   {
     key: 'sales',
     label: 'Sales',
@@ -45,8 +45,8 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
     key: 'manage',
     label: 'Manage',
     links: [
-      { label: 'Team', path: '/reps', icon: '👥' },
       { label: 'Product Library', path: '/product-library', icon: '📦' },
+      ...(featureDrawingTool ? [{ label: 'Designer', path: '/designer', icon: '📐' }] : []),
       { label: 'Settings', path: '/settings', icon: '⚙️' },
       { label: 'Help', path: '/faq', icon: '❓' },
     ]
@@ -139,12 +139,12 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
   }
 ]
 
-export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
+export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
   const location = useLocation()
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
   const featureSla = featurSlaProp || sessionStorage.getItem('featureSla') === 'true'
-  const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featureMonitoring') === 'true'
+const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featureMonitoring') === 'true'
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sidebarCollapsed') || '{}') } catch { return {} }
   })
@@ -182,7 +182,7 @@ export default function Sidebar({ isAdmin, featureProposals = true, featureCRM =
   }
 
   const groups = isAdmin || isSalesManager
-    ? NAV_GROUPS_ADMIN(featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring)
+    ? NAV_GROUPS_ADMIN(featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool || sessionStorage.getItem('featureDrawingTool') === 'true')
     : isPM
     ? NAV_GROUPS_PM(featurePurchaseOrders, featureInvoices)
     : isTechnician

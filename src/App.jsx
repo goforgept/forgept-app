@@ -39,6 +39,9 @@ import ServiceTicketDetail from './pages/ServiceTicketDetail'
 import Dispatch from './pages/Dispatch'
 import Contracts from './pages/Contracts'
 import ProductLibrary from './pages/ProductLibrary'
+import Designer from './pages/Designer'
+import DesignerProjects from './pages/DesignerProjects'
+import DrawingReview from './pages/DrawingReview'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -91,7 +94,7 @@ function App() {
     for (let i = 0; i < 5; i++) {
       const { data } = await supabase
         .from('profiles')
-.select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring)')
+        .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring, feature_drawing_tool)')
         .eq('id', userId)
         .single()
 
@@ -116,7 +119,7 @@ function App() {
 
     const { data } = await supabase
       .from('profiles')
-.select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring)')
+      .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring, feature_drawing_tool)')
       .eq('id', userId)
       .single()
     setProfile(data)
@@ -148,8 +151,10 @@ function App() {
   const featureSitePhotos = profile?.organizations?.feature_site_photos !== false
   const featureSla = profile?.organizations?.feature_sla || false
   const featureMonitoring = profile?.organizations?.feature_monitoring || false
+  const featureDrawingTool = profile?.organizations?.feature_drawing_tool || false
   sessionStorage.setItem('featureSla', featureSla)
-  sessionStorage.setItem('featureMonitoring', featureMonitoring)
+sessionStorage.setItem('featureMonitoring', featureMonitoring)
+sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
 
   if (session && isPending) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
@@ -175,7 +180,7 @@ function App() {
   const isSalesManager = role === 'sales_manager'
   const isPM = role === 'project_manager'
   const isTechnician = role === 'technician'
-  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail, featurePurchaseOrders, featureInvoices, featureAiBom, featureSitePhotos, featureSla, featureMonitoring, role, isSalesManager, isPM, isTechnician }
+  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail, featurePurchaseOrders, featureInvoices, featureAiBom, featureSitePhotos, featureSla, featureMonitoring, featureDrawingTool, role, isSalesManager, isPM, isTechnician }
 
   return (
     <>
@@ -236,6 +241,9 @@ function App() {
           <Route path="/integrations/microsoft/callback" element={<MicrosoftCallback />} />
           <Route path="/product-library" element={<ProductLibrary {...sharedProps} />} />
           {(featureSla || featureMonitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
+          {featureDrawingTool && <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />}
+          {featureDrawingTool && <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />}
+          <Route path="/designer/review/:token" element={<DrawingReview />} />
         </>
       )}
     </Routes>
