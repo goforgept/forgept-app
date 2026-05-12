@@ -517,7 +517,7 @@ function PlacementPanel({ placement, onClose, onUpdate }) {
       <div className="flex items-center justify-between px-3 py-3 border-b border-[#2a3d55]">
         <div>
           <p className="text-white text-sm font-semibold">{product.name}</p>
-          <p className="text-[#8A9AB0] text-xs">{product.category}</p>
+        <p className="text-[#8A9AB0] text-xs">{product.manufacturer} · {product.category}</p>
         </div>
         <button onClick={onClose} className="text-[#8A9AB0] hover:text-white transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
