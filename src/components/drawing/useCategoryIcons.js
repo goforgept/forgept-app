@@ -248,6 +248,23 @@ const CATEGORY_SVGS = {
       <path d="M14 8 L14 32" stroke-width="0.5" stroke-dasharray="2 2"/>
     </svg>`,
 
+  'Multi-Lens Camera': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="14" width="32" height="12" rx="2"/>
+      <circle cx="12" cy="20" r="3"/>
+      <circle cx="20" cy="20" r="3"/>
+      <circle cx="28" cy="20" r="3"/>
+      <path d="M4 14 L4 10 M36 14 L36 10" stroke-linecap="round"/>
+    </svg>`,
+
+  'Fisheye Camera': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <circle cx="20" cy="20" r="14"/>
+      <circle cx="20" cy="20" r="8"/>
+      <circle cx="20" cy="20" r="3" fill="${color}"/>
+      <path d="M6 20 Q20 8 34 20 Q20 32 6 20" stroke-width="1" opacity="0.5"/>
+    </svg>`,
+
   'default': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
       <rect x="10" y="10" width="20" height="20" rx="4"/>

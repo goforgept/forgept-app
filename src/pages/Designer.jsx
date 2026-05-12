@@ -19,6 +19,10 @@ export default function Designer({ featureDrawingTool }) {
   const [error,           setError]           = useState(null)
   const [selectedSymbol,  setSelectedSymbol]  = useState(null)
   const [selectedPlacement, setSelectedPlacement] = useState(null)
+  const [selectedCable,     setSelectedCable]     = useState(null)
+  const [editingCableId,    setEditingCableId]    = useState(null)
+  const [updatedCable,      setUpdatedCable]      = useState(null)
+  const [bomRefreshKey,     setBomRefreshKey]     = useState(0)
   const [activeTab,       setActiveTab]       = useState('canvas') // 'canvas' | 'bom'
   const [sidebarOpen,     setSidebarOpen]     = useState(true)
   const [showFireAlarmAck, setShowFireAlarmAck] = useState(false)
@@ -76,24 +80,67 @@ export default function Designer({ featureDrawingTool }) {
     if (!allowed.includes(file.type)) { setError('Please upload a PDF, PNG, or JPG.'); return }
     setUploading(true)
     setError(null)
-    try {
-      const { data: sheet, error: insertErr } = await supabase
-        .from('drawing_sheets')
-        .insert({ org_id: orgId, proposal_id: proposalId, name: file.name.replace(/\.[^/.]+$/, ''), storage_path: 'pending', sort_order: sheets.length })
-        .select().single()
-      if (insertErr) throw insertErr
 
-      const ext         = file.name.split('.').pop()
-      const storagePath = `${orgId}/${proposalId}/${sheet.id}.${ext}`
-      const { error: uploadErr } = await supabase.storage.from('floor-plans').upload(storagePath, file, { upsert: false })
+    try {
+      const isPDF = file.type === 'application/pdf'
+      let numPages = 1
+
+      // Check page count for PDFs
+      if (isPDF) {
+        const pdfjsLib  = await import('pdfjs-dist')
+        const workerUrl = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl.default
+        const arrayBuffer = await file.arrayBuffer()
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        numPages = pdf.numPages
+      }
+
+      const baseName = file.name.replace(/\.[^/.]+$/, '')
+      const ext      = file.name.split('.').pop()
+      const firstSheetId = null
+
+      // Upload the file once
+      const tempId      = crypto.randomUUID()
+      const storagePath = `${orgId}/${proposalId}/${tempId}.${ext}`
+      const { error: uploadErr } = await supabase.storage
+        .from('floor-plans')
+        .upload(storagePath, file, { upsert: false })
       if (uploadErr) throw uploadErr
 
-      await supabase.from('drawing_sheets')
-        .update({ storage_path: storagePath, last_activity_at: new Date().toISOString() })
-        .eq('id', sheet.id)
+      // Create one sheet per page
+      let firstId = null
+      for (let i = 1; i <= numPages; i++) {
+        // Clean up filename — remove date prefixes and long suffixes
+        const cleanName = baseName
+          .replace(/^\d{4}-\d{2}-\d{2}[_\s-]*/g, '') // remove date prefix
+          .replace(/\s*[\(\[].+[\)\]]/g, '')            // remove parenthetical
+          .trim()
+          .slice(0, 40)                                  // cap at 40 chars
+        const sheetName = numPages > 1 ? `${cleanName} — P${i}` : cleanName
+        const { data: sheet, error: insertErr } = await supabase
+          .from('drawing_sheets')
+          .insert({
+            org_id:       orgId,
+            proposal_id:  proposalId,
+            name:         sheetName,
+            storage_path: storagePath,
+            page_number:  i,
+            sort_order:   sheets.length + i - 1,
+            last_activity_at: new Date().toISOString(),
+          })
+          .select().single()
+        if (insertErr) throw insertErr
+        if (i === 1) firstId = sheet.id
+      }
 
       await load()
-      setActiveSheetId(sheet.id)
+      if (firstId) setActiveSheetId(firstId)
+
+      if (numPages > 1) {
+        setError(null)
+        // Show success message briefly
+        setTimeout(() => {}, 100)
+      }
     } catch (err) {
       setError('Upload failed. Please try again.')
       console.error(err)
@@ -395,21 +442,47 @@ export default function Designer({ featureDrawingTool }) {
                         orgId={orgId}
                         selectedSymbol={selectedSymbol}
                         onPlacementChange={() => {}}
-                        onPlacementSelect={setSelectedPlacement}
+                        onPlacementSelect={(p) => { setSelectedPlacement(p); setSelectedCable(null) }}
                         onPlacementUpdate={setSelectedPlacement}
                         updatedPlacement={selectedPlacement}
+                        onCableSelect={(c) => { setSelectedCable(c); setSelectedPlacement(null); setEditingCableId(null) }}
+                        editingCableId={editingCableId}
+                        onEditingCableDone={() => setEditingCableId(null)}
+                        updatedCable={updatedCable}
                       />
                     )}
                   </div>
 
-                  {/* Right panel — selected placement info */}
-                  <PlacementPanel
-                        placement={selectedPlacement}
-                        onClose={() => setSelectedPlacement(null)}
-                        onUpdate={(updated) => {
-                          setSelectedPlacement(updated)
-                        }}
-                      />
+                  {/* Right panel — selected placement or cable */}
+                  {(selectedPlacement || selectedCable) && (
+                    <div className="w-64 border-l border-[#2a3d55] flex-shrink-0 overflow-y-auto bg-[#0F1C2E]">
+                      {selectedPlacement && (
+                        <PlacementPanel
+                          placement={selectedPlacement}
+                          onClose={() => setSelectedPlacement(null)}
+                          onUpdate={(updated) => setSelectedPlacement(updated)}
+                          onSaved={() => setBomRefreshKey(k => k + 1)}
+                          sheets={sheets}
+                          currentSheetId={activeSheetId}
+                          proposalId={proposalId}
+                        />
+                      )}
+                      {selectedCable && (
+                        <CablePanel
+                          cable={selectedCable}
+                          onClose={() => setSelectedCable(null)}
+                          onUpdate={(updated) => { setSelectedCable(updated); setUpdatedCable(updated) }}
+                          onEditPoints={() => {
+                            setEditingCableId(selectedCable?.id)
+                            setSelectedCable(null)
+                          }}
+                          onDelete={() => {
+                            setSelectedCable(null)
+                          }}
+                        />
+                      )}
+                    </div>
+                  )}
                   </div>
               </>
             )}
@@ -423,6 +496,7 @@ export default function Designer({ featureDrawingTool }) {
               proposalId={proposalId}
               orgId={orgId}
               sheets={sheets}
+              refreshKey={bomRefreshKey}
             />
           </div>
         )}
@@ -512,9 +586,11 @@ const DEFAULT_COMPONENTS = {
 
   // Security — Access Control
   'Access Reader':       ['Back Box', 'Cable'],
-  'Access Control Door': ['Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply', 'Controller', 'Cable', 'Push to Exit'],
+  'Access Control Door': ['Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply', 'Controller', 'Composite Cable', '22/4 Cable', 'Push to Exit'],
   'Controller':          ['Power Supply', 'Cabinet', 'Battery Backup'],
   'Motion Sensor':       ['Back Box', 'Cable'],
+  'Multi-Lens Camera':   ['Mount', 'Housing', 'Junction Box', 'Cable'],
+  'Fisheye Camera':      ['Mount', 'Housing', 'Junction Box', 'Cable'],
 
   // Security — Fire Alarm
   'Smoke Detector':      ['Base', 'Cable'],
@@ -714,29 +790,57 @@ function ComponentsSection({ placementId, orgId, category }) {
 
 // ─── PlacementPanel ───────────────────────────────────────────────────────────
 // Right side panel — full edit fields for a selected placement
-function PlacementPanel({ placement, onClose, onUpdate }) {
+function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, currentSheetId, proposalId }) {
+  const [attachedRun, setAttachedRun] = useState(null)
+
+  useEffect(() => {
+    const fetchRun = async () => {
+      const { data } = await supabase
+        .from('cable_runs')
+        .select('footage, waste_factor, cable_type, total_footage')
+        .or(`from_placement_id.eq.${placement.id},to_placement_id.eq.${placement.id}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      setAttachedRun(data)
+    }
+    fetchRun()
+  }, [placement.id])
   if (!placement) return null
   const product = placement.global_products
   if (!product) return null
 
-  const [form, setForm] = useState({
-    part_number_override:   placement.part_number_override   || '',
-    manufacturer_override:  placement.manufacturer_override  || '',
-    model_number_override:  placement.model_number_override  || '',
-    description_override:   placement.description_override   || '',
-    notes:                  placement.notes                  || '',
-    quantity:               placement.quantity               || 1,
-    symbol_size:            placement.symbol_size            || 32,
-    fov_angle:              placement.fov_angle              || null,
-    fov_range:              placement.fov_range              || null,
-    // As-built
-    serial_number:          placement.serial_number          || '',
-    ip_address:             placement.ip_address             || '',
-    mac_address:            placement.mac_address            || '',
-    switch_name:            placement.switch_name            || '',
-    switch_port:            placement.switch_port            || '',
-    patch_panel_label:      placement.patch_panel_label      || '',
+  const getInitialForm = (p) => ({
+    part_number_override:   p.part_number_override   || '',
+    manufacturer_override:  p.manufacturer_override  || '',
+    model_number_override:  p.model_number_override  || '',
+    description_override:   p.description_override   || '',
+    notes:                  p.notes                  || '',
+    quantity:               p.quantity               || 1,
+    symbol_size:            p.symbol_size            || 32,
+    rotation:               p.rotation               || 0,
+    marker_color:           p.marker_color           || '#C8622A',
+    runs_to_sheet_id:       p.runs_to_sheet_id       || '',
+    runs_to_label:          p.runs_to_label          || '',
+    rise_height:            p.rise_height            || '',
+    rise_cable_type:        p.rise_cable_type        || 'Cat6',
+    fov_angle:              p.fov_angle              || null,
+    fov_range:              p.fov_range              || null,
+    serial_number:          p.serial_number          || '',
+    ip_address:             p.ip_address             || '',
+    mac_address:            p.mac_address            || '',
+    switch_name:            p.switch_name            || '',
+    switch_port:            p.switch_port            || '',
+    patch_panel_label:      p.patch_panel_label      || '',
   })
+
+  const [form, setForm] = useState(() => getInitialForm(placement))
+
+  useEffect(() => {
+    setForm(getInitialForm(placement))
+    setShowAsBuilt(false)
+  }, [placement.id])
+
   const [saved,  setSaved]            = useState(false)
   const [showAsBuilt, setShowAsBuilt] = useState(false)
   const saveTimer = useRef(null)
@@ -757,6 +861,12 @@ function PlacementPanel({ placement, onClose, onUpdate }) {
         notes:                 updated.notes                 || null,
         quantity:              parseInt(updated.quantity)    || 1,
         symbol_size:           parseInt(updated.symbol_size) || 32,
+          rotation:              parseInt(updated.rotation) || 0,
+          marker_color:          updated.marker_color || '#C8622A',
+          runs_to_sheet_id:      updated.runs_to_sheet_id || null,
+          runs_to_label:         updated.runs_to_label || null,
+          rise_height:           updated.rise_height ? parseFloat(updated.rise_height) : null,
+          rise_cable_type:       updated.rise_cable_type || null,
           fov_angle:             updated.fov_angle ? parseInt(updated.fov_angle) : null,
           fov_range:             updated.fov_range ? parseInt(updated.fov_range) : null,
         serial_number:         updated.serial_number         || null,
@@ -768,6 +878,7 @@ function PlacementPanel({ placement, onClose, onUpdate }) {
       }).eq('id', placement.id)
       if (!error) {
         setSaved(true)
+        onSaved?.()
         setTimeout(() => setSaved(false), 1500)
       } else {
         console.error('Auto-save failed:', error)
@@ -844,11 +955,144 @@ function PlacementPanel({ placement, onClose, onUpdate }) {
                 onChange={e => update('quantity', e.target.value)}
                 className={`${inputClass} w-20`} />
             </div>
+            {/* Symbol color */}
+            <div className="border-t border-[#2a3d55] pt-3">
+              <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Symbol Color</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { color: '#C8622A', label: 'Default' },
+                  { color: '#3b82f6', label: 'Interior' },
+                  { color: '#22c55e', label: 'Exterior' },
+                  { color: '#ef4444', label: 'Critical' },
+                  { color: '#a855f7', label: 'Special' },
+                  { color: '#eab308', label: 'Warning' },
+                ].map(({ color, label }) => (
+                  <button key={color} onClick={() => update('marker_color', color)}
+                    title={label}
+                    className={`w-7 h-7 rounded-full border-2 transition-all ${
+                      (form.marker_color || '#C8622A') === color
+                        ? 'border-white scale-110'
+                        : 'border-transparent hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: color }} />
+                ))}
+                <input type="color"
+                  value={form.marker_color || '#C8622A'}
+                  onChange={e => update('marker_color', e.target.value)}
+                  className="w-7 h-7 rounded-full cursor-pointer border-0 bg-transparent"
+                  title="Custom color" />
+              </div>
+            </div>
+
+            {/* Termination / runs to */}
+            <div className="border-t border-[#2a3d55] pt-3">
+              <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">
+                Network / Termination
+              </p>
+              <div className="space-y-2">
+                <div>
+                  <label className={labelClass}>Runs to</label>
+                  <input type="text" value={form.runs_to_label}
+                    onChange={e => update('runs_to_label', e.target.value)}
+                    placeholder="e.g. IDF-1, MDF, Server Room"
+                    className={inputClass} />
+                </div>
+                {form.runs_to_label && (
+                  <>
+                    
+                    <div>
+                      <label className={labelClass}>Cable type</label>
+                      <select value={form.rise_cable_type}
+                        onChange={e => update('rise_cable_type', e.target.value)}
+                        className={inputClass}>
+                        {['Cat6', 'Cat6A', 'Cat5e', 'Fiber SM', 'Fiber MM', 'Coax RG59', 'Coax RG6', '18/2', '22/4', 'Composite', 'Power'].map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className={labelClass}>Vertical rise <span className="text-[#4a5a6a]">(feet, optional)</span></label>
+                      <input type="number" value={form.rise_height}
+                        onChange={e => update('rise_height', e.target.value)}
+                        placeholder="e.g. 14"
+                        className={`${inputClass} w-24`} />
+                    </div>
+
+                    {/* Distance summary */}
+                    {(attachedRun || form.rise_height) && (
+                      <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55] space-y-1.5 mt-1">
+                        <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Cable Distance</p>
+                        {attachedRun && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#8A9AB0]">Floor run</span>
+                            <span className="text-white font-mono">{attachedRun.footage || 0}ft</span>
+                          </div>
+                        )}
+                        {form.rise_height && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#8A9AB0]">Vertical rise</span>
+                            <span className="text-white font-mono">{form.rise_height}ft</span>
+                          </div>
+                        )}
+                        {attachedRun && form.rise_height && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-[#8A9AB0]">Subtotal</span>
+                            <span className="text-white font-mono">
+                              {(parseFloat(attachedRun.footage || 0) + parseFloat(form.rise_height || 0)).toFixed(0)}ft
+                            </span>
+                          </div>
+                        )}
+                        {(() => {
+                          const run    = parseFloat(attachedRun?.footage || 0)
+                          const rise   = parseFloat(form.rise_height || 0)
+                          const waste  = parseFloat(attachedRun?.waste_factor || 10)
+                          const sub    = run + rise
+                          const total  = Math.round(sub * (1 + waste / 100))
+                          const type   = form.rise_cable_type || attachedRun?.cable_type || 'Cat6'
+                          if (!sub) return null
+                          return (
+                            <>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-[#8A9AB0]">Waste ({waste}%)</span>
+                                <span className="text-white font-mono">+{Math.round(sub * waste / 100)}ft</span>
+                              </div>
+                              <div className="flex justify-between text-xs border-t border-[#2a3d55] pt-1.5">
+                                <span className="text-[#8A9AB0] font-semibold">Total {type}</span>
+                                <span className="text-[#C8622A] font-bold font-mono">{total}ft</span>
+                              </div>
+                            </>
+                          )
+                        })()}
+                        {!attachedRun && (
+                          <p className="text-[#4a5a6a] text-xs">Draw a cable run from this device to see floor footage.</p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
             {/* FOV settings — cameras only */}
-            {['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor'].includes(product.category) && (
+            {['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Fisheye Camera'].includes(product.category) && (
               <div className="border-t border-[#2a3d55] pt-3">
                 <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Coverage / FOV</p>
                 <div className="space-y-2">
+                  <div>
+                    <label className={labelClass}>Direction <span className="text-[#4a5a6a]">(rotation)</span></label>
+                    <div className="flex items-center gap-2">
+                      <input type="range" min="0" max="359" step="1"
+                        value={form.rotation || placement.rotation || 0}
+                        onChange={e => update('rotation', parseInt(e.target.value))}
+                        className="flex-1 accent-[#C8622A]" />
+                      <span className="text-[#8A9AB0] text-xs w-10 text-right">
+                        {form.rotation ?? placement.rotation ?? 0}°
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-xs text-[#4a5a6a] mt-0.5">
+                      <span>N</span><span>E</span><span>S</span><span>W</span><span>N</span>
+                    </div>
+                  </div>
                   <div>
                     <label className={labelClass}>FOV Angle <span className="text-[#4a5a6a]">(degrees)</span></label>
                     <div className="flex items-center gap-2">
@@ -972,6 +1216,171 @@ function PlacementPanel({ placement, onClose, onUpdate }) {
         <span className={`text-xs transition-opacity ${saved ? 'text-green-400 opacity-100' : 'text-[#4a5a6a] opacity-60'}`}>
           {saved ? '✓ Saved' : 'Changes save automatically'}
         </span>
+ </div>
+    </div>
+  )
+}
+
+// ─── CablePanel ───────────────────────────────────────────────────────────────
+function CablePanel({ cable, onClose, onUpdate, onDelete, onEditPoints }) {
+  const [form, setForm] = useState({
+    cable_type:   cable.cable_type   || 'Cat6',
+    label:        cable.label        || '',
+    waste_factor: cable.waste_factor || 10,
+    color:        cable.color        || '#3b82f6',
+  })
+  const [saved,      setSaved]      = useState(false)
+  const [deleting,   setDeleting]   = useState(false)
+  const saveTimer = useRef(null)
+
+  const update = (field, value) => {
+    const updated = { ...form, [field]: value }
+    setForm(updated)
+
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      const totalFootage = Math.round(cable.footage * (1 + updated.waste_factor / 100))
+      const { error } = await supabase.from('cable_runs').update({
+        cable_type:    updated.cable_type,
+        label:         updated.label || null,
+        waste_factor:  parseFloat(updated.waste_factor) || 10,
+        total_footage: totalFootage,
+        color:         updated.color || '#3b82f6',
+      }).eq('id', cable.id)
+      if (!error) {
+        setSaved(true)
+        onUpdate?.({ ...cable, ...updated, total_footage: totalFootage })
+        setTimeout(() => setSaved(false), 1500)
+      }
+    }, 600)
+  }
+
+  const handleDelete = async () => {
+    if (!window.confirm('Delete this cable run?')) return
+    setDeleting(true)
+    await supabase.from('cable_runs').delete().eq('id', cable.id)
+    onDelete?.()
+  }
+
+  const totalFootage = Math.round((cable.footage || 0) * (1 + (form.waste_factor || 10) / 100))
+  const inputClass   = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
+  const labelClass   = "text-[#8A9AB0] text-xs mb-1 block"
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between px-3 py-3 border-b border-[#2a3d55] flex-shrink-0">
+        <div>
+          <p className="text-white text-sm font-semibold">{form.cable_type}</p>
+          <p className="text-[#8A9AB0] text-xs">Cable Run</p>
+        </div>
+        <button onClick={onClose} className="text-[#8A9AB0] hover:text-white transition-colors">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      {/* Fields */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+
+        {/* Cable color */}
+        <div>
+          <label className={labelClass}>Cable Color</label>
+          <div className="flex flex-wrap gap-2">
+            {[
+              { color: '#3b82f6', label: 'Data (blue)' },
+              { color: '#22c55e', label: 'Fiber (green)' },
+              { color: '#eab308', label: 'Power (yellow)' },
+              { color: '#ef4444', label: 'Alarm (red)' },
+              { color: '#a855f7', label: 'AV (purple)' },
+              { color: '#C8622A', label: 'Control (orange)' },
+              { color: '#06b6d4', label: 'Network (cyan)' },
+            ].map(({ color, label }) => (
+              <button key={color} onClick={() => update('color', color)}
+                title={label}
+                className={`w-7 h-7 rounded-full border-2 transition-all ${
+                  (form.color || '#3b82f6') === color
+                    ? 'border-white scale-110'
+                    : 'border-transparent hover:scale-105'
+                }`}
+                style={{ backgroundColor: color }} />
+            ))}
+            <input type="color"
+              value={form.color || '#3b82f6'}
+              onChange={e => update('color', e.target.value)}
+              className="w-7 h-7 rounded-full cursor-pointer border-0 bg-transparent"
+              title="Custom color" />
+          </div>
+        </div>
+
+        <div>
+          <label className={labelClass}>Cable Type</label>
+          <select value={form.cable_type} onChange={e => update('cable_type', e.target.value)}
+            className={inputClass}>
+            {['Cat6', 'Cat6A', 'Cat5e', 'Fiber SM', 'Fiber MM', 'Coax RG59', 'Coax RG6', 'Speaker 16/2', 'Speaker 14/2', '18/2', '22/4', '22/6', 'Composite', 'HDMI', 'HDBaseT', 'Power', 'Plenum Cat6', 'Plenum 22/4'].map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className={labelClass}>Label</label>
+          <input type="text" value={form.label}
+            onChange={e => update('label', e.target.value)}
+            placeholder="e.g. To IDF-1"
+            className={inputClass} />
+        </div>
+
+        <div>
+          <label className={labelClass}>Waste Factor (%)</label>
+          <div className="flex items-center gap-2">
+            <input type="range" min="0" max="30" step="1"
+              value={form.waste_factor}
+              onChange={e => update('waste_factor', parseInt(e.target.value))}
+              className="flex-1 accent-[#C8622A]" />
+            <span className="text-[#8A9AB0] text-xs w-8 text-right">{form.waste_factor}%</span>
+          </div>
+        </div>
+
+        {/* Footage summary */}
+        <div className="bg-[#1a2d45] rounded-lg p-3 border border-[#2a3d55] space-y-1.5">
+          <div className="flex justify-between text-xs">
+            <span className="text-[#8A9AB0]">Measured footage</span>
+            <span className="text-white font-mono">{cable.footage || 0}ft</span>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-[#8A9AB0]">Waste ({form.waste_factor}%)</span>
+            <span className="text-white font-mono">+{Math.round((cable.footage || 0) * form.waste_factor / 100)}ft</span>
+          </div>
+          <div className="flex justify-between text-xs border-t border-[#2a3d55] pt-1.5">
+            <span className="text-[#8A9AB0] font-semibold">Total footage</span>
+            <span className="text-[#C8622A] font-bold font-mono">{totalFootage}ft</span>
+          </div>
+        </div>
+
+        {!cable.footage && (
+          <p className="text-[#4a5a6a] text-xs">
+            Set scale calibration to calculate real footage from pixel distances.
+          </p>
+        )}
+      </div>
+
+      {/* Footer */}
+      <div className="px-3 py-3 border-t border-[#2a3d55] flex-shrink-0 space-y-2">
+        <div className="text-center">
+          <span className={`text-xs ${saved ? 'text-green-400' : 'text-[#4a5a6a]'}`}>
+            {saved ? '✓ Saved' : 'Changes save automatically'}
+          </span>
+        </div>
+        <button onClick={() => { onEditPoints?.(); onClose() }}
+          className="w-full py-2 text-xs font-semibold rounded-lg border border-green-700 text-green-400 hover:bg-green-900/20 transition-colors mb-2">
+          ✎ Edit Waypoints
+        </button>
+        <button onClick={handleDelete} disabled={deleting}
+          className="w-full py-2 text-xs font-semibold rounded-lg border border-red-800/40 text-red-400 hover:bg-red-900/20 transition-colors">
+          {deleting ? 'Deleting...' : 'Delete Cable Run'}
+        </button>
       </div>
     </div>
   )

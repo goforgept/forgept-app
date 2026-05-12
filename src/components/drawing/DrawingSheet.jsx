@@ -3,7 +3,7 @@ import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Shape, Li
 import { supabase } from '../../supabase'
 import { useCategoryIcons } from './useCategoryIcons'
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement }) {
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
   const isPanning    = useRef(false)
@@ -23,7 +23,19 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [placing,    setPlacing]    = useState(false)
 
   const { getIcon, ready: iconsReady } = useCategoryIcons('white', 40)
-  const [showFOV, setShowFOV] = useState(true)
+  const [showFOV,        setShowFOV]        = useState(true)
+  const [cableMode,      setCableMode]      = useState(false)
+  const [cableType,      setCableType]      = useState('Cat6')
+  const [cableRuns,      setCableRuns]      = useState([])
+  const [activeCable,    setActiveCable]    = useState(null) // run being drawn
+  const [activePoints,   setActivePoints]   = useState([])  // points of current run
+  const [selectedCable,     setSelectedCable]     = useState(null)
+  const [showCableRuns,  setShowCableRuns]  = useState(true)
+  const [wasteFactor,    setWasteFactor]    = useState(10)
+  const [editingCable,   setEditingCable]   = useState(null) // cable id being edited
+  const [dragPoint,      setDragPoint]      = useState(null) // {cableId, pointIndex}
+  const [hoveredWaypoint, setHoveredWaypoint] = useState(null) // {cableId, pointIndex}
+  const snapRadius = 20 // pixels — snap to device marker within this distance
 
   const [showScaleModal,  setShowScaleModal]  = useState(false)
   const [scaleMethod,     setScaleMethod]     = useState('manual')
@@ -32,9 +44,19 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [pointA,          setPointA]          = useState(null)
   const [pointB,          setPointB]          = useState(null)
   const [applyToAll,      setApplyToAll]      = useState(true)
+  const getScaleLabel = (ratio) => {
+    if (!ratio) return null
+    const feetPerInch = Math.round(ratio * 96 * 10) / 10
+    return `1" = ${feetPerInch}ft`
+  }
+
   const [calibratedScale, setCalibratedScale] = useState(
-    sheet.scale_ratio ? `1" = ${sheet.scale_ratio}ft` : null
+    getScaleLabel(sheet.scale_ratio)
   )
+
+  useEffect(() => {
+    setCalibratedScale(getScaleLabel(sheet.scale_ratio))
+  }, [sheet.scale_ratio, sheet.id])
   const [pickingPoint,    setPickingPoint]    = useState(null) // 'A' | 'B' | null
 
   // ── Measure container ──────────────────────────────────────────────────────
@@ -65,7 +87,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       const { data, error } = await supabase.storage.from('floor-plans').createSignedUrl(sheet.storage_path, 3600)
       if (error) throw error
       if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
-        await renderPDF(data.signedUrl)
+        await renderPDF(data.signedUrl, sheet.page_number || 1)
       } else {
         await loadImageFromUrl(data.signedUrl)
       }
@@ -77,19 +99,22 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     }
   }
 
-  const renderPDF = async (url) => {
+  const renderPDF = async (url, pageNum = 1) => {
     const pdfjsLib  = await import('pdfjs-dist')
     const workerUrl = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
     pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl.default
     const pdf      = await pdfjsLib.getDocument(url).promise
-    const page     = await pdf.getPage(1)
+    const page     = await pdf.getPage(pageNum)
     const viewport = page.getViewport({ scale: 1 })
-    const scaled   = page.getViewport({ scale: Math.min(2, 1800 / viewport.width) })
+    // Render at 3x for retina/zoom quality, cap at 3600px wide
+    const renderScale = Math.min(3, 3600 / viewport.width)
+    const scaled   = page.getViewport({ scale: renderScale })
     const canvas   = document.createElement('canvas')
     canvas.width   = scaled.width
     canvas.height  = scaled.height
     await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaled }).promise
     await loadImageFromUrl(canvas.toDataURL('image/png'))
+    return pdf.numPages
   }
 
   const loadImageFromUrl = (url) => new Promise((resolve, reject) => {
@@ -126,12 +151,56 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   useEffect(() => { loadPlacements() }, [loadPlacements])
 
+  const loadCableRuns = useCallback(async () => {
+    const { data } = await supabase
+      .from('cable_runs')
+      .select('*')
+      .eq('drawing_sheet_id', sheet.id)
+      .order('created_at')
+    if (data) setCableRuns(data)
+  }, [sheet.id])
+
+  useEffect(() => { loadCableRuns() }, [loadCableRuns])
+
+  useEffect(() => {
+    if (editingCableId) {
+      setEditingCable(editingCableId)
+      setSelectedCable(editingCableId)
+    }
+  }, [editingCableId])
+
+  // Delete selected cable with Delete/Backspace key
+  useEffect(() => {
+    const handleKeyDown = async (e) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedCable) {
+        await supabase.from('cable_runs').delete().eq('id', selectedCable)
+        setCableRuns(prev => prev.filter(r => r.id !== selectedCable))
+        setSelectedCable(null)
+      }
+      // Escape cancels active cable
+      if (e.key === 'Escape') {
+        setActivePoints([])
+        setEditingCable(null)
+        onEditingCableDone?.()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedCable, cableMode])
+
   useEffect(() => {
     if (!updatedPlacement) return
     setPlacements(prev =>
       prev.map(p => p.id === updatedPlacement.id ? { ...p, ...updatedPlacement } : p)
     )
   }, [updatedPlacement])
+
+  useEffect(() => {
+    if (!updatedCable) return
+    setCableRuns(prev =>
+      prev.map(r => r.id === updatedCable.id ? { ...r, ...updatedCable } : r)
+    )
+  }, [updatedCable])
 
   // ── Realtime ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -193,6 +262,32 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const canvasW = isBlank ? Math.max(stageSize.w, 1200) : imageSize.w
   const canvasH = isBlank ? Math.max(stageSize.h, 900) : imageSize.h
 
+  // ── Snap to nearest placement marker ──────────────────────────────────────
+  const snapToPlacement = useCallback((px, py) => {
+    let nearest = null
+    let minDist = snapRadius
+    placements.forEach(p => {
+      const mx   = position.x + p.x * canvasW * scale
+      const my   = position.y + p.y * canvasH * scale
+      const dist = Math.sqrt((px - mx) ** 2 + (py - my) ** 2)
+      if (dist < minDist) { minDist = dist; nearest = p }
+    })
+    if (nearest) {
+      return {
+        x: Math.round(nearest.x * 10000) / 10000,
+        y: Math.round(nearest.y * 10000) / 10000,
+        snapped: true,
+        placement: nearest,
+      }
+    }
+    return {
+      x: Math.round(((px - position.x) / scale / canvasW) * 10000) / 10000,
+      y: Math.round(((py - position.y) / scale / canvasH) * 10000) / 10000,
+      snapped: false,
+      placement: null,
+    }
+  }, [placements, position, canvasW, canvasH, scale])
+
   // ── Click to place ─────────────────────────────────────────────────────────
   const handleStageClick = useCallback(async (e) => {
     const onBg = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
@@ -210,6 +305,22 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         setPointB({ x, y })
         setPickingPoint(null)
         setShowScaleModal(true)
+      }
+      return
+    }
+
+    // Cable drawing mode — only add points on background clicks
+    if (cableMode) {
+      const onBgClick = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
+      if (!onBgClick) return
+      const pointer = stageRef.current.getPointerPosition()
+      const snapped = snapToPlacement(pointer.x, pointer.y)
+
+      // First point — check if starting from a device
+      if (activePoints.length === 0 && snapped.placement) {
+        setActivePoints([{ x: snapped.x, y: snapped.y, placement_id: snapped.placement.id }])
+      } else {
+        setActivePoints(prev => [...prev, { x: snapped.x, y: snapped.y, placement_id: snapped.placement?.id || null }])
       }
       return
     }
@@ -289,8 +400,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     let ratio = null
 
     if (scaleMethod === 'manual') {
-      ratio = parseFloat(manualScale)
-      if (!ratio || ratio <= 0) { alert('Please enter a valid scale.'); return }
+      const feetPerInch = parseFloat(manualScale)
+      if (!feetPerInch || feetPerInch <= 0) { alert('Please enter a valid scale.'); return }
+      // Store as feet per pixel using image width
+      // Assume standard 96 DPI for screen rendering
+      ratio = feetPerInch / 96
     } else {
       if (!pointA || !pointB || !realDistance) { alert('Please pick two points and enter the real distance.'); return }
       const dx       = pointB.x - pointA.x
@@ -301,8 +415,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     }
 
     const label = `1px = ${ratio.toFixed(4)}ft`
-    setCalibratedScale(`${parseFloat(realDistance || manualScale)}ft`)
-
+    setCalibratedScale(getScaleLabel(ratio))
     if (applyToAll) {
       // Update all sheets on this proposal
       const { data: sheets } = await supabase
@@ -338,11 +451,22 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 <span className="w-2 h-2 rounded-full bg-[#C8622A] animate-pulse inline-block"/>
                 Placing: {selectedSymbol.name} — click to place
               </span>
-            : <span>Select a symbol · Scroll to zoom · Middle-click to pan · Drag markers to move</span>
+            : cableMode
+            ? <span className="flex items-center gap-1.5 text-blue-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse inline-block"/>
+                Cable mode: {cableType} — click to add points · Double-click to finish
+                {activePoints.length > 0 && <span className="ml-2 text-blue-300">({activePoints.length} points)</span>}
+              </span>
+            : editingCable
+            ? <span className="flex items-center gap-1.5 text-green-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block"/>
+                Edit mode — click line to add point · drag dots to move · double-click dot to delete · Esc to finish
+              </span>
+            : <span>Select a symbol · Scroll to zoom · Drag to pan · Drag markers to move</span>
           }
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-[#8A9AB0]">{placements.length} device{placements.length !== 1 ? 's' : ''}</span>
+          <span className="text-[#8A9AB0]">{placements.length} device{placements.length !== 1 ? 's' : ''} · {cableRuns.length} run{cableRuns.length !== 1 ? 's' : ''}</span>
           <button
             onClick={() => setShowFOV(s => !s)}
             className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
@@ -358,6 +482,36 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             </svg>
             FOV
           </button>
+          <button
+            onClick={() => {
+              setCableMode(s => !s)
+              if (cableMode) {
+                setActiveCable(null)
+                setActivePoints([])
+              }
+            }}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+              cableMode
+                ? 'border-blue-400 bg-blue-500/10 text-blue-400'
+                : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
+            }`}
+            title="Cable drawing mode"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16M4 12l4-4M4 12l4 4"/>
+            </svg>
+            Cable
+          </button>
+
+          {cableMode && (
+            <select value={cableType} onChange={e => setCableType(e.target.value)}
+              className="text-xs bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]">
+              {['Cat6', 'Cat6A', 'Cat5e', 'Fiber SM', 'Fiber MM', 'Coax RG59', 'Coax RG6', 'Speaker 16/2', 'Speaker 14/2', '18/2', '22/4', '22/6', 'Composite', 'HDMI', 'HDBaseT', 'Power', 'Plenum Cat6', 'Plenum 22/4'].map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          )}
+
           <button
             onClick={() => setShowScaleModal(true)}
             className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
@@ -415,7 +569,41 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           <Stage ref={stageRef} width={stageSize.w} height={stageSize.h}
             onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-            onClick={handleStageClick} onTap={handleStageClick}>
+            onClick={handleStageClick} onTap={handleStageClick}
+            onDblClick={async () => {
+              if (!cableMode || activePoints.length < 2) return
+              // Calculate footage
+              let pixels = 0
+              for (let i = 1; i < activePoints.length; i++) {
+                const dx = (activePoints[i].x - activePoints[i-1].x) * imageSize.w
+                const dy = (activePoints[i].y - activePoints[i-1].y) * imageSize.h
+                pixels += Math.sqrt(dx*dx + dy*dy)
+              }
+              // scale_ratio = feet per pixel at original image resolution
+              const footage = sheet.scale_ratio ? Math.round(pixels * sheet.scale_ratio) : 0
+              const totalFootage = Math.round(footage * (1 + wasteFactor / 100))
+
+              const firstPoint = activePoints[0]
+              const lastPoint  = activePoints[activePoints.length - 1]
+              const { data, error } = await supabase.from('cable_runs').insert({
+                org_id:             orgId,
+                drawing_sheet_id:   sheet.id,
+                proposal_id:        sheet.proposal_id,
+                cable_type:         cableType,
+                points:             activePoints,
+                footage,
+                waste_factor:       wasteFactor,
+                total_footage:      totalFootage,
+                from_placement_id:  firstPoint?.placement_id || null,
+                to_placement_id:    lastPoint?.placement_id  || null,
+              }).select().single()
+
+              if (!error && data) {
+                setCableRuns(prev => [...prev, data])
+                onPlacementChange?.()
+              }
+              setActivePoints([])
+            }}>
 
             <Layer>
               {bgImage && !isBlank ? (
@@ -436,7 +624,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   const product = placement.global_products
                   if (!product) return null
                   const category = product.category
-                  const fovCategories = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor']
+                  const fovCategories = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Fisheye Camera']
                   if (!fovCategories.includes(category)) return null
 
                   const fovAngle    = placement.fov_angle || product.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
@@ -488,6 +676,200 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             )}
 
 
+            {/* Cable runs layer */}
+            {showCableRuns && (
+              <Layer>
+                {cableRuns.map(run => {
+                  if (!run.points || run.points.length < 2) return null
+                  const pts = run.points.flatMap(p => [
+                    position.x + p.x * canvasW * scale,
+                    position.y + p.y * canvasH * scale,
+                  ])
+                  const isSelected  = selectedCable === run.id
+                  const isEditing   = editingCable  === run.id
+
+                  return (
+                    <Group key={run.id}>
+                      {/* Hit area */}
+                      <Line points={pts} stroke="transparent" strokeWidth={20}
+                        lineCap="round" lineJoin="round" listening={true}
+                        onClick={(e) => {
+                          e.cancelBubble = true
+                          const newId = selectedCable === run.id ? null : run.id
+                          setSelectedCable(newId)
+                          setEditingCable(null)
+                          onCableSelect?.(newId ? run : null)
+                        }}
+                        onDblClick={(e) => {
+                          e.cancelBubble = true
+                          setEditingCable(run.id)
+                          setSelectedCable(run.id)
+                          onCableSelect?.(run)
+                        }}
+                      />
+
+                      {/* Visible line — click to add waypoint when editing */}
+                      <Line points={pts}
+                        stroke={isEditing ? '#34d399' : isSelected ? '#60a5fa' : (run.color || '#3b82f6')}
+                        strokeWidth={isEditing ? 10 : isSelected ? 3 : 2}
+                        lineCap="round" lineJoin="round"
+                        listening={isEditing} dash={isEditing ? [] : [8, 4]}
+                        onClick={(e) => {
+                          if (!isEditing) return
+                          e.cancelBubble = true
+                          const stage   = stageRef.current
+                          const pointer = stage.getPointerPosition()
+                          const nx = Math.round(((pointer.x - position.x) / scale / canvasW) * 10000) / 10000
+                          const ny = Math.round(((pointer.y - position.y) / scale / canvasH) * 10000) / 10000
+
+                          // Find nearest segment to insert between
+                          let minDist  = Infinity
+                          let insertAt = run.points.length - 1
+                          for (let i = 0; i < run.points.length - 1; i++) {
+                            const ax = position.x + run.points[i].x * canvasW * scale
+                            const ay = position.y + run.points[i].y * canvasH * scale
+                            const bx = position.x + run.points[i+1].x * canvasW * scale
+                            const by = position.y + run.points[i+1].y * canvasH * scale
+                            // Distance from point to segment
+                            const abx = bx - ax, aby = by - ay
+                            const t   = Math.max(0, Math.min(1, ((pointer.x - ax) * abx + (pointer.y - ay) * aby) / (abx*abx + aby*aby)))
+                            const dx  = pointer.x - (ax + t * abx)
+                            const dy  = pointer.y - (ay + t * aby)
+                            const d   = Math.sqrt(dx*dx + dy*dy)
+                            if (d < minDist) { minDist = d; insertAt = i + 1 }
+                          }
+
+                          const newPoints = [...run.points]
+                          newPoints.splice(insertAt, 0, { x: nx, y: ny, placement_id: null })
+                          supabase.from('cable_runs').update({ points: newPoints }).eq('id', run.id)
+                          setCableRuns(prev => prev.map(r =>
+                            r.id === run.id ? { ...r, points: newPoints } : r
+                          ))
+                        }}
+                      />
+
+                      {/* Waypoint dots — shown when editing */}
+                      {isEditing && run.points.map((p, i) => {
+                        const wx = position.x + p.x * canvasW * scale
+                        const wy = position.y + p.y * canvasH * scale
+                        return (
+                          <Circle key={i} x={wx} y={wy}
+                            radius={hoveredWaypoint?.cableId === run.id && hoveredWaypoint?.pointIndex === i ? 8 : 6}
+                            fill={hoveredWaypoint?.cableId === run.id && hoveredWaypoint?.pointIndex === i ? '#ef4444' : dragPoint?.pointIndex === i ? '#34d399' : '#0F1C2E'}
+                            stroke={hoveredWaypoint?.cableId === run.id && hoveredWaypoint?.pointIndex === i ? '#ef4444' : '#34d399'}
+                            strokeWidth={2}
+                            draggable listening={true}
+                            onMouseEnter={() => setHoveredWaypoint({ cableId: run.id, pointIndex: i })}
+                            onMouseLeave={() => setHoveredWaypoint(null)}
+                            onDragMove={(e) => {
+                              const nx = Math.min(Math.max((e.target.x() - position.x) / scale / canvasW, 0.01), 0.99)
+                              const ny = Math.min(Math.max((e.target.y() - position.y) / scale / canvasH, 0.01), 0.99)
+                              setCableRuns(prev => prev.map(r => {
+                                if (r.id !== run.id) return r
+                                const newPts = [...r.points]
+                                newPts[i] = { ...newPts[i], x: nx, y: ny }
+                                return { ...r, points: newPts }
+                              }))
+                            }}
+                            onDragEnd={async (e) => {
+                              const nx = Math.round(Math.min(Math.max((e.target.x() - position.x) / scale / canvasW, 0.01), 0.99) * 10000) / 10000
+                              const ny = Math.round(Math.min(Math.max((e.target.y() - position.y) / scale / canvasH, 0.01), 0.99) * 10000) / 10000
+                              const updatedPoints = run.points.map((pt, idx) =>
+                                idx === i ? { ...pt, x: nx, y: ny } : pt
+                              )
+                              // Recalculate footage
+                              let pixels = 0
+                              for (let j = 1; j < updatedPoints.length; j++) {
+                                const dx = (updatedPoints[j].x - updatedPoints[j-1].x) * imageSize.w
+                                const dy = (updatedPoints[j].y - updatedPoints[j-1].y) * imageSize.h
+                                pixels += Math.sqrt(dx*dx + dy*dy)
+                              }
+                              const footage      = sheet.scale_ratio ? Math.round(pixels * sheet.scale_ratio) : 0
+                              const totalFootage = Math.round(footage * (1 + (run.waste_factor || 10) / 100))
+                              await supabase.from('cable_runs').update({
+                                points: updatedPoints, footage, total_footage: totalFootage
+                              }).eq('id', run.id)
+                              setCableRuns(prev => prev.map(r =>
+                                r.id === run.id ? { ...r, points: updatedPoints, footage, total_footage: totalFootage } : r
+                              ))
+                              onCableSelect?.({ ...run, points: updatedPoints, footage, total_footage: totalFootage })
+                            }}
+                            onClick={(e) => {
+                              e.cancelBubble = true
+                              // Single click just selects the point — do nothing
+                            }}
+                            onDblClick={(e) => {
+                              e.cancelBubble = true
+                              // Double-click deletes waypoint if more than 2 remain
+                              if (run.points.length > 2) {
+                                const updatedPoints = run.points.filter((_, idx) => idx !== i)
+                                supabase.from('cable_runs').update({ points: updatedPoints }).eq('id', run.id)
+                                setCableRuns(prev => prev.map(r =>
+                                  r.id === run.id ? { ...r, points: updatedPoints } : r
+                                ))
+                              }
+                            }}
+                          />
+                        )
+                      })}
+
+                      {/* Label at midpoint */}
+                      {run.total_footage > 0 && (() => {
+                        const mid = Math.floor(run.points.length / 2)
+                        const mx  = position.x + run.points[mid].x * canvasW * scale
+                        const my  = position.y + run.points[mid].y * canvasH * scale
+                        const labelText = run.label ? `${run.label} · ${run.cable_type} · ${run.total_footage}ft` : `${run.cable_type} · ${run.total_footage}ft`
+                        const w   = Math.max(labelText.length * 5, 70)
+                        return (
+                          <Group x={mx} y={my} listening={false}>
+                            <Rect x={-w/2} y={-10} width={w} height={18}
+                              fill="#0F1C2E" stroke={isEditing ? '#34d399' : (run.color || '#3b82f6')}
+                              strokeWidth={1} cornerRadius={3}/>
+                            <Text text={run.label ? `${run.label} · ${run.cable_type} · ${run.total_footage}ft` : `${run.cable_type} · ${run.total_footage}ft`}
+                              fontSize={8} fill={isEditing ? '#34d399' : (run.color || '#60a5fa')}
+                              width={w} x={-w/2} y={-5} align="center"/>
+                          </Group>
+                        )
+                      })()}
+                    </Group>
+                  )
+                })}
+
+                {/* Active cable being drawn */}
+                {cableMode && activePoints.length > 0 && (() => {
+                  const pts = activePoints.flatMap(p => [
+                    position.x + p.x * canvasW * scale,
+                    position.y + p.y * canvasH * scale,
+                  ])
+                  return (
+                    <Line
+                      points={pts}
+                      stroke="#60a5fa"
+                      strokeWidth={2}
+                      lineCap="round"
+                      lineJoin="round"
+                      dash={[6, 3]}
+                      listening={false}
+                    />
+                  )
+                })()}
+
+                {/* Waypoint dots on active cable */}
+                {cableMode && activePoints.map((p, i) => (
+                  <Circle
+                    key={i}
+                    x={position.x + p.x * canvasW * scale}
+                    y={position.y + p.y * canvasH * scale}
+                    radius={4}
+                    fill="#3b82f6"
+                    stroke="#60a5fa"
+                    strokeWidth={1}
+                    listening={false}
+                  />
+                ))}
+              </Layer>
+            )}
+
             <Layer>
               {iconsReady && placements.map(placement => {
                 const product = placement.global_products
@@ -501,6 +883,15 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   <PlacementMarker key={placement.id} placement={placement} product={product}
                     icon={getIcon(product.category)} x={px} y={py} size={markerSize}
                     isSelected={isSelected} isHovered={isHovered}
+                    cableMode={cableMode}
+                    markerColor={placement.marker_color || '#C8622A'}
+                    onCableSnap={() => {
+                      setActivePoints(prev => [...prev, {
+                        x: placement.x,
+                        y: placement.y,
+                        placement_id: placement.id
+                      }])
+                    }}
                     onSelect={() => {
                       const newId = selectedId === placement.id ? null : placement.id
                       setSelectedId(newId)
@@ -651,7 +1042,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
 // ─── PlacementMarker ──────────────────────────────────────────────────────────
 function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isHovered,
-  onSelect, onHoverStart, onHoverEnd, onDelete, onRotate, onDragEnd }) {
+  cableMode, markerColor, onSelect, onCableSnap, onHoverStart, onHoverEnd, onDelete, onRotate, onDragEnd }) {
   const markerScale = isSelected ? 1.25 : isHovered ? 1.1 : 1
   const totalSize   = size * markerScale
   const iconSize    = totalSize * 0.65
@@ -659,15 +1050,22 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
   const tooltipW    = Math.max(product.name.length * 6.5, 100)
 
   return (
-    <Group x={x} y={y} draggable onClick={onSelect} onTap={onSelect}
-      onMouseEnter={onHoverStart} onMouseLeave={onHoverEnd} onDragEnd={onDragEnd}>
+    <Group x={x} y={y}
+      draggable={!cableMode}
+      onClick={cableMode ? onCableSnap : onSelect}
+      onTap={cableMode ? onCableSnap : onSelect}
+      onMouseEnter={onHoverStart}
+      onMouseLeave={onHoverEnd}
+      onDragEnd={cableMode ? undefined : onDragEnd}>
 
       {/* Shadow */}
       <Circle x={2} y={3} radius={totalSize / 2} fill="rgba(0,0,0,0.35)" listening={false}/>
 
       {/* Circle */}
-      <Circle radius={totalSize / 2} fill="#C8622A"
-        stroke={isSelected ? '#ff8c42' : '#b5571f'} strokeWidth={isSelected ? 3 : 1.5}
+      <Circle radius={totalSize / 2}
+        fill={cableMode && isHovered ? '#3b82f6' : markerColor}
+        stroke={cableMode && isHovered ? '#60a5fa' : isSelected ? '#ff8c42' : markerColor}
+        strokeWidth={isSelected ? 3 : cableMode && isHovered ? 3 : 1.5}
         shadowColor={isSelected ? '#C8622A' : 'transparent'} shadowBlur={isSelected ? 10 : 0} shadowOpacity={0.7}/>
 
       {/* Icon */}
@@ -676,10 +1074,13 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
       {/* Hover tooltip */}
       {isHovered && !isSelected && (
         <Group x={totalSize / 2 + 6} y={-totalSize / 2} listening={false}>
-          <Rect width={tooltipW} height={48} fill="#0F1C2E" stroke="#2a3d55" strokeWidth={1} cornerRadius={6}/>
+          <Rect width={tooltipW} height={placement.runs_to_label ? 58 : 48} fill="#0F1C2E" stroke="#2a3d55" strokeWidth={1} cornerRadius={6}/>
           <Text text={product.name} fontSize={10} fontStyle="bold" fill="white" x={6} y={6} width={tooltipW - 12}/>
           <Text text={product.part_number} fontSize={9} fill="#8A9AB0" fontFamily="monospace" x={6} y={20}/>
           <Text text={product.manufacturer} fontSize={9} fill="#8A9AB0" x={6} y={32}/>
+          {placement.runs_to_label && (
+            <Text text={`→ ${placement.runs_to_label}`} fontSize={8} fill="#60a5fa" x={6} y={42}/>
+          )}
         </Group>
       )}
 
