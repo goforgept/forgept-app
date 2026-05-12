@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 
 const INDUSTRY_LABELS = {
+  all:         'All',
   security:    'Security',
+  fire_alarm:  'Fire Alarm',
   av:          'AV',
   hvac:        'HVAC',
   electrical:  'Electrical',
@@ -10,7 +12,7 @@ const INDUSTRY_LABELS = {
 }
 
 export default function SymbolPicker({ selectedSymbol, onSelect }) {
-  const [industry,      setIndustry]      = useState('security')
+  const [industry,      setIndustry]      = useState('all')
   const [manufacturer,  setManufacturer]  = useState('Generic')
   const [category,      setCategory]      = useState(null)
   const [search,        setSearch]        = useState('')
@@ -23,6 +25,7 @@ export default function SymbolPicker({ selectedSymbol, onSelect }) {
     setManufacturer('Generic')
     setCategory(null)
     loadManufacturers(industry)
+    loadCategories(industry, 'Generic')
   }, [industry])
 
   useEffect(() => {
@@ -35,7 +38,9 @@ export default function SymbolPicker({ selectedSymbol, onSelect }) {
   }, [category, industry, manufacturer])
 
   const loadManufacturers = async (ind) => {
-    const { data } = await supabase.from('global_products').select('manufacturer').eq('industry', ind).eq('is_active', true)
+    let query = supabase.from('global_products').select('manufacturer').eq('is_active', true)
+    if (ind !== 'all') query = query.eq('industry', ind)
+    const { data } = await query
     if (data) {
       const unique = [...new Set(data.map(r => r.manufacturer))].sort()
       setManufacturers(['Generic', ...unique.filter(m => m !== 'Generic')])
@@ -43,13 +48,18 @@ export default function SymbolPicker({ selectedSymbol, onSelect }) {
   }
 
   const loadCategories = async (ind, mfr) => {
-    const { data } = await supabase.from('global_products').select('category').eq('industry', ind).eq('manufacturer', mfr).eq('is_active', true)
+    let query = supabase.from('global_products').select('category').eq('is_active', true)
+    if (ind !== 'all') query = query.eq('industry', ind)
+    if (mfr && mfr !== 'Generic') query = query.eq('manufacturer', mfr)
+    const { data } = await query
     if (data) setCategories([...new Set(data.map(r => r.category))].sort())
   }
 
   const loadSymbols = async (ind, mfr, cat) => {
     setLoading(true)
-    let query = supabase.from('global_products').select('*').eq('industry', ind).eq('manufacturer', mfr).eq('is_active', true).order('category').order('name')
+    let query = supabase.from('global_products').select('*').eq('is_active', true).order('category').order('name')
+    if (ind !== 'all') query = query.eq('industry', ind)
+    if (mfr && mfr !== 'Generic') query = query.eq('manufacturer', mfr)
     if (cat) query = query.eq('category', cat)
     const { data } = await query
     setSymbols(data || [])
@@ -91,26 +101,20 @@ export default function SymbolPicker({ selectedSymbol, onSelect }) {
         </select>
       </div>
 
-      {/* Category */}
-      {categories.length > 0 && (
+      {/* Category — only show when a specific industry is selected */}
+      {industry !== 'all' && categories.length > 0 && (
         <div className="px-3 py-2 border-b border-[#2a3d55]">
           <p className="text-xs font-medium text-[#8A9AB0] mb-2">Category</p>
-          <div className="flex flex-wrap gap-1">
-            <button onClick={() => setCategory(null)}
-              className={`px-2 py-1 text-xs rounded-md transition-colors ${
-                category === null ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/40' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
-              }`}>
-              All
-            </button>
+          <select
+            value={category || ''}
+            onChange={e => setCategory(e.target.value || null)}
+            className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white focus:outline-none focus:border-[#C8622A]"
+          >
+            <option value="">All Categories</option>
             {categories.map(cat => (
-              <button key={cat} onClick={() => setCategory(cat)}
-                className={`px-2 py-1 text-xs rounded-md transition-colors ${
-                  category === cat ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/40' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
-                }`}>
-                {cat}
-              </button>
+              <option key={cat} value={cat}>{cat}</option>
             ))}
-          </div>
+          </select>
         </div>
       )}
 

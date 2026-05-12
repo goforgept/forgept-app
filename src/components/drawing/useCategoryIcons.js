@@ -240,6 +240,14 @@ const CATEGORY_SVGS = {
       <rect x="26" y="17" width="4" height="6" rx="1"/>
     </svg>`,
 
+  'Access Control Door': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="8" y="4" width="24" height="32" rx="2"/>
+      <circle cx="26" cy="20" r="2" fill="${color}"/>
+      <path d="M8 4 L8 36" stroke-width="1"/>
+      <path d="M14 8 L14 32" stroke-width="0.5" stroke-dasharray="2 2"/>
+    </svg>`,
+
   'default': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
       <rect x="10" y="10" width="20" height="20" rx="4"/>

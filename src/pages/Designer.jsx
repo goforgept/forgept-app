@@ -376,7 +376,7 @@ export default function Designer({ featureDrawingTool }) {
               <>
                 {/* Symbol picker sidebar */}
                 {sidebarOpen && (
-                  <div className="w-60 border-r border-[#2a3d55] flex-shrink-0 overflow-y-auto">
+                  <div className="w-60 border-r border-[#2a3d55] flex-shrink-0 overflow-y-auto min-h-0 h-full">
                     <SymbolPicker
                       selectedSymbol={selectedSymbol}
                       onSelect={setSelectedSymbol}
@@ -506,18 +506,57 @@ function SheetTab({ sheet, isActive, onSelect, onRename, onDelete }) {
 
 // ─── Default components per category ─────────────────────────────────────────
 const DEFAULT_COMPONENTS = {
-  'Dome Camera':    ['Mount', 'Housing', 'Junction Box'],
-  'Bullet Camera':  ['Mount', 'Housing', 'Junction Box'],
-  'PTZ Camera':     ['Mount', 'Housing', 'Junction Box'],
-  'Access Reader':  ['Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply'],
-  'Controller':     ['Power Supply', 'Cabinet'],
-  'Horn Strobe':    ['Back Box', 'Power Supply'],
-  'Pull Station':   ['Back Box'],
-  'Speaker':        ['Amplifier', 'Volume Control', 'Back Box'],
-  'Display':        ['Mount', 'Media Player'],
-  'Network':        ['Patch Cable', 'SFP Module'],
-  'NVR':            ['Hard Drive', 'Rail Kit'],
-  'FACP':           ['Cabinet', 'Power Supply', 'Battery'],
+  // Security — Cameras
+  'Dome Camera':         ['Mount', 'Housing', 'Junction Box', 'Cable'],
+  'Bullet Camera':       ['Mount', 'Housing', 'Junction Box', 'Cable'],
+  'PTZ Camera':          ['Mount', 'Housing', 'Junction Box', 'Cable'],
+  'NVR':                 ['Hard Drive', 'Rail Kit', 'UPS'],
+
+  // Security — Access Control
+  'Access Reader':       ['Back Box', 'Cable'],
+  'Access Control Door': ['Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply', 'Controller', 'Cable', 'Push to Exit'],
+  'Controller':          ['Power Supply', 'Cabinet', 'Battery Backup'],
+  'Motion Sensor':       ['Back Box', 'Cable'],
+
+  // Security — Fire Alarm
+  'Smoke Detector':      ['Base', 'Cable'],
+  'Heat Detector':       ['Base', 'Cable'],
+  'Horn Strobe':         ['Back Box', 'Power Supply', 'Cable'],
+  'Pull Station':        ['Back Box', 'Cable'],
+  'FACP':                ['Cabinet', 'Power Supply', 'Battery', 'Cable'],
+  'Duct Detector':       ['Sampling Tube', 'Cable'],
+
+  // AV
+  'Speaker':             ['Amplifier', 'Volume Control', 'Back Box', 'Cable'],
+  'Display':             ['Mount', 'Media Player', 'HDMI Cable'],
+  'Projector':           ['Mount', 'Screen', 'HDMI Cable'],
+  'Microphone':          ['DSP', 'Cable'],
+  'Amplifier':           ['Rack Mount', 'Power Conditioner'],
+  'DSP':                 ['Rack Mount'],
+  'Control':             ['Rack Mount', 'Cable'],
+  'Network':             ['Patch Cable', 'SFP Module', 'Rack Mount'],
+  'Rack':                ['Cable Management', 'PDU', 'Shelf', 'Rail Kit'],
+
+  // Low Voltage / DataCom
+  'Data Drop':           ['Cat6 Jack', 'Faceplate', 'Back Box', 'RJ45 Connector', 'Cat6 Cable', 'Patch Cable'],
+  'Data':                ['Cat6 Jack', 'Faceplate', 'Back Box', 'RJ45 Connector', 'Cat6 Cable'],
+  'Fiber Panel':         ['LC Fiber Connector', 'LC Adapter', 'Fiber Cable', 'Cable Management'],
+  'Cable Tray':          ['Cable', 'Straps', 'Mounting Brackets'],
+  'UPS':                 ['PDU', 'Battery', 'Rack Mount'],
+  'Wireless AP':         ['Mount', 'PoE Injector', 'Cat6 Cable'],
+
+  // Electrical
+  'Panel':               ['Breakers', 'Lugs', 'Surge Protection'],
+  'Outlet':              ['Cover Plate', 'Box'],
+  'Lighting':            ['Driver', 'Mount', 'Wire'],
+  'Conduit':             ['Fittings', 'Straps', 'Pull String'],
+  'Junction Box':        ['Cover Plate', 'Wire Connectors'],
+  'Disconnect':          ['Fuses', 'Wire'],
+
+  // HVAC
+  'Diffuser':            ['Collar', 'Duct', 'Damper'],
+  'Thermostat':          ['Sub Base', 'Wire', 'Wall Plate'],
+  'VAV':                 ['Actuator', 'Controller', 'Duct'],
 }
 
 // ─── ComponentsSection ───────────────────────────────────────────────────────

@@ -140,12 +140,13 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   // ── Pan ────────────────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e) => {
-    if (e.evt.button === 1) {
+    // Middle mouse OR left mouse when no symbol selected = pan
+    if (e.evt.button === 1 || (e.evt.button === 0 && !selectedSymbol)) {
       isPanning.current = true
       lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY }
       e.evt.preventDefault()
     }
-  }, [])
+  }, [selectedSymbol])
 
   const handleMouseMove = useCallback((e) => {
     if (!isPanning.current || !lastPointer.current) return
@@ -279,7 +280,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
       {/* Canvas */}
       <div ref={containerRef} className="flex-1 overflow-hidden bg-[#060f1c] relative"
-        style={{ cursor: selectedSymbol ? 'crosshair' : 'default' }}>
+        style={{ cursor: selectedSymbol ? 'crosshair' : 'grab' }}>
 
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#060f1c] z-10">
