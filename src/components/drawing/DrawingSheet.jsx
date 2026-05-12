@@ -1,253 +1,710 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Arrow } from 'react-konva'
 import { supabase } from '../../supabase'
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange }) {
+// ─── DrawingSheet ─────────────────────────────────────────────────────────────
+// Full Konva canvas implementation.
+// Layer 1 — floor plan image or blank canvas (background)
+// Layer 2 — device placement markers (draggable)
+// Layer 3 — UI overlays (tooltips, action buttons)
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect }) {
   const containerRef = useRef(null)
-  const [imageUrl,   setImageUrl]   = useState(null)
+  const stageRef     = useRef(null)
+  const isPanning    = useRef(false)
+  const lastPointer  = useRef(null)
+  const lastDist     = useRef(0)
+
+  const [bgImage,    setBgImage]    = useState(null)
+  const [imageSize,  setImageSize]  = useState({ w: 1200, h: 900 })
+  const [stageSize,  setStageSize]  = useState({ w: 800, h: 600 })
+  const [scale,      setScale]      = useState(1)
+  const [position,   setPosition]   = useState({ x: 0, y: 0 })
   const [placements, setPlacements] = useState([])
+  const [selectedId, setSelectedId] = useState(null)
+  const [hoveredId,  setHoveredId]  = useState(null)
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
-  const [hoveredId,  setHoveredId]  = useState(null)
-  const [selectedId, setSelectedId] = useState(null)
   const [placing,    setPlacing]    = useState(false)
 
-  // Load signed URL
+  // ── Measure container ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (!sheet?.storage_path || sheet.storage_path === 'pending') return
-    const load = async () => {
-      setLoading(true)
-      setError(null)
-      try {
-        const isPDF = sheet.storage_path.toLowerCase().endsWith('.pdf')
-        const { data, error } = await supabase.storage.from('floor-plans').createSignedUrl(sheet.storage_path, 3600)
-        if (error) throw error
-        if (isPDF) {
-          await renderPDFPage(data.signedUrl)
-        } else {
-          setImageUrl(data.signedUrl)
-        }
-      } catch (err) {
-        setError('Failed to load floor plan.')
-        console.error(err)
-      } finally {
-        setLoading(false)
+    const measure = () => {
+      if (containerRef.current) {
+        setStageSize({
+          w: containerRef.current.offsetWidth,
+          h: containerRef.current.offsetHeight,
+        })
       }
     }
-    load()
+    measure()
+    const ro = new ResizeObserver(measure)
+    if (containerRef.current) ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [])
+
+  // ── Load floor plan ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!sheet?.storage_path) return
+    if (sheet.storage_path === 'pending') return
+    if (sheet.storage_path === 'blank') {
+      setLoading(false)
+      return
+    }
+    loadFloorPlan()
   }, [sheet?.storage_path])
 
-  const renderPDFPage = async (signedUrl) => {
+  const loadFloorPlan = async () => {
+    setLoading(true)
+    setError(null)
     try {
-      const pdfjsLib = await import('pdfjs-dist')
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
-      const pdf  = await pdfjsLib.getDocument(signedUrl).promise
-      const page = await pdf.getPage(1)
-      const viewport = page.getViewport({ scale: 1 })
-      const scale = Math.min(2, 1800 / viewport.width)
-      const scaledViewport = page.getViewport({ scale })
-      const canvas = document.createElement('canvas')
-      canvas.width  = scaledViewport.width
-      canvas.height = scaledViewport.height
-      await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaledViewport }).promise
-      setImageUrl(canvas.toDataURL('image/png'))
+      const { data, error } = await supabase.storage
+        .from('floor-plans')
+        .createSignedUrl(sheet.storage_path, 3600)
+      if (error) throw error
+
+      const isPDF = sheet.storage_path.toLowerCase().endsWith('.pdf')
+      if (isPDF) {
+        await renderPDF(data.signedUrl)
+      } else {
+        await loadImageFromUrl(data.signedUrl)
+      }
     } catch (err) {
-      throw new Error('PDF render failed: ' + err.message)
+      setError('Failed to load floor plan. Please try re-uploading.')
+      console.error(err)
+    } finally {
+      setLoading(false)
     }
   }
 
+  const renderPDF = async (url) => {
+    const pdfjsLib = await import('pdfjs-dist')
+    const workerUrl = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl.default
+
+    const pdf      = await pdfjsLib.getDocument(url).promise
+    const page     = await pdf.getPage(1)
+    const viewport = page.getViewport({ scale: 1 })
+    const renderScale = Math.min(2, 1800 / viewport.width)
+    const scaled   = page.getViewport({ scale: renderScale })
+
+    const canvas   = document.createElement('canvas')
+    canvas.width   = scaled.width
+    canvas.height  = scaled.height
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaled }).promise
+
+    await loadImageFromUrl(canvas.toDataURL('image/png'))
+  }
+
+  const loadImageFromUrl = (url) => new Promise((resolve, reject) => {
+    const img = new window.Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      setBgImage(img)
+      const w = img.naturalWidth
+      const h = img.naturalHeight
+      setImageSize({ w, h })
+      fitToStage(w, h)
+      resolve()
+    }
+    img.onerror = reject
+    img.src = url
+  })
+
+  const fitToStage = useCallback((imgW, imgH) => {
+    if (!containerRef.current) return
+    const sw  = containerRef.current.offsetWidth
+    const sh  = containerRef.current.offsetHeight
+    const fit = Math.min(sw / imgW, sh / imgH) * 0.92
+    setScale(fit)
+    setPosition({
+      x: (sw - imgW * fit) / 2,
+      y: (sh - imgH * fit) / 2,
+    })
+  }, [])
+
+  // ── Load placements ────────────────────────────────────────────────────────
   const loadPlacements = useCallback(async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('drawing_placements')
-      .select('*, global_products(id, name, part_number, manufacturer, category)')
+      .select(`
+        *,
+        global_products(id, name, part_number, manufacturer, category)
+      `)
       .eq('drawing_sheet_id', sheet.id)
       .order('created_at')
-    if (!error) setPlacements(data || [])
+    if (data) setPlacements(data)
   }, [sheet.id])
 
   useEffect(() => { loadPlacements() }, [loadPlacements])
 
-  const handleCanvasClick = async (e) => {
-    if (!selectedSymbol) { setSelectedId(null); return }
-    if (placing) return
+  // ── Realtime subscription ──────────────────────────────────────────────────
+  useEffect(() => {
+    const channel = supabase
+      .channel(`placements_${sheet.id}`)
+      .on('postgres_changes', {
+        event:  '*',
+        schema: 'public',
+        table:  'drawing_placements',
+        filter: `drawing_sheet_id=eq.${sheet.id}`,
+      }, () => loadPlacements())
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [sheet.id, loadPlacements])
+
+  // ── Zoom — mouse wheel ─────────────────────────────────────────────────────
+  const handleWheel = useCallback((e) => {
+    e.evt.preventDefault()
+    const stage    = stageRef.current
+    const pointer  = stage.getPointerPosition()
+    const factor   = e.evt.deltaY < 0 ? 1.12 : 0.9
+    const newScale = Math.min(Math.max(scale * factor, 0.05), 15)
+    const mouseX   = (pointer.x - position.x) / scale
+    const mouseY   = (pointer.y - position.y) / scale
+    setScale(newScale)
+    setPosition({
+      x: pointer.x - mouseX * newScale,
+      y: pointer.y - mouseY * newScale,
+    })
+  }, [scale, position])
+
+  // ── Pan — middle mouse button ──────────────────────────────────────────────
+  const handleMouseDown = useCallback((e) => {
+    if (e.evt.button === 1) {
+      isPanning.current   = true
+      lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY }
+      e.evt.preventDefault()
+    }
+  }, [])
+
+  const handleMouseMove = useCallback((e) => {
+    if (!isPanning.current || !lastPointer.current) return
+    const dx = e.evt.clientX - lastPointer.current.x
+    const dy = e.evt.clientY - lastPointer.current.y
+    lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY }
+    setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }))
+  }, [])
+
+  const handleMouseUp = useCallback(() => {
+    isPanning.current = false
+  }, [])
+
+  // ── Pinch zoom — touch ─────────────────────────────────────────────────────
+  const handleTouchMove = useCallback((e) => {
+    const touches = e.evt.touches
+    if (touches.length !== 2) return
+    const dx   = touches[0].clientX - touches[1].clientX
+    const dy   = touches[0].clientY - touches[1].clientY
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    if (lastDist.current) {
+      const factor   = dist / lastDist.current
+      const newScale = Math.min(Math.max(scale * factor, 0.05), 15)
+      setScale(newScale)
+    }
+    lastDist.current = dist
+  }, [scale])
+
+  const handleTouchEnd = useCallback(() => {
+    lastDist.current = 0
+  }, [])
+
+  // ── Click to place device ──────────────────────────────────────────────────
+  const handleStageClick = useCallback(async (e) => {
+    const clickedOnBackground =
+      e.target === stageRef.current ||
+      e.target.name() === 'bg-image' ||
+      e.target.name() === 'bg-blank'
+
+    if (!clickedOnBackground) return
+    if (!selectedSymbol || placing) {
+      setSelectedId(null)
+      onPlacementSelect?.(null)
+      return
+    }
+
     setPlacing(true)
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = Math.round(((e.clientX - rect.left) / rect.width)  * 10000) / 10000
-    const y = Math.round(((e.clientY - rect.top)  / rect.height) * 10000) / 10000
+    const stage   = stageRef.current
+    const pointer = stage.getPointerPosition()
+    const canvasW = sheet.storage_path === 'blank' ? stageSize.w : imageSize.w
+    const canvasH = sheet.storage_path === 'blank' ? stageSize.h : imageSize.h
+
+    const imgX = (pointer.x - position.x) / scale
+    const imgY = (pointer.y - position.y) / scale
+    const x    = Math.min(Math.max(imgX / canvasW, 0.01), 0.99)
+    const y    = Math.min(Math.max(imgY / canvasH, 0.01), 0.99)
+
     try {
+      // Check org catalog for pricing match
       const { data: catalogMatch } = await supabase
-        .from('products').select('id').eq('org_id', orgId).eq('part_number', selectedSymbol.part_number).maybeSingle()
+        .from('products')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('part_number', selectedSymbol.part_number)
+        .maybeSingle()
+
       const { data: placement, error } = await supabase
         .from('drawing_placements')
-        .insert({ org_id: orgId, drawing_sheet_id: sheet.id, global_product_id: selectedSymbol.id, product_id: catalogMatch?.id || null, x, y, rotation: 0, quantity: 1 })
+        .insert({
+          org_id:            orgId,
+          drawing_sheet_id:  sheet.id,
+          global_product_id: selectedSymbol.id,
+          product_id:        catalogMatch?.id || null,
+          x:                 Math.round(x * 10000) / 10000,
+          y:                 Math.round(y * 10000) / 10000,
+          rotation:          0,
+          quantity:          1,
+          symbol_size:       32,
+          source:            'manual',
+        })
         .select('*, global_products(id, name, part_number, manufacturer, category)')
         .single()
+
       if (error) throw error
       setPlacements(prev => [...prev, placement])
       onPlacementChange?.()
+
+      // Update sheet last_activity_at
+      await supabase.from('drawing_sheets')
+        .update({ last_activity_at: new Date().toISOString() })
+        .eq('id', sheet.id)
     } catch (err) {
       console.error('Failed to place device:', err)
     } finally {
-      setTimeout(() => setPlacing(false), 200)
+      setTimeout(() => setPlacing(false), 150)
+    }
+  }, [selectedSymbol, placing, position, scale, imageSize, stageSize, sheet, orgId, onPlacementChange, onPlacementSelect])
+
+  // ── Delete placement ───────────────────────────────────────────────────────
+  const handleDelete = useCallback(async (placementId) => {
+    await supabase.from('drawing_placements').delete().eq('id', placementId)
+    setPlacements(prev => prev.filter(p => p.id !== placementId))
+    setSelectedId(null)
+    onPlacementSelect?.(null)
+    onPlacementChange?.()
+  }, [onPlacementChange, onPlacementSelect])
+
+  // ── Rotate placement ───────────────────────────────────────────────────────
+  const handleRotate = useCallback(async (placementId) => {
+    const p = placements.find(p => p.id === placementId)
+    if (!p) return
+    const newRot = (p.rotation + 90) % 360
+    await supabase.from('drawing_placements').update({ rotation: newRot }).eq('id', placementId)
+    setPlacements(prev => prev.map(p => p.id === placementId ? { ...p, rotation: newRot } : p))
+  }, [placements])
+
+  // ── Drag end — update position ─────────────────────────────────────────────
+  const handleDragEnd = useCallback(async (placementId, e) => {
+    const node    = e.target
+    const canvasW = sheet.storage_path === 'blank' ? stageSize.w : imageSize.w
+    const canvasH = sheet.storage_path === 'blank' ? stageSize.h : imageSize.h
+    const x = Math.min(Math.max((node.x() - position.x) / scale / canvasW, 0.01), 0.99)
+    const y = Math.min(Math.max((node.y() - position.y) / scale / canvasH, 0.01), 0.99)
+    const rx = Math.round(x * 10000) / 10000
+    const ry = Math.round(y * 10000) / 10000
+    await supabase.from('drawing_placements').update({ x: rx, y: ry }).eq('id', placementId)
+    setPlacements(prev => prev.map(p => p.id === placementId ? { ...p, x: rx, y: ry } : p))
+    onPlacementChange?.()
+  }, [position, scale, imageSize, stageSize, sheet, onPlacementChange])
+
+  // ── Zoom controls ──────────────────────────────────────────────────────────
+  const zoomIn  = () => setScale(s => Math.min(s * 1.2, 15))
+  const zoomOut = () => setScale(s => Math.max(s * 0.8, 0.05))
+  const zoomFit = () => {
+    if (bgImage) fitToStage(imageSize.w, imageSize.h)
+    else {
+      setScale(1)
+      setPosition({ x: 0, y: 0 })
     }
   }
 
-  const handleDeletePlacement = async (placementId, e) => {
-    e.stopPropagation()
-    const { error } = await supabase.from('drawing_placements').delete().eq('id', placementId)
-    if (!error) { setPlacements(prev => prev.filter(p => p.id !== placementId)); setSelectedId(null); onPlacementChange?.() }
-  }
+  // ── Canvas dimensions ──────────────────────────────────────────────────────
+  const isBlank = sheet.storage_path === 'blank'
+  const canvasW = isBlank ? Math.max(stageSize.w, 1200) : imageSize.w
+  const canvasH = isBlank ? Math.max(stageSize.h, 900)  : imageSize.h
 
-  const handleRotate = async (placementId, e) => {
-    e.stopPropagation()
-    const placement = placements.find(p => p.id === placementId)
-    if (!placement) return
-    const newRotation = (placement.rotation + 90) % 360
-    const { error } = await supabase.from('drawing_placements').update({ rotation: newRotation }).eq('id', placementId)
-    if (!error) setPlacements(prev => prev.map(p => p.id === placementId ? { ...p, rotation: newRotation } : p))
-  }
-
-  if (loading) return (
-    <div className="flex-1 flex items-center justify-center h-full">
-      <div className="flex flex-col items-center gap-2">
-        <svg className="w-6 h-6 animate-spin text-[#C8622A]" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
-        </svg>
-        <span className="text-sm text-[#8A9AB0]">Loading floor plan...</span>
-      </div>
-    </div>
-  )
-
-  if (error) return (
-    <div className="flex-1 flex items-center justify-center h-full">
-      <p className="text-sm text-red-400 text-center max-w-xs">{error}</p>
-    </div>
-  )
-
-  if (!imageUrl) return null
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a3d55] bg-[#1a2d45] text-xs text-[#8A9AB0]">
-        <div>
-          {selectedSymbol
-            ? <span className="flex items-center gap-1.5 text-[#C8622A] font-medium"><span className="w-2 h-2 rounded-full bg-[#C8622A] animate-pulse"/>Placing: {selectedSymbol.name}</span>
-            : <span>Select a symbol from the left panel to place devices</span>
-          }
+
+      {/* ── Toolbar ── */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a3d55] bg-[#1a2d45] flex-shrink-0">
+        <div className="text-xs text-[#8A9AB0]">
+          {selectedSymbol ? (
+            <span className="flex items-center gap-1.5 text-[#C8622A] font-medium">
+              <span className="w-2 h-2 rounded-full bg-[#C8622A] animate-pulse inline-block"/>
+              Placing: {selectedSymbol.name} — click to place · Scroll to zoom · Middle-click to pan
+            </span>
+          ) : (
+            <span>Select a symbol to place · Scroll to zoom · Middle-click drag to pan · Drag markers to move</span>
+          )}
         </div>
-        <span>{placements.length} device{placements.length !== 1 ? 's' : ''} placed</span>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          <span className="text-xs text-[#8A9AB0]">
+            {placements.length} device{placements.length !== 1 ? 's' : ''}
+          </span>
+          {/* Zoom controls */}
+          <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5">
+            <button onClick={zoomOut} title="Zoom out"
+              className="w-7 h-7 flex items-center justify-center text-[#8A9AB0] hover:text-white transition-colors rounded">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/>
+              </svg>
+            </button>
+            <span className="text-xs text-[#8A9AB0] w-12 text-center tabular-nums">
+              {Math.round(scale * 100)}%
+            </span>
+            <button onClick={zoomIn} title="Zoom in"
+              className="w-7 h-7 flex items-center justify-center text-[#8A9AB0] hover:text-white transition-colors rounded">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+              </svg>
+            </button>
+            <button onClick={zoomFit} title="Fit to screen"
+              className="w-7 h-7 flex items-center justify-center text-[#8A9AB0] hover:text-white transition-colors rounded">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+              </svg>
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Canvas */}
-      <div ref={containerRef} className="flex-1 overflow-auto bg-[#060f1c] p-4">
-        <div className="relative inline-block select-none"
-          style={{ cursor: selectedSymbol ? 'crosshair' : 'default', maxWidth: '100%' }}
-          onClick={handleCanvasClick}>
-          <img src={imageUrl} alt={sheet.name} className="block max-w-full rounded shadow-lg" draggable={false} />
-          {placements.map(placement => (
-            <PlacementMarker key={placement.id} placement={placement}
-              isSelected={selectedId === placement.id}
-              isHovered={hoveredId === placement.id}
-              onSelect={(e) => { e.stopPropagation(); setSelectedId(prev => prev === placement.id ? null : placement.id) }}
-              onDelete={(e) => handleDeletePlacement(placement.id, e)}
-              onRotate={(e) => handleRotate(placement.id, e)}
-              onHover={(val) => setHoveredId(val ? placement.id : null)} />
-          ))}
-        </div>
+      {/* ── Canvas container ── */}
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-hidden bg-[#060f1c] relative"
+        style={{ cursor: selectedSymbol ? 'crosshair' : isPanning.current ? 'grabbing' : 'default' }}
+      >
+        {/* Loading overlay */}
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#060f1c] z-10">
+            <div className="flex flex-col items-center gap-3">
+              <svg className="w-8 h-8 animate-spin text-[#C8622A]" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+              </svg>
+              <span className="text-[#8A9AB0] text-sm">Loading floor plan...</span>
+            </div>
+          </div>
+        )}
+
+        {/* Error overlay */}
+        {!loading && error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#060f1c] z-10">
+            <div className="text-center">
+              <p className="text-red-400 text-sm mb-2">{error}</p>
+              <button onClick={loadFloorPlan} className="text-xs text-[#C8622A] underline">
+                Try again
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Konva Stage */}
+        {!loading && !error && stageSize.w > 0 && (
+          <Stage
+            ref={stageRef}
+            width={stageSize.w}
+            height={stageSize.h}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            onClick={handleStageClick}
+            onTap={handleStageClick}
+          >
+            {/* Layer 1 — Background */}
+            <Layer>
+              {bgImage && !isBlank ? (
+                <KonvaImage
+                  name="bg-image"
+                  image={bgImage}
+                  x={position.x}
+                  y={position.y}
+                  width={canvasW * scale}
+                  height={canvasH * scale}
+                  listening={true}
+                />
+              ) : (
+                <Rect
+                  name="bg-blank"
+                  x={position.x}
+                  y={position.y}
+                  width={canvasW * scale}
+                  height={canvasH * scale}
+                  fill="#1a1a2e"
+                  stroke="#2a3d55"
+                  strokeWidth={1}
+                  listening={true}
+                />
+              )}
+            </Layer>
+
+            {/* Layer 2 — Device placements */}
+            <Layer>
+              {placements.map(placement => {
+                const product    = placement.global_products
+                if (!product) return null
+                const isSelected = selectedId === placement.id
+                const isHovered  = hoveredId  === placement.id
+                const markerSize = Math.max((placement.symbol_size || 32) * Math.min(scale, 1.5), 16)
+                const px         = position.x + placement.x * canvasW * scale
+                const py         = position.y + placement.y * canvasH * scale
+
+                return (
+                  <PlacementMarker
+                    key={placement.id}
+                    placement={placement}
+                    product={product}
+                    x={px}
+                    y={py}
+                    size={markerSize}
+                    isSelected={isSelected}
+                    isHovered={isHovered}
+                    scale={scale}
+                    onSelect={() => {
+                      const newId = selectedId === placement.id ? null : placement.id
+                      setSelectedId(newId)
+                      onPlacementSelect?.(newId ? placement : null)
+                    }}
+                    onHoverStart={() => setHoveredId(placement.id)}
+                    onHoverEnd={() => setHoveredId(null)}
+                    onDelete={() => handleDelete(placement.id)}
+                    onRotate={() => handleRotate(placement.id)}
+                    onDragEnd={(e) => handleDragEnd(placement.id, e)}
+                    canvasW={canvasW}
+                    canvasH={canvasH}
+                    position={position}
+                    stageScale={scale}
+                  />
+                )
+              })}
+            </Layer>
+          </Stage>
+        )}
+
+        {/* Keyboard hint */}
+        {!loading && !error && placements.length === 0 && !selectedSymbol && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none">
+            <p className="text-[#2a3d55] text-xs text-center">
+              Select a symbol from the left panel to start placing devices
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Status bar */}
+      {/* ── Approved status bar ── */}
       {sheet.status === 'approved' && (
-        <div className="px-3 py-2 bg-green-900/20 border-t border-green-800/30 text-xs text-green-400 flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 px-3 py-2 bg-green-900/20 border-t border-green-800/30 text-xs text-green-400 flex-shrink-0">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
           </svg>
-          Approved — placements are in the BOM. You can still edit and re-approve.
+          Approved — placements are in the BOM. Edit and re-approve to update.
         </div>
       )}
     </div>
   )
 }
 
-function PlacementMarker({ placement, isSelected, isHovered, onSelect, onDelete, onRotate, onHover }) {
-  const product = placement.global_products
-  if (!product) return null
+// ─── PlacementMarker ──────────────────────────────────────────────────────────
+// Individual device marker on the Konva canvas.
+// Draggable, selectable, shows tooltip and action buttons when selected.
+function PlacementMarker({
+  placement, product, x, y, size,
+  isSelected, isHovered,
+  scale, canvasW, canvasH, position: stagePos, stageScale,
+  onSelect, onHoverStart, onHoverEnd, onDelete, onRotate, onDragEnd,
+}) {
+  const color       = isSelected ? '#C8622A' : isHovered ? '#e07840' : '#C8622A'
+  const strokeColor = isSelected ? '#ff8c42' : '#b5571f'
+  const markerScale = isSelected ? 1.2 : isHovered ? 1.1 : 1
+  const labelSize   = Math.max(10, Math.min(size * 0.3, 14))
+  const btnSize     = Math.max(18, size * 0.6)
+
+  // Category initial for the marker label
+  const initial = (product.category || product.name || '?')[0].toUpperCase()
+
   return (
-    <div
-      style={{ position: 'absolute', left: `${placement.x * 100}%`, top: `${placement.y * 100}%`, transform: `translate(-50%, -50%) rotate(${placement.rotation}deg)`, zIndex: isSelected ? 20 : isHovered ? 15 : 10 }}
-      onMouseEnter={() => onHover(true)} onMouseLeave={() => onHover(false)} onClick={onSelect}
+    <Group
+      x={x}
+      y={y}
+      draggable={true}
+      onClick={onSelect}
+      onTap={onSelect}
+      onMouseEnter={onHoverStart}
+      onMouseLeave={onHoverEnd}
+      onDragEnd={onDragEnd}
     >
-      {/* Marker */}
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
-        isSelected ? 'bg-[#C8622A] border-[#b5571f] shadow-lg scale-125'
-        : isHovered ? 'bg-[#C8622A]/80 border-[#C8622A] shadow-md scale-110'
-        : 'bg-[#C8622A] border-[#b5571f] shadow'
-      }`}>
-        <DeviceIcon category={product.category} />
-      </div>
+      {/* Shadow */}
+      <Circle
+        x={2}
+        y={2}
+        radius={size / 2 * markerScale}
+        fill="rgba(0,0,0,0.4)"
+      />
 
-      {/* Hover tooltip */}
+      {/* Main circle */}
+      <Circle
+        radius={size / 2 * markerScale}
+        fill={color}
+        stroke={strokeColor}
+        strokeWidth={isSelected ? 2.5 : 1.5}
+      />
+
+      {/* Category initial */}
+      <Text
+        text={initial}
+        fontSize={labelSize * markerScale}
+        fontStyle="bold"
+        fill="white"
+        width={size * markerScale}
+        height={size * markerScale}
+        x={-(size / 2) * markerScale}
+        y={-(size / 2) * markerScale}
+        align="center"
+        verticalAlign="middle"
+        listening={false}
+      />
+
+      {/* Tooltip — show on hover when not selected */}
       {isHovered && !isSelected && (
-        <div style={{ position: 'absolute', bottom: '110%', left: '50%', transform: 'translateX(-50%)', zIndex: 30 }}
-          className="bg-[#0F1C2E] border border-[#2a3d55] text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap shadow-lg pointer-events-none">
-          <p className="font-medium">{product.name}</p>
-          <p className="font-mono text-[#8A9AB0]">{product.part_number}</p>
-          <p className="text-[#8A9AB0]">{product.manufacturer}</p>
-        </div>
+        <Group x={size / 2 * markerScale + 4} y={-size / 2 * markerScale}>
+          <Rect
+            width={Math.max(product.name.length * 6.5, 80)}
+            height={44}
+            fill="#0F1C2E"
+            stroke="#2a3d55"
+            strokeWidth={1}
+            cornerRadius={6}
+          />
+          <Text
+            text={product.name}
+            fontSize={10}
+            fontStyle="bold"
+            fill="white"
+            x={6}
+            y={6}
+            width={Math.max(product.name.length * 6.5, 80) - 12}
+            listening={false}
+          />
+          <Text
+            text={product.part_number}
+            fontSize={9}
+            fill="#8A9AB0"
+            fontFamily="monospace"
+            x={6}
+            y={20}
+            listening={false}
+          />
+          <Text
+            text={product.manufacturer}
+            fontSize={9}
+            fill="#8A9AB0"
+            x={6}
+            y={32}
+            listening={false}
+          />
+        </Group>
       )}
 
-      {/* Selected tooltip */}
+      {/* Selected — show action buttons and info */}
       {isSelected && (
-        <div style={{ position: 'absolute', bottom: '110%', left: '50%', transform: `translateX(-50%) rotate(-${placement.rotation}deg)`, zIndex: 30 }}
-          className="bg-[#C8622A] text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap shadow-lg pointer-events-none">
-          <p className="font-medium">{product.name}</p>
-          <p className="font-mono opacity-80">{product.part_number}</p>
-        </div>
-      )}
+        <Group>
+          {/* Info label above */}
+          <Group x={-(size * markerScale)} y={-(size / 2 * markerScale) - 52}>
+            <Rect
+              width={Math.max(product.name.length * 6.5, 100)}
+              height={44}
+              fill="#C8622A"
+              cornerRadius={6}
+            />
+            <Text
+              text={product.name}
+              fontSize={10}
+              fontStyle="bold"
+              fill="white"
+              x={6}
+              y={6}
+              width={Math.max(product.name.length * 6.5, 100) - 12}
+              listening={false}
+            />
+            <Text
+              text={product.part_number}
+              fontSize={9}
+              fill="rgba(255,255,255,0.8)"
+              fontFamily="monospace"
+              x={6}
+              y={20}
+              listening={false}
+            />
+            <Text
+              text={`${product.manufacturer} · ${product.category}`}
+              fontSize={8}
+              fill="rgba(255,255,255,0.7)"
+              x={6}
+              y={32}
+              listening={false}
+            />
+          </Group>
 
-      {/* Action buttons */}
-      {isSelected && (
-        <div style={{ position: 'absolute', top: '110%', left: '50%', transform: `translateX(-50%) rotate(-${placement.rotation}deg)`, zIndex: 30 }}
-          className="flex items-center gap-1 mt-1" onClick={e => e.stopPropagation()}>
-          <button onClick={onRotate} title="Rotate 90°"
-            className="w-6 h-6 rounded-full bg-[#1a2d45] border border-[#2a3d55] shadow flex items-center justify-center hover:border-[#C8622A] transition-colors">
-            <svg className="w-3 h-3 text-[#8A9AB0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
-          </button>
-          <button onClick={onDelete} title="Remove device"
-            className="w-6 h-6 rounded-full bg-[#1a2d45] border border-red-800/40 shadow flex items-center justify-center hover:border-red-500 transition-colors">
-            <svg className="w-3 h-3 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
+          {/* Action buttons below */}
+          <Group y={size / 2 * markerScale + 6}>
+            {/* Rotate button */}
+            <Group
+              x={-(btnSize + 3)}
+              onClick={(e) => { e.cancelBubble = true; onRotate() }}
+              onTap={(e) => { e.cancelBubble = true; onRotate() }}
+            >
+              <Rect
+                width={btnSize}
+                height={btnSize}
+                fill="#1a2d45"
+                stroke="#2a3d55"
+                strokeWidth={1}
+                cornerRadius={4}
+              />
+              <Text
+                text="↻"
+                fontSize={btnSize * 0.55}
+                fill="#8A9AB0"
+                width={btnSize}
+                height={btnSize}
+                align="center"
+                verticalAlign="middle"
+                listening={false}
+              />
+            </Group>
+
+            {/* Delete button */}
+            <Group
+              x={3}
+              onClick={(e) => { e.cancelBubble = true; onDelete() }}
+              onTap={(e) => { e.cancelBubble = true; onDelete() }}
+            >
+              <Rect
+                width={btnSize}
+                height={btnSize}
+                fill="#1a2d45"
+                stroke="#7f1d1d"
+                strokeWidth={1}
+                cornerRadius={4}
+              />
+              <Text
+                text="✕"
+                fontSize={btnSize * 0.45}
+                fill="#f87171"
+                width={btnSize}
+                height={btnSize}
+                align="center"
+                verticalAlign="middle"
+                listening={false}
+              />
+            </Group>
+          </Group>
+        </Group>
       )}
-    </div>
+    </Group>
   )
-}
-
-function DeviceIcon({ category }) {
-  const props = { className: 'w-4 h-4 text-white', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }
-  switch (category) {
-    case 'Dome Camera':
-      return <svg {...props}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 10a8 8 0 1016 0A8 8 0 004 10z"/></svg>
-    case 'Bullet Camera':
-      return <svg {...props}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.362a1 1 0 01-1.447.894L15 14M3 8a1 1 0 011-1h11a1 1 0 011 1v8a1 1 0 01-1 1H4a1 1 0 01-1-1V8z"/></svg>
-    case 'PTZ Camera':
-      return <svg {...props}><circle cx="12" cy="12" r="3" strokeWidth={1.5}/><path strokeLinecap="round" strokeWidth={1.5} d="M12 5v2M12 17v2M5 12H3M21 12h-2M7.05 7.05L5.64 5.64M18.36 18.36l-1.41-1.41M18.36 5.64l-1.41 1.41M7.05 16.95L5.64 18.36"/></svg>
-    case 'Access Reader':
-      return <svg {...props}><rect x="3" y="3" width="18" height="18" rx="3" strokeWidth={1.5}/><path strokeLinecap="round" strokeWidth={1.5} d="M9 12h6M12 9v6"/></svg>
-    case 'Speaker':
-      return <svg {...props}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.536 8.464a5 5 0 010 7.072M12 6a7 7 0 010 12M9 8l-3 2H4a1 1 0 00-1 1v2a1 1 0 001 1h2l3 2V8z"/></svg>
-    case 'Display':
-      return <svg {...props}><rect x="2" y="4" width="20" height="14" rx="2" strokeWidth={1.5}/><path strokeLinecap="round" strokeWidth={1.5} d="M8 20h8M12 18v2"/></svg>
-    case 'Network':
-      return <svg {...props}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
-    case 'Thermostat':
-      return <svg {...props}><circle cx="12" cy="12" r="9" strokeWidth={1.5}/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 7v5l3 3"/></svg>
-    default:
-      return <svg {...props}><circle cx="12" cy="12" r="4" strokeWidth={1.5}/><path strokeLinecap="round" strokeWidth={1.5} d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
-  }
 }
