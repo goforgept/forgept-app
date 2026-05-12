@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import DrawingSheet from '../components/drawing/DrawingSheet'
@@ -396,23 +396,21 @@ export default function Designer({ featureDrawingTool }) {
                         selectedSymbol={selectedSymbol}
                         onPlacementChange={() => {}}
                         onPlacementSelect={setSelectedPlacement}
+                        onPlacementUpdate={setSelectedPlacement}
+                        updatedPlacement={selectedPlacement}
                       />
                     )}
                   </div>
 
                   {/* Right panel — selected placement info */}
-                  {selectedPlacement && (
-                    <div className="w-64 border-l border-[#2a3d55] flex-shrink-0 overflow-y-auto bg-[#0F1C2E]">
-                      <PlacementPanel
+                  <PlacementPanel
                         placement={selectedPlacement}
                         onClose={() => setSelectedPlacement(null)}
                         onUpdate={(updated) => {
                           setSelectedPlacement(updated)
                         }}
                       />
-                    </div>
-                  )}
-                </div>
+                  </div>
               </>
             )}
           </>
@@ -717,6 +715,7 @@ function ComponentsSection({ placementId, orgId, category }) {
 // ─── PlacementPanel ───────────────────────────────────────────────────────────
 // Right side panel — full edit fields for a selected placement
 function PlacementPanel({ placement, onClose, onUpdate }) {
+  if (!placement) return null
   const product = placement.global_products
   if (!product) return null
 
@@ -727,6 +726,9 @@ function PlacementPanel({ placement, onClose, onUpdate }) {
     description_override:   placement.description_override   || '',
     notes:                  placement.notes                  || '',
     quantity:               placement.quantity               || 1,
+    symbol_size:            placement.symbol_size            || 32,
+    fov_angle:              placement.fov_angle              || null,
+    fov_range:              placement.fov_range              || null,
     // As-built
     serial_number:          placement.serial_number          || '',
     ip_address:             placement.ip_address             || '',
@@ -735,46 +737,45 @@ function PlacementPanel({ placement, onClose, onUpdate }) {
     switch_port:            placement.switch_port            || '',
     patch_panel_label:      placement.patch_panel_label      || '',
   })
-  const [saving, setSaving]           = useState(false)
   const [saved,  setSaved]            = useState(false)
   const [showAsBuilt, setShowAsBuilt] = useState(false)
+  const saveTimer = useRef(null)
 
   const update = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }))
-    setSaved(false)
+    const updated = { ...form, [field]: value }
+    setForm(updated)
+    onUpdate?.({ ...placement, ...updated })
+
+    // Debounced auto-save — outside setForm so timer persists correctly
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      const { error } = await supabase.from('drawing_placements').update({
+        part_number_override:  updated.part_number_override  || null,
+        manufacturer_override: updated.manufacturer_override || null,
+        model_number_override: updated.model_number_override || null,
+        description_override:  updated.description_override  || null,
+        notes:                 updated.notes                 || null,
+        quantity:              parseInt(updated.quantity)    || 1,
+        symbol_size:           parseInt(updated.symbol_size) || 32,
+          fov_angle:             updated.fov_angle ? parseInt(updated.fov_angle) : null,
+          fov_range:             updated.fov_range ? parseInt(updated.fov_range) : null,
+        serial_number:         updated.serial_number         || null,
+        ip_address:            updated.ip_address            || null,
+        mac_address:           updated.mac_address           || null,
+        switch_name:           updated.switch_name           || null,
+        switch_port:           updated.switch_port           || null,
+        patch_panel_label:     updated.patch_panel_label     || null,
+      }).eq('id', placement.id)
+      if (!error) {
+        setSaved(true)
+        setTimeout(() => setSaved(false), 1500)
+      } else {
+        console.error('Auto-save failed:', error)
+      }
+    }, 800)
   }
 
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      const { error } = await supabase
-        .from('drawing_placements')
-        .update({
-          part_number_override:  form.part_number_override  || null,
-          manufacturer_override: form.manufacturer_override || null,
-          model_number_override: form.model_number_override || null,
-          description_override:  form.description_override  || null,
-          notes:                 form.notes                 || null,
-          quantity:              parseInt(form.quantity) || 1,
-          serial_number:         form.serial_number         || null,
-          ip_address:            form.ip_address            || null,
-          mac_address:           form.mac_address           || null,
-          switch_name:           form.switch_name           || null,
-          switch_port:           form.switch_port           || null,
-          patch_panel_label:     form.patch_panel_label     || null,
-        })
-        .eq('id', placement.id)
-
-      if (error) throw error
-      setSaved(true)
-      onUpdate?.({ ...placement, ...form })
-      setTimeout(() => setSaved(false), 2000)
-    } catch (err) {
-      console.error('Failed to save placement:', err)
-    } finally {
-      setSaving(false)
-    }
-  }
+  
 
   const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]"
   const labelClass = "text-[#8A9AB0] text-xs mb-1 block"
@@ -842,6 +843,53 @@ function PlacementPanel({ placement, onClose, onUpdate }) {
               <input type="number" min="1" value={form.quantity}
                 onChange={e => update('quantity', e.target.value)}
                 className={`${inputClass} w-20`} />
+            </div>
+            {/* FOV settings — cameras only */}
+            {['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor'].includes(product.category) && (
+              <div className="border-t border-[#2a3d55] pt-3">
+                <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Coverage / FOV</p>
+                <div className="space-y-2">
+                  <div>
+                    <label className={labelClass}>FOV Angle <span className="text-[#4a5a6a]">(degrees)</span></label>
+                    <div className="flex items-center gap-2">
+                      <input type="range" min="10" max="360" step="5"
+                        value={form.fov_angle || placement.global_products?.specs?.fov_angle || 90}
+                        onChange={e => update('fov_angle', parseInt(e.target.value))}
+                        className="flex-1 accent-[#C8622A]" />
+                      <span className="text-[#8A9AB0] text-xs w-10 text-right">
+                        {form.fov_angle || placement.global_products?.specs?.fov_angle || 90}°
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelClass}>Range <span className="text-[#4a5a6a]">(feet)</span></label>
+                    <div className="flex items-center gap-2">
+                      <input type="range" min="5" max="200" step="5"
+                        value={form.fov_range || placement.global_products?.specs?.ir_range || 30}
+                        onChange={e => update('fov_range', parseInt(e.target.value))}
+                        className="flex-1 accent-[#C8622A]" />
+                      <span className="text-[#8A9AB0] text-xs w-10 text-right">
+                        {form.fov_range || placement.global_products?.specs?.ir_range || 30}ft
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Symbol size */}
+            <div>
+              <label className={labelClass}>Symbol Size</label>
+              <div className="flex items-center gap-2">
+                <input type="range" min="16" max="64" step="4"
+                  value={form.symbol_size || 32}
+                  onChange={e => update('symbol_size', parseInt(e.target.value))}
+                  className="flex-1 accent-[#C8622A]" />
+                <span className="text-[#8A9AB0] text-xs w-8 text-right">{form.symbol_size || 32}px</span>
+              </div>
+              <div className="flex justify-between text-xs text-[#4a5a6a] mt-0.5">
+                <span>S</span><span>M</span><span>L</span><span>XL</span>
+              </div>
             </div>
             <div>
               <label className={labelClass}>Notes</label>
@@ -920,17 +968,10 @@ function PlacementPanel({ placement, onClose, onUpdate }) {
       </div>
 
       {/* Save button */}
-      <div className="px-3 py-3 border-t border-[#2a3d55] flex-shrink-0">
-        <button onClick={handleSave} disabled={saving}
-          className={`w-full py-2 text-sm font-semibold rounded-lg transition-colors ${
-            saved
-              ? 'bg-green-700 text-white'
-              : saving
-              ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
-              : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
-          }`}>
-          {saved ? '✓ Saved' : saving ? 'Saving...' : 'Save Changes'}
-        </button>
+      <div className="px-3 py-2 border-t border-[#2a3d55] flex-shrink-0 text-center">
+        <span className={`text-xs transition-opacity ${saved ? 'text-green-400 opacity-100' : 'text-[#4a5a6a] opacity-60'}`}>
+          {saved ? '✓ Saved' : 'Changes save automatically'}
+        </span>
       </div>
     </div>
   )

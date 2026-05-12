@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect } from 'react-konva'
+import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Shape, Line } from 'react-konva'
 import { supabase } from '../../supabase'
 import { useCategoryIcons } from './useCategoryIcons'
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect }) {
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
   const isPanning    = useRef(false)
@@ -23,6 +23,19 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [placing,    setPlacing]    = useState(false)
 
   const { getIcon, ready: iconsReady } = useCategoryIcons('white', 40)
+  const [showFOV, setShowFOV] = useState(true)
+
+  const [showScaleModal,  setShowScaleModal]  = useState(false)
+  const [scaleMethod,     setScaleMethod]     = useState('manual')
+  const [manualScale,     setManualScale]     = useState('')
+  const [realDistance,    setRealDistance]    = useState('')
+  const [pointA,          setPointA]          = useState(null)
+  const [pointB,          setPointB]          = useState(null)
+  const [applyToAll,      setApplyToAll]      = useState(true)
+  const [calibratedScale, setCalibratedScale] = useState(
+    sheet.scale_ratio ? `1" = ${sheet.scale_ratio}ft` : null
+  )
+  const [pickingPoint,    setPickingPoint]    = useState(null) // 'A' | 'B' | null
 
   // ── Measure container ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -105,13 +118,20 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const loadPlacements = useCallback(async () => {
     const { data } = await supabase
       .from('drawing_placements')
-      .select('*, global_products(id, name, part_number, manufacturer, category)')
+      .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
       .eq('drawing_sheet_id', sheet.id)
       .order('created_at')
     if (data) setPlacements(data)
   }, [sheet.id])
 
   useEffect(() => { loadPlacements() }, [loadPlacements])
+
+  useEffect(() => {
+    if (!updatedPlacement) return
+    setPlacements(prev =>
+      prev.map(p => p.id === updatedPlacement.id ? { ...p, ...updatedPlacement } : p)
+    )
+  }, [updatedPlacement])
 
   // ── Realtime ───────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -177,6 +197,23 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const handleStageClick = useCallback(async (e) => {
     const onBg = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
     if (!onBg) return
+
+    // Handle two-point calibration picking
+    if (pickingPoint) {
+      const pointer = stageRef.current.getPointerPosition()
+      const x = (pointer.x - position.x) / scale
+      const y = (pointer.y - position.y) / scale
+      if (pickingPoint === 'A') {
+        setPointA({ x, y })
+        setPickingPoint('B')
+      } else {
+        setPointB({ x, y })
+        setPickingPoint(null)
+        setShowScaleModal(true)
+      }
+      return
+    }
+
     if (!selectedSymbol || placing) {
       setSelectedId(null)
       onPlacementSelect?.(null)
@@ -201,7 +238,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           x: Math.round(x * 10000) / 10000, y: Math.round(y * 10000) / 10000,
           rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
         })
-        .select('*, global_products(id, name, part_number, manufacturer, category)')
+        .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
         .single()
       if (error) throw error
       setPlacements(prev => [...prev, placement])
@@ -247,6 +284,49 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const zoomOut = () => setScale(s => Math.max(s * 0.8, 0.05))
   const zoomFit = () => bgImage ? fitToStage(imageSize.w, imageSize.h) : (setScale(1), setPosition({ x: 0, y: 0 }))
 
+  // ── Save scale calibration ─────────────────────────────────────────────────
+  const handleSetScale = async () => {
+    let ratio = null
+
+    if (scaleMethod === 'manual') {
+      ratio = parseFloat(manualScale)
+      if (!ratio || ratio <= 0) { alert('Please enter a valid scale.'); return }
+    } else {
+      if (!pointA || !pointB || !realDistance) { alert('Please pick two points and enter the real distance.'); return }
+      const dx       = pointB.x - pointA.x
+      const dy       = pointB.y - pointA.y
+      const pixelDist = Math.sqrt(dx * dx + dy * dy)
+      ratio = parseFloat(realDistance) / pixelDist
+      if (!ratio || ratio <= 0) { alert('Invalid calibration.'); return }
+    }
+
+    const label = `1px = ${ratio.toFixed(4)}ft`
+    setCalibratedScale(`${parseFloat(realDistance || manualScale)}ft`)
+
+    if (applyToAll) {
+      // Update all sheets on this proposal
+      const { data: sheets } = await supabase
+        .from('drawing_sheets')
+        .select('id')
+        .eq('proposal_id', sheet.proposal_id)
+      if (sheets) {
+        await Promise.all(sheets.map(s =>
+          supabase.from('drawing_sheets').update({ scale_ratio: ratio, scale_calibrated: true }).eq('id', s.id)
+        ))
+      }
+    } else {
+      await supabase.from('drawing_sheets')
+        .update({ scale_ratio: ratio, scale_calibrated: true })
+        .eq('id', sheet.id)
+    }
+
+    setShowScaleModal(false)
+    setManualScale('')
+    setRealDistance('')
+    setPointA(null)
+    setPointB(null)
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full">
@@ -263,6 +343,34 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <span className="text-[#8A9AB0]">{placements.length} device{placements.length !== 1 ? 's' : ''}</span>
+          <button
+            onClick={() => setShowFOV(s => !s)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+              showFOV
+                ? 'border-[#C8622A]/40 bg-[#C8622A]/10 text-[#C8622A]'
+                : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
+            }`}
+            title="Toggle FOV overlays"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+            FOV
+          </button>
+          <button
+            onClick={() => setShowScaleModal(true)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+              calibratedScale
+                ? 'border-green-700 bg-green-900/20 text-green-400'
+                : 'border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A]'
+            }`}
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
+            </svg>
+            {calibratedScale || 'Set Scale'}
+          </button>
           <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5">
             <button onClick={zoomOut} className="w-7 h-7 flex items-center justify-center text-[#8A9AB0] hover:text-white rounded transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/></svg>
@@ -280,7 +388,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
       {/* Canvas */}
       <div ref={containerRef} className="flex-1 overflow-hidden bg-[#060f1c] relative"
-        style={{ cursor: selectedSymbol ? 'crosshair' : 'grab' }}>
+        style={{ cursor: pickingPoint ? 'crosshair' : selectedSymbol ? 'crosshair' : 'grab' }}>
 
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#060f1c] z-10">
@@ -319,6 +427,66 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   fill="#1a1a2e" stroke="#2a3d55" strokeWidth={1} listening={true}/>
               )}
             </Layer>
+
+           {/* FOV overlay layer */}
+            {showFOV && (
+              <Layer>
+                
+                {placements.map(placement => {
+                  const product = placement.global_products
+                  if (!product) return null
+                  const category = product.category
+                  const fovCategories = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor']
+                  if (!fovCategories.includes(category)) return null
+
+                  const fovAngle    = placement.fov_angle || product.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
+                  const rangeInFeet = placement.fov_range || product.specs?.ir_range || 30
+                  // If scale calibrated use real footage, otherwise use fixed 150px as default
+                  const range = sheet.scale_ratio
+                    ? Math.min((rangeInFeet / sheet.scale_ratio) * scale, 3000)
+                    : 150 * Math.min(scale, 1)
+                  const px          = position.x + placement.x * canvasW * scale
+                  const py          = position.y + placement.y * canvasH * scale
+
+                  // PTZ — full circle
+                  if (category === 'PTZ Camera' || fovAngle >= 355) {
+                    return (
+                      <Circle key={`fov_${placement.id}`}
+                        x={px} y={py} radius={range}
+                        fill="rgba(200,98,42,0.08)"
+                        stroke="rgba(200,98,42,0.3)"
+                        strokeWidth={1} listening={false} />
+                    )
+                  }
+
+                  // Directional — wedge using Shape with local coords
+                  const startAngle = ((placement.rotation || 0) - fovAngle / 2) * Math.PI / 180
+                  const endAngle   = ((placement.rotation || 0) + fovAngle / 2) * Math.PI / 180
+                  const steps      = Math.max(16, Math.floor(fovAngle / 5))
+
+                  // Build points array for Line — center + arc points + back to center
+                  const linePoints = [px, py]
+                  for (let i = 0; i <= steps; i++) {
+                    const angle = startAngle + (endAngle - startAngle) * (i / steps)
+                    linePoints.push(px + Math.cos(angle) * range)
+                    linePoints.push(py + Math.sin(angle) * range)
+                  }
+                  linePoints.push(px, py)
+
+                  return (
+                    <Line key={`fov_${placement.id}`}
+                      points={linePoints}
+                      fill="rgba(200,98,42,0.12)"
+                      stroke="rgba(200,98,42,0.4)"
+                      strokeWidth={1}
+                      closed={true}
+                      listening={false}
+                    />
+                  )
+                })}
+              </Layer>
+            )}
+
 
             <Layer>
               {iconsReady && placements.map(placement => {
@@ -363,6 +531,118 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
           </svg>
           Approved — edit and re-approve to update the BOM.
+        </div>
+      )}
+
+      {/* ── Scale calibration modal ── */}
+      {showScaleModal && (
+        <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-6 w-96 shadow-2xl">
+            <h3 className="text-white font-bold text-base mb-4 flex items-center gap-2">
+              <svg className="w-4 h-4 text-[#C8622A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/>
+              </svg>
+              Scale Calibration
+            </h3>
+
+            {/* Method selector */}
+            <div className="flex gap-2 mb-4">
+              {['manual', 'twopoint'].map(m => (
+                <button key={m} onClick={() => setScaleMethod(m)}
+                  className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                    scaleMethod === m
+                      ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]'
+                      : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
+                  }`}>
+                  {m === 'manual' ? 'Manual Ratio' : 'Two Point'}
+                </button>
+              ))}
+            </div>
+
+            {/* Manual method */}
+            {scaleMethod === 'manual' && (
+              <div className="space-y-3">
+                <p className="text-[#8A9AB0] text-xs">
+                  Find the scale printed on your floor plan (e.g. 1" = 20') and enter it below.
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#8A9AB0] text-xs whitespace-nowrap">1 inch =</span>
+                  <input type="number" placeholder="20" value={manualScale}
+                    onChange={e => setManualScale(e.target.value)}
+                    className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                  <span className="text-[#8A9AB0] text-xs">feet</span>
+                </div>
+              </div>
+            )}
+
+            {/* Two point method */}
+            {scaleMethod === 'twopoint' && (
+              <div className="space-y-3">
+                <p className="text-[#8A9AB0] text-xs">
+                  Click two points on the drawing whose real-world distance you know (e.g. a room that's 20ft wide).
+                </p>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => { setShowScaleModal(false); setPickingPoint('A') }}
+                    className={`w-full py-2 text-xs rounded-lg border transition-colors ${
+                      pointA
+                        ? 'border-green-700 bg-green-900/20 text-green-400'
+                        : 'border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A]'
+                    }`}>
+                    {pointA ? '✓ Point A set' : 'Click to set Point A'}
+                  </button>
+                  <button
+                    onClick={() => { if (pointA) { setShowScaleModal(false); setPickingPoint('B') } }}
+                    disabled={!pointA}
+                    className={`w-full py-2 text-xs rounded-lg border transition-colors ${
+                      pointB
+                        ? 'border-green-700 bg-green-900/20 text-green-400'
+                        : pointA
+                        ? 'border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A]'
+                        : 'border-[#2a3d55] text-[#4a5a6a] cursor-not-allowed'
+                    }`}>
+                    {pointB ? '✓ Point B set' : 'Click to set Point B'}
+                  </button>
+                </div>
+                {pointA && pointB && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#8A9AB0] text-xs whitespace-nowrap">Real distance:</span>
+                    <input type="number" placeholder="20" value={realDistance}
+                      onChange={e => setRealDistance(e.target.value)}
+                      className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                    <span className="text-[#8A9AB0] text-xs">feet</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Apply to all */}
+            <label className="flex items-center gap-2 mt-4 cursor-pointer">
+              <input type="checkbox" checked={applyToAll}
+                onChange={e => setApplyToAll(e.target.checked)}
+                className="accent-[#C8622A]" />
+              <span className="text-[#8A9AB0] text-xs">Apply to all sheets in this project</span>
+            </label>
+
+            {/* Buttons */}
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => { setShowScaleModal(false); setPointA(null); setPointB(null) }}
+                className="flex-1 py-2 text-sm font-medium rounded-lg border border-[#2a3d55] text-[#8A9AB0] hover:text-white transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleSetScale}
+                className="flex-1 py-2 text-sm font-semibold rounded-lg bg-[#C8622A] text-white hover:bg-[#b5571f] transition-colors">
+                Set Scale
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Two point picking hint */}
+      {pickingPoint && (
+        <div className="absolute top-12 left-1/2 -translate-x-1/2 bg-[#C8622A] text-white text-xs px-4 py-2 rounded-lg shadow-lg z-40 pointer-events-none">
+          Click Point {pickingPoint} on the drawing
         </div>
       )}
     </div>
