@@ -504,62 +504,394 @@ function SheetTab({ sheet, isActive, onSelect, onRename, onDelete }) {
   )
 }
 
+// ─── Default components per category ─────────────────────────────────────────
+const DEFAULT_COMPONENTS = {
+  'Dome Camera':    ['Mount', 'Housing', 'Junction Box'],
+  'Bullet Camera':  ['Mount', 'Housing', 'Junction Box'],
+  'PTZ Camera':     ['Mount', 'Housing', 'Junction Box'],
+  'Access Reader':  ['Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply'],
+  'Controller':     ['Power Supply', 'Cabinet'],
+  'Horn Strobe':    ['Back Box', 'Power Supply'],
+  'Pull Station':   ['Back Box'],
+  'Speaker':        ['Amplifier', 'Volume Control', 'Back Box'],
+  'Display':        ['Mount', 'Media Player'],
+  'Network':        ['Patch Cable', 'SFP Module'],
+  'NVR':            ['Hard Drive', 'Rail Kit'],
+  'FACP':           ['Cabinet', 'Power Supply', 'Battery'],
+}
+
+// ─── ComponentsSection ───────────────────────────────────────────────────────
+function ComponentsSection({ placementId, orgId, category }) {
+  const [components, setComponents] = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [adding,     setAdding]     = useState(false)
+
+  useEffect(() => {
+    loadComponents()
+  }, [placementId])
+
+  const loadComponents = async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('placement_components')
+      .select('*')
+      .eq('placement_id', placementId)
+      .order('created_at')
+    setComponents(data || [])
+    setLoading(false)
+  }
+
+  const handleAdd = async (type) => {
+    const { data, error } = await supabase
+      .from('placement_components')
+      .insert({
+        org_id:         orgId,
+        placement_id:   placementId,
+        component_type: type,
+        name:           type,
+        quantity:       1,
+      })
+      .select()
+      .single()
+    if (!error && data) setComponents(prev => [...prev, data])
+    setAdding(false)
+  }
+
+  const handleUpdate = async (id, field, value) => {
+    await supabase.from('placement_components').update({ [field]: value }).eq('id', id)
+    setComponents(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
+  }
+
+  const handleDelete = async (id) => {
+    await supabase.from('placement_components').delete().eq('id', id)
+    setComponents(prev => prev.filter(c => c.id !== id))
+  }
+
+  const defaultTypes = DEFAULT_COMPONENTS[category] || ['Mount', 'Housing', 'Cable', 'Power Supply']
+  const inputClass   = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]"
+
+  return (
+    <div className="border-t border-[#2a3d55] pt-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide">Components</p>
+        <button
+          onClick={() => setAdding(s => !s)}
+          className="text-xs text-[#C8622A] hover:text-white transition-colors flex items-center gap-1"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+          </svg>
+          Add
+        </button>
+      </div>
+
+      {/* Add component picker */}
+      {adding && (
+        <div className="mb-3 bg-[#1a2d45] rounded-lg p-2 border border-[#2a3d55]">
+          <p className="text-[#8A9AB0] text-xs mb-2">Select component type:</p>
+          <div className="flex flex-wrap gap-1 mb-2">
+            {defaultTypes.map(type => (
+              <button key={type} onClick={() => handleAdd(type)}
+                className="px-2 py-1 text-xs bg-[#0F1C2E] text-[#8A9AB0] hover:text-[#C8622A] hover:border-[#C8622A] border border-[#2a3d55] rounded transition-colors">
+                {type}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-1">
+            <input
+              type="text"
+              placeholder="Custom type..."
+              className={inputClass}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.target.value.trim()) {
+                  handleAdd(e.target.value.trim())
+                  e.target.value = ''
+                }
+              }}
+            />
+            <button onClick={() => setAdding(false)}
+              className="text-[#8A9AB0] hover:text-white text-xs px-2">✕</button>
+          </div>
+        </div>
+      )}
+
+      {/* Component list */}
+      {loading ? (
+        <p className="text-[#8A9AB0] text-xs">Loading...</p>
+      ) : components.length === 0 ? (
+        <p className="text-[#4a5a6a] text-xs">No components added yet</p>
+      ) : (
+        <div className="space-y-2">
+          {components.map(component => (
+            <div key={component.id} className="bg-[#1a2d45] rounded-lg p-2 border border-[#2a3d55] group">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[#C8622A] text-xs font-medium">{component.component_type}</span>
+                <button onClick={() => handleDelete(component.id)}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[#8A9AB0] hover:text-red-400">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+              <div className="space-y-1">
+                <input type="text" placeholder="Name / description"
+                  value={component.name || ''}
+                  onChange={e => handleUpdate(component.id, 'name', e.target.value)}
+                  onBlur={e => supabase.from('placement_components').update({ name: e.target.value }).eq('id', component.id)}
+                  className={inputClass} />
+                <div className="flex gap-1">
+                  <input type="text" placeholder="Part #"
+                    value={component.part_number || ''}
+                    onChange={e => handleUpdate(component.id, 'part_number', e.target.value)}
+                    onBlur={e => supabase.from('placement_components').update({ part_number: e.target.value }).eq('id', component.id)}
+                    className={inputClass} />
+                  <input type="text" placeholder="Mfr"
+                    value={component.manufacturer || ''}
+                    onChange={e => handleUpdate(component.id, 'manufacturer', e.target.value)}
+                    onBlur={e => supabase.from('placement_components').update({ manufacturer: e.target.value }).eq('id', component.id)}
+                    className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[#8A9AB0] text-xs">Qty:</span>
+                  <input type="number" min="1"
+                    value={component.quantity || 1}
+                    onChange={e => handleUpdate(component.id, 'quantity', parseInt(e.target.value) || 1)}
+                    onBlur={e => supabase.from('placement_components').update({ quantity: parseInt(e.target.value) || 1 }).eq('id', component.id)}
+                    className="w-14 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] text-center" />
+                  {component.notes !== undefined && (
+                    <input type="text" placeholder="Notes"
+                      value={component.notes || ''}
+                      onChange={e => handleUpdate(component.id, 'notes', e.target.value)}
+                      onBlur={e => supabase.from('placement_components').update({ notes: e.target.value }).eq('id', component.id)}
+                      className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── PlacementPanel ───────────────────────────────────────────────────────────
-// Right side panel shown when a placement marker is selected.
-// Bundle 3 will expand this with full edit fields.
+// Right side panel — full edit fields for a selected placement
 function PlacementPanel({ placement, onClose, onUpdate }) {
   const product = placement.global_products
   if (!product) return null
 
+  const [form, setForm] = useState({
+    part_number_override:   placement.part_number_override   || '',
+    manufacturer_override:  placement.manufacturer_override  || '',
+    model_number_override:  placement.model_number_override  || '',
+    description_override:   placement.description_override   || '',
+    notes:                  placement.notes                  || '',
+    quantity:               placement.quantity               || 1,
+    // As-built
+    serial_number:          placement.serial_number          || '',
+    ip_address:             placement.ip_address             || '',
+    mac_address:            placement.mac_address            || '',
+    switch_name:            placement.switch_name            || '',
+    switch_port:            placement.switch_port            || '',
+    patch_panel_label:      placement.patch_panel_label      || '',
+  })
+  const [saving, setSaving]           = useState(false)
+  const [saved,  setSaved]            = useState(false)
+  const [showAsBuilt, setShowAsBuilt] = useState(false)
+
+  const update = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+    setSaved(false)
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('drawing_placements')
+        .update({
+          part_number_override:  form.part_number_override  || null,
+          manufacturer_override: form.manufacturer_override || null,
+          model_number_override: form.model_number_override || null,
+          description_override:  form.description_override  || null,
+          notes:                 form.notes                 || null,
+          quantity:              parseInt(form.quantity) || 1,
+          serial_number:         form.serial_number         || null,
+          ip_address:            form.ip_address            || null,
+          mac_address:           form.mac_address           || null,
+          switch_name:           form.switch_name           || null,
+          switch_port:           form.switch_port           || null,
+          patch_panel_label:     form.patch_panel_label     || null,
+        })
+        .eq('id', placement.id)
+
+      if (error) throw error
+      setSaved(true)
+      onUpdate?.({ ...placement, ...form })
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      console.error('Failed to save placement:', err)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]"
+  const labelClass = "text-[#8A9AB0] text-xs mb-1 block"
+
   return (
     <div className="flex flex-col h-full">
+
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-3 border-b border-[#2a3d55]">
-        <div>
-          <p className="text-white text-sm font-semibold">{product.name}</p>
-        <p className="text-[#8A9AB0] text-xs">{product.manufacturer} · {product.category}</p>
+      <div className="flex items-center justify-between px-3 py-3 border-b border-[#2a3d55] flex-shrink-0">
+        <div className="min-w-0">
+          <p className="text-white text-sm font-semibold truncate">{product.name}</p>
+          <p className="text-[#8A9AB0] text-xs">{product.manufacturer} · {product.category}</p>
         </div>
-        <button onClick={onClose} className="text-[#8A9AB0] hover:text-white transition-colors">
+        <button onClick={onClose} className="text-[#8A9AB0] hover:text-white transition-colors flex-shrink-0 ml-2">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </button>
       </div>
 
-      {/* Device info */}
-      <div className="p-3 space-y-3 flex-1 overflow-y-auto">
-        <div>
-          <p className="text-[#8A9AB0] text-xs mb-1">Part Number</p>
-          <p className="text-white text-sm font-mono">
-            {placement.part_number_override || product.part_number}
-          </p>
-        </div>
-        <div>
-          <p className="text-[#8A9AB0] text-xs mb-1">Manufacturer</p>
-          <p className="text-white text-sm">
-            {placement.manufacturer_override || product.manufacturer}
-          </p>
-        </div>
-        {(placement.description_override || product.description) && (
-          <div>
-            <p className="text-[#8A9AB0] text-xs mb-1">Description</p>
-            <p className="text-white text-sm">
-              {placement.description_override || product.description}
-            </p>
-          </div>
-        )}
-        {placement.notes && (
-          <div>
-            <p className="text-[#8A9AB0] text-xs mb-1">Notes</p>
-            <p className="text-white text-sm">{placement.notes}</p>
-          </div>
-        )}
+      {/* Scrollable fields */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
 
-        <div className="pt-2 border-t border-[#2a3d55]">
-          <p className="text-[#8A9AB0] text-xs">
-            Full edit panel coming in Bundle 3 — part number override, components, site photos, as-built fields.
-          </p>
+        {/* Global product reference */}
+        <div className="bg-[#1a2d45] rounded-lg px-3 py-2 text-xs text-[#8A9AB0] border border-[#2a3d55]">
+          <span className="text-white font-mono">{product.part_number}</span>
+          <span className="mx-1">·</span>
+          {product.manufacturer}
         </div>
+
+        {/* ── Device data ── */}
+        <div>
+          <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Device Data</p>
+          <div className="space-y-2">
+            <div>
+              <label className={labelClass}>Part Number <span className="text-[#4a5a6a]">(override)</span></label>
+              <input type="text" value={form.part_number_override}
+                onChange={e => update('part_number_override', e.target.value)}
+                placeholder={product.part_number}
+                className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Manufacturer <span className="text-[#4a5a6a]">(override)</span></label>
+              <input type="text" value={form.manufacturer_override}
+                onChange={e => update('manufacturer_override', e.target.value)}
+                placeholder={product.manufacturer}
+                className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Model Number</label>
+              <input type="text" value={form.model_number_override}
+                onChange={e => update('model_number_override', e.target.value)}
+                placeholder="Model number"
+                className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Description</label>
+              <input type="text" value={form.description_override}
+                onChange={e => update('description_override', e.target.value)}
+                placeholder="e.g. 4MP IR IK10"
+                className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Quantity</label>
+              <input type="number" min="1" value={form.quantity}
+                onChange={e => update('quantity', e.target.value)}
+                className={`${inputClass} w-20`} />
+            </div>
+            <div>
+              <label className={labelClass}>Notes</label>
+              <textarea value={form.notes}
+                onChange={e => update('notes', e.target.value)}
+                placeholder="e.g. Mount at 9ft, corridor mode"
+                rows={2}
+                className={`${inputClass} resize-none`} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Components ── */}
+        <ComponentsSection placementId={placement.id} orgId={placement.org_id} category={product.category} />
+
+        {/* ── As-built fields ── */}
+        <div className="border-t border-[#2a3d55] pt-3">
+          <button
+            onClick={() => setShowAsBuilt(s => !s)}
+            className="flex items-center justify-between w-full text-left mb-2"
+          >
+            <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide">As-Built Data</p>
+            <svg className={`w-3 h-3 text-[#8A9AB0] transition-transform ${showAsBuilt ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+
+          {showAsBuilt && (
+            <div className="space-y-2">
+              <div>
+                <label className={labelClass}>Serial Number</label>
+                <input type="text" value={form.serial_number}
+                  onChange={e => update('serial_number', e.target.value)}
+                  placeholder="Device serial number"
+                  className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>IP Address</label>
+                <input type="text" value={form.ip_address}
+                  onChange={e => update('ip_address', e.target.value)}
+                  placeholder="192.168.1.x"
+                  className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>MAC Address</label>
+                <input type="text" value={form.mac_address}
+                  onChange={e => update('mac_address', e.target.value)}
+                  placeholder="AA:BB:CC:DD:EE:FF"
+                  className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Switch Name</label>
+                <input type="text" value={form.switch_name}
+                  onChange={e => update('switch_name', e.target.value)}
+                  placeholder="e.g. SW-IDF1"
+                  className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Switch Port</label>
+                <input type="text" value={form.switch_port}
+                  onChange={e => update('switch_port', e.target.value)}
+                  placeholder="e.g. Gi1/0/12"
+                  className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Patch Panel Label</label>
+                <input type="text" value={form.patch_panel_label}
+                  onChange={e => update('patch_panel_label', e.target.value)}
+                  placeholder="e.g. PP-A · C01"
+                  className={inputClass} />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Save button */}
+      <div className="px-3 py-3 border-t border-[#2a3d55] flex-shrink-0">
+        <button onClick={handleSave} disabled={saving}
+          className={`w-full py-2 text-sm font-semibold rounded-lg transition-colors ${
+            saved
+              ? 'bg-green-700 text-white'
+              : saving
+              ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
+              : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
+          }`}>
+          {saved ? '✓ Saved' : saving ? 'Saving...' : 'Save Changes'}
+        </button>
       </div>
     </div>
   )
