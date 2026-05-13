@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
+import GlobalProductsImport from '../components/GlobalProductsImport'
 
 const PLANS = [
   { name: 'Trial', rate: 0, color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
@@ -23,7 +24,9 @@ export default function SuperAdmin() {
   const [profiles, setProfiles] = useState([])
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('requests')
+  const [activeTab,      setActiveTab]      = useState('requests')
+  const [showImport,     setShowImport]     = useState(false)
+  const [productCount,   setProductCount]   = useState(0)
   const [editingBilling, setEditingBilling] = useState(null)
   const [billingForm, setBillingForm] = useState(emptyBillingForm)
   const [editingOrg, setEditingOrg] = useState(null)
@@ -467,8 +470,9 @@ export default function SuperAdmin() {
           {[
             { key: 'requests', label: `Access Requests${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}` },
             { key: 'orgs', label: 'Organizations' },
-            { key: 'billing', label: 'Billing & Plans' },
-            { key: 'metrics', label: 'Metrics' },
+            { key: 'billing',   label: 'Billing & Plans' },
+            { key: 'metrics',   label: 'Metrics' },
+            { key: 'products',  label: 'Global Products' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
@@ -921,6 +925,36 @@ export default function SuperAdmin() {
         )}
       </div>
 
+      {/* Global Products tab */}
+        {activeTab === 'products' && (
+          <div className="p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-white font-bold text-lg">Global Product Library</h3>
+                <p className="text-[#8A9AB0] text-sm mt-0.5">
+                  Manufacturer products available to all organizations in the symbol picker
+                </p>
+              </div>
+              <button onClick={() => setShowImport(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                Import Products
+              </button>
+            </div>
+            <GlobalProductStats />
+          </div>
+        )}
+
+      {/* Import modal */}
+      {showImport && (
+        <GlobalProductsImport
+          onClose={() => setShowImport(false)}
+          onImported={() => setShowImport(false)}
+        />
+      )}
+
       {/* Delete Org Modal */}
       {deleteModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
@@ -984,6 +1018,85 @@ export default function SuperAdmin() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── GlobalProductStats ───────────────────────────────────────────────────────
+function GlobalProductStats() {
+  const [stats,   setStats]   = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase
+        .from('global_products')
+        .select('manufacturer, industry, is_active')
+        .eq('is_active', true)
+        .order('manufacturer')
+
+      if (data) {
+        const grouped = {}
+        data.forEach(p => {
+          if (!grouped[p.manufacturer]) grouped[p.manufacturer] = { count: 0, industries: new Set() }
+          grouped[p.manufacturer].count++
+          grouped[p.manufacturer].industries.add(p.industry)
+        })
+        setStats(Object.entries(grouped)
+          .map(([mfr, d]) => ({ manufacturer: mfr, count: d.count, industries: [...d.industries] }))
+          .sort((a, b) => b.count - a.count))
+      }
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-8">
+      <svg className="w-5 h-5 animate-spin text-[#C8622A]" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+      </svg>
+    </div>
+  )
+
+  const total = stats.reduce((s, r) => s + r.count, 0)
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-6 text-sm">
+        <div><span className="text-[#8A9AB0]">Total products</span><span className="ml-2 text-white font-bold">{total.toLocaleString()}</span></div>
+        <div><span className="text-[#8A9AB0]">Manufacturers</span><span className="ml-2 text-white font-bold">{stats.length}</span></div>
+      </div>
+
+      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-[#2a3d55] bg-[#0F1C2E]">
+              <th className="text-left px-4 py-2.5 font-medium text-[#8A9AB0]">Manufacturer</th>
+              <th className="text-left px-4 py-2.5 font-medium text-[#8A9AB0]">Industries</th>
+              <th className="text-right px-4 py-2.5 font-medium text-[#8A9AB0]">Products</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#2a3d55]/50">
+            {stats.map(row => (
+              <tr key={row.manufacturer} className="hover:bg-[#0F1C2E]/50">
+                <td className="px-4 py-2.5 text-white font-medium">{row.manufacturer}</td>
+                <td className="px-4 py-2.5">
+                  <div className="flex flex-wrap gap-1">
+                    {row.industries.map(ind => (
+                      <span key={ind} className="text-xs px-1.5 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0] capitalize">
+                        {ind.replace('_', ' ')}
+                      </span>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-4 py-2.5 text-right text-[#C8622A] font-bold">{row.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
