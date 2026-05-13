@@ -35,6 +35,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [editingCable,   setEditingCable]   = useState(null) // cable id being edited
   const [dragPoint,      setDragPoint]      = useState(null) // {cableId, pointIndex}
   const [hoveredWaypoint, setHoveredWaypoint] = useState(null) // {cableId, pointIndex}
+  const [copiedPlacement, setCopiedPlacement] = useState(null) // clipboard
+  const [contextMenu,     setContextMenu]     = useState(null) // {x, y, placementId}
   const snapRadius = 20 // pixels — snap to device marker within this distance
 
   const [showScaleModal,  setShowScaleModal]  = useState(false)
@@ -174,21 +176,79 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   // Delete selected cable with Delete/Backspace key
   useEffect(() => {
     const handleKeyDown = async (e) => {
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedCable) {
+      const tag = document.activeElement?.tagName
+      const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)
+
+      // Delete selected cable
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedCable && !isInput) {
         await supabase.from('cable_runs').delete().eq('id', selectedCable)
         setCableRuns(prev => prev.filter(r => r.id !== selectedCable))
         setSelectedCable(null)
       }
-      // Escape cancels active cable
+
+      // Delete selected placement
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && !isInput) {
+        await supabase.from('drawing_placements').delete().eq('id', selectedId)
+        setPlacements(prev => prev.filter(p => p.id !== selectedId))
+        setSelectedId(null)
+        onPlacementSelect?.(null)
+        onPlacementChange?.()
+      }
+
+      // Copy placement
+      if ((e.key === 'c' || e.key === 'C') && (e.metaKey || e.ctrlKey) && selectedId && !isInput) {
+        const p = placements.find(p => p.id === selectedId)
+        if (p) setCopiedPlacement(p)
+      }
+
+      // Paste placement
+      if ((e.key === 'v' || e.key === 'V') && (e.metaKey || e.ctrlKey) && copiedPlacement && !isInput) {
+        e.preventDefault()
+        const offset = 0.03
+        const { data, error } = await supabase
+          .from('drawing_placements')
+          .insert({
+            org_id:              copiedPlacement.org_id,
+            drawing_sheet_id:    copiedPlacement.drawing_sheet_id,
+            global_product_id:   copiedPlacement.global_product_id,
+            product_id:          copiedPlacement.product_id,
+            x:                   Math.min(copiedPlacement.x + offset, 0.99),
+            y:                   Math.min(copiedPlacement.y + offset, 0.99),
+            rotation:            copiedPlacement.rotation,
+            quantity:            copiedPlacement.quantity,
+            symbol_size:         copiedPlacement.symbol_size,
+            marker_color:        copiedPlacement.marker_color,
+            part_number_override:  copiedPlacement.part_number_override,
+            manufacturer_override: copiedPlacement.manufacturer_override,
+            description_override:  copiedPlacement.description_override,
+            notes:               copiedPlacement.notes,
+            fov_angle:           copiedPlacement.fov_angle,
+            fov_range:           copiedPlacement.fov_range,
+            source:              'manual',
+          })
+          .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
+          .single()
+        if (!error && data) {
+          setPlacements(prev => [...prev, data])
+          setSelectedId(data.id)
+          onPlacementSelect?.(data)
+          onPlacementChange?.()
+          // Update clipboard to paste next one offset further
+          setCopiedPlacement({ ...copiedPlacement, x: Math.min(copiedPlacement.x + offset, 0.99), y: Math.min(copiedPlacement.y + offset, 0.99) })
+        }
+      }
+
+      // Escape
       if (e.key === 'Escape') {
         setActivePoints([])
         setEditingCable(null)
+        setContextMenu(null)
         onEditingCableDone?.()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedCable, cableMode])
+  }, [selectedCable, selectedId, copiedPlacement, cableMode, placements])
 
   useEffect(() => {
     if (!updatedPlacement) return
@@ -544,7 +604,48 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
       {/* Canvas */}
       <div ref={containerRef} className="flex-1 overflow-hidden bg-[#060f1c] relative"
-        style={{ cursor: pickingPoint ? 'crosshair' : selectedSymbol ? 'crosshair' : 'grab' }}>
+        style={{ cursor: pickingPoint ? 'crosshair' : selectedSymbol ? 'crosshair' : 'grab' }}
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
+        onDrop={async (e) => {
+          e.preventDefault()
+          try {
+            const symbol = JSON.parse(e.dataTransfer.getData('application/json'))
+            if (!symbol) return
+            const rect  = containerRef.current.getBoundingClientRect()
+            const dropX = e.clientX - rect.left
+            const dropY = e.clientY - rect.top
+            const imgX  = (dropX - position.x) / scale
+            const imgY  = (dropY - position.y) / scale
+            const x     = Math.min(Math.max(imgX / canvasW, 0.01), 0.99)
+            const y     = Math.min(Math.max(imgY / canvasH, 0.01), 0.99)
+            const { data: catalogMatch } = await supabase
+              .from('products').select('id')
+              .eq('org_id', orgId).eq('part_number', symbol.part_number)
+              .maybeSingle()
+            const { data: placement, error } = await supabase
+              .from('drawing_placements')
+              .insert({
+                org_id: orgId, drawing_sheet_id: sheet.id,
+                global_product_id: symbol.id, product_id: catalogMatch?.id || null,
+                x: Math.round(x * 10000) / 10000,
+                y: Math.round(y * 10000) / 10000,
+                rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
+              })
+              .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
+              .single()
+            if (!error && placement) {
+              setPlacements(prev => [...prev, placement])
+              setSelectedId(placement.id)
+              onPlacementSelect?.(placement)
+              onPlacementChange?.()
+              await supabase.from('drawing_sheets')
+                .update({ last_activity_at: new Date().toISOString() })
+                .eq('id', sheet.id)
+            }
+          } catch (err) {
+            console.error('Drop failed:', err)
+          }
+        }}>
 
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#060f1c] z-10">
@@ -571,7 +672,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           <Stage ref={stageRef} width={stageSize.w} height={stageSize.h}
             onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-            onClick={handleStageClick} onTap={handleStageClick}
+            onClick={(e) => { handleStageClick(e); setContextMenu(null) }}
+            onTap={(e) => { handleStageClick(e); setContextMenu(null) }}
             onDblClick={async () => {
               if (!cableMode || activePoints.length < 2) return
               // Calculate footage
@@ -890,6 +992,13 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                     isSelected={isSelected} isHovered={isHovered}
                     cableMode={cableMode}
                     markerColor={placement.marker_color || '#C8622A'}
+                    onContextMenu={(e) => {
+                      const stage   = stageRef.current
+                      const pointer = stage.getPointerPosition()
+                      setContextMenu({ x: pointer.x, y: pointer.y, placement })
+                      setSelectedId(placement.id)
+                      onPlacementSelect?.(placement)
+                    }}
                     onCableSnap={() => {
                       setActivePoints(prev => [...prev, {
                         x: placement.x,
@@ -917,6 +1026,67 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         {!loading && !error && placements.length === 0 && !selectedSymbol && (
           <div className="absolute bottom-4 left-1/2 -translate-x-1/2 pointer-events-none">
             <p className="text-[#2a3d55] text-xs">Select a symbol from the left panel to start placing devices</p>
+          </div>
+        )}
+
+        {/* Context menu */}
+        {contextMenu && (
+          <div
+            className="absolute bg-[#1a2d45] border border-[#2a3d55] rounded-lg shadow-xl z-50 py-1 min-w-36"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
+            <button onClick={() => {
+                setCopiedPlacement(contextMenu.placement)
+                setContextMenu(null)
+              }}
+              className="w-full text-left px-3 py-2 text-xs text-white hover:bg-[#2a3d55] flex items-center gap-2">
+              <span>⌘C</span> Copy
+            </button>
+            <button onClick={async () => {
+                const offset = 0.03
+                const p = contextMenu.placement
+                const { data, error } = await supabase
+                  .from('drawing_placements')
+                  .insert({
+                    org_id: p.org_id, drawing_sheet_id: p.drawing_sheet_id,
+                    global_product_id: p.global_product_id, product_id: p.product_id,
+                    x: Math.min(p.x + offset, 0.99), y: Math.min(p.y + offset, 0.99),
+                    rotation: p.rotation, quantity: p.quantity, symbol_size: p.symbol_size,
+                    marker_color: p.marker_color,
+                    part_number_override: p.part_number_override,
+                    manufacturer_override: p.manufacturer_override,
+                    description_override: p.description_override,
+                    notes: p.notes, fov_angle: p.fov_angle, fov_range: p.fov_range,
+                    source: 'manual',
+                  })
+                  .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
+                  .single()
+                if (!error && data) {
+                  setPlacements(prev => [...prev, data])
+                  setSelectedId(data.id)
+                  onPlacementSelect?.(data)
+                  onPlacementChange?.()
+                }
+                setContextMenu(null)
+              }}
+              className="w-full text-left px-3 py-2 text-xs text-white hover:bg-[#2a3d55] flex items-center gap-2">
+              <span>⌘V</span> Paste Here
+            </button>
+            <button onClick={() => {
+                setContextMenu(null)
+                handleRotate(contextMenu.placement.id)
+              }}
+              className="w-full text-left px-3 py-2 text-xs text-white hover:bg-[#2a3d55] flex items-center gap-2">
+              <span>↻</span> Rotate 90°
+            </button>
+            <div className="border-t border-[#2a3d55] my-1"/>
+            <button onClick={() => {
+                handleDelete(contextMenu.placement.id)
+                setContextMenu(null)
+              }}
+              className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-[#2a3d55] flex items-center gap-2">
+              <span>⌫</span> Delete
+            </button>
           </div>
         )}
       </div>
@@ -1047,7 +1217,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
 // ─── PlacementMarker ──────────────────────────────────────────────────────────
 function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isHovered,
-  cableMode, markerColor, onSelect, onCableSnap, onHoverStart, onHoverEnd, onDelete, onRotate, onDragEnd }) {
+  cableMode, markerColor, onSelect, onCableSnap, onContextMenu, onHoverStart, onHoverEnd, onDelete, onRotate, onDragEnd }) {
   const markerScale = isSelected ? 1.25 : isHovered ? 1.1 : 1
   const totalSize   = size * markerScale
   const iconSize    = totalSize * 0.65
@@ -1059,6 +1229,7 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
       draggable={!cableMode}
       onClick={cableMode ? onCableSnap : onSelect}
       onTap={cableMode ? onCableSnap : onSelect}
+      onContextMenu={(e) => { e.evt.preventDefault(); onContextMenu?.(e) }}
       onMouseEnter={onHoverStart}
       onMouseLeave={onHoverEnd}
       onDragEnd={cableMode ? undefined : onDragEnd}>

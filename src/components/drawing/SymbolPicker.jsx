@@ -155,9 +155,18 @@ export default function SymbolPicker({ selectedSymbol, onSelect }) {
 }
 
 function SymbolCard({ symbol, isSelected, onSelect }) {
+  const handleDragStart = (e) => {
+    e.dataTransfer.setData('application/json', JSON.stringify(symbol))
+    e.dataTransfer.effectAllowed = 'copy'
+  }
+
   return (
-    <button onClick={onSelect} title={`${symbol.name}\n${symbol.part_number}`}
-      className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-center transition-all cursor-pointer ${
+    <button
+      onClick={onSelect}
+      draggable={true}
+      onDragStart={handleDragStart}
+      title={`${symbol.name}\n${symbol.part_number}\nDrag to place on canvas`}
+      className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-center transition-all cursor-grab active:cursor-grabbing ${
         isSelected
           ? 'border-[#C8622A]/60 bg-[#C8622A]/10'
           : 'border-[#2a3d55] bg-[#1a2d45] hover:border-[#C8622A]/40 hover:bg-[#C8622A]/5'
