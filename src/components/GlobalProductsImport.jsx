@@ -98,10 +98,17 @@ async function parseSystemSurveyorFile(file) {
     }
   }
 
+  // Helper — get value for a specific product column
+  const getVal = (label, offset) => {
+    const vals = labelMap[label] || []
+    const v    = vals[offset]
+    return v && String(v).trim() && String(v) !== 'None' ? String(v).trim() : null
+  }
+
   // Extract products
   const products = []
   for (const { colIdx, model } of productCols) {
-    const offset = colIdx - 4
+    const offset = colIdx - productColStart
     const mfr    = getVal('Component Manufacturer', offset)
     if (!mfr) continue  // skip empty columns
 
