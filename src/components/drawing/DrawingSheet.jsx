@@ -3,7 +3,7 @@ import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Shape, Li
 import { supabase } from '../../supabase'
 import { useCategoryIcons } from './useCategoryIcons'
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable }) {
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, copiedPlacement: externalCopied, onCopyPlacement }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
   const isPanning    = useRef(false)
@@ -35,8 +35,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [editingCable,   setEditingCable]   = useState(null) // cable id being edited
   const [dragPoint,      setDragPoint]      = useState(null) // {cableId, pointIndex}
   const [hoveredWaypoint, setHoveredWaypoint] = useState(null) // {cableId, pointIndex}
-  const [copiedPlacement, setCopiedPlacement] = useState(null) // clipboard
+  const copiedPlacement    = externalCopied
+  const setCopiedPlacement = onCopyPlacement || (() => {})
   const [contextMenu,     setContextMenu]     = useState(null) // {x, y, placementId}
+
+  
   const snapRadius = 20 // pixels — snap to device marker within this distance
 
   const [showScaleModal,  setShowScaleModal]  = useState(false)
@@ -209,7 +212,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           .from('drawing_placements')
           .insert({
             org_id:              copiedPlacement.org_id,
-            drawing_sheet_id:    copiedPlacement.drawing_sheet_id,
+            drawing_sheet_id:    sheet.id,
             global_product_id:   copiedPlacement.global_product_id,
             product_id:          copiedPlacement.product_id,
             x:                   Math.min(copiedPlacement.x + offset, 0.99),
@@ -670,10 +673,24 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
         {!loading && !error && stageSize.w > 0 && (
           <Stage ref={stageRef} width={stageSize.w} height={stageSize.h}
-            onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
+            onWheel={handleWheel} onMouseDown={(e) => { if (e.evt.button === 2) return; handleMouseDown(e) }} onMouseMove={handleMouseMove}
+            onMouseDown={(e) => { if (e.evt.button === 2) return; handleMouseDown(e) }}
             onMouseUp={handleMouseUp} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
-            onClick={(e) => { handleStageClick(e); setContextMenu(null) }}
+            onClick={(e) => {
+              if (e.evt.button === 2) return // ignore right-click
+              setContextMenu(null)
+              handleStageClick(e)
+            }}
             onTap={(e) => { handleStageClick(e); setContextMenu(null) }}
+            onContextMenu={(e) => {
+              e.evt.preventDefault()
+              const pointer = stageRef.current.getPointerPosition()
+              const rect    = containerRef.current.getBoundingClientRect()
+              const targetName = e.target.name?.() || ''
+              if (['bg-image', 'bg-blank', ''].includes(targetName) || e.target === stageRef.current) {
+                setContextMenu({ x: pointer.x, y: pointer.y, clientX: rect.left + pointer.x, clientY: rect.top + pointer.y, placement: null })
+              }
+            }}
             onDblClick={async () => {
               if (!cableMode || activePoints.length < 2) return
               // Calculate footage
@@ -993,9 +1010,9 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                     cableMode={cableMode}
                     markerColor={placement.marker_color || '#C8622A'}
                     onContextMenu={(e) => {
-                      const stage   = stageRef.current
-                      const pointer = stage.getPointerPosition()
-                      setContextMenu({ x: pointer.x, y: pointer.y, placement })
+                      const pointer = stageRef.current.getPointerPosition()
+                      const rect    = containerRef.current.getBoundingClientRect()
+                      setContextMenu({ x: pointer.x, y: pointer.y, clientX: rect.left + pointer.x, clientY: rect.top + pointer.y, placement })
                       setSelectedId(placement.id)
                       onPlacementSelect?.(placement)
                     }}
@@ -1029,67 +1046,48 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           </div>
         )}
 
-        {/* Context menu */}
-        {contextMenu && (
-          <div
-            className="absolute bg-[#1a2d45] border border-[#2a3d55] rounded-lg shadow-xl z-50 py-1 min-w-36"
-            style={{ left: contextMenu.x, top: contextMenu.y }}
-          >
-            <button onClick={() => {
-                setCopiedPlacement(contextMenu.placement)
-                setContextMenu(null)
-              }}
-              className="w-full text-left px-3 py-2 text-xs text-white hover:bg-[#2a3d55] flex items-center gap-2">
-              <span>⌘C</span> Copy
-            </button>
-            <button onClick={async () => {
-                const offset = 0.03
-                const p = contextMenu.placement
-                const { data, error } = await supabase
-                  .from('drawing_placements')
-                  .insert({
-                    org_id: p.org_id, drawing_sheet_id: p.drawing_sheet_id,
-                    global_product_id: p.global_product_id, product_id: p.product_id,
-                    x: Math.min(p.x + offset, 0.99), y: Math.min(p.y + offset, 0.99),
-                    rotation: p.rotation, quantity: p.quantity, symbol_size: p.symbol_size,
-                    marker_color: p.marker_color,
-                    part_number_override: p.part_number_override,
-                    manufacturer_override: p.manufacturer_override,
-                    description_override: p.description_override,
-                    notes: p.notes, fov_angle: p.fov_angle, fov_range: p.fov_range,
-                    source: 'manual',
-                  })
-                  .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
-                  .single()
-                if (!error && data) {
-                  setPlacements(prev => [...prev, data])
-                  setSelectedId(data.id)
-                  onPlacementSelect?.(data)
-                  onPlacementChange?.()
-                }
-                setContextMenu(null)
-              }}
-              className="w-full text-left px-3 py-2 text-xs text-white hover:bg-[#2a3d55] flex items-center gap-2">
-              <span>⌘V</span> Paste Here
-            </button>
-            <button onClick={() => {
-                setContextMenu(null)
-                handleRotate(contextMenu.placement.id)
-              }}
-              className="w-full text-left px-3 py-2 text-xs text-white hover:bg-[#2a3d55] flex items-center gap-2">
-              <span>↻</span> Rotate 90°
-            </button>
-            <div className="border-t border-[#2a3d55] my-1"/>
-            <button onClick={() => {
-                handleDelete(contextMenu.placement.id)
-                setContextMenu(null)
-              }}
-              className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-[#2a3d55] flex items-center gap-2">
-              <span>⌫</span> Delete
-            </button>
-          </div>
-        )}
-      </div>
+    
+
+      {/* Context menu — fixed position outside Konva canvas */}
+      {contextMenu && <ContextMenu
+        contextMenu={contextMenu}
+        copiedPlacement={copiedPlacement}
+        onCopy={() => { setCopiedPlacement(contextMenu.placement); setContextMenu(null) }}
+        onPaste={async () => {
+          const p     = copiedPlacement
+          const dropX = (contextMenu.x - position.x) / scale / canvasW
+          const dropY = (contextMenu.y - position.y) / scale / canvasH
+          const x     = Math.min(Math.max(dropX, 0.01), 0.99)
+          const y     = Math.min(Math.max(dropY, 0.01), 0.99)
+          const { data, error } = await supabase
+            .from('drawing_placements')
+            .insert({
+              org_id: p.org_id, drawing_sheet_id: sheet.id,
+              global_product_id: p.global_product_id, product_id: p.product_id,
+              x, y, rotation: p.rotation, quantity: p.quantity,
+              symbol_size: p.symbol_size, marker_color: p.marker_color,
+              part_number_override: p.part_number_override,
+              manufacturer_override: p.manufacturer_override,
+              description_override: p.description_override,
+              device_address: p.device_address ? `${p.device_address}-copy` : null,
+              notes: p.notes, fov_angle: p.fov_angle, fov_range: p.fov_range,
+              source: 'manual',
+            })
+            .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
+            .single()
+          if (!error && data) {
+            setPlacements(prev => [...prev, data])
+            setSelectedId(data.id)
+            onPlacementSelect?.(data)
+            onPlacementChange?.()
+            setCopiedPlacement(p)
+          }
+          setContextMenu(null)
+        }}
+        onRotate={() => { setContextMenu(null); handleRotate(contextMenu.placement?.id) }}
+        onDelete={() => { handleDelete(contextMenu.placement?.id); setContextMenu(null) }}
+        onClose={() => setContextMenu(null)}
+      />}
 
       {sheet.status === 'approved' && (
         <div className="flex items-center gap-1.5 px-3 py-2 bg-green-900/20 border-t border-green-800/30 text-xs text-green-400 flex-shrink-0">
@@ -1212,6 +1210,44 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         </div>
       )}
     </div>
+  </div>
+  )
+}
+
+// ─── ContextMenu ─────────────────────────────────────────────────────────────
+function ContextMenu({ contextMenu, copiedPlacement, onCopy, onPaste, onRotate, onDelete, onClose }) {
+  const hasPl = !!contextMenu.placement
+
+  const Item = ({ label, color, onClick }) => (
+    <button
+      onClick={onClick}
+      className={`w-full text-left px-3 py-1.5 text-xs hover:bg-[#2a3d55] transition-colors ${color || 'text-[#c8d8e8]'}`}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[9998]" onClick={onClose} />
+      <div
+        className="fixed z-[9999] bg-[#1a2d45] border border-[#2a3d55] rounded-lg shadow-2xl py-1 min-w-[140px]"
+        style={{ left: contextMenu.clientX, top: contextMenu.clientY }}
+      >
+        {hasPl && <Item label="Copy"   onClick={onCopy} />}
+        {hasPl && <Item label="Rotate" onClick={onRotate} />}
+        {copiedPlacement && <Item label="Paste here" onClick={onPaste} />}
+        {hasPl && (
+          <>
+            <div className="border-t border-[#2a3d55] my-1" />
+            <Item label="Delete" color="text-red-400" onClick={onDelete} />
+          </>
+        )}
+        {!hasPl && !copiedPlacement && (
+          <span className="px-3 py-1.5 text-xs text-[#4a5a6a] block">No actions</span>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -1229,7 +1265,7 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
       draggable={!cableMode}
       onClick={cableMode ? onCableSnap : onSelect}
       onTap={cableMode ? onCableSnap : onSelect}
-      onContextMenu={(e) => { e.evt.preventDefault(); onContextMenu?.(e) }}
+      onContextMenu={(e) => { e.evt.preventDefault(); e.cancelBubble = true; onContextMenu?.(e) }}
       onMouseEnter={onHoverStart}
       onMouseLeave={onHoverEnd}
       onDragEnd={cableMode ? undefined : onDragEnd}>

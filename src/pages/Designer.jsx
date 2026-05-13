@@ -23,6 +23,7 @@ export default function Designer({ featureDrawingTool }) {
   const [selectedCable,     setSelectedCable]     = useState(null)
   const [editingCableId,    setEditingCableId]    = useState(null)
   const [updatedCable,      setUpdatedCable]      = useState(null)
+  const [copiedPlacement,   setCopiedPlacement]   = useState(null)
   const [bomRefreshKey,     setBomRefreshKey]     = useState(0)
   const [activeTab,       setActiveTab]       = useState('canvas') // 'canvas' | 'bom'
   const [sidebarOpen,     setSidebarOpen]     = useState(true)
@@ -463,6 +464,8 @@ export default function Designer({ featureDrawingTool }) {
                         editingCableId={editingCableId}
                         onEditingCableDone={() => setEditingCableId(null)}
                         updatedCable={updatedCable}
+                        copiedPlacement={copiedPlacement}
+                        onCopyPlacement={(p) => setCopiedPlacement(p)}
                       />
                     )}
                   </div>
@@ -1258,6 +1261,7 @@ function CablePanel({ cable, onClose, onUpdate, onDelete, onEditPoints }) {
   const [form, setForm] = useState({
     cable_type:   cable.cable_type   || 'Cat6',
     label:        cable.label        || '',
+    part_number:  cable.part_number  || '',
     waste_factor: cable.waste_factor || 10,
     color:        cable.color        || '#3b82f6',
   })
@@ -1274,10 +1278,11 @@ function CablePanel({ cable, onClose, onUpdate, onDelete, onEditPoints }) {
       const totalFootage = Math.round(cable.footage * (1 + updated.waste_factor / 100))
       const { error } = await supabase.from('cable_runs').update({
         cable_type:    updated.cable_type,
-        label:         updated.label || null,
+        label:         updated.label        || null,
+        part_number:   updated.part_number  || null,
         waste_factor:  parseFloat(updated.waste_factor) || 10,
         total_footage: totalFootage,
-        color:         updated.color || '#3b82f6',
+        color:         updated.color        || '#3b82f6',
       }).eq('id', cable.id)
       if (!error) {
         setSaved(true)
@@ -1315,6 +1320,24 @@ function CablePanel({ cable, onClose, onUpdate, onDelete, onEditPoints }) {
 
       {/* Fields */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
+
+        {/* Cable type + part number */}
+        <div className="space-y-2">
+          <div>
+            <label className={labelClass}>Part Number</label>
+            <input type="text" value={form.part_number}
+              onChange={e => update('part_number', e.target.value)}
+              placeholder="e.g. BELDEN-1583A, CAT6-23AWG"
+              className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Label</label>
+            <input type="text" value={form.label}
+              onChange={e => update('label', e.target.value)}
+              placeholder="e.g. To IDF-1, Home Run"
+              className={inputClass} />
+          </div>
+        </div>
 
         {/* Cable color */}
         <div>
