@@ -4,6 +4,7 @@ import { supabase } from '../supabase'
 import DrawingSheet from '../components/drawing/DrawingSheet'
 import SymbolPicker from '../components/drawing/SymbolPicker'
 import DrawingBOMPreview from '../components/drawing/DrawingBOMPreview'
+import DrawingExport from '../components/drawing/DrawingExport'
 
 export default function Designer({ featureDrawingTool }) {
   const { proposalId } = useParams()
@@ -335,12 +336,16 @@ export default function Designer({ featureDrawingTool }) {
 
           {/* Tab switcher */}
           <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5">
-            {['canvas', 'bom'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab)}
+            {[
+              { id: 'canvas', label: 'Drawing' },
+              { id: 'bom',    label: 'BOM Preview' },
+              { id: 'export', label: 'Export' },
+            ].map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  activeTab === tab ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'
+                  activeTab === tab.id ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'
                 }`}>
-                {tab === 'canvas' ? 'Drawing' : 'BOM Preview'}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -506,6 +511,18 @@ export default function Designer({ featureDrawingTool }) {
               orgId={orgId}
               sheets={sheets}
               refreshKey={bomRefreshKey}
+            />
+          </div>
+        )}
+
+        {/* Export tab */}
+        {activeTab === 'export' && (
+          <div className="flex-1 overflow-auto">
+            <DrawingExport
+              proposalId={proposalId}
+              orgId={orgId}
+              sheets={sheets}
+              proposal={proposal}
             />
           </div>
         )}

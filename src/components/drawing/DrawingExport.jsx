@@ -1,0 +1,828 @@
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../../supabase'
+import { getCategorySVG } from './useCategoryIcons'
+
+// ─── DrawingExport ────────────────────────────────────────────────────────────
+// Export tab — Client Overview, Shop Drawings, As-Builts, CSV BOM
+export default function DrawingExport({ proposalId, orgId, sheets, proposal }) {
+  const [activeExport,  setActiveExport]  = useState('client')
+  const [placements,    setPlacements]    = useState([])
+  const [cableRuns,     setCableRuns]     = useState([])
+  const [verticalRises, setVerticalRises] = useState([])
+  const [components,    setComponents]    = useState([])
+  const [orgProfile,    setOrgProfile]    = useState(null)
+  const [loading,       setLoading]       = useState(true)
+  const [generating,    setGenerating]    = useState(false)
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const sheetIds = sheets.map(s => s.id)
+      if (!sheetIds.length) { setLoading(false); return }
+
+      const [
+        { data: placementData },
+        { data: cableData },
+        { data: riseData },
+        { data: compData },
+        { data: profileData },
+      ] = await Promise.all([
+        supabase.from('drawing_placements')
+          .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
+          .in('drawing_sheet_id', sheetIds)
+          .order('drawing_sheet_id'),
+        supabase.from('cable_runs').select('*').in('drawing_sheet_id', sheetIds),
+        supabase.from('vertical_rises').select('*').eq('proposal_id', proposalId),
+        supabase.from('placement_components')
+          .select('*, drawing_placements!inner(drawing_sheet_id)')
+          .in('drawing_placements.drawing_sheet_id', sheetIds),
+        supabase.from('profiles')
+          .select('company_name, logo_url, primary_color, organizations(title_block_engineer, title_block_license, title_block_scale)')
+          .eq('org_id', orgId)
+          .limit(1)
+          .single(),
+      ])
+
+      setPlacements(placementData    || [])
+      setCableRuns(cableData         || [])
+      setVerticalRises(riseData      || [])
+      setComponents(compData         || [])
+      setOrgProfile(profileData)
+    } catch (err) {
+      console.error('Export data load failed:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [sheets, proposalId, orgId])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  // ── Get unique categories used across all sheets ────────────────────────────
+  const usedCategories = [...new Set(
+    placements.map(p => p.global_products?.category).filter(Boolean)
+  )].sort()
+
+  // ── Placements per sheet ────────────────────────────────────────────────────
+  const placementsBySheet = {}
+  placements.forEach(p => {
+    if (!placementsBySheet[p.drawing_sheet_id]) placementsBySheet[p.drawing_sheet_id] = []
+    placementsBySheet[p.drawing_sheet_id].push(p)
+  })
+
+  // ── Cable summary ──────────────────────────────────────────────────────────
+  const cableByType = {}
+  cableRuns.forEach(r => {
+    const t = r.cable_type || 'Unknown'
+    if (!cableByType[t]) cableByType[t] = { footage: 0, total_footage: 0, runs: 0 }
+    cableByType[t].footage       += r.footage       || 0
+    cableByType[t].total_footage += r.total_footage || 0
+    cableByType[t].runs          += 1
+  })
+  verticalRises.forEach(r => {
+    const t = r.cable_type || 'Unknown'
+    if (!cableByType[t]) cableByType[t] = { footage: 0, total_footage: 0, runs: 0 }
+    cableByType[t].total_footage += r.total_footage || 0
+  })
+
+  // ── Render sheet to image via Konva stage capture ──────────────────────────
+  const captureSheetImage = async (sheetId) => {
+    // Find the Konva stage for this sheet
+    const stageEl = document.querySelector(`[data-sheet-id="${sheetId}"] canvas`)
+    if (stageEl) return stageEl.toDataURL('image/png')
+
+    // Fallback — get signed URL and return as image data
+    const sheet = sheets.find(s => s.id === sheetId)
+    if (!sheet || sheet.storage_path === 'blank' || sheet.storage_path === 'pending') return null
+    const { data } = await supabase.storage.from('floor-plans').createSignedUrl(sheet.storage_path, 3600)
+    return data?.signedUrl || null
+  }
+
+  // ── CSV BOM Export ─────────────────────────────────────────────────────────
+  const handleCSVExport = () => {
+    const rows = []
+
+    // Header
+    rows.push(['Section', 'Device Address', 'Part Number', 'Name', 'Manufacturer', 'Category', 'Qty', 'Notes'])
+
+    // Devices per sheet
+    sheets.forEach(sheet => {
+      const sheetPlacements = placementsBySheet[sheet.id] || []
+      sheetPlacements.forEach(p => {
+        const gp = p.global_products
+        rows.push([
+          sheet.name,
+          p.device_address || '',
+          p.part_number_override || gp?.part_number || '',
+          p.description_override || gp?.name || '',
+          p.manufacturer_override || gp?.manufacturer || '',
+          gp?.category || '',
+          p.quantity || 1,
+          p.notes || '',
+        ])
+      })
+    })
+
+    // Components
+    if (components.length > 0) {
+      rows.push([])
+      rows.push(['COMPONENTS & HARDWARE', '', '', '', '', '', '', ''])
+      rows.push(['Type', 'Name', 'Part Number', 'Manufacturer', 'Qty', 'Notes', '', ''])
+      components.forEach(c => {
+        rows.push([c.component_type, c.name || '', c.part_number || '', c.manufacturer || '', c.quantity || 1, c.notes || '', '', ''])
+      })
+    }
+
+    // Cable summary
+    rows.push([])
+    rows.push(['CABLE SUMMARY', '', '', '', '', '', '', ''])
+    rows.push(['Cable Type', 'Runs', 'Measured (ft)', 'With Waste (ft)', '', '', '', ''])
+    Object.entries(cableByType).forEach(([type, data]) => {
+      rows.push([type, data.runs || '', Math.round(data.footage), Math.round(data.total_footage), '', '', '', ''])
+    })
+
+    // Vertical rises
+    if (verticalRises.length > 0) {
+      rows.push([])
+      rows.push(['VERTICAL RISES', '', '', '', '', '', '', ''])
+      rows.push(['From', 'To', 'Label', 'Cable Type', 'Height (ft)', 'Qty', 'Total (ft)', ''])
+      verticalRises.forEach(r => {
+        const fromSheet = sheets.find(s => s.id === r.from_sheet_id)
+        const toSheet   = sheets.find(s => s.id === r.to_sheet_id)
+        rows.push([
+          fromSheet?.name || '',
+          toSheet?.name || '',
+          r.label || '',
+          r.cable_type,
+          r.rise_height,
+          r.quantity,
+          Math.round(r.total_footage),
+          '',
+        ])
+      })
+    }
+
+    // Convert to CSV
+    const csv = rows.map(row =>
+      row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+    ).join('\n')
+
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `${proposal?.proposal_name || 'Drawing'}_BOM.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // ── Client Overview PDF ────────────────────────────────────────────────────
+  const handleClientOverview = async () => {
+    setGenerating(true)
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
+
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const margin = 10
+
+      // ── Legend page ──────────────────────────────────────────────────────
+      // Title
+      pdf.setFillColor(15, 28, 46)
+      pdf.rect(0, 0, pageW, pageH, 'F')
+
+      // Company name
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(22)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text(orgProfile?.company_name || 'ForgePt', margin, 20)
+
+      // Project name
+      pdf.setFontSize(14)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(200, 98, 42)
+      pdf.text(proposal?.proposal_name || 'Floor Plan Drawing', margin, 30)
+
+      // Client
+      if (proposal?.company) {
+        pdf.setTextColor(138, 154, 176)
+        pdf.setFontSize(10)
+        pdf.text(`Client: ${proposal.company}`, margin, 38)
+      }
+
+      // Date
+      pdf.setTextColor(138, 154, 176)
+      pdf.setFontSize(9)
+      pdf.text(`Date: ${new Date().toLocaleDateString()}`, margin, 44)
+      pdf.text(`Sheets: ${sheets.length}`, margin + 40, 44)
+      pdf.text(`Devices: ${placements.length}`, margin + 80, 44)
+
+      // Legend title
+      pdf.setTextColor(200, 98, 42)
+      pdf.setFontSize(11)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('SYMBOL LEGEND', margin, 58)
+
+      // Draw legend items
+      let lx = margin
+      let ly = 65
+      const colW   = 55
+      const rowH   = 14
+      const perRow = Math.floor((pageW - margin * 2) / colW)
+      let col = 0
+
+      usedCategories.forEach(category => {
+        // Orange circle
+        pdf.setFillColor(200, 98, 42)
+        pdf.circle(lx + 5, ly + 3, 4, 'F')
+
+        // Category name
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(8)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(category, lx + 12, ly + 5)
+
+        // Count
+        const count = placements.filter(p => p.global_products?.category === category).length
+        pdf.setTextColor(138, 154, 176)
+        pdf.text(`(${count})`, lx + 12, ly + 10)
+
+        col++
+        if (col >= perRow) {
+          col = 0
+          lx  = margin
+          ly += rowH
+        } else {
+          lx += colW
+        }
+      })
+
+      // Cable summary on legend page
+      if (Object.keys(cableByType).length > 0) {
+        const cableY = Math.max(ly + rowH + 10, pageH - 60)
+        pdf.setTextColor(200, 98, 42)
+        pdf.setFontSize(11)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('CABLE SUMMARY', margin, cableY)
+
+        let cy = cableY + 8
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(8)
+        Object.entries(cableByType).forEach(([type, data]) => {
+          pdf.setTextColor(255, 255, 255)
+          pdf.text(type, margin, cy)
+          pdf.setTextColor(138, 154, 176)
+          pdf.text(`${Math.round(data.total_footage)}ft (with waste)`, margin + 50, cy)
+          cy += 6
+        })
+      }
+
+      // ── One page per sheet ───────────────────────────────────────────────
+      for (let i = 0; i < sheets.length; i++) {
+        const sheet = sheets[i]
+        pdf.addPage()
+
+        // Dark background
+        pdf.setFillColor(15, 28, 46)
+        pdf.rect(0, 0, pageW, pageH, 'F')
+
+        // Header bar
+        pdf.setFillColor(26, 45, 69)
+        pdf.rect(0, 0, pageW, 12, 'F')
+
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(9)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(sheet.name, margin, 8)
+
+        pdf.setTextColor(138, 154, 176)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(`${orgProfile?.company_name || ''} · ${proposal?.proposal_name || ''}`, pageW - margin, 8, { align: 'right' })
+
+        // Floor plan image area
+        const imgY   = 14
+        const imgH   = pageH - imgY - 8
+        const imgW   = pageW - margin * 2
+
+        // Try to get the floor plan image
+        if (sheet.storage_path && !['blank', 'pending'].includes(sheet.storage_path)) {
+          try {
+            const { data: urlData } = await supabase.storage
+              .from('floor-plans')
+              .createSignedUrl(sheet.storage_path, 3600)
+
+            if (urlData?.signedUrl) {
+              // Fetch image as base64
+              const response = await fetch(urlData.signedUrl)
+              const blob     = await response.blob()
+              const reader   = new FileReader()
+              const imgData  = await new Promise(resolve => {
+                reader.onload = () => resolve(reader.result)
+                reader.readAsDataURL(blob)
+              })
+
+              const isPDF = sheet.storage_path.toLowerCase().endsWith('.pdf')
+              if (!isPDF) {
+                pdf.addImage(imgData, 'PNG', margin, imgY, imgW, imgH, undefined, 'FAST')
+              } else {
+                // For PDFs render a placeholder note
+                pdf.setTextColor(138, 154, 176)
+                pdf.setFontSize(9)
+                pdf.text('Floor plan image — view in ForgePt Designer', pageW / 2, pageH / 2, { align: 'center' })
+              }
+            }
+          } catch (err) {
+            console.error('Failed to load sheet image:', err)
+          }
+        }
+
+        // Device markers overlay
+        const sheetPlacements = placementsBySheet[sheet.id] || []
+        sheetPlacements.forEach(p => {
+          const px = margin + p.x * imgW
+          const py = imgY  + p.y * imgH
+
+          // Orange circle
+          const color = p.marker_color || '#C8622A'
+          const r = parseInt(color.slice(1, 3), 16)
+          const g = parseInt(color.slice(3, 5), 16)
+          const b = parseInt(color.slice(5, 7), 16)
+          pdf.setFillColor(r, g, b)
+          pdf.circle(px, py, 2.5, 'F')
+
+          // Device label
+          if (p.device_address) {
+            pdf.setTextColor(255, 255, 255)
+            pdf.setFontSize(5)
+            pdf.setFont('helvetica', 'bold')
+            pdf.text(p.device_address, px, py + 4.5, { align: 'center' })
+          }
+        })
+
+        // Page footer
+        pdf.setTextColor(138, 154, 176)
+        pdf.setFontSize(7)
+        pdf.text(`Sheet ${i + 1} of ${sheets.length}`, pageW - margin, pageH - 2, { align: 'right' })
+        pdf.text('Generated by ForgePt Designer', margin, pageH - 2)
+      }
+
+      pdf.save(`${proposal?.proposal_name || 'Drawing'}_Client_Overview.pdf`)
+    } catch (err) {
+      console.error('PDF generation failed:', err)
+      alert('PDF generation failed. Please try again.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // ── Shop Drawing PDF ───────────────────────────────────────────────────────
+  const handleShopDrawing = async () => {
+    setGenerating(true)
+    try {
+      const { default: jsPDF }      = await import('jspdf')
+      const { default: autoTable }  = await import('jspdf-autotable')
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
+
+      const pageW  = pdf.internal.pageSize.getWidth()
+      const pageH  = pdf.internal.pageSize.getHeight()
+      const margin = 10
+      const titleBlockH = 18
+
+      const drawTitleBlock = (sheetName, sheetNum) => {
+        // Title block border
+        pdf.setDrawColor(42, 61, 85)
+        pdf.setLineWidth(0.3)
+        pdf.rect(margin, pageH - titleBlockH - margin, pageW - margin * 2, titleBlockH)
+
+        // Company
+        pdf.setFontSize(8)
+        pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(200, 98, 42)
+        pdf.text(orgProfile?.company_name || 'ForgePt', margin + 2, pageH - titleBlockH - margin + 6)
+
+        // Project
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(7)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(proposal?.proposal_name || '', margin + 2, pageH - titleBlockH - margin + 11)
+        pdf.text(proposal?.company || '', margin + 2, pageH - titleBlockH - margin + 15)
+
+        // Engineer
+        const org = orgProfile?.organizations
+        if (org?.title_block_engineer) {
+          pdf.text(`Engineer: ${org.title_block_engineer}`, pageW / 2, pageH - titleBlockH - margin + 6, { align: 'center' })
+        }
+        if (org?.title_block_license) {
+          pdf.text(`License: ${org.title_block_license}`, pageW / 2, pageH - titleBlockH - margin + 11, { align: 'center' })
+        }
+        if (org?.title_block_scale) {
+          pdf.text(`Scale: ${org.title_block_scale}`, pageW / 2, pageH - titleBlockH - margin + 15, { align: 'center' })
+        }
+
+        // Sheet info
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(sheetName, pageW - margin - 2, pageH - titleBlockH - margin + 6, { align: 'right' })
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(`Sheet ${sheetNum} of ${sheets.length + 3}`, pageW - margin - 2, pageH - titleBlockH - margin + 11, { align: 'right' })
+        pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW - margin - 2, pageH - titleBlockH - margin + 15, { align: 'right' })
+      }
+
+      // ── Title sheet ──────────────────────────────────────────────────────
+      pdf.setFillColor(15, 28, 46)
+      pdf.rect(0, 0, pageW, pageH, 'F')
+
+      pdf.setTextColor(200, 98, 42)
+      pdf.setFontSize(28)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('SHOP DRAWINGS', pageW / 2, 40, { align: 'center' })
+
+      pdf.setTextColor(255, 255, 255)
+      pdf.setFontSize(16)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(proposal?.proposal_name || '', pageW / 2, 55, { align: 'center' })
+
+      pdf.setTextColor(138, 154, 176)
+      pdf.setFontSize(11)
+      pdf.text(proposal?.company || '', pageW / 2, 65, { align: 'center' })
+      pdf.text(`Prepared by: ${orgProfile?.company_name || ''}`, pageW / 2, 75, { align: 'center' })
+      pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW / 2, 83, { align: 'center' })
+      pdf.text(`Total Sheets: ${sheets.length}`, pageW / 2, 91, { align: 'center' })
+
+      drawTitleBlock('Title Sheet', 1)
+
+      // ── Legend sheet ─────────────────────────────────────────────────────
+      pdf.addPage()
+      pdf.setFillColor(15, 28, 46)
+      pdf.rect(0, 0, pageW, pageH, 'F')
+
+      pdf.setTextColor(200, 98, 42)
+      pdf.setFontSize(14)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('SYMBOL LEGEND', margin, margin + 8)
+
+      let lx = margin
+      let ly = margin + 18
+      const colW   = 60
+      const perRow = Math.floor((pageW - margin * 2) / colW)
+      let col = 0
+
+      usedCategories.forEach(category => {
+        pdf.setFillColor(200, 98, 42)
+        pdf.circle(lx + 5, ly + 3, 3.5, 'F')
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(8)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(category, lx + 11, ly + 4)
+        const count = placements.filter(p => p.global_products?.category === category).length
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor(138, 154, 176)
+        pdf.text(`Count: ${count}`, lx + 11, ly + 9)
+        col++
+        if (col >= perRow) { col = 0; lx = margin; ly += 16 }
+        else lx += colW
+      })
+
+      drawTitleBlock('Legend', 2)
+
+      // ── Device schedule sheet ────────────────────────────────────────────
+      pdf.addPage()
+      pdf.setFillColor(15, 28, 46)
+      pdf.rect(0, 0, pageW, pageH, 'F')
+
+      pdf.setTextColor(200, 98, 42)
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('DEVICE SCHEDULE', margin, margin + 8)
+
+      const scheduleRows = placements.map((p, idx) => {
+        const gp     = p.global_products
+        const sheet  = sheets.find(s => s.id === p.drawing_sheet_id)
+        return [
+          idx + 1,
+          p.device_address || '—',
+          p.part_number_override || gp?.part_number || '—',
+          p.description_override || gp?.name || '—',
+          p.manufacturer_override || gp?.manufacturer || '—',
+          gp?.category || '—',
+          p.quantity || 1,
+          sheet?.name || '—',
+          p.runs_to_label || '—',
+        ]
+      })
+
+      autoTable(pdf, {
+        startY:     margin + 14,
+        margin:     { left: margin, right: margin, bottom: titleBlockH + margin + 5 },
+        head:       [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Category', 'Qty', 'Sheet', 'Runs To']],
+        body:       scheduleRows,
+        theme:      'grid',
+        styles:     { fontSize: 7, cellPadding: 2, textColor: [255, 255, 255], fillColor: [15, 28, 46], lineColor: [42, 61, 85] },
+        headStyles: { fillColor: [26, 45, 69], textColor: [200, 98, 42], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [20, 35, 55] },
+      })
+
+      drawTitleBlock('Device Schedule', 3)
+
+      // ── Floor plan sheets ────────────────────────────────────────────────
+      for (let i = 0; i < sheets.length; i++) {
+        const sheet  = sheets[i]
+        pdf.addPage()
+        pdf.setFillColor(15, 28, 46)
+        pdf.rect(0, 0, pageW, pageH, 'F')
+
+        // Header
+        pdf.setFillColor(26, 45, 69)
+        pdf.rect(0, 0, pageW, 10, 'F')
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(8)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(sheet.name, margin, 7)
+
+        // Image area
+        const imgY = 12
+        const imgH = pageH - imgY - titleBlockH - margin - 5
+        const imgW = pageW - margin * 2
+
+        if (sheet.storage_path && !['blank', 'pending'].includes(sheet.storage_path)) {
+          try {
+            const { data: urlData } = await supabase.storage
+              .from('floor-plans')
+              .createSignedUrl(sheet.storage_path, 3600)
+            if (urlData?.signedUrl) {
+              const response = await fetch(urlData.signedUrl)
+              const blob     = await response.blob()
+              const reader   = new FileReader()
+              const imgData  = await new Promise(resolve => {
+                reader.onload  = () => resolve(reader.result)
+                reader.readAsDataURL(blob)
+              })
+              if (!sheet.storage_path.toLowerCase().endsWith('.pdf')) {
+                pdf.addImage(imgData, 'PNG', margin, imgY, imgW, imgH, undefined, 'FAST')
+              }
+            }
+          } catch (err) {
+            console.error('Image load failed:', err)
+          }
+        }
+
+        // Markers
+        const sheetPlacements = placementsBySheet[sheet.id] || []
+        sheetPlacements.forEach(p => {
+          const px  = margin + p.x * imgW
+          const py  = imgY   + p.y * imgH
+          const col = p.marker_color || '#C8622A'
+          pdf.setFillColor(
+            parseInt(col.slice(1,3),16),
+            parseInt(col.slice(3,5),16),
+            parseInt(col.slice(5,7),16)
+          )
+          pdf.circle(px, py, 2, 'F')
+          if (p.device_address) {
+            pdf.setTextColor(255,255,255)
+            pdf.setFontSize(4.5)
+            pdf.setFont('helvetica','bold')
+            pdf.text(p.device_address, px, py + 4, { align: 'center' })
+          }
+        })
+
+        drawTitleBlock(sheet.name, i + 4)
+      }
+
+      // ── Cable schedule ───────────────────────────────────────────────────
+      if (cableRuns.length > 0 || verticalRises.length > 0) {
+        pdf.addPage()
+        pdf.setFillColor(15, 28, 46)
+        pdf.rect(0, 0, pageW, pageH, 'F')
+
+        pdf.setTextColor(200, 98, 42)
+        pdf.setFontSize(12)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('CABLE SCHEDULE', margin, margin + 8)
+
+        const cableRows = Object.entries(cableByType).map(([type, data]) => [
+          type,
+          data.runs || '—',
+          `${Math.round(data.footage)}ft`,
+          `${Math.round(data.total_footage)}ft`,
+        ])
+
+        autoTable(pdf, {
+          startY:     margin + 14,
+          margin:     { left: margin, right: margin, bottom: titleBlockH + margin + 5 },
+          head:       [['Cable Type', 'Runs', 'Measured', 'With Waste']],
+          body:       cableRows,
+          theme:      'grid',
+          styles:     { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] },
+          headStyles: { fillColor: [26,45,69], textColor: [200,98,42], fontStyle: 'bold' },
+          alternateRowStyles: { fillColor: [20,35,55] },
+        })
+
+        if (verticalRises.length > 0) {
+          const riseY = pdf.lastAutoTable.finalY + 10
+          pdf.setTextColor(200,98,42)
+          pdf.setFontSize(10)
+          pdf.text('VERTICAL RISES', margin, riseY)
+
+          const riseRows = verticalRises.map(r => {
+            const from = sheets.find(s => s.id === r.from_sheet_id)
+            const to   = sheets.find(s => s.id === r.to_sheet_id)
+            return [from?.name || '—', to?.name || '—', r.label || '—', r.cable_type, `${r.rise_height}ft`, r.quantity, `${Math.round(r.total_footage)}ft`]
+          })
+
+          autoTable(pdf, {
+            startY:     riseY + 4,
+            margin:     { left: margin, right: margin, bottom: titleBlockH + margin + 5 },
+            head:       [['From', 'To', 'Label', 'Cable', 'Height', 'Qty', 'Total']],
+            body:       riseRows,
+            theme:      'grid',
+            styles:     { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] },
+            headStyles: { fillColor: [26,45,69], textColor: [200,98,42], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [20,35,55] },
+          })
+        }
+
+        drawTitleBlock('Cable Schedule', sheets.length + 4)
+      }
+
+      pdf.save(`${proposal?.proposal_name || 'Drawing'}_Shop_Drawings.pdf`)
+    } catch (err) {
+      console.error('Shop drawing failed:', err)
+      alert('PDF generation failed. Please try again.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // ── As-Built PDF ───────────────────────────────────────────────────────────
+  const handleAsBuilt = async () => {
+    setGenerating(true)
+    try {
+      const { default: jsPDF }     = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
+
+      const pageW  = pdf.internal.pageSize.getWidth()
+      const pageH  = pdf.internal.pageSize.getHeight()
+      const margin = 10
+
+      // Title
+      pdf.setFillColor(15,28,46)
+      pdf.rect(0,0,pageW,pageH,'F')
+      pdf.setTextColor(200,98,42)
+      pdf.setFontSize(28)
+      pdf.setFont('helvetica','bold')
+      pdf.text('AS-BUILT DRAWINGS', pageW/2, 40, { align: 'center' })
+      pdf.setTextColor(255,255,255)
+      pdf.setFontSize(14)
+      pdf.setFont('helvetica','normal')
+      pdf.text(proposal?.proposal_name || '', pageW/2, 54, { align: 'center' })
+      pdf.setTextColor(138,154,176)
+      pdf.setFontSize(10)
+      pdf.text(proposal?.company || '', pageW/2, 63, { align: 'center' })
+      pdf.text(`As-Built Date: ${new Date().toLocaleDateString()}`, pageW/2, 71, { align: 'center' })
+
+      // As-built device schedule
+      pdf.addPage()
+      pdf.setFillColor(15,28,46)
+      pdf.rect(0,0,pageW,pageH,'F')
+      pdf.setTextColor(200,98,42)
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica','bold')
+      pdf.text('AS-BUILT DEVICE SCHEDULE', margin, margin+8)
+
+      const asBuiltRows = placements.map((p, idx) => {
+        const gp    = p.global_products
+        const sheet = sheets.find(s => s.id === p.drawing_sheet_id)
+        return [
+          idx + 1,
+          p.device_address    || '—',
+          p.part_number_override || gp?.part_number || '—',
+          p.description_override || gp?.name        || '—',
+          p.manufacturer_override || gp?.manufacturer || '—',
+          sheet?.name         || '—',
+          p.serial_number     || '—',
+          p.ip_address        || '—',
+          p.mac_address       || '—',
+          p.switch_name       || '—',
+          p.switch_port       || '—',
+          p.patch_panel_label || '—',
+          p.runs_to_label     || '—',
+        ]
+      })
+
+      autoTable(pdf, {
+        startY:     margin + 14,
+        margin:     { left: margin, right: margin, bottom: margin + 5 },
+        head:       [['#', 'Address', 'Part #', 'Description', 'Manufacturer', 'Sheet', 'Serial', 'IP', 'MAC', 'Switch', 'Port', 'Patch Panel', 'Runs To']],
+        body:       asBuiltRows,
+        theme:      'grid',
+        styles:     { fontSize: 6, cellPadding: 1.5, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] },
+        headStyles: { fillColor: [26,45,69], textColor: [200,98,42], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [20,35,55] },
+      })
+
+      pdf.save(`${proposal?.proposal_name || 'Drawing'}_As_Built.pdf`)
+    } catch (err) {
+      console.error('As-built failed:', err)
+      alert('PDF generation failed.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  const exports = [
+    {
+      id:          'client',
+      label:       'Client Overview',
+      description: 'One page per floor plan with device markers. Clean presentation for client review.',
+      icon:        '📋',
+      action:      handleClientOverview,
+    },
+    {
+      id:          'shop',
+      label:       'Shop Drawings',
+      description: 'Full drawing package with title sheet, legend, device schedule, floor plans, and cable schedule.',
+      icon:        '📐',
+      action:      handleShopDrawing,
+    },
+    {
+      id:          'asbuilt',
+      label:       'As-Built Package',
+      description: 'Complete as-built documentation including IP addresses, MAC addresses, switch ports, and serial numbers.',
+      icon:        '🔧',
+      action:      handleAsBuilt,
+    },
+    {
+      id:          'csv',
+      label:       'CSV BOM Export',
+      description: 'Spreadsheet export of all devices, components, cable footage, and vertical rises.',
+      icon:        '📊',
+      action:      handleCSVExport,
+    },
+  ]
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-16">
+      <svg className="w-6 h-6 animate-spin text-[#C8622A]" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+      </svg>
+    </div>
+  )
+
+  return (
+    <div className="p-6 max-w-3xl mx-auto">
+      <h2 className="text-white font-bold text-lg mb-1">Export</h2>
+      <p className="text-[#8A9AB0] text-sm mb-6">
+        {placements.length} devices · {cableRuns.length} cable runs · {sheets.length} sheets
+      </p>
+
+      <div className="grid grid-cols-1 gap-4">
+        {exports.map(exp => (
+          <div key={exp.id}
+            className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-[#0F1C2E] flex items-center justify-center text-2xl flex-shrink-0">
+                {exp.icon}
+              </div>
+              <div>
+                <p className="text-white font-semibold text-sm">{exp.label}</p>
+                <p className="text-[#8A9AB0] text-xs mt-0.5">{exp.description}</p>
+              </div>
+            </div>
+            <button
+              onClick={exp.action}
+              disabled={generating || sheets.length === 0}
+              className={`flex-shrink-0 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                generating || sheets.length === 0
+                  ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
+                  : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
+              }`}>
+              {generating ? 'Generating...' : 'Export'}
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {sheets.length === 0 && (
+        <p className="text-[#8A9AB0] text-xs text-center mt-4">
+          Add floor plan sheets before exporting.
+        </p>
+      )}
+
+      {generating && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-8 text-center">
+            <svg className="w-8 h-8 animate-spin text-[#C8622A] mx-auto mb-3" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+            </svg>
+            <p className="text-white font-semibold">Generating PDF...</p>
+            <p className="text-[#8A9AB0] text-xs mt-1">This may take a moment for large drawings</p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
