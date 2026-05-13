@@ -299,8 +299,10 @@ export default function GlobalProductsImport({ onClose, onImported }) {
       const batch = toImport.slice(i, i + BATCH)
       const { data, error } = await supabase
         .from('global_products')
-        .upsert(batch, { onConflict: 'part_number', ignoreDuplicates: false })
+        .upsert(batch, { onConflict: 'part_number' })
         .select('id')
+
+      if (error) console.error('Batch error:', error)
 
       if (error) {
         console.error('Batch import error:', error)

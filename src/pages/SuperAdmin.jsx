@@ -943,7 +943,7 @@ export default function SuperAdmin() {
                 Import Products
               </button>
             </div>
-            <GlobalProductStats />
+            <GlobalProductStats onRefresh={() => {}} />
           </div>
         )}
 
@@ -1024,30 +1024,44 @@ export default function SuperAdmin() {
 
 // ─── GlobalProductStats ───────────────────────────────────────────────────────
 function GlobalProductStats() {
-  const [stats,   setStats]   = useState([])
-  const [loading, setLoading] = useState(true)
+  const [stats,      setStats]      = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [expanded,   setExpanded]   = useState(null) // manufacturer name
+  const [products,   setProducts]   = useState([])
+  const [loadingP,   setLoadingP]   = useState(false)
 
-  useEffect(() => {
-    const load = async () => {
+  const load = async () => {
       const { data } = await supabase
         .from('global_products')
         .select('manufacturer, industry, is_active')
-        .eq('is_active', true)
         .order('manufacturer')
 
       if (data) {
         const grouped = {}
         data.forEach(p => {
-          if (!grouped[p.manufacturer]) grouped[p.manufacturer] = { count: 0, industries: new Set() }
+          if (!grouped[p.manufacturer]) grouped[p.manufacturer] = { count: 0, industries: new Set(), active: 0 }
           grouped[p.manufacturer].count++
           grouped[p.manufacturer].industries.add(p.industry)
+          if (p.is_active) grouped[p.manufacturer].active++
         })
         setStats(Object.entries(grouped)
-          .map(([mfr, d]) => ({ manufacturer: mfr, count: d.count, industries: [...d.industries] }))
+          .map(([mfr, d]) => ({ manufacturer: mfr, count: d.count, active: d.active, industries: [...d.industries] }))
           .sort((a, b) => b.count - a.count))
       }
       setLoading(false)
     }
+
+    const loadProducts = async (manufacturer) => {
+      setLoadingP(true)
+      const { data } = await supabase
+        .from('global_products')
+        .select('*')
+        .eq('manufacturer', manufacturer)
+        .order('category').order('name')
+      setProducts(data || [])
+      setLoadingP(false)
+    }
+  useEffect(() => {
     load()
   }, [])
 
@@ -1075,24 +1089,117 @@ function GlobalProductStats() {
             <tr className="border-b border-[#2a3d55] bg-[#0F1C2E]">
               <th className="text-left px-4 py-2.5 font-medium text-[#8A9AB0]">Manufacturer</th>
               <th className="text-left px-4 py-2.5 font-medium text-[#8A9AB0]">Industries</th>
-              <th className="text-right px-4 py-2.5 font-medium text-[#8A9AB0]">Products</th>
+              <th className="text-center px-4 py-2.5 font-medium text-[#8A9AB0]">Active</th>
+              <th className="text-right px-4 py-2.5 font-medium text-[#8A9AB0]">Total</th>
+              <th className="px-4 py-2.5"/>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#2a3d55]/50">
             {stats.map(row => (
-              <tr key={row.manufacturer} className="hover:bg-[#0F1C2E]/50">
-                <td className="px-4 py-2.5 text-white font-medium">{row.manufacturer}</td>
-                <td className="px-4 py-2.5">
-                  <div className="flex flex-wrap gap-1">
-                    {row.industries.map(ind => (
-                      <span key={ind} className="text-xs px-1.5 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0] capitalize">
-                        {ind.replace('_', ' ')}
-                      </span>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-4 py-2.5 text-right text-[#C8622A] font-bold">{row.count}</td>
-              </tr>
+              <>
+                <tr key={row.manufacturer}
+                  className="hover:bg-[#0F1C2E]/50 cursor-pointer"
+                  onClick={() => {
+                    if (expanded === row.manufacturer) {
+                      setExpanded(null)
+                      setProducts([])
+                    } else {
+                      setExpanded(row.manufacturer)
+                      loadProducts(row.manufacturer)
+                    }
+                  }}>
+                  <td className="px-4 py-2.5 text-white font-medium flex items-center gap-2">
+                    <svg className={`w-3 h-3 text-[#8A9AB0] transition-transform ${expanded === row.manufacturer ? 'rotate-90' : ''}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/>
+                    </svg>
+                    {row.manufacturer}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <div className="flex flex-wrap gap-1">
+                      {row.industries.map(ind => (
+                        <span key={ind} className="text-xs px-1.5 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0] capitalize">
+                          {ind.replace('_', ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2.5 text-center text-green-400 font-medium">{row.active}</td>
+                  <td className="px-4 py-2.5 text-right text-[#C8622A] font-bold">{row.count}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (!window.confirm(`Delete ALL ${row.count} products from ${row.manufacturer}?`)) return
+                        await supabase.from('global_products').delete().eq('manufacturer', row.manufacturer)
+                        load()
+                        setExpanded(null)
+                        setProducts([])
+                      }}
+                      className="text-xs text-red-400 hover:text-red-300 transition-colors">
+                      Delete All
+                    </button>
+                  </td>
+                </tr>
+
+                {/* Expanded product list */}
+                {expanded === row.manufacturer && (
+                  <tr key={`${row.manufacturer}-expanded`}>
+                    <td colSpan={5} className="bg-[#0F1C2E] px-4 py-3">
+                      {loadingP ? (
+                        <div className="flex items-center gap-2 text-xs text-[#8A9AB0] py-2">
+                          <svg className="w-4 h-4 animate-spin text-[#C8622A]" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                          </svg>
+                          Loading products...
+                        </div>
+                      ) : (
+                        <div className="space-y-1 max-h-64 overflow-y-auto">
+                          <div className="grid grid-cols-5 gap-2 text-xs text-[#8A9AB0] font-medium pb-1 border-b border-[#2a3d55] sticky top-0 bg-[#0F1C2E]">
+                            <span>Part Number</span>
+                            <span>Name</span>
+                            <span>Category</span>
+                            <span>FOV°</span>
+                            <span className="text-right">Actions</span>
+                          </div>
+                          {products.map(p => (
+                            <div key={p.id} className="grid grid-cols-5 gap-2 text-xs py-1 hover:bg-[#1a2d45] rounded px-1">
+                              <span className="font-mono text-[#C8622A] truncate">{p.part_number}</span>
+                              <span className="text-white truncate">{p.name}</span>
+                              <span className="text-[#8A9AB0]">{p.category}</span>
+                              <span className="text-[#8A9AB0]">{p.specs?.fov_angle ? `${p.specs.fov_angle}°` : '—'}</span>
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={async () => {
+                                    await supabase.from('global_products')
+                                      .update({ is_active: !p.is_active })
+                                      .eq('id', p.id)
+                                    loadProducts(row.manufacturer)
+                                    load()
+                                  }}
+                                  className={`text-xs ${p.is_active ? 'text-green-400' : 'text-[#4a5a6a]'} hover:text-white transition-colors`}>
+                                  {p.is_active ? 'Active' : 'Inactive'}
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (!window.confirm(`Delete ${p.part_number}?`)) return
+                                    await supabase.from('global_products').delete().eq('id', p.id)
+                                    loadProducts(row.manufacturer)
+                                    load()
+                                  }}
+                                  className="text-red-400 hover:text-red-300 transition-colors">
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </>
             ))}
           </tbody>
         </table>
