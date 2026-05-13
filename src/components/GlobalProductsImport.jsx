@@ -46,29 +46,56 @@ async function parseSystemSurveyorFile(file) {
   // Row 1 (index 0): col D (index 3) = element type
   const elementType = String(rawRows[0]?.[3] || '').trim()
 
-  // Row 3 (index 2): col E+ (index 4+) = product model numbers
-  const modelRow   = rawRows[2] || []
-  const productCols = []
-  for (let i = 4; i < modelRow.length; i++) {
-    const v = modelRow[i]
-    if (v && String(v).trim()) {
-      productCols.push({ colIdx: i, model: String(v).trim() })
+  // Debug: find which row has the model numbers
+  // Model numbers start at col index 4 in row 3 (0-indexed)
+  // But xlsx library may shift cols — find by looking for 'Component Model #'
+  let modelRowIdx   = 2  // default row 3
+  let labelColIdx   = 3  // default col D
+  let productColStart = 4 // default col E
+
+  // Find the label column by searching for known labels
+  for (let ri = 0; ri < Math.min(rawRows.length, 15); ri++) {
+    const row = rawRows[ri] || []
+    for (let ci = 0; ci < row.length; ci++) {
+      const v = String(row[ci] || '').trim()
+      if (v === 'Component Manufacturer' || v === 'Component Model #' || v === 'Descriptive Label') {
+        labelColIdx     = ci
+        productColStart = ci + 1
+      }
+      if (v === 'Component Model #' || (ri === 2 && v === 'Attribute Tab')) {
+        modelRowIdx = ri === 2 ? ri : ri
+      }
     }
   }
 
-  // Build label -> values map (col D = label, col E+ = values)
-  const labelMap = {}
-  for (const row of rawRows.slice(3)) {
-    if (!row || row.length < 4) continue
-    const label = String(row[3] || '').trim()
-    if (!label || label === 'None') continue
-    labelMap[label] = row.slice(4)
+  // Get model numbers from row 3 (index 2), cols after label col
+  const modelRow    = rawRows[modelRowIdx] || []
+  const productCols = []
+  for (let i = productColStart; i < modelRow.length; i++) {
+    const v = modelRow[i]
+    const s = String(v || '').trim()
+    if (s && s !== 'None' && s !== 'Fixed Camera Element Attributes' && 
+        s !== 'Vape Sensor Element Attributes' && !s.includes('Element Attributes')) {
+      productCols.push({ colIdx: i, model: s })
+    }
   }
 
-  const getVal = (label, offset) => {
-    const vals = labelMap[label] || []
-    const v    = vals[offset]
-    return v && String(v).trim() && String(v) !== 'None' ? String(v).trim() : null
+  // Build label -> values map
+  const labelMap = {}
+  for (const row of rawRows.slice(3)) {
+    if (!row || row.length <= labelColIdx) continue
+    const label = String(row[labelColIdx] || '').trim()
+    if (!label || label === 'None') continue
+    labelMap[label] = row.slice(productColStart)
+  }
+
+  // Also index by col A label (some rows use col A)
+  for (const row of rawRows.slice(3)) {
+    if (!row) continue
+    const labelA = String(row[0] || '').trim()
+    if (labelA && labelA !== 'None' && !labelMap[labelA]) {
+      labelMap[labelA] = row.slice(productColStart)
+    }
   }
 
   // Extract products
@@ -117,6 +144,7 @@ async function parseSystemSurveyorFile(file) {
     })
   }
 
+  console.log('Parsed:', elementType, 'Products:', products.length, 'Sample:', products[0])
   return { elementType, products: dedupeByPartNumber(products) }
 }
 
