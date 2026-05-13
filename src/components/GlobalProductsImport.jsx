@@ -154,7 +154,8 @@ async function parseSystemSurveyorFile(file) {
     })
   }
 
-  console.log('Parsed:', elementType, 'Products:', products.length, 'Sample:', products[0])
+  console.log('Element type raw:', JSON.stringify(elementType))
+  console.log('Parsed products:', products.length, 'Sample:', products[0])
   return { elementType, products: dedupeByPartNumber(products) }
 }
 
