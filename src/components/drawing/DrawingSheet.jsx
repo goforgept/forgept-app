@@ -100,9 +100,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   }
 
   const renderPDF = async (url, pageNum = 1) => {
-    const pdfjsLib  = await import('pdfjs-dist')
-    const workerUrl = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
-    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl.default
+   const pdfjsLib = await import('pdfjs-dist')
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url
+    ).toString()
     const pdf      = await pdfjsLib.getDocument(url).promise
     const page     = await pdf.getPage(pageNum)
     const viewport = page.getViewport({ scale: 1 })
@@ -814,18 +816,21 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                       })}
 
                       {/* Label at midpoint */}
-                      {run.total_footage > 0 && (() => {
+                      {(run.total_footage > 0 || run.label || run.cable_type) && (() => {
                         const mid = Math.floor(run.points.length / 2)
                         const mx  = position.x + run.points[mid].x * canvasW * scale
                         const my  = position.y + run.points[mid].y * canvasH * scale
-                        const labelText = run.label ? `${run.label} · ${run.cable_type} · ${run.total_footage}ft` : `${run.cable_type} · ${run.total_footage}ft`
+                        const footageText = run.total_footage > 0 ? ` · ${run.total_footage}ft` : ' · (set scale for footage)'
+                        const labelText = run.label 
+                          ? `${run.label} · ${run.cable_type}${footageText}`
+                          : `${run.cable_type}${footageText}`
                         const w   = Math.max(labelText.length * 5, 70)
                         return (
                           <Group x={mx} y={my} listening={false}>
                             <Rect x={-w/2} y={-10} width={w} height={18}
                               fill="#0F1C2E" stroke={isEditing ? '#34d399' : (run.color || '#3b82f6')}
                               strokeWidth={1} cornerRadius={3}/>
-                            <Text text={run.label ? `${run.label} · ${run.cable_type} · ${run.total_footage}ft` : `${run.cable_type} · ${run.total_footage}ft`}
+                            <Text text={labelText}
                               fontSize={8} fill={isEditing ? '#34d399' : (run.color || '#60a5fa')}
                               width={w} x={-w/2} y={-5} align="center"/>
                           </Group>
@@ -1071,13 +1076,31 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
       {/* Icon */}
       {icon && <KonvaImage image={icon} x={-iconSize / 2} y={-iconSize / 2} width={iconSize} height={iconSize} listening={false}/>}
 
+      {/* Device address label below marker */}
+      {placement.device_address && !isSelected && (
+        <Text
+          text={placement.device_address}
+          fontSize={Math.max(9, totalSize * 0.28)}
+          fill="white"
+          fontStyle="bold"
+          x={-totalSize}
+          y={totalSize / 2 + 3}
+          width={totalSize * 2}
+          align="center"
+          listening={false}
+          shadowColor="black"
+          shadowBlur={3}
+          shadowOpacity={0.8}
+        />
+      )}
+
       {/* Hover tooltip */}
       {isHovered && !isSelected && (
         <Group x={totalSize / 2 + 6} y={-totalSize / 2} listening={false}>
           <Rect width={tooltipW} height={placement.runs_to_label ? 58 : 48} fill="#0F1C2E" stroke="#2a3d55" strokeWidth={1} cornerRadius={6}/>
-          <Text text={product.name} fontSize={10} fontStyle="bold" fill="white" x={6} y={6} width={tooltipW - 12}/>
-          <Text text={product.part_number} fontSize={9} fill="#8A9AB0" fontFamily="monospace" x={6} y={20}/>
-          <Text text={product.manufacturer} fontSize={9} fill="#8A9AB0" x={6} y={32}/>
+          <Text text={placement.device_address ? `${placement.device_address} · ${product.name}` : product.name} fontSize={10} fontStyle="bold" fill="white" x={6} y={6} width={tooltipW - 12}/>
+          <Text text={placement.part_number_override || product.part_number} fontSize={9} fill="#8A9AB0" fontFamily="monospace" x={6} y={20}/>
+          <Text text={placement.manufacturer_override || product.manufacturer} fontSize={9} fill="#8A9AB0" x={6} y={32}/>
           {placement.runs_to_label && (
             <Text text={`→ ${placement.runs_to_label}`} fontSize={8} fill="#60a5fa" x={6} y={42}/>
           )}

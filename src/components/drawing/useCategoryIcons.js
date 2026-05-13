@@ -265,6 +265,48 @@ const CATEGORY_SVGS = {
       <path d="M6 20 Q20 8 34 20 Q20 32 6 20" stroke-width="1" opacity="0.5"/>
     </svg>`,
 
+  'Wireless Lock': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="12" y="18" width="16" height="14" rx="2"/>
+      <path d="M16 18v-5a4 4 0 0 1 8 0v5"/>
+      <circle cx="20" cy="25" r="2" fill="${color}"/>
+      <path d="M8 12 Q8 6 20 6 Q32 6 32 12" stroke-width="1" opacity="0.5"/>
+      <path d="M11 15 Q11 10 20 10 Q29 10 29 15" stroke-width="1" opacity="0.7"/>
+    </svg>`,
+
+  'Intercom': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="10" y="6" width="20" height="28" rx="3"/>
+      <circle cx="20" cy="14" r="4"/>
+      <rect x="14" y="20" width="12" height="8" rx="1"/>
+      <circle cx="20" cy="24" r="1.5" fill="${color}"/>
+    </svg>`,
+
+  'Sensor': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <circle cx="20" cy="20" r="5"/>
+      <path d="M10 20 Q10 10 20 10 Q30 10 30 20" fill="none"/>
+      <path d="M6 24 Q4 12 20 6 Q36 12 34 24" fill="none"/>
+      <circle cx="20" cy="20" r="2" fill="${color}"/>
+    </svg>`,
+
+  'LPR Camera': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="14" width="24" height="12" rx="2"/>
+      <path d="M28 17 L36 14 L36 26 L28 23 Z" fill="none"/>
+      <rect x="8" y="17" width="10" height="6" rx="1"/>
+      <path d="M10 34 L30 34" stroke-width="1" stroke-dasharray="2 2"/>
+    </svg>`,
+
+  'Guard Tour': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="14" y="4" width="12" height="22" rx="3"/>
+      <circle cx="20" cy="10" r="3"/>
+      <path d="M17 16 L23 16 M17 20 L23 20"/>
+      <path d="M10 30 Q10 36 20 36 Q30 36 30 30"/>
+      <circle cx="20" cy="30" r="3" fill="${color}"/>
+    </svg>`,
+
   'default': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
       <rect x="10" y="10" width="20" height="20" rx="4"/>

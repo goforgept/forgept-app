@@ -58,6 +58,14 @@ export default function Designer({ featureDrawingTool }) {
         }
       }
 
+      // Clean up orphaned pending sheets older than 5 minutes
+      await supabase
+        .from('drawing_sheets')
+        .delete()
+        .eq('proposal_id', proposalId)
+        .eq('storage_path', 'pending')
+        .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString())
+
       const { data: sheetData } = await supabase
         .from('drawing_sheets').select('*')
         .eq('proposal_id', proposalId)
@@ -78,6 +86,7 @@ export default function Designer({ featureDrawingTool }) {
     if (!file) return
     const allowed = ['application/pdf', 'image/png', 'image/jpeg']
     if (!allowed.includes(file.type)) { setError('Please upload a PDF, PNG, or JPG.'); return }
+    if (!orgId) { setError('Please wait for the page to finish loading.'); return }
     setUploading(true)
     setError(null)
 
@@ -589,6 +598,11 @@ const DEFAULT_COMPONENTS = {
   'Access Control Door': ['Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply', 'Controller', 'Composite Cable', '22/4 Cable', 'Push to Exit'],
   'Controller':          ['Power Supply', 'Cabinet', 'Battery Backup'],
   'Motion Sensor':       ['Back Box', 'Cable'],
+  'Intercom':            ['Power Supply', 'Back Box', 'Cable', 'Strike', 'Door Release'],
+  'Sensor':              ['Back Box', 'Cable', 'Power Supply'],
+  'Wireless Lock':       ['Battery Pack', 'Wireless Gateway', 'Credential', 'Door Coordinator'],
+  'LPR Camera':          ['Mount', 'IR Illuminator', 'Cable', 'Junction Box'],
+  'Guard Tour':          ['Charging Cradle', 'Software License', 'Cable'],
   'Multi-Lens Camera':   ['Mount', 'Housing', 'Junction Box', 'Cable'],
   'Fisheye Camera':      ['Mount', 'Housing', 'Junction Box', 'Cable'],
 
@@ -811,6 +825,7 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
   if (!product) return null
 
   const getInitialForm = (p) => ({
+    device_address:         p.device_address         || '',
     part_number_override:   p.part_number_override   || '',
     manufacturer_override:  p.manufacturer_override  || '',
     model_number_override:  p.model_number_override  || '',
@@ -854,9 +869,9 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
       const { error } = await supabase.from('drawing_placements').update({
+        device_address:        updated.device_address        || null,
         part_number_override:  updated.part_number_override  || null,
         manufacturer_override: updated.manufacturer_override || null,
-        model_number_override: updated.model_number_override || null,
         description_override:  updated.description_override  || null,
         notes:                 updated.notes                 || null,
         quantity:              parseInt(updated.quantity)    || 1,
@@ -922,31 +937,31 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
           <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Device Data</p>
           <div className="space-y-2">
             <div>
-              <label className={labelClass}>Part Number <span className="text-[#4a5a6a]">(override)</span></label>
+              <label className={labelClass}>Device Address / Label</label>
+              <input type="text" value={form.device_address || ''}
+                onChange={e => update('device_address', e.target.value)}
+                placeholder="e.g. CAM-01, DR-01, SW-01"
+                className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Part Number</label>
               <input type="text" value={form.part_number_override}
                 onChange={e => update('part_number_override', e.target.value)}
                 placeholder={product.part_number}
                 className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Manufacturer <span className="text-[#4a5a6a]">(override)</span></label>
+              <label className={labelClass}>Manufacturer</label>
               <input type="text" value={form.manufacturer_override}
                 onChange={e => update('manufacturer_override', e.target.value)}
                 placeholder={product.manufacturer}
                 className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Model Number</label>
-              <input type="text" value={form.model_number_override}
-                onChange={e => update('model_number_override', e.target.value)}
-                placeholder="Model number"
-                className={inputClass} />
-            </div>
-            <div>
               <label className={labelClass}>Description</label>
               <input type="text" value={form.description_override}
                 onChange={e => update('description_override', e.target.value)}
-                placeholder="e.g. 4MP IR IK10"
+                placeholder="e.g. 4MP IR IK10 Dome"
                 className={inputClass} />
             </div>
             <div>
