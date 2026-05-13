@@ -118,9 +118,12 @@ async function parseSystemSurveyorFile(file) {
     const intExt  = getVal('Interior or Exterior?', offset)
     const hasIR   = getVal('      Embedded Infra-red (IR)', offset) === 'YES'
 
-    // Determine category
+    // Determine category — only override with camera style if it's a camera element type
+    const isCameraElement = elementType?.toLowerCase().includes('camera')
     let category = ELEMENT_TYPE_MAP[elementType]?.defaultCategory || 'Dome Camera'
-    if (style && STYLE_CATEGORY_MAP[style]) category = STYLE_CATEGORY_MAP[style]
+    if (isCameraElement && style && STYLE_CATEGORY_MAP[style]) {
+      category = STYLE_CATEGORY_MAP[style]
+    }
 
     // Determine industry
     const industry = ELEMENT_TYPE_MAP[elementType]?.industry || 'security'
