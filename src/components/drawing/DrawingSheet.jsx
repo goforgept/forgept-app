@@ -298,11 +298,29 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
           .single()
         if (!error && data) {
+          // Copy components from source placement
+          const { data: sourceComps } = await supabase
+            .from('placement_components')
+            .select('*')
+            .eq('placement_id', copiedPlacement.id)
+          if (sourceComps?.length > 0) {
+            await supabase.from('placement_components').insert(
+              sourceComps.map(c => ({
+                org_id:         c.org_id,
+                placement_id:   data.id,
+                component_type: c.component_type,
+                name:           c.name,
+                part_number:    c.part_number,
+                manufacturer:   c.manufacturer,
+                quantity:       c.quantity,
+                notes:          c.notes,
+              }))
+            )
+          }
           setPlacements(prev => [...prev, data])
           setSelectedId(data.id)
           onPlacementSelect?.(data)
           onPlacementChange?.()
-          // Update clipboard to paste next one offset further
           setCopiedPlacement({ ...copiedPlacement, x: Math.min(copiedPlacement.x + offset, 0.99), y: Math.min(copiedPlacement.y + offset, 0.99) })
         }
       }
@@ -1162,6 +1180,25 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
             .single()
           if (!error && data) {
+            // Copy components from source placement
+            const { data: sourceComps } = await supabase
+              .from('placement_components')
+              .select('*')
+              .eq('placement_id', p.id)
+            if (sourceComps?.length > 0) {
+              await supabase.from('placement_components').insert(
+                sourceComps.map(c => ({
+                  org_id:         c.org_id,
+                  placement_id:   data.id,
+                  component_type: c.component_type,
+                  name:           c.name,
+                  part_number:    c.part_number,
+                  manufacturer:   c.manufacturer,
+                  quantity:       c.quantity,
+                  notes:          c.notes,
+                }))
+              )
+            }
             setPlacements(prev => [...prev, data])
             setSelectedId(data.id)
             onPlacementSelect?.(data)
