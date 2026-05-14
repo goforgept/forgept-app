@@ -1094,15 +1094,23 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
     setBulkDone(false)
     // Count similar devices
     const countSimilar = async () => {
-      const { data, count } = await supabase
-        .from('drawing_placements')
-        .select('id, device_address, drawing_sheet_id, part_number_override, description_override', { count: 'exact' })
-        .in('drawing_sheet_id', allSheetIds || [placement.drawing_sheet_id])
-        .eq('global_product_id', placement.global_product_id)
-        .neq('id', placement.id)
+      const [{ data, count }, { data: compData }] = await Promise.all([
+        supabase
+          .from('drawing_placements')
+          .select('id, device_address, drawing_sheet_id, part_number_override, description_override', { count: 'exact' })
+          .in('drawing_sheet_id', allSheetIds || [placement.drawing_sheet_id])
+          .eq('global_product_id', placement.global_product_id)
+          .neq('id', placement.id),
+        supabase
+          .from('placement_components')
+          .select('*')
+          .eq('placement_id', placement.id)
+          .order('created_at'),
+      ])
       setBulkCount(count || 0)
       setSimilarDevices(data || [])
       setBulkSelected(new Set((data || []).map(d => d.id)))
+      setSourceComponents(compData || [])
     }
     countSimilar()
   }, [placement.id])
@@ -1114,8 +1122,10 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
   const [bulkScope,      setBulkScope]      = useState('all') // 'all' | 'sheet' | 'generic'
   const [bulkApplying,   setBulkApplying]   = useState(false)
   const [bulkDone,       setBulkDone]       = useState(false)
-  const [similarDevices, setSimilarDevices] = useState([])
-  const [bulkSelected,   setBulkSelected]   = useState(new Set())
+  const [similarDevices,    setSimilarDevices]    = useState([])
+  const [bulkSelected,      setBulkSelected]      = useState(new Set())
+  const [includeComponents, setIncludeComponents] = useState(true)
+  const [sourceComponents,  setSourceComponents]  = useState([])
   const saveTimer = useRef(null)
 
   const update = (field, value) => {
@@ -1557,6 +1567,25 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
                 </div>
               </div>
 
+              {/* Include components toggle */}
+              {sourceComponents.length > 0 && (
+                <div className="bg-[#0F1C2E] rounded-xl border border-[#2a3d55] p-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox"
+                      checked={includeComponents}
+                      onChange={e => setIncludeComponents(e.target.checked)}
+                      className="accent-[#C8622A]" />
+                    <div className="flex-1">
+                      <p className="text-white text-xs font-medium">Include components</p>
+                      <p className="text-[#8A9AB0] text-xs mt-0.5">
+                        Copy {sourceComponents.length} component{sourceComponents.length !== 1 ? 's' : ''} to selected devices
+                        ({sourceComponents.map(c => c.component_type).join(', ')})
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              )}
+
               {/* Device checklist */}
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -1619,6 +1648,9 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
                       }
                     })
                     if (bulkSelected.size === 0) return
+                    const selectedIds = [...bulkSelected]
+
+                    // Update device data
                     const { error } = await supabase
                       .from('drawing_placements')
                       .update({
@@ -1626,7 +1658,32 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
                         manufacturer_override: form.manufacturer_override || null,
                         description_override:  form.description_override  || null,
                       })
-                      .in('id', [...bulkSelected])
+                      .in('id', selectedIds)
+
+                    // Copy components if checked
+                    if (includeComponents && sourceComponents.length > 0 && !error) {
+                      for (const placementId of selectedIds) {
+                        // Delete existing components
+                        await supabase
+                          .from('placement_components')
+                          .delete()
+                          .eq('placement_id', placementId)
+
+                        // Insert source components
+                        await supabase
+                          .from('placement_components')
+                          .insert(sourceComponents.map(c => ({
+                            org_id:         c.org_id,
+                            placement_id:   placementId,
+                            component_type: c.component_type,
+                            name:           c.name,
+                            part_number:    c.part_number,
+                            manufacturer:   c.manufacturer,
+                            quantity:       c.quantity,
+                            notes:          c.notes,
+                          })))
+                      }
+                    }
                     if (!error) {
                       setBulkDone(true)
                       setShowBulkModal(false)
