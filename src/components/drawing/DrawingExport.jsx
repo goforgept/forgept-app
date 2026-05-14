@@ -4,7 +4,7 @@ import { getCategorySVG } from './useCategoryIcons'
 
 // ─── DrawingExport ────────────────────────────────────────────────────────────
 // Export tab — Client Overview, Shop Drawings, As-Builts, CSV BOM
-export default function DrawingExport({ proposalId, orgId, sheets, proposal }) {
+export default function DrawingExport({ proposalId, orgId, sheets, proposal, stageRefs }) {
   const [activeExport,  setActiveExport]  = useState('client')
   const [placements,    setPlacements]    = useState([])
   const [cableRuns,     setCableRuns]     = useState([])
@@ -85,16 +85,108 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal }) {
   })
 
   // ── Render sheet to image via Konva stage capture ──────────────────────────
-  const captureSheetImage = async (sheetId) => {
-    // Find the Konva stage for this sheet
-    const stageEl = document.querySelector(`[data-sheet-id="${sheetId}"] canvas`)
-    if (stageEl) return stageEl.toDataURL('image/png')
-
-    // Fallback — get signed URL and return as image data
+  const getFloorPlanImage = async (sheetId) => {
     const sheet = sheets.find(s => s.id === sheetId)
-    if (!sheet || sheet.storage_path === 'blank' || sheet.storage_path === 'pending') return null
-    const { data } = await supabase.storage.from('floor-plans').createSignedUrl(sheet.storage_path, 3600)
-    return data?.signedUrl || null
+    if (!sheet || ['blank', 'pending'].includes(sheet.storage_path)) return null
+    try {
+      const { data } = await supabase.storage.from('floor-plans').createSignedUrl(sheet.storage_path, 3600)
+      if (!data?.signedUrl) return null
+      const response = await fetch(data.signedUrl)
+      const blob     = await response.blob()
+      const reader   = new FileReader()
+      return await new Promise(resolve => {
+        reader.onload = () => resolve(reader.result)
+        reader.readAsDataURL(blob)
+      })
+    } catch { return null }
+  }
+
+  const drawSheetOnPDF = (pdf, sheet, imgData, imgX, imgY, imgW, imgH) => {
+    // Floor plan image
+    if (imgData) {
+      pdf.addImage(imgData, 'PNG', imgX, imgY, imgW, imgH, undefined, 'FAST')
+    }
+
+    // Cable runs
+    const sheetCables = cableRuns.filter(r => r.drawing_sheet_id === sheet.id)
+    sheetCables.forEach(run => {
+      if (!run.points || run.points.length < 2) return
+      const col = run.color || '#3b82f6'
+      pdf.setDrawColor(parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16))
+      pdf.setLineWidth(0.3)
+      for (let i = 1; i < run.points.length; i++) {
+        const x1 = imgX + run.points[i-1].x * imgW
+        const y1 = imgY + run.points[i-1].y * imgH
+        const x2 = imgX + run.points[i].x * imgW
+        const y2 = imgY + run.points[i].y * imgH
+        pdf.line(x1, y1, x2, y2)
+      }
+      // Cable label at midpoint
+      if (run.label || run.cable_type) {
+        const mid = Math.floor(run.points.length / 2)
+        const mx  = imgX + run.points[mid].x * imgW
+        const my  = imgY + run.points[mid].y * imgH
+        pdf.setTextColor(parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16))
+        pdf.setFontSize(4)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(run.label || run.cable_type, mx, my - 1, { align: 'center' })
+      }
+    })
+
+    // Device markers + FOV
+    const sheetPlacements = placementsBySheet[sheet.id] || []
+    sheetPlacements.forEach(p => {
+      const px  = imgX + p.x * imgW
+      const py  = imgY + p.y * imgH
+      const col = p.marker_color || '#C8622A'
+      const r   = parseInt(col.slice(1,3),16)
+      const g   = parseInt(col.slice(3,5),16)
+      const b   = parseInt(col.slice(5,7),16)
+
+      // FOV cone
+      const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera','Sensor','Intercom','LPR Camera']
+      const category = p.global_products?.category || ''
+      if (fovCategories.includes(category) && p.fov_angle && sheet.scale_ratio) {
+        const fovRange   = (p.fov_range || 30) * sheet.scale_ratio * 96 / (imgW / imgW)
+        const rangeInMM  = (p.fov_range || 30) / (sheet.scale_ratio * 96) * imgW
+        const halfAngle  = (p.fov_angle || 90) / 2 * Math.PI / 180
+        const rotation   = ((p.rotation || 0) - 90) * Math.PI / 180
+
+        if (category === 'PTZ Camera') {
+          // Circle for PTZ
+          pdf.setFillColor(r, g, b)
+          pdf.setGState(new pdf.GState({ opacity: 0.15 }))
+          pdf.circle(px, py, Math.min(rangeInMM, 20), 'F')
+          pdf.setGState(new pdf.GState({ opacity: 1 }))
+        } else {
+          // FOV wedge — approximate with triangle
+          const x1 = px + Math.cos(rotation - halfAngle) * Math.min(rangeInMM, 30)
+          const y1 = py + Math.sin(rotation - halfAngle) * Math.min(rangeInMM, 30)
+          const x2 = px + Math.cos(rotation + halfAngle) * Math.min(rangeInMM, 30)
+          const y2 = py + Math.sin(rotation + halfAngle) * Math.min(rangeInMM, 30)
+          pdf.setFillColor(r, g, b)
+          pdf.setDrawColor(r, g, b)
+          pdf.setLineWidth(0.1)
+          try {
+            pdf.triangle(px, py, x1, y1, x2, y2, 'FD')
+          } catch {
+            pdf.lines([[x1-px, y1-py], [x2-x1, y2-y1], [px-x2, py-y2]], px, py, [1,1], 'F')
+          }
+        }
+      }
+
+      // Marker circle
+      pdf.setFillColor(r, g, b)
+      pdf.circle(px, py, 2, 'F')
+
+      // Device label
+      if (p.device_address) {
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(4.5)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(p.device_address, px, py + 4, { align: 'center' })
+      }
+    })
   }
 
   // ── CSV BOM Export ─────────────────────────────────────────────────────────
@@ -304,60 +396,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal }) {
         const imgH   = pageH - imgY - 8
         const imgW   = pageW - margin * 2
 
-        // Try to get the floor plan image
-        if (sheet.storage_path && !['blank', 'pending'].includes(sheet.storage_path)) {
-          try {
-            const { data: urlData } = await supabase.storage
-              .from('floor-plans')
-              .createSignedUrl(sheet.storage_path, 3600)
-
-            if (urlData?.signedUrl) {
-              // Fetch image as base64
-              const response = await fetch(urlData.signedUrl)
-              const blob     = await response.blob()
-              const reader   = new FileReader()
-              const imgData  = await new Promise(resolve => {
-                reader.onload = () => resolve(reader.result)
-                reader.readAsDataURL(blob)
-              })
-
-              const isPDF = sheet.storage_path.toLowerCase().endsWith('.pdf')
-              if (!isPDF) {
-                pdf.addImage(imgData, 'PNG', margin, imgY, imgW, imgH, undefined, 'FAST')
-              } else {
-                // For PDFs render a placeholder note
-                pdf.setTextColor(138, 154, 176)
-                pdf.setFontSize(9)
-                pdf.text('Floor plan image — view in ForgePt Designer', pageW / 2, pageH / 2, { align: 'center' })
-              }
-            }
-          } catch (err) {
-            console.error('Failed to load sheet image:', err)
-          }
-        }
-
-        // Device markers overlay
-        const sheetPlacements = placementsBySheet[sheet.id] || []
-        sheetPlacements.forEach(p => {
-          const px = margin + p.x * imgW
-          const py = imgY  + p.y * imgH
-
-          // Orange circle
-          const color = p.marker_color || '#C8622A'
-          const r = parseInt(color.slice(1, 3), 16)
-          const g = parseInt(color.slice(3, 5), 16)
-          const b = parseInt(color.slice(5, 7), 16)
-          pdf.setFillColor(r, g, b)
-          pdf.circle(px, py, 2.5, 'F')
-
-          // Device label
-          if (p.device_address) {
-            pdf.setTextColor(255, 255, 255)
-            pdf.setFontSize(5)
-            pdf.setFont('helvetica', 'bold')
-            pdf.text(p.device_address, px, py + 4.5, { align: 'center' })
-          }
-        })
+        const imgData = await getFloorPlanImage(sheet.id)
+        drawSheetOnPDF(pdf, sheet, imgData, margin, imgY, imgW, imgH)
 
         // Page footer
         pdf.setTextColor(138, 154, 176)
@@ -543,47 +583,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal }) {
         const imgH = pageH - imgY - titleBlockH - margin - 5
         const imgW = pageW - margin * 2
 
-        if (sheet.storage_path && !['blank', 'pending'].includes(sheet.storage_path)) {
-          try {
-            const { data: urlData } = await supabase.storage
-              .from('floor-plans')
-              .createSignedUrl(sheet.storage_path, 3600)
-            if (urlData?.signedUrl) {
-              const response = await fetch(urlData.signedUrl)
-              const blob     = await response.blob()
-              const reader   = new FileReader()
-              const imgData  = await new Promise(resolve => {
-                reader.onload  = () => resolve(reader.result)
-                reader.readAsDataURL(blob)
-              })
-              if (!sheet.storage_path.toLowerCase().endsWith('.pdf')) {
-                pdf.addImage(imgData, 'PNG', margin, imgY, imgW, imgH, undefined, 'FAST')
-              }
-            }
-          } catch (err) {
-            console.error('Image load failed:', err)
-          }
-        }
-
-        // Markers
-        const sheetPlacements = placementsBySheet[sheet.id] || []
-        sheetPlacements.forEach(p => {
-          const px  = margin + p.x * imgW
-          const py  = imgY   + p.y * imgH
-          const col = p.marker_color || '#C8622A'
-          pdf.setFillColor(
-            parseInt(col.slice(1,3),16),
-            parseInt(col.slice(3,5),16),
-            parseInt(col.slice(5,7),16)
-          )
-          pdf.circle(px, py, 2, 'F')
-          if (p.device_address) {
-            pdf.setTextColor(255,255,255)
-            pdf.setFontSize(4.5)
-            pdf.setFont('helvetica','bold')
-            pdf.text(p.device_address, px, py + 4, { align: 'center' })
-          }
-        })
+        const imgData = await getFloorPlanImage(sheet.id)
+        drawSheetOnPDF(pdf, sheet, imgData, margin, imgY, imgW, imgH)
 
         drawTitleBlock(sheet.name, i + 4)
       }

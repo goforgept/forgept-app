@@ -3,9 +3,13 @@ import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Shape, Li
 import { supabase } from '../../supabase'
 import { useCategoryIcons } from './useCategoryIcons'
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, copiedPlacement: externalCopied, onCopyPlacement }) {
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, copiedPlacement: externalCopied, onCopyPlacement, onStageReady }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
+
+  useEffect(() => {
+    if (stageRef.current) onStageReady?.(stageRef.current)
+  }, [stageRef.current])
   const isPanning    = useRef(false)
   const lastPointer  = useRef(null)
   const lastDist     = useRef(0)

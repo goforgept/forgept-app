@@ -16,7 +16,9 @@ export default function Designer({ featureDrawingTool }) {
   const [orgId,           setOrgId]           = useState(null)
   const [loading,         setLoading]         = useState(true)
   const [uploading,       setUploading]       = useState(false)
-  const [approving,       setApproving]       = useState(false)
+  const [approving,        setApproving]        = useState(false)
+  const [showApproveModal, setShowApproveModal] = useState(false)
+  const [approveData,      setApproveData]      = useState(null)
   const [error,           setError]           = useState(null)
   const [selectedSymbol,  setSelectedSymbol]  = useState(null)
   const [selectedPlacement, setSelectedPlacement] = useState(null)
@@ -24,6 +26,7 @@ export default function Designer({ featureDrawingTool }) {
   const [editingCableId,    setEditingCableId]    = useState(null)
   const [updatedCable,      setUpdatedCable]      = useState(null)
   const [copiedPlacement,   setCopiedPlacement]   = useState(null)
+  const stageRefs = useRef({}) // sheetId -> Konva stage
   const [bomRefreshKey,     setBomRefreshKey]     = useState(0)
   const [activeTab,       setActiveTab]       = useState('canvas') // 'canvas' | 'bom'
   const [sidebarOpen,     setSidebarOpen]     = useState(true)
@@ -192,7 +195,64 @@ export default function Designer({ featureDrawingTool }) {
   }
 
   const handleApprove = async () => {
-    if (!window.confirm('Approve all drawings and push to proposal BOM? This will replace any previously drawing-sourced BOM items.')) return
+    try {
+    const sheetIds = sheets.map(s => s.id)
+    const [{ data: placementData }, { data: cableData }, { data: riseData }] = await Promise.all([
+      supabase.from('drawing_placements')
+        .select('*, global_products(name, part_number, manufacturer, category), placement_components(*)')
+        .in('drawing_sheet_id', sheetIds),
+      supabase.from('cable_runs').select('cable_type, total_footage').in('drawing_sheet_id', sheetIds),
+      supabase.from('vertical_rises').select('cable_type, total_footage').eq('proposal_id', proposalId),
+    ])
+
+    const deviceMap = {}
+    ;(placementData || []).forEach(p => {
+      const gp  = p.global_products
+      const key = p.part_number_override || gp?.part_number || 'unknown'
+      if (!deviceMap[key]) deviceMap[key] = {
+        part_number:  p.part_number_override || gp?.part_number,
+        name:         p.description_override || gp?.name,
+        manufacturer: p.manufacturer_override || gp?.manufacturer,
+        category:     gp?.category,
+        qty:          0,
+        is_generic:   !p.part_number_override && gp?.manufacturer === 'Generic',
+      }
+      deviceMap[key].qty += p.quantity || 1
+
+      // placement_components (hardware attached to this device)
+      ;(p.placement_components || []).forEach(c => {
+        const cKey = c.part_number || c.name || 'unknown_component'
+        if (!deviceMap[cKey]) deviceMap[cKey] = {
+          part_number:  c.part_number || null,
+          name:         c.name,
+          manufacturer: c.manufacturer || null,
+          category:     c.component_type,
+          qty:          0,
+          is_generic:   !c.part_number,
+        }
+        deviceMap[cKey].qty += c.quantity || 1
+      })
+    })
+
+    const cableMap = {}
+    ;[...(cableData || []), ...(riseData || [])].forEach(r => {
+      const t = r.cable_type || 'Unknown'
+      if (!cableMap[t]) cableMap[t] = 0
+      cableMap[t] += r.total_footage || 0
+    })
+
+    setApproveData({
+      devices:    Object.values(deviceMap).sort((a, b) => (a.category || '').localeCompare(b.category || '')),
+      cables:     Object.entries(cableMap),
+      hasGenerics: Object.values(deviceMap).some(d => d.is_generic),
+    })
+    setShowApproveModal(true)
+    } catch (err) {
+      console.error('handleApprove error:', err)
+      alert('Failed to load preview: ' + err.message)
+    }
+  }
+  const handleApproveConfirm = async () => {
     setApproving(true)
     setError(null)
     try {
@@ -202,6 +262,7 @@ export default function Designer({ featureDrawingTool }) {
         p_approved_by: user.id,
       })
       if (error) throw error
+      setShowApproveModal(false)
       await load()
       setActiveTab('canvas')
     } catch (err) {
@@ -466,6 +527,7 @@ export default function Designer({ featureDrawingTool }) {
                         updatedCable={updatedCable}
                         copiedPlacement={copiedPlacement}
                         onCopyPlacement={(p) => setCopiedPlacement(p)}
+                        onStageReady={(stage) => { stageRefs.current[activeSheetId] = stage }}
                       />
                     )}
                   </div>
@@ -526,6 +588,7 @@ export default function Designer({ featureDrawingTool }) {
               orgId={orgId}
               sheets={sheets}
               proposal={proposal}
+              stageRefs={stageRefs}
             />
           </div>
         )}
@@ -547,6 +610,141 @@ export default function Designer({ featureDrawingTool }) {
             }`}>
             {approving ? 'Pushing to BOM...' : allApproved ? 'Re-approve & Sync BOM' : 'Approve & Push to BOM'}
           </button>
+        </div>
+      )}
+
+      {/* ── Pre-approval BOM Review Modal ── */}
+      {showApproveModal && approveData && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a3d55] flex-shrink-0">
+              <div>
+                <h2 className="text-white font-bold text-lg">Review Before Approving</h2>
+                <p className="text-[#8A9AB0] text-xs mt-0.5">
+                  This will push to the proposal BOM and replace any previously drawing-sourced items
+                </p>
+              </div>
+              <button onClick={() => setShowApproveModal(false)} className="text-[#8A9AB0] hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+
+              {/* Generic warning */}
+              {approveData.hasGenerics && (
+                <div className="flex items-start gap-3 bg-yellow-900/20 border border-yellow-800/40 rounded-xl p-4">
+                  <svg className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                  </svg>
+                  <div>
+                    <p className="text-yellow-400 text-sm font-semibold">Generic devices detected</p>
+                    <p className="text-yellow-400/70 text-xs mt-0.5">
+                      Some devices are still using generic symbols. You can still approve — they'll appear as unpriced items in the BOM. Fill in real part numbers for accurate pricing.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Devices */}
+              <div>
+                <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">
+                  Devices & Equipment ({approveData.devices.reduce((s, d) => s + d.qty, 0)} total)
+                </p>
+                <div className="bg-[#0F1C2E] rounded-xl overflow-hidden border border-[#2a3d55]">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-[#2a3d55]">
+                        <th className="text-left px-4 py-2 font-medium text-[#8A9AB0]">Part Number</th>
+                        <th className="text-left px-4 py-2 font-medium text-[#8A9AB0]">Name</th>
+                        <th className="text-left px-4 py-2 font-medium text-[#8A9AB0]">Manufacturer</th>
+                        <th className="text-left px-4 py-2 font-medium text-[#8A9AB0]">Category</th>
+                        <th className="text-center px-4 py-2 font-medium text-[#8A9AB0]">Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#2a3d55]/50">
+                      {approveData.devices.map((d, i) => (
+                        <tr key={i} className={d.is_generic ? 'bg-yellow-900/10' : ''}>
+                          <td className="px-4 py-2 font-mono text-[#C8622A]">{d.part_number}</td>
+                          <td className="px-4 py-2 text-white">{d.name}</td>
+                          <td className="px-4 py-2 text-[#8A9AB0]">{d.manufacturer}</td>
+                          <td className="px-4 py-2">
+                            <span className="px-2 py-0.5 rounded-full bg-[#2a3d55] text-[#8A9AB0]">{d.category}</span>
+                          </td>
+                          <td className="px-4 py-2 text-center text-white font-semibold">{d.qty}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Cable summary */}
+              {approveData.cables.length > 0 && (
+                <div>
+                  <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Cable Summary</p>
+                  <div className="bg-[#0F1C2E] rounded-xl border border-[#2a3d55] divide-y divide-[#2a3d55]/50">
+                    {approveData.cables.map(([type, footage]) => (
+                      <div key={type} className="flex items-center justify-between px-4 py-2 text-xs">
+                        <span className="text-white">{type}</span>
+                        <span className="text-[#C8622A] font-bold font-mono">{Math.round(footage)}ft</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Summary stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-[#0F1C2E] rounded-xl p-3 border border-[#2a3d55] text-center">
+                  <p className="text-[#C8622A] text-xl font-bold">{sheets.length}</p>
+                  <p className="text-[#8A9AB0] text-xs">Sheets</p>
+                </div>
+                <div className="bg-[#0F1C2E] rounded-xl p-3 border border-[#2a3d55] text-center">
+                  <p className="text-[#C8622A] text-xl font-bold">{approveData.devices.reduce((s, d) => s + d.qty, 0)}</p>
+                  <p className="text-[#8A9AB0] text-xs">Devices</p>
+                </div>
+                <div className="bg-[#0F1C2E] rounded-xl p-3 border border-[#2a3d55] text-center">
+                  <p className="text-[#C8622A] text-xl font-bold">{Math.round(approveData.cables.reduce((s, [, f]) => s + f, 0))}ft</p>
+                  <p className="text-[#8A9AB0] text-xs">Total Cable</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-[#2a3d55] flex-shrink-0">
+              <button onClick={() => setShowApproveModal(false)}
+                className="px-4 py-2 text-sm text-[#8A9AB0] hover:text-white transition-colors">
+                Cancel — keep editing
+              </button>
+              <button onClick={handleApproveConfirm} disabled={approving}
+                className={`flex items-center gap-2 px-6 py-2.5 text-sm font-semibold rounded-lg transition-colors ${
+                  approving ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed' : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
+                }`}>
+                {approving ? (
+                  <>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                    </svg>
+                    Pushing to BOM...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Confirm & Push to BOM
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1304,6 +1502,7 @@ function CablePanel({ cable, onClose, onUpdate, onDelete, onEditPoints }) {
   const labelClass   = "text-[#8A9AB0] text-xs mb-1 block"
 
   return (
+    <>
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-3 border-b border-[#2a3d55] flex-shrink-0">
@@ -1438,5 +1637,6 @@ function CablePanel({ cable, onClose, onUpdate, onDelete, onEditPoints }) {
         </button>
       </div>
     </div>
+    </>
   )
 }
