@@ -150,15 +150,20 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     setError(null)
     try {
       const { data, error } = await supabase.storage.from('floor-plans').createSignedUrl(sheet.storage_path, 3600)
-      if (error) throw error
+      if (error) {
+        // File missing from storage — treat as blank canvas silently
+        console.warn('Floor plan not found in storage:', sheet.storage_path)
+        setLoading(false)
+        return
+      }
       if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
         await renderPDF(data.signedUrl, sheet.page_number || 1)
       } else {
         await loadImageFromUrl(data.signedUrl)
       }
     } catch (err) {
-      setError('Failed to load floor plan.')
-      console.error(err)
+      // Don't show error to user for missing files — just show blank canvas
+      console.warn('Floor plan load failed:', err.message)
     } finally {
       setLoading(false)
     }
