@@ -133,11 +133,15 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     // Floor plan image
     if (imgData) {
       try {
-        // Try PNG first, fall back to JPEG
-        const format = imgData.includes('data:image/jpeg') ? 'JPEG' : 'PNG'
-        pdf.addImage(imgData, format, imgX, imgY, imgW, imgH, undefined, 'FAST')
+        let format = 'PNG'
+        if (imgData.includes('data:image/jpeg') || imgData.includes('data:image/jpg')) format = 'JPEG'
+        else if (imgData.includes('data:image/webp')) format = 'WEBP'
+        // Strip data URL prefix for jsPDF
+        const base64 = imgData.split(',')[1]
+        pdf.addImage(base64, format, imgX, imgY, imgW, imgH, undefined, 'FAST')
       } catch (err) {
-        console.warn('Image add failed:', err.message)
+        console.warn('Image add failed, skipping:', err.message)
+        // Don't throw — continue with markers only
       }
     }
 
