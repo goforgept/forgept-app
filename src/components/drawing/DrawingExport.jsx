@@ -46,7 +46,14 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       setPlacements(placementData    || [])
       setCableRuns(cableData         || [])
       setVerticalRises(riseData      || [])
-      setComponents(compData         || [])
+      // Aggregate components by type+name+part_number
+      const compMap = {}
+      ;(compData || []).forEach(c => {
+        const key = `${c.component_type}|${c.name || ''}|${c.part_number || ''}`
+        if (!compMap[key]) compMap[key] = { ...c, quantity: 0 }
+        compMap[key].quantity += c.quantity || 1
+      })
+      setComponents(Object.values(compMap))
       setOrgProfile(profileData)
     } catch (err) {
       console.error('Export data load failed:', err)
