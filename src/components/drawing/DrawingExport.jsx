@@ -91,20 +91,54 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     try {
       const { data } = await supabase.storage.from('floor-plans').createSignedUrl(sheet.storage_path, 3600)
       if (!data?.signedUrl) return null
-      const response = await fetch(data.signedUrl)
-      const blob     = await response.blob()
-      const reader   = new FileReader()
-      return await new Promise(resolve => {
-        reader.onload = () => resolve(reader.result)
-        reader.readAsDataURL(blob)
-      })
-    } catch { return null }
+
+      const isPDF = sheet.storage_path.toLowerCase().endsWith('.pdf')
+
+      if (isPDF) {
+        // Render PDF page to canvas using pdfjs
+        const pdfjsLib = await import('pdfjs-dist')
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url
+        ).toString()
+
+        const response  = await fetch(data.signedUrl)
+        const arrayBuf  = await response.arrayBuffer()
+        const pdfDoc    = await pdfjsLib.getDocument({ data: arrayBuf }).promise
+        const pageNum   = sheet.page_number || 1
+        const page      = await pdfDoc.getPage(pageNum)
+        const viewport  = page.getViewport({ scale: 2 })
+        const canvas    = document.createElement('canvas')
+        canvas.width    = viewport.width
+        canvas.height   = viewport.height
+        const ctx       = canvas.getContext('2d')
+        await page.render({ canvasContext: ctx, viewport }).promise
+        return canvas.toDataURL('image/png')
+      } else {
+        // Regular image
+        const response = await fetch(data.signedUrl)
+        const blob     = await response.blob()
+        const reader   = new FileReader()
+        return await new Promise(resolve => {
+          reader.onload = () => resolve(reader.result)
+          reader.readAsDataURL(blob)
+        })
+      }
+    } catch (err) {
+      console.error('getFloorPlanImage failed:', err)
+      return null
+    }
   }
 
   const drawSheetOnPDF = (pdf, sheet, imgData, imgX, imgY, imgW, imgH) => {
     // Floor plan image
     if (imgData) {
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgW, imgH, undefined, 'FAST')
+      try {
+        // Try PNG first, fall back to JPEG
+        const format = imgData.includes('data:image/jpeg') ? 'JPEG' : 'PNG'
+        pdf.addImage(imgData, format, imgX, imgY, imgW, imgH, undefined, 'FAST')
+      } catch (err) {
+        console.warn('Image add failed:', err.message)
+      }
     }
 
     // Cable runs
