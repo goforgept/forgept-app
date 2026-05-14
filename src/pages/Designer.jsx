@@ -183,8 +183,11 @@ export default function Designer({ featureDrawingTool }) {
       if (sheet?.storage_path && !['pending', 'blank'].includes(sheet.storage_path)) {
         await supabase.storage.from('floor-plans').remove([sheet.storage_path])
       }
-      await load()
-      setActiveSheetId(sheets.find(s => s.id !== sheetId)?.id || null)
+      // Set active sheet BEFORE load() using current sheets state
+      const nextSheet = sheets.find(s => s.id !== sheetId)
+      setActiveSheetId(nextSheet?.id || null)
+      // Remove deleted sheet from state immediately
+      setSheets(prev => prev.filter(s => s.id !== sheetId))
     } catch (err) {
       setError('Failed to delete sheet.')
     }
