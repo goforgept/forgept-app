@@ -26,8 +26,10 @@ export default function Designer({ featureDrawingTool }) {
   const [editingCableId,    setEditingCableId]    = useState(null)
   const [updatedCable,      setUpdatedCable]      = useState(null)
   const [copiedPlacement,   setCopiedPlacement]   = useState(null)
+  const [showLabels,        setShowLabels]        = useState(() => localStorage.getItem('designer_show_labels') !== 'false')
   const stageRefs = useRef({}) // sheetId -> Konva stage
-  const [bomRefreshKey,     setBomRefreshKey]     = useState(0)
+  const [bomRefreshKey,          setBomRefreshKey]          = useState(0)
+  const [placementsRefreshKey,   setPlacementsRefreshKey]   = useState(0)
   const [activeTab,       setActiveTab]       = useState('canvas') // 'canvas' | 'bom'
   const [sidebarOpen,     setSidebarOpen]     = useState(true)
   const [showFireAlarmAck, setShowFireAlarmAck] = useState(false)
@@ -528,6 +530,13 @@ export default function Designer({ featureDrawingTool }) {
                         copiedPlacement={copiedPlacement}
                         onCopyPlacement={(p) => setCopiedPlacement(p)}
                         onStageReady={(stage) => { stageRefs.current[activeSheetId] = stage }}
+                        allSheetIds={sheets.map(s => s.id)}
+                        showLabels={showLabels}
+                        placementsRefreshKey={placementsRefreshKey}
+                        onToggleLabels={(val) => {
+                          setShowLabels(val)
+                          localStorage.setItem('designer_show_labels', val)
+                        }}
                       />
                     )}
                   </div>
@@ -540,10 +549,11 @@ export default function Designer({ featureDrawingTool }) {
                           placement={selectedPlacement}
                           onClose={() => setSelectedPlacement(null)}
                           onUpdate={(updated) => setSelectedPlacement(updated)}
-                          onSaved={() => setBomRefreshKey(k => k + 1)}
+                          onSaved={() => { setBomRefreshKey(k => k + 1); setPlacementsRefreshKey(k => k + 1) }}
                           sheets={sheets}
                           currentSheetId={activeSheetId}
                           proposalId={proposalId}
+                          allSheetIds={sheets.map(s => s.id)}
                         />
                       )}
                       {selectedCable && (
@@ -1022,7 +1032,7 @@ function ComponentsSection({ placementId, orgId, category }) {
 
 // ─── PlacementPanel ───────────────────────────────────────────────────────────
 // Right side panel — full edit fields for a selected placement
-function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, currentSheetId, proposalId }) {
+function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, currentSheetId, proposalId, allSheetIds }) {
   const [attachedRun, setAttachedRun] = useState(null)
 
   useEffect(() => {
@@ -1072,10 +1082,27 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
   useEffect(() => {
     setForm(getInitialForm(placement))
     setShowAsBuilt(false)
+    setBulkDone(false)
+    // Count similar devices
+    const countSimilar = async () => {
+      const { count } = await supabase
+        .from('drawing_placements')
+        .select('*', { count: 'exact', head: true })
+        .in('drawing_sheet_id', allSheetIds || [placement.drawing_sheet_id])
+        .eq('global_product_id', placement.global_product_id)
+        .neq('id', placement.id)
+      setBulkCount(count || 0)
+    }
+    countSimilar()
   }, [placement.id])
 
   const [saved,  setSaved]            = useState(false)
-  const [showAsBuilt, setShowAsBuilt] = useState(false)
+  const [showAsBuilt,    setShowAsBuilt]    = useState(false)
+  const [showBulkModal,  setShowBulkModal]  = useState(false)
+  const [bulkCount,      setBulkCount]      = useState(0)
+  const [bulkScope,      setBulkScope]      = useState('all') // 'all' | 'sheet' | 'generic'
+  const [bulkApplying,   setBulkApplying]   = useState(false)
+  const [bulkDone,       setBulkDone]       = useState(false)
   const saveTimer = useRef(null)
 
   const update = (field, value) => {
@@ -1188,6 +1215,31 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
                 onChange={e => update('quantity', e.target.value)}
                 className={`${inputClass} w-20`} />
             </div>
+            {/* Apply to similar */}
+            {bulkCount > 0 && (
+              <div className="border-t border-[#2a3d55] pt-3">
+                {bulkDone ? (
+                  <div className="flex items-center gap-2 text-xs text-green-400">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
+                    </svg>
+                    Applied to similar devices
+                  </div>
+                ) : (
+                  <button onClick={() => setShowBulkModal(true)}
+                    className="w-full flex items-center justify-between px-3 py-2 bg-[#0F1C2E] border border-[#C8622A]/30 rounded-lg text-xs text-[#C8622A] hover:bg-[#C8622A]/10 transition-colors">
+                    <span className="flex items-center gap-2">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                      </svg>
+                      Apply to similar devices
+                    </span>
+                    <span className="bg-[#C8622A]/20 px-1.5 py-0.5 rounded font-semibold">{bulkCount}</span>
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Symbol color */}
             <div className="border-t border-[#2a3d55] pt-3">
               <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Symbol Color</p>
@@ -1449,10 +1501,138 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
         <span className={`text-xs transition-opacity ${saved ? 'text-green-400 opacity-100' : 'text-[#4a5a6a] opacity-60'}`}>
           {saved ? '✓ Saved' : 'Changes save automatically'}
         </span>
- </div>
+      </div>
+
+      {/* ── Bulk Apply Modal ── */}
+      {showBulkModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="px-5 py-4 border-b border-[#2a3d55]">
+              <h3 className="text-white font-bold text-base">Apply to Similar Devices</h3>
+              <p className="text-[#8A9AB0] text-xs mt-0.5">
+                {product.category} · {bulkCount} other device{bulkCount !== 1 ? 's' : ''} in this project
+              </p>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* What gets applied */}
+              <div>
+                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">What to apply</p>
+                <div className="bg-[#0F1C2E] rounded-xl p-3 border border-[#2a3d55] space-y-1.5 text-xs">
+                  {form.part_number_override && (
+                    <div className="flex justify-between">
+                      <span className="text-[#8A9AB0]">Part Number</span>
+                      <span className="text-white font-mono">{form.part_number_override}</span>
+                    </div>
+                  )}
+                  {form.manufacturer_override && (
+                    <div className="flex justify-between">
+                      <span className="text-[#8A9AB0]">Manufacturer</span>
+                      <span className="text-white">{form.manufacturer_override}</span>
+                    </div>
+                  )}
+                  {form.description_override && (
+                    <div className="flex justify-between">
+                      <span className="text-[#8A9AB0]">Description</span>
+                      <span className="text-white">{form.description_override}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-1 border-t border-[#2a3d55]">
+                    <span className="text-[#4a5a6a]">FOV / marker color / labels</span>
+                    <span className="text-[#4a5a6a]">not changed</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scope */}
+              <div>
+                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Apply to</p>
+                <div className="space-y-2">
+                  {[
+                    { value: 'all',     label: `All ${product.category} devices in project`, count: bulkCount },
+                    { value: 'generic', label: 'Only unspec\'d (generic) devices', count: null },
+                    { value: 'sheet',   label: 'This sheet only', count: null },
+                  ].map(opt => (
+                    <label key={opt.value} className="flex items-center gap-3 cursor-pointer">
+                      <input type="radio" name="bulkScope" value={opt.value}
+                        checked={bulkScope === opt.value}
+                        onChange={() => setBulkScope(opt.value)}
+                        className="accent-[#C8622A]" />
+                      <span className="text-white text-xs flex-1">{opt.label}</span>
+                      {opt.count !== null && (
+                        <span className="text-[#C8622A] text-xs font-bold">{opt.count}</span>
+                      )}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 px-5 py-4 border-t border-[#2a3d55]">
+              <button onClick={() => setShowBulkModal(false)}
+                className="flex-1 py-2 text-sm text-[#8A9AB0] border border-[#2a3d55] rounded-lg hover:text-white transition-colors">
+                Cancel
+              </button>
+              <button
+                disabled={bulkApplying || (!form.part_number_override && !form.manufacturer_override && !form.description_override)}
+                onClick={async () => {
+                  setBulkApplying(true)
+                  try {
+                    console.log('Bulk apply:', {
+                      global_product_id: placement.global_product_id,
+                      allSheetIds,
+                      scope: bulkScope,
+                      updates: {
+                        part_number_override:  form.part_number_override  || null,
+                        manufacturer_override: form.manufacturer_override || null,
+                        description_override:  form.description_override  || null,
+                      }
+                    })
+                    let query = supabase
+                      .from('drawing_placements')
+                      .update({
+                        part_number_override:  form.part_number_override  || null,
+                        manufacturer_override: form.manufacturer_override || null,
+                        description_override:  form.description_override  || null,
+                      })
+                      .eq('global_product_id', placement.global_product_id)
+                      .neq('id', placement.id)
+
+                    if (bulkScope === 'sheet') {
+                      query = query.eq('drawing_sheet_id', placement.drawing_sheet_id)
+                    } else if (bulkScope === 'generic') {
+                      query = query
+                        .in('drawing_sheet_id', allSheetIds || [placement.drawing_sheet_id])
+                        .is('part_number_override', null)
+                    } else {
+                      query = query.in('drawing_sheet_id', allSheetIds || [placement.drawing_sheet_id])
+                    }
+
+                    const { error } = await query
+                    if (!error) {
+                      setBulkDone(true)
+                      setShowBulkModal(false)
+                      onSaved?.()
+                    }
+                  } finally {
+                    setBulkApplying(false)
+                  }
+                }}
+                className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  bulkApplying || (!form.part_number_override && !form.manufacturer_override && !form.description_override)
+                    ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
+                    : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
+                }`}>
+                {bulkApplying ? 'Applying...' : `Apply to ${bulkScope === 'sheet' ? 'sheet' : bulkScope === 'generic' ? 'generic' : 'all'}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
 
 // ─── CablePanel ───────────────────────────────────────────────────────────────
 function CablePanel({ cable, onClose, onUpdate, onDelete, onEditPoints }) {

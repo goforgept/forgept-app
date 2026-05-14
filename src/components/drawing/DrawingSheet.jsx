@@ -3,7 +3,63 @@ import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Shape, Li
 import { supabase } from '../../supabase'
 import { useCategoryIcons } from './useCategoryIcons'
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, copiedPlacement: externalCopied, onCopyPlacement, onStageReady }) {
+const LABEL_PREFIXES = {
+  'Dome Camera':         'CAM',
+  'Bullet Camera':       'CAM',
+  'PTZ Camera':          'PTZ',
+  'Multi-Lens Camera':   'CAM',
+  'Fisheye Camera':      'CAM',
+  'LPR Camera':          'LPR',
+  'Access Reader':       'RDR',
+  'Access Control Door': 'DR',
+  'Controller':          'CTRL',
+  'Motion Sensor':       'MS',
+  'Sensor':              'SEN',
+  'Intercom':            'INT',
+  'NVR':                 'NVR',
+  'Speaker':             'SPK',
+  'Display':             'DISP',
+  'Network':             'SW',
+  'Wireless Lock':       'WL',
+  'Data Drop':           'DD',
+  'Patch Panel':         'PP',
+  'UPS':                 'UPS',
+  'Rack':                'RACK',
+  'FACP':                'FA',
+  'Smoke Detector':      'SMK',
+  'Heat Detector':       'HEAT',
+  'Horn Strobe':         'HS',
+  'Pull Station':        'PS',
+  'Guard Tour':          'GT',
+  'Panel':               'PNL',
+  'Amplifier':           'AMP',
+  'DSP':                 'DSP',
+  'Switcher':            'SWTCH',
+  'Thermostat':          'THERM',
+}
+
+const getNextLabel = async (category, sheetIds) => {
+  const prefix = LABEL_PREFIXES[category]
+  if (!prefix) return null
+
+  const { data } = await supabase
+    .from('drawing_placements')
+    .select('device_address')
+    .in('drawing_sheet_id', sheetIds)
+    .not('device_address', 'is', null)
+    .like('device_address', `${prefix}-%`)
+
+  if (!data || data.length === 0) return `${prefix}-01`
+
+  const nums = data
+    .map(p => parseInt((p.device_address || '').replace(`${prefix}-`, '')) || 0)
+    .filter(n => !isNaN(n))
+
+  const next = nums.length > 0 ? Math.max(...nums) + 1 : 1
+  return `${prefix}-${String(next).padStart(2, '0')}`
+}
+
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
 
@@ -160,7 +216,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     if (data) setPlacements(data)
   }, [sheet.id])
 
-  useEffect(() => { loadPlacements() }, [loadPlacements])
+  useEffect(() => { loadPlacements() }, [loadPlacements, placementsRefreshKey ?? 0])
 
   const loadCableRuns = useCallback(async () => {
     const { data } = await supabase
@@ -221,6 +277,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             product_id:          copiedPlacement.product_id,
             x:                   Math.min(copiedPlacement.x + offset, 0.99),
             y:                   Math.min(copiedPlacement.y + offset, 0.99),
+            device_address:      await getNextLabel(copiedPlacement.global_products?.category, allSheetIds || [sheet.id]),
             rotation:            copiedPlacement.rotation,
             quantity:            copiedPlacement.quantity,
             symbol_size:         copiedPlacement.symbol_size,
@@ -417,6 +474,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           global_product_id: selectedSymbol.id, product_id: catalogMatch?.id || null,
           x: Math.round(x * 10000) / 10000, y: Math.round(y * 10000) / 10000,
           rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
+          device_address: await getNextLabel(selectedSymbol.category, allSheetIds || [sheet.id]),
         })
         .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
         .single()
@@ -553,6 +611,23 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           </button>
           <button
             onClick={() => {
+              const next = !showLabels
+              if (onToggleLabels) onToggleLabels(next)
+            }}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+              showLabels
+                ? 'border-[#C8622A]/40 bg-[#C8622A]/10 text-[#C8622A]'
+                : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
+            }`}
+            title="Toggle device labels"
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-5 5a2 2 0 01-2.828 0l-7-7A2 2 0 013 8V5a2 2 0 012-2z"/>
+            </svg>
+            Labels
+          </button>
+          <button
+            onClick={() => {
               setCableMode(s => !s)
               if (cableMode) {
                 setActiveCable(null)
@@ -637,6 +712,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 x: Math.round(x * 10000) / 10000,
                 y: Math.round(y * 10000) / 10000,
                 rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
+                device_address: await getNextLabel(symbol.category, allSheetIds || [sheet.id]),
               })
               .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
               .single()
@@ -1012,6 +1088,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                     icon={getIcon(product.category)} x={px} y={py} size={markerSize}
                     isSelected={isSelected} isHovered={isHovered}
                     cableMode={cableMode}
+                    showLabels={showLabels}
                     markerColor={placement.marker_color || '#C8622A'}
                     onContextMenu={(e) => {
                       const pointer = stageRef.current.getPointerPosition()
@@ -1073,7 +1150,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               part_number_override: p.part_number_override,
               manufacturer_override: p.manufacturer_override,
               description_override: p.description_override,
-              device_address: p.device_address ? `${p.device_address}-copy` : null,
+              device_address: await getNextLabel(p.global_products?.category, allSheetIds || [sheet.id]),
               notes: p.notes, fov_angle: p.fov_angle, fov_range: p.fov_range,
               source: 'manual',
             })
@@ -1257,7 +1334,7 @@ function ContextMenu({ contextMenu, copiedPlacement, onCopy, onPaste, onRotate, 
 
 // ─── PlacementMarker ──────────────────────────────────────────────────────────
 function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isHovered,
-  cableMode, markerColor, onSelect, onCableSnap, onContextMenu, onHoverStart, onHoverEnd, onDelete, onRotate, onDragEnd }) {
+  cableMode, showLabels, markerColor, onSelect, onCableSnap, onContextMenu, onHoverStart, onHoverEnd, onDelete, onRotate, onDragEnd }) {
   const markerScale = isSelected ? 1.25 : isHovered ? 1.1 : 1
   const totalSize   = size * markerScale
   const iconSize    = totalSize * 0.65
@@ -1288,7 +1365,7 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
       {icon && <KonvaImage image={icon} x={-iconSize / 2} y={-iconSize / 2} width={iconSize} height={iconSize} listening={false}/>}
 
       {/* Device address label below marker */}
-      {placement.device_address && !isSelected && (
+      {placement.device_address && !isSelected && showLabels !== false && (
         <Text
           text={placement.device_address}
           fontSize={Math.max(9, totalSize * 0.28)}
