@@ -1085,13 +1085,15 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
     setBulkDone(false)
     // Count similar devices
     const countSimilar = async () => {
-      const { count } = await supabase
+      const { data, count } = await supabase
         .from('drawing_placements')
-        .select('*', { count: 'exact', head: true })
+        .select('id, device_address, drawing_sheet_id, part_number_override, description_override', { count: 'exact' })
         .in('drawing_sheet_id', allSheetIds || [placement.drawing_sheet_id])
         .eq('global_product_id', placement.global_product_id)
         .neq('id', placement.id)
       setBulkCount(count || 0)
+      setSimilarDevices(data || [])
+      setBulkSelected(new Set((data || []).map(d => d.id)))
     }
     countSimilar()
   }, [placement.id])
@@ -1103,6 +1105,8 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
   const [bulkScope,      setBulkScope]      = useState('all') // 'all' | 'sheet' | 'generic'
   const [bulkApplying,   setBulkApplying]   = useState(false)
   const [bulkDone,       setBulkDone]       = useState(false)
+  const [similarDevices, setSimilarDevices] = useState([])
+  const [bulkSelected,   setBulkSelected]   = useState(new Set())
   const saveTimer = useRef(null)
 
   const update = (field, value) => {
@@ -1544,26 +1548,43 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
                 </div>
               </div>
 
-              {/* Scope */}
+              {/* Device checklist */}
               <div>
-                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Apply to</p>
-                <div className="space-y-2">
-                  {[
-                    { value: 'all',     label: `All ${product.category} devices in project`, count: bulkCount },
-                    { value: 'generic', label: 'Only unspec\'d (generic) devices', count: null },
-                    { value: 'sheet',   label: 'This sheet only', count: null },
-                  ].map(opt => (
-                    <label key={opt.value} className="flex items-center gap-3 cursor-pointer">
-                      <input type="radio" name="bulkScope" value={opt.value}
-                        checked={bulkScope === opt.value}
-                        onChange={() => setBulkScope(opt.value)}
-                        className="accent-[#C8622A]" />
-                      <span className="text-white text-xs flex-1">{opt.label}</span>
-                      {opt.count !== null && (
-                        <span className="text-[#C8622A] text-xs font-bold">{opt.count}</span>
-                      )}
-                    </label>
-                  ))}
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Select devices to update</p>
+                  <button onClick={() => {
+                    if (bulkSelected.size === similarDevices.length) setBulkSelected(new Set())
+                    else setBulkSelected(new Set(similarDevices.map(d => d.id)))
+                  }} className="text-xs text-[#C8622A] hover:text-white transition-colors">
+                    {bulkSelected.size === similarDevices.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
+                <div className="bg-[#0F1C2E] rounded-xl border border-[#2a3d55] divide-y divide-[#2a3d55]/50 max-h-48 overflow-y-auto">
+                  {similarDevices.map(d => {
+                    const sheetName = sheets.find(s => s.id === d.drawing_sheet_id)?.name || 'Unknown sheet'
+                    return (
+                      <label key={d.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-[#1a2d45] transition-colors">
+                        <input type="checkbox"
+                          checked={bulkSelected.has(d.id)}
+                          onChange={() => {
+                            setBulkSelected(prev => {
+                              const next = new Set(prev)
+                              if (next.has(d.id)) next.delete(d.id)
+                              else next.add(d.id)
+                              return next
+                            })
+                          }}
+                          className="accent-[#C8622A] flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-white text-xs font-medium">{d.device_address || 'Unlabeled'}</span>
+                          <span className="text-[#8A9AB0] text-xs ml-2">{sheetName}</span>
+                        </div>
+                        {(d.part_number_override || d.description_override) && (
+                          <span className="text-xs text-[#4a5a6a] truncate max-w-24">{d.part_number_override || d.description_override}</span>
+                        )}
+                      </label>
+                    )
+                  })}
                 </div>
               </div>
             </div>
@@ -1574,7 +1595,7 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
                 Cancel
               </button>
               <button
-                disabled={bulkApplying || (!form.part_number_override && !form.manufacturer_override && !form.description_override)}
+                disabled={bulkApplying || bulkSelected.size === 0 || (!form.part_number_override && !form.manufacturer_override && !form.description_override)}
                 onClick={async () => {
                   setBulkApplying(true)
                   try {
@@ -1588,27 +1609,15 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
                         description_override:  form.description_override  || null,
                       }
                     })
-                    let query = supabase
+                    if (bulkSelected.size === 0) return
+                    const { error } = await supabase
                       .from('drawing_placements')
                       .update({
                         part_number_override:  form.part_number_override  || null,
                         manufacturer_override: form.manufacturer_override || null,
                         description_override:  form.description_override  || null,
                       })
-                      .eq('global_product_id', placement.global_product_id)
-                      .neq('id', placement.id)
-
-                    if (bulkScope === 'sheet') {
-                      query = query.eq('drawing_sheet_id', placement.drawing_sheet_id)
-                    } else if (bulkScope === 'generic') {
-                      query = query
-                        .in('drawing_sheet_id', allSheetIds || [placement.drawing_sheet_id])
-                        .is('part_number_override', null)
-                    } else {
-                      query = query.in('drawing_sheet_id', allSheetIds || [placement.drawing_sheet_id])
-                    }
-
-                    const { error } = await query
+                      .in('id', [...bulkSelected])
                     if (!error) {
                       setBulkDone(true)
                       setShowBulkModal(false)
@@ -1623,7 +1632,7 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
                     ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
                     : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
                 }`}>
-                {bulkApplying ? 'Applying...' : `Apply to ${bulkScope === 'sheet' ? 'sheet' : bulkScope === 'generic' ? 'generic' : 'all'}`}
+                {bulkApplying ? 'Applying...' : `Apply to ${bulkSelected.size} device${bulkSelected.size !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>
