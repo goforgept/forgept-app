@@ -48,10 +48,19 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
         .order('cable_type')
 
       // Load placement components
-      const { data: components } = await supabase
+      const { data: rawComponents } = await supabase
         .from('placement_components')
         .select('*, drawing_placements!inner(drawing_sheet_id)')
         .in('drawing_placements.drawing_sheet_id', sheetIds)
+
+      // Aggregate components by type+name+part_number
+      const compMap = {}
+      ;(rawComponents || []).forEach(c => {
+        const key = `${c.component_type}|${c.name || ''}|${c.part_number || ''}`
+        if (!compMap[key]) compMap[key] = { ...c, quantity: 0 }
+        compMap[key].quantity += c.quantity || 1
+      })
+      const components = Object.values(compMap)
 
       // Load vertical rises
       const { data: rises } = await supabase
@@ -94,7 +103,7 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
       setRows(sorted)
       setCableRuns(runs || [])
       setVerticalRises(rises || [])
-      setComponents(components || [])
+      setComponents(components)
     } catch (err) {
       setError('Failed to load BOM preview.')
       console.error(err)
