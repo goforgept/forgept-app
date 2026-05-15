@@ -328,23 +328,17 @@ export default function GlobalProductsImport({ onClose, onImported }) {
   const [skipped,    setSkipped]    = useState(0)
   const [selected,   setSelected]   = useState(new Set())
   const [fileType,   setFileType]   = useState(null) // 'ss' | 'csv'
+  const [isDragging, setIsDragging] = useState(false)
 
-  const handleFile = useCallback(async (e) => {
-    const file = e.target.files?.[0]
+  const processFile = useCallback(async (file) => {
     if (!file) return
     setError(null)
     setParsed(null)
 
     try {
-      let result
       const isCSV = file.name.toLowerCase().endsWith('.csv')
       setFileType(isCSV ? 'csv' : 'ss')
-
-      if (isCSV) {
-        result = await parseForgePtCSV(file)
-      } else {
-        result = await parseSystemSurveyorFile(file)
-      }
+      const result = isCSV ? await parseForgePtCSV(file) : await parseSystemSurveyorFile(file)
 
       if (result.products.length === 0) {
         setError('No products found in this file. Make sure it is a valid System Surveyor Element Profile or ForgePt CSV template.')
@@ -357,8 +351,26 @@ export default function GlobalProductsImport({ onClose, onImported }) {
     } catch (err) {
       setError(`Failed to parse file: ${err.message}`)
     }
+  }, [])
 
+  const handleFile = useCallback(async (e) => {
+    await processFile(e.target.files?.[0])
     e.target.value = ''
+  }, [processFile])
+
+  const handleDrop = useCallback(async (e) => {
+    e.preventDefault()
+    setIsDragging(false)
+    await processFile(e.dataTransfer.files?.[0])
+  }, [processFile])
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault()
+    setIsDragging(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) setIsDragging(false)
   }, [])
 
   const handleImport = async () => {
@@ -443,6 +455,29 @@ export default function GlobalProductsImport({ onClose, onImported }) {
           {/* ── Upload step ── */}
           {step === 'upload' && (
             <div className="p-6 space-y-6">
+
+              {/* Drop zone */}
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={() => fileRef.current?.click()}
+                className={`relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-10 cursor-pointer transition-colors ${
+                  isDragging
+                    ? 'border-[#C8622A] bg-[#C8622A]/10'
+                    : 'border-[#2a3d55] bg-[#0F1C2E] hover:border-[#C8622A]/50 hover:bg-[#0F1C2E]/80'
+                }`}
+              >
+                <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFile}/>
+                <svg className={`w-8 h-8 transition-colors ${isDragging ? 'text-[#C8622A]' : 'text-[#2a3d55]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                </svg>
+                <div className="text-center">
+                  <p className="text-white text-sm font-medium">Drop your file here</p>
+                  <p className="text-[#8A9AB0] text-xs mt-0.5">or click to browse — .xlsx and .csv supported</p>
+                </div>
+              </div>
+
               {/* Format options */}
               <div className="grid grid-cols-2 gap-4">
                 {/* System Surveyor */}
@@ -460,7 +495,7 @@ export default function GlobalProductsImport({ onClose, onImported }) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                     </svg>
                     Upload .xlsx File
-                    <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile}/>
+                    <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFile}/>
                   </label>
                 </div>
 
