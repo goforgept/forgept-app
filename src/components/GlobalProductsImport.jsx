@@ -96,29 +96,29 @@ async function parseSystemSurveyorFile(file) {
     }
   }
 
-  // Build label -> values map
+  // Build label -> values map (lowercase keys for case-insensitive lookup)
   const labelMap = {}
   for (const row of rawRows.slice(3)) {
     if (!row || row.length <= labelColIdx) continue
-    const label = String(row[labelColIdx] || '').trim()
-    if (!label || label === 'None') continue
+    const label = String(row[labelColIdx] || '').trim().toLowerCase()
+    if (!label || label === 'none') continue
     labelMap[label] = row.slice(productColStart)
   }
 
   // Also index by col A label (some rows use col A)
   for (const row of rawRows.slice(3)) {
     if (!row) continue
-    const labelA = String(row[0] || '').trim()
-    if (labelA && labelA !== 'None' && !labelMap[labelA]) {
+    const labelA = String(row[0] || '').trim().toLowerCase()
+    if (labelA && labelA !== 'none' && !labelMap[labelA]) {
       labelMap[labelA] = row.slice(productColStart)
     }
   }
 
-  // Helper — get value for a specific product column
+  // Helper — get value for a specific product column (case-insensitive label lookup)
   const getVal = (label, offset) => {
-    const vals = labelMap[label] || []
+    const vals = labelMap[label.toLowerCase()] || []
     const v    = vals[offset]
-    return v && String(v).trim() && String(v) !== 'None' ? String(v).trim() : null
+    return v && String(v).trim() && String(v).toLowerCase() !== 'none' ? String(v).trim() : null
   }
 
   // Extract products
@@ -159,15 +159,24 @@ async function parseSystemSurveyorFile(file) {
     let category = mapping?.defaultCategory || null
     const isCameraType = !!category?.toLowerCase().includes('camera')
 
+    // Case-insensitive style map lookup
+    const styleKey = style
+      ? Object.keys(STYLE_CATEGORY_MAP).find(k => k.toLowerCase() === style.toLowerCase())
+      : null
+
+    if (offset === 0) {
+      console.log('Style raw value:', JSON.stringify(style), '| styleKey:', styleKey, '| category before style:', category)
+    }
+
     // Only apply camera style override when we know this is a camera element
-    if (isCameraType && style && STYLE_CATEGORY_MAP[style]) {
-      category = STYLE_CATEGORY_MAP[style]
+    if (isCameraType && styleKey) {
+      category = STYLE_CATEGORY_MAP[styleKey]
     }
 
     // Keyword-based fallback when element type didn't match anything
     if (!category) {
       const etLower = elementType.toLowerCase()
-      if (style && STYLE_CATEGORY_MAP[style])                category = STYLE_CATEGORY_MAP[style]
+      if (styleKey)                                          category = STYLE_CATEGORY_MAP[styleKey]
       else if (etLower.includes('ptz'))                      category = 'PTZ Camera'
       else if (etLower.includes('access control'))           category = 'Access Control Door'
       else if (etLower.includes('access reader') ||
