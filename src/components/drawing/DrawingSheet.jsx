@@ -1067,15 +1067,27 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
                       {/* Label along cable — rotated to follow cable direction */}
                       {(run.total_footage > 0 || run.label || run.cable_type) && (() => {
-                        // True midpoint between first and last point
-                        const midX = (run.points[0].x + run.points[run.points.length-1].x) / 2
-                        const midY = (run.points[0].y + run.points[run.points.length-1].y) / 2
-                        const mx   = position.x + midX * canvasW * scale
-                        const my   = position.y + midY * canvasH * scale
-
-                        // Calculate angle using first and last point
-                        const p1   = run.points[0]
-                        const p2   = run.points[run.points.length - 1]
+                        // Find true midpoint along the cable path
+                        let totalLen = 0
+                        const segs = []
+                        for (let si = 1; si < run.points.length; si++) {
+                          const sdx = (run.points[si].x - run.points[si-1].x) * canvasW * scale
+                          const sdy = (run.points[si].y - run.points[si-1].y) * canvasH * scale
+                          const len = Math.sqrt(sdx*sdx + sdy*sdy)
+                          segs.push({ len, i: si })
+                          totalLen += len
+                        }
+                        let halfLen = totalLen / 2
+                        let midIdx  = 1
+                        for (const seg of segs) {
+                          if (halfLen <= seg.len) { midIdx = seg.i; break }
+                          halfLen -= seg.len
+                        }
+                        const p1   = run.points[Math.max(0, midIdx - 1)]
+                        const p2   = run.points[midIdx]
+                        const t    = halfLen / Math.max(1, segs[midIdx-1]?.len || 1)
+                        const mx   = position.x + (p1.x + (p2.x - p1.x) * t) * canvasW * scale
+                        const my   = position.y + (p1.y + (p2.y - p1.y) * t) * canvasH * scale
                         const dx   = (p2.x - p1.x) * canvasW * scale
                         const dy   = (p2.y - p1.y) * canvasH * scale
                         let angle  = Math.atan2(dy, dx) * 180 / Math.PI

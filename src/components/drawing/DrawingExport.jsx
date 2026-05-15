@@ -168,12 +168,26 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       }
       // Cable label at midpoint — rotated to follow cable direction
       if (run.label || run.cable_type) {
-        const midX = (run.points[0].x + run.points[run.points.length-1].x) / 2
-        const midY = (run.points[0].y + run.points[run.points.length-1].y) / 2
-        const mx   = imgX + midX * imgW
-        const my   = imgY + midY * imgH
-        const p1   = run.points[0]
-        const p2   = run.points[run.points.length - 1]
+        let totalLen = 0
+        const segs = []
+        for (let si = 1; si < run.points.length; si++) {
+          const sdx = (run.points[si].x - run.points[si-1].x) * imgW
+          const sdy = (run.points[si].y - run.points[si-1].y) * imgH
+          const len = Math.sqrt(sdx*sdx + sdy*sdy)
+          segs.push({ len, i: si })
+          totalLen += len
+        }
+        let halfLen = totalLen / 2
+        let midIdx  = 1
+        for (const seg of segs) {
+          if (halfLen <= seg.len) { midIdx = seg.i; break }
+          halfLen -= seg.len
+        }
+        const p1   = run.points[Math.max(0, midIdx - 1)]
+        const p2   = run.points[midIdx]
+        const t    = halfLen / Math.max(1, segs[midIdx-1]?.len || 1)
+        const mx   = imgX + (p1.x + (p2.x - p1.x) * t) * imgW
+        const my   = imgY + (p1.y + (p2.y - p1.y) * t) * imgH
         const dx   = (p2.x - p1.x) * imgW
         const dy   = (p2.y - p1.y) * imgH
         let angle  = Math.atan2(dy, dx) * 180 / Math.PI
