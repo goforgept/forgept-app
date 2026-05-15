@@ -1065,24 +1065,36 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                         )
                       })}
 
-                      {/* Label at midpoint */}
+                      {/* Label along cable — rotated to follow cable direction */}
                       {(run.total_footage > 0 || run.label || run.cable_type) && (() => {
-                        const mid = Math.floor(run.points.length / 2)
-                        const mx  = position.x + run.points[mid].x * canvasW * scale
-                        const my  = position.y + run.points[mid].y * canvasH * scale
-                        const footageText = run.total_footage > 0 ? ` · ${run.total_footage}ft` : ' · (set scale for footage)'
-                        const labelText = run.label 
+                        const mid  = Math.floor(run.points.length / 2)
+                        const mx   = position.x + run.points[mid].x * canvasW * scale
+                        const my   = position.y + run.points[mid].y * canvasH * scale
+
+                        // Calculate angle of cable at midpoint
+                        const p1   = run.points[Math.max(0, mid - 1)]
+                        const p2   = run.points[Math.min(run.points.length - 1, mid + 1)]
+                        const dx   = (p2.x - p1.x) * canvasW * scale
+                        const dy   = (p2.y - p1.y) * canvasH * scale
+                        let angle  = Math.atan2(dy, dx) * 180 / Math.PI
+
+                        // Keep text readable — flip if upside down
+                        if (angle > 90)  angle -= 180
+                        if (angle < -90) angle += 180
+
+                        const footageText = run.total_footage > 0 ? ` · ${run.total_footage}ft` : ' · (set scale)'
+                        const labelText   = run.label
                           ? `${run.label} · ${run.cable_type}${footageText}`
                           : `${run.cable_type}${footageText}`
-                        const w   = Math.max(labelText.length * 5, 70)
+                        const w = Math.max(labelText.length * 5, 60)
+
                         return (
-                          <Group x={mx} y={my} listening={false}>
-                            <Rect x={-w/2} y={-10} width={w} height={18}
-                              fill="#0F1C2E" stroke={isEditing ? '#34d399' : (run.color || '#3b82f6')}
-                              strokeWidth={1} cornerRadius={3}/>
+                          <Group x={mx} y={my} rotation={angle} listening={false}>
+                            <Rect x={-w/2} y={-9} width={w} height={13}
+                              fill="#0F1C2E" opacity={0.8} cornerRadius={2}/>
                             <Text text={labelText}
-                              fontSize={8} fill={isEditing ? '#34d399' : (run.color || '#60a5fa')}
-                              width={w} x={-w/2} y={-5} align="center"/>
+                              fontSize={7} fill={isEditing ? '#34d399' : (run.color || '#60a5fa')}
+                              width={w} x={-w/2} y={-6} align="center"/>
                           </Group>
                         )
                       })()}
