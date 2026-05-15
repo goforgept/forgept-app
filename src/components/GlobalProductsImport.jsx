@@ -7,6 +7,7 @@ const ELEMENT_TYPE_MAP = {
   'PTZ Camera Element Profile Template':     { industry: 'security', defaultCategory: 'PTZ Camera' },
   'Dome Camera Element Profile Template':    { industry: 'security', defaultCategory: 'Dome Camera' },
   'Bullet Camera Element Profile Template':  { industry: 'security', defaultCategory: 'Bullet Camera' },
+  'Multi Sensor Camera Element Profile Template': { industry: 'security', defaultCategory: 'Multi Sensor Camera' },
   'Access Reader Element Profile Template':  { industry: 'security', defaultCategory: 'Access Reader' },
   'Access Control Element Profile Template': { industry: 'security', defaultCategory: 'Access Control Door' },
   'Controller Element Profile Template':     { industry: 'security', defaultCategory: 'Controller' },
@@ -31,7 +32,9 @@ const STYLE_CATEGORY_MAP = {
   'Turret':  'Dome Camera',
   'Box':     'Bullet Camera',
   'Covert':  'Dome Camera',
-  'Fisheye': 'Fisheye Camera',
+  'Fisheye':       'Fisheye Camera',
+  'Multi-Sensor':  'Multi Sensor Camera',
+  'Multi Sensor':  'Multi Sensor Camera',
   'Other':   'Dome Camera',
 }
 
@@ -172,6 +175,10 @@ async function parseSystemSurveyorFile(file) {
       else if (etLower.includes('nvr'))                      category = 'NVR'
       else if (etLower.includes('controller'))               category = 'Controller'
       else if (etLower.includes('lock'))                     category = 'Wireless Lock'
+      else if (etLower.includes('multi sensor') ||
+               etLower.includes('multisensor') ||
+               etLower.includes('multi-sensor'))             category = 'Multi Sensor Camera'
+      else if (etLower.includes('fisheye'))                  category = 'Fisheye Camera'
       else if (etLower.includes('camera') ||
                etLower.includes('fixed') ||
                etLower.includes('dome') ||
