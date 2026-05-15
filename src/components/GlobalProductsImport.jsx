@@ -113,8 +113,10 @@ async function parseSystemSurveyorFile(file) {
     if (!mfr) continue  // skip empty columns
 
     const partNum = getVal('Component Model #', offset) || model
-    const style   = getVal('Camera Style', offset)
+        const style   = getVal('Camera Style', offset)
     const fovAngle = getVal('AOC Angle', offset)
+    if (offset < 3) console.log(`Product ${offset}: style="${style}" fov="${fovAngle}" model="${partNum}"`)
+
     const intExt  = getVal('Interior or Exterior?', offset)
     const hasIR   = getVal('      Embedded Infra-red (IR)', offset) === 'YES'
 
