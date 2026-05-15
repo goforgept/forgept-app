@@ -583,6 +583,34 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         .eq('id', sheet.id)
     }
 
+    // Recalculate footage for all existing cable runs on this sheet
+    const { data: existingRuns } = await supabase
+      .from('cable_runs')
+      .select('*')
+      .eq('drawing_sheet_id', sheet.id)
+
+    if (existingRuns?.length > 0 && imageSizeRef.current) {
+      const { w: imgW, h: imgH } = imageSizeRef.current
+      for (const run of existingRuns) {
+        if (!run.points || run.points.length < 2) continue
+        let pixels = 0
+        for (let i = 1; i < run.points.length; i++) {
+          const dx = (run.points[i].x - run.points[i-1].x) * imgW
+          const dy = (run.points[i].y - run.points[i-1].y) * imgH
+          pixels += Math.sqrt(dx*dx + dy*dy)
+        }
+        const footage      = Math.round(pixels * ratio)
+        const totalFootage = Math.round(footage * (1 + (run.waste_factor || 10) / 100))
+        await supabase.from('cable_runs')
+          .update({ footage, total_footage: totalFootage })
+          .eq('id', run.id)
+      }
+      // Reload cable runs to update canvas
+      const { data: updatedRuns } = await supabase
+        .from('cable_runs').select('*').eq('drawing_sheet_id', sheet.id)
+      if (updatedRuns) setCableRuns(updatedRuns)
+    }
+
     setShowScaleModal(false)
     setManualScale('')
     setRealDistance('')
