@@ -33,8 +33,10 @@ const STYLE_CATEGORY_MAP = {
   'Box':     'Bullet Camera',
   'Covert':  'Dome Camera',
   'Fisheye':       'Fisheye Camera',
-  'Multi-Sensor':  'Multi Sensor Camera',
-  'Multi Sensor':  'Multi Sensor Camera',
+  'Multi-Sensor':        'Multi Sensor Camera',
+  'Multi Sensor':        'Multi Sensor Camera',
+  'Multi-image sensor':  'Multi Sensor Camera',
+  'Multi-Image Sensor':  'Multi Sensor Camera',
   'Other':   'Dome Camera',
 }
 
@@ -127,7 +129,7 @@ async function parseSystemSurveyorFile(file) {
     if (!mfr) continue  // skip empty columns
 
     const partNum = getVal('Component Model #', offset) || model
-        const style   = getVal('Camera Style', offset)
+        const style   = getVal('Camera Style', offset) || getVal('Camera Type', offset)
     const fovAngle = getVal('AOC Angle', offset)
         if (offset === 0) {
       console.log('Label map keys:', Object.keys(labelMap).slice(0, 20))
