@@ -115,7 +115,12 @@ async function parseSystemSurveyorFile(file) {
     const partNum = getVal('Component Model #', offset) || model
         const style   = getVal('Camera Style', offset)
     const fovAngle = getVal('AOC Angle', offset)
-    if (offset < 3) console.log(`Product ${offset}: style="${style}" fov="${fovAngle}" model="${partNum}"`)
+        if (offset === 0) {
+      console.log('Label map keys:', Object.keys(labelMap).slice(0, 20))
+      console.log('Product 0 style:', getVal('Camera Style', 0))
+      console.log('Product 0 mfr:', getVal('Component Manufacturer', 0))
+    }
+
 
     const intExt  = getVal('Interior or Exterior?', offset)
     const hasIR   = getVal('      Embedded Infra-red (IR)', offset) === 'YES'
