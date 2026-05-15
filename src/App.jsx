@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { supabase } from './supabase'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -176,6 +176,7 @@ sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
     </div>
   )
 
+  const location = useLocation()
   const role = profile?.org_role || profile?.role || 'rep'
   const isSalesManager = role === 'sales_manager'
   const isPM = role === 'project_manager'
@@ -190,7 +191,7 @@ sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
           <button onClick={() => { localStorage.removeItem('sa_impersonate'); window.location.reload() }} className="underline hover:no-underline ml-4">Exit</button>
         </div>
       )}
-    <Routes>
+    <Routes location={location} key={location.key}>
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/sign/:token" element={<SignProposal />} />
       <Route path="/rfq-response/:token" element={<RFQResponse />} />
