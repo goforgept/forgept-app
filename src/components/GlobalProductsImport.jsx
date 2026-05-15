@@ -302,14 +302,15 @@ export default function GlobalProductsImport({ onClose, onImported }) {
         .upsert(batch, { onConflict: 'part_number' })
         .select('id')
 
-      if (error) console.error('Batch error:', error)
-
-      if (error) {
+            if (error) {
         console.error('Batch import error:', error)
+        console.error('Error details:', JSON.stringify(error))
+        console.error('Batch sample:', batch[0])
         skippedCount += batch.length
       } else {
         importedCount += data?.length || batch.length
       }
+
 
       setProgress(Math.round(((i + BATCH) / toImport.length) * 100))
     }
