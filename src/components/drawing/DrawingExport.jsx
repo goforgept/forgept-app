@@ -239,7 +239,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     const rows = []
 
     // Header
-    rows.push(['Section', 'Device Address', 'Part Number', 'Name', 'Manufacturer', 'Category', 'Qty', 'Notes'])
+    rows.push(['Device Address', 'Part Number', 'Name', 'Manufacturer', 'Category', 'Qty', 'Notes'])
 
     // Devices — aggregated by part number across all sheets
     const deviceMap = {}
@@ -262,7 +262,6 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
     Object.values(deviceMap).forEach(d => {
       rows.push([
-        '',
         d.addresses.join(', '),
         d.part_number,
         d.name,
@@ -276,19 +275,19 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     // Components
     if (components.length > 0) {
       rows.push([])
-      rows.push(['COMPONENTS & HARDWARE', '', '', '', '', '', '', ''])
-      rows.push(['Type', 'Name', 'Part Number', 'Manufacturer', 'Qty', 'Notes', '', ''])
+      rows.push(['COMPONENTS & HARDWARE', '', '', '', '', '', ''])
+      rows.push(['Type', 'Name', 'Part Number', 'Manufacturer', 'Qty', 'Notes', ''])
       components.forEach(c => {
-        rows.push([c.component_type, c.name || '', c.part_number || '', c.manufacturer || '', c.quantity || 1, c.notes || '', '', ''])
+        rows.push([c.component_type, c.name || '', c.part_number || '', c.manufacturer || '', c.quantity || 1, c.notes || '', ''])
       })
     }
 
     // Cable summary
     rows.push([])
-    rows.push(['CABLE SUMMARY', '', '', '', '', '', '', ''])
-    rows.push(['Cable Type', 'Runs', 'Measured (ft)', 'With Waste (ft)', '', '', '', ''])
+    rows.push(['CABLE SUMMARY', '', '', '', '', '', ''])
+    rows.push(['Cable Type', 'Runs', 'Measured (ft)', 'With Waste (ft)', '', '', ''])
     Object.entries(cableByType).forEach(([type, data]) => {
-      rows.push([type, data.runs || '', Math.round(data.footage), Math.round(data.total_footage), '', '', '', ''])
+      rows.push([type, data.runs || '', Math.round(data.footage) || '—', Math.round(data.total_footage) || '—', '', '', ''])
     })
 
     // Vertical rises
