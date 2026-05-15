@@ -424,6 +424,18 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
             ))}
           </div>
 
+          {/* Sign out — shown for designer-only users who have no sidebar */}
+          {featureDesignerOnly && !featureDrawingTool && (
+            <button
+              onClick={async () => { sessionStorage.removeItem('orgType'); await supabase.auth.signOut() }}
+              className="w-8 h-8 flex items-center justify-center rounded-lg border border-[#2a3d55] text-[#8A9AB0] hover:text-white hover:border-[#C8622A]/40 transition-colors"
+              title="Sign out">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+              </svg>
+            </button>
+          )}
+
           {/* Symbol picker toggle */}
           {activeTab === 'canvas' && sheets.length > 0 && (
             <button onClick={() => setSidebarOpen(s => !s)}
