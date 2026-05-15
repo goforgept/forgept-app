@@ -251,9 +251,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     if (components.length > 0) {
       rows.push([])
       rows.push(['COMPONENTS & HARDWARE', '', '', '', '', '', ''])
-      rows.push(['Type', 'Name', 'Part Number', 'Manufacturer', 'Qty', 'Notes', ''])
+      rows.push(['Type', 'Part Number', 'Name', 'Manufacturer', 'Qty', 'Notes', ''])
       components.forEach(c => {
-        rows.push([c.component_type, c.name || '', c.part_number || '', c.manufacturer || '', c.quantity || 1, c.notes || '', ''])
+        rows.push([c.component_type, c.part_number || '', c.name || '', c.manufacturer || '', c.quantity || 1, c.notes || '', ''])
       })
     }
 
