@@ -27,6 +27,7 @@ export default function Designer({ featureDrawingTool }) {
   const [updatedCable,      setUpdatedCable]      = useState(null)
   const [copiedPlacement,   setCopiedPlacement]   = useState(null)
   const [showLabels,        setShowLabels]        = useState(() => localStorage.getItem('designer_show_labels') !== 'false')
+  const [industryFilter,    setIndustryFilter]    = useState('all')
   const stageRefs = useRef({}) // sheetId -> Konva stage
   const [bomRefreshKey,          setBomRefreshKey]          = useState(0)
   const [placementsRefreshKey,   setPlacementsRefreshKey]   = useState(0)

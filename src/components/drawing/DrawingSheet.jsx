@@ -94,7 +94,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [wasteFactor,    setWasteFactor]    = useState(10)
   const [editingCable,   setEditingCable]   = useState(null) // cable id being edited
   const [dragPoint,      setDragPoint]      = useState(null) // {cableId, pointIndex}
-  const [hoveredWaypoint, setHoveredWaypoint] = useState(null) // {cableId, pointIndex}
+  const [hoveredWaypoint,  setHoveredWaypoint]  = useState(null)
+  const [industryFilter,   setIndustryFilter]   = useState('all')
   const copiedPlacement    = externalCopied
   const setCopiedPlacement = onCopyPlacement || (() => {})
   const [contextMenu,     setContextMenu]     = useState(null) // {x, y, placementId}
@@ -677,6 +678,28 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             </svg>
             Labels
           </button>
+          {/* Industry filter */}
+          <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5 border border-[#2a3d55]">
+            {[
+              { id: 'all',        label: 'All' },
+              { id: 'security',   label: 'SEC' },
+              { id: 'av',         label: 'AV' },
+              { id: 'fire_alarm', label: 'FA' },
+              { id: 'low_voltage',label: 'LV' },
+              { id: 'hvac',       label: 'HVAC' },
+            ].map(f => (
+              <button key={f.id}
+                onClick={() => setIndustryFilter(f.id)}
+                className={`px-1.5 py-0.5 rounded text-xs transition-colors ${
+                  industryFilter === f.id
+                    ? 'bg-[#C8622A] text-white'
+                    : 'text-[#8A9AB0] hover:text-white'
+                }`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
           <button
             onClick={() => {
               setCableMode(s => !s)
@@ -1166,6 +1189,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                     isSelected={isSelected} isHovered={isHovered}
                     cableMode={cableMode}
                     showLabels={showLabels}
+                    opacity={industryFilter === 'all' || placement.global_products?.industry === industryFilter ? 1 : 0.15}
                     markerColor={placement.marker_color || '#C8622A'}
                     onContextMenu={(e) => {
                       const pointer = stageRef.current.getPointerPosition()
@@ -1430,7 +1454,7 @@ function ContextMenu({ contextMenu, copiedPlacement, onCopy, onPaste, onRotate, 
 
 // ─── PlacementMarker ──────────────────────────────────────────────────────────
 function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isHovered,
-  cableMode, showLabels, markerColor, onSelect, onCableSnap, onContextMenu, onHoverStart, onHoverEnd, onDelete, onRotate, onDragEnd }) {
+  cableMode, showLabels, opacity, markerColor, onSelect, onCableSnap, onContextMenu, onHoverStart, onHoverEnd, onDelete, onRotate, onDragEnd }) {
   const markerScale = isSelected ? 1.25 : isHovered ? 1.1 : 1
   const totalSize   = size * markerScale
   const iconSize    = totalSize * 0.65
@@ -1439,6 +1463,7 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
 
   return (
     <Group x={x} y={y}
+      opacity={opacity ?? 1}
       draggable={!cableMode}
       onClick={cableMode ? onCableSnap : onSelect}
       onTap={cableMode ? onCableSnap : onSelect}
