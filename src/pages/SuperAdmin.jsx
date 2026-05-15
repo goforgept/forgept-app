@@ -277,7 +277,8 @@ export default function SuperAdmin() {
 
       await Promise.all(dels)
 
-      // Delete org-level tables
+      // Delete proposals and everything that can run alongside them
+      // (pipeline_stages must come AFTER proposals because proposals.pipeline_stage_id FK references it)
       await Promise.all([
         supabase.from('activities').delete().eq('org_id', orgId),
         supabase.from('proposals').delete().eq('org_id', orgId),
@@ -292,11 +293,13 @@ export default function SuperAdmin() {
         supabase.from('contracts').delete().eq('org_id', orgId),
         supabase.from('tasks').delete().eq('org_id', orgId),
         supabase.from('product_library').delete().eq('org_id', orgId),
-        supabase.from('pipeline_stages').delete().eq('org_id', orgId),
         supabase.from('labor_rates').delete().eq('org_id', orgId),
         supabase.from('targets').delete().eq('org_id', orgId),
         supabase.from('client_emails').delete().eq('org_id', orgId),
       ])
+
+      // pipeline_stages after proposals are confirmed gone (proposals.pipeline_stage_id FK)
+      await supabase.from('pipeline_stages').delete().eq('org_id', orgId)
 
       // Delete auth users (requires service role — done via edge function)
       await supabase.functions.invoke('delete-org-users', { body: { orgId } })
