@@ -152,56 +152,6 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       }
     }
 
-    // Cable runs
-    const sheetCables = cableRuns.filter(r => r.drawing_sheet_id === sheet.id)
-    sheetCables.forEach(run => {
-      if (!run.points || run.points.length < 2) return
-      const col = run.color || '#3b82f6'
-      pdf.setDrawColor(parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16))
-      pdf.setLineWidth(0.3)
-      for (let i = 1; i < run.points.length; i++) {
-        const x1 = imgX + run.points[i-1].x * imgW
-        const y1 = imgY + run.points[i-1].y * imgH
-        const x2 = imgX + run.points[i].x * imgW
-        const y2 = imgY + run.points[i].y * imgH
-        pdf.line(x1, y1, x2, y2)
-      }
-      // Cable label at midpoint — rotated to follow cable direction
-      if (run.label || run.cable_type) {
-        let totalLen = 0
-        const segs = []
-        for (let si = 1; si < run.points.length; si++) {
-          const sdx = (run.points[si].x - run.points[si-1].x) * imgW
-          const sdy = (run.points[si].y - run.points[si-1].y) * imgH
-          const len = Math.sqrt(sdx*sdx + sdy*sdy)
-          segs.push({ len, i: si })
-          totalLen += len
-        }
-        let halfLen = totalLen / 2
-        let midIdx  = 1
-        for (const seg of segs) {
-          if (halfLen <= seg.len) { midIdx = seg.i; break }
-          halfLen -= seg.len
-        }
-        const p1   = run.points[Math.max(0, midIdx - 1)]
-        const p2   = run.points[midIdx]
-        const t    = halfLen / Math.max(1, segs[midIdx-1]?.len || 1)
-        const mx   = imgX + (p1.x + (p2.x - p1.x) * t) * imgW
-        const my   = imgY + (p1.y + (p2.y - p1.y) * t) * imgH
-        const dx   = (p2.x - p1.x) * imgW
-        const dy   = (p2.y - p1.y) * imgH
-        let angle  = Math.atan2(dy, dx) * 180 / Math.PI
-        if (angle > 90)  angle -= 180
-        if (angle < -90) angle += 180
-        const labelText = run.label
-          ? `${run.label} · ${run.cable_type}${run.total_footage > 0 ? ` · ${Math.round(run.total_footage)}ft` : ''}`
-          : `${run.cable_type}${run.total_footage > 0 ? ` · ${Math.round(run.total_footage)}ft` : ''}`
-        pdf.setTextColor(parseInt(col.slice(1,3),16), parseInt(col.slice(3,5),16), parseInt(col.slice(5,7),16))
-        pdf.setFontSize(4)
-        pdf.setFont('helvetica', 'normal')
-        pdf.text(labelText, mx, my - 1, { align: 'center', angle: -angle })
-      }
-    })
 
     // Device markers + FOV
     const sheetPlacements = placementsBySheet[sheet.id] || []
