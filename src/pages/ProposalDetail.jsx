@@ -2110,14 +2110,25 @@ const analyzeDrawing = async () => {
 
     if (profile?.logo_url) {
       const img = new Image()
+      img.crossOrigin = 'anonymous'
       img.src = profile.logo_url
       await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
-      const maxW = 50, maxH = 26
-      const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
-      const logoW = img.naturalWidth * ratio
-      const logoH = img.naturalHeight * ratio
-      const logoY = 8 + (maxH - logoH) / 2
-      doc.addImage(img, 'PNG', 14, logoY, logoW, logoH)
+      if (img.naturalWidth > 0) {
+        try {
+          const maxW = 50, maxH = 26
+          const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+          const logoW = img.naturalWidth * ratio
+          const logoH = img.naturalHeight * ratio
+          const logoY = 8 + (maxH - logoH) / 2
+          doc.addImage(img, 'PNG', 14, logoY, logoW, logoH)
+        } catch {
+          doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont('helvetica', 'bold')
+          doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
+        }
+      } else {
+        doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont('helvetica', 'bold')
+        doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
+      }
     } else {
       doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont('helvetica', 'bold')
       doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
