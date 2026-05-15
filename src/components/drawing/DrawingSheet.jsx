@@ -678,6 +678,20 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             </svg>
             Labels
           </button>
+          <button
+            onClick={() => setShowCableRuns(s => !s)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+              showCableRuns
+                ? 'border-[#C8622A]/40 bg-[#C8622A]/10 text-[#C8622A]'
+                : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
+            }`}
+            title="Toggle cable runs">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16M4 12l4-4M4 12l4 4"/>
+            </svg>
+            Cables
+          </button>
+
           {/* Industry filter */}
           <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5 border border-[#2a3d55]">
             {[
@@ -1089,7 +1103,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                       })}
 
                       {/* Label along cable — rotated to follow cable direction */}
-                      {(run.total_footage > 0 || run.label || run.cable_type) && (() => {
+                      {showLabels !== false && (run.total_footage > 0 || run.label || run.cable_type) && (() => {
                         // Find true midpoint along the cable path
                         let totalLen = 0
                         const segs = []
