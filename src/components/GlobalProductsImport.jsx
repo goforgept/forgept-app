@@ -119,6 +119,9 @@ async function parseSystemSurveyorFile(file) {
       console.log('Label map keys:', Object.keys(labelMap).slice(0, 20))
       console.log('Product 0 style:', getVal('Camera Style', 0))
       console.log('Product 0 mfr:', getVal('Component Manufacturer', 0))
+      console.log('Element type:', elementType)
+      console.log('Row 1 raw:', rawRows[0]?.slice(0, 8).map(v => String(v || '')))
+      console.log('Row 3 raw:', rawRows[2]?.slice(0, 8).map(v => String(v || '')))
     }
 
 
@@ -126,10 +129,22 @@ async function parseSystemSurveyorFile(file) {
     const hasIR   = getVal('      Embedded Infra-red (IR)', offset) === 'YES'
 
     // Determine category — only override with camera style if it's a camera element type
-        const isCameraElement = elementType?.toLowerCase().includes('camera') || !!style
-    let category = ELEMENT_TYPE_MAP[elementType]?.defaultCategory || 'Dome Camera'
+        // Get category from element type map first
+    let category = ELEMENT_TYPE_MAP[elementType]?.defaultCategory || null
+
+    // Override with camera style if available
     if (style && STYLE_CATEGORY_MAP[style]) {
       category = STYLE_CATEGORY_MAP[style]
+    }
+
+    // If still no category, use element type clues or default
+    if (!category) {
+      if (style) category = STYLE_CATEGORY_MAP[style] || 'Dome Camera'
+      else if (elementType?.toLowerCase().includes('ptz')) category = 'PTZ Camera'
+      else if (elementType?.toLowerCase().includes('sensor')) category = 'Sensor'
+      else if (elementType?.toLowerCase().includes('reader')) category = 'Access Reader'
+      else if (elementType?.toLowerCase().includes('access')) category = 'Access Control Door'
+      else category = 'Dome Camera'
     }
 
 
