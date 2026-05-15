@@ -209,6 +209,17 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     })
   }
 
+  // ── Load org logo safely (CORS-safe, falls back to null) ──────────────────
+  const loadOrgLogo = async () => {
+    if (!orgProfile?.logo_url) return null
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.src = orgProfile.logo_url
+    await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+    if (img.naturalWidth === 0) return null
+    return img
+  }
+
   // ── CSV BOM Export ─────────────────────────────────────────────────────────
   const handleCSVExport = () => {
     const rows = []
@@ -311,16 +322,29 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const pageH = pdf.internal.pageSize.getHeight()
       const margin = 10
 
+      const logoImg = await loadOrgLogo()
+
       // ── Legend page ──────────────────────────────────────────────────────
       // Title
       pdf.setFillColor(15, 28, 46)
       pdf.rect(0, 0, pageW, pageH, 'F')
 
-      // Company name
-      pdf.setTextColor(255, 255, 255)
-      pdf.setFontSize(22)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text(orgProfile?.company_name || 'ForgePt', margin, 20)
+      // Company logo or name
+      if (logoImg) {
+        try {
+          const maxW = 50, maxH = 18
+          const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+          pdf.addImage(logoImg, 'PNG', margin, 8, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
+        } catch {
+          pdf.setTextColor(255, 255, 255); pdf.setFontSize(22); pdf.setFont('helvetica', 'bold')
+          pdf.text(orgProfile?.company_name || 'ForgePt', margin, 20)
+        }
+      } else {
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(22)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(orgProfile?.company_name || 'ForgePt', margin, 20)
+      }
 
       // Project name
       pdf.setFontSize(14)
@@ -500,9 +524,26 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW - margin - 2, pageH - titleBlockH - margin + 15, { align: 'right' })
       }
 
+      const logoImg = await loadOrgLogo()
+
       // ── Title sheet ──────────────────────────────────────────────────────
       pdf.setFillColor(15, 28, 46)
       pdf.rect(0, 0, pageW, pageH, 'F')
+
+      // Logo or company name top-left
+      if (logoImg) {
+        try {
+          const maxW = 55, maxH = 22
+          const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+          pdf.addImage(logoImg, 'PNG', margin, margin, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
+        } catch {
+          pdf.setTextColor(200, 98, 42); pdf.setFontSize(12); pdf.setFont('helvetica', 'bold')
+          pdf.text(orgProfile?.company_name || '', margin, margin + 8)
+        }
+      } else if (orgProfile?.company_name) {
+        pdf.setTextColor(200, 98, 42); pdf.setFontSize(12); pdf.setFont('helvetica', 'bold')
+        pdf.text(orgProfile.company_name, margin, margin + 8)
+      }
 
       pdf.setTextColor(200, 98, 42)
       pdf.setFontSize(28)
@@ -699,9 +740,27 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const pageH  = pdf.internal.pageSize.getHeight()
       const margin = 10
 
+      const logoImg = await loadOrgLogo()
+
       // Title
       pdf.setFillColor(15,28,46)
       pdf.rect(0,0,pageW,pageH,'F')
+
+      // Logo or company name top-left
+      if (logoImg) {
+        try {
+          const maxW = 55, maxH = 22
+          const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+          pdf.addImage(logoImg, 'PNG', margin, margin, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
+        } catch {
+          pdf.setTextColor(200,98,42); pdf.setFontSize(12); pdf.setFont('helvetica','bold')
+          pdf.text(orgProfile?.company_name || '', margin, margin + 8)
+        }
+      } else if (orgProfile?.company_name) {
+        pdf.setTextColor(200,98,42); pdf.setFontSize(12); pdf.setFont('helvetica','bold')
+        pdf.text(orgProfile.company_name, margin, margin + 8)
+      }
+
       pdf.setTextColor(200,98,42)
       pdf.setFontSize(28)
       pdf.setFont('helvetica','bold')
