@@ -168,11 +168,12 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       }
       // Cable label at midpoint — rotated to follow cable direction
       if (run.label || run.cable_type) {
-        const mid  = Math.floor(run.points.length / 2)
-        const mx   = imgX + run.points[mid].x * imgW
-        const my   = imgY + run.points[mid].y * imgH
-        const p1   = run.points[Math.max(0, mid - 1)]
-        const p2   = run.points[Math.min(run.points.length - 1, mid + 1)]
+        const midX = (run.points[0].x + run.points[run.points.length-1].x) / 2
+        const midY = (run.points[0].y + run.points[run.points.length-1].y) / 2
+        const mx   = imgX + midX * imgW
+        const my   = imgY + midY * imgH
+        const p1   = run.points[0]
+        const p2   = run.points[run.points.length - 1]
         const dx   = (p2.x - p1.x) * imgW
         const dy   = (p2.y - p1.y) * imgH
         let angle  = Math.atan2(dy, dx) * 180 / Math.PI

@@ -1067,13 +1067,15 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
                       {/* Label along cable — rotated to follow cable direction */}
                       {(run.total_footage > 0 || run.label || run.cable_type) && (() => {
-                        const mid  = Math.floor(run.points.length / 2)
-                        const mx   = position.x + run.points[mid].x * canvasW * scale
-                        const my   = position.y + run.points[mid].y * canvasH * scale
+                        // True midpoint between first and last point
+                        const midX = (run.points[0].x + run.points[run.points.length-1].x) / 2
+                        const midY = (run.points[0].y + run.points[run.points.length-1].y) / 2
+                        const mx   = position.x + midX * canvasW * scale
+                        const my   = position.y + midY * canvasH * scale
 
-                        // Calculate angle of cable at midpoint
-                        const p1   = run.points[Math.max(0, mid - 1)]
-                        const p2   = run.points[Math.min(run.points.length - 1, mid + 1)]
+                        // Calculate angle using first and last point
+                        const p1   = run.points[0]
+                        const p2   = run.points[run.points.length - 1]
                         const dx   = (p2.x - p1.x) * canvasW * scale
                         const dy   = (p2.y - p1.y) * canvasH * scale
                         let angle  = Math.atan2(dy, dx) * 180 / Math.PI
