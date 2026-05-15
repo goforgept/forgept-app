@@ -1051,14 +1051,22 @@ export default function SuperAdmin() {
             </div>
             <div className="mb-4">
               <label className="text-[#8A9AB0] text-xs mb-1 block">Type <span className="text-white font-mono">{deleteModal.name}</span> to confirm</label>
-              <input type="text" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)}
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                onKeyDown={e => {
+                  e.stopPropagation()
+                  if (e.key === 'Enter' && deleteConfirmText === deleteModal.name && !deletingOrg) deleteOrg()
+                }}
                 placeholder={deleteModal.name}
+                autoFocus
                 className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { setDeleteModal(null); setDeleteConfirmText('') }}
+              <button type="button" onClick={() => { setDeleteModal(null); setDeleteConfirmText('') }}
                 className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-              <button onClick={deleteOrg} disabled={deletingOrg || deleteConfirmText !== deleteModal.name}
+              <button type="button" onClick={deleteOrg} disabled={deletingOrg || deleteConfirmText !== deleteModal.name}
                 className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50">
                 {deletingOrg ? 'Deleting...' : 'Delete Everything'}
               </button>
