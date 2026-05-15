@@ -31,15 +31,17 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
         .insert({
           org_id:        profile.org_id,
           proposal_name: `Project ${new Date().toLocaleDateString()}`,
-          status:        'draft',
-          created_by:    user.id,
+          status:        'Draft',
+          user_id:       user.id,
         })
         .select('id')
         .single()
 
-      if (!error && proposal) {
-        navigate(`/designer/${proposal.id}`)
+      if (error) {
+        console.error('Failed to create project:', error)
+        return
       }
+      if (proposal) navigate(`/designer/${proposal.id}`)
     } catch (err) {
       console.error('Failed to create project:', err)
     }
