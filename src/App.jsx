@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './supabase'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -94,7 +94,7 @@ function App() {
     for (let i = 0; i < 5; i++) {
       const { data } = await supabase
         .from('profiles')
-        .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring, feature_drawing_tool)')
+        .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring, feature_drawing_tool, feature_designer_only)')
         .eq('id', userId)
         .single()
 
@@ -119,7 +119,7 @@ function App() {
 
     const { data } = await supabase
       .from('profiles')
-      .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring, feature_drawing_tool)')
+      .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring, feature_drawing_tool, feature_designer_only)')
       .eq('id', userId)
       .single()
     setProfile(data)
@@ -151,7 +151,9 @@ function App() {
   const featureSitePhotos = profile?.organizations?.feature_site_photos !== false
   const featureSla = profile?.organizations?.feature_sla || false
   const featureMonitoring = profile?.organizations?.feature_monitoring || false
-  const featureDrawingTool = profile?.organizations?.feature_drawing_tool || false
+  const featureDrawingTool   = profile?.organizations?.feature_drawing_tool   || false
+  const featureDesignerOnly  = profile?.organizations?.feature_designer_only  || false
+  sessionStorage.setItem('featureDesignerOnly', featureDesignerOnly)
   sessionStorage.setItem('featureSla', featureSla)
 sessionStorage.setItem('featureMonitoring', featureMonitoring)
 sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
@@ -181,7 +183,7 @@ sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
   const isSalesManager = role === 'sales_manager'
   const isPM = role === 'project_manager'
   const isTechnician = role === 'technician'
-  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail, featurePurchaseOrders, featureInvoices, featureAiBom, featureSitePhotos, featureSla, featureMonitoring, featureDrawingTool, role, isSalesManager, isPM, isTechnician }
+  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail, featurePurchaseOrders, featureInvoices, featureAiBom, featureSitePhotos, featureSla, featureMonitoring, featureDrawingTool, featureDesignerOnly, role, isSalesManager, isPM, isTechnician }
 
   return (
     <>
@@ -200,7 +202,9 @@ sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
       ) : (
         <>
           <Route path="/" element={
-            isAdmin || isSalesManager
+            featureDesignerOnly
+              ? <Navigate to="/designer" replace />
+              : isAdmin || isSalesManager
               ? <AdminDashboard {...sharedProps} />
               : isPM
               ? <AdminDashboard {...sharedProps} defaultMode="pm" />
@@ -242,8 +246,9 @@ sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
           <Route path="/integrations/microsoft/callback" element={<MicrosoftCallback />} />
           <Route path="/product-library" element={<ProductLibrary {...sharedProps} />} />
           {(featureSla || featureMonitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
-          {featureDrawingTool && <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />}
-          {featureDrawingTool && <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />}
+          {(featureDrawingTool || featureDesignerOnly) && <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />}
+          {(featureDrawingTool || featureDesignerOnly) && <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />}
+          {featureDesignerOnly && <Route path="*" element={<Navigate to="/designer" replace />} />}
           <Route path="/designer/review/:token" element={<DrawingReview />} />
         </>
       )}

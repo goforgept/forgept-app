@@ -139,7 +139,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
   }
 ]
 
-export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
+export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, featureDesignerOnly = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
   const location = useLocation()
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
@@ -181,7 +181,17 @@ const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featu
     await supabase.auth.signOut()
   }
 
-  const groups = isAdmin || isSalesManager
+  const isDesignerOnly = featureDesignerOnly || sessionStorage.getItem('featureDesignerOnly') === 'true'
+  const groups = isDesignerOnly
+    ? [{
+        key: 'designer',
+        label: 'Designer',
+        links: [
+          { label: 'My Projects', path: '/designer', icon: '📐' },
+          { label: 'Settings', path: '/settings', icon: '⚙️' },
+        ]
+      }]
+    : isAdmin || isSalesManager
     ? NAV_GROUPS_ADMIN(featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool || sessionStorage.getItem('featureDrawingTool') === 'true')
     : isPM
     ? NAV_GROUPS_PM(featurePurchaseOrders, featureInvoices)

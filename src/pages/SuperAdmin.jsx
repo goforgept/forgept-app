@@ -266,7 +266,8 @@ export default function SuperAdmin() {
       feature_invoices: org.feature_invoices !== false,
       feature_ai_bom: org.feature_ai_bom || false,
       feature_site_photos: org.feature_site_photos !== false,
-      feature_drawing_tool: org.feature_drawing_tool || false,
+      feature_drawing_tool:   org.feature_drawing_tool   || false,
+      feature_designer_only:  org.feature_designer_only  || false,
     })
   }
 
@@ -281,7 +282,8 @@ export default function SuperAdmin() {
       feature_invoices: orgForm.feature_invoices,
       feature_ai_bom: orgForm.feature_ai_bom,
       feature_site_photos: orgForm.feature_site_photos,
-      feature_drawing_tool: orgForm.feature_drawing_tool,
+      feature_drawing_tool:  orgForm.feature_drawing_tool,
+      feature_designer_only: orgForm.feature_designer_only,
     }).eq('id', orgId)
     setEditingOrg(null)
     fetchData()
@@ -625,6 +627,14 @@ export default function SuperAdmin() {
                               <button onClick={() => setOrgForm(p => ({ ...p, feature_drawing_tool: !p.feature_drawing_tool }))}
                                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_drawing_tool ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
                                 <span>{orgForm.feature_drawing_tool ? '✓' : '○'}</span> Designer
+                              </button>
+                              <button onClick={() => setOrgForm(p => ({ 
+                                ...p, 
+                                feature_designer_only: !p.feature_designer_only,
+                                feature_drawing_tool: !p.feature_designer_only ? true : p.feature_drawing_tool
+                              }))}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_designer_only ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                <span>{orgForm.feature_designer_only ? '✓' : '○'}</span> Designer Only
                               </button>
                               <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold ${orgForm.feature_proposals && orgForm.feature_crm ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
                                 {orgForm.feature_proposals && orgForm.feature_crm ? '✓ Full Suite' : '○ Full Suite'}
