@@ -241,22 +241,36 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     // Header
     rows.push(['Section', 'Device Address', 'Part Number', 'Name', 'Manufacturer', 'Category', 'Qty', 'Notes'])
 
-    // Devices per sheet
-    sheets.forEach(sheet => {
-      const sheetPlacements = placementsBySheet[sheet.id] || []
-      sheetPlacements.forEach(p => {
-        const gp = p.global_products
-        rows.push([
-          sheet.name,
-          p.device_address || '',
-          p.part_number_override || gp?.part_number || '',
-          p.description_override || gp?.name || '',
-          p.manufacturer_override || gp?.manufacturer || '',
-          gp?.category || '',
-          p.quantity || 1,
-          p.notes || '',
-        ])
-      })
+    // Devices — aggregated by part number across all sheets
+    const deviceMap = {}
+    placements.forEach(p => {
+      const gp  = p.global_products
+      const key = p.part_number_override || gp?.part_number || 'unknown'
+      if (!deviceMap[key]) {
+        deviceMap[key] = {
+          part_number:  p.part_number_override  || gp?.part_number  || '',
+          name:         p.description_override  || gp?.name         || '',
+          manufacturer: p.manufacturer_override || gp?.manufacturer || '',
+          category:     gp?.category || '',
+          qty:          0,
+          addresses:    [],
+        }
+      }
+      deviceMap[key].qty += p.quantity || 1
+      if (p.device_address) deviceMap[key].addresses.push(p.device_address)
+    })
+
+    Object.values(deviceMap).forEach(d => {
+      rows.push([
+        '',
+        d.addresses.join(', '),
+        d.part_number,
+        d.name,
+        d.manufacturer,
+        d.category,
+        d.qty,
+        '',
+      ])
     })
 
     // Components
