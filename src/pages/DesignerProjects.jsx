@@ -7,7 +7,7 @@ import Sidebar from '../components/Sidebar'
 // Entry point for full ForgePt users accessing Designer from Sidebar.
 // Shows all proposals that have drawing sheets, plus quick access to start
 // a new drawing on any proposal.
-export default function DesignerProjects({ isAdmin, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, featureSla, featureMonitoring, featureDrawingTool, role, isSalesManager, isPM, isTechnician }) {
+export default function DesignerProjects({ isAdmin, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, featureSla, featureMonitoring, featureDrawingTool, featureDesignerOnly, role, isSalesManager, isPM, isTechnician }) {
   const navigate = useNavigate()
   const [projects, setProjects]   = useState([])
   const [proposals, setProposals] = useState([])
@@ -18,6 +18,32 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
   useEffect(() => {
     load()
   }, [])
+
+  const handleNewProject = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profile }  = await supabase
+        .from('profiles').select('org_id').eq('id', user.id).single()
+
+      // Create a minimal proposal for designer-only users
+      const { data: proposal, error } = await supabase
+        .from('proposals')
+        .insert({
+          org_id:        profile.org_id,
+          proposal_name: `Project ${new Date().toLocaleDateString()}`,
+          status:        'draft',
+          created_by:    user.id,
+        })
+        .select('id')
+        .single()
+
+      if (!error && proposal) {
+        navigate(`/designer/${proposal.id}`)
+      }
+    } catch (err) {
+      console.error('Failed to create project:', err)
+    }
+  }
 
   const load = async () => {
     setLoading(true)
@@ -126,6 +152,7 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
         featureSla={featureSla}
         featureMonitoring={featureMonitoring}
         featureDrawingTool={featureDrawingTool}
+        featureDesignerOnly={featureDesignerOnly}
         role={role}
         isSalesManager={isSalesManager}
         isPM={isPM}
@@ -145,6 +172,13 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
               Floor plan design and device takeoff tool
             </p>
           </div>
+          <button onClick={handleNewProject}
+            className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+            </svg>
+            New Project
+          </button>
         </div>
 
         {/* Search and filter */}

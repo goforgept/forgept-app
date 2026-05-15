@@ -6,7 +6,7 @@ import SymbolPicker from '../components/drawing/SymbolPicker'
 import DrawingBOMPreview from '../components/drawing/DrawingBOMPreview'
 import DrawingExport from '../components/drawing/DrawingExport'
 
-export default function Designer({ featureDrawingTool }) {
+export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const { proposalId } = useParams()
   const navigate       = useNavigate()
 
@@ -40,7 +40,7 @@ export default function Designer({ featureDrawingTool }) {
   const [nicetNumber, setNicetNumber] = useState('')
 
   useEffect(() => {
-    if (featureDrawingTool === false) { navigate('/'); return }
+    if (featureDrawingTool === false && !featureDesignerOnly) { navigate('/'); return }
     load()
   }, [proposalId])
 
