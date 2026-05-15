@@ -7,7 +7,8 @@ const ELEMENT_TYPE_MAP = {
   'PTZ Camera Element Profile Template':     { industry: 'security', defaultCategory: 'PTZ Camera' },
   'Dome Camera Element Profile Template':    { industry: 'security', defaultCategory: 'Dome Camera' },
   'Bullet Camera Element Profile Template':  { industry: 'security', defaultCategory: 'Bullet Camera' },
-  'Multi Sensor Camera Element Profile Template': { industry: 'security', defaultCategory: 'Multi Sensor Camera' },
+  'Multi Sensor Camera Element Profile Template': { industry: 'security', defaultCategory: 'Multi Sensor Camera', preserveCategory: true },
+  'Multi-Lens Camera Element Profile Template':   { industry: 'security', defaultCategory: 'Multi Sensor Camera', preserveCategory: true },
   'Access Reader Element Profile Template':  { industry: 'security', defaultCategory: 'Access Reader' },
   'Access Control Element Profile Template': { industry: 'security', defaultCategory: 'Access Control Door' },
   'Controller Element Profile Template':     { industry: 'security', defaultCategory: 'Controller' },
@@ -37,6 +38,7 @@ const STYLE_CATEGORY_MAP = {
   'Multi Sensor':        'Multi Sensor Camera',
   'Multi-image sensor':  'Multi Sensor Camera',
   'Multi-Image Sensor':  'Multi Sensor Camera',
+  'Panoramic':           'Multi Sensor Camera',
   'Other':   'Dome Camera',
 }
 
@@ -168,8 +170,8 @@ async function parseSystemSurveyorFile(file) {
       console.log('Style raw value:', JSON.stringify(style), '| styleKey:', styleKey, '| category before style:', category)
     }
 
-    // Only apply camera style override when we know this is a camera element
-    if (isCameraType && styleKey) {
+    // Apply camera style override — but not for element types with a definitive category
+    if (isCameraType && styleKey && !mapping?.preserveCategory) {
       category = STYLE_CATEGORY_MAP[styleKey]
     }
 
@@ -188,7 +190,9 @@ async function parseSystemSurveyorFile(file) {
       else if (etLower.includes('lock'))                     category = 'Wireless Lock'
       else if (etLower.includes('multi sensor') ||
                etLower.includes('multisensor') ||
-               etLower.includes('multi-sensor'))             category = 'Multi Sensor Camera'
+               etLower.includes('multi-sensor') ||
+               etLower.includes('multi-lens') ||
+               etLower.includes('multi lens'))               category = 'Multi Sensor Camera'
       else if (etLower.includes('fisheye'))                  category = 'Fisheye Camera'
       else if (etLower.includes('camera') ||
                etLower.includes('fixed') ||
