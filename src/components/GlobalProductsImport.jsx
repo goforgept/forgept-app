@@ -43,8 +43,19 @@ async function parseSystemSurveyorFile(file) {
   const ws        = workbook.Sheets[workbook.SheetNames[0]]
   const rawRows   = utils.sheet_to_json(ws, { header: 1, defval: null })
 
-  // Row 1 (index 0): col D (index 3) = element type
-  const elementType = String(rawRows[0]?.[3] || '').trim()
+  // Search first 10 rows for the element type label instead of assuming a fixed cell
+  let elementType = ''
+  outer: for (let ri = 0; ri < Math.min(rawRows.length, 10); ri++) {
+    const row = rawRows[ri] || []
+    for (let ci = 0; ci < row.length; ci++) {
+      const v = String(row[ci] || '').trim()
+      if (v.includes('Element Profile Template')) {
+        elementType = v
+        break outer
+      }
+    }
+  }
+  if (!elementType) elementType = String(rawRows[0]?.[3] || '').trim()
 
   // Debug: find which row has the model numbers
   // Model numbers start at col index 4 in row 3 (0-indexed)
@@ -128,23 +139,44 @@ async function parseSystemSurveyorFile(file) {
     const intExt  = getVal('Interior or Exterior?', offset)
     const hasIR   = getVal('      Embedded Infra-red (IR)', offset) === 'YES'
 
-    // Determine category — only override with camera style if it's a camera element type
-        // Get category from element type map first
-    let category = ELEMENT_TYPE_MAP[elementType]?.defaultCategory || null
+    // Determine category — exact match first, then fuzzy, then keyword fallback
+    let mapping = ELEMENT_TYPE_MAP[elementType]
+    if (!mapping) {
+      const etLower = elementType.toLowerCase()
+      for (const [key, val] of Object.entries(ELEMENT_TYPE_MAP)) {
+        if (etLower.includes(key.toLowerCase()) || key.toLowerCase().includes(etLower)) {
+          mapping = val
+          break
+        }
+      }
+    }
 
-    // Override with camera style if available
-    if (style && STYLE_CATEGORY_MAP[style]) {
+    let category = mapping?.defaultCategory || null
+    const isCameraType = !!category?.toLowerCase().includes('camera')
+
+    // Only apply camera style override when we know this is a camera element
+    if (isCameraType && style && STYLE_CATEGORY_MAP[style]) {
       category = STYLE_CATEGORY_MAP[style]
     }
 
-    // If still no category, use element type clues or default
+    // Keyword-based fallback when element type didn't match anything
     if (!category) {
-      if (style) category = STYLE_CATEGORY_MAP[style] || 'Dome Camera'
-      else if (elementType?.toLowerCase().includes('ptz')) category = 'PTZ Camera'
-      else if (elementType?.toLowerCase().includes('sensor')) category = 'Sensor'
-      else if (elementType?.toLowerCase().includes('reader')) category = 'Access Reader'
-      else if (elementType?.toLowerCase().includes('access')) category = 'Access Control Door'
-      else category = 'Dome Camera'
+      const etLower = elementType.toLowerCase()
+      if (style && STYLE_CATEGORY_MAP[style])                category = STYLE_CATEGORY_MAP[style]
+      else if (etLower.includes('ptz'))                      category = 'PTZ Camera'
+      else if (etLower.includes('access control'))           category = 'Access Control Door'
+      else if (etLower.includes('access reader') ||
+               etLower.includes('reader'))                   category = 'Access Reader'
+      else if (etLower.includes('sensor'))                   category = 'Sensor'
+      else if (etLower.includes('intercom'))                 category = 'Intercom'
+      else if (etLower.includes('nvr'))                      category = 'NVR'
+      else if (etLower.includes('controller'))               category = 'Controller'
+      else if (etLower.includes('lock'))                     category = 'Wireless Lock'
+      else if (etLower.includes('camera') ||
+               etLower.includes('fixed') ||
+               etLower.includes('dome') ||
+               etLower.includes('bullet'))                   category = 'Dome Camera'
+      else                                                   category = 'Dome Camera'
     }
 
 
