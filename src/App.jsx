@@ -246,8 +246,8 @@ sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
           <Route path="/integrations/microsoft/callback" element={<MicrosoftCallback />} />
           <Route path="/product-library" element={<ProductLibrary {...sharedProps} />} />
           {(featureSla || featureMonitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
-          {(featureDrawingTool || featureDesignerOnly) && <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />}
-          {(featureDrawingTool || featureDesignerOnly) && <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />}
+          <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />
+          <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />
           {featureDesignerOnly && <Route path="*" element={<Navigate to="/designer" replace />} />}
           <Route path="/designer/review/:token" element={<DrawingReview />} />
         </>
