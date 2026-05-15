@@ -215,94 +215,11 @@ export default function SuperAdmin() {
     if (!deleteModal || deleteConfirmText !== deleteModal.name) return
     setDeletingOrg(true)
     try {
-      const orgId = deleteModal.id
-
-      // Pre-fetch parent IDs needed for child deletions
-      const [proposalIds, jobIds, stIds, sheetIds, clientIds, templateIds, poIds, productLibIds, invoiceIds, orderIds] = await Promise.all([
-        supabase.from('proposals').select('id').eq('org_id', orgId).then(r => r.data?.map(x => x.id) || []),
-        supabase.from('jobs').select('id').eq('org_id', orgId).then(r => r.data?.map(x => x.id) || []),
-        supabase.from('service_tickets').select('id').eq('org_id', orgId).then(r => r.data?.map(x => x.id) || []),
-        supabase.from('drawing_sheets').select('id').eq('org_id', orgId).then(r => r.data?.map(x => x.id) || []),
-        supabase.from('clients').select('id').eq('org_id', orgId).then(r => r.data?.map(x => x.id) || []),
-        supabase.from('templates').select('id').eq('org_id', orgId).then(r => r.data?.map(x => x.id) || []),
-        supabase.from('purchase_orders').select('id').eq('org_id', orgId).then(r => r.data?.map(x => x.id) || []),
-        supabase.from('product_library').select('id').eq('org_id', orgId).then(r => r.data?.map(x => x.id) || []),
-        supabase.from('invoices').select('id').eq('org_id', orgId).then(r => r.data?.map(x => x.id) || []),
-        supabase.from('manufacturer_orders').select('id').eq('org_id', orgId).then(r => r.data?.map(x => x.id) || []),
-      ])
-
-      // Pre-fetch placement IDs for placement_components
-      const placementIds = sheetIds.length
-        ? (await supabase.from('drawing_placements').select('id').in('drawing_sheet_id', sheetIds)).data?.map(x => x.id) || []
-        : []
-
-      // Phase 1 — deepest leaf records (nothing references these)
-      await Promise.all([
-        placementIds.length && supabase.from('placement_components').delete().in('placement_id', placementIds),
-        proposalIds.length && supabase.from('proposal_activity').delete().in('proposal_id', proposalIds),
-        proposalIds.length && supabase.from('proposal_photos').delete().in('proposal_id', proposalIds),
-        proposalIds.length && supabase.from('proposal_sections').delete().in('proposal_id', proposalIds),
-        proposalIds.length && supabase.from('change_orders').delete().in('proposal_id', proposalIds),
-        proposalIds.length && supabase.from('rfq_requests').delete().in('proposal_id', proposalIds),
-        proposalIds.length && supabase.from('bom_line_items').delete().in('proposal_id', proposalIds),
-        proposalIds.length && supabase.from('drawing_packages').delete().in('proposal_id', proposalIds),
-        jobIds.length && supabase.from('job_checklist_items').delete().in('job_id', jobIds),
-        jobIds.length && supabase.from('job_photos').delete().in('job_id', jobIds),
-        jobIds.length && supabase.from('job_tech_schedules').delete().in('job_id', jobIds),
-        jobIds.length && supabase.from('tech_daily_logs').delete().in('job_id', jobIds),
-        stIds.length && supabase.from('service_ticket_photos').delete().in('service_ticket_id', stIds),
-        clientIds.length && supabase.from('client_contacts').delete().in('client_id', clientIds),
-        clientIds.length && supabase.from('client_locations').delete().in('client_id', clientIds),
-        templateIds.length && supabase.from('template_line_items').delete().in('template_id', templateIds),
-        poIds.length && supabase.from('purchase_order_line_items').delete().in('purchase_order_id', poIds),
-        invoiceIds.length && supabase.from('invoice_payments').delete().in('invoice_id', invoiceIds),
-        invoiceIds.length && supabase.from('invoice_line_items').delete().in('invoice_id', invoiceIds),
-        orderIds.length && supabase.from('manufacturer_order_items').delete().in('order_id', orderIds),
-        productLibIds.length && supabase.from('product_library_pricing').delete().in('product_id', productLibIds),
-      ].filter(Boolean))
-
-      // Phase 2 — drawing sheet children (after placement_components is gone)
-      await Promise.all([
-        sheetIds.length && supabase.from('drawing_placements').delete().in('drawing_sheet_id', sheetIds),
-        sheetIds.length && supabase.from('cable_runs').delete().in('drawing_sheet_id', sheetIds),
-        sheetIds.length && supabase.from('vertical_rises').delete().in('drawing_sheet_id', sheetIds),
-      ].filter(Boolean))
-
-      // Phase 3 — drawing_sheets (after its children; drawing_sheets.proposal_id → proposals)
-      await supabase.from('drawing_sheets').delete().eq('org_id', orgId)
-
-      // Phase 4 — proposals (after drawing_sheets are gone)
-      await supabase.from('proposals').delete().eq('org_id', orgId)
-
-      // Phase 5 — pipeline_stages (after proposals; proposals.pipeline_stage_id → pipeline_stages)
-      await supabase.from('pipeline_stages').delete().eq('org_id', orgId)
-
-      // Phase 6 — remaining org-level tables (no inter-dependencies)
-      await Promise.all([
-        supabase.from('activities').delete().eq('org_id', orgId),
-        supabase.from('jobs').delete().eq('org_id', orgId),
-        supabase.from('service_tickets').delete().eq('org_id', orgId),
-        supabase.from('invoices').delete().eq('org_id', orgId),
-        supabase.from('purchase_orders').delete().eq('org_id', orgId),
-        supabase.from('manufacturer_orders').delete().eq('org_id', orgId),
-        supabase.from('clients').delete().eq('org_id', orgId),
-        supabase.from('templates').delete().eq('org_id', orgId),
-        supabase.from('vendors').delete().eq('org_id', orgId),
-        supabase.from('contracts').delete().eq('org_id', orgId),
-        supabase.from('tasks').delete().eq('org_id', orgId),
-        supabase.from('product_library').delete().eq('org_id', orgId),
-        supabase.from('labor_rates').delete().eq('org_id', orgId),
-        supabase.from('targets').delete().eq('org_id', orgId),
-        supabase.from('client_emails').delete().eq('org_id', orgId),
-      ])
-
-      // Delete auth users (requires service role — done via edge function)
-      await supabase.functions.invoke('delete-org-users', { body: { orgId } })
-
-      // Delete profiles then the org itself
-      await supabase.from('profiles').delete().eq('org_id', orgId)
-      const { error: orgDeleteError } = await supabase.from('organizations').delete().eq('id', orgId)
-      if (orgDeleteError) throw new Error(orgDeleteError.message)
+      const { data, error } = await supabase.functions.invoke('delete-org-users', {
+        body: { orgId: deleteModal.id },
+      })
+      if (error) throw new Error(error.message)
+      if (data?.error) throw new Error(data.error)
 
       const deletedId = deleteModal.id
       setDeleteModal(null)
