@@ -271,7 +271,8 @@ async function parseForgePtCSV(file) {
   const products = []
 
   for (const line of lines.slice(1)) {
-    if (line.startsWith('EXAMPLE-')) continue // skip example rows
+    if (line.startsWith('EXAMPLE-')) continue
+    if (line.startsWith('#')) continue
     const vals = parseCSVLine(line)
     if (vals.length < 2) continue
 
@@ -532,7 +533,7 @@ export default function GlobalProductsImport({ onClose, onImported }) {
                     <p className="text-white font-semibold text-sm">ForgePt CSV Template</p>
                   </div>
                   <p className="text-[#8A9AB0] text-xs mb-3">
-                    Use our simple CSV template — great for any manufacturer or product type not covered by System Surveyor.
+                    Use our CSV template for any device type — cameras, AV equipment, intrusion detection, access control, and more. Set the <strong className="text-white">Category</strong> column to any valid ForgePt category.
                   </p>
                   <div className="flex gap-2">
                     <a
@@ -542,9 +543,28 @@ export default function GlobalProductsImport({ onClose, onImported }) {
                       onClick={(e) => {
                         // Generate and download the template
                         e.preventDefault()
-                        const csv = `Part Number,Product Name,Category,Manufacturer,Description,FOV Angle (degrees),IR Range (feet),Interior/Exterior,Camera Style,Lens Detail,Installation Notes
-EXAMPLE-001,Example Dome Camera,Dome Camera,Example Corp,2MP IR Dome Camera,90,98,Exterior,Dome,2.8mm Fixed,PoE required
-EXAMPLE-002,Example Bullet Camera,Bullet Camera,Example Corp,4MP Varifocal Bullet,70,164,Exterior,Bullet,2.8-12mm Varifocal,PoE or 12VDC`
+                        const csv = `Part Number,Product Name,Category,Manufacturer,Description,FOV Angle (degrees),IR Range (feet),Installation Notes
+# ── Security Cameras ──────────────────────────────────────────────────────────
+# Valid categories: Dome Camera | Bullet Camera | PTZ Camera | Fisheye Camera | Multi Sensor Camera | Indoor Camera
+EXAMPLE-CAM-001,Example Dome Camera,Dome Camera,Example Corp,2MP IR Dome Camera,90,98,PoE required
+EXAMPLE-CAM-002,Example Bullet Camera,Bullet Camera,Example Corp,4MP Varifocal Bullet,70,164,PoE or 12VDC
+# ── Access Control ────────────────────────────────────────────────────────────
+# Valid categories: Access Reader | Access Control Door | Controller | Intercom | Wireless Lock
+EXAMPLE-ACC-001,Example Card Reader,Access Reader,Example Corp,Multi-format RFID reader,,,
+EXAMPLE-ACC-002,Example Door Controller,Access Control Door,Example Corp,2-door access controller,,,
+# ── Intrusion Detection ────────────────────────────────────────────────────────
+# Valid categories: PIR Detector | Door Contact | Glass Break | Alarm Keypad | Alarm Panel | Interior Siren | Exterior Siren | Panic Button | Shock Sensor | Dual Tech Detector | Motion Sensor
+EXAMPLE-INT-001,Example PIR Detector,PIR Detector,Example Corp,Ceiling mount PIR,,,
+EXAMPLE-INT-002,Example Door Contact,Door Contact,Example Corp,Surface mount contact,,,
+EXAMPLE-INT-003,Example Alarm Keypad,Alarm Keypad,Example Corp,LCD alarm keypad,,,
+# ── AV ────────────────────────────────────────────────────────────────────────
+# Valid categories: Projector | Projection Screen | Ceiling Speaker | Subwoofer | Microphone | Wireless Mic | Touch Panel | Control Processor | Video Conference | Media Player | HDMI Extender | AV Receiver | Digital Signage | Display | Document Camera | Streaming Encoder | Wall Plate | Clock
+EXAMPLE-AV-001,Example Ceiling Speaker,Ceiling Speaker,Example Corp,8-inch 2-way ceiling speaker,,,
+EXAMPLE-AV-002,Example Projector,Projector,Example Corp,5000 lumen laser projector,,,
+EXAMPLE-AV-003,Example Touch Panel,Touch Panel,Example Corp,10-inch control touch panel,,,
+# ── Other ─────────────────────────────────────────────────────────────────────
+# Valid categories: NVR | Network | Sensor | Smoke Detector | Horn Strobe
+EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,`
                         const blob = new Blob([csv], { type: 'text/csv' })
                         const url  = URL.createObjectURL(blob)
                         const a    = document.createElement('a')
