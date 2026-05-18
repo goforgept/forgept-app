@@ -307,6 +307,143 @@ const CATEGORY_SVGS = {
       <circle cx="20" cy="30" r="3" fill="${color}"/>
     </svg>`,
 
+  'Projector': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="6" y="14" width="22" height="12" rx="2"/>
+      <circle cx="22" cy="20" r="4"/>
+      <circle cx="22" cy="20" r="1.5" fill="${color}" stroke="none"/>
+      <path d="M28 17 L36 13 L36 27 L28 23" fill="none"/>
+      <circle cx="10" cy="18" r="1" fill="${color}" stroke="none"/>
+      <circle cx="10" cy="22" r="1" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Projection Screen': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <path d="M4 8 L36 8" stroke-linecap="round" stroke-width="2"/>
+      <rect x="8" y="8" width="24" height="20" rx="1"/>
+      <path d="M16 28 L16 36 M24 28 L24 36" stroke-linecap="round"/>
+      <path d="M20 6 L20 4" stroke-linecap="round"/>
+    </svg>`,
+
+  'Touch Panel': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="8" y="4" width="24" height="32" rx="3"/>
+      <rect x="11" y="8" width="18" height="20" rx="1"/>
+      <circle cx="20" cy="32" r="2"/>
+      <path d="M20 14 L20 18 M18 16 L22 16" stroke-linecap="round" stroke-width="1"/>
+    </svg>`,
+
+  'Control Processor': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="10" width="32" height="20" rx="2"/>
+      <rect x="8" y="14" width="10" height="8" rx="1"/>
+      <circle cx="26" cy="17" r="2" fill="${color}" stroke="none"/>
+      <circle cx="32" cy="17" r="2" fill="${color}" stroke="none"/>
+      <path d="M22 24 L36 24 M8 26 L18 26" stroke-width="1" stroke-linecap="round"/>
+    </svg>`,
+
+  'Ceiling Speaker': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <circle cx="20" cy="20" r="14"/>
+      <circle cx="20" cy="20" r="8"/>
+      <circle cx="20" cy="20" r="3" fill="${color}" stroke="none"/>
+      <path d="M20 6 L20 2 M34 20 L38 20 M20 34 L20 38 M6 20 L2 20" stroke-linecap="round" stroke-width="1"/>
+    </svg>`,
+
+  'Subwoofer': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="6" y="8" width="28" height="24" rx="2"/>
+      <circle cx="20" cy="20" r="9"/>
+      <circle cx="20" cy="20" r="4"/>
+      <circle cx="20" cy="20" r="1.5" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Microphone': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="14" y="4" width="12" height="18" rx="6"/>
+      <path d="M8 20 Q8 30 20 30 Q32 30 32 20" fill="none"/>
+      <path d="M20 30 L20 36"/>
+      <path d="M14 36 L26 36"/>
+    </svg>`,
+
+  'Wireless Mic': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="14" y="14" width="12" height="20" rx="6"/>
+      <ellipse cx="20" cy="14" rx="6" ry="4"/>
+      <path d="M28 12 Q32 17 28 22" fill="none" stroke-width="1"/>
+      <path d="M31 9 Q37 17 31 25" fill="none" stroke-width="1"/>
+    </svg>`,
+
+  'Video Conference': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="10" width="28" height="18" rx="2"/>
+      <path d="M32 14 L38 11 L38 29 L32 26 Z" fill="none"/>
+      <path d="M14 28 L14 34 M26 28 L26 34" stroke-linecap="round"/>
+      <path d="M10 34 L30 34" stroke-linecap="round"/>
+    </svg>`,
+
+  'Media Player': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="14" width="32" height="12" rx="3"/>
+      <path d="M17 17 L17 23 L23 20 Z" fill="${color}" stroke="none"/>
+      <circle cx="30" cy="20" r="2" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'HDMI Extender': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="2" y="14" width="12" height="12" rx="2"/>
+      <rect x="26" y="14" width="12" height="12" rx="2"/>
+      <path d="M14 20 L26 20" stroke-dasharray="2 2"/>
+      <path d="M8 17 L8 23 M32 17 L32 23" stroke-linecap="round"/>
+    </svg>`,
+
+  'AV Receiver': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="12" width="32" height="16" rx="2"/>
+      <rect x="8" y="16" width="10" height="8" rx="1"/>
+      <circle cx="26" cy="20" r="4"/>
+      <circle cx="26" cy="20" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="34" cy="16" r="1" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Clock': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <circle cx="20" cy="20" r="14"/>
+      <path d="M20 10 L20 20 L26 26"/>
+      <circle cx="20" cy="20" r="1.5" fill="${color}" stroke="none"/>
+      <path d="M20 8 L20 6 M32 20 L34 20 M20 32 L20 34 M8 20 L6 20" stroke-width="1"/>
+    </svg>`,
+
+  'Document Camera': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="6" y="30" width="28" height="6" rx="2"/>
+      <path d="M20 30 L20 16"/>
+      <path d="M20 16 L30 10"/>
+      <circle cx="32" cy="10" r="4"/>
+      <circle cx="32" cy="10" r="1.5" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Streaming Encoder': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="12" width="32" height="16" rx="2"/>
+      <path d="M10 22 Q13 16 16 22 Q19 28 22 22 Q24 18 26 22" stroke-linecap="round" fill="none"/>
+      <circle cx="32" cy="18" r="2" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Digital Signage': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="4" y="6" width="32" height="22" rx="2"/>
+      <path d="M15 32 L25 32 M20 28 L20 32"/>
+      <path d="M9 11 L31 11 M9 15 L24 15 M9 19 L20 19"/>
+    </svg>`,
+
+  'Wall Plate': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="10" y="6" width="20" height="28" rx="2"/>
+      <rect x="14" y="11" width="12" height="7" rx="1"/>
+      <rect x="14" y="22" width="12" height="7" rx="1"/>
+    </svg>`,
+
   'default': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
       <rect x="10" y="10" width="20" height="20" rx="4"/>
