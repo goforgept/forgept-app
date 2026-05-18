@@ -227,22 +227,21 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         }
       }
 
-     // Device icon — SVG converted to PNG
-      const iconSize = 8
-      const iconPng  = await getIconPng(p.global_products?.category || 'default', col, 32)
+     // Device icon — colored circle background + white SVG icon
+      const iconSize = 5
+      pdf.setFillColor(r, g, b)
+      pdf.circle(px, py, iconSize/2 + 0.5, 'F')
+      const iconPng = await getIconPng(p.global_products?.category || 'default', '#ffffff', 32)
       if (iconPng) {
         pdf.addImage(iconPng, 'PNG', px - iconSize/2, py - iconSize/2, iconSize, iconSize)
-      } else {
-        pdf.setFillColor(r, g, b)
-        pdf.circle(px, py, 2, 'F')
       }
 
       // Device label
       if (p.device_address) {
         pdf.setTextColor(r, g, b)
-        pdf.setFontSize(4.5)
+        pdf.setFontSize(4)
         pdf.setFont('helvetica', 'bold')
-        pdf.text(p.device_address, px, py + iconSize/2 + 2, { align: 'center' })
+        pdf.text(p.device_address, px, py + iconSize/2 + 2.5, { align: 'center' })
       }
     }
   }
