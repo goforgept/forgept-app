@@ -18,10 +18,25 @@ const ELEMENT_TYPE_MAP = {
   'Vape Sensor Element Profile Template':    { industry: 'security', defaultCategory: 'Sensor' },
   'Sensor Element Profile Template':         { industry: 'security', defaultCategory: 'Sensor' },
   'NVR Element Profile Template':            { industry: 'security', defaultCategory: 'NVR' },
-  'Speaker Element Profile Template':        { industry: 'av',       defaultCategory: 'Speaker' },
+  'Speaker Element Profile Template':        { industry: 'av',       defaultCategory: 'Ceiling Speaker' },
   'Display Element Profile Template':        { industry: 'av',       defaultCategory: 'Display' },
   'Switch Element Profile Template':         { industry: 'low_voltage', defaultCategory: 'Network' },
   'Wireless Lock Element Profile Template':  { industry: 'security', defaultCategory: 'Wireless Lock' },
+  // Intrusion detection
+  'PIR Detector Element Profile Template':          { industry: 'security', defaultCategory: 'PIR Detector' },
+  'PIR Sensor Element Profile Template':            { industry: 'security', defaultCategory: 'PIR Detector' },
+  'Dual Tech Detector Element Profile Template':    { industry: 'security', defaultCategory: 'Dual Tech Detector' },
+  'Door Contact Element Profile Template':          { industry: 'security', defaultCategory: 'Door Contact' },
+  'Glass Break Element Profile Template':           { industry: 'security', defaultCategory: 'Glass Break' },
+  'Glass Break Detector Element Profile Template':  { industry: 'security', defaultCategory: 'Glass Break' },
+  'Alarm Panel Element Profile Template':           { industry: 'security', defaultCategory: 'Alarm Panel' },
+  'Alarm Keypad Element Profile Template':          { industry: 'security', defaultCategory: 'Alarm Keypad' },
+  'Keypad Element Profile Template':                { industry: 'security', defaultCategory: 'Alarm Keypad' },
+  'Interior Siren Element Profile Template':        { industry: 'security', defaultCategory: 'Interior Siren' },
+  'Exterior Siren Element Profile Template':        { industry: 'security', defaultCategory: 'Exterior Siren' },
+  'Siren Element Profile Template':                 { industry: 'security', defaultCategory: 'Interior Siren' },
+  'Panic Button Element Profile Template':          { industry: 'security', defaultCategory: 'Panic Button' },
+  'Shock Sensor Element Profile Template':          { industry: 'security', defaultCategory: 'Shock Sensor' },
 }
 
 // Camera style → category override
@@ -148,7 +163,7 @@ async function parseSystemSurveyorFile(file) {
 
     // Determine category — exact match first, then fuzzy, then keyword fallback
     let mapping = ELEMENT_TYPE_MAP[elementType]
-    if (!mapping) {
+    if (!mapping && elementType) {
       const etLower = elementType.toLowerCase()
       for (const [key, val] of Object.entries(ELEMENT_TYPE_MAP)) {
         if (etLower.includes(key.toLowerCase()) || key.toLowerCase().includes(etLower)) {
@@ -194,6 +209,16 @@ async function parseSystemSurveyorFile(file) {
                etLower.includes('multi-lens') ||
                etLower.includes('multi lens'))               category = 'Multi Sensor Camera'
       else if (etLower.includes('fisheye'))                  category = 'Fisheye Camera'
+      else if (etLower.includes('pir') || etLower.includes('passive infrared')) category = 'PIR Detector'
+      else if (etLower.includes('dual tech'))                category = 'Dual Tech Detector'
+      else if (etLower.includes('door contact') || etLower.includes('contact sensor')) category = 'Door Contact'
+      else if (etLower.includes('glass break'))              category = 'Glass Break'
+      else if (etLower.includes('keypad'))                   category = 'Alarm Keypad'
+      else if (etLower.includes('alarm panel') || etLower.includes('alarm control')) category = 'Alarm Panel'
+      else if (etLower.includes('siren') || etLower.includes('sounder')) category = 'Interior Siren'
+      else if (etLower.includes('panic'))                    category = 'Panic Button'
+      else if (etLower.includes('shock'))                    category = 'Shock Sensor'
+      else if (etLower.includes('detector') && !etLower.includes('smoke')) category = 'PIR Detector'
       else if (etLower.includes('camera') ||
                etLower.includes('fixed') ||
                etLower.includes('dome') ||
@@ -298,8 +323,9 @@ function parseCSVLine(line) {
 
 function guessIndustry(category) {
   const cat = (category || '').toLowerCase()
-  if (['camera', 'reader', 'controller', 'nvr', 'sensor', 'intercom', 'lock', 'motion'].some(k => cat.includes(k))) return 'security'
-  if (['speaker', 'display', 'projector', 'amplifier', 'dsp'].some(k => cat.includes(k))) return 'av'
+  if (['camera', 'reader', 'controller', 'nvr', 'sensor', 'intercom', 'lock', 'motion',
+       'keypad', 'alarm', 'contact', 'siren', 'panic', 'detector', 'glass break', 'shock'].some(k => cat.includes(k))) return 'security'
+  if (['speaker', 'display', 'projector', 'amplifier', 'dsp', 'ceiling speaker', 'subwoofer', 'microphone'].some(k => cat.includes(k))) return 'av'
   if (['switch', 'patch', 'fiber', 'data', 'ups', 'rack', 'wireless ap'].some(k => cat.includes(k))) return 'low_voltage'
   if (['outlet', 'panel', 'conduit', 'lighting'].some(k => cat.includes(k))) return 'electrical'
   if (['diffuser', 'thermostat', 'vav'].some(k => cat.includes(k))) return 'hvac'
