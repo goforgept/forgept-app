@@ -13,6 +13,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [orgProfile,    setOrgProfile]    = useState(null)
   const [loading,       setLoading]       = useState(true)
   const [generating,    setGenerating]    = useState(false)
+  const [shareLink,     setShareLink]     = useState(null)
+  const [sharing,       setSharing]       = useState(false)
+  const [shareCopied,   setShareCopied]   = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -824,6 +827,44 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  const handleShare = async () => {
+    setSharing(true)
+    try {
+      const token    = crypto.randomUUID()
+      const expires  = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
+      const { data, error } = await supabase
+        .from('drawing_packages')
+        .insert({
+          org_id:           orgId,
+          proposal_id:      proposalId,
+          package_type:     'client_overview',
+          revision:         'Rev 0',
+          status:           'shared',
+          share_token:      token,
+          shared_at:        new Date().toISOString(),
+          share_expires_at: expires.toISOString(),
+        })
+        .select('share_token')
+        .single()
+
+      if (!error && data) {
+        const link = `${window.location.origin}/designer/review/${data.share_token}`
+        setShareLink(link)
+      }
+    } catch (err) {
+      console.error('Share failed:', err)
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(shareLink)
+    setShareCopied(true)
+    setTimeout(() => setShareCopied(false), 2000)
+  }
+
   const exports = [
     {
       id:          'client',
@@ -903,6 +944,57 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           Add floor plan sheets before exporting.
         </p>
       )}
+
+      {/* Share for client review */}
+      <div className="border-t border-[#2a3d55] pt-6 mt-2">
+        <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-[#0F1C2E] flex items-center justify-center text-2xl flex-shrink-0">
+                🔗
+              </div>
+              <div>
+                <p className="text-white font-semibold text-sm">Share for Client Review</p>
+                <p className="text-[#8A9AB0] text-xs mt-0.5">
+                  Generate a link your client can use to view the design and approve it.
+                  Link expires in 30 days.
+                </p>
+              </div>
+            </div>
+            {!shareLink && (
+              <button
+                onClick={handleShare}
+                disabled={sharing || sheets.length === 0}
+                className={`flex-shrink-0 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  sharing || sheets.length === 0
+                    ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
+                    : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
+                }`}>
+                {sharing ? 'Generating...' : 'Generate Link'}
+              </button>
+            )}
+          </div>
+
+          {shareLink && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2 bg-[#0F1C2E] border border-[#2a3d55] rounded-lg px-3 py-2">
+                <span className="text-[#8A9AB0] text-xs flex-1 truncate">{shareLink}</span>
+                <button onClick={handleCopyLink}
+                  className="text-xs font-semibold text-[#C8622A] hover:text-white transition-colors flex-shrink-0">
+                  {shareCopied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <p className="text-[#4a5a6a] text-xs">
+                This link is valid for 30 days. Your client can view the design and approve it without logging in.
+              </p>
+              <button onClick={() => { setShareLink(null) }}
+                className="text-xs text-[#8A9AB0] hover:text-white transition-colors">
+                Generate new link
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {generating && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
