@@ -165,8 +165,8 @@ export default function DrawingReview() {
           </div>
           <p className="text-white font-semibold mb-2">Floor Plan Drawing</p>
           <p className="text-[#8A9AB0] text-sm">
-            Interactive floor plan preview will be available in Bundle 6.
-            Your integrator can share a PDF overview in the meantime.
+            Your integrator will share the full floor plan drawings separately.
+            Please review and approve the design scope below.
           </p>
         </div>
 
