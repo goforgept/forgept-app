@@ -20,51 +20,55 @@ export default function SymbolPicker({ selectedSymbol, onSelect }) {
   const [categories,    setCategories]    = useState([])
   const [symbols,       setSymbols]       = useState([])
   const [loading,       setLoading]       = useState(false)
+  const [allProducts,   setAllProducts]   = useState([])
 
+  // Load ALL products once on mount
   useEffect(() => {
+    const loadAll = async () => {
+      setLoading(true)
+      const { data } = await supabase
+        .from('global_products')
+        .select('*')
+        .eq('is_active', true)
+        .order('category')
+        .order('name')
+      setAllProducts(data || [])
+      setLoading(false)
+    }
+    loadAll()
+  }, [])
+
+  // Derive manufacturers from allProducts client-side
+  useEffect(() => {
+    const filtered = industry === 'all' ? allProducts : allProducts.filter(p => p.industry === industry)
+    const unique = [...new Set(filtered.map(r => r.manufacturer))].sort()
+    setManufacturers(['Generic', ...unique.filter(m => m !== 'Generic')])
     setManufacturer('Generic')
     setCategory(null)
-    loadManufacturers(industry)
-    loadCategories(industry, 'Generic')
-  }, [industry])
+  }, [industry, allProducts])
 
+  // Derive categories client-side
   useEffect(() => {
+    const filtered = allProducts.filter(p => {
+      if (industry !== 'all' && p.industry !== industry) return false
+      if (manufacturer && p.manufacturer !== manufacturer) return false
+      return true
+    })
+    setCategories([...new Set(filtered.map(r => r.category))].sort())
     setCategory(null)
-    loadCategories(industry, manufacturer)
-  }, [manufacturer])
+  }, [manufacturer, industry, allProducts])
 
+  // Derive symbols client-side
   useEffect(() => {
-    loadSymbols(industry, manufacturer, category)
-  }, [category, industry, manufacturer])
-
-  const loadManufacturers = async (ind) => {
-    let query = supabase.from('global_products').select('manufacturer').eq('is_active', true)
-    if (ind !== 'all') query = query.eq('industry', ind)
-    const { data } = await query
-    if (data) {
-      const unique = [...new Set(data.map(r => r.manufacturer))].sort()
-      setManufacturers(['Generic', ...unique.filter(m => m !== 'Generic')])
-    }
-  }
-
-  const loadCategories = async (ind, mfr) => {
-    let query = supabase.from('global_products').select('category').eq('is_active', true)
-    if (ind !== 'all') query = query.eq('industry', ind)
-    if (mfr) query = query.eq('manufacturer', mfr)
-    const { data } = await query
-    if (data) setCategories([...new Set(data.map(r => r.category))].sort())
-  }
-
-  const loadSymbols = async (ind, mfr, cat) => {
-    setLoading(true)
-    let query = supabase.from('global_products').select('*').eq('is_active', true).order('category').order('name')
-    if (ind !== 'all') query = query.eq('industry', ind)
-    if (mfr) query = query.eq('manufacturer', mfr)
-    if (cat) query = query.eq('category', cat)
-    const { data } = await query
-    setSymbols(data || [])
-    setLoading(false)
-  }
+    const filtered = allProducts.filter(p => {
+      if (!p.is_active) return false
+      if (industry !== 'all' && p.industry !== industry) return false
+      if (manufacturer && p.manufacturer !== manufacturer) return false
+      if (category && p.category !== category) return false
+      return true
+    })
+    setSymbols(filtered)
+  }, [category, industry, manufacturer, allProducts])
 
   const filtered = search.trim()
     ? symbols.filter(s =>
