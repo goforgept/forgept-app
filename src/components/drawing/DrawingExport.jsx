@@ -168,7 +168,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     }
   }
 
-  const drawSheetOnPDF = (pdf, sheet, imgData, imgX, imgY, imgW, imgH) => {
+  const drawSheetOnPDF = async (pdf, sheet, imgData, imgX, imgY, imgW, imgH) => {
     // Floor plan image
     if (imgData) {
       try {
@@ -187,7 +187,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
     // Device markers + FOV
     const sheetPlacements = placementsBySheet[sheet.id] || []
-    sheetPlacements.forEach(p => {
+    for (const p of sheetPlacements) {
       const px  = imgX + p.x * imgW
       const py  = imgY + p.y * imgH
       const col = p.marker_color || '#C8622A'
@@ -233,13 +233,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       if (iconPng) {
         pdf.addImage(iconPng, 'PNG', px - iconSize/2, py - iconSize/2, iconSize, iconSize)
       } else {
-        const legendIcon = await getIconPng(category, '#C8622A', 32)
-        if (legendIcon) {
-          pdf.addImage(legendIcon, 'PNG', lx, ly - 2, 8, 8)
-        } else {
-          pdf.setFillColor(200, 98, 42)
-          pdf.circle(lx + 4, ly + 3, 4, 'F')
-        }
+        pdf.setFillColor(r, g, b)
+        pdf.circle(px, py, 2, 'F')
       }
 
       // Device label
@@ -249,7 +244,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.setFont('helvetica', 'bold')
         pdf.text(p.device_address, px, py + iconSize/2 + 2, { align: 'center' })
       }
-    })
+    }
   }
 
   // ── Load org logo safely (CORS-safe, falls back to null) ──────────────────
@@ -423,10 +418,15 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const perRow = Math.floor((pageW - margin * 2) / colW)
       let col = 0
 
-      usedCategories.forEach(category => {
-        // Orange circle
-        pdf.setFillColor(200, 98, 42)
-        pdf.circle(lx + 5, ly + 3, 4, 'F')
+      for (const category of usedCategories) {
+        // Category icon
+        const legendIcon = await getIconPng(category, '#C8622A', 32)
+        if (legendIcon) {
+          pdf.addImage(legendIcon, 'PNG', lx, ly - 2, 8, 8)
+        } else {
+          pdf.setFillColor(200, 98, 42)
+          pdf.circle(lx + 4, ly + 3, 4, 'F')
+        }
 
         // Category name
         pdf.setTextColor(255, 255, 255)
@@ -447,7 +447,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         } else {
           lx += colW
         }
-      })
+      }
 
       // Cable summary on legend page
       if (Object.keys(cableByType).length > 0) {
@@ -497,7 +497,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         const imgW   = pageW - margin * 2
 
         const imgData = await getFloorPlanImage(sheet.id)
-        drawSheetOnPDF(pdf, sheet, imgData, margin, imgY, imgW, imgH)
+        await drawSheetOnPDF(pdf, sheet, imgData, margin, imgY, imgW, imgH)
 
         // Page footer
         pdf.setTextColor(138, 154, 176)
@@ -623,7 +623,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const perRow = Math.floor((pageW - margin * 2) / colW)
       let col = 0
 
-      usedCategories.forEach(category => {
+      for (const category of usedCategories) {
         const legendIcon = await getIconPng(category, '#C8622A', 32)
         if (legendIcon) {
           pdf.addImage(legendIcon, 'PNG', lx, ly - 2, 7, 7)
@@ -642,7 +642,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         col++
         if (col >= perRow) { col = 0; lx = margin; ly += 16 }
         else lx += colW
-      })
+      }
 
       drawTitleBlock('Legend', 2)
 
