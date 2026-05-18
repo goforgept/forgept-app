@@ -50,7 +50,7 @@ export default function SymbolPicker({ selectedSymbol, onSelect }) {
   const loadCategories = async (ind, mfr) => {
     let query = supabase.from('global_products').select('category').eq('is_active', true)
     if (ind !== 'all') query = query.eq('industry', ind)
-    if (mfr && mfr !== 'Generic') query = query.eq('manufacturer', mfr)
+    if (mfr) query = query.eq('manufacturer', mfr)
     const { data } = await query
     if (data) setCategories([...new Set(data.map(r => r.category))].sort())
   }
@@ -59,7 +59,7 @@ export default function SymbolPicker({ selectedSymbol, onSelect }) {
     setLoading(true)
     let query = supabase.from('global_products').select('*').eq('is_active', true).order('category').order('name')
     if (ind !== 'all') query = query.eq('industry', ind)
-    if (mfr && mfr !== 'Generic') query = query.eq('manufacturer', mfr)
+    if (mfr) query = query.eq('manufacturer', mfr)
     if (cat) query = query.eq('category', cat)
     const { data } = await query
     setSymbols(data || [])
@@ -247,6 +247,26 @@ function CategoryIcon({ category }) {
       return <svg {...props}><rect x="4" y="6" width="32" height="22" rx="2" strokeWidth="1.5"/><path d="M15 32 L25 32 M20 28 L20 32" strokeLinecap="round" strokeWidth="1.5"/><path d="M9 11 L31 11 M9 15 L24 15 M9 19 L20 19" strokeLinecap="round" strokeWidth="1"/></svg>
     case 'Wall Plate':
       return <svg {...props}><rect x="10" y="6" width="20" height="28" rx="2" strokeWidth="1.5"/><rect x="14" y="11" width="12" height="7" rx="1" strokeWidth="1.5"/><rect x="14" y="22" width="12" height="7" rx="1" strokeWidth="1.5"/></svg>
+    case 'Alarm Keypad':
+      return <svg {...props}><rect x="10" y="4" width="20" height="32" rx="2" strokeWidth="1.5"/><rect x="13" y="7" width="14" height="8" rx="1" strokeWidth="1.5"/><circle cx="15" cy="20" r="1.5" fill="currentColor"/><circle cx="20" cy="20" r="1.5" fill="currentColor"/><circle cx="25" cy="20" r="1.5" fill="currentColor"/><circle cx="15" cy="25" r="1.5" fill="currentColor"/><circle cx="20" cy="25" r="1.5" fill="currentColor"/><circle cx="25" cy="25" r="1.5" fill="currentColor"/><circle cx="15" cy="30" r="1.5" fill="currentColor"/><circle cx="20" cy="30" r="1.5" fill="currentColor"/><circle cx="25" cy="30" r="1.5" fill="currentColor"/></svg>
+    case 'Alarm Panel':
+      return <svg {...props}><rect x="4" y="6" width="32" height="28" rx="2" strokeWidth="1.5"/><rect x="8" y="10" width="16" height="10" rx="1" strokeWidth="1.5"/><circle cx="30" cy="13" r="2" fill="currentColor"/><circle cx="30" cy="19" r="2" fill="currentColor"/><path d="M8 24 L24 24 M8 28 L18 28" strokeLinecap="round" strokeWidth="1"/></svg>
+    case 'Door Contact':
+      return <svg {...props}><rect x="5" y="8" width="11" height="24" rx="2" strokeWidth="1.5"/><rect x="24" y="8" width="11" height="24" rx="2" strokeWidth="1.5"/><path d="M16 14 L24 14 M16 26 L24 26" strokeWidth="1" strokeDasharray="2 2"/></svg>
+    case 'PIR Detector':
+      return <svg {...props}><path d="M6 32 Q6 14 20 10 Q34 14 34 32 Z" strokeWidth="1.5" fill="none"/><path d="M12 26 Q12 18 20 16 Q28 18 28 26" strokeWidth="1" strokeDasharray="2 2" fill="none"/><circle cx="20" cy="30" r="2" fill="currentColor"/></svg>
+    case 'Dual Tech Detector':
+      return <svg {...props}><rect x="6" y="12" width="28" height="16" rx="2" strokeWidth="1.5"/><path d="M12 20 Q16 15 20 20 Q24 25 28 20" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M6 32 L10 28 M34 32 L30 28" strokeLinecap="round" strokeWidth="1"/></svg>
+    case 'Glass Break':
+      return <svg {...props}><circle cx="20" cy="20" r="13" strokeWidth="1.5"/><path d="M20 7 L17 14 L22 14 L16 22 M22 14 L26 19" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5"/><circle cx="20" cy="20" r="2" fill="currentColor"/></svg>
+    case 'Interior Siren':
+      return <svg {...props}><rect x="12" y="12" width="16" height="16" rx="2" strokeWidth="1.5"/><path d="M8 15 Q5 20 8 25" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M32 15 Q35 20 32 25" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M5 12 Q2 20 5 28" strokeLinecap="round" strokeWidth="1" fill="none"/><path d="M35 12 Q38 20 35 28" strokeLinecap="round" strokeWidth="1" fill="none"/></svg>
+    case 'Exterior Siren':
+      return <svg {...props}><rect x="10" y="8" width="20" height="14" rx="2" strokeWidth="1.5"/><circle cx="20" cy="30" r="6" strokeWidth="1.5"/><circle cx="20" cy="30" r="2.5" fill="currentColor"/><path d="M7 11 Q4 15 7 19" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M33 11 Q36 15 33 19" strokeLinecap="round" strokeWidth="1.5" fill="none"/></svg>
+    case 'Panic Button':
+      return <svg {...props}><rect x="6" y="12" width="28" height="16" rx="8" strokeWidth="1.5"/><circle cx="20" cy="20" r="5" fill="currentColor"/></svg>
+    case 'Shock Sensor':
+      return <svg {...props}><circle cx="20" cy="20" r="8" strokeWidth="1.5"/><path d="M9 11 Q6 9 8 6 M31 11 Q34 9 32 6 M9 29 Q6 31 8 34 M31 29 Q34 31 32 34" strokeLinecap="round" strokeWidth="1"/><circle cx="20" cy="20" r="3" fill="currentColor"/></svg>
     default:
       return <svg {...props}><rect x="10" y="10" width="20" height="20" rx="4" strokeWidth="1.5"/><circle cx="20" cy="20" r="4" strokeWidth="1.5"/></svg>
   }

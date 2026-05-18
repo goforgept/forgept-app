@@ -298,6 +298,89 @@ const CATEGORY_SVGS = {
       <path d="M10 34 L30 34" stroke-width="1" stroke-dasharray="2 2"/>
     </svg>`,
 
+  'Alarm Keypad': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="10" y="4" width="20" height="32" rx="2"/>
+      <rect x="13" y="7" width="14" height="8" rx="1"/>
+      <circle cx="15" cy="20" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="20" cy="20" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="25" cy="20" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="15" cy="25" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="20" cy="25" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="25" cy="25" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="15" cy="30" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="20" cy="30" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="25" cy="30" r="1.5" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Alarm Panel': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="6" width="32" height="28" rx="2"/>
+      <rect x="8" y="10" width="16" height="10" rx="1"/>
+      <circle cx="30" cy="13" r="2" fill="${color}" stroke="none"/>
+      <circle cx="30" cy="19" r="2" fill="${color}" stroke="none"/>
+      <path d="M8 24 L24 24 M8 28 L18 28" stroke-linecap="round" stroke-width="1"/>
+    </svg>`,
+
+  'Door Contact': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="5" y="8" width="11" height="24" rx="2"/>
+      <rect x="24" y="8" width="11" height="24" rx="2"/>
+      <path d="M16 14 L24 14 M16 26 L24 26" stroke-width="1" stroke-dasharray="2 2"/>
+    </svg>`,
+
+  'PIR Detector': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <path d="M6 32 Q6 14 20 10 Q34 14 34 32 Z" fill="none"/>
+      <path d="M12 26 Q12 18 20 16 Q28 18 28 26" fill="none" stroke-width="1" stroke-dasharray="2 2"/>
+      <circle cx="20" cy="30" r="2" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Dual Tech Detector': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="6" y="12" width="28" height="16" rx="2"/>
+      <path d="M12 20 Q16 15 20 20 Q24 25 28 20" stroke-linecap="round" fill="none"/>
+      <path d="M6 32 L10 28 M34 32 L30 28" stroke-linecap="round" stroke-width="1"/>
+    </svg>`,
+
+  'Glass Break': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <circle cx="20" cy="20" r="13"/>
+      <path d="M20 7 L17 14 L22 14 L16 22 M22 14 L26 19" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="20" cy="20" r="2" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Interior Siren': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="12" y="12" width="16" height="16" rx="2"/>
+      <path d="M8 15 Q5 20 8 25" fill="none" stroke-linecap="round"/>
+      <path d="M32 15 Q35 20 32 25" fill="none" stroke-linecap="round"/>
+      <path d="M5 12 Q2 20 5 28" fill="none" stroke-linecap="round" stroke-width="1"/>
+      <path d="M35 12 Q38 20 35 28" fill="none" stroke-linecap="round" stroke-width="1"/>
+    </svg>`,
+
+  'Exterior Siren': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="10" y="8" width="20" height="14" rx="2"/>
+      <circle cx="20" cy="30" r="6"/>
+      <circle cx="20" cy="30" r="2.5" fill="${color}" stroke="none"/>
+      <path d="M7 11 Q4 15 7 19" fill="none" stroke-linecap="round"/>
+      <path d="M33 11 Q36 15 33 19" fill="none" stroke-linecap="round"/>
+    </svg>`,
+
+  'Panic Button': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="6" y="12" width="28" height="16" rx="8"/>
+      <circle cx="20" cy="20" r="5" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Shock Sensor': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <circle cx="20" cy="20" r="8"/>
+      <path d="M9 11 Q6 9 8 6 M31 11 Q34 9 32 6 M9 29 Q6 31 8 34 M31 29 Q34 31 32 34" stroke-linecap="round" stroke-width="1"/>
+      <circle cx="20" cy="20" r="3" fill="${color}" stroke="none"/>
+    </svg>`,
+
   'Guard Tour': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
       <rect x="14" y="4" width="12" height="22" rx="3"/>
