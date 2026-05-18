@@ -216,37 +216,35 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const g   = parseInt(col.slice(3,5),16)
       const b   = parseInt(col.slice(5,7),16)
 
-      // FOV cone
+      // FOV cone — matches canvas arc calculation exactly
       const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera','Sensor','Intercom','LPR Camera']
       const category = p.global_products?.category || ''
       if (fovCategories.includes(category) && p.fov_angle) {
-        const fovRangePct = sheet.scale_ratio
-          ? (p.fov_range || 30) / (sheet.scale_ratio * 96)
-          : 0.04
-        const rangeInMM  = fovRangePct * Math.min(imgW, imgH)
-        const halfAngle  = (p.fov_angle || 90) / 2 * Math.PI / 180
-        const rotation   = (p.rotation || 0) * Math.PI / 180
+        const fovAngle   = p.fov_angle || 90
+        const rangeInMM  = sheet.scale_ratio
+          ? (p.fov_range || 30) / sheet.scale_ratio * imgW * 0.01
+          : Math.min(imgW, imgH) * 0.04
+        const startAngle = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
+        const endAngle   = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
+        const steps      = Math.max(16, Math.floor(fovAngle / 5))
 
-        const fr = Math.min(255, r + 120)
-        const fg = Math.min(255, g + 120)
-        const fb = Math.min(255, b + 120)
+        pdf.setFillColor(r, g, b)
+        pdf.setDrawColor(r, g, b)
+        pdf.setLineWidth(0.1)
 
-        if (category === 'PTZ Camera') {
-          pdf.setFillColor(fr, fg, fb)
-          pdf.circle(px, py, Math.min(rangeInMM, 20), 'F')
+        if (category === 'PTZ Camera' || fovAngle >= 355) {
+          pdf.circle(px, py, Math.min(rangeInMM, 15), 'F')
         } else {
-          const x1 = px + Math.cos(rotation - halfAngle) * Math.min(rangeInMM, 40)
-          const y1 = py + Math.sin(rotation - halfAngle) * Math.min(rangeInMM, 40)
-          const x2 = px + Math.cos(rotation + halfAngle) * Math.min(rangeInMM, 40)
-          const y2 = py + Math.sin(rotation + halfAngle) * Math.min(rangeInMM, 40)
-          pdf.setFillColor(fr, fg, fb)
-          pdf.setDrawColor(fr, fg, fb)
-          pdf.setLineWidth(0.1)
-          try {
-            pdf.triangle(px, py, x1, y1, x2, y2, 'FD')
-          } catch {
-            pdf.lines([[x1-px, y1-py], [x2-x1, y2-y1], [px-x2, py-y2]], px, py, [1,1], 'F')
+          // Arc points — same pattern as canvas Line component
+          const pts = [[px, py]]
+          for (let i = 0; i <= steps; i++) {
+            const angle = startAngle + (endAngle - startAngle) * (i / steps)
+            pts.push([px + Math.cos(angle) * rangeInMM, py + Math.sin(angle) * rangeInMM])
           }
+          pts.push([px, py])
+          // Draw as filled polygon using lines
+          const deltas = pts.slice(1).map((pt, i) => [pt[0] - pts[i][0], pt[1] - pts[i][1]])
+          pdf.lines(deltas, pts[0][0], pts[0][1], [1, 1], 'F')
         }
       }
 
