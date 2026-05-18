@@ -1,17 +1,17 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 
 const FOV_CATEGORIES = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera']
 
 // ── SheetViewer ────────────────────────────────────────────────────────────────
-// Canvas overlay avoids SVG preserveAspectRatio alignment issues — the canvas is
-// sized to exactly match the rendered image in CSS pixels, so coordinates are 1:1.
+// SVG viewBox uses rendered CSS pixel dimensions (not natural image pixels) so
+// preserveAspectRatio="none" is safe — no letterboxing, no scaling artifacts.
+// Range/marker size uses natW to convert from original-pixel coordinates.
 function SheetViewer({ sheet, placements }) {
-  const [imgSrc,   setImgSrc]   = useState(null)
-  const [naturalW, setNaturalW] = useState(null)
-  const imgRef    = useRef(null)
-  const canvasRef = useRef(null)
+  const [imgSrc,  setImgSrc]  = useState(null)
+  const [svgDims, setSvgDims] = useState(null) // { w, h, natW }
+  const imgRef = useRef(null)
 
   useEffect(() => {
     if (!sheet.storage_path || ['blank','pending'].includes(sheet.storage_path)) return
@@ -48,104 +48,19 @@ function SheetViewer({ sheet, placements }) {
     }
   }
 
-  const drawOverlay = useCallback(() => {
-    const img    = imgRef.current
-    const canvas = canvasRef.current
-    if (!img || !canvas || !naturalW) return
-
-    const W   = img.offsetWidth
-    const H   = img.offsetHeight
-    if (!W || !H) return
-
-    const dpr = window.devicePixelRatio || 1
-    canvas.width        = W * dpr
-    canvas.height       = H * dpr
-    canvas.style.width  = `${W}px`
-    canvas.style.height = `${H}px`
-
-    const ctx = canvas.getContext('2d')
-    ctx.scale(dpr, dpr)
-    ctx.clearRect(0, 0, W, H)
-
-    for (const p of placements) {
-      const cx      = p.x * W
-      const cy      = p.y * H
-      const col     = p.marker_color || '#C8622A'
-      const markerR = Math.max((p.symbol_size || 32) * (W / naturalW), 4)
-      const category = p.global_products?.category || ''
-
-      // FOV cone
-      if (FOV_CATEGORIES.includes(category)) {
-        const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
-        const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
-        const range = sheet.scale_ratio
-          ? Math.min((rangeInFeet / sheet.scale_ratio) * (W / naturalW), W * 0.35)
-          : W * 0.08
-
-        ctx.save()
-        ctx.fillStyle   = col
-        ctx.strokeStyle = col
-        ctx.lineWidth   = 1
-
-        if (category === 'PTZ Camera' || fovAngle >= 355) {
-          ctx.globalAlpha = 0.08
-          ctx.beginPath()
-          ctx.arc(cx, cy, range, 0, Math.PI * 2)
-          ctx.fill()
-          ctx.globalAlpha = 0.3
-          ctx.stroke()
-        } else {
-          const startAngle = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
-          const endAngle   = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
-          ctx.globalAlpha = 0.12
-          ctx.beginPath()
-          ctx.moveTo(cx, cy)
-          ctx.arc(cx, cy, range, startAngle, endAngle)
-          ctx.closePath()
-          ctx.fill()
-          ctx.globalAlpha = 0.4
-          ctx.stroke()
-        }
-        ctx.restore()
-      }
-
-      // Marker circle
-      ctx.save()
-      ctx.fillStyle = col
-      ctx.beginPath()
-      ctx.arc(cx, cy, markerR, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.restore()
-
-      // Label
-      if (p.device_address) {
-        const fontSize = Math.max(markerR * 0.75, 8)
-        ctx.save()
-        ctx.fillStyle  = col
-        ctx.font       = `bold ${fontSize}px sans-serif`
-        ctx.textAlign  = 'center'
-        ctx.fillText(p.device_address, cx, cy + markerR + fontSize * 0.9)
-        ctx.restore()
-      }
-    }
-  }, [placements, naturalW, sheet.scale_ratio])
-
-  // Redraw whenever placements or image change
-  useEffect(() => {
-    if (naturalW) drawOverlay()
-  }, [drawOverlay, naturalW])
-
-  const handleImgLoad = (e) => {
-    setNaturalW(e.target.naturalWidth)
+  const updateDims = () => {
+    const img = imgRef.current
+    if (!img || !img.naturalWidth) return
+    setSvgDims({ w: img.offsetWidth, h: img.offsetHeight, natW: img.naturalWidth })
   }
 
-  // Redraw on resize
   useEffect(() => {
-    if (!canvasRef.current) return
-    const ro = new ResizeObserver(() => drawOverlay())
-    if (imgRef.current) ro.observe(imgRef.current)
+    const img = imgRef.current
+    if (!img) return
+    const ro = new ResizeObserver(updateDims)
+    ro.observe(img)
     return () => ro.disconnect()
-  }, [drawOverlay])
+  }, [imgSrc])
 
   return (
     <div className="bg-[#0F1C2E] rounded-xl overflow-hidden border border-[#2a3d55]">
@@ -160,7 +75,7 @@ function SheetViewer({ sheet, placements }) {
             src={imgSrc}
             alt={sheet.name}
             className="w-full block"
-            onLoad={handleImgLoad}
+            onLoad={updateDims}
           />
         ) : (
           <div className="h-64 flex items-center justify-center bg-[#0F1C2E]">
@@ -170,10 +85,67 @@ function SheetViewer({ sheet, placements }) {
             </svg>
           </div>
         )}
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0 pointer-events-none"
-        />
+        {svgDims && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            width={svgDims.w}
+            height={svgDims.h}
+            viewBox={`0 0 ${svgDims.w} ${svgDims.h}`}
+            preserveAspectRatio="none"
+          >
+            {placements.map(p => {
+              const cx       = p.x * svgDims.w
+              const cy       = p.y * svgDims.h
+              const col      = p.marker_color || '#C8622A'
+              const markerR  = Math.max((p.symbol_size || 32) * (svgDims.w / svgDims.natW), 4)
+              const category = p.global_products?.category || ''
+
+              let fovEl = null
+              if (FOV_CATEGORIES.includes(category)) {
+                const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
+                const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
+                const range = sheet.scale_ratio
+                  ? Math.min((rangeInFeet / sheet.scale_ratio) * (svgDims.w / svgDims.natW), svgDims.w * 0.25)
+                  : svgDims.w * 0.06
+
+                if (category === 'PTZ Camera' || fovAngle >= 355) {
+                  fovEl = (
+                    <circle key={`fov_${p.id}`} cx={cx} cy={cy} r={range}
+                      fill={col} fillOpacity={0.08}
+                      stroke={col} strokeOpacity={0.3} strokeWidth={1} />
+                  )
+                } else {
+                  const startAngle = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
+                  const endAngle   = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
+                  const x1 = cx + Math.cos(startAngle) * range
+                  const y1 = cy + Math.sin(startAngle) * range
+                  const x2 = cx + Math.cos(endAngle) * range
+                  const y2 = cy + Math.sin(endAngle) * range
+                  fovEl = (
+                    <path key={`fov_${p.id}`}
+                      d={`M ${cx} ${cy} L ${x1} ${y1} A ${range} ${range} 0 ${fovAngle > 180 ? 1 : 0} 1 ${x2} ${y2} Z`}
+                      fill={col} fillOpacity={0.12}
+                      stroke={col} strokeOpacity={0.4} strokeWidth={1} />
+                  )
+                }
+              }
+
+              return (
+                <g key={p.id}>
+                  {fovEl}
+                  <circle cx={cx} cy={cy} r={markerR} fill={col} />
+                  {p.device_address && (
+                    <text x={cx} y={cy + markerR + markerR * 0.8}
+                      textAnchor="middle" fill={col}
+                      fontSize={Math.max(markerR * 0.75, 8)} fontWeight="bold">
+                      {p.device_address}
+                    </text>
+                  )}
+                </g>
+              )
+            })}
+          </svg>
+        )}
       </div>
     </div>
   )
