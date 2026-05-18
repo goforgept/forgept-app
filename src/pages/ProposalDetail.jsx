@@ -1879,6 +1879,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       if (r3.error) { console.error('bom_line_items delete error:', r3.error); alert('Error: ' + r3.error.message); setDeletingProposal(false); return }
       const r4 = await supabase.from('purchase_orders').delete().eq('proposal_id', id)
       if (r4.error) { console.error('purchase_orders delete error:', r4.error); alert('Error: ' + r4.error.message); setDeletingProposal(false); return }
+      // Unlink any jobs referencing this proposal before deleting
+      await supabase.from('jobs').update({ proposal_id: null }).eq('proposal_id', id)
       const r5 = await supabase.from('proposals').delete().eq('id', id)
       if (r5.error) { console.error('proposals delete error:', r5.error); alert('Error: ' + r5.error.message); setDeletingProposal(false); return }
       navigate('/proposals')
