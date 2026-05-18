@@ -169,6 +169,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   }
 
   const drawSheetOnPDF = async (pdf, sheet, imgData, imgX, imgY, imgW, imgH) => {
+    // Background
+    pdf.setFillColor(255, 255, 255)
+    pdf.rect(imgX, imgY, imgW, imgH, 'F')
     // Floor plan image — preserve aspect ratio
     if (imgData) {
       try {
@@ -177,12 +180,11 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         else if (imgData.includes('data:image/webp')) format = 'WEBP'
         const base64 = imgData.split(',')[1]
 
-        // Get image natural dimensions to preserve aspect ratio
-        const tempImg = new Image()
-        await new Promise(resolve => {
-          tempImg.onload = resolve
-          tempImg.onerror = resolve
-          tempImg.src = imgData
+        const tempImg = await new Promise(resolve => {
+          const img = new Image()
+          img.onload  = () => resolve(img)
+          img.onerror = () => resolve(img)
+          img.src = imgData
         })
         const naturalW = tempImg.naturalWidth  || imgW
         const naturalH = tempImg.naturalHeight || imgH
@@ -193,11 +195,16 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         const drawY    = imgY + (imgH - drawH) / 2
 
         pdf.addImage(base64, format, drawX, drawY, drawW, drawH, undefined, 'FAST')
+
+        // Update effective image bounds for device placement
+        imgX = drawX
+        imgY = drawY
+        imgW = drawW
+        imgH = drawH
       } catch (err) {
         console.warn('Image add failed, skipping:', err.message)
       }
     }
-
 
     // Device markers + FOV
     const sheetPlacements = placementsBySheet[sheet.id] || []
@@ -213,15 +220,13 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera','Sensor','Intercom','LPR Camera']
       const category = p.global_products?.category || ''
       if (fovCategories.includes(category) && p.fov_angle) {
-        // FOV range as proportion of image — matches canvas rendering
         const fovRangePct = sheet.scale_ratio
           ? (p.fov_range || 30) / (sheet.scale_ratio * 96)
-          : 0.04  // 4% of image width fallback
+          : 0.04
         const rangeInMM  = fovRangePct * Math.min(imgW, imgH)
         const halfAngle  = (p.fov_angle || 90) / 2 * Math.PI / 180
         const rotation   = (p.rotation || 0) * Math.PI / 180
 
-        // Use lighter tint for FOV fill
         const fr = Math.min(255, r + 120)
         const fg = Math.min(255, g + 120)
         const fb = Math.min(255, b + 120)
@@ -245,7 +250,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         }
       }
 
-     // Device icon — colored circle background + white SVG icon
+      // Device icon — colored circle background + white SVG icon
       const iconSize = 5
       pdf.setFillColor(r, g, b)
       pdf.circle(px, py, iconSize/2 + 0.5, 'F')
