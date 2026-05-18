@@ -1865,17 +1865,27 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const deleteProposal = async () => {
     if (deleteConfirmText !== proposal?.proposal_name) return
     setDeletingProposal(true)
-    const photoData = await supabase.from('proposal_photos').select('url').eq('proposal_id', id)
-    for (const photo of (photoData.data || [])) {
-      const path = photo.url.split('/proposal-photos/')[1]
-      if (path) await supabase.storage.from('proposal-photos').remove([path])
+    try {
+      const photoData = await supabase.from('proposal_photos').select('url').eq('proposal_id', id)
+      for (const photo of (photoData.data || [])) {
+        const path = photo.url.split('/proposal-photos/')[1]
+        if (path) await supabase.storage.from('proposal-photos').remove([path])
+      }
+      const r1 = await supabase.from('proposal_photos').delete().eq('proposal_id', id)
+      if (r1.error) { console.error('proposal_photos delete error:', r1.error); alert('Error: ' + r1.error.message); setDeletingProposal(false); return }
+      const r2 = await supabase.from('activities').delete().eq('proposal_id', id)
+      if (r2.error) { console.error('activities delete error:', r2.error); alert('Error: ' + r2.error.message); setDeletingProposal(false); return }
+      const r3 = await supabase.from('bom_line_items').delete().eq('proposal_id', id)
+      if (r3.error) { console.error('bom_line_items delete error:', r3.error); alert('Error: ' + r3.error.message); setDeletingProposal(false); return }
+      const r4 = await supabase.from('purchase_orders').delete().eq('proposal_id', id)
+      if (r4.error) { console.error('purchase_orders delete error:', r4.error); alert('Error: ' + r4.error.message); setDeletingProposal(false); return }
+      const r5 = await supabase.from('proposals').delete().eq('id', id)
+      if (r5.error) { console.error('proposals delete error:', r5.error); alert('Error: ' + r5.error.message); setDeletingProposal(false); return }
+      navigate('/proposals')
+    } catch (err) {
+      alert('Delete error: ' + err.message)
+      setDeletingProposal(false)
     }
-    await supabase.from('proposal_photos').delete().eq('proposal_id', id)
-    await supabase.from('activities').delete().eq('proposal_id', id)
-    await supabase.from('bom_line_items').delete().eq('proposal_id', id)
-    await supabase.from('purchase_orders').delete().eq('proposal_id', id)
-    await supabase.from('proposals').delete().eq('id', id)
-    navigate('/proposals')
   }
 
   const fetchPhotos = async () => {
