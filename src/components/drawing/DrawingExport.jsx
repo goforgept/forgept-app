@@ -213,12 +213,13 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera','Sensor','Intercom','LPR Camera']
       const category = p.global_products?.category || ''
       if (fovCategories.includes(category) && p.fov_angle) {
-        // Use scale_ratio if available, otherwise use 8% of image width as fallback
-        const rangeInMM  = sheet.scale_ratio
-          ? (p.fov_range || 30) / (sheet.scale_ratio * 96) * imgW
-          : imgW * 0.08
+        // FOV range as proportion of image — matches canvas rendering
+        const fovRangePct = sheet.scale_ratio
+          ? (p.fov_range || 30) / (sheet.scale_ratio * 96)
+          : 0.04  // 4% of image width fallback
+        const rangeInMM  = fovRangePct * Math.min(imgW, imgH)
         const halfAngle  = (p.fov_angle || 90) / 2 * Math.PI / 180
-        const rotation   = ((p.rotation || 0) - 90) * Math.PI / 180
+        const rotation   = (p.rotation || 0) * Math.PI / 180
 
         // Use lighter tint for FOV fill
         const fr = Math.min(255, r + 120)
