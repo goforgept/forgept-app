@@ -169,18 +169,32 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   }
 
   const drawSheetOnPDF = async (pdf, sheet, imgData, imgX, imgY, imgW, imgH) => {
-    // Floor plan image
+    // Floor plan image — preserve aspect ratio
     if (imgData) {
       try {
         let format = 'PNG'
         if (imgData.includes('data:image/jpeg') || imgData.includes('data:image/jpg')) format = 'JPEG'
         else if (imgData.includes('data:image/webp')) format = 'WEBP'
-        // Strip data URL prefix for jsPDF
         const base64 = imgData.split(',')[1]
-        pdf.addImage(base64, format, imgX, imgY, imgW, imgH, undefined, 'FAST')
+
+        // Get image natural dimensions to preserve aspect ratio
+        const tempImg = new Image()
+        await new Promise(resolve => {
+          tempImg.onload = resolve
+          tempImg.onerror = resolve
+          tempImg.src = imgData
+        })
+        const naturalW = tempImg.naturalWidth  || imgW
+        const naturalH = tempImg.naturalHeight || imgH
+        const ratio    = Math.min(imgW / naturalW, imgH / naturalH)
+        const drawW    = naturalW * ratio
+        const drawH    = naturalH * ratio
+        const drawX    = imgX + (imgW - drawW) / 2
+        const drawY    = imgY + (imgH - drawH) / 2
+
+        pdf.addImage(base64, format, drawX, drawY, drawW, drawH, undefined, 'FAST')
       } catch (err) {
         console.warn('Image add failed, skipping:', err.message)
-        // Don't throw — continue with markers only
       }
     }
 
@@ -198,26 +212,29 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       // FOV cone
       const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera','Sensor','Intercom','LPR Camera']
       const category = p.global_products?.category || ''
-      if (fovCategories.includes(category) && p.fov_angle && sheet.scale_ratio) {
-        const fovRange   = (p.fov_range || 30) * sheet.scale_ratio * 96 / (imgW / imgW)
-        const rangeInMM  = (p.fov_range || 30) / (sheet.scale_ratio * 96) * imgW
+      if (fovCategories.includes(category) && p.fov_angle) {
+        // Use scale_ratio if available, otherwise use 8% of image width as fallback
+        const rangeInMM  = sheet.scale_ratio
+          ? (p.fov_range || 30) / (sheet.scale_ratio * 96) * imgW
+          : imgW * 0.08
         const halfAngle  = (p.fov_angle || 90) / 2 * Math.PI / 180
         const rotation   = ((p.rotation || 0) - 90) * Math.PI / 180
 
+        // Use lighter tint for FOV fill
+        const fr = Math.min(255, r + 120)
+        const fg = Math.min(255, g + 120)
+        const fb = Math.min(255, b + 120)
+
         if (category === 'PTZ Camera') {
-          // Circle for PTZ
-          pdf.setFillColor(r, g, b)
-          pdf.setGState(new pdf.GState({ opacity: 0.15 }))
+          pdf.setFillColor(fr, fg, fb)
           pdf.circle(px, py, Math.min(rangeInMM, 20), 'F')
-          pdf.setGState(new pdf.GState({ opacity: 1 }))
         } else {
-          // FOV wedge — approximate with triangle
-          const x1 = px + Math.cos(rotation - halfAngle) * Math.min(rangeInMM, 30)
-          const y1 = py + Math.sin(rotation - halfAngle) * Math.min(rangeInMM, 30)
-          const x2 = px + Math.cos(rotation + halfAngle) * Math.min(rangeInMM, 30)
-          const y2 = py + Math.sin(rotation + halfAngle) * Math.min(rangeInMM, 30)
-          pdf.setFillColor(r, g, b)
-          pdf.setDrawColor(r, g, b)
+          const x1 = px + Math.cos(rotation - halfAngle) * Math.min(rangeInMM, 40)
+          const y1 = py + Math.sin(rotation - halfAngle) * Math.min(rangeInMM, 40)
+          const x2 = px + Math.cos(rotation + halfAngle) * Math.min(rangeInMM, 40)
+          const y2 = py + Math.sin(rotation + halfAngle) * Math.min(rangeInMM, 40)
+          pdf.setFillColor(fr, fg, fb)
+          pdf.setDrawColor(fr, fg, fb)
           pdf.setLineWidth(0.1)
           try {
             pdf.triangle(px, py, x1, y1, x2, y2, 'FD')
