@@ -527,6 +527,14 @@ const CATEGORY_SVGS = {
       <rect x="14" y="22" width="12" height="7" rx="1"/>
     </svg>`,
 
+  'Door Operator': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <path d="M6 6 L6 32"/>
+      <path d="M6 32 A26 26 0 0 0 32 6" stroke-dasharray="3 3" stroke-width="1"/>
+      <rect x="28" y="2" width="10" height="8" rx="1"/>
+      <circle cx="33" cy="6" r="2" fill="${color}" stroke="none"/>
+    </svg>`,
+
   'default': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
       <rect x="10" y="10" width="20" height="20" rx="4"/>

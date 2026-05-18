@@ -267,6 +267,8 @@ function CategoryIcon({ category }) {
       return <svg {...props}><rect x="6" y="12" width="28" height="16" rx="8" strokeWidth="1.5"/><circle cx="20" cy="20" r="5" fill="currentColor"/></svg>
     case 'Shock Sensor':
       return <svg {...props}><circle cx="20" cy="20" r="8" strokeWidth="1.5"/><path d="M9 11 Q6 9 8 6 M31 11 Q34 9 32 6 M9 29 Q6 31 8 34 M31 29 Q34 31 32 34" strokeLinecap="round" strokeWidth="1"/><circle cx="20" cy="20" r="3" fill="currentColor"/></svg>
+    case 'Door Operator':
+      return <svg {...props}><path d="M6 6 L6 32" strokeWidth="1.5" strokeLinecap="round"/><path d="M6 32 A26 26 0 0 0 32 6" strokeDasharray="3 3" strokeWidth="1"/><rect x="28" y="2" width="10" height="8" rx="1" strokeWidth="1.5"/><circle cx="33" cy="6" r="2" fill="currentColor" stroke="none"/></svg>
     default:
       return <svg {...props}><rect x="10" y="10" width="20" height="20" rx="4" strokeWidth="1.5"/><circle cx="20" cy="20" r="4" strokeWidth="1.5"/></svg>
   }

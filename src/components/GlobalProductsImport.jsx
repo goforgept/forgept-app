@@ -37,6 +37,9 @@ const ELEMENT_TYPE_MAP = {
   'Siren Element Profile Template':                 { industry: 'security', defaultCategory: 'Interior Siren' },
   'Panic Button Element Profile Template':          { industry: 'security', defaultCategory: 'Panic Button' },
   'Shock Sensor Element Profile Template':          { industry: 'security', defaultCategory: 'Shock Sensor' },
+  'Door Operator Element Profile Template':         { industry: 'security', defaultCategory: 'Door Operator' },
+  'Automatic Door Element Profile Template':        { industry: 'security', defaultCategory: 'Door Operator' },
+  'Door Opener Element Profile Template':           { industry: 'security', defaultCategory: 'Door Operator' },
 }
 
 // Camera style → category override
@@ -218,6 +221,7 @@ async function parseSystemSurveyorFile(file) {
       else if (etLower.includes('siren') || etLower.includes('sounder')) category = 'Interior Siren'
       else if (etLower.includes('panic'))                    category = 'Panic Button'
       else if (etLower.includes('shock'))                    category = 'Shock Sensor'
+      else if (etLower.includes('door operator') || etLower.includes('automatic door') || etLower.includes('door opener')) category = 'Door Operator'
       else if (etLower.includes('detector') && !etLower.includes('smoke')) category = 'PIR Detector'
       else if (etLower.includes('camera') ||
                etLower.includes('fixed') ||
@@ -325,7 +329,8 @@ function parseCSVLine(line) {
 function guessIndustry(category) {
   const cat = (category || '').toLowerCase()
   if (['camera', 'reader', 'controller', 'nvr', 'sensor', 'intercom', 'lock', 'motion',
-       'keypad', 'alarm', 'contact', 'siren', 'panic', 'detector', 'glass break', 'shock'].some(k => cat.includes(k))) return 'security'
+       'keypad', 'alarm', 'contact', 'siren', 'panic', 'detector', 'glass break', 'shock',
+       'door operator', 'door opener', 'automatic door'].some(k => cat.includes(k))) return 'security'
   if (['speaker', 'display', 'projector', 'amplifier', 'dsp', 'ceiling speaker', 'subwoofer', 'microphone'].some(k => cat.includes(k))) return 'av'
   if (['switch', 'patch', 'fiber', 'data', 'ups', 'rack', 'wireless ap'].some(k => cat.includes(k))) return 'low_voltage'
   if (['outlet', 'panel', 'conduit', 'lighting'].some(k => cat.includes(k))) return 'electrical'
@@ -549,7 +554,7 @@ export default function GlobalProductsImport({ onClose, onImported }) {
 EXAMPLE-CAM-001,Example Dome Camera,Dome Camera,Example Corp,2MP IR Dome Camera,90,98,PoE required
 EXAMPLE-CAM-002,Example Bullet Camera,Bullet Camera,Example Corp,4MP Varifocal Bullet,70,164,PoE or 12VDC
 # ── Access Control ────────────────────────────────────────────────────────────
-# Valid categories: Access Reader | Access Control Door | Controller | Intercom | Wireless Lock
+# Valid categories: Access Reader | Access Control Door | Controller | Intercom | Wireless Lock | Door Operator
 EXAMPLE-ACC-001,Example Card Reader,Access Reader,Example Corp,Multi-format RFID reader,,,
 EXAMPLE-ACC-002,Example Door Controller,Access Control Door,Example Corp,2-door access controller,,,
 # ── Intrusion Detection ────────────────────────────────────────────────────────
