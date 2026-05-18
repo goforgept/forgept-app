@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 
 const FOV_CATEGORIES = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera']
 
 // ── SheetViewer ────────────────────────────────────────────────────────────────
-// Renders one floor plan sheet with FOV cones + device markers via SVG overlay.
+// Canvas overlay avoids SVG preserveAspectRatio alignment issues — the canvas is
+// sized to exactly match the rendered image in CSS pixels, so coordinates are 1:1.
 function SheetViewer({ sheet, placements }) {
-  const [imgSrc, setImgSrc] = useState(null)
-  const [dims,   setDims]   = useState(null)
+  const [imgSrc,   setImgSrc]   = useState(null)
+  const [naturalW, setNaturalW] = useState(null)
+  const imgRef    = useRef(null)
+  const canvasRef = useRef(null)
 
   useEffect(() => {
     if (!sheet.storage_path || ['blank','pending'].includes(sheet.storage_path)) return
@@ -45,20 +48,119 @@ function SheetViewer({ sheet, placements }) {
     }
   }
 
+  const drawOverlay = useCallback(() => {
+    const img    = imgRef.current
+    const canvas = canvasRef.current
+    if (!img || !canvas || !naturalW) return
+
+    const W   = img.offsetWidth
+    const H   = img.offsetHeight
+    if (!W || !H) return
+
+    const dpr = window.devicePixelRatio || 1
+    canvas.width        = W * dpr
+    canvas.height       = H * dpr
+    canvas.style.width  = `${W}px`
+    canvas.style.height = `${H}px`
+
+    const ctx = canvas.getContext('2d')
+    ctx.scale(dpr, dpr)
+    ctx.clearRect(0, 0, W, H)
+
+    for (const p of placements) {
+      const cx      = p.x * W
+      const cy      = p.y * H
+      const col     = p.marker_color || '#C8622A'
+      const markerR = Math.max((p.symbol_size || 32) * (W / naturalW), 4)
+      const category = p.global_products?.category || ''
+
+      // FOV cone
+      if (FOV_CATEGORIES.includes(category)) {
+        const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
+        const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
+        const range = sheet.scale_ratio
+          ? Math.min((rangeInFeet / sheet.scale_ratio) * (W / naturalW), W * 0.35)
+          : W * 0.08
+
+        ctx.save()
+        ctx.fillStyle   = col
+        ctx.strokeStyle = col
+        ctx.lineWidth   = 1
+
+        if (category === 'PTZ Camera' || fovAngle >= 355) {
+          ctx.globalAlpha = 0.08
+          ctx.beginPath()
+          ctx.arc(cx, cy, range, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.globalAlpha = 0.3
+          ctx.stroke()
+        } else {
+          const startAngle = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
+          const endAngle   = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
+          ctx.globalAlpha = 0.12
+          ctx.beginPath()
+          ctx.moveTo(cx, cy)
+          ctx.arc(cx, cy, range, startAngle, endAngle)
+          ctx.closePath()
+          ctx.fill()
+          ctx.globalAlpha = 0.4
+          ctx.stroke()
+        }
+        ctx.restore()
+      }
+
+      // Marker circle
+      ctx.save()
+      ctx.fillStyle = col
+      ctx.beginPath()
+      ctx.arc(cx, cy, markerR, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+
+      // Label
+      if (p.device_address) {
+        const fontSize = Math.max(markerR * 0.75, 8)
+        ctx.save()
+        ctx.fillStyle  = col
+        ctx.font       = `bold ${fontSize}px sans-serif`
+        ctx.textAlign  = 'center'
+        ctx.fillText(p.device_address, cx, cy + markerR + fontSize * 0.9)
+        ctx.restore()
+      }
+    }
+  }, [placements, naturalW, sheet.scale_ratio])
+
+  // Redraw whenever placements or image change
+  useEffect(() => {
+    if (naturalW) drawOverlay()
+  }, [drawOverlay, naturalW])
+
+  const handleImgLoad = (e) => {
+    setNaturalW(e.target.naturalWidth)
+  }
+
+  // Redraw on resize
+  useEffect(() => {
+    if (!canvasRef.current) return
+    const ro = new ResizeObserver(() => drawOverlay())
+    if (imgRef.current) ro.observe(imgRef.current)
+    return () => ro.disconnect()
+  }, [drawOverlay])
+
   return (
     <div className="bg-[#0F1C2E] rounded-xl overflow-hidden border border-[#2a3d55]">
       <div className="bg-[#1a2d45] px-4 py-3 border-b border-[#2a3d55] flex items-center justify-between">
         <p className="text-white text-sm font-semibold">{sheet.name}</p>
         <p className="text-[#8A9AB0] text-xs">{placements.length} device{placements.length !== 1 ? 's' : ''}</p>
       </div>
-
       <div className="relative bg-white">
         {imgSrc ? (
           <img
+            ref={imgRef}
             src={imgSrc}
             alt={sheet.name}
             className="w-full block"
-            onLoad={e => setDims({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+            onLoad={handleImgLoad}
           />
         ) : (
           <div className="h-64 flex items-center justify-center bg-[#0F1C2E]">
@@ -68,70 +170,10 @@ function SheetViewer({ sheet, placements }) {
             </svg>
           </div>
         )}
-
-        {dims && (
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            viewBox={`0 0 ${dims.w} ${dims.h}`}
-            preserveAspectRatio="xMidYMid meet"
-          >
-            {placements.map(p => {
-              const cx       = p.x * dims.w
-              const cy       = p.y * dims.h
-              const col      = p.marker_color || '#C8622A'
-              const markerR  = (p.symbol_size || 32) / 2
-              const category = p.global_products?.category || ''
-              const sw       = Math.max(dims.w * 0.0012, 1)
-
-              let fovEl = null
-              if (FOV_CATEGORIES.includes(category)) {
-                const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
-                const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
-                const range = sheet.scale_ratio
-                  ? Math.min(rangeInFeet / sheet.scale_ratio, dims.w * 0.35)
-                  : dims.w * 0.08
-
-                if (category === 'PTZ Camera' || fovAngle >= 355) {
-                  fovEl = (
-                    <circle key={`fov_${p.id}`} cx={cx} cy={cy} r={range}
-                      fill={col} fillOpacity={0.08}
-                      stroke={col} strokeOpacity={0.3} strokeWidth={sw * 2} />
-                  )
-                } else {
-                  const startAngle = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
-                  const endAngle   = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
-                  const x1 = cx + Math.cos(startAngle) * range
-                  const y1 = cy + Math.sin(startAngle) * range
-                  const x2 = cx + Math.cos(endAngle) * range
-                  const y2 = cy + Math.sin(endAngle) * range
-                  const largeArc = fovAngle > 180 ? 1 : 0
-                  fovEl = (
-                    <path key={`fov_${p.id}`}
-                      d={`M ${cx} ${cy} L ${x1} ${y1} A ${range} ${range} 0 ${largeArc} 1 ${x2} ${y2} Z`}
-                      fill={col} fillOpacity={0.12}
-                      stroke={col} strokeOpacity={0.4} strokeWidth={sw * 2} />
-                  )
-                }
-              }
-
-              return (
-                <g key={p.id}>
-                  {fovEl}
-                  <circle cx={cx} cy={cy} r={markerR} fill={col} />
-                  {p.device_address && (
-                    <text
-                      x={cx} y={cy + markerR + markerR * 0.7}
-                      textAnchor="middle" fill={col}
-                      fontSize={markerR * 0.75} fontWeight="bold"
-                    >
-                      {p.device_address}
-                    </text>
-                  )}
-                </g>
-              )
-            })}
-          </svg>
-        )}
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 pointer-events-none"
+        />
       </div>
     </div>
   )
@@ -196,7 +238,7 @@ export default function DrawingReview() {
       setSheets(sheetData || [])
       setPlacements(placementData || [])
       setOrgProfile(profileData)
-    } catch (err) {
+    } catch {
       setError('Failed to load drawing review.')
     } finally {
       setLoading(false)
@@ -298,7 +340,7 @@ export default function DrawingReview() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
 
         {/* Floor plan sheets */}
         {sheets.length > 0 ? (
@@ -314,6 +356,52 @@ export default function DrawingReview() {
         ) : (
           <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-8 text-center">
             <p className="text-[#8A9AB0] text-sm">No floor plan sheets found for this project.</p>
+          </div>
+        )}
+
+        {/* Device schedule */}
+        {placements.length > 0 && (
+          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#2a3d55]">
+              <p className="text-[#C8622A] font-bold text-sm tracking-wide uppercase">Device Schedule</p>
+              <p className="text-[#8A9AB0] text-xs mt-0.5">{placements.length} device{placements.length !== 1 ? 's' : ''} across {sheets.length} sheet{sheets.length !== 1 ? 's' : ''}</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-[#0F1C2E] text-[#C8622A] text-left">
+                    <th className="px-4 py-3 font-semibold">#</th>
+                    <th className="px-4 py-3 font-semibold">Address</th>
+                    <th className="px-4 py-3 font-semibold">Part Number</th>
+                    <th className="px-4 py-3 font-semibold">Description</th>
+                    <th className="px-4 py-3 font-semibold">Manufacturer</th>
+                    <th className="px-4 py-3 font-semibold">Category</th>
+                    <th className="px-4 py-3 font-semibold">Qty</th>
+                    <th className="px-4 py-3 font-semibold">Sheet</th>
+                    <th className="px-4 py-3 font-semibold">Runs To</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {placements.map((p, idx) => {
+                    const gp    = p.global_products
+                    const sheet = sheets.find(s => s.id === p.drawing_sheet_id)
+                    return (
+                      <tr key={p.id} className={idx % 2 === 0 ? 'bg-[#1a2d45]' : 'bg-[#162338]'}>
+                        <td className="px-4 py-2.5 text-[#8A9AB0]">{idx + 1}</td>
+                        <td className="px-4 py-2.5 text-white font-medium">{p.device_address || '—'}</td>
+                        <td className="px-4 py-2.5 text-[#8A9AB0] font-mono">{p.part_number_override || gp?.part_number || '—'}</td>
+                        <td className="px-4 py-2.5 text-white">{p.description_override || gp?.name || '—'}</td>
+                        <td className="px-4 py-2.5 text-[#8A9AB0]">{p.manufacturer_override || gp?.manufacturer || '—'}</td>
+                        <td className="px-4 py-2.5 text-[#8A9AB0]">{gp?.category || '—'}</td>
+                        <td className="px-4 py-2.5 text-[#8A9AB0]">{p.quantity || 1}</td>
+                        <td className="px-4 py-2.5 text-[#8A9AB0]">{sheet?.name || '—'}</td>
+                        <td className="px-4 py-2.5 text-[#8A9AB0]">{p.runs_to_label || '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
