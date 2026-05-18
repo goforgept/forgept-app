@@ -173,6 +173,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     pdf.setFillColor(255, 255, 255)
     pdf.rect(imgX, imgY, imgW, imgH, 'F')
     // Floor plan image — preserve aspect ratio
+    let imgNaturalW = null
     if (imgData) {
       try {
         let format = 'PNG'
@@ -188,6 +189,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         })
         const naturalW = tempImg.naturalWidth  || imgW
         const naturalH = tempImg.naturalHeight || imgH
+        imgNaturalW = naturalW
         const ratio    = Math.min(imgW / naturalW, imgH / naturalH)
         const drawW    = naturalW * ratio
         const drawH    = naturalH * ratio
@@ -216,42 +218,48 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const g   = parseInt(col.slice(3,5),16)
       const b   = parseInt(col.slice(5,7),16)
 
-      // FOV cone — matches canvas arc calculation exactly
-      const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera','Sensor','Intercom','LPR Camera']
+      // FOV cone — mirrors canvas rendering in DrawingSheet
+      const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera']
       const category = p.global_products?.category || ''
       if (fovCategories.includes(category) && p.fov_angle) {
-        const fovAngle   = p.fov_angle || 90
-        const rangeInMM  = sheet.scale_ratio
-          ? (p.fov_range || 30) / sheet.scale_ratio * imgW * 0.01
-          : Math.min(imgW, imgH) * 0.04
-        const startAngle = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
-        const endAngle   = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
-        const steps      = Math.max(16, Math.floor(fovAngle / 5))
+        const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
+        const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
+        // feet → mm: same formula as canvas (feet / scale_ratio gives original px, scaled to PDF image width)
+        const rangeInMM = sheet.scale_ratio && imgNaturalW
+          ? (rangeInFeet / sheet.scale_ratio) * (imgW / imgNaturalW)
+          : Math.min(imgW, imgH) * 0.08
 
+        pdf.saveGraphicsState()
+        pdf.setGState(pdf.GState({ opacity: 0.12, 'stroke-opacity': 0.4 }))
         pdf.setFillColor(r, g, b)
         pdf.setDrawColor(r, g, b)
-        pdf.setLineWidth(0.1)
+        pdf.setLineWidth(0.3)
 
         if (category === 'PTZ Camera' || fovAngle >= 355) {
-          pdf.circle(px, py, Math.min(rangeInMM, 15), 'F')
+          pdf.circle(px, py, rangeInMM, 'FD')
         } else {
-          // Arc points — same pattern as canvas Line component
+          const startAngle = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
+          const endAngle   = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
+          const steps      = Math.max(16, Math.floor(fovAngle / 5))
           const pts = [[px, py]]
           for (let i = 0; i <= steps; i++) {
             const angle = startAngle + (endAngle - startAngle) * (i / steps)
             pts.push([px + Math.cos(angle) * rangeInMM, py + Math.sin(angle) * rangeInMM])
           }
           pts.push([px, py])
-          // Draw as filled polygon using lines
           const deltas = pts.slice(1).map((pt, i) => [pt[0] - pts[i][0], pt[1] - pts[i][1]])
-          pdf.lines(deltas, pts[0][0], pts[0][1], [1, 1], 'F')
+          pdf.lines(deltas, pts[0][0], pts[0][1], [1, 1], 'FD')
         }
+        pdf.restoreGraphicsState()
       }
 
-      // Device icon — colored circle background + white SVG icon
-      const iconSize = 5
+      // Device icon — size proportional to floor plan image, matching canvas marker scale
+      const symbolSizeMM = imgNaturalW
+        ? Math.max((p.symbol_size || 32) * (imgW / imgNaturalW), 2)
+        : 4
+      const iconSize = symbolSizeMM * 0.65
       pdf.setFillColor(r, g, b)
-      pdf.circle(px, py, iconSize/2 + 0.5, 'F')
+      pdf.circle(px, py, symbolSizeMM / 2, 'F')
       const iconPng = await getIconPng(p.global_products?.category || 'default', '#ffffff', 32)
       if (iconPng) {
         pdf.addImage(iconPng, 'PNG', px - iconSize/2, py - iconSize/2, iconSize, iconSize)
@@ -260,9 +268,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       // Device label
       if (p.device_address) {
         pdf.setTextColor(r, g, b)
-        pdf.setFontSize(4)
+        pdf.setFontSize(Math.max(symbolSizeMM * 0.7, 3))
         pdf.setFont('helvetica', 'bold')
-        pdf.text(p.device_address, px, py + iconSize/2 + 2.5, { align: 'center' })
+        pdf.text(p.device_address, px, py + symbolSizeMM / 2 + symbolSizeMM * 0.4, { align: 'center' })
       }
     }
   }
