@@ -840,7 +840,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           proposal_id:      proposalId,
           package_type:     'client_overview',
           revision:         'Rev 0',
-          status:           'shared',
+          status:           'submitted',
           share_token:      token,
           shared_at:        new Date().toISOString(),
           share_expires_at: expires.toISOString(),
