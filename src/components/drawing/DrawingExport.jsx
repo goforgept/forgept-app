@@ -2,6 +2,35 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../supabase'
 import { getCategorySVG } from './useCategoryIcons'
 
+// Convert SVG string to PNG base64 for jsPDF
+const svgToPng = (svgString, size = 20) => new Promise(resolve => {
+  const canvas  = document.createElement('canvas')
+  canvas.width  = size
+  canvas.height = size
+  const ctx     = canvas.getContext('2d')
+  const img     = new Image()
+  const blob    = new Blob([svgString], { type: 'image/svg+xml' })
+  const url     = URL.createObjectURL(blob)
+  img.onload = () => {
+    ctx.drawImage(img, 0, 0, size, size)
+    URL.revokeObjectURL(url)
+    resolve(canvas.toDataURL('image/png'))
+  }
+  img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+  img.src = url
+})
+
+// Cache rendered icons
+const iconCache = {}
+const getIconPng = async (category, color, size = 16) => {
+  const key = `${category}_${color}_${size}`
+  if (iconCache[key]) return iconCache[key]
+  const svg = getCategorySVG(category, color)
+  const png = await svgToPng(svg, size)
+  iconCache[key] = png
+  return png
+}
+
 // ─── DrawingExport ────────────────────────────────────────────────────────────
 // Export tab — Client Overview, Shop Drawings, As-Builts, CSV BOM
 export default function DrawingExport({ proposalId, orgId, sheets, proposal, stageRefs }) {
@@ -198,16 +227,27 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         }
       }
 
-      // Marker circle
-      pdf.setFillColor(r, g, b)
-      pdf.circle(px, py, 2, 'F')
+     // Device icon — SVG converted to PNG
+      const iconSize = 8
+      const iconPng  = await getIconPng(p.global_products?.category || 'default', col, 32)
+      if (iconPng) {
+        pdf.addImage(iconPng, 'PNG', px - iconSize/2, py - iconSize/2, iconSize, iconSize)
+      } else {
+        const legendIcon = await getIconPng(category, '#C8622A', 32)
+        if (legendIcon) {
+          pdf.addImage(legendIcon, 'PNG', lx, ly - 2, 8, 8)
+        } else {
+          pdf.setFillColor(200, 98, 42)
+          pdf.circle(lx + 4, ly + 3, 4, 'F')
+        }
+      }
 
       // Device label
       if (p.device_address) {
-        pdf.setTextColor(255, 255, 255)
+        pdf.setTextColor(r, g, b)
         pdf.setFontSize(4.5)
         pdf.setFont('helvetica', 'bold')
-        pdf.text(p.device_address, px, py + 4, { align: 'center' })
+        pdf.text(p.device_address, px, py + iconSize/2 + 2, { align: 'center' })
       }
     })
   }
@@ -584,8 +624,13 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       let col = 0
 
       usedCategories.forEach(category => {
-        pdf.setFillColor(200, 98, 42)
-        pdf.circle(lx + 5, ly + 3, 3.5, 'F')
+        const legendIcon = await getIconPng(category, '#C8622A', 32)
+        if (legendIcon) {
+          pdf.addImage(legendIcon, 'PNG', lx, ly - 2, 7, 7)
+        } else {
+          pdf.setFillColor(200, 98, 42)
+          pdf.circle(lx + 3.5, ly + 3, 3.5, 'F')
+        }
         pdf.setTextColor(255, 255, 255)
         pdf.setFontSize(8)
         pdf.setFont('helvetica', 'bold')
