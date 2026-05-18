@@ -221,7 +221,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       // FOV cone — mirrors canvas rendering in DrawingSheet
       const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera']
       const category = p.global_products?.category || ''
-      if (fovCategories.includes(category) && p.fov_angle) {
+      if (fovCategories.includes(category)) {
         const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
         const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
         // feet → mm: same formula as canvas (feet / scale_ratio gives original px, scaled to PDF image width)
