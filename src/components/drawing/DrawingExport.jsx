@@ -226,10 +226,14 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
         const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
         // feet → mm: same formula as canvas (feet / scale_ratio gives original px, scaled to PDF image width)
-        const rangeInMM = sheet.scale_ratio && imgNaturalW
-          ? (rangeInFeet / sheet.scale_ratio) * (imgW / imgNaturalW)
+        // scale_ratio = feet per pixel at 96dpi
+        // imgW/imgNaturalW = pdf mm per canvas pixel
+        const pdfMmPerFoot = imgNaturalW
+          ? imgW / (imgNaturalW * sheet.scale_ratio)
+          : null
+        const rangeInMM = pdfMmPerFoot
+          ? rangeInFeet * pdfMmPerFoot
           : Math.min(imgW, imgH) * 0.08
-
         pdf.saveGraphicsState()
         pdf.setGState(pdf.GState({ opacity: 0.12, 'stroke-opacity': 0.4 }))
         pdf.setFillColor(r, g, b)
