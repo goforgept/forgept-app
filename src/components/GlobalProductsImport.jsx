@@ -152,12 +152,8 @@ async function parseSystemSurveyorFile(file) {
         const style   = getVal('Camera Style', offset) || getVal('Camera Type', offset)
     const fovAngle = getVal('AOC Angle', offset)
         if (offset === 0) {
-      console.log('Label map keys:', Object.keys(labelMap).slice(0, 20))
-      console.log('Product 0 style:', getVal('Camera Style', 0))
+      console.log('ALL label map keys:', Object.keys(labelMap))
       console.log('Product 0 mfr:', getVal('Component Manufacturer', 0))
-      console.log('Element type:', elementType)
-      console.log('Row 1 raw:', rawRows[0]?.slice(0, 8).map(v => String(v || '')))
-      console.log('Row 3 raw:', rawRows[2]?.slice(0, 8).map(v => String(v || '')))
     }
 
 
