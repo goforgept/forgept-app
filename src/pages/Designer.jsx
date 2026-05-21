@@ -119,10 +119,8 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
       // Upload the file once
       const tempId      = crypto.randomUUID()
       const storagePath = `${orgId}/${proposalId}/${tempId}.${ext}`
-      const { error: uploadErr } = await supabase.storage
-        .from('floor-plans')
-        .upload(storagePath, file, { upsert: false })
-      if (uploadErr) throw uploadErr
+      const { uploadToR2 } = await import('../r2')
+      await uploadToR2(storagePath, file, file.type)
 
       // Create one sheet per page
       let firstId = null
@@ -188,7 +186,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
           s.id !== sheetId && s.storage_path === sheet.storage_path
         )
         if (othersUsingFile.length === 0) {
-          await supabase.storage.from('floor-plans').remove([sheet.storage_path])
+          // R2 deletion — skip for now, files cleaned up via maintenance
         }
       }
 

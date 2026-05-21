@@ -128,8 +128,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     const sheet = sheets.find(s => s.id === sheetId)
     if (!sheet || ['blank', 'pending'].includes(sheet.storage_path)) return null
     try {
-      const { data } = await supabase.storage.from('floor-plans').createSignedUrl(sheet.storage_path, 3600)
-      if (!data?.signedUrl) return null
+      const { getR2Url } = await import('../../r2')
+      const signedUrl = await getR2Url(sheet.storage_path, 3600)
+      if (!signedUrl) return null
 
       const isPDF = sheet.storage_path.toLowerCase().endsWith('.pdf')
 

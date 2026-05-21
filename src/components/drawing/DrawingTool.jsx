@@ -53,8 +53,8 @@ export default function DrawingTool({ proposalId, orgId, featureEnabled, onBOMAp
       if (insertErr) throw insertErr
       const ext = file.name.split('.').pop()
       const storagePath = `${orgId}/${proposalId}/${sheet.id}.${ext}`
-      const { error: uploadErr } = await supabase.storage.from('floor-plans').upload(storagePath, file, { upsert: false })
-      if (uploadErr) throw uploadErr
+      const { uploadToR2 } = await import('../../r2')
+      await uploadToR2(storagePath, file, file.type)
       const { error: updateErr } = await supabase.from('drawing_sheets').update({ storage_path: storagePath }).eq('id', sheet.id)
       if (updateErr) throw updateErr
       await loadSheets()
@@ -74,9 +74,8 @@ export default function DrawingTool({ proposalId, orgId, featureEnabled, onBOMAp
       const sheet = sheets.find(s => s.id === sheetId)
       const { error: deleteErr } = await supabase.from('drawing_sheets').delete().eq('id', sheetId)
       if (deleteErr) throw deleteErr
-      if (sheet?.storage_path && sheet.storage_path !== 'pending') {
-        await supabase.storage.from('floor-plans').remove([sheet.storage_path])
-      }
+      // R2 deletion handled via separate cleanup — skip for now
+      // Files will be cleaned up via scheduled maintenance
       await loadSheets()
       setActiveSheetId(sheets.find(s => s.id !== sheetId)?.id || null)
     } catch (err) { setError('Failed to delete sheet.') }

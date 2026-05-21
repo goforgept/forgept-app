@@ -20,17 +20,16 @@ function SheetViewer({ sheet, placements }) {
 
   const loadImage = async () => {
     try {
-      const { data } = await supabase.storage
-        .from('floor-plans')
-        .createSignedUrl(sheet.storage_path, 3600)
-      if (!data?.signedUrl) return
+      const { getR2Url } = await import('../r2')
+      const signedUrl = await getR2Url(sheet.storage_path, 3600)
+      if (!signedUrl) return
 
       if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
         const pdfjsLib = await import('pdfjs-dist')
         pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
           'pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url
         ).toString()
-        const response = await fetch(data.signedUrl)
+        const response = await fetch(signedUrl)
         const buf      = await response.arrayBuffer()
         const pdfDoc   = await pdfjsLib.getDocument({ data: buf }).promise
         const page     = await pdfDoc.getPage(sheet.page_number || 1)
@@ -41,7 +40,7 @@ function SheetViewer({ sheet, placements }) {
         await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise
         setImgSrc(canvas.toDataURL('image/png'))
       } else {
-        setImgSrc(data.signedUrl)
+        setImgSrc(signedUrl)
       }
     } catch (err) {
       console.error('Sheet image load failed:', err)
