@@ -5,6 +5,7 @@ const ACCESS_KEY  = Deno.env.get('R2_ACCESS_KEY_ID')!
 const SECRET_KEY  = Deno.env.get('R2_SECRET_ACCESS_KEY')!
 const BUCKET      = Deno.env.get('R2_BUCKET_NAME')!
 
+// Bucket-specific endpoint
 const R2_ENDPOINT = `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`
 
 const corsHeaders = {
@@ -40,22 +41,28 @@ async function getSigningKey(secret: string, date: string) {
   return hmac(kService, 'aws4_request')
 }
 
-async function signedFetch(method: string, path: string, body?: ArrayBuffer, contentType?: string) {
-  const url  = new URL(`${R2_ENDPOINT}/${BUCKET}/${path}`)
+async function r2Put(path: string, body: ArrayBuffer, contentType: string) {
+  const url  = `${R2_ENDPOINT}/${BUCKET}/${path}`
   const now  = new Date()
   const date = now.toISOString().slice(0, 10).replace(/-/g, '')
   const time = now.toISOString().slice(0, 19).replace(/[-:T]/g, '') + 'Z'
 
-  const payloadHash = body ? await sha256hexBuf(body) : 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+  const payloadHash    = await sha256hexBuf(body)
+  const canonicalUri   = `/${BUCKET}/${path}`
+  const signedHeaders  = 'content-type;host;x-amz-content-sha256;x-amz-date'
+  const host           = new URL(R2_ENDPOINT).host
 
-  const signedHeaders = contentType ? 'content-type;host' : 'host'
-  const canonicalHeaders = contentType
-    ? `content-type:${contentType}\nhost:${url.host}\n`
-    : `host:${url.host}\n`
+  const canonicalHeaders = [
+    `content-type:${contentType}`,
+    `host:${host}`,
+    `x-amz-content-sha256:${payloadHash}`,
+    `x-amz-date:${time}`,
+    '',
+  ].join('\n')
 
   const canonicalRequest = [
-    method,
-    `/${BUCKET}/${path}`,
+    'PUT',
+    canonicalUri,
     '',
     canonicalHeaders,
     signedHeaders,
@@ -75,21 +82,26 @@ async function signedFetch(method: string, path: string, body?: ArrayBuffer, con
 
   const authHeader = `AWS4-HMAC-SHA256 Credential=${ACCESS_KEY}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`
 
-  const headers: Record<string, string> = {
-    'Authorization': authHeader,
-    'X-Amz-Date':   time,
-    'X-Amz-Content-Sha256': payloadHash,
-  }
-  if (contentType) headers['Content-Type'] = contentType
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      'Authorization':        authHeader,
+      'Content-Type':         contentType,
+      'X-Amz-Date':          time,
+      'X-Amz-Content-Sha256': payloadHash,
+    },
+    body,
+  })
 
-  return fetch(url.toString(), { method, headers, body })
+  return res
 }
 
-async function getPresignedUrl(path: string, expiresIn = 3600) {
+async function r2GetPresigned(path: string, expiresIn: number) {
   const url  = new URL(`${R2_ENDPOINT}/${BUCKET}/${path}`)
   const now  = new Date()
   const date = now.toISOString().slice(0, 10).replace(/-/g, '')
   const time = now.toISOString().slice(0, 19).replace(/[-:T]/g, '') + 'Z'
+  const host = url.host
 
   url.searchParams.set('X-Amz-Algorithm',     'AWS4-HMAC-SHA256')
   url.searchParams.set('X-Amz-Credential',    `${ACCESS_KEY}/${date}/auto/s3/aws4_request`)
@@ -97,11 +109,16 @@ async function getPresignedUrl(path: string, expiresIn = 3600) {
   url.searchParams.set('X-Amz-Expires',       String(expiresIn))
   url.searchParams.set('X-Amz-SignedHeaders', 'host')
 
+  const sortedParams = Array.from(url.searchParams.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join('&')
+
   const canonicalRequest = [
     'GET',
     `/${BUCKET}/${path}`,
-    url.searchParams.toString(),
-    `host:${url.host}\n`,
+    sortedParams,
+    `host:${host}\n`,
     'host',
     'UNSIGNED-PAYLOAD',
   ].join('\n')
@@ -116,6 +133,7 @@ async function getPresignedUrl(path: string, expiresIn = 3600) {
 
   const signingKey = await getSigningKey(SECRET_KEY, date)
   const signature  = await hmacHex(signingKey, stringToSign)
+
   url.searchParams.set('X-Amz-Signature', signature)
   return url.toString()
 }
@@ -126,7 +144,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validate session
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
 
@@ -139,18 +156,18 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
 
-    // PUT — upload file through Edge Function
     if (req.method === 'PUT') {
       const path        = req.headers.get('x-file-path')
       const contentType = req.headers.get('x-file-type') || 'application/octet-stream'
-      if (!path) return new Response(JSON.stringify({ error: 'x-file-path header required' }), { status: 400, headers: corsHeaders })
+      if (!path) return new Response(JSON.stringify({ error: 'x-file-path required' }), { status: 400, headers: corsHeaders })
 
-      const body = await req.arrayBuffer()
-      const r2Res = await signedFetch('PUT', path, body, contentType)
+      const body  = await req.arrayBuffer()
+      const r2Res = await r2Put(path, body, contentType)
 
       if (!r2Res.ok) {
         const text = await r2Res.text()
-        return new Response(JSON.stringify({ error: `R2 upload failed: ${text}` }), { status: 500, headers: corsHeaders })
+        console.error('R2 PUT failed:', r2Res.status, text)
+        return new Response(JSON.stringify({ error: `R2 error: ${r2Res.status}` }), { status: 500, headers: corsHeaders })
       }
 
       return new Response(JSON.stringify({ success: true, path }), {
@@ -158,16 +175,17 @@ Deno.serve(async (req) => {
       })
     }
 
-    // POST — get presigned read URL
+    // POST — presigned read URL
     const { path, expiresIn = 3600 } = await req.json()
     if (!path) return new Response(JSON.stringify({ error: 'path required' }), { status: 400, headers: corsHeaders })
 
-    const url = await getPresignedUrl(path, expiresIn)
+    const url = await r2GetPresigned(path, expiresIn)
     return new Response(JSON.stringify({ url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
   } catch (err) {
+    console.error('r2-sign error:', err)
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
