@@ -402,11 +402,11 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
           pdf.addImage(logoImg, 'PNG', margin, 8, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
         } catch {
-          pdf.setTextColor(255, 255, 255); pdf.setFontSize(22); pdf.setFont('helvetica', 'bold')
+          pdf.setTextColor(30, 30, 30); pdf.setFontSize(22); pdf.setFont('helvetica', 'bold')
           pdf.text(orgProfile?.company_name || 'ForgePt', margin, 20)
         }
       } else {
-        pdf.setTextColor(255, 255, 255)
+        pdf.setTextColor(30, 30, 30)
         pdf.setFontSize(22)
         pdf.setFont('helvetica', 'bold')
         pdf.text(orgProfile?.company_name || 'ForgePt', margin, 20)
@@ -420,13 +420,13 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       // Client
       if (proposal?.company) {
-        pdf.setTextColor(138, 154, 176)
+        pdf.setTextColor(90, 100, 110)
         pdf.setFontSize(10)
         pdf.text(`Client: ${proposal.company}`, margin, 38)
       }
 
       // Date
-      pdf.setTextColor(138, 154, 176)
+      pdf.setTextColor(90, 100, 110)
       pdf.setFontSize(9)
       pdf.text(`Date: ${new Date().toLocaleDateString()}`, margin, 44)
       pdf.text(`Sheets: ${sheets.length}`, margin + 40, 44)
@@ -457,14 +457,14 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         }
 
         // Category name
-        pdf.setTextColor(255, 255, 255)
+        pdf.setTextColor(30, 30, 30)
         pdf.setFontSize(8)
         pdf.setFont('helvetica', 'normal')
         pdf.text(category, lx + 12, ly + 5)
 
         // Count
         const count = placements.filter(p => p.global_products?.category === category).length
-        pdf.setTextColor(138, 154, 176)
+        pdf.setTextColor(90, 100, 110)
         pdf.text(`(${count})`, lx + 12, ly + 10)
 
         col++
@@ -489,9 +489,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.setFont('helvetica', 'normal')
         pdf.setFontSize(8)
         Object.entries(cableByType).forEach(([type, data]) => {
-          pdf.setTextColor(255, 255, 255)
+          pdf.setTextColor(30, 30, 30)
           pdf.text(type, margin, cy)
-          pdf.setTextColor(138, 154, 176)
+          pdf.setTextColor(90, 100, 110)
           pdf.text(`${Math.round(data.total_footage)}ft (with waste)`, margin + 50, cy)
           cy += 6
         })
@@ -593,7 +593,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.text(orgProfile?.company_name || 'ForgePt', margin + 2, pageH - titleBlockH - margin + 6)
 
         // Project
-        pdf.setTextColor(255, 255, 255)
+        pdf.setTextColor(30, 30, 30)
         pdf.setFontSize(7)
         pdf.setFont('helvetica', 'normal')
         pdf.text(proposal?.proposal_name || '', margin + 2, pageH - titleBlockH - margin + 11)
@@ -645,12 +645,12 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       pdf.setFont('helvetica', 'bold')
       pdf.text('SHOP DRAWINGS', pageW / 2, 40, { align: 'center' })
 
-      pdf.setTextColor(255, 255, 255)
+      pdf.setTextColor(30, 30, 30)
       pdf.setFontSize(16)
       pdf.setFont('helvetica', 'normal')
       pdf.text(proposal?.proposal_name || '', pageW / 2, 55, { align: 'center' })
 
-      pdf.setTextColor(138, 154, 176)
+      pdf.setTextColor(90, 100, 110)
       pdf.setFontSize(11)
       pdf.text(proposal?.company || '', pageW / 2, 65, { align: 'center' })
       pdf.text(`Prepared by: ${orgProfile?.company_name || ''}`, pageW / 2, 75, { align: 'center' })
@@ -683,13 +683,13 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           pdf.setFillColor(200, 98, 42)
           pdf.circle(lx + 3.5, ly + 3, 3.5, 'F')
         }
-        pdf.setTextColor(255, 255, 255)
+        pdf.setTextColor(30, 30, 30)
         pdf.setFontSize(8)
         pdf.setFont('helvetica', 'bold')
         pdf.text(category, lx + 11, ly + 4)
         const count = placements.filter(p => p.global_products?.category === category).length
         pdf.setFont('helvetica', 'normal')
-        pdf.setTextColor(138, 154, 176)
+        pdf.setTextColor(90, 100, 110)
         pdf.text(`Count: ${count}`, lx + 11, ly + 9)
         col++
         if (col >= perRow) { col = 0; lx = margin; ly += 16 }
