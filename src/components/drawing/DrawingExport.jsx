@@ -141,7 +141,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           'pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url
         ).toString()
 
-        const response  = await fetch(data.signedUrl)
+        const response  = await fetch(signedUrl)
         const arrayBuf  = await response.arrayBuffer()
         const pdfDoc    = await pdfjsLib.getDocument({ data: arrayBuf }).promise
         const pageNum   = sheet.page_number || 1
@@ -155,7 +155,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         return canvas.toDataURL('image/png')
       } else {
         // Regular image
-        const response = await fetch(data.signedUrl)
+        const response = await fetch(signedUrl)
         const blob     = await response.blob()
         const reader   = new FileReader()
         return await new Promise(resolve => {
