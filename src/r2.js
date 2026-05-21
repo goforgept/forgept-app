@@ -50,7 +50,6 @@ export async function uploadToR2(path, file, contentType) {
   
   const res = await fetch(uploadUrl, {
     method: 'PUT',
-    headers: { 'Content-Type': contentType },
     body: file,
   })
   
