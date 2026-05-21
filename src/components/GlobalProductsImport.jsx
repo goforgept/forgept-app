@@ -240,6 +240,19 @@ async function parseSystemSurveyorFile(file) {
     if (hasIR)    specs.has_ir    = true
     if (intExt)   specs.location  = intExt
 
+    // IR range defaults by category if not specified
+    const irRangeStr = getVal('IR Range', offset) || getVal('IR Distance', offset) || getVal('Night Vision Range', offset)
+    if (irRangeStr) {
+      specs.ir_range = parseFloat(irRangeStr)
+    } else if (hasIR) {
+      // Default IR ranges by camera type
+      if (category === 'PTZ Camera')         specs.ir_range = 200
+      else if (category === 'Bullet Camera') specs.ir_range = 100
+      else if (category === 'LPR Camera')    specs.ir_range = 150
+      else                                   specs.ir_range = 60  // dome default
+    } else {
+      specs.ir_range = 30 // no IR — short range
+    }
     const lensDetail    = getVal('Lens Detail', offset)
     const installNotes  = getVal('Installation Notes', offset) || getVal('Installation Considerations', offset)
     const mountHeight   = getVal('Mount Height to Center Line (ft above floor)', offset)
@@ -252,7 +265,7 @@ async function parseSystemSurveyorFile(file) {
       industry,
       manufacturer: mfr,
       category,
-      name:         getVal('Descriptive Label', offset) || `${mfr} ${partNum}`,
+      name:         getVal('Descriptive Label', offset) || getVal('Product Description', offset) || getVal('Description', offset) || getVal('Model Name', offset) || `${mfr} ${partNum}`,
       part_number:  partNum,
       is_basic:     false,
       is_active:    true,
