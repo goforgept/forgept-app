@@ -736,7 +736,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
             ...(isAdmin && !featureDesignerOnly ? [{ key: 'sla',          label: 'SLA & Contracts' }] : []),
             ...(isAdmin && !featureDesignerOnly ? [{ key: 'data',         label: 'Data & Import' }] : []),
             ...(isAdmin ? [{ key: 'designer', label: 'Designer' }] : []),
-            { key: 'team', label: 'Team' },
+            ...(featureDesignerOnly ? [{ key: 'team', label: 'Team' }] : []),
           ].map(tab => (
             <button key={tab.key} onClick={() => { setActiveTab(tab.key); setSuccess(null) }}
               className={`flex-shrink-0 px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap border-b-2 -mb-px rounded-none ${

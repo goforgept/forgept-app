@@ -66,7 +66,7 @@ export default function Login() {
     setLoading(true)
     setError(null)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://app.goforgept.com/reset-password'
+      redirectTo: `${window.location.origin}/reset-password`
     })
     if (error) setError(error.message)
     else setSuccess('Password reset email sent — check your inbox')

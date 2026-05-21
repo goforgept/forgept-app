@@ -838,31 +838,31 @@ function SheetTab({ sheet, isActive, onSelect, onRename, onDelete }) {
 // ─── Default components per category ─────────────────────────────────────────
 const DEFAULT_COMPONENTS = {
   // Security — Cameras
-  'Dome Camera':         ['Mount', 'Housing', 'Junction Box', 'Cable'],
-  'Bullet Camera':       ['Mount', 'Housing', 'Junction Box', 'Cable'],
-  'PTZ Camera':          ['Mount', 'Housing', 'Junction Box', 'Cable'],
-  'NVR':                 ['Hard Drive', 'Rail Kit', 'UPS'],
+  'Dome Camera':         ['Mount', 'Housing', 'Junction Box', 'Surge Protector'],
+  'Bullet Camera':       ['Mount', 'Housing', 'Junction Box', 'Surge Protector'],
+  'PTZ Camera':          ['Mount', 'Housing', 'Junction Box', 'Surge Protector'],
+  'NVR':                 ['Hard Drive', 'Rail Kit', 'UPS', 'Surge Protector'],
+  'Multi-Lens Camera':   ['Mount', 'Housing', 'Junction Box', 'Surge Protector'],
+  'Fisheye Camera':      ['Mount', 'Housing', 'Junction Box', 'Surge Protector'],
+  'LPR Camera':          ['Mount', 'IR Illuminator', 'Junction Box', 'Surge Protector'],
 
   // Security — Access Control
-  'Access Reader':       ['Back Box', 'Cable'],
-  'Access Control Door': ['Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply', 'Controller', 'Composite Cable', '22/4 Cable', 'Push to Exit'],
-  'Controller':          ['Power Supply', 'Cabinet', 'Battery Backup'],
-  'Motion Sensor':       ['Back Box', 'Cable'],
-  'Intercom':            ['Power Supply', 'Back Box', 'Cable', 'Strike', 'Door Release'],
-  'Sensor':              ['Back Box', 'Cable', 'Power Supply'],
+  'Access Reader':       ['Back Box', 'Surge Protector'],
+  'Access Control Door': ['Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply', 'Controller', 'Push to Exit'],
+  'Controller':          ['Power Supply', 'Cabinet', 'Battery Backup', 'Surge Protector'],
+  'Motion Sensor':       ['Back Box', 'Surge Protector'],
+  'Intercom':            ['Power Supply', 'Back Box', 'Strike', 'Door Release', 'Surge Protector'],
+  'Sensor':              ['Back Box', 'Power Supply', 'Surge Protector'],
   'Wireless Lock':       ['Battery Pack', 'Wireless Gateway', 'Credential', 'Door Coordinator'],
-  'LPR Camera':          ['Mount', 'IR Illuminator', 'Cable', 'Junction Box'],
-  'Guard Tour':          ['Charging Cradle', 'Software License', 'Cable'],
-  'Multi-Lens Camera':   ['Mount', 'Housing', 'Junction Box', 'Cable'],
-  'Fisheye Camera':      ['Mount', 'Housing', 'Junction Box', 'Cable'],
+  'Guard Tour':          ['Charging Cradle', 'Software License'],
 
   // Security — Fire Alarm
-  'Smoke Detector':      ['Base', 'Cable'],
-  'Heat Detector':       ['Base', 'Cable'],
-  'Horn Strobe':         ['Back Box', 'Power Supply', 'Cable'],
-  'Pull Station':        ['Back Box', 'Cable'],
-  'FACP':                ['Cabinet', 'Power Supply', 'Battery', 'Cable'],
-  'Duct Detector':       ['Sampling Tube', 'Cable'],
+  'Smoke Detector':      ['Base'],
+  'Heat Detector':       ['Base'],
+  'Horn Strobe':         ['Back Box', 'Power Supply'],
+  'Pull Station':        ['Back Box'],
+  'FACP':                ['Cabinet', 'Power Supply', 'Battery'],
+  'Duct Detector':       ['Sampling Tube'],
 
   // AV
   'Speaker':             ['Amplifier', 'Volume Control', 'Back Box', 'Cable'],
@@ -949,7 +949,7 @@ function ComponentsSection({ placementId, orgId, category }) {
     setComponents(prev => prev.filter(c => c.id !== id))
   }
 
-  const defaultTypes = DEFAULT_COMPONENTS[category] || ['Mount', 'Housing', 'Cable', 'Power Supply']
+  const defaultTypes = DEFAULT_COMPONENTS[category] || ['Mount', 'Housing', 'Power Supply', 'Surge Protector']
   const inputClass   = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]"
 
   return (
