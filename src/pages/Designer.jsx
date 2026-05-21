@@ -934,9 +934,14 @@ function ComponentsSection({ placementId, orgId, category }) {
     setAdding(false)
   }
 
-  const handleUpdate = async (id, field, value) => {
-    await supabase.from('placement_components').update({ [field]: value }).eq('id', id)
+  const handleUpdate = (id, field, value) => {
+    // Update local state immediately for responsive UI
     setComponents(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
+  }
+
+  const handleSave = async (id, field, value) => {
+    // Only save to DB on blur
+    await supabase.from('placement_components').update({ [field]: value }).eq('id', id)
   }
 
   const handleDelete = async (id) => {
@@ -1014,18 +1019,18 @@ function ComponentsSection({ placementId, orgId, category }) {
                 <input type="text" placeholder="Name / description"
                   value={component.name || ''}
                   onChange={e => handleUpdate(component.id, 'name', e.target.value)}
-                  onBlur={e => supabase.from('placement_components').update({ name: e.target.value }).eq('id', component.id)}
+                  onBlur={e => handleSave(component.id, 'name', e.target.value)}
                   className={inputClass} />
                 <div className="flex gap-1">
                   <input type="text" placeholder="Part #"
                     value={component.part_number || ''}
                     onChange={e => handleUpdate(component.id, 'part_number', e.target.value)}
-                    onBlur={e => supabase.from('placement_components').update({ part_number: e.target.value }).eq('id', component.id)}
+                    onBlur={e => handleSave(component.id, 'part_number', e.target.value)}
                     className={inputClass} />
                   <input type="text" placeholder="Mfr"
                     value={component.manufacturer || ''}
                     onChange={e => handleUpdate(component.id, 'manufacturer', e.target.value)}
-                    onBlur={e => supabase.from('placement_components').update({ manufacturer: e.target.value }).eq('id', component.id)}
+                    onBlur={e => handleSave(component.id, 'manufacturer', e.target.value)}
                     className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
                 </div>
                 <div className="flex items-center gap-1">
@@ -1033,13 +1038,13 @@ function ComponentsSection({ placementId, orgId, category }) {
                   <input type="number" min="1"
                     value={component.quantity || 1}
                     onChange={e => handleUpdate(component.id, 'quantity', parseInt(e.target.value) || 1)}
-                    onBlur={e => supabase.from('placement_components').update({ quantity: parseInt(e.target.value) || 1 }).eq('id', component.id)}
+                    onBlur={e => handleSave(component.id, 'quantity', parseInt(e.target.value) || 1)}
                     className="w-14 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] text-center" />
                   {component.notes !== undefined && (
                     <input type="text" placeholder="Notes"
                       value={component.notes || ''}
                       onChange={e => handleUpdate(component.id, 'notes', e.target.value)}
-                      onBlur={e => supabase.from('placement_components').update({ notes: e.target.value }).eq('id', component.id)}
+                      onBlur={e => handleSave(component.id, 'notes', e.target.value)}
                       className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
                   )}
                 </div>

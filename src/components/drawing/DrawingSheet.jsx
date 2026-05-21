@@ -398,14 +398,42 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const handleMouseUp = useCallback(() => { isPanning.current = false }, [])
 
   // ── Pinch zoom ─────────────────────────────────────────────────────────────
+  const lastTouchPos = useRef(null)
+
+  const handleTouchStart = useCallback((e) => {
+    const t = e.evt.touches
+    if (t.length === 2) {
+      lastDist.current = Math.sqrt((t[0].clientX - t[1].clientX) ** 2 + (t[0].clientY - t[1].clientY) ** 2)
+      lastTouchPos.current = null
+    } else if (t.length === 1) {
+      lastTouchPos.current = { x: t[0].clientX, y: t[0].clientY }
+    }
+  }, [])
+
   const handleTouchMove = useCallback((e) => {
     const t = e.evt.touches
-    if (t.length !== 2) return
-    const dist = Math.sqrt((t[0].clientX - t[1].clientX) ** 2 + (t[0].clientY - t[1].clientY) ** 2)
-    if (lastDist.current) setScale(s => Math.min(Math.max(s * (dist / lastDist.current), 0.05), 15))
-    lastDist.current = dist
+    if (t.length === 2) {
+      // Pinch zoom
+      const dist = Math.sqrt((t[0].clientX - t[1].clientX) ** 2 + (t[0].clientY - t[1].clientY) ** 2)
+      if (lastDist.current) {
+        const scaleBy = dist / lastDist.current
+        setScale(s => Math.min(Math.max(s * scaleBy, 0.05), 15))
+      }
+      lastDist.current = dist
+      lastTouchPos.current = null
+    } else if (t.length === 1 && lastTouchPos.current) {
+      // Single finger pan
+      const dx = t[0].clientX - lastTouchPos.current.x
+      const dy = t[0].clientY - lastTouchPos.current.y
+      setPosition(p => ({ x: p.x + dx, y: p.y + dy }))
+      lastTouchPos.current = { x: t[0].clientX, y: t[0].clientY }
+    }
   }, [])
-  const handleTouchEnd = useCallback(() => { lastDist.current = 0 }, [])
+
+  const handleTouchEnd = useCallback(() => {
+    lastDist.current = 0
+    lastTouchPos.current = null
+  }, [])
 
   // ── Canvas dimensions ──────────────────────────────────────────────────────
   const isBlank = sheet.storage_path === 'blank'
@@ -842,8 +870,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         {!loading && !error && stageSize.w > 0 && (
           <Stage ref={stageRef} width={stageSize.w} height={stageSize.h}
             onWheel={handleWheel} onMouseDown={(e) => { if (e.evt.button === 2) return; handleMouseDown(e) }} onMouseMove={handleMouseMove}
-            onMouseDown={(e) => { if (e.evt.button === 2) return; handleMouseDown(e) }}
-            onMouseUp={handleMouseUp} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+            onMouseUp={handleMouseUp} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
             onClick={(e) => {
               if (e.evt.button === 2) return // ignore right-click
               setContextMenu(null)

@@ -392,7 +392,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       // ── Legend page ──────────────────────────────────────────────────────
       // Title
-      pdf.setFillColor(15, 28, 46)
+      pdf.setFillColor(255, 255, 255)
       pdf.rect(0, 0, pageW, pageH, 'F')
 
       // Company logo or name
@@ -502,8 +502,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         const sheet = sheets[i]
         pdf.addPage()
 
-        // Dark background
-        pdf.setFillColor(15, 28, 46)
+        // Page background
+        pdf.setFillColor(255, 255, 255)
         pdf.rect(0, 0, pageW, pageH, 'F')
 
         // Header bar
@@ -531,7 +531,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
         // Title block footer — same style as shop drawings
         const tbY = pageH - titleBlockH
-        pdf.setFillColor(15, 28, 46)
+        pdf.setFillColor(26, 45, 69)
         pdf.rect(0, tbY, pageW, titleBlockH, 'F')
         pdf.setDrawColor(42, 61, 85)
         pdf.setLineWidth(0.3)
@@ -622,7 +622,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const logoImg = await loadOrgLogo()
 
       // ── Title sheet ──────────────────────────────────────────────────────
-      pdf.setFillColor(15, 28, 46)
+      pdf.setFillColor(255, 255, 255)
       pdf.rect(0, 0, pageW, pageH, 'F')
 
       // Logo or company name top-left
@@ -661,7 +661,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       // ── Legend sheet ─────────────────────────────────────────────────────
       pdf.addPage()
-      pdf.setFillColor(15, 28, 46)
+      pdf.setFillColor(255, 255, 255)
       pdf.rect(0, 0, pageW, pageH, 'F')
 
       pdf.setTextColor(200, 98, 42)
@@ -700,7 +700,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       // ── Device schedule sheet ────────────────────────────────────────────
       pdf.addPage()
-      pdf.setFillColor(15, 28, 46)
+      pdf.setFillColor(255, 255, 255)
       pdf.rect(0, 0, pageW, pageH, 'F')
 
       pdf.setTextColor(200, 98, 42)
@@ -730,9 +730,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         head:       [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Category', 'Qty', 'Sheet', 'Runs To']],
         body:       scheduleRows,
         theme:      'grid',
-        styles:     { fontSize: 7, cellPadding: 2, textColor: [255, 255, 255], fillColor: [15, 28, 46], lineColor: [42, 61, 85] },
+        styles:     { fontSize: 7, cellPadding: 2, textColor: [40, 40, 40], fillColor: [255, 255, 255], lineColor: [200, 200, 200] },
         headStyles: { fillColor: [26, 45, 69], textColor: [200, 98, 42], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [20, 35, 55] },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
       })
 
       drawTitleBlock('Device Schedule', 3)
@@ -741,7 +741,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       for (let i = 0; i < sheets.length; i++) {
         const sheet  = sheets[i]
         pdf.addPage()
-        pdf.setFillColor(15, 28, 46)
+        pdf.setFillColor(255, 255, 255)
         pdf.rect(0, 0, pageW, pageH, 'F')
 
         // Header
@@ -766,7 +766,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       // ── Cable schedule ───────────────────────────────────────────────────
       if (cableRuns.length > 0 || verticalRises.length > 0) {
         pdf.addPage()
-        pdf.setFillColor(15, 28, 46)
+        pdf.setFillColor(255, 255, 255)
         pdf.rect(0, 0, pageW, pageH, 'F')
 
         pdf.setTextColor(200, 98, 42)
