@@ -7,8 +7,19 @@ const BUCKET      = Deno.env.get('R2_BUCKET_NAME')!
 
 const R2_ENDPOINT = `https://${ACCOUNT_ID}.r2.cloudflarestorage.com`
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Headers': 'authorization, content-type, x-file-path, x-file-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+}
+
 async function sha256hex(data: string) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(data))
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function sha256hexBuf(data: ArrayBuffer) {
+  const buf = await crypto.subtle.digest('SHA-256', data)
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
@@ -29,7 +40,52 @@ async function getSigningKey(secret: string, date: string) {
   return hmac(kService, 'aws4_request')
 }
 
-async function sign(method: string, path: string, expiresIn = 3600) {
+async function signedFetch(method: string, path: string, body?: ArrayBuffer, contentType?: string) {
+  const url  = new URL(`${R2_ENDPOINT}/${BUCKET}/${path}`)
+  const now  = new Date()
+  const date = now.toISOString().slice(0, 10).replace(/-/g, '')
+  const time = now.toISOString().slice(0, 19).replace(/[-:T]/g, '') + 'Z'
+
+  const payloadHash = body ? await sha256hexBuf(body) : 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
+
+  const signedHeaders = contentType ? 'content-type;host' : 'host'
+  const canonicalHeaders = contentType
+    ? `content-type:${contentType}\nhost:${url.host}\n`
+    : `host:${url.host}\n`
+
+  const canonicalRequest = [
+    method,
+    `/${BUCKET}/${path}`,
+    '',
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash,
+  ].join('\n')
+
+  const credentialScope = `${date}/auto/s3/aws4_request`
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    time,
+    credentialScope,
+    await sha256hex(canonicalRequest),
+  ].join('\n')
+
+  const signingKey = await getSigningKey(SECRET_KEY, date)
+  const signature  = await hmacHex(signingKey, stringToSign)
+
+  const authHeader = `AWS4-HMAC-SHA256 Credential=${ACCESS_KEY}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`
+
+  const headers: Record<string, string> = {
+    'Authorization': authHeader,
+    'X-Amz-Date':   time,
+    'X-Amz-Content-Sha256': payloadHash,
+  }
+  if (contentType) headers['Content-Type'] = contentType
+
+  return fetch(url.toString(), { method, headers, body })
+}
+
+async function getPresignedUrl(path: string, expiresIn = 3600) {
   const url  = new URL(`${R2_ENDPOINT}/${BUCKET}/${path}`)
   const now  = new Date()
   const date = now.toISOString().slice(0, 10).replace(/-/g, '')
@@ -42,7 +98,7 @@ async function sign(method: string, path: string, expiresIn = 3600) {
   url.searchParams.set('X-Amz-SignedHeaders', 'host')
 
   const canonicalRequest = [
-    method,
+    'GET',
     `/${BUCKET}/${path}`,
     url.searchParams.toString(),
     `host:${url.host}\n`,
@@ -64,18 +120,13 @@ async function sign(method: string, path: string, expiresIn = 3600) {
   return url.toString()
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin':  '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
+    // Validate session
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
 
@@ -85,17 +136,37 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     )
 
-    const { data: { user }, error } = await supabase.auth.getUser()
-    if (error || !user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
 
-    const { path, method = 'GET', expiresIn = 3600 } = await req.json()
+    // PUT — upload file through Edge Function
+    if (req.method === 'PUT') {
+      const path        = req.headers.get('x-file-path')
+      const contentType = req.headers.get('x-file-type') || 'application/octet-stream'
+      if (!path) return new Response(JSON.stringify({ error: 'x-file-path header required' }), { status: 400, headers: corsHeaders })
+
+      const body = await req.arrayBuffer()
+      const r2Res = await signedFetch('PUT', path, body, contentType)
+
+      if (!r2Res.ok) {
+        const text = await r2Res.text()
+        return new Response(JSON.stringify({ error: `R2 upload failed: ${text}` }), { status: 500, headers: corsHeaders })
+      }
+
+      return new Response(JSON.stringify({ success: true, path }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // POST — get presigned read URL
+    const { path, expiresIn = 3600 } = await req.json()
     if (!path) return new Response(JSON.stringify({ error: 'path required' }), { status: 400, headers: corsHeaders })
 
-    const url = await sign(method, path, expiresIn)
-
+    const url = await getPresignedUrl(path, expiresIn)
     return new Response(JSON.stringify({ url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
+
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
