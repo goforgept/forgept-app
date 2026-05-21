@@ -1,4 +1,12 @@
 @import "tailwindcss";
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(48%) sepia(79%) saturate(476%) hue-rotate(346deg) brightness(88%) contrast(86%);

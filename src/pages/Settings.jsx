@@ -726,7 +726,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         <h2 className="text-white text-2xl font-bold mb-6">Settings</h2>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1 scrollbar-none border-b border-[#2a3d55]">
           {[
             { key: 'general',      label: 'General' },
             ...(isAdmin && !featureDesignerOnly ? [{ key: 'ratecard',     label: 'Rate Card' }] : []),
@@ -739,7 +739,11 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
             { key: 'team', label: 'Team' },
           ].map(tab => (
             <button key={tab.key} onClick={() => { setActiveTab(tab.key); setSuccess(null) }}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === tab.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
+              className={`flex-shrink-0 px-3 py-2 text-sm font-medium transition-colors whitespace-nowrap border-b-2 -mb-px rounded-none ${
+                activeTab === tab.key
+                  ? 'border-[#C8622A] text-white'
+                  : 'border-transparent text-[#8A9AB0] hover:text-white hover:border-[#2a3d55]'
+              }`}>
               {tab.label}
             </button>
           ))}
