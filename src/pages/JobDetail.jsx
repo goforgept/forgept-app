@@ -261,12 +261,12 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       .eq('job_id', id)
       .order('created_at', { ascending: true })
 
-    // Generate fresh signed URLs
+    // Generate R2 signed URLs
+    const { getR2Url, BUCKETS } = await import('../r2')
     const photosWithUrls = await Promise.all((photoData || []).map(async (photo) => {
-      const { data: signed } = await supabase.storage
-        .from('job-photos')
-        .createSignedUrl(photo.storage_path, 60 * 60 * 24)
-      return { ...photo, url: signed?.signedUrl || photo.url }
+      if (photo.url?.startsWith('http')) return photo // old Supabase URL
+      const signedUrl = await getR2Url(photo.storage_path, 60 * 60 * 24, BUCKETS.PHOTOS)
+      return { ...photo, url: signedUrl || photo.url }
     }))
     setPhotos(photosWithUrls)
 
@@ -825,20 +825,15 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     try {
       const fileExt = file.name.split('.').pop()
       const storagePath = `${profile?.org_id}/${id}/${Date.now()}.${fileExt}`
-      const { error: uploadError } = await supabase.storage
-        .from('job-photos')
-        .upload(storagePath, file, { contentType: file.type, upsert: false })
-      if (uploadError) throw uploadError
-      const { data: signed } = await supabase.storage
-        .from('job-photos')
-        .createSignedUrl(storagePath, 60 * 60 * 24 * 365)
+      const { uploadToR2, BUCKETS } = await import('../r2')
+      await uploadToR2(storagePath, file, file.type, BUCKETS.PHOTOS)
       const { data: { user } } = await supabase.auth.getUser()
       await supabase.from('job_photos').insert({
         job_id: id,
         org_id: profile?.org_id,
         uploaded_by: user.id,
         storage_path: storagePath,
-        url: signed?.signedUrl,
+        url: storagePath, // store path not URL
         category: photoCategory,
         caption: ''
       })
@@ -849,7 +844,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
   const deleteJobPhoto = async (photoId, storagePath) => {
     if (!window.confirm('Delete this photo?')) return
-    await supabase.storage.from('job-photos').remove([storagePath])
+    // R2 cleanup handled via maintenance — just delete DB record
     await supabase.from('job_photos').delete().eq('id', photoId)
     setPhotos(prev => prev.filter(p => p.id !== photoId))
   }

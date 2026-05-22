@@ -244,7 +244,16 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setSupportPin(pin)
     setPinInput(pin)
     setProfile(data)
-    setLogoUrl(data?.logo_url || null)
+    // Generate R2 URL if logo_url is a path, otherwise use directly (old Supabase URL)
+    if (data?.logo_url) {
+      if (data.logo_url.startsWith('http')) {
+        setLogoUrl(data.logo_url)
+      } else {
+        const { getR2Url, BUCKETS } = await import('../r2')
+        const url = await getR2Url(data.logo_url, 60 * 60 * 24 * 365, BUCKETS.ASSETS)
+        setLogoUrl(url)
+      }
+    }
     setForm({
       full_name: data?.full_name || '',
       email: data?.email || '',
@@ -367,11 +376,13 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     const { data: { user } } = await supabase.auth.getUser()
     const fileExt = file.name.split('.').pop()
     const fileName = `${user.id}.${fileExt}`
-    const { error: uploadError } = await supabase.storage.from('Logos').upload(fileName, file, { upsert: true })
-    if (uploadError) { alert('Error uploading logo: ' + uploadError.message); setUploadingLogo(false); return }
-    const { data: { publicUrl } } = supabase.storage.from('Logos').getPublicUrl(fileName)
-    await supabase.from('profiles').update({ logo_url: publicUrl }).eq('id', user.id)
-    setLogoUrl(publicUrl)
+    const { uploadToR2, getR2Url, BUCKETS } = await import('../r2')
+    const orgId = (await supabase.from('profiles').select('org_id').eq('id', user.id).single()).data?.org_id
+    const r2Path = `${orgId}/logos/${fileName}`
+    await uploadToR2(r2Path, file, file.type, BUCKETS.ASSETS)
+    const logoUrl = await getR2Url(r2Path, 60 * 60 * 24 * 365, BUCKETS.ASSETS)
+    await supabase.from('profiles').update({ logo_url: r2Path }).eq('id', user.id)
+    setLogoUrl(logoUrl)
     setUploadingLogo(false)
     setSuccess('Logo uploaded successfully')
   }

@@ -278,7 +278,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type, feature_send_proposal)')
       .eq('id', user.id)
       .single()
-    setProfile(data)
+    // Resolve logo URL if stored as R2 path
+    let profileData = data
+    if (data?.logo_url && !data.logo_url.startsWith('http')) {
+      const { getR2Url, BUCKETS } = await import('../r2')
+      const logoUrl = await getR2Url(data.logo_url, 60 * 60 * 24, BUCKETS.ASSETS)
+      profileData = { ...data, logo_url: logoUrl }
+    }
+    setProfile(profileData)
     setOrgType(data?.organizations?.org_type || 'integrator')
     setFeatureSendProposal(data?.organizations?.feature_send_proposal || false)
     if (data?.org_id) {
@@ -530,13 +537,10 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setUploadingSignedPDF(true)
     try {
       const fileName = `${id}/uploaded-signed-${Date.now()}.pdf`
-      const { error: uploadError } = await supabase.storage
-        .from('signed-proposals')
-        .upload(fileName, file, { contentType: 'application/pdf', upsert: true })
-      if (uploadError) throw uploadError
-      const { data: urlData } = await supabase.storage.from('signed-proposals').createSignedUrl(fileName, 60 * 60 * 24 * 365)
-      await supabase.from('proposals').update({ signed_pdf_url: urlData.signedUrl }).eq('id', id)
-      setProposal(prev => ({ ...prev, signed_pdf_url: urlData.signedUrl }))
+      const { uploadToR2, BUCKETS } = await import('../r2')
+      await uploadToR2(fileName, file, 'application/pdf', BUCKETS.DOCUMENTS)
+      await supabase.from('proposals').update({ signed_pdf_url: fileName }).eq('id', id)
+      setProposal(prev => ({ ...prev, signed_pdf_url: fileName }))
       logActivity('Signed agreement uploaded manually')
     } catch (err) {
       alert('Error uploading signed PDF: ' + err.message)
@@ -1353,7 +1357,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       )
       for (const photo of photos) {
         try {
-          const response = await fetch(photo.url)
+          const response = await fetch(photo.displayUrl || photo.url)
           const arrayBuffer = await response.arrayBuffer()
           children.push(
             new Paragraph({ children: [new ImageRun({ data: arrayBuffer, transformation: { width: 400, height: 250 }, type: 'jpg' })] })
@@ -1899,16 +1903,14 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     const { data } = await supabase.from('proposal_photos').select('*').eq('proposal_id', id).order('created_at', { ascending: true })
     if (!data) { setPhotos([]); return }
 
-    // Generate fresh signed URLs for each photo
-    const photosWithUrls = await Promise.all(data.map(async (photo) => {
-      const path = photo.url.includes('/proposal-photos/') 
-        ? photo.url.split('/proposal-photos/')[1]
-        : photo.url
-      const { data: signed } = await supabase.storage
-        .from('proposal-photos')
-        .createSignedUrl(path, 60 * 60 * 24) // 24 hour signed URL
-      return { ...photo, url: signed?.signedUrl || photo.url }
-    }))
+    const { getR2Url, BUCKETS } = await import('../r2')
+      const photosWithUrls = await Promise.all(data.map(async (photo) => {
+        if (photo.url.startsWith('http')) {
+          return photo // old Supabase URL — use directly until migrated
+        }
+        const signedUrl = await getR2Url(photo.url, 60 * 60 * 24, BUCKETS.PHOTOS)
+        return { ...photo, displayUrl: signedUrl || photo.url }
+      }))
 
     setPhotos(photosWithUrls)
   }
@@ -2087,11 +2089,11 @@ const analyzeDrawing = async () => {
     try {
       const fileExt = file.name.split('.').pop()
       const fileName = `${proposal?.org_id}/${id}/${Date.now()}.${fileExt}`
-      const { error: uploadError } = await supabase.storage.from('proposal-photos').upload(fileName, file, { upsert: false })
-      if (uploadError) throw uploadError
-      const { data: urlData } = await supabase.storage.from('proposal-photos').createSignedUrl(fileName, 60 * 60 * 24 * 365)
+      const { uploadToR2, getR2Url, BUCKETS } = await import('../r2')
+      await uploadToR2(fileName, file, file.type, BUCKETS.PHOTOS)
+      const signedUrl = await getR2Url(fileName, 60 * 60 * 24 * 365)
       const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('proposal_photos').insert({ proposal_id: id, org_id: proposal?.org_id, user_id: user.id, url: urlData.signedUrl, caption: '' })
+      await supabase.from('proposal_photos').insert({ proposal_id: id, org_id: proposal?.org_id, user_id: user.id, url: fileName, caption: '' })
       await fetchPhotos()
       logActivity(`Site photo added`)
     } catch (err) { alert('Error uploading photo: ' + err.message) }
@@ -2100,8 +2102,7 @@ const analyzeDrawing = async () => {
 
   const deletePhoto = async (photoId, url) => {
     if (!window.confirm('Delete this photo?')) return
-    const path = url.split('/proposal-photos/')[1]
-    await supabase.storage.from('proposal-photos').remove([path])
+    // Delete from DB — R2 cleanup handled separately
     await supabase.from('proposal_photos').delete().eq('id', photoId)
     await fetchPhotos()
   }
@@ -2653,10 +2654,17 @@ const analyzeDrawing = async () => {
                 </button>
               )}
               {proposal?.signed_pdf_url && (
-                <a href={proposal.signed_pdf_url} target="_blank" rel="noopener noreferrer"
+                <button
+                  onClick={async () => {
+                    const { getR2Url, BUCKETS } = await import('../r2')
+                    const url = proposal.signed_pdf_url.startsWith('http')
+                      ? proposal.signed_pdf_url  // old Supabase URL
+                      : await getR2Url(proposal.signed_pdf_url, 3600, BUCKETS.DOCUMENTS)
+                    if (url) window.open(url, '_blank')
+                  }}
                   className="bg-green-600/20 text-green-400 border border-green-600/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-600/30 transition-colors flex items-center gap-1">
                   ⬇ Signed Copy
-                </a>
+                </button>
               )}
               <label className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1 ${uploadingSignedPDF ? 'bg-[#2a3d55] text-[#8A9AB0] opacity-50 cursor-not-allowed' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}
                 title="Upload a physically signed or externally signed agreement PDF">
@@ -4092,7 +4100,7 @@ const analyzeDrawing = async () => {
               <div className="grid grid-cols-2 gap-4">
                 {photos.map(photo => (
                   <div key={photo.id} className="bg-[#0F1C2E] rounded-xl overflow-hidden">
-                    <img src={photo.url} alt={photo.caption || 'Site photo'} className="w-full h-48 object-cover" />
+                    <img src={photo.displayUrl || photo.url} alt={photo.caption || 'Site photo'} className="w-full h-48 object-cover" />
                     <div className="p-3 flex items-center gap-2">
                       <input type="text" value={photo.caption || ''} placeholder="Add caption..." onChange={e => updatePhotoCaption(photo.id, e.target.value)} onBlur={e => updatePhotoCaption(photo.id, e.target.value)}
                         className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />

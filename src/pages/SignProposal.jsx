@@ -384,11 +384,9 @@ export default function SignProposal() {
         const doc = await generateSignedPDF(signerName.trim(), now, lineItems, proposal, orgProfile, sections)
         const pdfBlob = doc.output('blob')
         const fileName = `${proposal.id}/signed-${Date.now()}.pdf`
-        const { error: uploadError } = await supabase.storage.from('signed-proposals').upload(fileName, pdfBlob, { contentType: 'application/pdf', upsert: true })
-        if (!uploadError) {
-          const { data: urlData } = await supabase.storage.from('signed-proposals').createSignedUrl(fileName, 60 * 60 * 24 * 365)
-          signedPdfUrl = urlData.signedUrl
-        }
+        const { uploadToR2, getR2Url, BUCKETS } = await import('../r2')
+        await uploadToR2(fileName, pdfBlob, 'application/pdf', BUCKETS.DOCUMENTS)
+        signedPdfUrl = fileName // store path not URL
       } catch (pdfErr) { console.log('PDF generation error (non-fatal):', pdfErr) }
 
       const { error: updateError } = await supabase.from('proposals').update({
