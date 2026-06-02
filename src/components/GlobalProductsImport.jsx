@@ -261,7 +261,11 @@ async function parseSystemSurveyorFile(file) {
       industry,
       manufacturer: mfr,
       category,
-      name:         getVal('Descriptive Label', offset) || getVal('Product Description', offset) || getVal('Description', offset) || getVal('Model Name', offset) || `${mfr} ${partNum}`,
+      name:         (() => {
+        const label = getVal('Descriptive Label', offset) || getVal('Product Description', offset) || getVal('Description', offset)
+        if (label && label !== partNum) return `${partNum} — ${label}`
+        return `${mfr} ${partNum}`
+      })(),
       part_number:  partNum,
       is_basic:     false,
       is_active:    true,

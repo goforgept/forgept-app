@@ -79,7 +79,7 @@ export default function SuperAdmin() {
       { data: clientsData },
     ] = await Promise.all([
       supabase.from('organizations').select('*').order('created_at', { ascending: false }),
-      supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, created_at, team_id, is_regional_vp, is_operations_manager').order('created_at', { ascending: false }),
+      supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, created_at, team_id, is_regional_vp, is_operations_manager, last_login').order('created_at', { ascending: false }),
       supabase.from('access_requests').select('*').order('created_at', { ascending: false }),
       supabase.from('proposals').select('id, org_id, created_at, status, proposal_value, proposal_name').order('created_at', { ascending: false }),
       supabase.from('clients').select('id, org_id'),
@@ -698,6 +698,11 @@ export default function SuperAdmin() {
                                         <div>
                                           <p className="text-white text-xs font-medium">{member.full_name || '—'}</p>
                                           <p className="text-[#8A9AB0] text-xs">{member.email}</p>
+                                          <p className="text-[#4a5d75] text-xs">
+                                            {member.last_login
+                                              ? `Last login: ${new Date(member.last_login).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}`
+                                              : 'Never logged in'}
+                                          </p>
                                         </div>
                                       </div>
                                       <span className={`text-xs px-2 py-0.5 rounded font-semibold ${member.org_role === 'admin' ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
