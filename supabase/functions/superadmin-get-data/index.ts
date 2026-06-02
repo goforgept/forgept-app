@@ -53,7 +53,7 @@ Deno.serve(async (req) => {
     const adminClient = createClient(supabaseUrl, serviceKey)
     const { data: profiles, error } = await adminClient
       .from('profiles')
-      .select('id, full_name, email, org_id, role, org_role, company_name, created_at, team_id, is_regional_vp, is_operations_manager')
+      .select('id, full_name, email, org_id, role, org_role, company_name, created_at, team_id, is_regional_vp, is_operations_manager, last_login')
       .order('created_at', { ascending: false })
 
     if (error) throw error
