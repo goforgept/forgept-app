@@ -159,11 +159,15 @@ export default function SuperAdmin() {
 
   const getOrgHealth = (orgId) => {
     const orgProps = allProposals.filter(p => p.org_id === orgId)
-    if (!orgProps.length) return { label: 'No proposals', dot: 'bg-gray-500', status: 'silent' }
-    const days = Math.floor((Date.now() - new Date(orgProps[0].created_at)) / 86400000)
-    if (days < 7) return { label: `Active ${days}d ago`, dot: 'bg-green-400', status: 'active' }
-    if (days < 30) return { label: `${days}d ago`, dot: 'bg-yellow-400', status: 'moderate' }
-    return { label: `Inactive ${days}d ago`, dot: 'bg-red-400', status: 'inactive' }
+    const orgMembers = profiles.filter(p => p.org_id === orgId)
+    const lastLogin = orgMembers.reduce((max, m) => m.last_login && new Date(m.last_login) > max ? new Date(m.last_login) : max, new Date(0))
+    const lastProposal = orgProps.length ? new Date(orgProps[0].created_at) : new Date(0)
+    const lastActive = lastLogin > lastProposal ? lastLogin : lastProposal
+    if (lastActive.getTime() === 0) return { label: 'No activity', dot: 'bg-gray-500', labelColor: 'text-[#8A9AB0]', status: 'silent' }
+    const days = Math.floor((Date.now() - lastActive) / 86400000)
+    if (days < 7) return { label: `Active ${days}d ago`, dot: 'bg-green-400', labelColor: 'text-green-400', status: 'active' }
+    if (days < 30) return { label: `${days}d ago`, dot: 'bg-yellow-400', labelColor: 'text-yellow-400', status: 'moderate' }
+    return { label: `Inactive ${days}d ago`, dot: 'bg-red-400', labelColor: 'text-red-400', status: 'inactive' }
   }
 
   const getOrgStats = (orgId) => {
@@ -531,7 +535,7 @@ export default function SuperAdmin() {
                             <p className="text-white font-semibold">{org.name}</p>
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>{org.org_type || 'integrator'}</span>
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded ${status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : status === 'suspended' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>{status}</span>
-                            <span className="text-[#8A9AB0] text-xs">{health.label}</span>
+                            <span className={`text-xs ${health.labelColor}`}>{health.label}</span>
                           </div>
                           <p className="text-[#8A9AB0] text-xs">{admin?.full_name || '—'} · {admin?.email || '—'} · {memberCount} users</p>
                           <div className="flex gap-2 mt-1.5 flex-wrap items-center">
@@ -700,7 +704,7 @@ export default function SuperAdmin() {
                                         <div>
                                           <p className="text-white text-xs font-medium">{member.full_name || '—'}</p>
                                           <p className="text-[#8A9AB0] text-xs">{member.email}</p>
-                                          <p className="text-[#4a5d75] text-xs">
+                                          <p className="text-[#8A9AB0] text-xs">
                                             {member.last_login
                                               ? `Last login: ${new Date(member.last_login).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}`
                                               : 'Never logged in'}
@@ -894,7 +898,7 @@ export default function SuperAdmin() {
                             <span className={`text-xs px-2 py-0.5 rounded font-semibold ${plan.bg} ${plan.color}`}>{org.plan || 'Trial'}</span>
                           </td>
                           <td className="py-3 pr-4">
-                            <span className={`text-xs ${health.status === 'active' ? 'text-green-400' : health.status === 'moderate' ? 'text-yellow-400' : health.status === 'inactive' ? 'text-red-400' : 'text-[#8A9AB0]'}`}>{health.label}</span>
+                            <span className={`text-xs ${health.labelColor}`}>{health.label}</span>
                           </td>
                           <td className="text-white py-3 pr-4 font-semibold">{stats.total}</td>
                           <td className="text-[#8A9AB0] py-3 pr-4">{stats.last30}</td>

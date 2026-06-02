@@ -49,16 +49,29 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Use service role to bypass RLS and fetch all profiles
+    // Use service role to bypass RLS and fetch all profiles + auth last_sign_in_at
     const adminClient = createClient(supabaseUrl, serviceKey)
-    const { data: profiles, error } = await adminClient
-      .from('profiles')
-      .select('id, full_name, email, org_id, role, org_role, company_name, created_at, team_id, is_regional_vp, is_operations_manager, last_login')
-      .order('created_at', { ascending: false })
+    const [{ data: profiles, error }, { data: authUsers }] = await Promise.all([
+      adminClient
+        .from('profiles')
+        .select('id, full_name, email, org_id, role, org_role, company_name, created_at, team_id, is_regional_vp, is_operations_manager')
+        .order('created_at', { ascending: false }),
+      adminClient.auth.admin.listUsers({ perPage: 1000 }),
+    ])
 
     if (error) throw error
 
-    return new Response(JSON.stringify({ profiles: profiles || [] }), {
+    const lastSignInMap: Record<string, string> = {}
+    for (const u of (authUsers?.users ?? [])) {
+      if (u.last_sign_in_at) lastSignInMap[u.id] = u.last_sign_in_at
+    }
+
+    const enriched = (profiles || []).map(p => ({
+      ...p,
+      last_login: lastSignInMap[p.id] ?? null,
+    }))
+
+    return new Response(JSON.stringify({ profiles: enriched }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (err) {
