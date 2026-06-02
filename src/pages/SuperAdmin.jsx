@@ -73,7 +73,7 @@ export default function SuperAdmin() {
 
     const [
       { data: orgsData },
-      { data: profilesData },
+      { data: profilesData, error: profilesError },
       { data: requestsData },
       { data: proposalsData },
       { data: clientsData },
@@ -84,6 +84,8 @@ export default function SuperAdmin() {
       supabase.from('proposals').select('id, org_id, created_at, status, proposal_value, proposal_name').order('created_at', { ascending: false }),
       supabase.from('clients').select('id, org_id'),
     ])
+
+    console.log('[SuperAdmin] profiles query result:', { count: profilesData?.length, error: profilesError, sample: profilesData?.[0] })
 
     const orgsResult = orgsData || []
     setOrgs(orgsResult)
