@@ -60,7 +60,7 @@ function App() {
       if (session) {
         fetchProfile(session.user.id)
         if (_event === 'SIGNED_IN') {
-          supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', session.user.id)
+          supabase.rpc('update_last_login')
         }
       } else { setProfile(null); setLoading(false) }
     })
