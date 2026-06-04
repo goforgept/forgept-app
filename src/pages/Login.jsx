@@ -48,9 +48,10 @@ export default function Login() {
       return
     }
 
-    await supabase.functions.invoke('notify-new-request', {
+    const { error: notifyError } = await supabase.functions.invoke('notify-new-request', {
       body: { fullName, email, companyName, notes, role }
     })
+    if (notifyError) console.error('notify-new-request failed:', notifyError)
 
     setSuccess("Request submitted! We'll be in touch within 1 business day to schedule your walkthrough.")
     setFullName('')

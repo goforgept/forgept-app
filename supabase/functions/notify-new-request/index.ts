@@ -11,10 +11,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { fullName, email, companyName, notes } = await req.json()
+    const { fullName, email, companyName, notes, role } = await req.json()
     const brevoKey = Deno.env.get('BREVO_API_KEY') ?? ''
 
-    await fetch('https://api.brevo.com/v3/smtp/email', {
+    const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -30,6 +30,7 @@ Deno.serve(async (req) => {
             <p><strong>Name:</strong> ${fullName}</p>
             <p><strong>Email:</strong> ${email}</p>
             <p><strong>Company:</strong> ${companyName}</p>
+            <p><strong>Role:</strong> ${role || '—'}</p>
             <p><strong>Notes:</strong> ${notes || '—'}</p>
             <br/>
             <a href="https://app.goforgept.com/superadmin" style="background: #C8622A; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
@@ -40,12 +41,22 @@ Deno.serve(async (req) => {
       })
     })
 
+    if (!brevoRes.ok) {
+      const brevoError = await brevoRes.text()
+      console.error('Brevo error:', brevoRes.status, brevoError)
+      return new Response(
+        JSON.stringify({ error: `Brevo ${brevoRes.status}: ${brevoError}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     return new Response(
       JSON.stringify({ success: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
+    console.error('notify-new-request error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -470,43 +470,60 @@ export default function SuperAdmin() {
 
         {/* Access Requests */}
         {activeTab === 'requests' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">Access Requests</h3>
-            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : requests.length === 0 ? <p className="text-[#8A9AB0]">No requests yet.</p> : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#2a3d55]">
-                      {['Name', 'Email', 'Company', 'Role', 'Notes', 'Date', 'Status', 'Actions'].map(h => (
-                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {requests.map(req => (
-                      <tr key={req.id} className="border-b border-[#2a3d55]/30">
-                        <td className="text-white py-3 pr-4 font-medium">{req.full_name}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{req.email}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{req.company_name}</td>
-                        <td className="py-3 pr-4">{req.role ? <span className="bg-[#2a3d55] text-white text-xs px-2 py-1 rounded">{req.role}</span> : <span className="text-[#8A9AB0]">—</span>}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4 max-w-xs truncate">{req.notes || '—'}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{new Date(req.created_at).toLocaleDateString()}</td>
-                        <td className="py-3 pr-4">
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${req.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : req.status === 'approved' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{req.status}</span>
-                        </td>
-                        <td className="py-3">
-                          {req.status === 'pending' && (
-                            <div className="flex gap-2">
-                              <button onClick={() => approveRequest(req)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">Approve</button>
-                              <button onClick={() => rejectRequest(req.id)} className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors">Reject</button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          <div className="space-y-4">
+            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : (
+              <>
+                {[
+                  { key: 'pending', label: 'Pending', color: 'text-yellow-400', border: 'border-yellow-500/20', bg: 'bg-yellow-500/20', emptyMsg: 'No pending requests.' },
+                  { key: 'approved', label: 'Approved', color: 'text-green-400', border: 'border-green-500/20', bg: 'bg-green-500/20', emptyMsg: 'No approved requests.' },
+                  { key: 'rejected', label: 'Rejected', color: 'text-red-400', border: 'border-red-500/20', bg: 'bg-red-500/20', emptyMsg: 'No rejected requests.' },
+                ].map(({ key, label, color, border, bg, emptyMsg }) => {
+                  const group = requests.filter(r => r.status === key)
+                  return (
+                    <div key={key} className="bg-[#1a2d45] rounded-xl overflow-hidden">
+                      <div className={`flex items-center gap-3 px-6 py-3 border-b ${border}`}>
+                        <h3 className={`font-bold text-sm ${color}`}>{label}</h3>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${bg} ${color}`}>{group.length}</span>
+                      </div>
+                      {group.length === 0 ? (
+                        <p className="text-[#8A9AB0] text-sm px-6 py-4">{emptyMsg}</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-[#2a3d55]">
+                                {['Name', 'Email', 'Company', 'Role', 'Notes', 'Date', ...(key === 'pending' ? ['Actions'] : [])].map(h => (
+                                  <th key={h} className="text-[#8A9AB0] text-left py-2 px-6 font-normal text-xs">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {group.map(req => (
+                                <tr key={req.id} className="border-b border-[#2a3d55]/30 last:border-0">
+                                  <td className="text-white py-3 px-6 font-medium">{req.full_name}</td>
+                                  <td className="text-[#8A9AB0] py-3 pr-4">{req.email}</td>
+                                  <td className="text-[#8A9AB0] py-3 pr-4">{req.company_name}</td>
+                                  <td className="py-3 pr-4">{req.role ? <span className="bg-[#2a3d55] text-white text-xs px-2 py-1 rounded">{req.role}</span> : <span className="text-[#8A9AB0]">—</span>}</td>
+                                  <td className="text-[#8A9AB0] py-3 pr-4 max-w-xs truncate">{req.notes || '—'}</td>
+                                  <td className="text-[#8A9AB0] py-3 pr-4 whitespace-nowrap">{new Date(req.created_at).toLocaleDateString()}</td>
+                                  {key === 'pending' && (
+                                    <td className="py-3 px-6">
+                                      <div className="flex gap-2">
+                                        <button onClick={() => approveRequest(req)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">Approve</button>
+                                        <button onClick={() => rejectRequest(req.id)} className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors">Reject</button>
+                                      </div>
+                                    </td>
+                                  )}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </>
             )}
           </div>
         )}
