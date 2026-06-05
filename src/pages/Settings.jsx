@@ -1985,11 +1985,13 @@ function TeamSettingsTab({ featureDesignerOnly }) {
         body: JSON.stringify({ email: form.email, fullName: form.full_name, orgId, orgRole: form.org_role })
       })
       const result = await res.json()
+      console.log('[invite]', res.status, result)
       if (result.error) { setError(result.error); return }
       setSuccess(`Invite sent to ${form.email}`)
       setForm({ email: '', full_name: '', org_role: 'rep' })
       setShowForm(false)
-    } catch {
+    } catch (err) {
+      console.error('[invite catch]', err)
       setError('Failed to send invite.')
     } finally {
       setAdding(false)
