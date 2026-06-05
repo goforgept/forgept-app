@@ -1991,8 +1991,7 @@ function TeamSettingsTab({ featureDesignerOnly }) {
       setForm({ email: '', full_name: '', org_role: 'rep' })
       setShowForm(false)
     } catch (err) {
-      console.error('[invite catch]', err)
-      setError('Failed to send invite.')
+      setError('Failed to send invite: ' + (err?.message || String(err)))
     } finally {
       setAdding(false)
     }
