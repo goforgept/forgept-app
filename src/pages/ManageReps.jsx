@@ -43,7 +43,9 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
     setLoading(false)
   }
 
-  const handleAddRep = async () => {
+    const handleAddRep = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+
     setAdding(true)
     setError(null)
     setSuccess(null)
