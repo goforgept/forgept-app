@@ -37,24 +37,13 @@ Deno.serve(async (req) => {
 
     const adminSupabase = createClient(supabaseUrl, serviceKey)
 
-    // Invite user via Supabase Admin API
-    const inviteRes = await fetch(`${supabaseUrl}/auth/v1/invite`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': serviceKey,
-        'Authorization': `Bearer ${serviceKey}`,
-      },
-      body: JSON.stringify({
-        email,
-        data: { full_name: fullName, org_id: profile.org_id, org_role: orgRole }
-      })
+    // Invite user via Admin SDK
+    const { data: inviteData, error: inviteError } = await adminSupabase.auth.admin.inviteUserByEmail(email, {
+      data: { full_name: fullName, org_id: profile.org_id, org_role: orgRole }
     })
 
-    const inviteData = await inviteRes.json()
-
-    if (!inviteRes.ok) {
-      return new Response(JSON.stringify({ error: inviteData.message || 'Failed to send invite' }), {
+    if (inviteError) {
+      return new Response(JSON.stringify({ error: inviteError.message }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
@@ -62,14 +51,14 @@ Deno.serve(async (req) => {
     // Pre-create profile scoped to caller's org
     await adminSupabase
       .from('profiles')
-      .insert({
-        id: inviteData.id,
+      .upsert({
+        id: inviteData.user.id,
         email,
         full_name: fullName,
         org_id: profile.org_id,
         org_role: orgRole,
         role: orgRole,
-      })
+      }, { onConflict: 'id' })
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
