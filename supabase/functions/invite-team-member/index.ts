@@ -33,10 +33,11 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const brevoKey = Deno.env.get('BREVO_API_KEY') ?? ''
+    const adminSupabase = createClient(supabaseUrl, serviceKey)
 
     const tempPassword = Math.random().toString(36).slice(-10) + 'A1!'
 
-    // Create auth user with temp password — email_confirm skips Supabase's email
+    // Step 1: create auth user
     const authRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
       method: 'POST',
       headers: {
@@ -53,29 +54,65 @@ Deno.serve(async (req) => {
     })
 
     const authData = await authRes.json()
-    if (!authData.id) {
-      throw new Error(authData.message || authData.msg || 'Failed to create user')
+    let userId = authData.id
+
+    if (!userId) {
+      // Auth user already exists from a prior invite — look up their ID via profiles table
+      const { data: existing } = await adminSupabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single()
+
+      userId = existing?.id
+      if (!userId) throw new Error(authData.message || authData.msg || 'Failed to create or find user')
+      console.log('Existing user found via profiles table:', userId)
     }
 
-    const adminSupabase = createClient(supabaseUrl, serviceKey)
+    // Step 2: stamp org_id on the profile (update existing or insert if trigger didn't create it)
+    const profilePayload = {
+      id: userId,
+      email,
+      full_name: fullName,
+      org_id: profile.org_id,
+      org_role: orgRole,
+      role: orgRole,
+    }
 
-    const { error: upsertError } = await adminSupabase
+    const { error: updateError, count } = await adminSupabase
       .from('profiles')
-      .upsert({
-        id: authData.id,
-        email,
-        full_name: fullName,
-        org_id: profile.org_id,
-        org_role: orgRole,
-        role: orgRole,
-      }, { onConflict: 'id' })
+      .update({ org_id: profile.org_id, org_role: orgRole, role: orgRole, full_name: fullName, email })
+      .eq('id', userId)
+      .select('id', { count: 'exact', head: true })
 
-    if (upsertError) {
-      console.error('Profile upsert failed:', upsertError)
-      throw new Error(`Profile setup failed: ${upsertError.message}`)
+    console.log('Profile update result — count:', count, 'error:', updateError)
+
+    if (updateError) throw new Error(`Profile update failed: ${updateError.message}`)
+
+    if (!count || count === 0) {
+      // No existing profile row (trigger didn't fire) — insert it
+      const { error: insertError } = await adminSupabase
+        .from('profiles')
+        .insert(profilePayload)
+
+      if (insertError) throw new Error(`Profile insert failed: ${insertError.message}`)
+      console.log('Profile inserted fresh')
     }
 
-    // Send invite email via Brevo
+    // Step 3: verify
+    const { data: verifyProfile } = await adminSupabase
+      .from('profiles')
+      .select('id, org_id')
+      .eq('id', userId)
+      .single()
+
+    console.log('Profile after stamp:', verifyProfile)
+
+    if (!verifyProfile?.org_id) {
+      throw new Error('org_id failed to stamp on profile — check DB triggers or constraints')
+    }
+
+    // Step 4: send invite email
     await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
