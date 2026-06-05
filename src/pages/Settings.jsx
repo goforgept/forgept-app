@@ -1978,11 +1978,13 @@ function TeamSettingsTab({ featureDesignerOnly }) {
     if (!form.email || !form.full_name) { setError('Name and email are required'); return }
     setAdding(true)
     setError(null)
-        try {
-      console.log('[invite] sending', { email: form.email, orgId, session: !!session?.access_token })
+            try {
+      const { data: { session: freshSession } } = await supabase.auth.getSession()
+      console.log('[invite] sending', { email: form.email, orgId, hasToken: !!freshSession?.access_token })
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/invite-team-member', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${freshSession?.access_token}` },
+
         body: JSON.stringify({ email: form.email, fullName: form.full_name, orgId, orgRole: form.org_role })
       })
       console.log('[invite] status', res.status)
