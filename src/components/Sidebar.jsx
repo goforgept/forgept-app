@@ -98,7 +98,7 @@ const NAV_GROUPS_TECH = () => [
   }
 ]
 
-const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, featureSla, featureMonitoring) => [
+const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool) => [
   {
     key: 'sales',
     label: 'Sales',
@@ -113,6 +113,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
         { label: 'New Proposal', path: '/new', icon: '➕' },
       ] : []),
       { label: 'Clients', path: '/clients', icon: '🏢' },
+      ...(featureDrawingTool ? [{ label: 'Designer', path: '/designer', icon: '📐' }] : []),
     ]
   },
   {
@@ -198,7 +199,7 @@ const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featu
     ? NAV_GROUPS_PM(featurePurchaseOrders, featureInvoices)
     : isTechnician
     ? NAV_GROUPS_TECH()
-    : NAV_GROUPS_REP(featureProposals, featureCRM, featureInvoices, orgType, featureSla, featureMonitoring)
+    : NAV_GROUPS_REP(featureProposals, featureCRM, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool || sessionStorage.getItem('featureDrawingTool') === 'true')
 
   const visibleGroups = groups.filter(g => g.links.length > 0)
 

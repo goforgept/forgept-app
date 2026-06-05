@@ -28,15 +28,22 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     const adminSupabase = createClient(supabaseUrl, serviceKey)
 
-    // Confirm the target belongs to the same org — prevents cross-org deletions
+    // Confirm the target belongs to the same org and is not an admin
     const { data: target } = await adminSupabase
       .from('profiles')
-      .select('id, org_id')
+      .select('id, org_id, org_role, role')
       .eq('id', userId)
       .single()
 
     if (!target || target.org_id !== profile.org_id) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    if (target.org_role === 'admin' || target.role === 'admin') {
+      return new Response(JSON.stringify({ error: 'Admin accounts can only be removed directly in Supabase.' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })

@@ -204,7 +204,7 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
                       {updatingRole[rep.id] && (
                         <span className="text-[#8A9AB0] text-xs">Saving...</span>
                       )}
-                      {isAdmin && !isCurrentUser ? (
+                      {isAdmin && !isCurrentUser && currentRole !== 'admin' ? (
                         <>
                           <select
                             value={currentRole}
