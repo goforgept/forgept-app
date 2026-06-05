@@ -23,6 +23,7 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
   const [success, setSuccess] = useState(null)
   const [currentProfile, setCurrentProfile] = useState(null)
   const [updatingRole, setUpdatingRole] = useState({})
+  const [deletingId, setDeletingId] = useState(null)
 
   useEffect(() => { fetchCurrentProfile() }, [])
 
@@ -83,6 +84,24 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
     }
 
     setAdding(false)
+  }
+
+  const handleRemoveMember = async (rep) => {
+    if (!window.confirm(`Remove ${rep.full_name || rep.email} from your team? This cannot be undone.`)) return
+    setDeletingId(rep.id)
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/remove-team-member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ userId: rep.id })
+    })
+    const result = await res.json()
+    if (result.error) {
+      setError(result.error)
+    } else {
+      setReps(prev => prev.filter(r => r.id !== rep.id))
+    }
+    setDeletingId(null)
   }
 
   const updateRole = async (repId, newRole) => {
@@ -186,15 +205,24 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
                         <span className="text-[#8A9AB0] text-xs">Saving...</span>
                       )}
                       {isAdmin && !isCurrentUser ? (
-                        <select
-                          value={currentRole}
-                          onChange={e => updateRole(rep.id, e.target.value)}
-                          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
-                        >
-                          {ROLES.map(r => (
-                            <option key={r.value} value={r.value}>{r.label}</option>
-                          ))}
-                        </select>
+                        <>
+                          <select
+                            value={currentRole}
+                            onChange={e => updateRole(rep.id, e.target.value)}
+                            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                          >
+                            {ROLES.map(r => (
+                              <option key={r.value} value={r.value}>{r.label}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => handleRemoveMember(rep)}
+                            disabled={deletingId === rep.id}
+                            className="text-red-400 hover:text-red-300 text-xs disabled:opacity-40 transition-colors"
+                          >
+                            {deletingId === rep.id ? 'Removing...' : 'Remove'}
+                          </button>
+                        </>
                       ) : (
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getRoleStyle(currentRole)}`}>
                           {getRoleLabel(currentRole)}
