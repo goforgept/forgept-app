@@ -34,11 +34,13 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
   }
 
   const fetchReps = async (orgId) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('id, full_name, email, role, org_role, dispatch_zone, team_id, created_at')
       .eq('org_id', orgId)
       .order('created_at', { ascending: false })
+    if (error) console.error('fetchReps error:', error)
+    console.log('fetchReps result:', data)
     setReps(data || [])
     setLoading(false)
   }

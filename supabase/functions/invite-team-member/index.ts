@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
 
     const adminSupabase = createClient(supabaseUrl, serviceKey)
 
-    await adminSupabase
+    const { error: upsertError } = await adminSupabase
       .from('profiles')
       .upsert({
         id: authData.id,
@@ -69,6 +69,11 @@ Deno.serve(async (req) => {
         org_role: orgRole,
         role: orgRole,
       }, { onConflict: 'id' })
+
+    if (upsertError) {
+      console.error('Profile upsert failed:', upsertError)
+      throw new Error(`Profile setup failed: ${upsertError.message}`)
+    }
 
     // Send invite email via Brevo
     await fetch('https://api.brevo.com/v3/smtp/email', {
