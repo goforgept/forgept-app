@@ -1192,40 +1192,13 @@ function GlobalProductStats() {
                             <span className="text-right">Actions</span>
                           </div>
                           {products.map(p => (
-                            <div key={p.id} className="grid grid-cols-5 gap-2 text-xs py-1 hover:bg-[#1a2d45] rounded px-1">
-                              <span className="font-mono text-[#C8622A] truncate">{p.part_number}</span>
-                              <span className="text-white truncate">{p.name}</span>
-                              <span className="text-[#8A9AB0]">{p.category}</span>
-                              <span className="text-[#8A9AB0]">{p.specs?.fov_angle ? `${p.specs.fov_angle}°` : '—'}</span>
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={async () => {
-                                    await supabase.from('global_products')
-                                      .update({ is_active: !p.is_active })
-                                      .eq('id', p.id)
-                                    loadProducts(row.manufacturer)
-                                    load()
-                                  }}
-                                  className={`text-xs ${p.is_active ? 'text-green-400' : 'text-[#4a5a6a]'} hover:text-white transition-colors`}>
-                                  {p.is_active ? 'Active' : 'Inactive'}
-                                </button>
-                                <button
-                                  onClick={() => { setEditingProduct(p); setShowAccessories(true) }}
-                                  className="text-xs text-[#C8622A] hover:text-white transition-colors">
-                                  Accessories
-                                </button>
-                                <button
-                                  onClick={async () => {
-                                    if (!window.confirm(`Delete ${p.part_number}?`)) return
-                                    await supabase.from('global_products').delete().eq('id', p.id)
-                                    loadProducts(row.manufacturer)
-                                    load()
-                                  }}
-                                  className="text-red-400 hover:text-red-300 transition-colors">
-                                  ✕
-                                </button>
-                              </div>
-                            </div>
+                            <EditableProductRow
+                              key={p.id}
+                              product={p}
+                              onSaved={() => { loadProducts(row.manufacturer); load() }}
+                              onDelete={() => { loadProducts(row.manufacturer); load() }}
+                              onEditAccessories={() => { setEditingProduct(p); setShowAccessories(true) }}
+                            />
                           ))}
                         </div>
                       )}
@@ -1251,6 +1224,108 @@ function GlobalProductStats() {
       />
     )}
   </>
+  )
+}
+
+// ─── EditableProductRow ───────────────────────────────────────────────────────
+function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
+  const [editing, setEditing] = useState(false)
+  const [form, setForm]       = useState({
+    part_number:  product.part_number,
+    name:         product.name,
+    category:     product.category,
+    manufacturer: product.manufacturer,
+    fov_angle:    product.specs?.fov_angle || '',
+    ir_range:     product.specs?.ir_range  || '',
+    is_active:    product.is_active,
+  })
+  const [saving, setSaving] = useState(false)
+
+  const CATEGORIES = [
+    'Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera',
+    'LPR Camera','NVR','Access Reader','Access Control Door','Controller',
+    'Motion Sensor','Sensor','Intercom','Wireless Lock','Guard Tour',
+    'Speaker','Display','Projector','Amplifier','DSP','Network',
+    'Rack','UPS','Data Drop','Patch Panel','Cable Tray',
+    'Smoke Detector','Heat Detector','Horn Strobe','Pull Station','FACP',
+    'Panel','Outlet','Thermostat','Other'
+  ]
+
+  const inputClass = "w-full bg-[#0a1628] text-white border border-[#C8622A]/40 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-[#C8622A]"
+
+  const handleSave = async () => {
+    setSaving(true)
+    await supabase.from('global_products').update({
+      part_number:  form.part_number,
+      name:         form.name,
+      category:     form.category,
+      manufacturer: form.manufacturer,
+      is_active:    form.is_active,
+      specs: {
+        ...product.specs,
+        ...(form.fov_angle ? { fov_angle: parseFloat(form.fov_angle) } : {}),
+        ...(form.ir_range  ? { ir_range:  parseFloat(form.ir_range)  } : {}),
+      }
+    }).eq('id', product.id)
+    setSaving(false)
+    setEditing(false)
+    onSaved()
+  }
+
+  if (editing) return (
+    <div className="grid grid-cols-5 gap-1.5 text-xs py-1.5 bg-[#1a2d45] rounded px-1 border border-[#C8622A]/30">
+      <input value={form.part_number} onChange={e => setForm(p => ({ ...p, part_number: e.target.value }))} className={inputClass} placeholder="Part #" />
+      <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className={inputClass} placeholder="Name" />
+      <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className={inputClass}>
+        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+      </select>
+      <div className="flex gap-1">
+        <input value={form.fov_angle} onChange={e => setForm(p => ({ ...p, fov_angle: e.target.value }))} className={inputClass} placeholder="FOV°" type="number" />
+        <input value={form.ir_range} onChange={e => setForm(p => ({ ...p, ir_range: e.target.value }))} className={inputClass} placeholder="IR" type="number" />
+      </div>
+      <div className="flex items-center justify-end gap-1.5">
+        <button onClick={handleSave} disabled={saving} className="text-xs bg-[#C8622A] text-white px-2 py-0.5 rounded hover:bg-[#b5571f] transition-colors">
+          {saving ? '...' : 'Save'}
+        </button>
+        <button onClick={() => setEditing(false)} className="text-xs text-[#8A9AB0] hover:text-white transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="grid grid-cols-5 gap-2 text-xs py-1 hover:bg-[#1a2d45] rounded px-1 group">
+      <span className="font-mono text-[#C8622A] truncate">{product.part_number}</span>
+      <span className="text-white truncate">{product.name}</span>
+      <span className="text-[#8A9AB0]">{product.category}</span>
+      <span className="text-[#8A9AB0]">{product.specs?.fov_angle ? `${product.specs.fov_angle}°` : '—'}</span>
+      <div className="flex items-center justify-end gap-2">
+        <button onClick={() => setEditing(true)} className="text-xs text-[#8A9AB0] hover:text-white transition-colors opacity-0 group-hover:opacity-100">
+          Edit
+        </button>
+        <button
+          onClick={async () => {
+            await supabase.from('global_products').update({ is_active: !product.is_active }).eq('id', product.id)
+            onSaved()
+          }}
+          className={`text-xs ${product.is_active ? 'text-green-400' : 'text-[#4a5a6a]'} hover:text-white transition-colors`}>
+          {product.is_active ? 'Active' : 'Inactive'}
+        </button>
+        <button onClick={onEditAccessories} className="text-xs text-[#C8622A] hover:text-white transition-colors">
+          Accessories
+        </button>
+        <button
+          onClick={async () => {
+            if (!window.confirm(`Delete ${product.part_number}?`)) return
+            await supabase.from('global_products').delete().eq('id', product.id)
+            onDelete()
+          }}
+          className="text-red-400 hover:text-red-300 transition-colors">
+          ✕
+        </button>
+      </div>
+    </div>
   )
 }
 
