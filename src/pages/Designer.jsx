@@ -1001,25 +1001,62 @@ function ComponentsSection({ placementId, orgId, category, product }) {
               {group.group}
               {group.required && <span className="text-[#C8622A] ml-1">*</span>}
             </p>
-            <div className="space-y-1">
-              {(group.choices || []).map((choice, ci) => (
-                <label key={ci} className="flex items-center gap-2 cursor-pointer group">
-                  <input
-                    type="radio"
-                    name={`${placementId}-${group.group}`}
-                    checked={selected?.part_number === choice.part_number}
-                    onChange={() => handleSelectOption(group, choice)}
-                    className="accent-[#C8622A]"
-                  />
-                  <div className="flex-1">
-                    <span className="text-white text-xs">{choice.name}</span>
-                    <span className="text-[#C8622A] font-mono text-xs ml-2">{choice.part_number}</span>
+            <div className="space-y-1.5">
+              {(group.choices || []).map((choice, ci) => {
+                const existing = components.find(c => c.component_type === group.group && c.part_number === choice.part_number)
+                return (
+                  <div key={ci} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={!!existing}
+                      onChange={async (e) => {
+                        if (e.target.checked) {
+                          // Add this choice
+                          const { data, error } = await supabase
+                            .from('placement_components')
+                            .insert({
+                              org_id:         orgId,
+                              placement_id:   placementId,
+                              component_type: group.group,
+                              name:           choice.name,
+                              part_number:    choice.part_number,
+                              manufacturer:   choice.manufacturer,
+                              quantity:       1,
+                            })
+                            .select()
+                            .single()
+                          if (!error && data) setComponents(prev => [...prev, data])
+                        } else {
+                          // Remove this choice
+                          if (existing) {
+                            await supabase.from('placement_components').delete().eq('id', existing.id)
+                            setComponents(prev => prev.filter(c => c.id !== existing.id))
+                          }
+                        }
+                      }}
+                      className="accent-[#C8622A] flex-shrink-0"
+                    />
+                    <div className="flex-1">
+                      <span className="text-white text-xs">{choice.name}</span>
+                      <span className="text-[#C8622A] font-mono text-xs ml-2">{choice.part_number}</span>
+                    </div>
+                    {existing && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[#8A9AB0] text-xs">×</span>
+                        <input
+                          type="number" min="1" value={existing.quantity || 1}
+                          onChange={async (e) => {
+                            const qty = parseInt(e.target.value) || 1
+                            await supabase.from('placement_components').update({ quantity: qty }).eq('id', existing.id)
+                            setComponents(prev => prev.map(c => c.id === existing.id ? { ...c, quantity: qty } : c))
+                          }}
+                          className="w-10 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-1 py-0.5 text-xs text-center focus:outline-none focus:border-[#C8622A]"
+                        />
+                      </div>
+                    )}
                   </div>
-                  {group.default === choice.part_number && !selected && (
-                    <span className="text-xs text-[#4a5a6a]">default</span>
-                  )}
-                </label>
-              ))}
+                )
+              })}
             </div>
           </div>
         )
