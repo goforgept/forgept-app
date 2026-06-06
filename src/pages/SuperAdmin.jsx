@@ -960,6 +960,8 @@ export default function SuperAdmin() {
                 Import Products
               </button>
             </div>
+            <AddProductForm onAdded={() => {}} />
+            <AddProductForm onAdded={() => {}} />
             <GlobalProductStats onRefresh={() => {}} />
           </div>
         )}
@@ -1491,6 +1493,167 @@ function AccessoriesEditor({ product, onClose, onSaved }) {
             {saving ? 'Saving...' : 'Save Accessories'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── AddProductForm ───────────────────────────────────────────────────────────
+function AddProductForm({ onAdded }) {
+  const emptyRow = () => ({
+    part_number: '', name: '', manufacturer: '', category: 'Dome Camera',
+    industry: 'security', fov_angle: '', ir_range: '', _id: Math.random()
+  })
+
+  const [rows,    setRows]    = useState([emptyRow()])
+  const [saving,  setSaving]  = useState(false)
+  const [success, setSuccess] = useState(null)
+  const [error,   setError]   = useState(null)
+
+  const CATEGORIES = [
+    'Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera',
+    'LPR Camera','NVR','Access Reader','Access Control Door','Controller',
+    'Motion Sensor','Sensor','Intercom','Wireless Lock','Guard Tour',
+    'Speaker','Display','Projector','Amplifier','DSP','Network',
+    'Rack','UPS','Data Drop','Patch Panel','Cable Tray',
+    'Smoke Detector','Heat Detector','Horn Strobe','Pull Station','FACP',
+    'Panel','Outlet','Thermostat','Other'
+  ]
+
+  const INDUSTRIES = ['security','av','fire_alarm','low_voltage','hvac','electrical']
+
+  const update = (idx, field, value) => {
+    setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r))
+  }
+
+  const addRow = () => setRows(prev => [...prev, emptyRow()])
+  const removeRow = (idx) => setRows(prev => prev.filter((_, i) => i !== idx))
+
+  const handleSave = async () => {
+    const valid = rows.filter(r => r.part_number.trim() && r.manufacturer.trim())
+    if (!valid.length) { setError('At least one product with part number and manufacturer required'); return }
+
+    setSaving(true)
+    setError(null)
+    setSuccess(null)
+
+    const toInsert = valid.map(r => ({
+      part_number:  r.part_number.trim(),
+      name:         r.name.trim() || `${r.manufacturer.trim()} ${r.part_number.trim()}`,
+      manufacturer: r.manufacturer.trim(),
+      category:     r.category,
+      industry:     r.industry,
+      is_active:    true,
+      is_basic:     false,
+      specs: {
+        ...(r.fov_angle ? { fov_angle: parseFloat(r.fov_angle) } : {}),
+        ...(r.ir_range  ? { ir_range:  parseFloat(r.ir_range)  } : {}),
+      }
+    }))
+
+    const { error: err } = await supabase
+      .from('global_products')
+      .upsert(toInsert, { onConflict: 'part_number' })
+
+    setSaving(false)
+    if (err) { setError(err.message); return }
+    setSuccess(`${valid.length} product${valid.length !== 1 ? 's' : ''} saved successfully`)
+    setRows([emptyRow()])
+    onAdded()
+  }
+
+  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]"
+  const selectClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
+
+  return (
+    <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-white font-bold text-sm">Add Products Manually</h3>
+          <p className="text-[#8A9AB0] text-xs mt-0.5">Add one or more products directly — no Excel needed</p>
+        </div>
+        <button onClick={addRow}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2a3d55] text-white text-xs rounded-lg hover:bg-[#3a4d65] transition-colors">
+          + Add Row
+        </button>
+      </div>
+
+      {/* Column headers */}
+      <div className="grid grid-cols-12 gap-1.5 mb-1.5 px-1">
+        {['Part Number *', 'Name', 'Manufacturer *', 'Category', 'Industry', 'FOV°', 'IR Range', ''].map(h => (
+          <div key={h} className={`text-[#8A9AB0] text-xs font-medium ${
+            h === 'Part Number *' ? 'col-span-2' :
+            h === 'Name'         ? 'col-span-2' :
+            h === 'Manufacturer *' ? 'col-span-2' :
+            h === 'Category'     ? 'col-span-2' :
+            h === 'Industry'     ? 'col-span-1' :
+            h === 'FOV°'         ? 'col-span-1' :
+            h === 'IR Range'     ? 'col-span-1' : 'col-span-1'
+          }`}>{h}</div>
+        ))}
+      </div>
+
+      {/* Rows */}
+      <div className="space-y-1.5">
+        {rows.map((row, idx) => (
+          <div key={row._id} className="grid grid-cols-12 gap-1.5 items-center">
+            <div className="col-span-2">
+              <input placeholder="e.g. KT-400" value={row.part_number}
+                onChange={e => update(idx, 'part_number', e.target.value)}
+                className={inputClass} />
+            </div>
+            <div className="col-span-2">
+              <input placeholder="e.g. 4-Door Controller" value={row.name}
+                onChange={e => update(idx, 'name', e.target.value)}
+                className={inputClass} />
+            </div>
+            <div className="col-span-2">
+              <input placeholder="e.g. Kantech" value={row.manufacturer}
+                onChange={e => update(idx, 'manufacturer', e.target.value)}
+                className={inputClass} />
+            </div>
+            <div className="col-span-2">
+              <select value={row.category} onChange={e => update(idx, 'category', e.target.value)}
+                className={selectClass}>
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div className="col-span-1">
+              <select value={row.industry} onChange={e => update(idx, 'industry', e.target.value)}
+                className={selectClass}>
+                {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
+              </select>
+            </div>
+            <div className="col-span-1">
+              <input placeholder="90" value={row.fov_angle}
+                onChange={e => update(idx, 'fov_angle', e.target.value)}
+                className={inputClass} type="number" />
+            </div>
+            <div className="col-span-1">
+              <input placeholder="30" value={row.ir_range}
+                onChange={e => update(idx, 'ir_range', e.target.value)}
+                className={inputClass} type="number" />
+            </div>
+            <div className="col-span-1 flex justify-center">
+              {rows.length > 1 && (
+                <button onClick={() => removeRow(idx)}
+                  className="text-red-400 hover:text-red-300 transition-colors text-xs">✕</button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between mt-4 pt-4 border-t border-[#2a3d55]">
+        <div>
+          {error   && <p className="text-red-400 text-xs">{error}</p>}
+          {success && <p className="text-green-400 text-xs">{success}</p>}
+        </div>
+        <button onClick={handleSave} disabled={saving}
+          className="px-4 py-2 bg-[#C8622A] text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+          {saving ? 'Saving...' : `Save ${rows.filter(r => r.part_number).length || ''} Product${rows.filter(r => r.part_number).length !== 1 ? 's' : ''}`}
+        </button>
       </div>
     </div>
   )
