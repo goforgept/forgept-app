@@ -896,14 +896,25 @@ const DEFAULT_COMPONENTS = {
 }
 
 // ─── ComponentsSection ───────────────────────────────────────────────────────
-function ComponentsSection({ placementId, orgId, category }) {
-  const [components, setComponents] = useState([])
-  const [loading,    setLoading]    = useState(true)
-  const [adding,     setAdding]     = useState(false)
+function ComponentsSection({ placementId, orgId, category, product }) {
+  const [components,   setComponents]   = useState([])
+  const [accessories,  setAccessories]  = useState(null) // from global_products
+  const [loading,      setLoading]      = useState(true)
+  const [adding,       setAdding]       = useState(false)
 
   useEffect(() => {
     loadComponents()
+    if (product?.id) loadAccessories()
   }, [placementId])
+
+  const loadAccessories = async () => {
+    const { data } = await supabase
+      .from('global_products')
+      .select('accessories')
+      .eq('id', product.id)
+      .single()
+    if (data?.accessories) setAccessories(data.accessories)
+  }
 
   const loadComponents = async () => {
     setLoading(true)
@@ -950,8 +961,70 @@ function ComponentsSection({ placementId, orgId, category }) {
   const defaultTypes = DEFAULT_COMPONENTS[category] || ['Mount', 'Housing', 'Power Supply', 'Surge Protector']
   const inputClass   = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]"
 
+  const handleSelectOption = async (group, choice) => {
+    // Remove any existing component of this group type
+    const existing = components.find(c => c.component_type === group.group)
+    if (existing) {
+      await supabase.from('placement_components').delete().eq('id', existing.id)
+    }
+    // Add selected choice
+    const { data, error } = await supabase
+      .from('placement_components')
+      .insert({
+        org_id:         orgId,
+        placement_id:   placementId,
+        component_type: group.group,
+        name:           choice.name,
+        part_number:    choice.part_number,
+        manufacturer:   choice.manufacturer,
+        quantity:       1,
+      })
+      .select()
+      .single()
+    if (!error && data) {
+      setComponents(prev => [
+        ...prev.filter(c => c.component_type !== group.group),
+        data
+      ])
+    }
+  }
+
   return (
     <div className="border-t border-[#2a3d55] pt-3">
+
+      {/* Accessories option groups */}
+      {accessories?.options?.map((group, gi) => {
+        const selected = components.find(c => c.component_type === group.group)
+        return (
+          <div key={gi} className="mb-3">
+            <p className="text-[#8A9AB0] text-xs font-medium mb-1.5">
+              {group.group}
+              {group.required && <span className="text-[#C8622A] ml-1">*</span>}
+            </p>
+            <div className="space-y-1">
+              {(group.choices || []).map((choice, ci) => (
+                <label key={ci} className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="radio"
+                    name={`${placementId}-${group.group}`}
+                    checked={selected?.part_number === choice.part_number}
+                    onChange={() => handleSelectOption(group, choice)}
+                    className="accent-[#C8622A]"
+                  />
+                  <div className="flex-1">
+                    <span className="text-white text-xs">{choice.name}</span>
+                    <span className="text-[#C8622A] font-mono text-xs ml-2">{choice.part_number}</span>
+                  </div>
+                  {group.default === choice.part_number && !selected && (
+                    <span className="text-xs text-[#4a5a6a]">default</span>
+                  )}
+                </label>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+
       <div className="flex items-center justify-between mb-2">
         <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide">Components</p>
         <button
@@ -1471,7 +1544,7 @@ function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, current
         </div>
 
         {/* ── Components ── */}
-        <ComponentsSection placementId={placement.id} orgId={placement.org_id} category={product.category} />
+        <ComponentsSection placementId={placement.id} orgId={placement.org_id} category={product.category} product={product} />
 
         {/* ── As-built fields ── */}
         <div className="border-t border-[#2a3d55] pt-3">
