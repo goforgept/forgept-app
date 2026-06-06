@@ -209,7 +209,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
     const sheetIds = sheets.map(s => s.id)
     const [{ data: placementData }, { data: cableData }, { data: riseData }] = await Promise.all([
       supabase.from('drawing_placements')
-        .select('*, global_products(name, part_number, manufacturer, category), placement_components(*)')
+        .select('*, global_products(name, part_number, manufacturer, category, accessories), placement_components(*)')
         .in('drawing_sheet_id', sheetIds),
       supabase.from('cable_runs').select('cable_type, total_footage').in('drawing_sheet_id', sheetIds),
       supabase.from('vertical_rises').select('cable_type, total_footage').eq('proposal_id', proposalId),
@@ -903,17 +903,24 @@ function ComponentsSection({ placementId, orgId, category, product }) {
   const [adding,       setAdding]       = useState(false)
 
   useEffect(() => {
+    setAccessories(null) // reset on placement change
     loadComponents()
     if (product?.id) loadAccessories()
-  }, [placementId])
+  }, [placementId, product?.id])
 
   const loadAccessories = async () => {
-    const { data } = await supabase
-      .from('global_products')
-      .select('accessories')
-      .eq('id', product.id)
-      .single()
-    if (data?.accessories) setAccessories(data.accessories)
+    if (product?.accessories) {
+      setAccessories(product.accessories)
+    } else {
+      // Fallback — fetch from DB
+      const { data } = await supabase
+        .from('global_products')
+        .select('accessories')
+        .eq('id', product.id)
+        .single()
+      if (data?.accessories) setAccessories(data.accessories)
+      else setAccessories(null)
+    }
   }
 
   const loadComponents = async () => {
