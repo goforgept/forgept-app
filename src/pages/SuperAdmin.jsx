@@ -961,7 +961,6 @@ export default function SuperAdmin() {
               </button>
             </div>
             <AddProductForm onAdded={() => {}} />
-            <AddProductForm onAdded={() => {}} />
             <GlobalProductStats onRefresh={() => {}} />
           </div>
         )}
