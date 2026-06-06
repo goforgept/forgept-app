@@ -40,6 +40,20 @@ const ELEMENT_TYPE_MAP = {
   'Door Operator Element Profile Template':         { industry: 'security', defaultCategory: 'Door Operator' },
   'Automatic Door Element Profile Template':        { industry: 'security', defaultCategory: 'Door Operator' },
   'Door Opener Element Profile Template':           { industry: 'security', defaultCategory: 'Door Operator' },
+  // Fire Alarm
+  'Smoke Detector Element Profile Template':        { industry: 'fire_alarm', defaultCategory: 'Smoke Detector' },
+  'Heat Detector Element Profile Template':         { industry: 'fire_alarm', defaultCategory: 'Heat Detector' },
+  'Duct Detector Element Profile Template':         { industry: 'fire_alarm', defaultCategory: 'Smoke Detector' },
+  'Horn Strobe Element Profile Template':           { industry: 'fire_alarm', defaultCategory: 'Horn Strobe' },
+  'Strobe Element Profile Template':                { industry: 'fire_alarm', defaultCategory: 'Horn Strobe' },
+  'Pull Station Element Profile Template':          { industry: 'fire_alarm', defaultCategory: 'Pull Station' },
+  'Manual Pull Station Element Profile Template':   { industry: 'fire_alarm', defaultCategory: 'Pull Station' },
+  'FACP Element Profile Template':                  { industry: 'fire_alarm', defaultCategory: 'FACP' },
+  'Fire Alarm Control Panel Element Profile Template': { industry: 'fire_alarm', defaultCategory: 'FACP' },
+  'Fire Alarm Panel Element Profile Template':      { industry: 'fire_alarm', defaultCategory: 'FACP' },
+  'Notification Appliance Element Profile Template': { industry: 'fire_alarm', defaultCategory: 'Horn Strobe' },
+  // ACS Expansion
+  'ACS Expansion Module Element Profile Template':  { industry: 'security', defaultCategory: 'Controller' },
 }
 
 // Camera style → category override
@@ -218,7 +232,9 @@ async function parseSystemSurveyorFile(file) {
       else if (etLower.includes('panic'))                    category = 'Panic Button'
       else if (etLower.includes('shock'))                    category = 'Shock Sensor'
       else if (etLower.includes('door operator') || etLower.includes('automatic door') || etLower.includes('door opener')) category = 'Door Operator'
-      else if (etLower.includes('detector') && !etLower.includes('smoke')) category = 'PIR Detector'
+      else if (etLower.includes('smoke') || etLower.includes('duct detector')) category = 'Smoke Detector'
+      else if (etLower.includes('heat detector')) category = 'Heat Detector'
+      else if (etLower.includes('detector')) category = 'PIR Detector'
       else if (etLower.includes('camera') ||
                etLower.includes('fixed') ||
                etLower.includes('dome') ||
