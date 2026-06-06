@@ -1276,6 +1276,7 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
     <div className="grid grid-cols-5 gap-1.5 text-xs py-1.5 bg-[#1a2d45] rounded px-1 border border-[#C8622A]/30">
       <input value={form.part_number} onChange={e => setForm(p => ({ ...p, part_number: e.target.value }))} className={inputClass} placeholder="Part #" />
       <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className={inputClass} placeholder="Name" />
+      <input value={form.manufacturer} onChange={e => setForm(p => ({ ...p, manufacturer: e.target.value }))} className={inputClass} placeholder="Manufacturer" />
       <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className={inputClass}>
         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
@@ -1612,7 +1613,7 @@ function AddProductForm({ onAdded }) {
     setSuccess(null)
 
     const toInsert = valid.map(r => ({
-      part_number:  r.part_number.trim(),
+      part_number:  r.part_number.trim().toUpperCase(),
       name:         r.name.trim() || `${r.manufacturer.trim()} ${r.part_number.trim()}`,
       manufacturer: r.manufacturer.trim(),
       category:     r.category,
