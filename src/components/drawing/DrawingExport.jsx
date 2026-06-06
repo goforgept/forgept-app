@@ -60,7 +60,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         { data: profileData },
       ] = await Promise.all([
         supabase.from('drawing_placements')
-          .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
+          .select('*, global_products(id, name, part_number, manufacturer, category, specs, accessories)')
           .in('drawing_sheet_id', sheetIds)
           .order('drawing_sheet_id'),
         supabase.from('cable_runs').select('*').in('drawing_sheet_id', sheetIds),

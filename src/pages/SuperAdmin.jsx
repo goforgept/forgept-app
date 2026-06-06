@@ -1519,19 +1519,22 @@ function AccessoriesEditor({ product, onClose, onSaved }) {
 
                 {/* Add choice form */}
                 {editingGroupIdx === groupIdx && (
-                  <div className="flex gap-2 px-3 py-2">
-                    <input placeholder="Part #" value={optChoice.part_number}
-                      onChange={e => setOptChoice(p => ({ ...p, part_number: e.target.value }))}
-                      className={`${inputClass} flex-1`} />
-                    <input placeholder="Name" value={optChoice.name}
-                      onChange={e => setOptChoice(p => ({ ...p, name: e.target.value }))}
-                      className={`${inputClass} flex-1`} />
-                    <input placeholder="Mfr" value={optChoice.manufacturer}
-                      onChange={e => setOptChoice(p => ({ ...p, manufacturer: e.target.value }))}
-                      className={`${inputClass} w-24`} />
+                  <div className="px-3 py-2 space-y-2 bg-[#0F1C2E]/50">
+                    <p className="text-[#8A9AB0] text-xs font-medium">Add Choice:</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input placeholder="Part Number" value={optChoice.part_number}
+                        onChange={e => setOptChoice(p => ({ ...p, part_number: e.target.value }))}
+                        className={inputClass} />
+                      <input placeholder="Name (e.g. 2-Door Expansion)" value={optChoice.name}
+                        onChange={e => setOptChoice(p => ({ ...p, name: e.target.value }))}
+                        className={inputClass} />
+                      <input placeholder="Manufacturer" value={optChoice.manufacturer}
+                        onChange={e => setOptChoice(p => ({ ...p, manufacturer: e.target.value }))}
+                        className={inputClass} />
+                    </div>
                     <button onClick={() => addChoice(groupIdx)}
-                      className="bg-[#C8622A] text-white px-2 py-1 rounded text-xs hover:bg-[#b5571f] transition-colors flex-shrink-0">
-                      Add
+                      className="bg-[#C8622A] text-white px-3 py-1.5 rounded text-xs hover:bg-[#b5571f] transition-colors">
+                      Add Choice
                     </button>
                   </div>
                 )}

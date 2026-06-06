@@ -424,7 +424,9 @@ export default function GlobalProductsImport({ onClose, onImported }) {
     setStep('importing')
     setProgress(0)
 
-    const toImport = parsed.products.filter(p => selected.has(p.part_number))
+    const toImport = parsed.products
+      .filter(p => selected.has(p.part_number))
+      .map(p => ({ ...p, part_number: p.part_number.toUpperCase().trim() }))
     let importedCount = 0
     let skippedCount  = 0
     const BATCH = 50
