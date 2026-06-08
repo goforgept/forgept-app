@@ -1027,7 +1027,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                       {/* Visible line — click to add waypoint when editing */}
                       <Line points={pts}
                         stroke={isEditing ? '#34d399' : isSelected ? '#60a5fa' : (run.color || '#3b82f6')}
-                        strokeWidth={isEditing ? 10 : isSelected ? 3 : 2}
+                        strokeWidth={isEditing ? 10 : isSelected ? (run.stroke_width || 2) + 1 : (run.stroke_width || 2)}
                         lineCap="round" lineJoin="round"
                         listening={isEditing} dash={isEditing ? [] : [8, 4]}
                         onClick={(e) => {

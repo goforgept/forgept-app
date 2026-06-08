@@ -1850,6 +1850,7 @@ function CablePanel({ cable, onClose, onUpdate, onDelete, onEditPoints }) {
     part_number:  cable.part_number  || '',
     waste_factor: cable.waste_factor || 10,
     color:        cable.color        || '#3b82f6',
+    stroke_width: cable.stroke_width || 2,
   })
   const [saved,      setSaved]      = useState(false)
   const [deleting,   setDeleting]   = useState(false)
@@ -1869,6 +1870,7 @@ function CablePanel({ cable, onClose, onUpdate, onDelete, onEditPoints }) {
         waste_factor:  parseFloat(updated.waste_factor) || 10,
         total_footage: totalFootage,
         color:         updated.color        || '#3b82f6',
+        stroke_width:  updated.stroke_width || 2,
       }).eq('id', cable.id)
       if (!error) {
         setSaved(true)
@@ -1953,6 +1955,19 @@ function CablePanel({ cable, onClose, onUpdate, onDelete, onEditPoints }) {
               onChange={e => update('color', e.target.value)}
               className="w-7 h-7 rounded-full cursor-pointer border-0 bg-transparent"
               title="Custom color" />
+          </div>
+        </div>
+
+        {/* Thickness slider */}
+        <div>
+          <label className={labelClass}>Line Thickness — {form.stroke_width || 2}px</label>
+          <input type="range" min="1" max="8" step="1"
+            value={form.stroke_width || 2}
+            onChange={e => update('stroke_width', parseInt(e.target.value))}
+            className="w-full accent-[#C8622A]" />
+          <div className="flex justify-between text-xs text-[#4a5a6a] mt-0.5">
+            <span>Thin</span>
+            <span>Thick</span>
           </div>
         </div>
 
