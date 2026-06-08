@@ -25,6 +25,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const [selectedCable,     setSelectedCable]     = useState(null)
   const [editingCableId,    setEditingCableId]    = useState(null)
   const [updatedCable,      setUpdatedCable]      = useState(null)
+  const [deletedCableId,    setDeletedCableId]    = useState(null)
   const [copiedPlacement,   setCopiedPlacement]   = useState(null)
   const [showLabels,        setShowLabels]        = useState(() => localStorage.getItem('designer_show_labels') !== 'false')
   const [industryFilter,    setIndustryFilter]    = useState('all')
@@ -547,6 +548,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                         editingCableId={editingCableId}
                         onEditingCableDone={() => setEditingCableId(null)}
                         updatedCable={updatedCable}
+                        deletedCableId={deletedCableId}
                         copiedPlacement={copiedPlacement}
                         onCopyPlacement={(p) => setCopiedPlacement(p)}
                         onStageReady={(stage) => { stageRefs.current[activeSheetId] = stage }}
@@ -586,6 +588,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                             setSelectedCable(null)
                           }}
                           onDelete={() => {
+                            setDeletedCableId(selectedCable?.id)
                             setSelectedCable(null)
                           }}
                         />

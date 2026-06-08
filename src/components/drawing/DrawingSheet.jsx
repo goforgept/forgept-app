@@ -59,7 +59,7 @@ const getNextLabel = async (category, sheetIds) => {
   return `${prefix}-${String(next).padStart(2, '0')}`
 }
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey }) {
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
 
@@ -351,6 +351,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       prev.map(r => r.id === updatedCable.id ? { ...r, ...updatedCable } : r)
     )
   }, [updatedCable])
+
+  useEffect(() => {
+    if (!deletedCableId) return
+    setCableRuns(prev => prev.filter(r => r.id !== deletedCableId))
+  }, [deletedCableId])
 
   // ── Realtime ───────────────────────────────────────────────────────────────
   useEffect(() => {
