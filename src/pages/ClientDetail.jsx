@@ -533,7 +533,7 @@ const deleteMeeting = async (meetingId) => {
 
         {/* Contact strip */}
         <div className="bg-[#1a2d45] rounded-xl px-6 py-4 flex gap-8 flex-wrap">
-          {client?.email && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Email</span><a href={`mailto:${client.email}`} className="text-[#C8622A] text-sm hover:underline">{client.email}</a></div>}
+          {client?.email && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Email</span><a href={`mailto:${encodeURIComponent(client.email)}`} className="text-[#C8622A] text-sm hover:underline">{client.email}</a></div>}
           {client?.phone && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Phone</span><a href={`tel:${client.phone}`} className="text-white text-sm hover:text-[#C8622A] transition-colors">{client.phone}</a></div>}
           {client?.industry && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Industry</span><span className="text-white text-sm">{client.industry}</span></div>}
           {fullAddress && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Address</span><a href={`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`} target="_blank" rel="noreferrer" className="text-white text-sm hover:text-[#C8622A] transition-colors">{fullAddress}</a></div>}
@@ -630,7 +630,7 @@ const deleteMeeting = async (meetingId) => {
                       {contact.email && (
                         <div className="flex items-center gap-2">
                           <span className="text-[#8A9AB0] text-xs w-10">Email</span>
-                          <a href={`mailto:${contact.email}`} className="text-[#C8622A] text-xs hover:underline truncate">{contact.email}</a>
+                          <a href={`mailto:${encodeURIComponent(contact.email)}`} className="text-[#C8622A] text-xs hover:underline truncate">{contact.email}</a>
                         </div>
                       )}
                       {contact.phone && (
@@ -691,7 +691,7 @@ const deleteMeeting = async (meetingId) => {
                         <div className="border-t border-[#2a3d55] pt-2 mt-2 space-y-1">
                           <p className="text-[#8A9AB0] text-xs font-semibold">Site Contact</p>
                           {loc.site_contact_name && <p className="text-white text-xs font-medium">{loc.site_contact_name}</p>}
-                          {loc.site_contact_email && <a href={`mailto:${loc.site_contact_email}`} className="text-[#C8622A] text-xs hover:underline block">{loc.site_contact_email}</a>}
+                          {loc.site_contact_email && <a href={`mailto:${encodeURIComponent(loc.site_contact_email)}`} className="text-[#C8622A] text-xs hover:underline block">{loc.site_contact_email}</a>}
                           {loc.site_contact_phone && <a href={`tel:${loc.site_contact_phone}`} className="text-[#8A9AB0] text-xs hover:text-white transition-colors block">{loc.site_contact_phone}</a>}
                         </div>
                       )}
