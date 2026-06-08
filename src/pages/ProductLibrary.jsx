@@ -471,7 +471,8 @@ if (!finalCost) continue
                         )}
                         <button
                           onClick={e => { e.stopPropagation(); handleDeleteProduct(p.id) }}
-                          className="text-[#2a3d55] hover:text-red-400 text-xs transition-colors"
+                          title="Delete product"
+                          className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors px-1"
                         >✕</button>
                         <span className="text-[#8A9AB0] text-xs">{isOpen ? '▲' : '▼'}</span>
                       </div>
