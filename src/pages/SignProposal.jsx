@@ -387,7 +387,7 @@ export default function SignProposal() {
         const { uploadToR2, getR2Url, BUCKETS } = await import('../r2')
         await uploadToR2(fileName, pdfBlob, 'application/pdf', BUCKETS.DOCUMENTS)
         signedPdfUrl = fileName // store path not URL
-      } catch (pdfErr) { console.log('PDF generation error (non-fatal):', pdfErr) }
+      } catch (pdfErr) { console.error('PDF generation error (non-fatal):', pdfErr) }
 
       const { error: updateError } = await supabase.from('proposals').update({
         signature_name: signerName.trim(), signature_at: now, signature_ip: clientIp, status: 'Won',

@@ -877,7 +877,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   }
 
   const generateFinalJobPacket = async () => {
-    console.log('Generating final job packet...')
     try {
     const { default: jsPDF } = await import('jspdf')
     const { default: autoTable } = await import('jspdf-autotable')

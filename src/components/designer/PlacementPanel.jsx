@@ -596,16 +596,6 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                 onClick={async () => {
                   setBulkApplying(true)
                   try {
-                    console.log('Bulk apply:', {
-                      global_product_id: placement.global_product_id,
-                      allSheetIds,
-                      scope: bulkScope,
-                      updates: {
-                        part_number_override:  form.part_number_override  || null,
-                        manufacturer_override: form.manufacturer_override || null,
-                        description_override:  form.description_override  || null,
-                      }
-                    })
                     if (bulkSelected.size === 0) return
                     const selectedIds = [...bulkSelected]
 

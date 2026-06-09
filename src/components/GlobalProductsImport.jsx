@@ -165,10 +165,7 @@ async function parseSystemSurveyorFile(file) {
     const partNum = getVal('Component Model #', offset) || model
         const style   = getVal('Camera Style', offset) || getVal('Camera Type', offset)
     const fovAngle = getVal('AOC Angle', offset)
-        if (offset === 0) {
-      console.log('ALL label map keys:', Object.keys(labelMap))
-      console.log('Product 0 mfr:', getVal('Component Manufacturer', 0))
-    }
+
 
 
     const intExt  = getVal('Interior or Exterior?', offset)
@@ -194,9 +191,6 @@ async function parseSystemSurveyorFile(file) {
       ? Object.keys(STYLE_CATEGORY_MAP).find(k => k.toLowerCase() === style.toLowerCase())
       : null
 
-    if (offset === 0) {
-      console.log('Style raw value:', JSON.stringify(style), '| styleKey:', styleKey, '| category before style:', category)
-    }
 
     // Apply camera style override — but not for element types with a definitive category
     if (isCameraType && styleKey && !mapping?.preserveCategory) {
@@ -289,8 +283,6 @@ async function parseSystemSurveyorFile(file) {
     })
   }
 
-  console.log('Element type raw:', JSON.stringify(elementType))
-  console.log('Parsed products:', products.length, 'Sample:', products[0])
   return { elementType, products: dedupeByPartNumber(products) }
 }
 

@@ -336,7 +336,7 @@ export default function ProposalDetail({ isAdmin }) {
           name: proposal.proposal_name,
           status: 'Active',
         })
-      } catch (e) { console.log('Job creation error:', e) }
+      } catch (e) { console.error('Job creation error:', e) }
     }
     if (newStatus === 'Won') {
       const recurringMissingDate = lineItems.filter(l => l.recurring && !l.renewal_date && !(renewalDates[l.id]))
@@ -695,8 +695,6 @@ export default function ProposalDetail({ isAdmin }) {
   setGeneratingSOW(true)
   try {
     const { data: { session } } = await supabase.auth.getSession()
-    console.log('Session token:', session?.access_token ? 'present' : 'MISSING')
-
     const { error } = await supabase.functions.invoke('generate-sow', {
       body: {
         proposalId: id,
@@ -903,7 +901,7 @@ export default function ProposalDetail({ isAdmin }) {
           })
         })
       } catch (err) {
-        console.log(`RFQ error for ${vendorName}:`, err)
+        console.error(`RFQ error for ${vendorName}:`, err)
       }
     }
 
@@ -1350,7 +1348,7 @@ export default function ProposalDetail({ isAdmin }) {
             children.push(new Paragraph({ children: [new TextRun({ text: photo.caption, size: 16, color: '888888', italics: true })] }))
           }
           children.push(new Paragraph({ children: [new TextRun({ text: '' })] }))
-        } catch (e) { console.log('DOCX photo error:', e) }
+        } catch (e) { console.error('DOCX photo error:', e) }
       }
     }
 
@@ -1500,7 +1498,7 @@ export default function ProposalDetail({ isAdmin }) {
       setEditLines(mapped)
       setTimeout(() => { setEditingBOM(true) }, 0)
     } catch (err) {
-      console.log('Excel upload error:', err)
+      console.error('Excel upload error:', err)
       alert('Could not read Excel file')
     }
   }
@@ -1746,7 +1744,7 @@ export default function ProposalDetail({ isAdmin }) {
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
             body: JSON.stringify({ type: 'share_notification', toEmail: sharedWith.email, toName: sharedWith.full_name, fromName: profile?.full_name || 'A teammate', proposalName: proposal?.proposal_name, proposalId: id })
           })
-        } catch (e) { console.log('Share notification error', e) }
+        } catch (e) { console.error('Share notification error:', e) }
       }
     }
     setSharingProposal(false)
@@ -2440,7 +2438,7 @@ const analyzeDrawing = async () => {
           doc.addImage(base64, 'JPEG', photoX, photoY, photoWidth, photoHeight)
           if (photos[i].caption) { doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100); doc.text(photos[i].caption, photoX, photoY + photoHeight + 4, { maxWidth: photoWidth }) }
           if (i % 2 === 0) { photoX = photoX + photoWidth + 14 } else { photoX = 14; photoY = photoY + photoHeight + 16; if (photoY > 250) { doc.addPage(); photoY = 20 } }
-        } catch (e) { console.log('Photo load error:', e) }
+        } catch (e) { console.error('Photo load error:', e) }
       }
     }
     return doc

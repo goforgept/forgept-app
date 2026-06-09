@@ -73,7 +73,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
       }
       return meetingLink
     } catch (e) {
-      console.log('Calendar push error:', e)
+      console.error('Calendar push error:', e)
       return null
     }
   }

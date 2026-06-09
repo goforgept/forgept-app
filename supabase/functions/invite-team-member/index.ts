@@ -66,7 +66,6 @@ Deno.serve(async (req) => {
 
       userId = existing?.id
       if (!userId) throw new Error(authData.message || authData.msg || 'Failed to create or find user')
-      console.log('Existing user found via profiles table:', userId)
     }
 
     // Step 2: stamp org_id on the profile (update existing or insert if trigger didn't create it)
@@ -85,8 +84,6 @@ Deno.serve(async (req) => {
       .eq('id', userId)
       .select('id', { count: 'exact', head: true })
 
-    console.log('Profile update result — count:', count, 'error:', updateError)
-
     if (updateError) throw new Error(`Profile update failed: ${updateError.message}`)
 
     if (!count || count === 0) {
@@ -96,7 +93,6 @@ Deno.serve(async (req) => {
         .insert(profilePayload)
 
       if (insertError) throw new Error(`Profile insert failed: ${insertError.message}`)
-      console.log('Profile inserted fresh')
     }
 
     // Step 3: verify
@@ -105,8 +101,6 @@ Deno.serve(async (req) => {
       .select('id, org_id')
       .eq('id', userId)
       .single()
-
-    console.log('Profile after stamp:', verifyProfile)
 
     if (!verifyProfile?.org_id) {
       throw new Error('org_id failed to stamp on profile — check DB triggers or constraints')

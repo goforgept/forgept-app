@@ -293,7 +293,7 @@ const deleteMeeting = async (meetingId) => {
           google_event_id: task.google_event_id || null,
           microsoft_event_id: task.microsoft_event_id || null,
         }),
-      }).catch(e => console.log('Calendar delete error:', e))
+      }).catch(e => console.error('Calendar delete error:', e))
     }
 
     // Send cancellation email with .ics to client
@@ -328,7 +328,7 @@ const deleteMeeting = async (meetingId) => {
           meetingTitle: `${task.meeting_type}: ${task.title}`,
           meetingUid: `forgept-${meetingId}@goforgept.com`,
         }),
-      }).catch(e => console.log('Cancellation email error:', e))
+      }).catch(e => console.error('Cancellation email error:', e))
     }
 
     await supabase.from('tasks').delete().eq('id', meetingId)

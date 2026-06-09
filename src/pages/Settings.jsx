@@ -380,11 +380,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     const { uploadToR2, getR2Url, BUCKETS } = await import('../r2')
     const orgId = (await supabase.from('profiles').select('org_id').eq('id', user.id).single()).data?.org_id
     const r2Path = `${orgId}/logos/${fileName}`
-    console.log('Uploading to R2:', r2Path, BUCKETS.ASSETS)
     await uploadToR2(r2Path, file, file.type, BUCKETS.ASSETS)
-    console.log('R2 upload done, getting URL')
     const logoUrl = await getR2Url(r2Path, 60 * 60 * 24 * 365, BUCKETS.ASSETS)
-    console.log('Got URL, updating profile')
     const { error: updateError } = await supabase.from('profiles').update({ logo_url: r2Path }).eq('id', user.id)
     if (updateError) console.error('Profile update error:', updateError)
     setLogoUrl(logoUrl)
@@ -1989,16 +1986,13 @@ function TeamSettingsTab({ featureDesignerOnly }) {
     setError(null)
             try {
       const { data: { session: freshSession } } = await supabase.auth.getSession()
-      console.log('[invite] sending', { email: form.email, orgId, hasToken: !!freshSession?.access_token })
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/invite-team-member', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${freshSession?.access_token}` },
 
         body: JSON.stringify({ email: form.email, fullName: form.full_name, orgId, orgRole: form.org_role })
       })
-      console.log('[invite] status', res.status)
       const result = await res.json()
-      console.log('[invite] result', result)
 
       if (result.error) { setError(result.error); return }
       setSuccess(`Invite sent to ${form.email}`)
