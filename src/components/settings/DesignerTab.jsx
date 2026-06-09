@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { useProfile } from '../../context/ProfileContext'
+import AccessoriesEditor from '../AccessoriesEditor'
 
 const INDUSTRIES = ['Security', 'AV', 'IT / Networking', 'Low Voltage', 'Fire Alarm', 'HVAC', 'Electrical', 'Telecom', 'Other']
 
@@ -27,6 +28,7 @@ export default function DesignerTab() {
   const [showModal, setShowModal] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [editingAccessories, setEditingAccessories] = useState(null)
 
   useEffect(() => {
     if (profile?.org_id) loadProducts()
@@ -120,7 +122,10 @@ export default function DesignerTab() {
                     <span className="text-xs px-2 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0]">{p.industry}</span>
                   </div>
                 </div>
-                <button onClick={() => handleDelete(p.id)} className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors">✕</button>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setEditingAccessories(p)} className="text-xs text-[#C8622A] hover:text-white transition-colors">Accessories</button>
+                  <button onClick={() => handleDelete(p.id)} className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors">✕</button>
+                </div>
               </div>
             ))}
           </div>
@@ -148,6 +153,19 @@ export default function DesignerTab() {
           </div>
         </div>
       </div>
+
+      {/* Accessories Editor */}
+      {editingAccessories && (
+        <AccessoriesEditor
+          product={editingAccessories}
+          tableName="org_products"
+          onClose={() => setEditingAccessories(null)}
+          onSaved={(updated) => {
+            setProducts(prev => prev.map(p => p.id === updated.id ? updated : p))
+            setEditingAccessories(null)
+          }}
+        />
+      )}
 
       {/* Add Symbol Modal */}
       {showModal && (
