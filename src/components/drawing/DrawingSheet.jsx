@@ -76,7 +76,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [scale,      setScale]      = useState(1)
   const [position,   setPosition]   = useState({ x: 0, y: 0 })
   const [placements, setPlacements] = useState([])
-  const [selectedId, setSelectedId] = useState(null)
+  const [selectedId,  setSelectedId]  = useState(null)
+  const [selectedIds, setSelectedIds] = useState(new Set()) // multiselect
+  const [selectionBox, setSelectionBox] = useState(null) // drag selection box
+  const isSelecting = useRef(false)
+  const selectionStart = useRef(null)
   const [hoveredId,  setHoveredId]  = useState(null)
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
@@ -256,10 +260,18 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       }
 
       // Delete selected placement
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && !isInput) {
-        await supabase.from('drawing_placements').delete().eq('id', selectedId)
-        setPlacements(prev => prev.filter(p => p.id !== selectedId))
-        setSelectedId(null)
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !isInput) {
+        if (selectedIds.size > 0) {
+          for (const id of selectedIds) {
+            await supabase.from('drawing_placements').delete().eq('id', id)
+          }
+          setPlacements(prev => prev.filter(p => !selectedIds.has(p.id)))
+          setSelectedIds(new Set())
+        } else if (selectedId) {
+          await supabase.from('drawing_placements').delete().eq('id', selectedId)
+          setPlacements(prev => prev.filter(p => p.id !== selectedId))
+          setSelectedId(null)
+        }
         onPlacementSelect?.(null)
         onPlacementChange?.()
       }
@@ -384,15 +396,34 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   // ── Pan ────────────────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e) => {
-    // Middle mouse OR left mouse when no symbol selected = pan
+    const isOnBackground = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
+    // Middle mouse OR left mouse when no symbol selected = pan or selection box
     if (e.evt.button === 1 || (e.evt.button === 0 && !selectedSymbol)) {
-      isPanning.current = true
-      lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY }
-      e.evt.preventDefault()
+      if (e.evt.shiftKey && isOnBackground) {
+        // Shift+drag = selection box
+        const pointer = stageRef.current.getPointerPosition()
+        selectionStart.current = pointer
+        isSelecting.current = true
+        setSelectionBox({ x: pointer.x, y: pointer.y, w: 0, h: 0 })
+      } else {
+        isPanning.current = true
+        lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY }
+        e.evt.preventDefault()
+      }
     }
   }, [selectedSymbol])
 
   const handleMouseMove = useCallback((e) => {
+    if (isSelecting.current && selectionStart.current) {
+      const pointer = stageRef.current.getPointerPosition()
+      setSelectionBox({
+        x: Math.min(pointer.x, selectionStart.current.x),
+        y: Math.min(pointer.y, selectionStart.current.y),
+        w: Math.abs(pointer.x - selectionStart.current.x),
+        h: Math.abs(pointer.y - selectionStart.current.y),
+      })
+      return
+    }
     if (!isPanning.current || !lastPointer.current) return
     const dx = e.evt.clientX - lastPointer.current.x
     const dy = e.evt.clientY - lastPointer.current.y
@@ -400,7 +431,29 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }))
   }, [])
 
-  const handleMouseUp = useCallback(() => { isPanning.current = false }, [])
+  const handleMouseUp = useCallback(() => {
+    isPanning.current = false
+    if (isSelecting.current && selectionBox) {
+      // Find all placements within the selection box
+      const selected = new Set()
+      placements.forEach(p => {
+        const px = position.x + p.x * canvasW * scale
+        const py = position.y + p.y * canvasH * scale
+        if (px >= selectionBox.x && px <= selectionBox.x + selectionBox.w &&
+            py >= selectionBox.y && py <= selectionBox.y + selectionBox.h) {
+          selected.add(p.id)
+        }
+      })
+      if (selected.size > 0) {
+        setSelectedIds(selected)
+        setSelectedId(null)
+        onPlacementSelect?.(null)
+      }
+    }
+    isSelecting.current = false
+    selectionStart.current = null
+    setSelectionBox(null)
+  }, [selectionBox, placements, position, canvasW, canvasH, scale])
 
   // ── Pinch zoom ─────────────────────────────────────────────────────────────
   const lastTouchPos = useRef(null)
@@ -678,7 +731,30 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           }
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-[#8A9AB0]">{placements.length} device{placements.length !== 1 ? 's' : ''} · {cableRuns.length} run{cableRuns.length !== 1 ? 's' : ''}</span>
+          {selectedIds.size > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-blue-400 font-semibold text-xs">{selectedIds.size} selected</span>
+              <button onClick={async () => {
+                if (!window.confirm(`Delete ${selectedIds.size} devices?`)) return
+                for (const id of selectedIds) {
+                  await supabase.from('drawing_placements').delete().eq('id', id)
+                }
+                setPlacements(prev => prev.filter(p => !selectedIds.has(p.id)))
+                setSelectedIds(new Set())
+                onPlacementChange?.()
+              }} className="text-xs text-red-400 hover:text-red-300 transition-colors px-2 py-0.5 border border-red-400/30 rounded">
+                Delete All
+              </button>
+              <button onClick={() => {
+                setSelectedIds(new Set())
+                setSelectedId(null)
+              }} className="text-xs text-[#8A9AB0] hover:text-white transition-colors">
+                Clear
+              </button>
+            </div>
+          ) : (
+            <span className="text-[#8A9AB0]">{placements.length} device{placements.length !== 1 ? 's' : ''} · {cableRuns.length} run{cableRuns.length !== 1 ? 's' : ''}</span>
+          )}
           <button
             onClick={() => setShowFOV(s => !s)}
             className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
@@ -1220,11 +1296,25 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               </Layer>
             )}
 
+            {/* Selection box layer */}
+            {selectionBox && (
+              <Layer listening={false}>
+                <Rect
+                  x={selectionBox.x} y={selectionBox.y}
+                  width={selectionBox.w} height={selectionBox.h}
+                  fill="rgba(59,130,246,0.1)"
+                  stroke="#3b82f6"
+                  strokeWidth={1}
+                  dash={[4, 4]}
+                />
+              </Layer>
+            )}
+
             <Layer>
               {iconsReady && placements.map(placement => {
                 const product = placement.global_products
                 if (!product) return null
-                const isSelected = selectedId === placement.id
+                const isSelected = selectedId === placement.id || selectedIds.has(placement.id)
                 const isHovered  = hoveredId  === placement.id
                 const markerSize = Math.max((placement.symbol_size || 32) * Math.min(scale, 1.5), 14)
                 const px = position.x + placement.x * canvasW * scale
@@ -1252,9 +1342,23 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                       }])
                     }}
                     onSelect={() => {
-                      const newId = selectedId === placement.id ? null : placement.id
-                      setSelectedId(newId)
-                      onPlacementSelect?.(newId ? placement : null)
+                      if (window.event?.shiftKey) {
+                        // Shift+click — add/remove from multiselect
+                        setSelectedIds(prev => {
+                          const next = new Set(prev)
+                          if (next.has(placement.id)) next.delete(placement.id)
+                          else next.add(placement.id)
+                          return next
+                        })
+                        setSelectedId(null)
+                        onPlacementSelect?.(null)
+                      } else {
+                        // Normal click — single select
+                        setSelectedIds(new Set())
+                        const newId = selectedId === placement.id ? null : placement.id
+                        setSelectedId(newId)
+                        onPlacementSelect?.(newId ? placement : null)
+                      }
                     }}
                     onHoverStart={() => setHoveredId(placement.id)}
                     onHoverEnd={() => setHoveredId(null)}
