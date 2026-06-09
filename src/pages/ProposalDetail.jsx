@@ -30,6 +30,11 @@ import SpecReaderModal from '../components/proposal/SpecReaderModal'
 import DrawingReaderModal from '../components/proposal/DrawingReaderModal'
 import SLAModal from '../components/proposal/SLAModal'
 import MonitoringModal from '../components/proposal/MonitoringModal'
+import ProposalHeader from '../components/proposal/ProposalHeader'
+import ScopeSection from '../components/proposal/ScopeSection'
+import RecurringSection from '../components/proposal/RecurringSection'
+import ServiceAgreementSection from '../components/proposal/ServiceAgreementSection'
+import MonitoringSection from '../components/proposal/MonitoringSection'
 import BomSection from '../components/proposal/BomSection'
 
 export default function ProposalDetail({ isAdmin }) {
@@ -2515,217 +2520,38 @@ const analyzeDrawing = async () => {
           </div>
         )}
 
-        {/* Header */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <div className="flex justify-between items-start">
-            <div>
-              {editingProposalName ? (
-                <div className="flex items-center gap-2">
-                  <input
-                    autoFocus
-                    type="text"
-                    value={proposalNameDraft}
-                    onChange={e => setProposalNameDraft(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Enter') saveProposalName(); if (e.key === 'Escape') setEditingProposalName(false) }}
-                    className="bg-[#0F1C2E] text-white text-2xl font-bold border-b-2 border-[#C8622A] focus:outline-none px-1 w-96"
-                  />
-                  <button onClick={saveProposalName} className="text-[#C8622A] text-sm font-semibold hover:text-white transition-colors">Save</button>
-                  <button onClick={() => setEditingProposalName(false)} className="text-[#8A9AB0] text-sm hover:text-white transition-colors">Cancel</button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 group">
-                  <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
-                  <button onClick={() => { setProposalNameDraft(proposal?.proposal_name || ''); setEditingProposalName(true) }}
-                    className="opacity-0 group-hover:opacity-100 text-[#8A9AB0] hover:text-white text-xs transition-all">✏️</button>
-                </div>
-              )}
-              <div className="flex items-center gap-2 mt-1">
-                <p className="text-[#8A9AB0]">{proposal?.company} · {proposal?.client_name}</p>
-                <button onClick={openEditClientModal} className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors" title="Edit client info">✏️</button>
-              </div>
-              <p className="text-[#8A9AB0] text-sm">{proposal?.client_email}</p>
-              {locationName && <span className="inline-flex items-center gap-1 bg-[#2a3d55] text-[#8A9AB0] text-xs px-2 py-0.5 rounded-full mt-1">📍 {locationName}</span>}
-              {proposal?.signature_name && (
-                <div className="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full mt-1">
-                  <span>✍️</span>
-                  <span>Signed by {proposal.signature_name} · {proposal.signature_at ? new Date(proposal.signature_at).toLocaleDateString() : ''}</span>
-                </div>
-              )}
-              {collaborators.length > 0 && (
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-[#8A9AB0] text-xs">Shared with:</span>
-                  {collaborators.map(cid => {
-                    const cp = orgProfiles.find(p => p.id === cid)
-                    return cp ? <span key={cid} className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full">{cp.full_name}</span> : null
-                  })}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {features.aiBom && (
-                <button onClick={() => { setShowDealSummaryModal(true); setDealSummary(null) }} className="bg-purple-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors">🧠 Deal Summary</button>
-              )}
-              <button onClick={() => setShowShareModal(true)} className="bg-[#2a3d55] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-1">
-                👥 Share{collaborators.length > 0 ? ` (${collaborators.length})` : ''}
-              </button>
-              {isAdmin && proposal?.status !== 'Won' && (
-                <button onClick={() => { setDeleteConfirmText(''); setShowDeleteModal(true) }} className="bg-red-900/30 text-red-400 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-red-900/50 transition-colors">Delete</button>
-              )}
-              <select value={proposal?.status} onChange={e => updateStatus(e.target.value)} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                {['Draft', 'Sent', 'Won', 'Lost'].map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-6 gap-4 mt-6">
-            <div><p className="text-[#8A9AB0] text-xs">Rep</p><p className="text-white text-sm font-medium">{proposal?.rep_name}</p></div>
-            <div>
-              <p className="text-[#8A9AB0] text-xs mb-1">Quote #</p>
-              {editingQuoteNumber ? (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="text"
-                      value={quoteNumberDraft}
-                      onChange={e => { setQuoteNumberDraft(e.target.value); setQuoteNumberError('') }}
-                      onKeyDown={e => { if (e.key === 'Enter') saveQuoteNumber(); if (e.key === 'Escape') { setEditingQuoteNumber(false); setQuoteNumberError('') } }}
-                      className="w-24 bg-[#0F1C2E] text-white border border-[#C8622A]/50 rounded px-2 py-0.5 text-sm focus:outline-none focus:border-[#C8622A]"
-                      autoFocus
-                    />
-                    <button onClick={saveQuoteNumber} className="text-green-400 hover:text-green-300 text-xs">✓</button>
-                    <button onClick={() => { setEditingQuoteNumber(false); setQuoteNumberError('') }} className="text-[#8A9AB0] hover:text-white text-xs">✕</button>
-                  </div>
-                  {quoteNumberError && <p className="text-red-400 text-xs">{quoteNumberError}</p>}
-                </div>
-              ) : (
-                <button
-                  onClick={() => { setQuoteNumberDraft(proposal?.quote_number || ''); setEditingQuoteNumber(true) }}
-                  className="text-white text-sm font-medium hover:text-[#C8622A] transition-colors group flex items-center gap-1"
-                  title="Click to edit quote number">
-                  {proposal?.quote_number || <span className="text-[#8A9AB0] italic">Add #</span>}
-                  <span className="text-[#2a3d55] group-hover:text-[#C8622A] text-xs transition-colors">✏️</span>
-                </button>
-              )}
-            </div>
-            <div>
-              <p className="text-[#8A9AB0] text-xs">Close Date</p>
-              <input type="date" value={proposal?.close_date || ''} onChange={e => updateCloseDate(e.target.value)} className="bg-transparent text-white text-sm font-medium focus:outline-none focus:border-b focus:border-[#C8622A] cursor-pointer" />
-            </div>
-            <div><p className="text-[#8A9AB0] text-xs">Industry</p><p className="text-white text-sm font-medium">{proposal?.industry}</p></div>
-            <div><p className="text-[#8A9AB0] text-xs">Margin</p><p className="text-[#C8622A] text-sm font-medium">{proposal?.total_gross_margin_percent ? `${proposal.total_gross_margin_percent.toFixed(1)}%` : '—'}</p></div>
-            <div>
-              <p className="text-[#8A9AB0] text-xs mb-1">Tax Exempt</p>
-              <button onClick={() => updateTaxExempt(!proposal?.tax_exempt)}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${proposal?.tax_exempt ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-[#0F1C2E] text-[#8A9AB0] border border-[#2a3d55] hover:text-white'}`}>
-                {proposal?.tax_exempt ? 'Exempt' : 'Taxable'}
-              </button>
-            </div>
-            <div>
-              <p className="text-[#8A9AB0] text-xs mb-1">Tax Rate %</p>
-              {proposal?.tax_exempt ? (
-                <p className="text-[#8A9AB0] text-sm">—</p>
-              ) : (
-                <input type="number" step="0.01" placeholder="e.g. 8.5" value={proposal?.tax_rate ?? ''}
-                  onChange={e => updateTaxRate(e.target.value)}
-                  className="w-full bg-transparent text-white text-sm font-medium border-b border-[#2a3d55] focus:outline-none focus:border-[#C8622A]" />
-              )}
-            </div>
-          </div>
-        </div>
+        <ProposalHeader
+          proposal={proposal} profile={profile} features={features} isAdmin={isAdmin}
+          editingProposalName={editingProposalName} proposalNameDraft={proposalNameDraft}
+          setProposalNameDraft={setProposalNameDraft} setEditingProposalName={setEditingProposalName}
+          saveProposalName={saveProposalName}
+          openEditClientModal={openEditClientModal} locationName={locationName}
+          collaborators={collaborators} orgProfiles={orgProfiles}
+          updateStatus={updateStatus}
+          editingQuoteNumber={editingQuoteNumber} quoteNumberDraft={quoteNumberDraft}
+          setQuoteNumberDraft={setQuoteNumberDraft} quoteNumberError={quoteNumberError}
+          setQuoteNumberError={setQuoteNumberError} saveQuoteNumber={saveQuoteNumber}
+          setEditingQuoteNumber={setEditingQuoteNumber}
+          updateCloseDate={updateCloseDate} updateTaxExempt={updateTaxExempt} updateTaxRate={updateTaxRate}
+          setShowDealSummaryModal={setShowDealSummaryModal} setDealSummary={setDealSummary}
+          setShowShareModal={setShowShareModal}
+          setDeleteConfirmText={setDeleteConfirmText} setShowDeleteModal={setShowDeleteModal}
+        />
 
-        {/* Scope of Work */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-white font-bold text-lg">Scope of Work</h3>
-            <div className="flex gap-2 flex-wrap">
-              {features.sendProposal && proposal?.client_email && (
-                <button onClick={() => { setSendForm({ subject: `Proposal: ${proposal.proposal_name}`, message: `Hi ${proposal.client_name || 'there'},\n\nPlease find your proposal attached. Don't hesitate to reach out with any questions.\n\nLooking forward to working with you.` }); setShowSendModal(true) }}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
-                  ✉ Send Proposal
-                </button>
-              )}
-              {proposal?.client_email && proposal?.status === 'Sent' && !proposal?.signature_name && (
-                <button onClick={requestSignature} disabled={requestingSignature}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
-                  {requestingSignature ? 'Sending...' : '✍️ Request Signature'}
-                </button>
-              )}
-              {proposal?.signed_pdf_url && (
-                <button
-                  onClick={async () => {
-                    const { getR2Url, BUCKETS } = await import('../r2')
-                    const url = proposal.signed_pdf_url.startsWith('http')
-                      ? proposal.signed_pdf_url  // old Supabase URL
-                      : await getR2Url(proposal.signed_pdf_url, 3600, BUCKETS.DOCUMENTS)
-                    if (url) window.open(url, '_blank')
-                  }}
-                  className="bg-green-600/20 text-green-400 border border-green-600/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-600/30 transition-colors flex items-center gap-1">
-                  ⬇ Signed Copy
-                </button>
-              )}
-              <label className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1 ${uploadingSignedPDF ? 'bg-[#2a3d55] text-[#8A9AB0] opacity-50 cursor-not-allowed' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}
-                title="Upload a physically signed or externally signed agreement PDF">
-                {uploadingSignedPDF ? 'Uploading...' : '📎 Upload Signed'}
-                <input type="file" accept=".pdf" onChange={uploadSignedPDF} className="hidden" disabled={uploadingSignedPDF} />
-              </label>
-              {qboConnected && proposal?.status === 'Won' && (
-                <button onClick={sendToQBO} disabled={sendingToQBO}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${qboInvoiceId ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-[#2CA01C] text-white hover:bg-[#259018]'}`}>
-                  {sendingToQBO ? 'Sending...' : qboInvoiceId ? '✓ In QuickBooks' : '🟢 Send to QuickBooks'}
-                </button>
-              )}
-              <button onClick={() => setShowPricingModal(true)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${(proposal?.hide_material_prices || proposal?.hide_labor_breakdown) ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
-                ⚙ Pricing
-              </button>
-              <button onClick={downloadPDF} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">↓ PDF</button>
-              <button onClick={downloadDOCX} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">↓ DOCX</button>
-              {features.sitePhotos && (
-                <button onClick={() => setShowPhotosModal(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-2">
-                  📷 Photos{photos.length > 0 ? ` (${photos.length})` : ''}
-                </button>
-              )}
-              <button onClick={generateSOW} disabled={generatingSOW} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                {generatingSOW ? 'Generating...' : proposal?.scope_of_work ? 'Regenerate SOW' : 'Generate SOW'}
-              </button>
-            </div>
-          </div>
+        <ScopeSection
+          proposal={proposal} features={features} photos={photos}
+          aiNotes={aiNotes} setAiNotes={setAiNotes}
+          editingSOW={editingSOW} sowDraft={sowDraft} setSowDraft={setSowDraft}
+          setEditingSOW={setEditingSOW} saveSOW={saveSOW}
+          generatingSOW={generatingSOW} generateSOW={generateSOW}
+          sendForm={sendForm} setSendForm={setSendForm} setShowSendModal={setShowSendModal}
+          requestingSignature={requestingSignature} requestSignature={requestSignature}
+          uploadingSignedPDF={uploadingSignedPDF} uploadSignedPDF={uploadSignedPDF}
+          qboConnected={qboConnected} qboInvoiceId={qboInvoiceId} sendingToQBO={sendingToQBO} sendToQBO={sendToQBO}
+          setShowPricingModal={setShowPricingModal} downloadPDF={downloadPDF} downloadDOCX={downloadDOCX}
+          setShowPhotosModal={setShowPhotosModal}
+        />
 
-          <div className="mb-4">
-            <label className="text-white text-sm font-semibold block mb-1">AI Notes (Optional)</label>
-            <p className="text-[#8A9AB0] text-xs mb-2">Describe what you want the Scope of Work to include, how it should sound, or anything important.</p>
-            <textarea value={aiNotes} onChange={e => setAiNotes(e.target.value)}
-              placeholder="Example: This is for a commercial install. Keep it professional, emphasize safety, and make it easy for a non-technical client to understand."
-              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] min-h-[100px]" />
-          </div>
-
-          {editingSOW ? (
-            <div className="space-y-3">
-              <textarea
-                value={sowDraft}
-                onChange={e => setSowDraft(e.target.value)}
-                rows={14}
-                className="w-full bg-[#0F1C2E] text-white border border-[#C8622A]/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-y leading-relaxed"
-              />
-              <div className="flex gap-2 justify-end">
-                <button onClick={() => setEditingSOW(false)} className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={saveSOW} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save SOW</button>
-              </div>
-            </div>
-          ) : proposal?.scope_of_work ? (
-            <div className="relative group">
-              <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
-              <button
-                onClick={() => { setSowDraft(proposal.scope_of_work); setEditingSOW(true) }}
-                className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[#2a3d55] text-[#8A9AB0] hover:text-white px-2 py-1 rounded text-xs">
-                ✏️ Edit
-              </button>
-            </div>
-          ) : (
-            <p className="text-[#8A9AB0] text-sm">No Scope of Work yet. Click Generate SOW to create one.</p>
-          )}
-        </div>
-
-        {/* BOM */}
         <BomSection
           proposalId={id}
           proposal={proposal}
@@ -2792,151 +2618,14 @@ const analyzeDrawing = async () => {
           fmt={fmt}
         />
 
-        {/* Recurring Items Summary */}
-        {proposal?.status === 'Won' && lineItems.some(l => l.recurring) && (
-          <div className="bg-[#1a2d45] border border-[#C8622A]/30 rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-[#C8622A] text-lg">🔄</span>
-              <h3 className="text-white font-bold">Recurring Line Items</h3>
-            </div>
-            <div className="space-y-2">
-              {lineItems.filter(l => l.recurring).map(item => (
-                <div key={item.id} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-4 py-3">
-                  <div>
-                    <p className="text-white text-sm font-medium">{item.item_name}</p>
-                    <p className="text-[#8A9AB0] text-xs">${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} / renewal</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {item.renewal_date ? <span className="text-[#C8622A] text-xs font-semibold">Renews {new Date(item.renewal_date).toLocaleDateString()}</span> : <span className="text-yellow-400 text-xs">⚠ Set renewal date</span>}
-                    <input type="date" value={renewalDates[item.id] || item.renewal_date || ''} onChange={e => saveRenewalDate(item.id, e.target.value)}
-                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <RecurringSection proposal={proposal} lineItems={lineItems} renewalDates={renewalDates} saveRenewalDate={saveRenewalDate} />
 
-        {/* Service Agreement Section */}
-        {orgSLASettings?.feature_sla && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-3">
-                <span className="text-lg">📋</span>
-                <h3 className="text-white font-bold text-lg">Service Agreements</h3>
-                {slaContracts.length > 0 && <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-2 py-0.5 rounded-full">{slaContracts.length} attached</span>}
-              </div>
-              <button onClick={() => openSLAModal(null)} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Service Agreement</button>
-            </div>
-            {slaContracts.length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No service agreements attached. Click "Add Service Agreement" to add one.</p>
-            ) : (
-              <div className="space-y-4">
-                {slaContracts.map((slaC, idx) => (
-                  <div key={idx} className="bg-[#0F1C2E] rounded-xl p-4 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-white font-semibold">{slaC.name || 'Service Level Agreement'}</p>
-                        {slaC.tier_name && <span className="inline-block bg-[#C8622A]/20 text-[#C8622A] text-xs font-semibold px-2 py-0.5 rounded-full mt-1">{slaC.tier_name}</span>}
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => openSLAModal(idx)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Edit</button>
-                        <button onClick={() => removeSLAContract(idx)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Remove</button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      {slaC.response_time_hours && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Response Time</p><p className="text-white text-sm font-semibold">{slaC.response_time_hours} hours</p></div>}
-                      <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Billing</p><p className="text-white text-sm font-semibold">{slaC.billing_frequency}</p></div>
-                      <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Standard Rate</p><p className="text-white text-sm font-semibold">${slaC.labor_rate}/hr</p></div>
-                      {slaC.emergency_rate && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Emergency Rate</p><p className="text-white text-sm font-semibold">${slaC.emergency_rate}/hr</p></div>}
-                      {slaC.maintenance_calls_per_year > 0 && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Maintenance/Year</p><p className="text-white text-sm font-semibold">{slaC.maintenance_calls_per_year}</p></div>}
-                      {slaC.recurring_fee > 0 && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Recurring Fee</p><p className="text-white text-sm font-semibold">${slaC.recurring_fee}/{slaC.billing_frequency}</p></div>}
-                      {slaC.initial_fee > 0 && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Initial Fee</p><p className="text-white text-sm font-semibold">${slaC.initial_fee} <span className="text-[#8A9AB0] font-normal text-xs">w/ job</span></p></div>}
-                      {slaC.start_date && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Term</p><p className="text-white text-sm font-semibold">{new Date(slaC.start_date).toLocaleDateString()} – {slaC.end_date ? new Date(slaC.end_date).toLocaleDateString() : 'TBD'}</p></div>}
-                      {slaC.auto_renew && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Auto-Renew</p><p className="text-green-400 text-sm font-semibold">Yes</p></div>}
-                    </div>
-                    {slaC.body && (
-                      <div className="border-t border-[#2a3d55] pt-3">
-                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
-                        <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{slaC.body
-                          .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
-                          .replace(/\{\{clientName\}\}/g, proposal?.company || '')
-                          .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-                          .replace(/\{\{tierName\}\}/g, slaC.tier_name || slaC.name || '')
-                          .replace(/\{\{responseTime\}\}/g, slaC.response_time_hours ? `${slaC.response_time_hours} hours` : 'as scheduled')
-                          .replace(/\{\{billingFrequency\}\}/g, slaC.billing_frequency || 'Quarterly')
-                          .replace(/\{\{laborRate\}\}/g, `${slaC.labor_rate || 100}`)
-                          .replace(/\{\{emergencyRate\}\}/g, `${slaC.emergency_rate || 150}`)
-                          .replace(/\{\{maintenanceCalls\}\}/g, `${slaC.maintenance_calls_per_year || 0}`)
-                          .replace(/\{\{initialFee\}\}/g, `${slaC.initial_fee || 0}`)
-                          .replace(/\{\{recurringFee\}\}/g, `${slaC.recurring_fee || 0}`)
-                        }</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        <ServiceAgreementSection orgSLASettings={orgSLASettings} slaContracts={slaContracts} profile={profile} proposal={proposal} openSLAModal={openSLAModal} removeSLAContract={removeSLAContract} />
 
-        {/* Monitoring Contract Section */}
-        {orgSLASettings?.feature_monitoring && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center gap-3">
-                <span className="text-lg">📡</span>
-                <h3 className="text-white font-bold text-lg">Monitoring Contracts</h3>
-                {monitoringContracts.length > 0 && <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-2 py-0.5 rounded-full">{monitoringContracts.length} attached</span>}
-              </div>
-              <button onClick={() => openMonitoringModal(null)} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Monitoring Contract</button>
-            </div>
-            {monitoringContracts.length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No monitoring contracts attached. Click "Add Monitoring Contract" to add one.</p>
-            ) : (
-              <div className="space-y-4">
-                {monitoringContracts.map((monC, idx) => (
-                  <div key={idx} className="bg-[#0F1C2E] rounded-xl p-4 space-y-3">
-                    <div className="flex justify-between items-start">
-                      <p className="text-white font-semibold">{monC.name || 'Monitoring Contract'}</p>
-                      <div className="flex gap-2">
-                        <button onClick={() => openMonitoringModal(idx)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Edit</button>
-                        <button onClick={() => removeMonitoringContract(idx)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Remove</button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                      <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Monthly Fee</p><p className="text-white text-sm font-semibold">${monC.monthly_fee}/mo</p></div>
-                      <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Billing</p><p className="text-white text-sm font-semibold">{monC.billing_frequency}</p></div>
-                      <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Escalation Contacts</p><p className="text-white text-sm font-semibold">{monC.escalation_contacts}</p></div>
-                      {monC.monitored_systems && <div className="bg-[#1a2d45] rounded-lg p-2 col-span-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Monitored Systems</p><p className="text-white text-sm">{monC.monitored_systems}</p></div>}
-                      {monC.start_date && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Term</p><p className="text-white text-sm font-semibold">{new Date(monC.start_date).toLocaleDateString()} – {monC.end_date ? new Date(monC.end_date).toLocaleDateString() : 'TBD'}</p></div>}
-                      {monC.auto_renew && <div className="bg-[#1a2d45] rounded-lg p-2"><p className="text-[#8A9AB0] text-xs mb-0.5">Auto-Renew</p><p className="text-green-400 text-sm font-semibold">Yes</p></div>}
-                    </div>
-                    {monC.body && (
-                      <div className="border-t border-[#2a3d55] pt-3">
-                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Contract Language</p>
-                        <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap">{monC.body
-                          .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
-                          .replace(/\{\{clientName\}\}/g, proposal?.company || '')
-                          .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
-                          .replace(/\{\{monthlyFee\}\}/g, `${monC.monthly_fee || 49}`)
-                          .replace(/\{\{monitoredSystems\}\}/g, monC.monitored_systems || '')
-                          .replace(/\{\{billingFrequency\}\}/g, monC.billing_frequency || 'Monthly')
-                          .replace(/\{\{escalationContacts\}\}/g, `${monC.escalation_contacts || 2}`)
-                        }</p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        
-        <DrawingToolSummary
-  proposalId={id}
-  featureEnabled={features.drawingTool}
-/>
+        <MonitoringSection orgSLASettings={orgSLASettings} monitoringContracts={monitoringContracts} profile={profile} proposal={proposal} openMonitoringModal={openMonitoringModal} removeMonitoringContract={removeMonitoringContract} />
+
+        <DrawingToolSummary proposalId={id} featureEnabled={features.drawingTool} />
+
         <ActivityFeed proposalId={id} clientId={proposal?.client_id} orgId={proposal?.org_id} refreshKey={activityRefreshKey} />
 
         <POList proposalId={id} />
