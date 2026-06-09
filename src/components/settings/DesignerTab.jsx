@@ -4,15 +4,17 @@ import { useProfile } from '../../context/ProfileContext'
 
 const INDUSTRIES = ['Security', 'AV', 'IT / Networking', 'Low Voltage', 'Fire Alarm', 'HVAC', 'Electrical', 'Telecom', 'Other']
 
-const CATEGORIES = [
-  'Access Reader','Alarm Keypad','Alarm Panel','AV Receiver','Bullet Camera','Ceiling Speaker',
-  'Clock','Control Processor','Controller','Diffuser','Digital Signage','Display','Document Camera',
-  'Dome Camera','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break',
-  'HDMI Extender','Interior Siren','Lighting','Media Player','Microphone','Motion Sensor','Network',
-  'NVR','Outlet','Panel','Panic Button','PIR Detector','PTZ Camera','Projection Screen','Projector',
-  'Shock Sensor','Speaker','Streaming Encoder','Subwoofer','Thermostat','Touch Panel',
-  'Video Conference','Wall Plate','Wireless Mic',
-]
+const CATEGORY_MAP = {
+  'Security':        ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','Bullet Camera','Controller','Door Contact','Door Operator','Dome Camera','Dual Tech Detector','Exterior Siren','Glass Break','Interior Siren','Motion Sensor','Network','NVR','Panel','Panic Button','PIR Detector','PTZ Camera','Shock Sensor'],
+  'AV':              ['Accessory','AV Receiver','Ceiling Speaker','Clock','Control Processor','Digital Signage','Display','Document Camera','HDMI Extender','Media Player','Microphone','Network','Projection Screen','Projector','Speaker','Streaming Encoder','Subwoofer','Touch Panel','Video Conference','Wall Plate','Wireless Mic'],
+  'IT / Networking': ['Accessory','Controller','Display','Network','Outlet','Panel','Wall Plate'],
+  'Low Voltage':     ['Access Reader','Accessory','Controller','Display','Door Contact','Door Operator','Network','Outlet','Panel','Speaker','Wall Plate'],
+  'Fire Alarm':      ['Accessory','Alarm Keypad','Alarm Panel','Door Contact','Exterior Siren','Interior Siren','Motion Sensor','Panel','PIR Detector','Shock Sensor'],
+  'HVAC':            ['Accessory','Controller','Diffuser','Network','Panel','Thermostat'],
+  'Electrical':      ['Accessory','Controller','Lighting','Outlet','Panel'],
+  'Telecom':         ['Accessory','Controller','Network','Outlet','Panel','Wall Plate'],
+  'Other':           ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','AV Receiver','Bullet Camera','Ceiling Speaker','Clock','Control Processor','Controller','Diffuser','Digital Signage','Display','Document Camera','Dome Camera','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','HDMI Extender','Interior Siren','Lighting','Media Player','Microphone','Motion Sensor','Network','NVR','Outlet','Panel','Panic Button','PIR Detector','PTZ Camera','Projection Screen','Projector','Shock Sensor','Speaker','Streaming Encoder','Subwoofer','Thermostat','Touch Panel','Video Conference','Wall Plate','Wireless Mic'],
+}
 
 const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
 
@@ -125,16 +127,6 @@ export default function DesignerTab() {
         )}
       </div>
 
-      {/* Assembly Templates */}
-      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-6">
-        <h3 className="text-white font-bold text-base mb-1">Assembly Templates</h3>
-        <p className="text-[#8A9AB0] text-xs mb-4">Save device configurations as templates to apply quickly during design.</p>
-        <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] p-8 text-center">
-          <p className="text-[#8A9AB0] text-sm">No templates yet</p>
-          <p className="text-[#8A9AB0] text-xs mt-1">Templates are created from the Designer when you save a device configuration</p>
-        </div>
-      </div>
-
       {/* Storage Preferences */}
       <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-6">
         <h3 className="text-white font-bold text-base mb-1">Storage & Cleanup</h3>
@@ -186,14 +178,17 @@ export default function DesignerTab() {
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Industry</label>
-                  <select value={form.industry} onChange={e => setForm(p => ({ ...p, industry: e.target.value }))} className={inputClass}>
+                  <select value={form.industry} onChange={e => {
+                    const ind = e.target.value
+                    setForm(p => ({ ...p, industry: ind, category: CATEGORY_MAP[ind][0] }))
+                  }} className={inputClass}>
                     {INDUSTRIES.map(i => <option key={i}>{i}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Category (Icon)</label>
                   <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className={inputClass}>
-                    {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                    {CATEGORY_MAP[form.industry].map(c => <option key={c}>{c}</option>)}
                   </select>
                 </div>
               </div>
