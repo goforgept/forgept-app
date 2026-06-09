@@ -21,6 +21,13 @@ Deno.serve(async (req) => {
       })
     }
 
+    // ~15MB file limit (base64 is ~33% larger than raw)
+    if (fileBase64.length > 20 * 1024 * 1024) {
+      return new Response(JSON.stringify({ error: 'File too large. Please use the page range selector to upload only the relevant section (typically 10–30 pages).' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
 
     const systemPrompt = `You are an expert estimator and systems engineer for trades contractors and systems integrators. You are reading a project specification document.

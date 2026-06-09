@@ -98,6 +98,8 @@ export default function ProposalDetail({ isAdmin }) {
   const [analyzingDrawing, setAnalyzingDrawing] = useState(false)
   const [showSpecModal, setShowSpecModal] = useState(false)
   const [specFile, setSpecFile] = useState(null)
+  const [specPageFrom, setSpecPageFrom] = useState('')
+  const [specPageTo, setSpecPageTo] = useState('')
   const [analyzingSpec, setAnalyzingSpec] = useState(false)
   const [specSummary, setSpecSummary] = useState(null)
   const [showDealSummaryModal, setShowDealSummaryModal] = useState(false)
@@ -1930,19 +1932,43 @@ const analyzeSpec = async () => {
     setAnalyzingSpec(true)
     setSpecSummary(null)
     try {
-      const reader = new FileReader()
-      const fileBase64 = await new Promise((resolve, reject) => {
-        reader.onload = () => resolve(reader.result.split(',')[1])
-        reader.onerror = reject
-        reader.readAsDataURL(specFile)
-      })
+      let fileBase64
+      let mediaType = specFile.type
+
+      const isPDF = specFile.type === 'application/pdf'
+      const fromPage = parseInt(specPageFrom) || null
+      const toPage = parseInt(specPageTo) || null
+
+      if (isPDF && (fromPage || toPage)) {
+        const { PDFDocument } = await import('pdf-lib')
+        const arrayBuffer = await specFile.arrayBuffer()
+        const srcDoc = await PDFDocument.load(arrayBuffer)
+        const total = srcDoc.getPageCount()
+        const start = Math.max(0, (fromPage || 1) - 1)
+        const end = Math.min(total - 1, (toPage || total) - 1)
+        if (start > end) throw new Error(`Invalid page range: ${fromPage}–${toPage} (document has ${total} pages)`)
+        const newDoc = await PDFDocument.create()
+        const indices = Array.from({ length: end - start + 1 }, (_, i) => start + i)
+        const copied = await newDoc.copyPagesFrom(srcDoc, indices)
+        copied.forEach(p => newDoc.addPage(p))
+        const bytes = await newDoc.save()
+        fileBase64 = btoa(String.fromCharCode(...new Uint8Array(bytes)))
+      } else {
+        const reader = new FileReader()
+        fileBase64 = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result.split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(specFile)
+        })
+      }
+
       const { data: { session: currentSession } } = await supabase.auth.refreshSession()
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/ai-read-spec', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession?.access_token}` },
         body: JSON.stringify({
           fileBase64,
-          mediaType: specFile.type,
+          mediaType,
           industry: proposal?.industry || ''
         })
       })
@@ -3611,7 +3637,7 @@ const analyzeDrawing = async () => {
       {showAIBOMModal && <AIBOMModal aiBOMPrompt={aiBOMPrompt} setAIBOMPrompt={setAIBOMPrompt} generatingBOM={generatingBOM} aiBOMPreview={aiBOMPreview} setAIBOMPreview={setAIBOMPreview} onGenerate={generateAIBOM} onApply={applyAIBOM} onClose={() => { setShowAIBOMModal(false); setAIBOMPreview([]); setAIBOMPrompt('') }} />}
       {showDealSummaryModal && <DealSummaryModal dealSummary={dealSummary} setDealSummary={setDealSummary} generatingDealSummary={generatingDealSummary} onGenerate={generateDealSummary} onClose={() => { setShowDealSummaryModal(false); setDealSummary(null) }} />}
 
-      {showSpecModal && <SpecReaderModal specFile={specFile} setSpecFile={setSpecFile} analyzingSpec={analyzingSpec} specSummary={specSummary} onAnalyze={analyzeSpec} onClose={() => { setShowSpecModal(false); setSpecFile(null) }} />}
+      {showSpecModal && <SpecReaderModal specFile={specFile} setSpecFile={setSpecFile} specPageFrom={specPageFrom} setSpecPageFrom={setSpecPageFrom} specPageTo={specPageTo} setSpecPageTo={setSpecPageTo} analyzingSpec={analyzingSpec} specSummary={specSummary} onAnalyze={analyzeSpec} onClose={() => { setShowSpecModal(false); setSpecFile(null); setSpecPageFrom(''); setSpecPageTo('') }} />}
 
       {showDrawingModal && <DrawingReaderModal drawingFile={drawingFile} setDrawingFile={setDrawingFile} drawingInstructions={drawingInstructions} setDrawingInstructions={setDrawingInstructions} drawingPreview={drawingPreview} setDrawingPreview={setDrawingPreview} analyzingDrawing={analyzingDrawing} onAnalyze={analyzeDrawing} onApply={applyDrawingBOM} onClose={() => { setShowDrawingModal(false); setDrawingFile(null); setDrawingInstructions(''); setDrawingPreview([]) }} />}
 
