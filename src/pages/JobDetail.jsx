@@ -3,6 +3,17 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import ChecklistTab from '../components/job/ChecklistTab'
+import ChangeOrdersTab from '../components/job/ChangeOrdersTab'
+import POTab from '../components/job/POTab'
+import CostReportTab from '../components/job/CostReportTab'
+import TechLogTab from '../components/job/TechLogTab'
+import PhotosTab from '../components/job/PhotosTab'
+import ProposalTab from '../components/job/ProposalTab'
+import POModal from '../components/job/POModal'
+import ScheduleModal from '../components/job/ScheduleModal'
+import NotifyModal from '../components/job/NotifyModal'
+import ChangeOrderModal from '../components/job/ChangeOrderModal'
 
 const AUTO_CHECK_TYPES = [
   { type: 'proposal_signed', label: 'Proposal signed', icon: '✍️' },
@@ -33,47 +44,6 @@ const STATUS_COLORS = {
 
 const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-function JobPOList({ proposalId }) {
-  const [pos, setPos] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    if (!proposalId) { setLoading(false); return }
-    supabase.from('purchase_orders').select('*').eq('proposal_id', proposalId).order('created_at', { ascending: false })
-      .then(({ data }) => { setPos(data || []); setLoading(false) })
-  }, [proposalId])
-
-  if (loading) return <p className="text-[#8A9AB0] text-sm">Loading...</p>
-  if (!proposalId) return <p className="text-[#8A9AB0] text-sm">No proposal linked to this job.</p>
-  if (pos.length === 0) return (
-    <div className="text-center py-8 border-2 border-dashed border-[#2a3d55] rounded-xl">
-      <p className="text-[#8A9AB0]">No purchase orders yet.</p>
-      <p className="text-[#8A9AB0] text-xs mt-1">Generate POs from the linked proposal's BOM tab.</p>
-    </div>
-  )
-
-  return (
-    <div className="space-y-3">
-      {pos.map(po => (
-        <div key={po.id} className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
-          <div className="flex justify-between items-start">
-            <div>
-              <p className="text-white font-semibold font-mono">{po.po_number}</p>
-              <p className="text-[#8A9AB0] text-sm mt-0.5">{po.vendor_name}</p>
-              <p className="text-[#8A9AB0] text-xs mt-0.5">{po.created_at ? new Date(po.created_at).toLocaleDateString() : ''}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[#C8622A] font-bold text-lg">${fmt(po.total_amount)}</p>
-              <span className={`text-xs px-2 py-1 rounded font-semibold ${po.status === 'Received' ? 'bg-green-500/20 text-green-400' : po.status === 'Sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
-                {po.status}
-              </span>
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
 
 export default function JobDetail({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false }) {
   const { id } = useParams()
@@ -1257,935 +1227,133 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
         {/* CHECKLIST TAB */}
         {activeTab === 'checklist' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-5">Job Checklist</h3>
-            <div className="space-y-2 mb-6">
-              {checklist.map(item => {
-                const autoType = AUTO_CHECK_TYPES.find(a => a.type === item.auto_check_type)
-                const isPartiallyOrdered = item.auto_check_type === 'po_generated' && !item.completed &&
-                  lineItems.some(l => l.po_status === 'PO Sent' || l.po_status === 'Received') &&
-                  !lineItems.every(l => l.po_status === 'PO Sent' || l.po_status === 'Received')
-                return (
-                  <div key={item.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${item.completed ? 'bg-green-500/5 border-green-500/20' : isPartiallyOrdered ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-[#0F1C2E] border-[#2a3d55]'}`}>
-                    <button onClick={() => toggleCheckItem(item)} disabled={item.is_auto}
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${item.completed ? 'bg-green-500 border-green-500' : isPartiallyOrdered ? 'border-yellow-500' : 'border-[#2a3d55] hover:border-[#C8622A]'} ${item.is_auto ? 'cursor-default' : 'cursor-pointer'}`}>
-                      {item.completed && <span className="text-white text-xs">✓</span>}
-                      {isPartiallyOrdered && <span className="text-yellow-400 text-xs">–</span>}
-                    </button>
-                    <div className="flex-1">
-                      <p className={`text-sm font-medium ${item.completed ? 'text-green-400 line-through' : isPartiallyOrdered ? 'text-yellow-400' : 'text-white'}`}>
-                        {autoType ? `${autoType.icon} ` : ''}{item.label}
-                      </p>
-                      {item.completed && item.completed_at && (
-                        <p className="text-[#8A9AB0] text-xs mt-0.5">Completed {new Date(item.completed_at).toLocaleDateString()}</p>
-                      )}
-                      {isPartiallyOrdered && (
-                        <p className="text-yellow-500/70 text-xs mt-0.5">
-                          {lineItems.filter(l => l.po_status === 'PO Sent' || l.po_status === 'Received').length} of {lineItems.length} lines ordered
-                        </p>
-                      )}
-                    </div>
-                    {item.is_auto && (
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${isPartiallyOrdered ? 'text-yellow-400 bg-yellow-500/10' : 'text-[#8A9AB0] bg-[#2a3d55]'}`}>
-                        {isPartiallyOrdered ? 'Partially Ordered' : 'Auto'}
-                      </span>
-                    )}
-                    {!item.is_auto && (
-                      <button onClick={() => deleteCheckItem(item.id)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">✕</button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            <div className="flex gap-2 border-t border-[#2a3d55] pt-4">
-              <input type="text" value={newCheckItem} onChange={e => setNewCheckItem(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addCheckItem()}
-                placeholder="Add a custom checklist item..."
-                className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
-              <button onClick={addCheckItem} disabled={savingCheck || !newCheckItem.trim()}
-                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">Add</button>
-            </div>
-          </div>
+          <ChecklistTab
+            checklist={checklist}
+            lineItems={lineItems}
+            newCheckItem={newCheckItem}
+            setNewCheckItem={setNewCheckItem}
+            savingCheck={savingCheck}
+            onToggleItem={toggleCheckItem}
+            onAddItem={addCheckItem}
+            onDeleteItem={deleteCheckItem}
+          />
         )}
 
         {/* CHANGE ORDERS TAB */}
         {activeTab === 'changeorders' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="text-white font-bold text-lg">Change Orders</h3>
-              <button onClick={() => setShowCOModal(true)}
-                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-                + New Change Order
-              </button>
-            </div>
-            {changeOrders.length === 0 ? (
-              <div className="text-center py-8 border-2 border-dashed border-[#2a3d55] rounded-xl">
-                <p className="text-[#8A9AB0]">No change orders yet.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {changeOrders.map(co => (
-                  <div key={co.id} className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-white font-semibold">{co.name}</p>
-                        {co.description && <p className="text-[#8A9AB0] text-sm mt-0.5">{co.description}</p>}
-                        <p className="text-[#C8622A] font-bold mt-1">${fmt(co.amount)}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs px-2 py-1 rounded font-semibold ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : co.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                          {co.status}
-                        </span>
-                        {co.status === 'Pending' && (
-                          <div className="flex gap-1">
-                            <button onClick={() => updateCOStatus(co.id, 'Approved')}
-                              className="bg-green-600 text-white px-3 py-1 rounded text-xs font-semibold hover:bg-green-700 transition-colors">Approve</button>
-                            <button onClick={() => updateCOStatus(co.id, 'Rejected')}
-                              className="bg-red-600/30 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-600/50 transition-colors">Reject</button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {totalCOAmount > 0 && (
-                  <div className="flex justify-between items-center pt-3 border-t border-[#2a3d55]">
-                    <span className="text-[#8A9AB0] font-semibold">Approved Change Orders Total</span>
-                    <span className="text-[#C8622A] font-bold text-lg">+${fmt(totalCOAmount)}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <ChangeOrdersTab
+            changeOrders={changeOrders}
+            totalCOAmount={totalCOAmount}
+            onOpenCOModal={() => setShowCOModal(true)}
+            onUpdateCOStatus={updateCOStatus}
+          />
         )}
 
         {/* PURCHASE ORDERS TAB */}
         {activeTab === 'pos' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="text-white font-bold text-lg">Purchase Orders</h3>
-              <button onClick={() => selectedForPO.size > 0 && setShowPOModal(true)}
-                disabled={selectedForPO.size === 0}
-                title={selectedForPO.size === 0 ? 'Check items below to select for PO' : `Generate PO for ${selectedForPO.size} items`}
-                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                {selectedForPO.size > 0 ? `Generate PO (${selectedForPO.size})` : 'Generate PO'}
-              </button>
-            </div>
-            {lineItems.length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No materials on this job's BOM.</p>
-            ) : (
-              <div className="overflow-x-auto mb-4">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[#2a3d55]">
-                      <th className="py-2 pr-2 w-8">
-                        <input type="checkbox" className="accent-[#C8622A]"
-                          checked={lineItems.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing').every(l => selectedForPO.has(l.id)) && lineItems.some(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')}
-                          onChange={() => {
-                            const orderable = lineItems.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')
-                            const allSelected = orderable.every(l => selectedForPO.has(l.id))
-                            setSelectedForPO(prev => {
-                              const next = new Set(prev)
-                              orderable.forEach(l => allSelected ? next.delete(l.id) : next.add(l.id))
-                              return next
-                            })
-                          }} />
-                      </th>
-                      {['Item', 'Vendor', 'Qty', 'Your Cost', 'PO #', 'Status'].map(h => (
-                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lineItems.map(item => {
-                      const isOrdered = item.po_status === 'PO Sent' || item.po_status === 'Received'
-                      return (
-                        <tr key={item.id} className={`border-b border-[#2a3d55]/50 ${selectedForPO.has(item.id) ? 'bg-[#C8622A]/5' : ''}`}>
-                          <td className="pr-2 py-3">
-                            {!isOrdered && (
-                              <input type="checkbox" className="accent-[#C8622A] cursor-pointer"
-                                checked={selectedForPO.has(item.id)}
-                                onChange={() => setSelectedForPO(prev => {
-                                  const next = new Set(prev)
-                                  next.has(item.id) ? next.delete(item.id) : next.add(item.id)
-                                  return next
-                                })} />
-                            )}
-                          </td>
-                          <td className="py-3 pr-4"><p className="text-white text-sm">{item.item_name}</p>{item.part_number_sku && <p className="text-[#8A9AB0] text-xs">{item.part_number_sku}</p>}</td>
-                          <td className="text-[#8A9AB0] py-3 pr-4 text-sm">{item.vendor || '—'}</td>
-                          <td className="text-white py-3 pr-4 text-sm">{item.quantity} {item.unit}</td>
-                          <td className="text-white py-3 pr-4 text-sm">${fmt((item.your_cost_unit || 0) * (item.quantity || 0))}</td>
-                          <td className="py-3 pr-4">{item.po_number ? <span className="text-[#8A9AB0] text-xs font-mono">{item.po_number}</span> : <span className="text-[#2a3d55]">—</span>}</td>
-                          <td className="py-3">
-                            <span className={`text-xs px-2 py-1 rounded font-semibold ${item.po_status === 'Received' ? 'bg-green-500/20 text-green-400' : item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
-                              {item.po_status || 'Not Ordered'}
-                            </span>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <JobPOList proposalId={job?.proposal_id} />
-          </div>
+          <POTab
+            lineItems={lineItems}
+            selectedForPO={selectedForPO}
+            setSelectedForPO={setSelectedForPO}
+            job={job}
+            onOpenPOModal={() => setShowPOModal(true)}
+          />
         )}
 
         {/* COST REPORT TAB */}
         {activeTab === 'costReport' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="text-white font-bold text-lg">Job Cost Report</h3>
-              <button onClick={exportCostReport}
-                className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                ↓ Export PDF
-              </button>
-            </div>
-            {(() => {
-              const quotedMaterials = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
-              const quotedLabor = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-              const quotedTotal = quotedMaterials + quotedLabor
-              const costMaterials = lineItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
-              const costLabor = (proposal?.labor_items || []).reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
-              const approvedCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, c) => sum + (c.amount || 0), 0)
-              // CO your_cost side
-              const costCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, co) => {
-                const matCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
-                const labCost = (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
-                return sum + matCost + labCost
-              }, 0)
-              // Freeform PO costs (job-linked POs with line items)
-              const freeformPOCost = freeformPOItems.reduce((sum, l) => sum + (l.total || 0), 0)
-              const hoursLogged = techLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0)
-              const totalRevenue = quotedTotal + approvedCOs
-              const totalCost = costMaterials + costLabor + costCOs + freeformPOCost
-              const grossMargin = totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue * 100).toFixed(1) : '0.0'
-              const budgetBurnPct = totalCost > 0 && (costMaterials + costLabor) > 0
-                ? Math.min((totalCost / (costMaterials + costLabor)) * 100, 999)
-                : 0
-              const overBudget = totalRevenue > 0 && totalCost > totalRevenue
-              const nearBudget = !overBudget && totalRevenue > 0 && totalCost / totalRevenue > 0.8
-
-              const rows = [
-                { label: 'Quoted Materials', quoted: quotedMaterials, cost: costMaterials, color: 'text-white' },
-                { label: 'Quoted Labor', quoted: quotedLabor, cost: costLabor, color: 'text-white' },
-                ...(approvedCOs > 0 ? [{ label: 'Approved Change Orders', quoted: approvedCOs, cost: costCOs, color: 'text-[#C8622A]' }] : []),
-                ...(freeformPOCost > 0 ? [{ label: 'Freeform POs (Job-linked)', quoted: 0, cost: freeformPOCost, color: 'text-blue-400' }] : []),
-              ]
-
-              const usedByItemId = {}
-              techLogs.forEach(log => {
-                if (!log.materials_used) return
-                try {
-                  const parsed = JSON.parse(log.materials_used)
-                  if (Array.isArray(parsed)) parsed.forEach(m => {
-                    usedByItemId[m.id] = (usedByItemId[m.id] || 0) + (parseFloat(m.qty) || 0)
-                  })
-                } catch {}
-              })
-              const totalPlannedUnits = lineItems.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0)
-              const totalUsedUnits = lineItems.reduce((sum, i) => sum + (usedByItemId[i.id] || 0), 0)
-              const materialsPct = totalPlannedUnits > 0 ? Math.min((totalUsedUnits / totalPlannedUnits) * 100, 100) : 0
-              const materialsOver = totalUsedUnits > totalPlannedUnits
-              const estimatedHours = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.quantity) || 0), 0)
-              const laborPct = estimatedHours > 0 ? Math.min((hoursLogged / estimatedHours) * 100, 100) : 0
-              const laborOver = hoursLogged > estimatedHours
-              const checklistTotal = checklist.length
-              const checklistDone = checklist.filter(c => c.completed).length
-              const checklistPct = checklistTotal > 0 ? (checklistDone / checklistTotal) * 100 : 0
-              const actualMaterialCost = lineItems.reduce((sum, i) => sum + ((usedByItemId[i.id] || 0) * (i.your_cost_unit || 0)), 0)
-              const laborRate = estimatedHours > 0 ? costLabor / estimatedHours : 0
-              const actualLaborCost = hoursLogged * laborRate
-              const actualCostTotal = actualMaterialCost + actualLaborCost
-              const costBurnPct = totalCost > 0 ? Math.min((actualCostTotal / totalCost) * 100, 100) : 0
-
-              return (
-                <div className="space-y-5">
-
-                  {/* Over-budget banner */}
-                  {(overBudget || nearBudget) && (
-                    <div className={`rounded-xl px-5 py-4 flex items-center gap-3 ${overBudget ? 'bg-red-500/10 border border-red-500/30' : 'bg-yellow-500/10 border border-yellow-500/30'}`}>
-                      <span className="text-2xl">{overBudget ? '🔴' : '🟡'}</span>
-                      <div>
-                        <p className={`font-bold text-sm ${overBudget ? 'text-red-400' : 'text-yellow-400'}`}>
-                          {overBudget
-                            ? `Over budget by $${fmt(totalCost - totalRevenue)}`
-                            : `Approaching budget limit — ${((totalCost / totalRevenue) * 100).toFixed(0)}% of contract value spent`}
-                        </p>
-                        <p className="text-[#8A9AB0] text-xs mt-0.5">
-                          Contract value: ${fmt(totalRevenue)} · Total cost: ${fmt(totalCost)} · Remaining: ${overBudget ? '-' : ''}${fmt(Math.abs(totalRevenue - totalCost))}
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  {!overBudget && !nearBudget && totalRevenue > 0 && (
-                    <div className="rounded-xl px-5 py-3 flex items-center gap-3 bg-green-500/10 border border-green-500/20">
-                      <span className="text-xl">🟢</span>
-                      <p className="text-green-400 text-sm font-medium">On budget — ${fmt(totalRevenue - totalCost)} remaining ({((1 - totalCost / totalRevenue) * 100).toFixed(0)}% of contract value)</p>
-                    </div>
-                  )}
-
-                  {/* True Progress */}
-                  <div className="bg-[#0F1C2E] rounded-xl p-5 space-y-4">
-                    <p className="text-white font-semibold text-sm">Job Progress</p>
-                    {[
-                      { label: 'Materials Used', pct: materialsPct, detail: totalPlannedUnits > 0 ? `${totalUsedUnits} of ${totalPlannedUnits} units${materialsOver ? ` (+${(totalUsedUnits - totalPlannedUnits).toFixed(1)} over)` : ''}` : 'No materials logged', over: materialsOver, color: materialsOver ? 'bg-red-500' : 'bg-[#C8622A]' },
-                      { label: 'Labor Hours', pct: laborPct, detail: estimatedHours > 0 ? `${hoursLogged.toFixed(1)} of ${estimatedHours.toFixed(1)} hrs est.${laborOver ? ` (+${(hoursLogged - estimatedHours).toFixed(1)} over)` : ''}` : `${hoursLogged.toFixed(1)} hrs logged (no estimate)`, over: laborOver, color: laborOver ? 'bg-red-500' : 'bg-blue-500' },
-                      { label: 'Checklist', pct: checklistPct, detail: `${checklistDone} of ${checklistTotal} items complete`, over: false, color: 'bg-green-500' },
-                      { label: 'Cost Burned', pct: costBurnPct, detail: totalCost > 0 ? `$${fmt(actualCostTotal)} of $${fmt(totalCost)} budgeted` : 'No cost data', over: actualCostTotal > totalCost, color: actualCostTotal > totalCost ? 'bg-red-500' : 'bg-purple-500' },
-                    ].map(({ label, pct, detail, over, color }) => (
-                      <div key={label}>
-                        <div className="flex justify-between items-baseline mb-1">
-                          <span className="text-[#8A9AB0] text-xs">{label}</span>
-                          <span className={`text-xs font-semibold ${over ? 'text-red-400' : 'text-white'}`}>{pct.toFixed(0)}%{over ? ' ⚠' : ''}</span>
-                        </div>
-                        <div className="w-full bg-[#1a2d45] rounded-full h-2 mb-1">
-                          <div className={`h-2 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
-                        </div>
-                        <p className={`text-xs ${over ? 'text-red-400' : 'text-[#8A9AB0]'}`}>{detail}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Summary cards */}
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Total Revenue</p><p className="text-white font-bold text-xl">${fmt(totalRevenue)}</p></div>
-                    <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Total Cost</p><p className="text-white font-bold text-xl">${fmt(totalCost)}</p>{freeformPOCost > 0 && <p className="text-blue-400 text-xs mt-1">incl. ${fmt(freeformPOCost)} freeform POs</p>}</div>
-                    <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Gross Margin</p><p className={`font-bold text-xl ${parseFloat(grossMargin) >= 30 ? 'text-green-400' : parseFloat(grossMargin) >= 15 ? 'text-[#C8622A]' : 'text-red-400'}`}>{grossMargin}%</p></div>
-                    <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Hours Logged</p><p className="text-white font-bold text-xl">{hoursLogged.toFixed(1)}</p></div>
-                  </div>
-
-                  {/* Breakdown table */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[#2a3d55]">
-                          <th className="text-[#8A9AB0] text-left py-2 font-normal">Category</th>
-                          <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Revenue (Customer)</th>
-                          <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Your Cost</th>
-                          <th className="text-[#8A9AB0] text-right py-2 font-normal">Margin $</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map((row, i) => (
-                          <tr key={i} className="border-b border-[#2a3d55]/50">
-                            <td className={`py-3 ${row.color}`}>{row.label}</td>
-                            <td className="text-white py-3 pr-4 text-right">{row.quoted > 0 ? `$${fmt(row.quoted)}` : '—'}</td>
-                            <td className="text-white py-3 pr-4 text-right">${fmt(row.cost)}</td>
-                            <td className={`py-3 text-right font-semibold ${row.quoted - row.cost >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {row.quoted > 0 ? `$${fmt(row.quoted - row.cost)}` : '—'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t border-[#2a3d55]">
-                          <td className="text-white pt-3 font-bold">Total</td>
-                          <td className="text-white pt-3 pr-4 text-right font-bold">${fmt(totalRevenue)}</td>
-                          <td className="text-white pt-3 pr-4 text-right font-bold">${fmt(totalCost)}</td>
-                          <td className="text-green-400 pt-3 text-right font-bold">${fmt(totalRevenue - totalCost)}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
-
-                  {/* Materials breakdown */}
-                  {lineItems.length > 0 && (
-                    <div>
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Materials — Line Item Detail</p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-[#2a3d55]">
-                              {['Item', 'Vendor', 'Planned', 'Used', 'Remaining', 'Your Cost', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
-                                <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {lineItems.map(item => {
-                              const planned = parseFloat(item.quantity) || 0
-                              const used = usedByItemId[item.id] || 0
-                              const remaining = planned - used
-                              const cost = (item.your_cost_unit || 0) * planned
-                              const revenue = item.customer_price_total || 0
-                              const margin = revenue - cost
-                              const marginPct = revenue > 0 ? ((margin / revenue) * 100).toFixed(1) : '—'
-                              const isOver = used > 0 && remaining < 0
-                              const isLow = !isOver && used > 0 && planned > 0 && remaining / planned < 0.2
-                              return (
-                                <tr key={item.id} className="border-b border-[#2a3d55]/30">
-                                  <td className="text-white py-2 pr-3 font-medium">{item.item_name}</td>
-                                  <td className="text-[#8A9AB0] py-2 pr-3">{item.vendor || '—'}</td>
-                                  <td className="text-white py-2 pr-3">{planned} {item.unit}</td>
-                                  <td className="py-2 pr-3">{used > 0 ? <span className="text-[#C8622A] font-semibold">{used} {item.unit}</span> : <span className="text-[#2a3d55]">—</span>}</td>
-                                  <td className="py-2 pr-3">
-                                    {used === 0 ? <span className="text-[#8A9AB0]">—</span>
-                                      : isOver ? <span className="text-red-400 font-semibold">{Math.abs(remaining).toFixed(1)} over ⚠</span>
-                                      : isLow ? <span className="text-yellow-400 font-semibold">{remaining.toFixed(1)} left ↓</span>
-                                      : <span className="text-green-400">{remaining.toFixed(1)} left</span>}
-                                  </td>
-                                  <td className="text-white py-2 pr-3">${fmt(cost)}</td>
-                                  <td className="text-white py-2 pr-3">${fmt(revenue)}</td>
-                                  <td className={`py-2 pr-3 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(margin)}</td>
-                                  <td className={`py-2 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{marginPct}{marginPct !== '—' ? '%' : ''}</td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                          <tfoot>
-                            <tr className="border-t border-[#2a3d55]">
-                              <td colSpan="5" className="text-[#8A9AB0] pt-2 font-semibold">Totals</td>
-                              <td className="text-white pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0))}</td>
-                              <td className="text-white pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + (i.customer_price_total || 0), 0))}</td>
-                              <td className="text-green-400 pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + ((i.customer_price_total || 0) - ((i.your_cost_unit || 0) * (i.quantity || 0))), 0))}</td>
-                              <td></td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Labor detail */}
-                  {(proposal?.labor_items || []).length > 0 && (
-                    <div>
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Labor — Line Item Detail</p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-[#2a3d55]">
-                              {['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
-                                <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(proposal.labor_items || []).map((l, i) => {
-                              const cost = parseFloat(l.your_cost) || 0
-                              const revenue = parseFloat(l.customer_price) || 0
-                              const margin = revenue - cost
-                              const marginPct = revenue > 0 ? ((margin / revenue) * 100).toFixed(1) : '—'
-                              return (
-                                <tr key={i} className="border-b border-[#2a3d55]/30">
-                                  <td className="text-white py-2 pr-3 font-medium">{l.role || '—'}</td>
-                                  <td className="text-white py-2 pr-3">{l.quantity || '—'}</td>
-                                  <td className="text-[#8A9AB0] py-2 pr-3">{l.unit || 'hr'}</td>
-                                  <td className="text-white py-2 pr-3">${fmt(cost)}</td>
-                                  <td className="text-white py-2 pr-3">${fmt(revenue)}</td>
-                                  <td className={`py-2 pr-3 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(margin)}</td>
-                                  <td className={`py-2 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{marginPct}{marginPct !== '—' ? '%' : ''}</td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Freeform PO line items */}
-                  {freeformPOItems.length > 0 && (
-                    <div>
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Freeform PO Line Items</p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-[#2a3d55]">
-                              {['PO #', 'Vendor', 'Description', 'Item', 'Qty', 'Unit Cost', 'Total'].map(h => (
-                                <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {freeformPOItems.map((l, i) => (
-                              <tr key={i} className="border-b border-[#2a3d55]/30">
-                                <td className="text-white py-2 pr-3 font-mono">{l.purchase_orders?.po_number || '—'}</td>
-                                <td className="text-[#8A9AB0] py-2 pr-3">{l.purchase_orders?.vendor_name || '—'}</td>
-                                <td className="text-[#8A9AB0] py-2 pr-3">{l.purchase_orders?.description || '—'}</td>
-                                <td className="text-white py-2 pr-3 font-medium">{l.item_name}</td>
-                                <td className="text-white py-2 pr-3">{l.quantity} {l.unit || ''}</td>
-                                <td className="text-white py-2 pr-3">${fmt(l.unit_cost)}</td>
-                                <td className="text-blue-400 py-2 font-semibold">${fmt(l.total)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="border-t border-[#2a3d55]">
-                              <td colSpan="6" className="text-[#8A9AB0] pt-2 font-semibold">Freeform PO Total</td>
-                              <td className="text-blue-400 pt-2 font-bold">${fmt(freeformPOCost)}</td>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Change orders detail */}
-                  {changeOrders.length > 0 && (
-                    <div className="space-y-4">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Change Orders</p>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-[#2a3d55]">
-                              {['Name', 'Status', 'Amount', 'Your Cost', 'Margin $'].map(h => (
-                                <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {changeOrders.map(co => {
-                              const coCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0) + (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
-                              const coMargin = co.amount - coCost
-                              return (
-                                <tr key={co.id} className="border-b border-[#2a3d55]/30">
-                                  <td className="text-white py-2 pr-3">{co.name}</td>
-                                  <td className="py-2 pr-3">
-                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : co.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                                      {co.status}
-                                    </span>
-                                  </td>
-                                  <td className="text-[#C8622A] py-2 pr-3 font-semibold">${fmt(co.amount)}</td>
-                                  <td className="text-white py-2 pr-3">{coCost > 0 ? `$${fmt(coCost)}` : '—'}</td>
-                                  <td className={`py-2 font-semibold ${coMargin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{coCost > 0 ? `$${fmt(coMargin)}` : '—'}</td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })()}
-          </div>
+          <CostReportTab
+            job={job}
+            proposal={proposal}
+            lineItems={lineItems}
+            freeformPOItems={freeformPOItems}
+            changeOrders={changeOrders}
+            techLogs={techLogs}
+            checklist={checklist}
+            onExportPDF={exportCostReport}
+          />
         )}
 
         {/* TECH LOG TAB */}
         {activeTab === 'techlog' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex justify-between items-center mb-5">
-              <div>
-                <h3 className="text-white font-bold text-lg">Tech Daily Log</h3>
-                <p className="text-[#8A9AB0] text-xs mt-0.5">
-                  {techLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0).toFixed(1)} total hours · {techLogs.length} entries
-                </p>
-              </div>
-              <button onClick={() => window.location.href = '/tech-log'}
-                className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                Open Full Log →
-              </button>
-            </div>
-            {techLogs.length === 0 ? (
-              <div className="text-center py-8 border-2 border-dashed border-[#2a3d55] rounded-xl">
-                <p className="text-[#8A9AB0]">No log entries yet for this job.</p>
-                <button onClick={() => window.location.href = '/tech-log'} className="mt-3 text-[#C8622A] hover:text-white text-sm transition-colors">+ Log Today's Work →</button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {techLogs.map(log => (
-                  <div key={log.id} className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-3">
-                        <span className="text-[#8A9AB0] text-xs font-mono bg-[#1a2d45] px-2 py-0.5 rounded">
-                          {new Date(log.log_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                        </span>
-                        <span className="text-white text-sm font-medium">{log.profiles?.full_name}</span>
-                      </div>
-                      <span className="text-[#C8622A] font-bold">{log.hours_worked || 0} hrs</span>
-                    </div>
-                    <p className="text-[#D6E4F0] text-sm">{log.work_summary}</p>
-                    {log.materials_used && (() => {
-                      let parsed = null
-                      try { parsed = JSON.parse(log.materials_used) } catch {}
-                      if (Array.isArray(parsed) && parsed.length > 0) {
-                        return (
-                          <div className="mt-2">
-                            <p className="text-[#8A9AB0] text-xs font-semibold mb-1">📦 Materials Used</p>
-                            <div className="space-y-0.5">
-                              {parsed.map((m, i) => (
-                                <p key={i} className="text-[#8A9AB0] text-xs">· {m.name} — {m.qty} {m.unit}{m.planned && m.qty !== m.planned ? <span className="text-yellow-500/70"> (planned: {m.planned})</span> : null}</p>
-                              ))}
-                            </div>
-                          </div>
-                        )
-                      }
-                      return <p className="text-[#8A9AB0] text-xs mt-1">📦 {log.materials_used}</p>
-                    })()}
-                    {log.issues && <p className="text-red-400 text-xs mt-1">⚠ {log.issues}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <TechLogTab techLogs={techLogs} />
         )}
 
-{/* PHOTOS TAB */}
+        {/* PHOTOS TAB */}
         {activeTab === 'photos' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex justify-between items-center mb-5">
-              <div>
-                <h3 className="text-white font-bold text-lg">Site Photos</h3>
-                <p className="text-[#8A9AB0] text-sm mt-0.5">{photos.length} photo{photos.length !== 1 ? 's' : ''}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <select value={photoCategory} onChange={e => setPhotoCategory(e.target.value)}
-                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                  {['Before', 'During', 'After', 'Issue/Defect', 'Equipment', 'Panel/Rack', 'Cable Run', 'Other'].map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-                {photos.length > 0 && (
-                  <button onClick={downloadAllPhotos}
-                    className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                    ↓ Download All
-                  </button>
-                )}
-                <label className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors cursor-pointer">
-                  {uploadingPhoto ? 'Uploading...' : '+ Upload Photo'}
-                  <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadJobPhoto} className="hidden" disabled={uploadingPhoto} />
-                </label>
-              </div>
-            </div>
-
-            {photos.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-[#2a3d55] rounded-xl">
-                <p className="text-4xl mb-3">📷</p>
-                <p className="text-[#8A9AB0]">No photos yet.</p>
-                <p className="text-[#8A9AB0] text-sm mt-1">Upload before, during, and after photos to document this job.</p>
-              </div>
-            ) : (
-              <div>
-                {['Before', 'During', 'After', 'Issue/Defect', 'Equipment', 'Panel/Rack', 'Cable Run', 'Other'].map(category => {
-                  const categoryPhotos = photos.filter(p => p.category === category)
-                  if (categoryPhotos.length === 0) return null
-                  return (
-                    <div key={category} className="mb-6">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">{category} ({categoryPhotos.length})</p>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {categoryPhotos.map(photo => (
-                          <div key={photo.id} className="bg-[#0F1C2E] rounded-xl overflow-hidden border border-[#2a3d55]">
-                            <img src={photo.url} alt={photo.caption || category}
-                              className="w-full h-48 object-cover cursor-pointer"
-                              onClick={() => window.open(photo.url, '_blank')} />
-                            <div className="p-3 space-y-2">
-                              <input type="text" value={photo.caption || ''} placeholder="Add caption..."
-                                onChange={e => updateJobPhotoCaption(photo.id, e.target.value)}
-                                onBlur={e => updateJobPhotoCaption(photo.id, e.target.value)}
-                                className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                              <div className="flex justify-between items-center">
-                                <span className="text-[#8A9AB0] text-xs">{new Date(photo.created_at).toLocaleDateString()}</span>
-                                <button onClick={() => deleteJobPhoto(photo.id, photo.storage_path)}
-                                  className="text-[#2a3d55] hover:text-red-400 text-xs transition-colors">Delete</button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+          <PhotosTab
+            photos={photos}
+            photoCategory={photoCategory}
+            setPhotoCategory={setPhotoCategory}
+            uploadingPhoto={uploadingPhoto}
+            onUpload={uploadJobPhoto}
+            onDownloadAll={downloadAllPhotos}
+            onUpdateCaption={updateJobPhotoCaption}
+            onDelete={deleteJobPhoto}
+          />
         )}
 
         {/* PROPOSAL TAB */}
         {activeTab === 'proposal' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-bold text-lg">Linked Proposal</h3>
-              {job?.proposal_id && (
-                <button onClick={() => navigate(`/proposal/${job.proposal_id}`)}
-                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
-                  Open Proposal →
-                </button>
-              )}
-            </div>
-            {proposal ? (
-              <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Proposal Name</p><p className="text-white font-medium">{proposal.proposal_name}</p></div>
-                  <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Value</p><p className="text-white font-bold">${fmt(proposal.proposal_value)}</p></div>
-                  <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Margin</p><p className="text-[#C8622A] font-bold">{proposal.total_gross_margin_percent?.toFixed(1) || '—'}%</p></div>
-                </div>
-                {proposal.scope_of_work && (
-                  <div className="bg-[#0F1C2E] rounded-xl p-4">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Scope of Work</p>
-                    <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap line-clamp-6">{proposal.scope_of_work}</p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-[#8A9AB0]">No proposal linked to this job.</p>
-            )}
-          </div>
+          <ProposalTab job={job} proposal={proposal} navigate={navigate} />
         )}
       </div>
 
-      {/* PO Modal */}
-      {showPOModal && (() => {
-        const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
-        const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
-        const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
-        const vendorEmailSuggestion = (() => {
-          if (vendorNames.length !== 1) return null
-          const v = vendors.find(v => v.vendor_name === vendorNames[0])
-          return v?.contact_email || null
-        })()
-        return (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-              <h3 className="text-white font-bold text-lg mb-4">Generate Purchase Order</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor Email <span className="font-normal text-[#8A9AB0]">(optional)</span></label>
-                  {vendorNames.length > 0 && <p className="text-[#8A9AB0] text-xs mb-1">Vendors: {vendorNames.join(', ')}</p>}
-                  <input type="email" value={poVendorEmail || vendorEmailSuggestion || ''} onChange={e => setPOVendorEmail(e.target.value)} placeholder={vendorEmailSuggestion || 'vendor@company.com'}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
-                  <div className="flex gap-2 mb-2">
-                    <button onClick={() => setPOAutoNumber(true)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Auto-Generate</button>
-                    <button onClick={() => setPOAutoNumber(false)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${!poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Enter Manually</button>
-                  </div>
-                  {!poAutoNumber && <input type="text" value={poNumber} onChange={e => setPONumber(e.target.value)} placeholder="e.g. PO-2026-001"
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />}
-                </div>
-                <div className="bg-[#0F1C2E] rounded-lg p-3">
-                  <p className="text-[#8A9AB0] text-xs mb-2">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} · Your cost: ${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {selectedItems.map(item => (
-                      <div key={item.id} className="flex justify-between text-xs py-0.5">
-                        <span className="text-white">{item.item_name}</span>
-                        <span className="text-[#8A9AB0]">{item.vendor ? `${item.vendor} · ` : ''}Qty: {item.quantity}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-3 pt-1">
-                  <button onClick={() => setShowPOModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                  <button onClick={generatePO} disabled={generatingPO || (!poAutoNumber && !poNumber.trim())}
-                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                    {generatingPO ? 'Generating...' : `Generate PO (${selectedItems.length} items)`}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
+      {showPOModal && (
+        <POModal
+          lineItems={lineItems}
+          selectedForPO={selectedForPO}
+          vendors={vendors}
+          poVendorEmail={poVendorEmail}
+          setPOVendorEmail={setPOVendorEmail}
+          poNumber={poNumber}
+          setPONumber={setPONumber}
+          poAutoNumber={poAutoNumber}
+          setPOAutoNumber={setPOAutoNumber}
+          generatingPO={generatingPO}
+          onGenerate={generatePO}
+          onClose={() => setShowPOModal(false)}
+        />
+      )}
 
-      {/* Schedule Tech Modal */}
       {showScheduleModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-1">Schedule Tech</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">{job?.name}</p>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Technician <span className="text-[#C8622A]">*</span></label>
-                <select value={schedTechId} onChange={e => setSchedTechId(e.target.value)} className={`w-full ${inputClass}`}>
-                  <option value="">— Select tech —</option>
-                  {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                </select>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Date <span className="text-[#C8622A]">*</span></label>
-                  <input type="date" value={schedDate} onChange={e => setSchedDate(e.target.value)} className={`w-full ${inputClass}`} />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Hours on this job</label>
-                  <select value={schedHours} onChange={e => setSchedHours(e.target.value)} className={`w-full ${inputClass}`}>
-                    {['1','2','3','4','5','6','7','8'].map(h => <option key={h} value={h}>{h} {parseInt(h) === 1 ? 'hour' : 'hours'}</option>)}
-                  </select>
-                </div>
-              </div>
-              <p className="text-[#8A9AB0] text-xs">You can add multiple techs or multiple days by saving and adding again.</p>
-              {jobSchedules.length > 0 && (
-                <div className="bg-[#0F1C2E] rounded-lg p-3">
-                  <p className="text-[#8A9AB0] text-xs font-semibold mb-2">Already scheduled</p>
-                  <div className="space-y-1">
-                    {jobSchedules.map(s => (
-                      <div key={s.id} className="flex items-center justify-between text-xs">
-                        <span className="text-white">{s.profiles?.full_name} · {new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {s.hours_allocated}h</span>
-                        <button onClick={() => removeSchedule(s.id)} className="text-[#8A9AB0] hover:text-red-400 transition-colors ml-2">✕</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowScheduleModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Close</button>
-                <button onClick={saveSchedule} disabled={savingSchedule || !schedTechId || !schedDate}
-                  className="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
-                  {savingSchedule ? 'Saving...' : 'Add to Schedule'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ScheduleModal
+          job={job}
+          orgProfiles={orgProfiles}
+          jobSchedules={jobSchedules}
+          schedTechId={schedTechId}
+          setSchedTechId={setSchedTechId}
+          schedDate={schedDate}
+          setSchedDate={setSchedDate}
+          schedHours={schedHours}
+          setSchedHours={setSchedHours}
+          savingSchedule={savingSchedule}
+          onSave={saveSchedule}
+          onRemoveSchedule={removeSchedule}
+          onClose={() => setShowScheduleModal(false)}
+        />
       )}
 
-      {/* Notify Customer Modal */}
       {showNotifyModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg">
-            <h3 className="text-white font-bold text-lg mb-1">Notify Customer</h3>
-            <p className="text-[#8A9AB0] text-sm mb-4">Sending to <span className="text-white">{job?.clients?.email}</span></p>
-            <textarea value={notifyMessage} onChange={e => setNotifyMessage(e.target.value)} rows={8}
-              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none mb-4" />
-            <div className="flex gap-3">
-              <button onClick={() => setShowNotifyModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Skip</button>
-              <button onClick={sendNotification} disabled={sendingNotify || !notifyMessage.trim()}
-                className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                {sendingNotify ? 'Sending...' : 'Send Notification →'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <NotifyModal
+          job={job}
+          notifyMessage={notifyMessage}
+          setNotifyMessage={setNotifyMessage}
+          sendingNotify={sendingNotify}
+          onSend={sendNotification}
+          onClose={() => setShowNotifyModal(false)}
+        />
       )}
 
-      {/* Change Order Modal */}
-      {showCOModal && (() => {
-        const coInputClass = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
-        const matTotal = (coForm.line_items || []).reduce((sum, l) => sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
-        const labTotal = (coForm.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-        const coTotal = matTotal + labTotal
-        return (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-              <h3 className="text-white font-bold text-lg mb-5">New Change Order</h3>
-              <div className="space-y-5">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Name <span className="text-[#C8622A]">*</span></label>
-                    <input type="text" value={coForm.name} onChange={e => setCoForm(p => ({ ...p, name: e.target.value }))}
-                      placeholder="e.g. Additional camera location" className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                  </div>
-                  <div>
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Description</label>
-                    <input type="text" value={coForm.description} onChange={e => setCoForm(p => ({ ...p, description: e.target.value }))}
-                      placeholder="Brief description..." className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Materials</p>
-                    <button onClick={() => setCoForm(p => ({ ...p, line_items: [...(p.line_items || []), { id: crypto.randomUUID(), item_name: '', quantity: 1, unit: 'ea', your_cost_unit: '', markup_percent: 35, customer_price_unit: '' }] }))}
-                      className="text-[#C8622A] text-xs hover:text-white transition-colors">+ Add Material</button>
-                  </div>
-                  {(coForm.line_items || []).length === 0
-                    ? <p className="text-[#8A9AB0] text-xs italic">No materials added yet.</p>
-                    : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-[#2a3d55]">
-                              {['Item Name', 'Qty', 'Unit', 'Your Cost', 'Markup %', 'Unit Price', 'Total', ''].map(h => (
-                                <th key={h} className="text-[#8A9AB0] text-left py-1.5 pr-2 font-normal">{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(coForm.line_items || []).map((line, i) => {
-                              const lineTotal = (parseFloat(line.customer_price_unit) || 0) * (parseFloat(line.quantity) || 0)
-                              return (
-                                <tr key={line.id} className="border-b border-[#2a3d55]/30">
-                                  <td className="pr-2 py-1"><input value={line.item_name} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; li[i] = {...li[i], item_name: e.target.value}; return {...p, line_items: li} })} placeholder="Item name" className={`w-36 ${coInputClass}`} /></td>
-                                  <td className="pr-2 py-1"><input type="number" min="0" value={line.quantity} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; li[i] = {...li[i], quantity: e.target.value}; return {...p, line_items: li} })} className={`w-14 ${coInputClass}`} /></td>
-                                  <td className="pr-2 py-1"><select value={line.unit} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; li[i] = {...li[i], unit: e.target.value}; return {...p, line_items: li} })} className={coInputClass}>{['ea','ft','lot','hr','box','roll'].map(u => <option key={u}>{u}</option>)}</select></td>
-                                  <td className="pr-2 py-1"><input type="number" min="0" step="0.01" placeholder="0.00" value={line.your_cost_unit} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; const cost = parseFloat(e.target.value)||0; const mkp = parseFloat(li[i].markup_percent)||0; li[i] = {...li[i], your_cost_unit: e.target.value, customer_price_unit: (cost*(1+mkp/100)).toFixed(2)}; return {...p, line_items: li} })} className={`w-20 ${coInputClass}`} /></td>
-                                  <td className="pr-2 py-1"><input type="number" min="0" placeholder="35" value={line.markup_percent} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; const mkp = parseFloat(e.target.value)||0; const cost = parseFloat(li[i].your_cost_unit)||0; li[i] = {...li[i], markup_percent: e.target.value, customer_price_unit: (cost*(1+mkp/100)).toFixed(2)}; return {...p, line_items: li} })} className={`w-14 ${coInputClass}`} /></td>
-                                  <td className="pr-2 py-1"><input type="number" min="0" step="0.01" placeholder="0.00" value={line.customer_price_unit} onChange={e => setCoForm(p => { const li = [...(p.line_items||[])]; li[i] = {...li[i], customer_price_unit: e.target.value}; return {...p, line_items: li} })} className={`w-20 ${coInputClass}`} /></td>
-                                  <td className="pr-2 py-1 text-white font-medium">${lineTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                                  <td className="py-1"><button onClick={() => setCoForm(p => ({...p, line_items: (p.line_items||[]).filter((_,idx)=>idx!==i)}))} className="text-[#8A9AB0] hover:text-red-400">✕</button></td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                          <tfoot>
-                            <tr><td colSpan="6" className="text-[#8A9AB0] text-right pt-2 pr-2 font-semibold">Materials Total</td><td className="text-[#C8622A] font-bold pt-2">${matTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</td><td></td></tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    )
-                  }
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Labor</p>
-                    <button onClick={() => setCoForm(p => ({ ...p, labor_items: [...(p.labor_items || []), { id: crypto.randomUUID(), role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: '' }] }))}
-                      className="text-[#C8622A] text-xs hover:text-white transition-colors">+ Add Labor</button>
-                  </div>
-                  {(coForm.labor_items || []).length === 0
-                    ? <p className="text-[#8A9AB0] text-xs italic">No labor added yet.</p>
-                    : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="border-b border-[#2a3d55]">
-                              {['Role', 'Qty', 'Unit', 'Your Cost', 'Markup %', 'Total', ''].map(h => (
-                                <th key={h} className="text-[#8A9AB0] text-left py-1.5 pr-2 font-normal">{h}</th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(coForm.labor_items || []).map((labor, i) => (
-                              <tr key={labor.id} className="border-b border-[#2a3d55]/30">
-                                <td className="pr-2 py-1"><input value={labor.role} onChange={e => setCoForm(p => { const li = [...(p.labor_items||[])]; li[i] = {...li[i], role: e.target.value}; return {...p, labor_items: li} })} placeholder="e.g. Electrician" className={`w-36 ${coInputClass}`} /></td>
-                                <td className="pr-2 py-1"><input type="number" min="0" step="0.5" value={labor.quantity} onChange={e => setCoForm(p => { const li = [...(p.labor_items||[])]; const qty=parseFloat(e.target.value)||0; const cost=parseFloat(li[i].your_cost)||0; const mkp=parseFloat(li[i].markup)||0; li[i]={...li[i],quantity:e.target.value,customer_price:(cost*(1+mkp/100)*qty).toFixed(2)}; return {...p,labor_items:li} })} className={`w-14 ${coInputClass}`} /></td>
-                                <td className="pr-2 py-1"><select value={labor.unit} onChange={e => setCoForm(p => { const li=[...(p.labor_items||[])]; li[i]={...li[i],unit:e.target.value}; return {...p,labor_items:li} })} className={coInputClass}>{['hr','day','lot'].map(u => <option key={u}>{u}</option>)}</select></td>
-                                <td className="pr-2 py-1"><input type="number" min="0" step="0.01" placeholder="0.00" value={labor.your_cost} onChange={e => setCoForm(p => { const li=[...(p.labor_items||[])]; const cost=parseFloat(e.target.value)||0; const mkp=parseFloat(li[i].markup)||0; const qty=parseFloat(li[i].quantity)||0; li[i]={...li[i],your_cost:e.target.value,customer_price:(cost*(1+mkp/100)*qty).toFixed(2)}; return {...p,labor_items:li} })} className={`w-20 ${coInputClass}`} /></td>
-                                <td className="pr-2 py-1"><input type="number" min="0" placeholder="35" value={labor.markup} onChange={e => setCoForm(p => { const li=[...(p.labor_items||[])]; const mkp=parseFloat(e.target.value)||0; const cost=parseFloat(li[i].your_cost)||0; const qty=parseFloat(li[i].quantity)||0; li[i]={...li[i],markup:e.target.value,customer_price:(cost*(1+mkp/100)*qty).toFixed(2)}; return {...p,labor_items:li} })} className={`w-14 ${coInputClass}`} /></td>
-                                <td className="pr-2 py-1 text-white font-medium">${(parseFloat(labor.customer_price)||0).toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                                <td className="py-1"><button onClick={() => setCoForm(p => ({...p,labor_items:(p.labor_items||[]).filter((_,idx)=>idx!==i)}))} className="text-[#8A9AB0] hover:text-red-400">✕</button></td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr><td colSpan="5" className="text-[#8A9AB0] text-right pt-2 pr-2 font-semibold">Labor Total</td><td className="text-[#C8622A] font-bold pt-2">${labTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</td><td></td></tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    )
-                  }
-                </div>
-
-                {((coForm.line_items||[]).length > 0 || (coForm.labor_items||[]).length > 0) && (
-                  <div className="bg-[#0F1C2E] rounded-xl p-4 flex justify-between items-center">
-                    <div className="text-sm text-[#8A9AB0] space-y-0.5">
-                      {(coForm.line_items||[]).length > 0 && <p>Materials: <span className="text-white">${matTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></p>}
-                      {(coForm.labor_items||[]).length > 0 && <p>Labor: <span className="text-white">${labTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></p>}
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[#8A9AB0] text-xs mb-0.5">Change Order Total</p>
-                      <p className="text-[#C8622A] font-bold text-xl">${coTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex gap-3 pt-1">
-                  <button onClick={() => { setShowCOModal(false); setCoForm({ name: '', description: '', line_items: [], labor_items: [] }) }}
-                    className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                  <button onClick={saveChangeOrder} disabled={savingCO || !coForm.name.trim()}
-                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                    {savingCO ? 'Saving...' : 'Create Change Order'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
+      {showCOModal && (
+        <ChangeOrderModal
+          coForm={coForm}
+          setCoForm={setCoForm}
+          savingCO={savingCO}
+          onSave={saveChangeOrder}
+          onClose={() => { setShowCOModal(false); setCoForm({ name: '', description: '', line_items: [], labor_items: [] }) }}
+        />
+      )}
     </div>
   )
 }
