@@ -8,6 +8,27 @@ import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } from 'docx'
 import DrawingToolSummary from '../components/drawing/DrawingToolSummary'
+import ActivityFeed from '../components/proposal/ActivityFeed'
+import DeleteProposalModal from '../components/proposal/DeleteProposalModal'
+import ShareModal from '../components/proposal/ShareModal'
+import SaveTemplateModal from '../components/proposal/SaveTemplateModal'
+import SendProposalModal from '../components/proposal/SendProposalModal'
+import PricingOptionsModal from '../components/proposal/PricingOptionsModal'
+import SentPromptModal from '../components/proposal/SentPromptModal'
+import EditClientModal from '../components/proposal/EditClientModal'
+import ContractStartDateModal from '../components/proposal/ContractStartDateModal'
+import RenewalDateModal from '../components/proposal/RenewalDateModal'
+import MoveLineModal from '../components/proposal/MoveLineModal'
+import AIBOMModal from '../components/proposal/AIBOMModal'
+import DealSummaryModal from '../components/proposal/DealSummaryModal'
+import PhotosModal from '../components/proposal/PhotosModal'
+import ConvertToOrderModal from '../components/proposal/ConvertToOrderModal'
+import RFQModal from '../components/proposal/RFQModal'
+import POModal from '../components/proposal/POModal'
+import SpecReaderModal from '../components/proposal/SpecReaderModal'
+import DrawingReaderModal from '../components/proposal/DrawingReaderModal'
+import SLAModal from '../components/proposal/SLAModal'
+import MonitoringModal from '../components/proposal/MonitoringModal'
 
 export default function ProposalDetail({ isAdmin, featureProposals = true, featureCRM = false, featureAiBom = false, featureSitePhotos = true, featureDrawingTool = false }) {
   const { id } = useParams()
@@ -51,9 +72,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [orderNumber, setOrderNumber] = useState('')
   const [orderExpectedShip, setOrderExpectedShip] = useState('')
   const [creatingOrder, setCreatingOrder] = useState(false)
-  const [activity, setActivity] = useState([])
-  const [newActivityNote, setNewActivityNote] = useState('')
-  const [savingActivity, setSavingActivity] = useState(false)
   const [renewalDates, setRenewalDates] = useState({})
   const [savingRenewal, setSavingRenewal] = useState(false)
   const [showRenewalModal, setShowRenewalModal] = useState(false)
@@ -134,7 +152,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [pendingContractDates, setPendingContractDates] = useState({})
   const [savingContractDates, setSavingContractDates] = useState(false)
   const [session, setSession] = useState(null)
-  
+  const [activityRefreshKey, setActivityRefreshKey] = useState(0)
 
   useEffect(() => {
     fetchProposal()
@@ -142,7 +160,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     fetchSections()
     fetchRFQRequests()
     fetchProfile()
-    fetchActivity()
     fetchPhotos()
     fetchVendors()
   }, [])
@@ -306,15 +323,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     setVendors(data || [])
   }
 
-  const fetchActivity = async () => {
-    const { data } = await supabase
-      .from('activities')
-      .select('*, profiles(full_name)')
-      .eq('proposal_id', id)
-      .order('created_at', { ascending: false })
-    setActivity(data || [])
-  }
-
   const logActivity = async (event, type = 'note') => {
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('activities').insert({
@@ -325,17 +333,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       type,
       title: event
     })
-    fetchActivity()
-  }
-
-  const addManualActivity = async () => {
-    const title = typeof newActivityNote === 'string' ? newActivityNote.trim() : newActivityNote?.title?.trim()
-    const type = typeof newActivityNote === 'string' ? 'note' : (newActivityNote?.type || 'note')
-    if (!title) return
-    setSavingActivity(true)
-    await logActivity(title, type)
-    setNewActivityNote('')
-    setSavingActivity(false)
+    setActivityRefreshKey(k => k + 1)
   }
 
   const updateStatus = async (newStatus) => {
@@ -3627,961 +3625,50 @@ const analyzeDrawing = async () => {
   proposalId={id}
   featureEnabled={featureDrawingTool}
 />
-        {/* Activity Feed */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold text-lg mb-4">Activity</h3>
-          <div className="bg-[#0F1C2E] rounded-xl p-4 mb-5 space-y-3">
-            <div className="flex gap-2">
-              {[{value:'note',label:'Note',icon:'📝'},{value:'call',label:'Call',icon:'📞'},{value:'email',label:'Email',icon:'✉️'},{value:'meeting',label:'Meeting',icon:'🤝'}].map(t => (
-                <button key={t.value} onClick={() => setNewActivityNote(prev => ({ ...prev, type: t.value }))}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${(newActivityNote?.type || 'note') === t.value ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
-                  {t.icon} {t.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <input type="text"
-                value={typeof newActivityNote === 'string' ? newActivityNote : (newActivityNote?.title || '')}
-                onChange={e => setNewActivityNote(prev => typeof prev === 'string' ? { type: 'note', title: e.target.value } : { ...prev, title: e.target.value })}
-                onKeyDown={e => e.key === 'Enter' && addManualActivity()}
-                placeholder="Log a note, call, follow-up..."
-                className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
-              <button onClick={addManualActivity} disabled={savingActivity || !(typeof newActivityNote === 'string' ? newActivityNote.trim() : newActivityNote?.title?.trim())}
-                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">Log</button>
-            </div>
-          </div>
-          {activity.length === 0 ? (
-            <p className="text-[#8A9AB0] text-sm">No activity yet. Changes and notes will appear here.</p>
-          ) : (
-            <div className="space-y-0">
-              {activity.map((item, i) => {
-                const icons = { call: '📞', email: '✉️', meeting: '🤝', note: '📝' }
-                const icon = icons[item.type] || '📝'
-                return (
-                  <div key={item.id} className="flex gap-3 relative">
-                    {i < activity.length - 1 && <div className="absolute left-4 top-8 bottom-0 w-px bg-[#2a3d55]" />}
-                    <div className="w-8 h-8 rounded-full bg-[#0F1C2E] border border-[#2a3d55] flex items-center justify-center text-sm shrink-0 z-10">{icon}</div>
-                    <div className="flex-1 pb-4">
-                      <div className="flex justify-between items-start">
-                        <p className="text-white text-sm font-medium">{item.title}</p>
-                        <span className="text-[#8A9AB0] text-xs shrink-0 ml-2">{new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                      {item.body && <p className="text-[#8A9AB0] text-xs mt-1 leading-relaxed">{item.body}</p>}
-                      <p className="text-[#2a3d55] text-xs mt-0.5">{item.profiles?.full_name || 'System'}</p>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+        <ActivityFeed proposalId={id} clientId={proposal?.client_id} orgId={proposal?.org_id} refreshKey={activityRefreshKey} />
 
         <POList proposalId={id} />
 
       </div>
 
-      {/* RFQ Modal */}
-      {showRFQModal && (() => {
-        const needsPricing = lineItems.filter(l => l.pricing_status === 'Needs Pricing' && l.vendor)
-        const byVendor = needsPricing.reduce((acc, item) => { const vendor = item.vendor || 'Unknown Vendor'; if (!acc[vendor]) acc[vendor] = []; acc[vendor].push(item); return acc }, {})
-        return (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[85vh] overflow-y-auto">
-              <h3 className="text-white font-bold text-lg mb-1">Send RFQs</h3>
-              <p className="text-[#8A9AB0] text-sm mb-5">Verify vendor emails and choose delivery options for each vendor.</p>
-              <div className="space-y-4">
-                {Object.entries(byVendor).map(([vendorName, items]) => (
-                  <div key={vendorName} className="bg-[#0F1C2E] rounded-xl p-4">
-                    <div className="flex justify-between items-start mb-3">
-                      <div><p className="text-white font-semibold text-sm">{vendorName}</p><p className="text-[#8A9AB0] text-xs">{items.length} item{items.length !== 1 ? 's' : ''}</p></div>
-                    </div>
-                    <div className="mb-3 space-y-1">
-                      {items.map(item => (
-                        <div key={item.id} className="flex justify-between text-xs py-0.5">
-                          <span className="text-[#8A9AB0]">{item.item_name}</span>
-                          <div className="flex gap-3 text-[#8A9AB0]">
-                            {item.manufacturer && <span className="text-[#C8622A]">{item.manufacturer}</span>}
-                            <span>Qty: {item.quantity}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mb-2">
-                      <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor Email</label>
-                      <input type="email" value={rfqVendorData[vendorName]?.email || ''} onChange={e => setRfqVendorData(prev => ({ ...prev, [vendorName]: { ...prev[vendorName], email: e.target.value } }))} placeholder="vendor@company.com" className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                    </div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={rfqVendorData[vendorName]?.attachExcel || false} onChange={e => setRfqVendorData(prev => ({ ...prev, [vendorName]: { ...prev[vendorName], attachExcel: e.target.checked } }))} className="accent-[#C8622A]" />
-                      <span className="text-[#8A9AB0] text-xs">Attach Excel spreadsheet for pricing</span>
-                    </label>
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-3 mt-5">
-                <button onClick={() => setShowRFQModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={sendAllRFQs} disabled={sendingRFQs || !Object.values(rfqVendorData).some(v => v.email)}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {sendingRFQs ? 'Sending...' : `Send ${Object.values(rfqVendorData).filter(v => v.email).length} RFQ${Object.values(rfqVendorData).filter(v => v.email).length !== 1 ? 's' : ''} →`}
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
+      {showRFQModal && <RFQModal lineItems={lineItems} rfqVendorData={rfqVendorData} setRfqVendorData={setRfqVendorData} sendingRFQs={sendingRFQs} onSend={sendAllRFQs} onClose={() => setShowRFQModal(false)} />}
 
-      {/* Edit Client Modal */}
-      {showEditClientModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-1">Edit Client Info</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Link to an existing client or edit the contact details directly.</p>
-            <div className="space-y-3">
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Link to Client Record</label>
-                <select value={editClientForm.client_id || ''} onChange={e => { const cid = e.target.value; const found = allClients.find(c => c.id === cid); setEditClientForm(p => ({ ...p, client_id: cid, ...(found ? { company: found.company || p.company, client_name: found.client_name || p.client_name, client_email: found.email || p.client_email } : {}) })) }}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                  <option value="">— No client linked —</option>
-                  {allClients.map(c => <option key={c.id} value={c.id}>{c.company}{c.client_name ? ` — ${c.client_name}` : ''}</option>)}
-                </select>
-                {editClientForm.client_id && <p className="text-green-400 text-xs mt-1">✓ Linked — changes below will also update the client record</p>}
-              </div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Company</label><input type="text" value={editClientForm.company} onChange={e => setEditClientForm(p => ({ ...p, company: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" /></div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Client Name</label><input type="text" value={editClientForm.client_name} onChange={e => setEditClientForm(p => ({ ...p, client_name: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" /></div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Email</label><input type="email" value={editClientForm.client_email} onChange={e => setEditClientForm(p => ({ ...p, client_email: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" /></div>
-            </div>
-            <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowEditClientModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-              <button onClick={saveClientInfo} disabled={savingClient} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingClient ? 'Saving...' : 'Save Changes'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showEditClientModal && <EditClientModal allClients={allClients} editClientForm={editClientForm} setEditClientForm={setEditClientForm} savingClient={savingClient} onSave={saveClientInfo} onClose={() => setShowEditClientModal(false)} />}
 
-      {/* Delete Proposal Modal */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4"><span className="text-red-400 text-xl">⚠</span></div>
-            <h3 className="text-white font-bold text-lg mb-1 text-center">Delete Proposal</h3>
-            <p className="text-[#8A9AB0] text-sm mb-4 text-center">This will permanently delete this proposal and all associated data including BOM, photos, and activity. This cannot be undone.</p>
-            <div className="mb-4">
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Type <span className="text-white font-mono">{proposal?.proposal_name}</span> to confirm</label>
-              <input type="text" value={deleteConfirmText} onChange={e => setDeleteConfirmText(e.target.value)} placeholder={proposal?.proposal_name}
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-              <button onClick={deleteProposal} disabled={deletingProposal || deleteConfirmText !== proposal?.proposal_name}
-                className="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50">
-                {deletingProposal ? 'Deleting...' : 'Delete Proposal'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showDeleteModal && <DeleteProposalModal proposal={proposal} deleteConfirmText={deleteConfirmText} setDeleteConfirmText={setDeleteConfirmText} deletingProposal={deletingProposal} onDelete={deleteProposal} onClose={() => setShowDeleteModal(false)} />}
 
-      {/* AI BOM Builder Modal */}
-      {showAIBOMModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-1">✨ AI BOM Builder</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Describe the system or project and AI will generate a complete parts list. You'll review before adding.</p>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Describe the system you need</label>
-                <textarea value={aiBOMPrompt} onChange={e => setAIBOMPrompt(e.target.value)} rows={3}
-                  placeholder="e.g. 8 camera outdoor commercial security system with NVR, remote access, and PoE switch. No specific brands."
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
-              </div>
-              <button onClick={generateAIBOM} disabled={generatingBOM || !aiBOMPrompt.trim()} className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
-                {generatingBOM ? '✨ Building BOM...' : '✨ Generate BOM'}
-              </button>
-              {aiBOMPreview.length > 0 && (
-                <div>
-                  <p className="text-white text-sm font-semibold mb-2">{aiBOMPreview.length} items generated — review before adding</p>
-                  <div className="bg-[#0F1C2E] rounded-xl overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead><tr className="border-b border-[#2a3d55]"><th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Item</th><th className="text-[#8A9AB0] text-right py-2 px-3 font-normal">Qty</th><th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Unit</th><th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Category</th><th className="py-2 px-3"></th></tr></thead>
-                      <tbody>
-                        {aiBOMPreview.map((item, i) => (
-                          <tr key={i} className="border-b border-[#2a3d55]/30">
-                            <td className="text-white py-2 px-3">{item.item_name}</td><td className="text-[#8A9AB0] py-2 px-3 text-right">{item.quantity}</td><td className="text-[#8A9AB0] py-2 px-3">{item.unit}</td><td className="text-[#8A9AB0] py-2 px-3">{item.category}</td>
-                            <td className="py-2 px-3"><button onClick={() => setAIBOMPreview(prev => prev.filter((_, idx) => idx !== i))} className="text-[#8A9AB0] hover:text-red-400 transition-colors text-base leading-none">×</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="text-[#8A9AB0] text-xs mt-2">Items will be added to your BOM in Edit mode. Add your costs and markup after.</p>
-                </div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => { setShowAIBOMModal(false); setAIBOMPreview([]); setAIBOMPrompt('') }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                {aiBOMPreview.length > 0 && (
-                  <button onClick={applyAIBOM} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Add {aiBOMPreview.length} Items to BOM →</button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-{/* Deal Summary Modal */}
-      {showDealSummaryModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-1">🧠 Deal Summary</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">AI analyzes your proposal and returns a plain English summary with risk flags and action items.</p>
-            <div className="space-y-4">
-              {!dealSummary && (
-                <button onClick={generateDealSummary} disabled={generatingDealSummary}
-                  className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
-                  {generatingDealSummary ? '🧠 Analyzing Deal...' : '🧠 Analyze This Deal'}
-                </button>
-              )}
-              {dealSummary && (
-                <div className="space-y-4">
-                  {/* Headline */}
-                  <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#C8622A]/30">
-                    <p className="text-white font-semibold text-sm">{dealSummary.headline}</p>
-                  </div>
+      {showAIBOMModal && <AIBOMModal aiBOMPrompt={aiBOMPrompt} setAIBOMPrompt={setAIBOMPrompt} generatingBOM={generatingBOM} aiBOMPreview={aiBOMPreview} setAIBOMPreview={setAIBOMPreview} onGenerate={generateAIBOM} onApply={applyAIBOM} onClose={() => { setShowAIBOMModal(false); setAIBOMPreview([]); setAIBOMPrompt('') }} />}
+      {showDealSummaryModal && <DealSummaryModal dealSummary={dealSummary} setDealSummary={setDealSummary} generatingDealSummary={generatingDealSummary} onGenerate={generateDealSummary} onClose={() => { setShowDealSummaryModal(false); setDealSummary(null) }} />}
 
-                  {/* Readiness */}
-                  <div className={`rounded-xl p-4 border ${
-                    dealSummary.readiness === 'ready' ? 'bg-green-500/10 border-green-500/20' :
-                    dealSummary.readiness === 'needs_work' ? 'bg-yellow-500/10 border-yellow-500/20' :
-                    'bg-red-500/10 border-red-500/20'
-                  }`}>
-                    <p className={`font-semibold text-sm mb-1 ${
-                      dealSummary.readiness === 'ready' ? 'text-green-400' :
-                      dealSummary.readiness === 'needs_work' ? 'text-yellow-400' :
-                      'text-red-400'
-                    }`}>
-                      {dealSummary.readiness === 'ready' ? '✓ Ready to Send' :
-                       dealSummary.readiness === 'needs_work' ? '⚠ Needs Work' :
-                       '✗ Incomplete'}
-                    </p>
-                    <p className="text-[#8A9AB0] text-xs">{dealSummary.readiness_note}</p>
-                  </div>
+      {showSpecModal && <SpecReaderModal specFile={specFile} setSpecFile={setSpecFile} analyzingSpec={analyzingSpec} specSummary={specSummary} onAnalyze={analyzeSpec} onClose={() => { setShowSpecModal(false); setSpecFile(null) }} />}
 
-                  {/* Strength */}
-                  {dealSummary.strength && (
-                    <div className="bg-[#0F1C2E] rounded-xl p-4">
-                      <p className="text-green-400 font-semibold text-xs mb-1 uppercase tracking-wide">Strength</p>
-                      <p className="text-white text-sm">{dealSummary.strength}</p>
-                    </div>
-                  )}
+      {showDrawingModal && <DrawingReaderModal drawingFile={drawingFile} setDrawingFile={setDrawingFile} drawingInstructions={drawingInstructions} setDrawingInstructions={setDrawingInstructions} drawingPreview={drawingPreview} setDrawingPreview={setDrawingPreview} analyzingDrawing={analyzingDrawing} onAnalyze={analyzeDrawing} onApply={applyDrawingBOM} onClose={() => { setShowDrawingModal(false); setDrawingFile(null); setDrawingInstructions(''); setDrawingPreview([]) }} />}
 
-                  {/* Margin + Close */}
-                  <div className="grid grid-cols-2 gap-3">
-                    {dealSummary.margin_note && (
-                      <div className="bg-[#0F1C2E] rounded-xl p-4">
-                        <p className="text-[#C8622A] font-semibold text-xs mb-1 uppercase tracking-wide">Margin</p>
-                        <p className="text-[#8A9AB0] text-xs">{dealSummary.margin_note}</p>
-                      </div>
-                    )}
-                    {dealSummary.close_note && (
-                      <div className="bg-[#0F1C2E] rounded-xl p-4">
-                        <p className="text-[#C8622A] font-semibold text-xs mb-1 uppercase tracking-wide">Close Timeline</p>
-                        <p className="text-[#8A9AB0] text-xs">{dealSummary.close_note}</p>
-                      </div>
-                    )}
-                  </div>
+      {showPhotosModal && <PhotosModal photos={photos} uploadingPhoto={uploadingPhoto} onUpload={uploadPhoto} onUpdateCaption={updatePhotoCaption} onDelete={deletePhoto} onClose={() => setShowPhotosModal(false)} />}
 
-                  {/* Risks */}
-                  {dealSummary.risks?.length > 0 && (
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-                      <p className="text-red-400 font-semibold text-xs mb-2 uppercase tracking-wide">Risks</p>
-                      {dealSummary.risks.map((r, i) => (
-                        <p key={i} className="text-red-300 text-xs mb-1">• {r}</p>
-                      ))}
-                    </div>
-                  )}
+      {showOrderModal && <ConvertToOrderModal lineItems={lineItems} orderAutoNumber={orderAutoNumber} setOrderAutoNumber={setOrderAutoNumber} orderNumber={orderNumber} setOrderNumber={setOrderNumber} orderExpectedShip={orderExpectedShip} setOrderExpectedShip={setOrderExpectedShip} clientAddress={clientAddress} creatingOrder={creatingOrder} onCreate={createOrder} onClose={() => setShowOrderModal(false)} />}
 
-                  {/* Action Items */}
-                  {dealSummary.actions?.length > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-xl p-4">
-                      <p className="text-white font-semibold text-xs mb-2 uppercase tracking-wide">Action Items</p>
-                      {dealSummary.actions.map((a, i) => (
-                        <p key={i} className="text-[#8A9AB0] text-xs mb-1">→ {a}</p>
-                      ))}
-                    </div>
-                  )}
+      {showSLAModal && <SLAModal editSLAForm={editSLAForm} setEditSLAForm={setEditSLAForm} editingAgreementIdx={editingAgreementIdx} orgSLASettings={orgSLASettings} savingContract={savingContract} onSave={saveSLAContract} onClose={() => setShowSLAModal(false)} />}
 
-                  <button onClick={() => { setDealSummary(null) }}
-                    className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
-                    ↺ Re-analyze
-                  </button>
-                </div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => { setShowDealSummaryModal(false); setDealSummary(null) }}
-                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showMonitoringModal && <MonitoringModal editMonitoringForm={editMonitoringForm} setEditMonitoringForm={setEditMonitoringForm} editingAgreementIdx={editingAgreementIdx} orgSLASettings={orgSLASettings} savingContract={savingContract} onSave={saveMonitoringContract} onClose={() => setShowMonitoringModal(false)} />}
 
-{/* Spec Reader Modal */}
-      {showSpecModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-1">📋 Spec Reader</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Upload a project specification document and AI will extract manufacturers, compliance requirements, submittals, and scope notes.</p>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Upload Spec Document (PDF)</label>
-                <input type="file" accept=".pdf,image/jpeg,image/png"
-                  onChange={e => setSpecFile(e.target.files[0] || null)}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                {specFile && <p className="text-[#8A9AB0] text-xs mt-1">{specFile.name} — {(specFile.size / 1024 / 1024).toFixed(2)} MB</p>}
-              </div>
-              <button onClick={analyzeSpec} disabled={analyzingSpec || !specFile}
-                className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
-                {analyzingSpec ? '📋 Reading Spec...' : '📋 Read Spec'}
-              </button>
-              {specSummary && (
-                <div className="space-y-4">
-                  {specSummary.flags?.length > 0 && (
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
-                      <p className="text-red-400 font-semibold text-sm mb-2">⚠ Flags — Review Carefully</p>
-                      {specSummary.flags.map((f, i) => <p key={i} className="text-red-300 text-xs mb-1">• {f}</p>)}
-                    </div>
-                  )}
-                  {specSummary.manufacturers?.length > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-xl p-4">
-                      <p className="text-white font-semibold text-sm mb-2">Approved Manufacturers</p>
-                      {specSummary.manufacturers.map((m, i) => (
-                        <div key={i} className="mb-2">
-                          <p className="text-[#C8622A] text-xs font-semibold">{m.category}</p>
-                          <p className="text-white text-xs">{m.approved?.join(', ')}</p>
-                          {m.notes && <p className="text-[#8A9AB0] text-xs italic">{m.notes}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {specSummary.compliance?.length > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-xl p-4">
-                      <p className="text-white font-semibold text-sm mb-2">Compliance & Codes</p>
-                      {specSummary.compliance.map((c, i) => <p key={i} className="text-[#8A9AB0] text-xs mb-1">• {c}</p>)}
-                    </div>
-                  )}
-                  {specSummary.scope_notes?.length > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-xl p-4">
-                      <p className="text-white font-semibold text-sm mb-2">Scope Notes</p>
-                      {specSummary.scope_notes.map((s, i) => <p key={i} className="text-[#8A9AB0] text-xs mb-1">• {s}</p>)}
-                    </div>
-                  )}
-                  {specSummary.submittals?.length > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-xl p-4">
-                      <p className="text-white font-semibold text-sm mb-2">Submittals Required</p>
-                      {specSummary.submittals.map((s, i) => <p key={i} className="text-[#8A9AB0] text-xs mb-1">• {s}</p>)}
-                    </div>
-                  )}
-                  {specSummary.installation?.length > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-xl p-4">
-                      <p className="text-white font-semibold text-sm mb-2">Installation Standards</p>
-                      {specSummary.installation.map((s, i) => <p key={i} className="text-[#8A9AB0] text-xs mb-1">• {s}</p>)}
-                    </div>
-                  )}
-                  {specSummary.testing?.length > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-xl p-4">
-                      <p className="text-white font-semibold text-sm mb-2">Testing & Commissioning</p>
-                      {specSummary.testing.map((s, i) => <p key={i} className="text-[#8A9AB0] text-xs mb-1">• {s}</p>)}
-                    </div>
-                  )}
-                  {specSummary.warranty?.length > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-xl p-4">
-                      <p className="text-white font-semibold text-sm mb-2">Warranty Requirements</p>
-                      {specSummary.warranty.map((s, i) => <p key={i} className="text-[#8A9AB0] text-xs mb-1">• {s}</p>)}
-                    </div>
-                  )}
-                  {specSummary.exclusions?.length > 0 && (
-                    <div className="bg-[#0F1C2E] rounded-xl p-4">
-                      <p className="text-white font-semibold text-sm mb-2">Exclusions</p>
-                      {specSummary.exclusions.map((s, i) => <p key={i} className="text-[#8A9AB0] text-xs mb-1">• {s}</p>)}
-                    </div>
-                  )}
-                  <p className="text-green-400 text-xs">✓ Spec summary saved to this proposal</p>
-                </div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => { setShowSpecModal(false); setSpecFile(null) }}
-                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showContractStartModal && <ContractStartDateModal pendingContractItems={pendingContractItems} pendingContractDates={pendingContractDates} setPendingContractDates={setPendingContractDates} savingContractDates={savingContractDates} onSave={saveContractStartDates} onClose={() => setShowContractStartModal(false)} />}
 
-{/* Drawing Reader Modal */}
-      {showDrawingModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-1">📐 Drawing Reader</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Upload a floor plan or technical drawing and AI will count devices and build a BOM. You'll review before adding.</p>
-            <div className="space-y-4">
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Upload Drawing (PDF or Image)</label>
-                <input type="file" accept=".pdf,image/jpeg,image/png,image/webp"
-                  onChange={e => setDrawingFile(e.target.files[0] || null)}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                {drawingFile && <p className="text-[#8A9AB0] text-xs mt-1">{drawingFile.name} — {(drawingFile.size / 1024 / 1024).toFixed(2)} MB</p>}
-              </div>
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Instructions — what to look for</label>
-                <textarea value={drawingInstructions} onChange={e => setDrawingInstructions(e.target.value)} rows={3}
-                  placeholder="e.g. Only count cameras and access control readers. Ignore data drops and AV equipment."
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
-              </div>
-              <button onClick={analyzeDrawing} disabled={analyzingDrawing || !drawingFile}
-                className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">
-                {analyzingDrawing ? '📐 Analyzing Drawing...' : '📐 Analyze Drawing'}
-              </button>
-              {drawingPreview.length > 0 && (
-                <div>
-                  <p className="text-white text-sm font-semibold mb-2">{drawingPreview.length} items found — review before adding</p>
-                  <div className="bg-[#0F1C2E] rounded-xl overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-[#2a3d55]">
-                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Item</th>
-                          <th className="text-[#8A9AB0] text-right py-2 px-3 font-normal">Qty</th>
-                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Category</th>
-                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Notes</th>
-                          <th className="py-2 px-3"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {drawingPreview.map((item, i) => (
-                          <tr key={i} className="border-b border-[#2a3d55]/30">
-                            <td className="text-white py-2 px-3">{item.item_name}</td>
-                            <td className="text-[#8A9AB0] py-2 px-3 text-right">{item.quantity}</td>
-                            <td className="text-[#8A9AB0] py-2 px-3">{item.category}</td>
-                            <td className="text-[#8A9AB0] py-2 px-3 text-xs italic">{item.notes}</td>
-                            <td className="py-2 px-3"><button onClick={() => setDrawingPreview(prev => prev.filter((_, idx) => idx !== i))} className="text-[#8A9AB0] hover:text-red-400 transition-colors text-base leading-none">×</button></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <p className="text-[#8A9AB0] text-xs mt-2">Review quantities carefully — AI counts may need adjustment. Items added to BOM in Edit mode.</p>
-                </div>
-              )}
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => { setShowDrawingModal(false); setDrawingFile(null); setDrawingInstructions(''); setDrawingPreview([]) }}
-                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                {drawingPreview.length > 0 && (
-                  <button onClick={applyDrawingBOM}
-                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-                    Add {drawingPreview.length} Items to BOM →
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showRenewalModal && <RenewalDateModal pendingRenewalItems={pendingRenewalItems} pendingRenewalDates={pendingRenewalDates} setPendingRenewalDates={setPendingRenewalDates} savingRenewal={savingRenewal} onSave={saveRenewalModalDates} onClose={() => setShowRenewalModal(false)} />}
 
-      {/* Site Photos Modal */}
-      {showPhotosModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-5">
-              <div><h3 className="text-white font-bold text-lg">📷 Site Photos</h3><p className="text-[#8A9AB0] text-sm mt-0.5">Attach job site photos to this proposal</p></div>
-              <label className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors cursor-pointer">
-                {uploadingPhoto ? 'Uploading...' : '+ Upload Photo'}
-                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} className="hidden" disabled={uploadingPhoto} />
-              </label>
-            </div>
-            {photos.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-[#2a3d55] rounded-xl"><p className="text-[#8A9AB0] text-lg mb-2">📷</p><p className="text-[#8A9AB0] text-sm">No photos yet.</p></div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                {photos.map(photo => (
-                  <div key={photo.id} className="bg-[#0F1C2E] rounded-xl overflow-hidden">
-                    <img src={photo.displayUrl || photo.url} alt={photo.caption || 'Site photo'} className="w-full h-48 object-cover" />
-                    <div className="p-3 flex items-center gap-2">
-                      <input type="text" value={photo.caption || ''} placeholder="Add caption..." onChange={e => updatePhotoCaption(photo.id, e.target.value)} onBlur={e => updatePhotoCaption(photo.id, e.target.value)}
-                        className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-                      <button onClick={() => deletePhoto(photo.id, photo.url)} className="text-red-400 hover:text-red-300 text-xs">✕</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button onClick={() => setShowPhotosModal(false)} className="mt-5 w-full py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Done</button>
-          </div>
-        </div>
-      )}
+      {showShareModal && <ShareModal orgProfiles={orgProfiles} profile={profile} collaborators={collaborators} onShare={shareProposal} onClose={() => setShowShareModal(false)} />}
 
-      {/* Convert to Order Modal */}
-      {showOrderModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-1">Convert to Manufacturer Order</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Create an order from this proposal's BOM to track fulfillment.</p>
-            <div className="space-y-4">
-              <div className="bg-[#0F1C2E] rounded-lg p-3 max-h-48 overflow-y-auto">
-                <p className="text-[#8A9AB0] text-xs mb-2">{lineItems.length} item{lineItems.length !== 1 ? 's' : ''} to fulfill</p>
-                {lineItems.map(item => <div key={item.id} className="flex justify-between text-xs py-1 border-b border-[#2a3d55]/30"><span className="text-white">{item.item_name}</span><span className="text-[#8A9AB0]">Qty: {item.quantity}</span></div>)}
-                <div className="flex justify-between text-xs pt-2 font-semibold"><span className="text-[#8A9AB0]">Order Value</span><span className="text-[#C8622A]">${lineItems.reduce((sum, l) => sum + (l.customer_price_total || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-              </div>
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Order Number</label>
-                <div className="flex gap-2 mb-2">
-                  <button onClick={() => setOrderAutoNumber(true)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${orderAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Auto-Generate</button>
-                  <button onClick={() => setOrderAutoNumber(false)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${!orderAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Enter Manually</button>
-                </div>
-                {!orderAutoNumber && <input type="text" value={orderNumber} onChange={e => setOrderNumber(e.target.value)} placeholder="e.g. ORD-2026-001" className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />}
-              </div>
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Expected Ship Date (optional)</label>
-                <input type="date" value={orderExpectedShip} onChange={e => setOrderExpectedShip(e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-              </div>
-              {clientAddress && <div className="bg-[#0F1C2E] rounded-lg px-4 py-3 text-xs text-[#8A9AB0]"><p className="text-white font-medium mb-0.5">Ship to:</p><p>{clientAddress}</p></div>}
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowOrderModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={createOrder} disabled={creatingOrder || (!orderAutoNumber && !orderNumber)} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{creatingOrder ? 'Creating...' : 'Create Order'}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showSaveTemplateModal && <SaveTemplateModal lineItems={lineItems} laborItems={laborItems} templateName={templateName} setTemplateName={setTemplateName} savingTemplate={savingTemplate} onSave={saveAsTemplate} onClose={() => { setShowSaveTemplateModal(false); setTemplateName('') }} />}
 
-      {/* SLA Agreement Modal */}
-      {showSLAModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="text-white font-bold text-lg">📋 {editingAgreementIdx !== null ? 'Edit' : 'Add'} Service Agreement</h3>
-              <button onClick={() => setShowSLAModal(false)} className="text-[#8A9AB0] hover:text-white text-2xl leading-none">×</button>
-            </div>
-            <div className="space-y-4">
-              {/* Template picker — all enabled tiers across all industries */}
-              {allSLATiers().length > 0 && (
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start from a template</label>
-                  <select value={editSLAForm.tier_id || ''} onChange={e => {
-                    const tier = allSLATiers().find(t => t.id === e.target.value)
-                    if (tier) setEditSLAForm(p => ({ ...p, tier_id: tier.id, tier_name: tier.name, name: tier.name, response_time_hours: tier.response_time_hours ?? '', labor_rate: tier.labor_rate || 100, emergency_rate: tier.emergency_rate ?? '', billing_frequency: tier.billing_frequency || 'Quarterly', maintenance_calls_per_year: tier.maintenance_calls_per_year || 0, initial_fee: tier.initial_fee || 0, recurring_fee: tier.recurring_fee || 0, body: tier.body || '' }))
-                  }} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                    <option value="">— Pick a template to pre-fill —</option>
-                    {allSLATiers().map(t => (
-                      <option key={t.id} value={t.id}>{t.name} {t._industry ? `(${t._industry})` : ''}</option>
-                    ))}
-                  </select>
-                  <p className="text-[#8A9AB0] text-xs mt-1">All fields below remain editable after selecting a template.</p>
-                </div>
-              )}
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Agreement Name</label>
-                <input type="text" value={editSLAForm.name || ''} onChange={e => setEditSLAForm(p => ({ ...p, name: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Response Time (hours) <span className="text-[#8A9AB0] font-normal">— blank = N/A</span></label>
-                  <input type="number" value={editSLAForm.response_time_hours ?? ''} placeholder="N/A" onChange={e => setEditSLAForm(p => ({ ...p, response_time_hours: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Frequency</label>
-                  <select value={editSLAForm.billing_frequency || 'Quarterly'} onChange={e => setEditSLAForm(p => ({ ...p, billing_frequency: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                    <option>Monthly</option><option>Quarterly</option><option>Annually</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Labor Rate ($/hr)</label>
-                  <input type="number" value={editSLAForm.labor_rate || ''} onChange={e => setEditSLAForm(p => ({ ...p, labor_rate: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Emergency Rate ($/hr) <span className="text-[#8A9AB0] font-normal">— blank = N/A</span></label>
-                  <input type="number" value={editSLAForm.emergency_rate ?? ''} placeholder="N/A" onChange={e => setEditSLAForm(p => ({ ...p, emergency_rate: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Maintenance Visits/Year</label>
-                  <input type="number" min="0" value={editSLAForm.maintenance_calls_per_year ?? 0} onChange={e => setEditSLAForm(p => ({ ...p, maintenance_calls_per_year: Number(e.target.value) }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Initial Fee ($) <span className="text-[#8A9AB0] font-normal">billed with job</span></label>
-                  <input type="number" min="0" value={editSLAForm.initial_fee ?? 0} onChange={e => setEditSLAForm(p => ({ ...p, initial_fee: Number(e.target.value) }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Recurring Fee ($) <span className="text-[#8A9AB0] font-normal">per billing cycle</span></label>
-                  <input type="number" min="0" value={editSLAForm.recurring_fee ?? 0} onChange={e => setEditSLAForm(p => ({ ...p, recurring_fee: Number(e.target.value) }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start Date</label>
-                  <input type="date" value={editSLAForm.start_date || ''} onChange={e => setEditSLAForm(p => ({ ...p, start_date: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">End Date</label>
-                  <input type="date" value={editSLAForm.end_date || ''} onChange={e => setEditSLAForm(p => ({ ...p, end_date: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div className="col-span-2 flex items-center gap-3">
-                  <input type="checkbox" id="sla-autorenew" checked={!!editSLAForm.auto_renew} onChange={e => setEditSLAForm(p => ({ ...p, auto_renew: e.target.checked }))} className="w-4 h-4 accent-[#C8622A]" />
-                  <label htmlFor="sla-autorenew" className="text-[#8A9AB0] text-sm">Auto-renew when term ends</label>
-                </div>
-              </div>
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Language</label>
-                <textarea rows={10} value={editSLAForm.body || ''} onChange={e => setEditSLAForm(p => ({ ...p, body: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none font-mono" />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowSLAModal(false)} className="flex-1 bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">Cancel</button>
-                <button onClick={saveSLAContract} disabled={savingContract} className="flex-1 bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {savingContract ? 'Saving...' : editingAgreementIdx !== null ? 'Save Changes' : 'Add Agreement'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showSendModal && <SendProposalModal proposal={proposal} sendForm={sendForm} setSendForm={setSendForm} sendingProposal={sendingProposal} onSend={sendProposal} onClose={() => setShowSendModal(false)} />}
 
-      {/* Monitoring Contract Modal */}
-      {showMonitoringModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-5">
-              <h3 className="text-white font-bold text-lg">📡 {editingAgreementIdx !== null ? 'Edit' : 'Add'} Monitoring Contract</h3>
-              <button onClick={() => setShowMonitoringModal(false)} className="text-[#8A9AB0] hover:text-white text-2xl leading-none">×</button>
-            </div>
-            <div className="space-y-4">
-              {/* Template picker */}
-              {allMonitoringTemplates().length > 0 && (
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start from a template</label>
-                  <select onChange={e => {
-                    const tmpl = allMonitoringTemplates().find(t => t._industry === e.target.value)
-                    if (tmpl) setEditMonitoringForm(p => ({ ...p, name: tmpl.name || 'Monitoring Contract', monthly_fee: tmpl.monthly_fee || 49, monitored_systems: tmpl.monitored_systems || '', billing_frequency: tmpl.billing_frequency || 'Monthly', escalation_contacts: tmpl.escalation_contacts || 2, body: tmpl.body || '' }))
-                  }} defaultValue="" className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                    <option value="">— Pick a template to pre-fill —</option>
-                    {allMonitoringTemplates().map(t => (
-                      <option key={t._industry} value={t._industry}>{t.name || 'Monitoring Contract'} ({t._industry})</option>
-                    ))}
-                  </select>
-                  <p className="text-[#8A9AB0] text-xs mt-1">All fields remain editable after selecting.</p>
-                </div>
-              )}
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Name</label>
-                <input type="text" value={editMonitoringForm.name || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, name: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Monthly Fee ($)</label>
-                  <input type="number" value={editMonitoringForm.monthly_fee || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, monthly_fee: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Escalation Contacts</label>
-                  <input type="number" min="1" value={editMonitoringForm.escalation_contacts || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, escalation_contacts: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Frequency</label>
-                  <select value={editMonitoringForm.billing_frequency || 'Monthly'} onChange={e => setEditMonitoringForm(p => ({ ...p, billing_frequency: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                    <option>Monthly</option><option>Quarterly</option><option>Annual</option>
-                  </select>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Monitored Systems</label>
-                  <input type="text" value={editMonitoringForm.monitored_systems || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, monitored_systems: e.target.value }))}
-                    placeholder="e.g. Cameras, Access Control, Alarm" className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start Date</label>
-                  <input type="date" value={editMonitoringForm.start_date || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, start_date: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">End Date</label>
-                  <input type="date" value={editMonitoringForm.end_date || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, end_date: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div className="col-span-2 flex items-center gap-3">
-                  <input type="checkbox" id="mon-autorenew" checked={!!editMonitoringForm.auto_renew} onChange={e => setEditMonitoringForm(p => ({ ...p, auto_renew: e.target.checked }))} className="w-4 h-4 accent-[#C8622A]" />
-                  <label htmlFor="mon-autorenew" className="text-[#8A9AB0] text-sm">Auto-renew when term ends</label>
-                </div>
-              </div>
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Contract Language</label>
-                <textarea rows={12} value={editMonitoringForm.body || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, body: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none font-mono" />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowMonitoringModal(false)} className="flex-1 bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">Cancel</button>
-                <button onClick={saveMonitoringContract} disabled={savingContract} className="flex-1 bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {savingContract ? 'Saving...' : editingAgreementIdx !== null ? 'Save Changes' : 'Add Contract'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onClose={() => setShowPricingModal(false)} />}
 
-      {/* Contract Start Date Modal */}
-      {showContractStartModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <div className="w-12 h-12 rounded-full bg-[#C8622A]/20 flex items-center justify-center mx-auto mb-4"><span className="text-2xl">📋</span></div>
-            <h3 className="text-white font-bold text-lg mb-1 text-center">Set Contract Start Dates</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5 text-center">Set a start date for each agreement. End date will be auto-set to 1 year later.</p>
-            <div className="space-y-3 mb-5">
-              {pendingContractItems.map(item => (
-                <div key={`${item._type}_${item._idx}`} className="bg-[#0F1C2E] rounded-lg px-4 py-3">
-                  <div className="flex justify-between items-center gap-3">
-                    <div>
-                      <p className="text-white text-sm font-medium">{item.name || (item._type === 'sla' ? 'Service Agreement' : 'Monitoring Contract')}</p>
-                      <p className="text-[#8A9AB0] text-xs capitalize">{item._type}</p>
-                    </div>
-                    <input type="date" value={pendingContractDates[`${item._type}_${item._idx}`] || ''}
-                      onChange={e => setPendingContractDates(prev => ({ ...prev, [`${item._type}_${item._idx}`]: e.target.value }))}
-                      className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]" />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setShowContractStartModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Skip for now</button>
-              <button onClick={saveContractStartDates} disabled={savingContractDates} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                {savingContractDates ? 'Saving...' : 'Save Start Dates'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showMoveModal && moveLineIndex !== null && <MoveLineModal editLines={editLines} moveLineIndex={moveLineIndex} editSections={editSections} onMove={moveLineToSection} onClose={() => { setShowMoveModal(false); setMoveLineIndex(null) }} />}
 
-      {/* Renewal Date Modal */}
-      {showRenewalModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <div className="w-12 h-12 rounded-full bg-[#C8622A]/20 flex items-center justify-center mx-auto mb-4"><span className="text-2xl">🔄</span></div>
-            <h3 className="text-white font-bold text-lg mb-1 text-center">Set Renewal Dates</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5 text-center">This deal has recurring items. Set a renewal date for each so ForgePt. can notify you and auto-generate renewal proposals.</p>
-            <div className="space-y-3 mb-5">
-              {pendingRenewalItems.map(item => (
-                <div key={item.id} className="bg-[#0F1C2E] rounded-lg px-4 py-3">
-                  <div className="flex justify-between items-center">
-                    <div><p className="text-white text-sm font-medium">{item.item_name}</p><p className="text-[#8A9AB0] text-xs">${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} / renewal</p></div>
-                    <input type="date" value={pendingRenewalDates[item.id] || ''} onChange={e => setPendingRenewalDates(prev => ({ ...prev, [item.id]: e.target.value }))}
-                      className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#C8622A]" />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setShowRenewalModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Skip for now</button>
-              <button onClick={saveRenewalModalDates} disabled={savingRenewal} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingRenewal ? 'Saving...' : 'Save Renewal Dates'}</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showSentPrompt && <SentPromptModal onConfirm={markAsSent} onClose={() => setShowSentPrompt(false)} />}
 
-      {/* Share Modal */}
-      {showShareModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-1">Share Proposal</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Tag teammates on this deal — they'll be notified and gain visibility.</p>
-            {orgProfiles.filter(p => p.id !== profile?.id).length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No other team members found.</p>
-            ) : (
-              <div className="space-y-2">
-                {orgProfiles.filter(p => p.id !== profile?.id).map(p => {
-                  const isCollab = collaborators.includes(p.id)
-                  return (
-                    <div key={p.id} className={`flex justify-between items-center p-3 rounded-lg border cursor-pointer transition-colors ${isCollab ? 'border-[#C8622A] bg-[#C8622A]/10' : 'border-[#2a3d55] bg-[#0F1C2E] hover:border-[#3a4d65]'}`} onClick={() => shareProposal(p.id)}>
-                      <div><p className="text-white text-sm font-medium">{p.full_name}</p><p className="text-[#8A9AB0] text-xs">{p.email}</p></div>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded ${isCollab ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{isCollab ? '✓ Shared' : '+ Share'}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-            <button onClick={() => setShowShareModal(false)} className="mt-5 w-full py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Done</button>
-          </div>
-        </div>
-      )}
-
-      {/* Save as Template Modal */}
-      {showSaveTemplateModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-sm">
-            <div className="w-12 h-12 rounded-full bg-[#C8622A]/20 flex items-center justify-center mx-auto mb-4"><span className="text-[#C8622A] text-xl">📋</span></div>
-            <h3 className="text-white font-bold text-lg mb-2 text-center">Save as Template</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5 text-center">This will save all {lineItems.length} line items{laborItems.filter(l => l.role).length > 0 ? ` and ${laborItems.filter(l => l.role).length} labor item${laborItems.filter(l => l.role).length > 1 ? 's' : ''}` : ''} as a reusable template.</p>
-            <div className="mb-4">
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Template Name</label>
-              <input type="text" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. 8 Camera Install"
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" autoFocus />
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => { setShowSaveTemplateModal(false); setTemplateName('') }} className="flex-1 py-2 bg-[#0F1C2E] text-[#8A9AB0] hover:text-white rounded-lg text-sm transition-colors">Cancel</button>
-              <button onClick={saveAsTemplate} disabled={savingTemplate || !templateName.trim()} className="flex-1 py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingTemplate ? 'Saving...' : 'Save Template'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Send Proposal Modal */}
-      {showSendModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg">
-            <h3 className="text-white font-bold text-lg mb-1">Send Proposal</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Sending to <span className="text-white font-medium">{proposal?.client_email}</span> · PDF will be attached</p>
-            <div className="space-y-4">
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Subject</label><input type="text" value={sendForm.subject} onChange={e => setSendForm(p => ({ ...p, subject: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" /></div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Message</label><textarea value={sendForm.message} onChange={e => setSendForm(p => ({ ...p, message: e.target.value }))} rows={6} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" /></div>
-              <div className="bg-[#0F1C2E] rounded-lg px-4 py-3 text-xs text-[#8A9AB0]">
-                <p>✓ PDF proposal will be attached automatically</p><p>✓ Proposal will be marked as Sent</p><p>✓ Follow-up emails will begin on your cadence</p><p>✓ Reply-to will be set to your email</p>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowSendModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={sendProposal} disabled={sendingProposal || !sendForm.subject || !sendForm.message} className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50">{sendingProposal ? 'Sending...' : 'Send Proposal →'}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-{/* Pricing Options Modal */}
-      {showPricingModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-sm">
-            <h3 className="text-white font-bold text-lg mb-1">⚙ Pricing Options</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Controls what clients see on PDF, DOCX, and the signing page. Internal view always shows full detail.</p>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between bg-[#0F1C2E] rounded-xl px-4 py-3">
-                <div>
-                  <p className="text-white text-sm font-semibold">Hide Material Unit Prices</p>
-                  <p className="text-[#8A9AB0] text-xs mt-0.5">Show item names and qty only — no unit price or line total</p>
-                </div>
-                <button onClick={toggleHideMaterialPrices}
-                  className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.hide_material_prices ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
-                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.hide_material_prices ? 'left-6' : 'left-1'}`} />
-                </button>
-              </div>
-              <div className="flex items-center justify-between bg-[#0F1C2E] rounded-xl px-4 py-3">
-                <div>
-                  <p className="text-white text-sm font-semibold">Hide Labor Breakdown</p>
-                  <p className="text-[#8A9AB0] text-xs mt-0.5">Show Role, Qty, Total only — no hourly rate</p>
-                </div>
-                <button onClick={toggleHideLaborBreakdown}
-                  className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.hide_labor_breakdown ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
-                  <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.hide_labor_breakdown ? 'left-6' : 'left-1'}`} />
-                </button>
-              </div>
-              
-            </div>
-            <button onClick={() => setShowPricingModal(false)}
-              className="mt-5 w-full py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-              Done
-            </button>
-          </div>
-        </div>
-      )}
-
-{/* Move Line Modal */}
-      {showMoveModal && moveLineIndex !== null && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-sm">
-            <h3 className="text-white font-bold text-lg mb-1">Move Item</h3>
-            <p className="text-[#8A9AB0] text-sm mb-4">{editLines[moveLineIndex]?.item_name}</p>
-            <div className="space-y-2 mb-5">
-              {[{ id: 'general', name: 'General (no section)' }, ...editSections].map(s => (
-                <button key={s.id} onClick={() => moveLineToSection(moveLineIndex, s.id, 'move')}
-                  className="w-full text-left px-4 py-3 bg-[#0F1C2E] hover:bg-[#C8622A]/10 border border-[#2a3d55] hover:border-[#C8622A]/40 rounded-xl text-white text-sm transition-colors">
-                  {s.name || 'Untitled Section'}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => { setShowMoveModal(false); setMoveLineIndex(null) }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-              <button onClick={() => { moveLineToSection(moveLineIndex, editLines[moveLineIndex]?.section_id || 'general', 'copy'); }}
-                className="flex-1 bg-[#2a3d55] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">
-                Copy Instead
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Sent Prompt Modal */}
-      {showSentPrompt && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-sm text-center">
-            <div className="w-12 h-12 rounded-full bg-[#C8622A]/20 flex items-center justify-center mx-auto mb-4"><span className="text-[#C8622A] text-xl">✉</span></div>
-            <h3 className="text-white font-bold text-lg mb-2">Did you send this proposal?</h3>
-            <p className="text-[#8A9AB0] text-sm mb-6">Mark it as Sent so follow-up emails go out automatically on schedule.</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowSentPrompt(false)} className="flex-1 py-2 bg-[#0F1C2E] text-[#8A9AB0] hover:text-white rounded-lg text-sm transition-colors">Not yet</button>
-              <button onClick={markAsSent} className="flex-1 py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Yes, mark as Sent</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* PO Modal */}
-      {showPOModal && (() => {
-        const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
-        const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
-        const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
-        return (
-          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-              <h3 className="text-white font-bold text-lg mb-4">Generate Purchase Order</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor Email <span className="font-normal text-[#8A9AB0]">(optional — for your records)</span></label>
-                  {vendorNames.length > 0 && <p className="text-[#8A9AB0] text-xs mb-1">Vendors: {vendorNames.join(', ')}</p>}
-                  <input type="email" value={poVendorEmail} onChange={e => setPOVendorEmail(e.target.value)} placeholder="vendor@company.com"
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
-                  <div className="flex gap-2 mb-2">
-                    <button onClick={() => setPOAutoNumber(true)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Auto-Generate</button>
-                    <button onClick={() => setPOAutoNumber(false)} className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${!poAutoNumber ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Enter Manually</button>
-                  </div>
-                  {!poAutoNumber && <input type="text" value={poNumber} onChange={e => setPONumber(e.target.value)} placeholder="e.g. PO-2026-001"
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />}
-                </div>
-                <div className="bg-[#0F1C2E] rounded-lg p-3">
-                  <p className="text-[#8A9AB0] text-xs mb-2">{selectedItems.length} item{selectedItems.length !== 1 ? 's' : ''} · Your cost: ${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                  <div className="space-y-1 max-h-40 overflow-y-auto">
-                    {selectedItems.map(item => (
-                      <div key={item.id} className="flex justify-between text-xs py-0.5">
-                        <span className="text-white">{item.item_name}</span>
-                        <span className="text-[#8A9AB0]">{item.vendor ? `${item.vendor} · ` : ''}Qty: {item.quantity} {item.unit}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-3 pt-2">
-                  <button onClick={() => setShowPOModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                  <button onClick={generatePO} disabled={generatingPO || selectedItems.length === 0 || (!poAutoNumber && !poNumber)}
-                    className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                    {generatingPO ? 'Generating...' : `Generate PO (${selectedItems.length} items)`}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
+      {showPOModal && <POModal lineItems={lineItems} selectedForPO={selectedForPO} poVendorEmail={poVendorEmail} setPOVendorEmail={setPOVendorEmail} poAutoNumber={poAutoNumber} setPOAutoNumber={setPOAutoNumber} poNumber={poNumber} setPONumber={setPONumber} generatingPO={generatingPO} onGenerate={generatePO} onClose={() => setShowPOModal(false)} />}
     </div>
   )
 }
