@@ -49,6 +49,7 @@ export default function SuperAdmin() {
   const [noteSaved, setNoteSaved] = useState(null)
   const [orgDetail, setOrgDetail] = useState({})
   const [loadingDetail, setLoadingDetail] = useState(null)
+  const [orgSearch, setOrgSearch] = useState('')
   const [metricsSortBy, setMetricsSortBy] = useState('health')
   const [pinQuery, setPinQuery] = useState('')
   const [pinResult, setPinResult] = useState(null)
@@ -535,10 +536,27 @@ export default function SuperAdmin() {
         {/* Organizations */}
         {activeTab === 'orgs' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">All Organizations</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <h3 className="text-white font-bold text-lg">All Organizations</h3>
+                <span className="text-[#8A9AB0] text-sm">{orgs.length}</span>
+              </div>
+              <input
+                type="text"
+                value={orgSearch}
+                onChange={e => setOrgSearch(e.target.value)}
+                placeholder="Search name or email..."
+                className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:border-[#C8622A] placeholder-[#4a5d75]"
+              />
+            </div>
             {loading ? <p className="text-[#8A9AB0]">Loading...</p> : orgs.length === 0 ? <p className="text-[#8A9AB0]">No organizations yet.</p> : (
               <div className="space-y-3">
-                {orgs.map(org => {
+                {orgs.filter(o => {
+                  if (!orgSearch) return true
+                  const q = orgSearch.toLowerCase()
+                  const adm = getOrgAdmin(o.id)
+                  return o.name?.toLowerCase().includes(q) || adm?.email?.toLowerCase().includes(q)
+                }).map(org => {
                   const admin = getOrgAdmin(org.id)
                   const memberCount = getOrgProfiles(org.id).length
                   const status = org.status || 'active'
@@ -559,16 +577,21 @@ export default function SuperAdmin() {
                             <span className={`text-xs ${health.labelColor}`}>{health.label}</span>
                           </div>
                           <p className="text-[#8A9AB0] text-xs">{admin?.full_name || '—'} · {admin?.email || '—'} · {memberCount} users</p>
-                          <div className="flex gap-2 mt-1.5 flex-wrap items-center">
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_proposals !== false ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_proposals !== false ? '✓ Proposals' : '✗ Proposals'}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_crm ? '✓ CRM' : '✗ CRM'}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_send_proposal ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_send_proposal ? '✓ Send Proposal' : '✗ Send Proposal'}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_ai_email ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_ai_email ? '✓ AI Email' : '✗ AI Email'}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_purchase_orders !== false ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_purchase_orders !== false ? '✓ POs' : '✗ POs'}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_invoices !== false ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_invoices !== false ? '✓ Invoices' : '✗ Invoices'}</span>
-                            <span className="bg-[#0F1C2E] text-[#8A9AB0] text-xs px-2 py-0.5 rounded border border-[#2a3d55]">{stats.total} proposals</span>
-                            <span className="bg-[#0F1C2E] text-[#8A9AB0] text-xs px-2 py-0.5 rounded border border-[#2a3d55]">{stats.clients} clients</span>
-                            <span className="bg-[#0F1C2E] text-[#8A9AB0] text-xs px-2 py-0.5 rounded border border-[#2a3d55]">{stats.last30} last 30d</span>
+                          <div className="flex gap-1.5 mt-1.5 flex-wrap items-center">
+                            {org.feature_crm && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">CRM</span>}
+                            {org.feature_send_proposal && <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 font-medium">Send</span>}
+                            {org.feature_ai_email && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">AI Email</span>}
+                            {org.feature_ai_bom && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">AI BOM</span>}
+                            {org.feature_drawing_tool && <span className="text-xs px-1.5 py-0.5 rounded bg-[#C8622A]/15 text-[#C8622A] font-medium">Designer</span>}
+                            {org.feature_drawing_reader && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">Draw Reader</span>}
+                            {org.feature_spec_reader && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">Spec Reader</span>}
+                            {org.feature_proposals === false && <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-medium">No Proposals</span>}
+                            {org.feature_purchase_orders === false && <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-medium">No POs</span>}
+                            <span className="text-[#4a5d75] text-xs">·</span>
+                            <span className="text-xs text-[#8A9AB0]">{stats.total} proposals</span>
+                            <span className="text-[#4a5d75] text-xs">·</span>
+                            <span className="text-xs text-[#8A9AB0]">{stats.clients} clients</span>
+                            {stats.last30 > 0 && <><span className="text-[#4a5d75] text-xs">·</span><span className="text-xs text-green-400">{stats.last30} last 30d</span></>}
                           </div>
                         </div>
                         <div className="flex gap-2 flex-wrap justify-end">
@@ -595,63 +618,79 @@ export default function SuperAdmin() {
                             </div>
                           </div>
 
-                          <div>
-                            <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">Feature Access</label>
-                            <div className="flex gap-3 flex-wrap">
-                              <button onClick={() => setOrgForm(p => ({ ...p, feature_proposals: !p.feature_proposals }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_proposals ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_proposals ? '✓' : '○'}</span> Proposals
-                              </button>
-                              <button onClick={() => setOrgForm(p => ({ ...p, feature_crm: !p.feature_crm }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_crm ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_crm ? '✓' : '○'}</span> CRM
-                              </button>
-                              <button onClick={() => setOrgForm(p => ({ ...p, feature_send_proposal: !p.feature_send_proposal }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_send_proposal ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_send_proposal ? '✓' : '○'}</span> Send Proposal
-                              </button>
-                              <button onClick={() => setOrgForm(p => ({ ...p, feature_ai_email: !p.feature_ai_email }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_ai_email ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_ai_email ? '✓' : '○'}</span> AI Email Writer
-                              </button>
-                              <button onClick={() => setOrgForm(p => ({ ...p, feature_purchase_orders: !p.feature_purchase_orders }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_purchase_orders ? 'border-blue-400 bg-blue-500/10 text-blue-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_purchase_orders ? '✓' : '○'}</span> Purchase Orders
-                              </button>
-                              <button onClick={() => setOrgForm(p => ({ ...p, feature_invoices: !p.feature_invoices }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_invoices ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_invoices ? '✓' : '○'}</span> Invoices
-                              </button>
-                              <button onClick={() => setOrgForm(p => ({ ...p, feature_ai_bom: !p.feature_ai_bom }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_ai_bom ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_ai_bom ? '✓' : '○'}</span> AI BOM Builder
-                              </button>
-                              <button onClick={() => setOrgForm(p => ({ ...p, feature_site_photos: !p.feature_site_photos }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_site_photos ? 'border-blue-400 bg-blue-500/10 text-blue-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_site_photos ? '✓' : '○'}</span> Site Photos
-                              </button>
-                              <button onClick={() => setOrgForm(p => ({ ...p, feature_drawing_tool: !p.feature_drawing_tool }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_drawing_tool ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_drawing_tool ? '✓' : '○'}</span> Designer
-                              </button>
-                              <button onClick={() => setOrgForm(p => ({
-                                ...p,
-                                feature_designer_only: !p.feature_designer_only,
-                                feature_drawing_tool: !p.feature_designer_only ? true : p.feature_drawing_tool
-                              }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_designer_only ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_designer_only ? '✓' : '○'}</span> Designer Only
-                              </button>
-                              <button onClick={() => setOrgForm(p => ({ ...p, feature_drawing_reader: !p.feature_drawing_reader }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_drawing_reader ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_drawing_reader ? '✓' : '○'}</span> Drawing Reader
-                              </button>
-                              <button onClick={() => setOrgForm(p => ({ ...p, feature_spec_reader: !p.feature_spec_reader }))}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold transition-colors ${orgForm.feature_spec_reader ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                <span>{orgForm.feature_spec_reader ? '✓' : '○'}</span> Spec Reader
-                              </button>
-                              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-semibold ${orgForm.feature_proposals && orgForm.feature_crm ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                {orgForm.feature_proposals && orgForm.feature_crm ? '✓ Full Suite' : '○ Full Suite'}
+                          <div className="space-y-3">
+                            <label className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Feature Access</label>
+
+                            <div>
+                              <p className="text-[#8A9AB0] text-xs mb-1.5 font-medium">Core</p>
+                              <div className="grid grid-cols-5 gap-2">
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_proposals: !p.feature_proposals }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_proposals ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_proposals ? '✓' : '○'}</span> Proposals
+                                </button>
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_crm: !p.feature_crm }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_crm ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_crm ? '✓' : '○'}</span> CRM
+                                </button>
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_send_proposal: !p.feature_send_proposal }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_send_proposal ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_send_proposal ? '✓' : '○'}</span> Send Proposal
+                                </button>
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_purchase_orders: !p.feature_purchase_orders }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_purchase_orders ? 'border-blue-400 bg-blue-500/10 text-blue-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_purchase_orders ? '✓' : '○'}</span> Purchase Orders
+                                </button>
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_invoices: !p.feature_invoices }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_invoices ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_invoices ? '✓' : '○'}</span> Invoices
+                                </button>
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="text-[#8A9AB0] text-xs mb-1.5 font-medium">AI Tools</p>
+                              <div className="grid grid-cols-4 gap-2">
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_ai_email: !p.feature_ai_email }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_ai_email ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_ai_email ? '✓' : '○'}</span> AI Email
+                                </button>
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_ai_bom: !p.feature_ai_bom }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_ai_bom ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_ai_bom ? '✓' : '○'}</span> AI BOM
+                                </button>
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_drawing_reader: !p.feature_drawing_reader }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_drawing_reader ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_drawing_reader ? '✓' : '○'}</span> Drawing Reader
+                                </button>
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_spec_reader: !p.feature_spec_reader }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_spec_reader ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_spec_reader ? '✓' : '○'}</span> Spec Reader
+                                </button>
+                              </div>
+                            </div>
+
+                            <div>
+                              <p className="text-[#8A9AB0] text-xs mb-1.5 font-medium">Designer & Other</p>
+                              <div className="grid grid-cols-4 gap-2">
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_drawing_tool: !p.feature_drawing_tool }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_drawing_tool ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_drawing_tool ? '✓' : '○'}</span> Designer
+                                </button>
+                                <button onClick={() => setOrgForm(p => ({
+                                  ...p,
+                                  feature_designer_only: !p.feature_designer_only,
+                                  feature_drawing_tool: !p.feature_designer_only ? true : p.feature_drawing_tool
+                                }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_designer_only ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_designer_only ? '✓' : '○'}</span> Designer Only
+                                </button>
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_site_photos: !p.feature_site_photos }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_site_photos ? 'border-blue-400 bg-blue-500/10 text-blue-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_site_photos ? '✓' : '○'}</span> Site Photos
+                                </button>
+                                <div className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold ${orgForm.feature_proposals && orgForm.feature_crm ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  {orgForm.feature_proposals && orgForm.feature_crm ? '✓ Full Suite' : '○ Full Suite'}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -833,14 +872,6 @@ export default function SuperAdmin() {
                             <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>{org.org_type || 'integrator'}</span>
                           </div>
                           <p className="text-[#8A9AB0] text-xs">{admin?.email || '—'}</p>
-                          <div className="flex gap-2 mt-1 flex-wrap">
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_proposals !== false ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_proposals !== false ? '✓ Proposals' : '✗ Proposals'}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_crm ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_crm ? '✓ CRM' : '✗ CRM'}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_send_proposal ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_send_proposal ? '✓ Send Proposal' : '✗ Send Proposal'}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_ai_email ? 'bg-purple-500/20 text-purple-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_ai_email ? '✓ AI Email' : '✗ AI Email'}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_purchase_orders !== false ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_purchase_orders !== false ? '✓ POs' : '✗ POs'}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded ${org.feature_invoices !== false ? 'bg-green-500/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{org.feature_invoices !== false ? '✓ Invoices' : '✗ Invoices'}</span>
-                          </div>
                           {hasStripe && <p className="text-green-400 text-xs mt-1">✓ Stripe connected</p>}
                         </div>
                         <div className="flex items-center gap-2 flex-wrap justify-end">
