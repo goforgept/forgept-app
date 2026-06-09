@@ -11,7 +11,7 @@ const INDUSTRY_LABELS = {
   low_voltage: 'Low Voltage',
 }
 
-export default function SymbolPicker({ selectedSymbol, onSelect }) {
+export default function SymbolPicker({ selectedSymbol, onSelect, orgId }) {
   const [industry,      setIndustry]      = useState('all')
   const [manufacturer,  setManufacturer]  = useState('Generic')
   const [category,      setCategory]      = useState(null)
@@ -22,17 +22,15 @@ export default function SymbolPicker({ selectedSymbol, onSelect }) {
   const [loading,       setLoading]       = useState(false)
   const [allProducts,   setAllProducts]   = useState([])
 
-  // Load ALL products once on mount
+  // Load global + org products on mount
   useEffect(() => {
     const loadAll = async () => {
       setLoading(true)
-      const { data } = await supabase
-        .from('global_products')
-        .select('*')
-        .eq('is_active', true)
-        .order('category')
-        .order('name')
-      setAllProducts(data || [])
+      const [{ data: global }, { data: org }] = await Promise.all([
+        supabase.from('global_products').select('*').eq('is_active', true).order('category').order('name'),
+        orgId ? supabase.from('org_products').select('*').eq('org_id', orgId).eq('is_active', true).order('name') : Promise.resolve({ data: [] }),
+      ])
+      setAllProducts([...(global || []), ...(org || []).map(p => ({ ...p, is_custom: true }))])
       setLoading(false)
     }
     loadAll()

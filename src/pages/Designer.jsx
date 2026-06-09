@@ -529,6 +529,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                     <SymbolPicker
                       selectedSymbol={selectedSymbol}
                       onSelect={setSelectedSymbol}
+                      orgId={orgId}
                     />
                   </div>
                 )}
