@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { supabase } from './supabase'
+import { useProfile } from './context/ProfileContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ProposalDetail from './pages/ProposalDetail'
@@ -44,95 +44,8 @@ import DesignerProjects from './pages/DesignerProjects'
 import DrawingReview from './pages/DrawingReview'
 
 function App() {
-  const [session, setSession] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      if (session) fetchProfile(session.user.id)
-      else setLoading(false)
-    })
-
-    supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      if (session) {
-        fetchProfile(session.user.id)
-        if (_event === 'SIGNED_IN') {
-          supabase.rpc('update_last_login')
-        }
-      } else { setProfile(null); setLoading(false) }
-    })
-  }, [])
-
-  // Auto-logout after 1 hour of inactivity
-  useEffect(() => {
-    if (!session) return
-
-    const IDLE_TIMEOUT = 60 * 60 * 1000 // 1 hour in ms
-    let timer
-
-    const resetTimer = () => {
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        supabase.auth.signOut()
-      }, IDLE_TIMEOUT)
-    }
-
-    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
-    events.forEach(e => window.addEventListener(e, resetTimer))
-    resetTimer() // start timer on mount
-
-    return () => {
-      clearTimeout(timer)
-      events.forEach(e => window.removeEventListener(e, resetTimer))
-    }
-  }, [session])
-
-  const fetchProfile = async (userId) => {
-    const impersonation = (() => {
-      try { return JSON.parse(localStorage.getItem('sa_impersonate') || 'null') } catch { return null }
-    })()
-
-    for (let i = 0; i < 5; i++) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring, feature_drawing_tool, feature_designer_only)')
-        .eq('id', userId)
-        .single()
-
-      if (data?.org_role) {
-        if (data.role === 'superadmin' && impersonation?.userId) {
-          const { data: impResult } = await supabase.functions.invoke('superadmin-get-profile', {
-            body: { userId: impersonation.userId }
-          })
-          if (impResult?.profile) {
-            setProfile(impResult.profile)
-            setLoading(false)
-            return
-          }
-        }
-        setProfile(data)
-        setLoading(false)
-        return
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 1000))
-    }
-
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(status, org_type, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring, feature_drawing_tool, feature_designer_only)')
-      .eq('id', userId)
-      .single()
-    setProfile(data)
-    setLoading(false)
-  }
-
-  const impersonation = (() => {
-    try { return JSON.parse(localStorage.getItem('sa_impersonate') || 'null') } catch { return null }
-  })()
+  const { session, profile, loading } = useProfile()
+  const location = useLocation()
 
   if (loading) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
@@ -143,24 +56,26 @@ function App() {
     </div>
   )
 
-  const isAdmin = profile?.org_role === 'admin' || profile?.role === 'admin'
-  const isPending = profile?.organizations?.status === 'pending'
-  const featureProposals = profile?.organizations?.feature_proposals !== false
-  const featureCRM = profile?.organizations?.feature_crm || false
-  const featureSendProposal = profile?.organizations?.feature_send_proposal || false
-  const featureAiEmail = profile?.organizations?.feature_ai_email || false
+  const isAdmin      = profile?.org_role === 'admin' || profile?.role === 'admin'
+  const isPending    = profile?.organizations?.status === 'pending'
+
+  const featureProposals      = profile?.organizations?.feature_proposals      !== false
+  const featureCRM            = profile?.organizations?.feature_crm            || false
+  const featureSendProposal   = profile?.organizations?.feature_send_proposal  || false
+  const featureAiEmail        = profile?.organizations?.feature_ai_email       || false
   const featurePurchaseOrders = profile?.organizations?.feature_purchase_orders !== false
-  const featureInvoices = profile?.organizations?.feature_invoices !== false
-  const featureAiBom = profile?.organizations?.feature_ai_bom || false
-  const featureSitePhotos = profile?.organizations?.feature_site_photos !== false
-  const featureSla = profile?.organizations?.feature_sla || false
-  const featureMonitoring = profile?.organizations?.feature_monitoring || false
-  const featureDrawingTool   = profile?.organizations?.feature_drawing_tool   || false
-  const featureDesignerOnly  = profile?.organizations?.feature_designer_only  || false
+  const featureInvoices       = profile?.organizations?.feature_invoices       !== false
+  const featureAiBom          = profile?.organizations?.feature_ai_bom         || false
+  const featureSitePhotos     = profile?.organizations?.feature_site_photos    !== false
+  const featureSla            = profile?.organizations?.feature_sla            || false
+  const featureMonitoring     = profile?.organizations?.feature_monitoring     || false
+  const featureDrawingTool    = profile?.organizations?.feature_drawing_tool   || false
+  const featureDesignerOnly   = profile?.organizations?.feature_designer_only  || false
+
   sessionStorage.setItem('featureDesignerOnly', featureDesignerOnly)
   sessionStorage.setItem('featureSla', featureSla)
-sessionStorage.setItem('featureMonitoring', featureMonitoring)
-sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
+  sessionStorage.setItem('featureMonitoring', featureMonitoring)
+  sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
 
   if (session && isPending) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
@@ -182,11 +97,15 @@ sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
     </div>
   )
 
-  const location = useLocation()
-  const role = profile?.org_role || profile?.role || 'rep'
+  const role           = profile?.org_role || profile?.role || 'rep'
   const isSalesManager = role === 'sales_manager'
-  const isPM = role === 'project_manager'
-  const isTechnician = role === 'technician'
+  const isPM           = role === 'project_manager'
+  const isTechnician   = role === 'technician'
+
+  const impersonation = (() => {
+    try { return JSON.parse(localStorage.getItem('sa_impersonate') || 'null') } catch { return null }
+  })()
+
   const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail, featurePurchaseOrders, featureInvoices, featureAiBom, featureSitePhotos, featureSla, featureMonitoring, featureDrawingTool, featureDesignerOnly, role, isSalesManager, isPM, isTechnician }
 
   return (
@@ -197,66 +116,66 @@ sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
           <button onClick={() => { localStorage.removeItem('sa_impersonate'); window.location.reload() }} className="underline hover:no-underline ml-4">Exit</button>
         </div>
       )}
-    <Routes location={location} key={location.key}>
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/sign/:token" element={<SignProposal />} />
-      <Route path="/rfq-response/:token" element={<RFQResponse />} />
-      {!session ? (
-        <Route path="*" element={<Login />} />
-      ) : (
-        <>
-          <Route path="/" element={
-            featureDesignerOnly
-              ? <Navigate to="/designer" replace />
-              : isAdmin || isSalesManager
-              ? <AdminDashboard {...sharedProps} />
-              : isPM
-              ? <AdminDashboard {...sharedProps} defaultMode="pm" />
-              : isTechnician
-              ? <TechLog {...sharedProps} />
-              : <Dashboard {...sharedProps} />
-          } />
-          <Route path="/admin" element={<AdminDashboard {...sharedProps} />} />
-          <Route path="/rep" element={<Dashboard {...sharedProps} />} />
-          <Route path="/new" element={<NewProposal />} />
-          <Route path="/proposal/:id" element={<ProposalDetail {...sharedProps} />} />
-          <Route path="/reps" element={<ManageReps {...sharedProps} />} />
-          <Route path="/proposals" element={<Proposals {...sharedProps} />} />
-          <Route path="/vendors" element={<Vendors {...sharedProps} />} />
-          <Route path="/settings" element={<Settings {...sharedProps} />} />
-          <Route path="/clients" element={<Clients {...sharedProps} />} />
-          <Route path="/superadmin" element={<SuperAdmin />} />
-          <Route path="/client/:id" element={<ClientDetail {...sharedProps} />} />
-          <Route path="/purchase-orders" element={<PurchaseOrders {...sharedProps} />} />
-          <Route path="/faq" element={<FAQ {...sharedProps} />} />
-          <Route path="/tasks" element={<Tasks {...sharedProps} />} />
-          <Route path="/pipeline" element={<Pipeline {...sharedProps} />} />
-          <Route path="/forecast" element={<Forecast {...sharedProps} />} />
-          <Route path="/catalog" element={<Catalog {...sharedProps} />} />
-          <Route path="/templates" element={<Templates isAdmin={isAdmin} />} />
-          <Route path="/invoices" element={<Invoices {...sharedProps} />} />
-          <Route path="/invoices/new" element={<NewInvoice {...sharedProps} />} />
-          <Route path="/invoices/:id" element={<InvoiceDetail {...sharedProps} />} />
-          <Route path="/orders" element={<ManufacturerOrders {...sharedProps} />} />
-          <Route path="/jobs" element={<Jobs {...sharedProps} />} />
-          <Route path="/jobs/:id" element={<JobDetail {...sharedProps} />} />
-          <Route path="/tech/job/:id" element={<TechJobView {...sharedProps} />} />
-          <Route path="/tech-log" element={<TechLog {...sharedProps} />} />
-          <Route path="/service-tickets" element={<ServiceTickets {...sharedProps} />} />
-          <Route path="/service-tickets/:id" element={<ServiceTicketDetail {...sharedProps} />} />
-          <Route path="/dispatch" element={<Dispatch {...sharedProps} />} />
-          <Route path="/integrations/square/callback" element={<SquareCallback />} />
-          <Route path="/integrations/google/callback" element={<GoogleCallback />} />
-          <Route path="/integrations/microsoft/callback" element={<MicrosoftCallback />} />
-          <Route path="/product-library" element={<ProductLibrary {...sharedProps} />} />
-          {(featureSla || featureMonitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
-          <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />
-          <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />
-          {featureDesignerOnly && <Route path="*" element={<Navigate to="/designer" replace />} />}
-          <Route path="/designer/review/:token" element={<DrawingReview />} />
-        </>
-      )}
-    </Routes>
+      <Routes location={location} key={location.key}>
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/sign/:token" element={<SignProposal />} />
+        <Route path="/rfq-response/:token" element={<RFQResponse />} />
+        {!session ? (
+          <Route path="*" element={<Login />} />
+        ) : (
+          <>
+            <Route path="/" element={
+              featureDesignerOnly
+                ? <Navigate to="/designer" replace />
+                : isAdmin || isSalesManager
+                ? <AdminDashboard {...sharedProps} />
+                : isPM
+                ? <AdminDashboard {...sharedProps} defaultMode="pm" />
+                : isTechnician
+                ? <TechLog {...sharedProps} />
+                : <Dashboard {...sharedProps} />
+            } />
+            <Route path="/admin" element={<AdminDashboard {...sharedProps} />} />
+            <Route path="/rep" element={<Dashboard {...sharedProps} />} />
+            <Route path="/new" element={<NewProposal />} />
+            <Route path="/proposal/:id" element={<ProposalDetail {...sharedProps} />} />
+            <Route path="/reps" element={<ManageReps {...sharedProps} />} />
+            <Route path="/proposals" element={<Proposals {...sharedProps} />} />
+            <Route path="/vendors" element={<Vendors {...sharedProps} />} />
+            <Route path="/settings" element={<Settings {...sharedProps} />} />
+            <Route path="/clients" element={<Clients {...sharedProps} />} />
+            <Route path="/superadmin" element={<SuperAdmin />} />
+            <Route path="/client/:id" element={<ClientDetail {...sharedProps} />} />
+            <Route path="/purchase-orders" element={<PurchaseOrders {...sharedProps} />} />
+            <Route path="/faq" element={<FAQ {...sharedProps} />} />
+            <Route path="/tasks" element={<Tasks {...sharedProps} />} />
+            <Route path="/pipeline" element={<Pipeline {...sharedProps} />} />
+            <Route path="/forecast" element={<Forecast {...sharedProps} />} />
+            <Route path="/catalog" element={<Catalog {...sharedProps} />} />
+            <Route path="/templates" element={<Templates isAdmin={isAdmin} />} />
+            <Route path="/invoices" element={<Invoices {...sharedProps} />} />
+            <Route path="/invoices/new" element={<NewInvoice {...sharedProps} />} />
+            <Route path="/invoices/:id" element={<InvoiceDetail {...sharedProps} />} />
+            <Route path="/orders" element={<ManufacturerOrders {...sharedProps} />} />
+            <Route path="/jobs" element={<Jobs {...sharedProps} />} />
+            <Route path="/jobs/:id" element={<JobDetail {...sharedProps} />} />
+            <Route path="/tech/job/:id" element={<TechJobView {...sharedProps} />} />
+            <Route path="/tech-log" element={<TechLog {...sharedProps} />} />
+            <Route path="/service-tickets" element={<ServiceTickets {...sharedProps} />} />
+            <Route path="/service-tickets/:id" element={<ServiceTicketDetail {...sharedProps} />} />
+            <Route path="/dispatch" element={<Dispatch {...sharedProps} />} />
+            <Route path="/integrations/square/callback" element={<SquareCallback />} />
+            <Route path="/integrations/google/callback" element={<GoogleCallback />} />
+            <Route path="/integrations/microsoft/callback" element={<MicrosoftCallback />} />
+            <Route path="/product-library" element={<ProductLibrary {...sharedProps} />} />
+            {(featureSla || featureMonitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
+            <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />
+            <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />
+            {featureDesignerOnly && <Route path="*" element={<Navigate to="/designer" replace />} />}
+            <Route path="/designer/review/:token" element={<DrawingReview />} />
+          </>
+        )}
+      </Routes>
     </>
   )
 }
