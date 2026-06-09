@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 const STATUS_COLORS = {
   'Draft': 'bg-[#2a3d55] text-[#8A9AB0]',
@@ -13,15 +14,14 @@ const STATUS_COLORS = {
 
 export default function Invoices({ isAdmin, featureProposals = true, featureCRM = false }) {
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('All')
 
-  useEffect(() => { fetchInvoices() }, [])
+  useEffect(() => { if (profile?.org_id) fetchInvoices() }, [profile?.org_id])
 
   const fetchInvoices = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
     if (!profile?.org_id) { setLoading(false); return }
 
     const { data } = await supabase

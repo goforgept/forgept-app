@@ -100,8 +100,23 @@ export function ProfileProvider({ children }) {
     if (session?.user?.id) fetchProfile(session.user.id)
   }
 
+  const features = {
+    proposals:      profile?.organizations?.feature_proposals !== false,
+    crm:            profile?.organizations?.feature_crm || false,
+    sendProposal:   profile?.organizations?.feature_send_proposal || false,
+    aiEmail:        profile?.organizations?.feature_ai_email || false,
+    purchaseOrders: profile?.organizations?.feature_purchase_orders !== false,
+    invoices:       profile?.organizations?.feature_invoices !== false,
+    aiBom:          profile?.organizations?.feature_ai_bom || false,
+    sitePhotos:     profile?.organizations?.feature_site_photos !== false,
+    sla:            profile?.organizations?.feature_sla || false,
+    monitoring:     profile?.organizations?.feature_monitoring || false,
+    drawingTool:    profile?.organizations?.feature_drawing_tool || false,
+    designerOnly:   profile?.organizations?.feature_designer_only || false,
+  }
+
   return (
-    <ProfileContext.Provider value={{ session, profile, loading, refreshProfile }}>
+    <ProfileContext.Provider value={{ session, profile, features, loading, refreshProfile }}>
       {children}
     </ProfileContext.Provider>
   )

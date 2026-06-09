@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 const STATUS_COLORS = {
   'Open': 'bg-blue-500/20 text-blue-400',
@@ -19,9 +20,9 @@ const PRIORITY_COLORS = {
 
 export default function ServiceTickets({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false }) {
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState(null)
   const [clients, setClients] = useState([])
   const [techs, setTechs] = useState([])
   const [statusFilter, setStatusFilter] = useState('All')
@@ -38,28 +39,24 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   const [clientJobs, setClientJobs] = useState([])
   const [clientLocations, setClientLocations] = useState([])
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { if (profile?.org_id) fetchAll() }, [profile?.org_id])
 
   const fetchAll = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type)').eq('id', user.id).single()
-    setProfile(profileData)
-
     const { data: ticketData } = await supabase
       .from('service_tickets')
       .select('*, clients(company, client_name), profiles!service_tickets_assigned_tech_id_fkey(full_name), jobs(name, job_number)')
-      .eq('org_id', profileData.org_id)
+      .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
     setTickets(ticketData || [])
 
     const { data: clientData } = await supabase
       .from('clients').select('id, company, client_name')
-      .eq('org_id', profileData.org_id).order('company')
+      .eq('org_id', profile.org_id).order('company')
     setClients(clientData || [])
 
     const { data: techData } = await supabase
       .from('profiles').select('id, full_name, role, dispatch_zone')
-      .eq('org_id', profileData.org_id).order('full_name')
+      .eq('org_id', profile.org_id).order('full_name')
     setTechs(techData || [])
 
     setLoading(false)

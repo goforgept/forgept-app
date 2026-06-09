@@ -44,7 +44,7 @@ import DesignerProjects from './pages/DesignerProjects'
 import DrawingReview from './pages/DrawingReview'
 
 function App() {
-  const { session, profile, loading } = useProfile()
+  const { session, profile, features, loading } = useProfile()
   const location = useLocation()
 
   if (loading) return (
@@ -59,23 +59,10 @@ function App() {
   const isAdmin      = profile?.org_role === 'admin' || profile?.role === 'admin'
   const isPending    = profile?.organizations?.status === 'pending'
 
-  const featureProposals      = profile?.organizations?.feature_proposals      !== false
-  const featureCRM            = profile?.organizations?.feature_crm            || false
-  const featureSendProposal   = profile?.organizations?.feature_send_proposal  || false
-  const featureAiEmail        = profile?.organizations?.feature_ai_email       || false
-  const featurePurchaseOrders = profile?.organizations?.feature_purchase_orders !== false
-  const featureInvoices       = profile?.organizations?.feature_invoices       !== false
-  const featureAiBom          = profile?.organizations?.feature_ai_bom         || false
-  const featureSitePhotos     = profile?.organizations?.feature_site_photos    !== false
-  const featureSla            = profile?.organizations?.feature_sla            || false
-  const featureMonitoring     = profile?.organizations?.feature_monitoring     || false
-  const featureDrawingTool    = profile?.organizations?.feature_drawing_tool   || false
-  const featureDesignerOnly   = profile?.organizations?.feature_designer_only  || false
-
-  sessionStorage.setItem('featureDesignerOnly', featureDesignerOnly)
-  sessionStorage.setItem('featureSla', featureSla)
-  sessionStorage.setItem('featureMonitoring', featureMonitoring)
-  sessionStorage.setItem('featureDrawingTool', featureDrawingTool)
+  sessionStorage.setItem('featureDesignerOnly', features.designerOnly)
+  sessionStorage.setItem('featureSla', features.sla)
+  sessionStorage.setItem('featureMonitoring', features.monitoring)
+  sessionStorage.setItem('featureDrawingTool', features.drawingTool)
 
   if (session && isPending) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
@@ -106,7 +93,21 @@ function App() {
     try { return JSON.parse(localStorage.getItem('sa_impersonate') || 'null') } catch { return null }
   })()
 
-  const sharedProps = { isAdmin, featureProposals, featureCRM, featureSendProposal, featureAiEmail, featurePurchaseOrders, featureInvoices, featureAiBom, featureSitePhotos, featureSla, featureMonitoring, featureDrawingTool, featureDesignerOnly, role, isSalesManager, isPM, isTechnician }
+  const sharedProps = {
+    isAdmin, role, isSalesManager, isPM, isTechnician,
+    featureProposals:      features.proposals,
+    featureCRM:            features.crm,
+    featureSendProposal:   features.sendProposal,
+    featureAiEmail:        features.aiEmail,
+    featurePurchaseOrders: features.purchaseOrders,
+    featureInvoices:       features.invoices,
+    featureAiBom:          features.aiBom,
+    featureSitePhotos:     features.sitePhotos,
+    featureSla:            features.sla,
+    featureMonitoring:     features.monitoring,
+    featureDrawingTool:    features.drawingTool,
+    featureDesignerOnly:   features.designerOnly,
+  }
 
   return (
     <>
@@ -125,7 +126,7 @@ function App() {
         ) : (
           <>
             <Route path="/" element={
-              featureDesignerOnly
+              features.designerOnly
                 ? <Navigate to="/designer" replace />
                 : isAdmin || isSalesManager
                 ? <AdminDashboard {...sharedProps} />
@@ -168,10 +169,10 @@ function App() {
             <Route path="/integrations/google/callback" element={<GoogleCallback />} />
             <Route path="/integrations/microsoft/callback" element={<MicrosoftCallback />} />
             <Route path="/product-library" element={<ProductLibrary {...sharedProps} />} />
-            {(featureSla || featureMonitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
+            {(features.sla || features.monitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
             <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />
             <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />
-            {featureDesignerOnly && <Route path="*" element={<Navigate to="/designer" replace />} />}
+            {features.designerOnly && <Route path="*" element={<Navigate to="/designer" replace />} />}
             <Route path="/designer/review/:token" element={<DrawingReview />} />
           </>
         )}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
+import { useProfile } from '../context/ProfileContext'
 import Sidebar from '../components/Sidebar'
 import POList from '../components/POList'
 import jsPDF from 'jspdf'
@@ -30,15 +31,16 @@ import DrawingReaderModal from '../components/proposal/DrawingReaderModal'
 import SLAModal from '../components/proposal/SLAModal'
 import MonitoringModal from '../components/proposal/MonitoringModal'
 
-export default function ProposalDetail({ isAdmin, featureProposals = true, featureCRM = false, featureAiBom = false, featureSitePhotos = true, featureDrawingTool = false }) {
+export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { profile, features } = useProfile()
   const [proposal, setProposal] = useState(null)
   const [lineItems, setLineItems] = useState([])
   const [laborItems, setLaborItems] = useState([
     { role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: 0 }
   ])
-  const [profile, setProfile] = useState(null)
+  const [resolvedLogoUrl, setResolvedLogoUrl] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editingBOM, setEditingBOM] = useState(false)
   const [editLines, setEditLines] = useState([])
@@ -55,8 +57,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
-  const [orgType, setOrgType] = useState('integrator')
-  const [featureSendProposal, setFeatureSendProposal] = useState(false)
+  const orgType = profile?.organizations?.org_type || 'integrator'
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendingProposal, setSendingProposal] = useState(false)
   const [sendForm, setSendForm] = useState({ subject: '', message: '' })
@@ -151,7 +152,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const [pendingContractItems, setPendingContractItems] = useState([])
   const [pendingContractDates, setPendingContractDates] = useState({})
   const [savingContractDates, setSavingContractDates] = useState(false)
-  const [session, setSession] = useState(null)
   const [activityRefreshKey, setActivityRefreshKey] = useState(0)
 
   useEffect(() => {
@@ -159,10 +159,25 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     fetchLineItems()
     fetchSections()
     fetchRFQRequests()
-    fetchProfile()
     fetchPhotos()
     fetchVendors()
   }, [])
+
+  useEffect(() => {
+    if (!profile?.org_id) return
+    supabase.from('organizations').select('qbo_connected').eq('id', profile.org_id).single()
+      .then(({ data }) => setQboConnected(data?.qbo_connected || false))
+    supabase.from('profiles').select('id, full_name, email').eq('org_id', profile.org_id)
+      .then(({ data }) => setOrgProfiles(data || []))
+  }, [profile?.org_id])
+
+  useEffect(() => {
+    if (!profile?.logo_url) return
+    if (profile.logo_url.startsWith('http')) { setResolvedLogoUrl(profile.logo_url); return }
+    import('../r2').then(({ getR2Url, BUCKETS }) =>
+      getR2Url(profile.logo_url, 60 * 60 * 24, BUCKETS.ASSETS).then(setResolvedLogoUrl)
+    )
+  }, [profile?.logo_url])
 
   const fetchProposal = async () => {
     const { data } = await supabase
@@ -284,35 +299,6 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       .eq('proposal_id', id)
       .order('sort_order', { ascending: true })
     setSections(data || [])
-  }
-
-  const fetchProfile = async () => {
-    const { data: { session: currentSession } } = await supabase.auth.refreshSession()
-    setSession(currentSession)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type, feature_send_proposal)')
-      .eq('id', user.id)
-      .single()
-    // Resolve logo URL if stored as R2 path
-    let profileData = data
-    if (data?.logo_url && !data.logo_url.startsWith('http')) {
-      const { getR2Url, BUCKETS } = await import('../r2')
-      const logoUrl = await getR2Url(data.logo_url, 60 * 60 * 24, BUCKETS.ASSETS)
-      profileData = { ...data, logo_url: logoUrl }
-    }
-    setProfile(profileData)
-    setOrgType(data?.organizations?.org_type || 'integrator')
-    setFeatureSendProposal(data?.organizations?.feature_send_proposal || false)
-    if (data?.org_id) {
-      const { data: orgData } = await supabase.from('organizations').select('qbo_connected').eq('id', data.org_id).single()
-      setQboConnected(orgData?.qbo_connected || false)
-    }
-    if (data?.org_id) {
-      const { data: teamData } = await supabase.from('profiles').select('id, full_name, email').eq('org_id', data.org_id)
-      setOrgProfiles(teamData || [])
-    }
   }
 
   const fetchVendors = async () => {
@@ -515,7 +501,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
           proposalName: proposal.proposal_name,
           signingUrl,
           orgId: proposal.org_id,
-          logoUrl: profile?.logo_url || null,
+          logoUrl: resolvedLogoUrl || null,
           companyName: profile?.company_name || proposal.company || '',
         })
       })
@@ -1388,18 +1374,11 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
     if (selectedForPO.size === 0) return
     setGeneratingPO(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('org_id, company_name, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip')
-        .eq('id', user.id)
-        .single()
-
       let finalPONumber = poNumber
       if (poAutoNumber) {
-        const { data: org } = await supabase.from('organizations').select('po_counter').eq('id', profileData.org_id).single()
+        const { data: org } = await supabase.from('organizations').select('po_counter').eq('id', profile.org_id).single()
         finalPONumber = `PO-${org.po_counter}`
-        await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profileData.org_id)
+        await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profile.org_id)
       }
 
       const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
@@ -1411,9 +1390,9 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.rect(0, 0, pageWidth, 40, 'F')
 
-      if (profile?.logo_url) {
+      if (resolvedLogoUrl) {
         const img = new Image()
-        img.src = profile.logo_url
+        img.src = resolvedLogoUrl
         await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
         const maxW = 50, maxH = 26
         const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
@@ -1431,8 +1410,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       doc.setFontSize(10); doc.setFont('helvetica', 'normal')
       doc.text(finalPONumber, pageWidth - 14, 28, { align: 'right' })
 
-      const billToLines = [profileData?.company_name || '', profileData?.bill_to_address || '', [profileData?.bill_to_city, profileData?.bill_to_state, profileData?.bill_to_zip].filter(Boolean).join(', ')].filter(Boolean)
-      const shipToLines = [profileData?.company_name || '', profileData?.ship_to_address || '', [profileData?.ship_to_city, profileData?.ship_to_state, profileData?.ship_to_zip].filter(Boolean).join(', ')].filter(Boolean)
+      const billToLines = [profile?.company_name || '', profile?.bill_to_address || '', [profile?.bill_to_city, profile?.bill_to_state, profile?.bill_to_zip].filter(Boolean).join(', ')].filter(Boolean)
+      const shipToLines = [profile?.company_name || '', profile?.ship_to_address || '', [profile?.ship_to_city, profile?.ship_to_state, profile?.ship_to_zip].filter(Boolean).join(', ')].filter(Boolean)
 
       doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
       doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52)
@@ -1462,7 +1441,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
       })
 
       const totalAmount = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
-      await supabase.from('purchase_orders').insert({ po_number: finalPONumber, proposal_id: id, org_id: profileData.org_id, vendor_name: vendorNames || null, status: 'Sent', total_amount: totalAmount })
+      await supabase.from('purchase_orders').insert({ po_number: finalPONumber, proposal_id: id, org_id: profile.org_id, vendor_name: vendorNames || null, status: 'Sent', total_amount: totalAmount })
       for (const item of selectedItems) {
         await supabase.from('bom_line_items').update({ po_number: finalPONumber, po_status: 'PO Sent' }).eq('id', item.id)
       }
@@ -1729,10 +1708,8 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const saveAsTemplate = async () => {
     if (!templateName.trim()) return
     setSavingTemplate(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
     const { data: template, error } = await supabase.from('templates').insert({
-      org_id: profileData.org_id, name: templateName.trim(), industry: proposal?.industry || '',
+      org_id: profile.org_id, name: templateName.trim(), industry: proposal?.industry || '',
       description: proposal?.job_description || '', labor_items: laborItems.filter(l => l.role) || []
     }).select().single()
 
@@ -1795,17 +1772,15 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
   const createOrder = async () => {
     setCreatingOrder(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: profileData } = await supabase.from('profiles').select('org_id, company_name').eq('id', user.id).single()
       let finalOrderNumber = orderNumber
       if (orderAutoNumber) {
-        const { data: org } = await supabase.from('organizations').select('po_counter').eq('id', profileData.org_id).single()
+        const { data: org } = await supabase.from('organizations').select('po_counter').eq('id', profile.org_id).single()
         finalOrderNumber = `ORD-${org.po_counter}`
-        await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profileData.org_id)
+        await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profile.org_id)
       }
       const totalValue = lineItems.reduce((sum, l) => sum + (l.customer_price_total || 0), 0)
       const { data: order, error } = await supabase.from('manufacturer_orders').insert({
-        org_id: profileData.org_id, proposal_id: id, order_number: finalOrderNumber, vendor_name: proposal?.company || '',
+        org_id: profile.org_id, proposal_id: id, order_number: finalOrderNumber, vendor_name: proposal?.company || '',
         status: 'Draft', expected_ship_date: orderExpectedShip || null, ship_to_address: clientAddress || null, total_cost: totalValue
       }).select().single()
       if (error) throw error
@@ -1823,9 +1798,7 @@ export default function ProposalDetail({ isAdmin, featureProposals = true, featu
 
   const openEditClientModal = async () => {
     setEditClientForm({ client_name: proposal?.client_name || '', company: proposal?.company || '', client_email: proposal?.client_email || '', client_id: proposal?.client_id || '' })
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-    const { data: clientsData } = await supabase.from('clients').select('id, company, client_name, email').eq('org_id', profileData.org_id).order('company', { ascending: true })
+    const { data: clientsData } = await supabase.from('clients').select('id, company, client_name, email').eq('org_id', profile.org_id).order('company', { ascending: true })
     setAllClients(clientsData || [])
     setShowEditClientModal(true)
   }
@@ -2124,10 +2097,10 @@ const analyzeDrawing = async () => {
     doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
     doc.rect(0, 0, pageWidth, 40, 'F')
 
-    if (profile?.logo_url) {
+    if (resolvedLogoUrl) {
       const img = new Image()
       img.crossOrigin = 'anonymous'
-      img.src = profile.logo_url
+      img.src = resolvedLogoUrl
       await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
       if (img.naturalWidth > 0) {
         try {
@@ -2487,7 +2460,7 @@ const analyzeDrawing = async () => {
           proposalId: id, clientEmail: proposal.client_email, clientName: proposal.client_name || 'there',
           repName: proposal.rep_name || profile?.full_name || '', repEmail: proposal.rep_email || profile?.email || '',
           companyName: profile?.company_name || proposal.company || '', proposalName: proposal.proposal_name || 'Proposal',
-          subject: sendForm.subject, message: sendForm.message, logoUrl: profile?.logo_url || null, pdfBase64
+          subject: sendForm.subject, message: sendForm.message, logoUrl: resolvedLogoUrl || null, pdfBase64
         })
       })
       setProposal(prev => ({ ...prev, status: 'Sent' }))
@@ -2505,7 +2478,7 @@ const analyzeDrawing = async () => {
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
+      <Sidebar isAdmin={isAdmin} featureProposals={features.proposals} featureCRM={features.crm} />
       <div className="flex-1 p-6 space-y-6">
         {contractNotification && (
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-5 py-3 flex items-center justify-between">
@@ -2564,7 +2537,7 @@ const analyzeDrawing = async () => {
               )}
             </div>
             <div className="flex items-center gap-2">
-              {featureAiBom && (
+              {features.aiBom && (
                 <button onClick={() => { setShowDealSummaryModal(true); setDealSummary(null) }} className="bg-purple-600 text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-purple-700 transition-colors">🧠 Deal Summary</button>
               )}
               <button onClick={() => setShowShareModal(true)} className="bg-[#2a3d55] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-1">
@@ -2639,7 +2612,7 @@ const analyzeDrawing = async () => {
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-white font-bold text-lg">Scope of Work</h3>
             <div className="flex gap-2 flex-wrap">
-              {featureSendProposal && proposal?.client_email && (
+              {features.sendProposal && proposal?.client_email && (
                 <button onClick={() => { setSendForm({ subject: `Proposal: ${proposal.proposal_name}`, message: `Hi ${proposal.client_name || 'there'},\n\nPlease find your proposal attached. Don't hesitate to reach out with any questions.\n\nLooking forward to working with you.` }); setShowSendModal(true) }}
                   className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
                   ✉ Send Proposal
@@ -2681,7 +2654,7 @@ const analyzeDrawing = async () => {
               </button>
               <button onClick={downloadPDF} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">↓ PDF</button>
               <button onClick={downloadDOCX} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">↓ DOCX</button>
-              {featureSitePhotos && (
+              {features.sitePhotos && (
                 <button onClick={() => setShowPhotosModal(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-2">
                   📷 Photos{photos.length > 0 ? ` (${photos.length})` : ''}
                 </button>
@@ -2836,7 +2809,7 @@ const analyzeDrawing = async () => {
                   <button onClick={openRFQModal} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Send All RFQs</button>
                 )}
                 <button onClick={() => { setTemplateName(proposal?.proposal_name || ''); setShowSaveTemplateModal(true) }} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Save as Template</button>
-                {featureAiBom && (
+                {features.aiBom && (
                   <>
                   <button onClick={() => setShowAIBOMModal(true)} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✨ AI Build BOM</button>
                   <button onClick={() => { setShowDrawingModal(true); setDrawingInstructions(proposal?.industry === 'Security' ? 'Focus on cameras, access control readers, door contacts, and NVR/DVR equipment.' : proposal?.industry === 'Audio/Visual' ? 'Focus on displays, speakers, amplifiers, source equipment, and cable runs.' : '') }} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">📐 Read Drawing</button>
@@ -3623,7 +3596,7 @@ const analyzeDrawing = async () => {
         
         <DrawingToolSummary
   proposalId={id}
-  featureEnabled={featureDrawingTool}
+  featureEnabled={features.drawingTool}
 />
         <ActivityFeed proposalId={id} clientId={proposal?.client_id} orgId={proposal?.org_id} refreshKey={activityRefreshKey} />
 

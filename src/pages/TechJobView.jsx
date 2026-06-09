@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 export default function TechJobView({ isAdmin, featureProposals = true, featureCRM = false, role, isTechnician }) {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const [job, setJob] = useState(null)
   const [checklist, setChecklist] = useState([])
   const [lineItems, setLineItems] = useState([])
@@ -13,17 +15,12 @@ export default function TechJobView({ isAdmin, featureProposals = true, featureC
   const [techLogs, setTechLogs] = useState([])
   const [jobSchedules, setJobSchedules] = useState([])
   const [orgProfiles, setOrgProfiles] = useState([])
-  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
 
-  useEffect(() => { fetchAll() }, [id])
+  useEffect(() => { if (profile?.org_id) fetchAll() }, [id, profile?.org_id])
 
   const fetchAll = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager').eq('id', user.id).single()
-    setProfile(profileData)
-
     const { data: jobData } = await supabase
       .from('jobs')
       .select('*, clients(company, client_name), profiles!jobs_assigned_pm_fkey(full_name)')
@@ -31,11 +28,11 @@ export default function TechJobView({ isAdmin, featureProposals = true, featureC
       .single()
     setJob(jobData)
 
-    if (profileData?.org_id) {
+    if (profile?.org_id) {
       const { data: profilesData } = await supabase
         .from('profiles')
         .select('id, full_name, org_role')
-        .eq('org_id', profileData.org_id)
+        .eq('org_id', profile.org_id)
       setOrgProfiles(profilesData || [])
     }
 

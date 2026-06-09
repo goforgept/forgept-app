@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import * as XLSX from 'xlsx'
+import { useProfile } from '../context/ProfileContext'
 
 const CATEGORIES = ['Electrical','Mechanical','Audio/Visual','Security','Networking','Material','Roofing Materials','Insulation','Windows & Doors','Flooring','Painting & Finishing','Plumbing','HVAC','Solar','Hardware','Other']
 
@@ -18,6 +19,7 @@ const AgeBadge = ({ days }) => {
 }
 
 export default function ProductLibrary({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, isSalesManager = false, isPM = false, isTechnician = false }) {
+  const { profile } = useProfile()
   const [products, setProducts] = useState([])   // product_library rows
   const [pricing, setPricing] = useState({})      // { product_id: [pricing rows] }
   const [loading, setLoading] = useState(true)
@@ -40,12 +42,10 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [editingProductId, setEditingProductId] = useState(null)
   const [editForm, setEditForm] = useState({})
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { if (profile?.org_id) fetchAll() }, [profile?.org_id])
 
   const fetchAll = async () => {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
     if (!profile?.org_id) { setLoading(false); return }
     setOrgId(profile.org_id)
 

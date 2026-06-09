@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 export default function Tasks({ isAdmin, featureProposals = true, featureCRM = false }) {
+  const { profile } = useProfile()
   const [tasks, setTasks] = useState([])
   const [profiles, setProfiles] = useState([])
   const [clients, setClients] = useState([])
@@ -14,7 +16,6 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
   const [view, setView] = useState('list') // 'list' | 'calendar'
   const [calendarDate, setCalendarDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState(null)
-  const [profile, setProfile] = useState(null)
   const navigate = useNavigate()
   const [form, setForm] = useState({
     title: '', due_date: '', priority: 'normal',
@@ -26,24 +27,21 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
   const [showMeeting, setShowMeeting] = useState(false)
   const [newAttendeeEmail, setNewAttendeeEmail] = useState('')
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { if (profile?.org_id) fetchData() }, [profile?.org_id])
 
   const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager').eq('id', user.id).single()
-    setProfile(profileData)
-    if (!profileData?.org_id) { setLoading(false); return }
+    if (!profile?.org_id) { setLoading(false); return }
 
     const [tasksRes, profilesRes, clientsRes] = await Promise.all([
-      supabase.from('tasks').select('*, clients(company), profiles!tasks_assigned_to_fkey(full_name)').eq('org_id', profileData.org_id).order('due_date', { ascending: true }),
-      supabase.from('profiles').select('id, full_name').eq('org_id', profileData.org_id),
-      supabase.from('clients').select('id, company').eq('org_id', profileData.org_id).order('company')
+      supabase.from('tasks').select('*, clients(company), profiles!tasks_assigned_to_fkey(full_name)').eq('org_id', profile.org_id).order('due_date', { ascending: true }),
+      supabase.from('profiles').select('id, full_name').eq('org_id', profile.org_id),
+      supabase.from('clients').select('id, company').eq('org_id', profile.org_id).order('company')
     ])
 
     setTasks(tasksRes.data || [])
     setProfiles(profilesRes.data || [])
     setClients(clientsRes.data || [])
-    setForm(prev => ({ ...prev, assigned_to: profileData.id }))
+    setForm(prev => ({ ...prev, assigned_to: profile.id }))
     setLoading(false)
   }
 

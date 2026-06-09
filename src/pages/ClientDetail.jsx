@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 import ActivityTimeline from '../components/ActivityTimeline'
 import TaskList from '../components/TaskList'
 
@@ -27,9 +28,9 @@ const emptyContact = {
 export default function ClientDetail({ isAdmin, featureProposals = true, featureCRM = false, featureAiEmail = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const [client, setClient] = useState(null)
   const [proposals, setProposals] = useState([])
-  const [profile, setProfile] = useState(null)
   const [teamProfiles, setTeamProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingClient, setEditingClient] = useState(false)
@@ -74,12 +75,20 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   useEffect(() => {
     fetchClient()
     fetchProposals()
-    fetchProfile()
     fetchLocations()
     fetchContacts()
     fetchClientTickets()
     fetchClientMeetings()
   }, [])
+
+  useEffect(() => {
+    if (!profile?.org_id) return
+    supabase.from('profiles').select('id, full_name').eq('org_id', profile.org_id)
+      .then(({ data: team }) => setTeamProfiles(team || []))
+    supabase.from('organizations').select('timezone').eq('id', profile.org_id).single()
+      .then(({ data: orgData }) => { if (orgData?.timezone) setOrgTimezone(orgData.timezone) })
+    fetchClientEmails(profile.id)
+  }, [profile?.org_id])
 
   const fetchClient = async () => {
     const { data } = await supabase.from('clients').select('*').eq('id', id).single()
@@ -91,19 +100,6 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     const { data } = await supabase.from('proposals').select('*').eq('client_id', id).order('created_at', { ascending: false })
     setProposals(data || [])
     setLoading(false)
-  }
-
-  const fetchProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager').eq('id', user.id).single()
-    setProfile(data)
-    if (data?.org_id) {
-      const { data: team } = await supabase.from('profiles').select('id, full_name').eq('org_id', data.org_id)
-      setTeamProfiles(team || [])
-      const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', data.org_id).single()
-      if (orgData?.timezone) setOrgTimezone(orgData.timezone)
-    }
-    fetchClientEmails(user.id)
   }
 
   const fetchClientEmails = async (userId) => {
@@ -172,9 +168,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     if (editingLocation) {
       await supabase.from('client_locations').update(locationForm).eq('id', editingLocation.id)
     } else {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-      await supabase.from('client_locations').insert({ ...locationForm, client_id: id, org_id: profileData.org_id })
+      await supabase.from('client_locations').insert({ ...locationForm, client_id: id, org_id: profile.org_id })
     }
     await fetchLocations()
     setShowLocationModal(false)
@@ -212,9 +206,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     if (editingContact) {
       await supabase.from('client_contacts').update(contactForm).eq('id', editingContact.id)
     } else {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: profileData } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-      await supabase.from('client_contacts').insert({ ...contactForm, client_id: id, org_id: profileData.org_id })
+      await supabase.from('client_contacts').insert({ ...contactForm, client_id: id, org_id: profile.org_id })
     }
     await fetchContacts()
     setShowContactModal(false)

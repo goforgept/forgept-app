@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 const STATUS_COLORS = {
   'Open': 'border-blue-500/40 bg-blue-500/5',
@@ -42,13 +43,13 @@ function getWeekDates(referenceDate) {
 
 export default function Dispatch({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false }) {
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const [tickets, setTickets] = useState([])
   const [jobs, setJobs] = useState([])
   const [jobSchedules, setJobSchedules] = useState([])
   const [unscheduledJobs, setUnscheduledJobs] = useState([])
   const [techs, setTechs] = useState([])
   const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState(null)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [viewMode, setViewMode] = useState('day') // 'day' | 'week'
   const [view, setView] = useState('board') // 'board' | 'unscheduled'
@@ -71,13 +72,10 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
   const today = new Date().toISOString().split('T')[0]
   const weekDates = getWeekDates(selectedDate)
 
-  useEffect(() => { fetchAll() }, [selectedDate])
+  useEffect(() => { if (profile?.org_id) fetchAll() }, [selectedDate, profile?.org_id])
 
   const fetchAll = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type)').eq('id', user.id).single()
-    setProfile(profileData)
-
+    if (!profile?.org_id) return
     const startDate = viewMode === 'week' ? weekDates[0] : selectedDate
     const endDate = viewMode === 'week' ? weekDates[4] : selectedDate
 
@@ -89,12 +87,12 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
       { data: scheduleData },
       { data: allSchedules },
     ] = await Promise.all([
-      supabase.from('organizations').select('timezone').eq('id', profileData.org_id).single(),
-      supabase.from('profiles').select('id, full_name, dispatch_zone, role').eq('org_id', profileData.org_id).order('full_name'),
-      supabase.from('service_tickets').select('*, clients(company), profiles!service_tickets_assigned_tech_id_fkey(full_name)').eq('org_id', profileData.org_id).not('status', 'in', '("Resolved","Cancelled")').order('scheduled_date', { ascending: true, nullsFirst: false }),
-      supabase.from('jobs').select('*, clients(company), proposals(proposal_name)').eq('org_id', profileData.org_id).eq('status', 'Active').order('created_at', { ascending: false }),
-      supabase.from('job_tech_schedules').select('*, jobs(name, job_number, clients(company)), profiles(full_name)').eq('org_id', profileData.org_id).gte('date', startDate).lte('date', endDate),
-      supabase.from('job_tech_schedules').select('job_id').eq('org_id', profileData.org_id).gte('date', today),
+      supabase.from('organizations').select('timezone').eq('id', profile.org_id).single(),
+      supabase.from('profiles').select('id, full_name, dispatch_zone, role').eq('org_id', profile.org_id).order('full_name'),
+      supabase.from('service_tickets').select('*, clients(company), profiles!service_tickets_assigned_tech_id_fkey(full_name)').eq('org_id', profile.org_id).not('status', 'in', '("Resolved","Cancelled")').order('scheduled_date', { ascending: true, nullsFirst: false }),
+      supabase.from('jobs').select('*, clients(company), proposals(proposal_name)').eq('org_id', profile.org_id).eq('status', 'Active').order('created_at', { ascending: false }),
+      supabase.from('job_tech_schedules').select('*, jobs(name, job_number, clients(company)), profiles(full_name)').eq('org_id', profile.org_id).gte('date', startDate).lte('date', endDate),
+      supabase.from('job_tech_schedules').select('job_id').eq('org_id', profile.org_id).gte('date', today),
     ])
 
     setOrgTimezone(orgData?.timezone || 'America/Chicago')

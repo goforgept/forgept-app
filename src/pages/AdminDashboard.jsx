@@ -2,8 +2,10 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 export default function AdminDashboard({ isAdmin, featureProposals = true, featureCRM = false, role = 'admin', isSalesManager = false, isPM = false, defaultMode = null }) {
+  const { profile } = useProfile()
   const [proposals, setProposals] = useState([])
   const [dashboardMode, setDashboardMode] = useState(() => defaultMode || localStorage.getItem('dashboardMode') || (isPM ? 'pm' : 'sales'))
   const [jobs, setJobs] = useState([])
@@ -26,11 +28,9 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const [recurringModal, setRecurringModal] = useState(null) // 'revenue' | 'quoting' | 'all'
   const navigate = useNavigate()
 
-  useEffect(() => { fetchOrgData() }, [])
+  useEffect(() => { if (profile?.org_id) fetchOrgData() }, [profile?.org_id])
 
   const fetchOrgData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
     if (!profile?.org_id) { setLoading(false); return }
 
     const today = new Date().toISOString().split('T')[0]
@@ -75,8 +75,6 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
   const saveTarget = async () => {
     setSavingTarget(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
 
     const existing = targets.find(t => t.profile_id === targetForm.profile_id && t.period_start === targetForm.period_start)
     if (existing) {

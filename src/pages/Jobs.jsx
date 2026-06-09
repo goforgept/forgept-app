@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 const STATUS_COLORS = {
   'Active': 'bg-green-500/20 text-green-400',
@@ -12,24 +13,21 @@ const STATUS_COLORS = {
 
 export default function Jobs({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, isTechnician = false }) {
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
-  const [profile, setProfile] = useState(null)
 
-  useEffect(() => { fetchJobs() }, [])
+  useEffect(() => { if (profile?.org_id) fetchJobs() }, [profile?.org_id])
 
   const fetchJobs = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase.from('profiles').select('org_id, full_name').eq('id', user.id).single()
-    setProfile(profileData)
-    if (!profileData?.org_id) { setLoading(false); return }
+    if (!profile?.org_id) { setLoading(false); return }
 
     const { data } = await supabase
       .from('jobs')
       .select('*, proposals(proposal_name, proposal_value), clients(company), profiles!jobs_assigned_pm_fkey(full_name), job_checklist_items(id, completed)')
-      .eq('org_id', profileData.org_id)
+      .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
 
     setJobs(data || [])

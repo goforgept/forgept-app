@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import DataImportTab from '../components/DataImportTab'
+import { useProfile } from '../context/ProfileContext'
 
 const SLA_INDUSTRIES = ['Security','Audio/Visual','IT / Networking','Low Voltage','Fire Protection','HVAC','Electrical','Telecom','Solar','Mechanical','Plumbing','General Contractor','Other']
 const MONITORING_INDUSTRIES = ['Security','IT / Networking','Fire Protection','Low Voltage','Telecom','Audio/Visual','HVAC']
@@ -77,7 +78,7 @@ const MONITORING_DEFAULTS = {
 }
 
 export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, featureDesignerOnly = false, role, isSalesManager, isPM, isTechnician }) {
-  const [profile, setProfile] = useState(null)
+  const { profile } = useProfile()
   const [activeTab, setActiveTab] = useState('general')
   const [laborRates, setLaborRates] = useState([])
   const [savingRates, setSavingRates] = useState(false)
@@ -188,7 +189,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [verifyingInbound, setVerifyingInbound] = useState(false)
 
   useEffect(() => {
-    fetchProfile()
+    if (profile?.id) fetchProfile()
     // Check for QBO OAuth callback result
     const params = new URLSearchParams(window.location.search)
     if (params.get('tab') === 'integrations') setActiveTab('integrations')
@@ -229,21 +230,21 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         setInboundMessage({ type: 'error', text: 'Invalid verification link.' })
       }
     }
-  }, [])
+  }, [profile?.id])
 
   const fetchProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, support_pin').eq('id', user.id).single()
+    // Fetch extra fields not included in ProfileContext select
+    const { data: extraData } = await supabase.from('profiles').select('support_pin, terms_and_conditions, email_template_early_subject, email_template_early_body, email_cadence_early, email_template_14day_subject, email_template_14day_body, email_cadence_14day, email_template_7day_subject, email_template_7day_body, email_cadence_7day, email_template_close_subject, email_template_close_body, payment_instructions_bank, payment_instructions_routing, payment_instructions_account, google_email, microsoft_email').eq('id', profile.id).single()
+    const data = { ...profile, ...extraData }
 
     // Auto-generate a PIN if none exists
     let pin = data?.support_pin || ''
     if (!pin) {
       pin = String(Math.floor(100000 + Math.random() * 900000))
-      await supabase.from('profiles').update({ support_pin: pin }).eq('id', user.id)
+      await supabase.from('profiles').update({ support_pin: pin }).eq('id', data.id)
     }
     setSupportPin(pin)
     setPinInput(pin)
-    setProfile(data)
     // Generate R2 URL if logo_url is a path, otherwise use directly (old Supabase URL)
     if (data?.logo_url) {
       if (data.logo_url.startsWith('http')) {

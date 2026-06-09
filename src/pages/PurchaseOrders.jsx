@@ -2,15 +2,16 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 export default function PurchaseOrders({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false }) {
+  const { profile } = useProfile()
   const [pos, setPOs] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('All')
   const [expandedPO, setExpandedPO] = useState(null)
   const [lineItems, setLineItems] = useState({})
   const [savingReceiving, setSavingReceiving] = useState({})
-  const [profile, setProfile] = useState(null)
   const navigate = useNavigate()
 
   // New PO modal
@@ -36,34 +37,31 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     { id: crypto.randomUUID(), item_name: '', part_number: '', quantity: 1, unit: 'ea', unit_cost: '' }
   ])
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => { if (profile?.org_id) fetchAll() }, [profile?.org_id])
 
   const fetchAll = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-    setProfile(prof)
-    if (!prof?.org_id) { setLoading(false); return }
+    if (!profile?.org_id) { setLoading(false); return }
 
     const { data } = await supabase
       .from('purchase_orders')
       .select('*, proposals(proposal_name, company)')
-      .eq('org_id', prof.org_id)
+      .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
     setPOs(data || [])
 
     const { data: vendorData } = await supabase
       .from('vendors').select('id, vendor_name, contact_email, default_markup_percent')
-      .eq('org_id', prof.org_id).eq('active', true).order('vendor_name')
+      .eq('org_id', profile.org_id).eq('active', true).order('vendor_name')
     setVendors(vendorData || [])
 
     const { data: jobData } = await supabase
       .from('jobs').select('id, name, job_number')
-      .eq('org_id', prof.org_id).in('status', ['Active', 'On Hold']).order('created_at', { ascending: false })
+      .eq('org_id', profile.org_id).in('status', ['Active', 'On Hold']).order('created_at', { ascending: false })
     setJobs(jobData || [])
 
     const { data: ticketData } = await supabase
       .from('service_tickets').select('id, title, clients(company)')
-      .eq('org_id', prof.org_id).not('status', 'in', '("Resolved","Cancelled")').order('created_at', { ascending: false })
+      .eq('org_id', profile.org_id).not('status', 'in', '("Resolved","Cancelled")').order('created_at', { ascending: false })
     setServiceTickets(ticketData || [])
 
     setLoading(false)

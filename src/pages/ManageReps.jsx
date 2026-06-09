@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 const ROLES = [
   { value: 'admin', label: 'Admin', color: 'bg-[#C8622A]/20 text-[#C8622A]', desc: 'Full access — manages team, settings, billing, and all features' },
@@ -14,6 +15,7 @@ const getRoleStyle = (role) => ROLES.find(r => r.value === role)?.color || 'bg-[
 const getRoleLabel = (role) => ROLES.find(r => r.value === role)?.label || role || 'Rep'
 
 export default function ManageReps({ isAdmin, featureProposals = true, featureCRM = false }) {
+  const { profile: currentProfile } = useProfile()
   const [reps, setReps] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -21,18 +23,10 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
   const [form, setForm] = useState({ email: '', full_name: '', org_role: 'rep' })
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
-  const [currentProfile, setCurrentProfile] = useState(null)
   const [updatingRole, setUpdatingRole] = useState({})
   const [deletingId, setDeletingId] = useState(null)
 
-  useEffect(() => { fetchCurrentProfile() }, [])
-
-  const fetchCurrentProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager').eq('id', user.id).single()
-    setCurrentProfile(data)
-    if (data?.org_id) fetchReps(data.org_id)
-  }
+  useEffect(() => { if (currentProfile?.org_id) fetchReps(currentProfile.org_id) }, [currentProfile?.org_id])
 
   const fetchReps = async (orgId) => {
     const { data, error } = await supabase

@@ -2,16 +2,17 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 export default function NewInvoice({ isAdmin, featureProposals = true, featureCRM = false }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const { profile } = useProfile()
   const [sourceType, setSourceType] = useState('proposal') // 'proposal' | 'ticket'
   const [proposals, setProposals] = useState([])
   const [selectedProposal, setSelectedProposal] = useState(null)
   const [serviceTickets, setServiceTickets] = useState([])
   const [selectedTicket, setSelectedTicket] = useState(null)
-  const [profile, setProfile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [orgDefaultTaxRate, setOrgDefaultTaxRate] = useState('')
   const [form, setForm] = useState({
@@ -28,20 +29,17 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   const [contractFees, setContractFees] = useState([]) // { label, amount, included }
   const [includedContractFees, setIncludedContractFees] = useState({})
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { if (profile?.org_id) fetchData() }, [profile?.org_id])
 
   const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: prof } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type, default_tax_rate)').eq('id', user.id).single()
-    setProfile(prof)
-    const defaultRate = prof?.organizations?.default_tax_rate ?? ''
+    const defaultRate = profile?.organizations?.default_tax_rate ?? ''
     setOrgDefaultTaxRate(String(defaultRate))
     setForm(prev => ({ ...prev, tax_percent: String(defaultRate || '0') }))
 
     const { data: props } = await supabase
       .from('proposals')
       .select('id, proposal_name, company, client_name, total_customer_value, labor_items')
-      .eq('org_id', prof.org_id)
+      .eq('org_id', profile.org_id)
       .eq('status', 'Won')
       .order('created_at', { ascending: false })
     setProposals(props || [])
@@ -49,7 +47,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     const { data: tickets } = await supabase
       .from('service_tickets')
       .select('id, ticket_number, title, status, line_items, labor_items, clients(company, client_name)')
-      .eq('org_id', prof.org_id)
+      .eq('org_id', profile.org_id)
       .neq('status', 'Cancelled')
       .order('created_at', { ascending: false })
     setServiceTickets(tickets || [])
@@ -259,13 +257,11 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
   const handleSave = async () => {
     setSaving(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
 
-    const { data: invoiceNumber } = await supabase.rpc('get_next_invoice_number', { org_id_input: prof.org_id })
+    const { data: invoiceNumber } = await supabase.rpc('get_next_invoice_number', { org_id_input: profile.org_id })
 
     const { data: inv, error } = await supabase.from('invoices').insert({
-      org_id: prof.org_id,
+      org_id: profile.org_id,
       proposal_id: form.proposal_id || null,
       service_ticket_id: form.service_ticket_id || null,
       invoice_number: invoiceNumber,

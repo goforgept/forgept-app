@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 const STATUS_COLORS = {
   'Open': 'bg-blue-500/20 text-blue-400',
@@ -20,9 +21,9 @@ const PRIORITY_COLORS = {
 export default function ServiceTicketDetail({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const [ticket, setTicket] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState(null)
   const [techs, setTechs] = useState([])
   const [saving, setSaving] = useState(false)
   const [newNote, setNewNote] = useState('')
@@ -41,13 +42,10 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoCategory, setPhotoCategory] = useState('Other')
 
-  useEffect(() => { fetchAll() }, [id])
+  useEffect(() => { if (profile?.org_id) fetchAll() }, [id, profile?.org_id])
 
   const fetchAll = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type)').eq('id', user.id).single()
-    setProfile(profileData)
-    const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', profileData.org_id).single()
+    const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', profile.org_id).single()
     setOrgTimezone(orgData?.timezone || 'America/Chicago')
 
     const { data: ticketData } = await supabase
@@ -61,7 +59,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
 
     const { data: techData } = await supabase
       .from('profiles').select('id, full_name, dispatch_zone')
-      .eq('org_id', profileData.org_id).order('full_name')
+      .eq('org_id', profile.org_id).order('full_name')
     setTechs(techData || [])
 
     // Fetch client locations if client is set
@@ -241,11 +239,10 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
       const storagePath = `${profile?.org_id}/${id}/${Date.now()}.${fileExt}`
       const { uploadToR2, BUCKETS } = await import('../r2')
       await uploadToR2(storagePath, file, file.type, BUCKETS.PHOTOS)
-      const { data: { user } } = await supabase.auth.getUser()
       await supabase.from('service_ticket_photos').insert({
         ticket_id: id,
         org_id: profile?.org_id,
-        uploaded_by: user.id,
+        uploaded_by: profile?.id,
         storage_path: storagePath,
         url: storagePath,
         category: photoCategory,

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 const AUTO_CHECK_TYPES = [
   { type: 'proposal_signed', label: 'Proposal signed', icon: '✍️' },
@@ -77,6 +78,7 @@ function JobPOList({ proposalId }) {
 export default function JobDetail({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const [job, setJob] = useState(null)
   const [editingJobName, setEditingJobName] = useState(false)
   const [jobNameDraft, setJobNameDraft] = useState('')
@@ -84,7 +86,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [lineItems, setLineItems] = useState([])
   const [checklist, setChecklist] = useState([])
   const [changeOrders, setChangeOrders] = useState([])
-  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('checklist')
   const [savingStatus, setSavingStatus] = useState(false)
@@ -141,13 +142,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [savingSchedule, setSavingSchedule] = useState(false)
   const [jobSchedules, setJobSchedules] = useState([])
 
-  useEffect(() => { fetchAll() }, [id])
+  useEffect(() => { if (profile?.org_id) fetchAll() }, [id, profile?.org_id])
 
   const fetchAll = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profileData } = await supabase.from('profiles').select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type)').eq('id', user.id).single()
-    setProfile(profileData)
-
     const { data: jobData } = await supabase
       .from('jobs')
       .select('*, clients(company, email, client_name), profiles!jobs_assigned_pm_fkey(full_name, email)')
@@ -155,14 +152,14 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       .single()
     setJob(jobData)
 
-    if (profileData?.org_id) {
+    if (profile?.org_id) {
       const { data: profilesData } = await supabase
         .from('profiles')
         .select('id, full_name, email, role')
-        .eq('org_id', profileData.org_id)
+        .eq('org_id', profile.org_id)
         .order('full_name')
       setOrgProfiles(profilesData || [])
-      const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', profileData.org_id).single()
+      const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', profile.org_id).single()
       setOrgTimezone(orgData?.timezone || 'America/Chicago')
     }
 
@@ -181,11 +178,11 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       setLineItems(lineData || [])
       setEditLines(lineData || [])
 
-      if (profileData?.org_id) {
+      if (profile?.org_id) {
         const { data: vendorData } = await supabase
           .from('vendors')
           .select('id, vendor_name, default_markup_percent, contact_email')
-          .eq('org_id', profileData.org_id)
+          .eq('org_id', profile.org_id)
           .eq('active', true)
           .order('vendor_name')
         setVendors(vendorData || [])
@@ -218,7 +215,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     if (checkData && checkData.length > 0) {
       setChecklist(checkData)
     } else {
-      await createDefaultChecklist(id, profileData?.org_id)
+      await createDefaultChecklist(id, profile?.org_id)
       const { data: freshCheck } = await supabase
         .from('job_checklist_items')
         .select('*')
@@ -827,11 +824,10 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       const storagePath = `${profile?.org_id}/${id}/${Date.now()}.${fileExt}`
       const { uploadToR2, BUCKETS } = await import('../r2')
       await uploadToR2(storagePath, file, file.type, BUCKETS.PHOTOS)
-      const { data: { user } } = await supabase.auth.getUser()
       await supabase.from('job_photos').insert({
         job_id: id,
         org_id: profile?.org_id,
-        uploaded_by: user.id,
+        uploaded_by: profile?.id,
         storage_path: storagePath,
         url: storagePath, // store path not URL
         category: photoCategory,

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
+import { useProfile } from '../context/ProfileContext'
 
 const INDUSTRIES = [
   'Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security',
@@ -11,6 +12,7 @@ const INDUSTRIES = [
 export default function NewProposal() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { profile } = useProfile()
   const [saving, setSaving] = useState(false)
   const [clients, setClients] = useState([])
   const [selectedClientId, setSelectedClientId] = useState('')
@@ -18,7 +20,6 @@ export default function NewProposal() {
   const [selectedLocationId, setSelectedLocationId] = useState('')
   const [clientContacts, setClientContacts] = useState([])
   const [selectedContactId, setSelectedContactId] = useState('__main__')
-  const [profile, setProfile] = useState(null)
   const [taxRate, setTaxRate] = useState('')
   const [taxExempt, setTaxExempt] = useState(false)
   const [errors, setErrors] = useState({})
@@ -38,30 +39,22 @@ export default function NewProposal() {
     }
   })
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { if (profile?.org_id) fetchData() }, [profile?.org_id])
 
   const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: prof } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type, default_tax_rate)')
-      .eq('id', user.id)
-      .single()
-
-    if (prof) {
-      setProfile(prof)
+    if (profile) {
       setForm(prev => ({
         ...prev,
-        rep_name: prof.full_name || '',
-        rep_email: prof.email || user.email || '',
+        rep_name: profile.full_name || '',
+        rep_email: profile.email || '',
       }))
-      setTaxRate(prof.organizations?.default_tax_rate ?? '')
+      setTaxRate(profile.organizations?.default_tax_rate ?? '')
 
-      if (prof.org_id) {
+      if (profile.org_id) {
         const { data: clientsData } = await supabase
           .from('clients')
           .select('id, company, client_name, email, industry')
-          .eq('org_id', prof.org_id)
+          .eq('org_id', profile.org_id)
           .order('company', { ascending: true })
         setClients(clientsData || [])
       }
@@ -137,15 +130,12 @@ export default function NewProposal() {
     if (!validate()) return
     setSaving(true)
 
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-
     // Auto-generate quote number
     let quoteNumber = ''
-    if (prof?.org_id) {
-      const { data: org } = await supabase.from('organizations').select('quote_counter').eq('id', prof.org_id).single()
+    if (profile?.org_id) {
+      const { data: org } = await supabase.from('organizations').select('quote_counter').eq('id', profile.org_id).single()
       quoteNumber = `Q-${org.quote_counter}`
-      await supabase.from('organizations').update({ quote_counter: org.quote_counter + 1 }).eq('id', prof.org_id)
+      await supabase.from('organizations').update({ quote_counter: org.quote_counter + 1 }).eq('id', profile.org_id)
     }
 
     // Create client if new
@@ -153,7 +143,7 @@ export default function NewProposal() {
     let clientId = params.get('clientId') || selectedClientId || null
     if (!clientId && form.company.trim()) {
       const { data: newClient } = await supabase.from('clients').insert({
-        org_id: prof?.org_id,
+        org_id: profile?.org_id,
         company: form.company,
         client_name: form.client_name || '',
         email: form.client_email || '',
@@ -169,8 +159,8 @@ export default function NewProposal() {
 
     const { data: proposal, error } = await supabase.from('proposals').insert({
       proposal_name: form.job_description,
-      user_id: user.id,
-      org_id: prof?.org_id,
+      user_id: profile?.id,
+      org_id: profile?.org_id,
       client_id: clientId || null,
       contact_id: resolvedContactId,
       location_id: selectedLocationId || null,

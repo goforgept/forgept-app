@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 const STATUSES = ['Draft', 'In Production', 'Packed', 'Shipped', 'Delivered']
 const STATUS_COLORS = {
@@ -13,6 +14,7 @@ const STATUS_COLORS = {
 }
 
 export default function ManufacturerOrders({ isAdmin, featureProposals = true, featureCRM = false }) {
+  const { profile } = useProfile()
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('All')
@@ -22,11 +24,9 @@ export default function ManufacturerOrders({ isAdmin, featureProposals = true, f
   const [savingOrder, setSavingOrder] = useState(false)
   const navigate = useNavigate()
 
-  useEffect(() => { fetchOrders() }, [])
+  useEffect(() => { if (profile?.org_id) fetchOrders() }, [profile?.org_id])
 
   const fetchOrders = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
     if (!profile?.org_id) { setLoading(false); return }
 
     const { data } = await supabase

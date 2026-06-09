@@ -2,18 +2,18 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 export default function Forecast({ isAdmin, featureProposals = true, featureCRM = false }) {
+  const { profile } = useProfile()
   const [proposals, setProposals] = useState([])
   const [stages, setStages] = useState([])
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => { if (profile?.org_id) fetchData() }, [profile?.org_id])
 
   const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
     if (!profile?.org_id) { setLoading(false); return }
     const [proposalsRes, stagesRes] = await Promise.all([
       supabase.from('proposals').select('*').eq('org_id', profile.org_id).order('created_at', { ascending: false }),

@@ -2,26 +2,20 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { useProfile } from '../context/ProfileContext'
 
 export default function Contracts({ isAdmin, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, featureSla, featureMonitoring, role, isSalesManager, isPM, isTechnician }) {
   const navigate = useNavigate()
+  const { profile } = useProfile()
   const [contracts, setContracts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filterType, setFilterType] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
-  const [profile, setProfile] = useState(null)
 
   useEffect(() => {
-    fetchProfile()
-  }, [])
-
-  const fetchProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase.from('profiles').select('id, org_id, org_role').eq('id', user.id).single()
-    setProfile(data)
-    fetchContracts(data)
-  }
+    if (profile?.org_id) fetchContracts(profile)
+  }, [profile?.org_id])
 
   const fetchContracts = async (prof) => {
     let query = supabase
