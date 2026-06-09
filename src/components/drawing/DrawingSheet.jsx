@@ -79,6 +79,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [selectedId,  setSelectedId]  = useState(null)
   const [selectedIds, setSelectedIds] = useState(new Set()) // multiselect
   const [selectionBox, setSelectionBox] = useState(null) // drag selection box
+  const selectionBoxRef = useRef(null)
   const isSelecting = useRef(false)
   const selectionStart = useRef(null)
   const [hoveredId,  setHoveredId]  = useState(null)
@@ -416,12 +417,14 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const handleMouseMove = useCallback((e) => {
     if (isSelecting.current && selectionStart.current) {
       const pointer = stageRef.current.getPointerPosition()
-      setSelectionBox({
-        x: Math.min(pointer.x, selectionStart.current.x),
-        y: Math.min(pointer.y, selectionStart.current.y),
-        w: Math.abs(pointer.x - selectionStart.current.x),
-        h: Math.abs(pointer.y - selectionStart.current.y),
-      })
+      const box = {
+          x: Math.min(pointer.x, selectionStart.current.x),
+          y: Math.min(pointer.y, selectionStart.current.y),
+          w: Math.abs(pointer.x - selectionStart.current.x),
+          h: Math.abs(pointer.y - selectionStart.current.y),
+        }
+        selectionBoxRef.current = box
+        setSelectionBox(box)
       return
     }
     if (!isPanning.current || !lastPointer.current) return
@@ -433,7 +436,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   const handleMouseUp = useCallback(() => {
     isPanning.current = false
-    if (isSelecting.current && selectionBox) {
+    if (isSelecting.current) {
+      const box = selectionBoxRef.current
       // Find all placements within the selection box
       const selected = new Set()
       placements.forEach(p => {
@@ -453,7 +457,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     isSelecting.current = false
     selectionStart.current = null
     setSelectionBox(null)
-  }, [selectionBox, placements, position, canvasW, canvasH, scale])
+  }, [placements, position, canvasW, canvasH, scale])
 
   // ── Pinch zoom ─────────────────────────────────────────────────────────────
   const lastTouchPos = useRef(null)
