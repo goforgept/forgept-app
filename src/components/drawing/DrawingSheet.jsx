@@ -69,6 +69,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const isPanning    = useRef(false)
   const lastPointer  = useRef(null)
   const lastDist     = useRef(0)
+  const canvasWRef   = useRef(1200)
+  const canvasHRef   = useRef(900)
+  const positionRef  = useRef({ x: 0, y: 0 })
+  const scaleRef     = useRef(1)
+  const placementsRef = useRef([])
 
   const [bgImage,    setBgImage]    = useState(null)
   const [imageSize,  setImageSize]  = useState({ w: 1200, h: 900 })
@@ -438,26 +443,31 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     isPanning.current = false
     if (isSelecting.current) {
       const box = selectionBoxRef.current
-      // Find all placements within the selection box
-      const selected = new Set()
-      placements.forEach(p => {
-        const px = position.x + p.x * canvasW * scale
-        const py = position.y + p.y * canvasH * scale
-        if (px >= selectionBox.x && px <= selectionBox.x + selectionBox.w &&
-            py >= selectionBox.y && py <= selectionBox.y + selectionBox.h) {
-          selected.add(p.id)
+      if (box) {
+        const selected = new Set()
+        const cW = canvasWRef.current
+        const cH = canvasHRef.current
+        const pos = positionRef.current
+        const sc  = scaleRef.current
+        placementsRef.current.forEach(p => {
+          const px = pos.x + p.x * cW * sc
+          const py = pos.y + p.y * cH * sc
+          if (px >= box.x && px <= box.x + box.w &&
+              py >= box.y && py <= box.y + box.h) {
+            selected.add(p.id)
+          }
+        })
+        if (selected.size > 0) {
+          setSelectedIds(selected)
+          setSelectedId(null)
+          onPlacementSelect?.(null)
         }
-      })
-      if (selected.size > 0) {
-        setSelectedIds(selected)
-        setSelectedId(null)
-        onPlacementSelect?.(null)
       }
     }
     isSelecting.current = false
     selectionStart.current = null
     setSelectionBox(null)
-  }, [placements, position, canvasW, canvasH, scale])
+  }, [])
 
   // ── Pinch zoom ─────────────────────────────────────────────────────────────
   const lastTouchPos = useRef(null)
@@ -501,6 +511,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const isBlank = sheet.storage_path === 'blank'
   const canvasW = isBlank ? Math.max(stageSize.w, 1200) : imageSize.w
   const canvasH = isBlank ? Math.max(stageSize.h, 900) : imageSize.h
+  canvasWRef.current   = canvasW
+  canvasHRef.current   = canvasH
+  positionRef.current  = position
+  scaleRef.current     = scale
+  placementsRef.current = placements
 
   // ── Snap to nearest placement marker ──────────────────────────────────────
   const snapToPlacement = useCallback((px, py) => {
