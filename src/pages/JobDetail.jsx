@@ -503,7 +503,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         styles: { fontSize: 9 }, showFoot: 'lastPage'
       })
       const { error: poInsertError } = await supabase.from('purchase_orders').insert({
-        po_number: finalPONumber, proposal_id: job?.proposal_id || null,
+        po_number: finalPONumber, proposal_id: job?.proposal_id || null, job_id: id,
         org_id: profile.org_id, vendor_name: vendorNames || null, status: 'Sent', total_amount: poTotal
       })
       if (poInsertError) throw new Error(poInsertError.message)
