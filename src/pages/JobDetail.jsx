@@ -159,21 +159,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       }
     }
 
-    // Fetch freeform PO line items linked to this job
-    const { data: poData } = await supabase
-      .from('purchase_orders')
-      .select('id, po_number, vendor_name, total_amount, description')
-      .eq('job_id', id)
-    if (poData && poData.length > 0) {
-      const poIds = poData.map(p => p.id)
-      const { data: poLineData } = await supabase
-        .from('purchase_order_line_items')
-        .select('*, purchase_orders(po_number, vendor_name, description)')
-        .in('po_id', poIds)
-      setFreeformPOItems(poLineData || [])
-    } else {
-      setFreeformPOItems([])
-    }
+    setFreeformPOItems([])
 
     // Fetch checklist
     const { data: checkData } = await supabase
