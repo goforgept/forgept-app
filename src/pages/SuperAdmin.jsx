@@ -257,6 +257,7 @@ export default function SuperAdmin() {
       feature_designer_only:  org.feature_designer_only  || false,
       feature_spec_reader:    org.feature_spec_reader    || false,
       feature_drawing_reader: org.feature_drawing_reader || false,
+      feature_api:            org.feature_api            || false,
     })
   }
 
@@ -275,6 +276,7 @@ export default function SuperAdmin() {
       feature_designer_only:  orgForm.feature_designer_only,
       feature_spec_reader:    orgForm.feature_spec_reader,
       feature_drawing_reader: orgForm.feature_drawing_reader,
+      feature_api:            orgForm.feature_api,
     }).eq('id', orgId)
     setEditingOrg(null)
     fetchData()
@@ -666,6 +668,10 @@ export default function SuperAdmin() {
                                 <button onClick={() => setOrgForm(p => ({ ...p, feature_spec_reader: !p.feature_spec_reader }))}
                                   className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_spec_reader ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
                                   <span>{orgForm.feature_spec_reader ? '✓' : '○'}</span> Spec Reader
+                                </button>
+                                <button onClick={() => setOrgForm(p => ({ ...p, feature_api: !p.feature_api }))}
+                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_api ? 'border-blue-400 bg-blue-500/10 text-blue-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
+                                  <span>{orgForm.feature_api ? '✓' : '○'}</span> API Access
                                 </button>
                               </div>
                             </div>

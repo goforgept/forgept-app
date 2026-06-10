@@ -12,8 +12,9 @@ import RateCardTab from '../components/settings/RateCardTab'
 import DesignerTab from '../components/settings/DesignerTab'
 import EmailTemplatesTab from '../components/settings/EmailTemplatesTab'
 import TeamSettingsTab from '../components/settings/TeamSettingsTab'
+import ApiTab from '../components/settings/ApiTab'
 
-export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, featureDesignerOnly = false, role, isSalesManager, isPM, isTechnician }) {
+export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, featureDesignerOnly = false, featureApi = false, role, isSalesManager, isPM, isTechnician }) {
   const { profile } = useProfile()
   const [activeTab, setActiveTab] = useState('general')
   const [laborRates, setLaborRates] = useState([])
@@ -374,7 +375,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         { key: 'data',         label: 'Data & Import' },
       ]
     }] : []),
-    ...(isAdmin ? [{ items: [{ key: 'designer', label: 'Designer' }] }] : []),
+    ...(isAdmin ? [{ items: [{ key: 'designer', label: 'Designer' }, { key: 'api', label: 'API' }] }] : []),
     ...(featureDesignerOnly ? [{ label: 'Team', items: [{ key: 'team', label: 'Team' }] }] : []),
   ]
 
@@ -457,6 +458,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           )}
 
           {activeTab === 'designer' && isAdmin && <DesignerTab />}
+
+          {activeTab === 'api' && isAdmin && <ApiTab featureApi={featureApi} />}
 
           {activeTab === 'data' && isAdmin && (
             <DataImportTab

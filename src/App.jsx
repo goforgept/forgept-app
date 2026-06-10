@@ -107,6 +107,7 @@ function App() {
     featureMonitoring:     features.monitoring,
     featureDrawingTool:    features.drawingTool,
     featureDesignerOnly:   features.designerOnly,
+    featureApi:            features.api,
   }
 
   return (
