@@ -468,6 +468,7 @@ export default function SuperAdmin() {
             { key: 'billing',   label: 'Billing & Plans' },
             { key: 'metrics',   label: 'Metrics' },
             { key: 'products',  label: 'Global Products' },
+            { key: 'api',       label: 'API Keys' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
@@ -1092,6 +1093,125 @@ export default function SuperAdmin() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── API KEYS TAB ── */}
+      {activeTab === 'api' && <APIKeysPanel orgs={orgs} />}
+
+    </div>
+  )
+}
+
+// ─── APIKeysPanel ─────────────────────────────────────────────────────────────
+function APIKeysPanel({ orgs }) {
+  const [keys, setKeys] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('api_keys').select('*').order('created_at', { ascending: false })
+      setKeys(data || [])
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  const getOrgName = (orgId) => orgs.find(o => o.id === orgId)?.name || orgId
+
+  const filtered = keys.filter(k => {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return k.name.toLowerCase().includes(q) || getOrgName(k.org_id).toLowerCase().includes(q)
+  })
+
+  const activeKeys = keys.filter(k => k.is_active)
+  const usedLast30 = keys.filter(k => k.last_used_at && (Date.now() - new Date(k.last_used_at)) < 30 * 24 * 60 * 60 * 1000)
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-white font-bold text-lg">API Keys</h3>
+          <p className="text-[#8A9AB0] text-sm mt-0.5">All API keys across all organizations</p>
+        </div>
+        <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search org or key name..."
+          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:border-[#C8622A] placeholder-[#4a5d75]" />
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label: 'Total Keys', value: keys.length },
+          { label: 'Active Keys', value: activeKeys.length },
+          { label: 'Used Last 30 Days', value: usedLast30.length },
+        ].map(s => (
+          <div key={s.label} className="bg-[#1a2d45] rounded-xl p-4 border border-[#2a3d55]">
+            <p className="text-[#8A9AB0] text-xs mb-1">{s.label}</p>
+            <p className="text-white text-2xl font-bold">{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {loading ? (
+        <p className="text-[#8A9AB0] text-sm">Loading...</p>
+      ) : filtered.length === 0 ? (
+        <div className="bg-[#1a2d45] rounded-xl p-8 text-center border border-[#2a3d55]">
+          <p className="text-[#8A9AB0]">{search ? 'No keys match your search.' : 'No API keys have been created yet.'}</p>
+        </div>
+      ) : (
+        <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[#2a3d55] bg-[#0F1C2E]">
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Organization</th>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Key Name</th>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Prefix</th>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Scopes</th>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Last Used</th>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Created</th>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#2a3d55]/50">
+              {filtered.map(k => {
+                const daysSinceUsed = k.last_used_at ? Math.floor((Date.now() - new Date(k.last_used_at)) / (1000 * 60 * 60 * 24)) : null
+                return (
+                  <tr key={k.id} className="hover:bg-[#0F1C2E]/30">
+                    <td className="px-4 py-3 text-white font-medium">{getOrgName(k.org_id)}</td>
+                    <td className="px-4 py-3 text-[#8A9AB0]">{k.name}</td>
+                    <td className="px-4 py-3 font-mono text-[#8A9AB0] text-xs">{k.key_prefix}…</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {k.scopes.map(s => (
+                          <span key={s} className="text-xs bg-[#C8622A]/15 text-[#C8622A] px-2 py-0.5 rounded font-medium">
+                            {s.replace('read:', '')}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {k.last_used_at ? (
+                        <span className={daysSinceUsed === 0 ? 'text-green-400' : daysSinceUsed <= 7 ? 'text-[#C8622A]' : 'text-[#8A9AB0]'}>
+                          {daysSinceUsed === 0 ? 'Today' : `${daysSinceUsed}d ago`}
+                        </span>
+                      ) : (
+                        <span className="text-[#4a5d75]">Never</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-[#8A9AB0] text-xs">{new Date(k.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded font-semibold ${k.is_active ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {k.is_active ? 'Active' : 'Revoked'}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

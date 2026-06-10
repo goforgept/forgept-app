@@ -141,6 +141,21 @@ const faqs = [
       { q: 'How do I change my brand color?', a: 'Go to Settings and find the Brand Color field under Proposal Branding. Use the color picker or enter a hex code. Your brand color will be used in PDF headers, tables, and section headings.' },
       { q: 'How do I set a default markup percentage?', a: 'Go to Settings and enter your Default Markup % under Proposal Branding. This pre-fills the markup field when adding line items to a new proposal.' }
     ]
+  },
+  {
+    category: 'API & Integrations',
+    items: [
+      { q: 'How do I get API access?', a: 'API access is available on eligible plans. Once enabled for your account, go to Settings → API to generate keys. Contact us if you need API access enabled.' },
+      { q: 'How do I generate an API key?', a: 'Go to Settings → API and click Generate Key. Give the key a name (e.g. "Salesforce Integration"), select which scopes it needs (Proposals, Clients, Jobs, Designer), then click Generate. Copy the key immediately — it will only be shown once.' },
+      { q: 'How do I authenticate API requests?', a: 'Include your API key in the Authorization header of every request: Authorization: Bearer fpk_your_key_here. Keys that are revoked or belong to accounts without API access will be rejected with a 401.' },
+      { q: 'What endpoints are available?', a: 'The API provides read access to: GET /v1/proposals (list), GET /v1/proposals/:id (with full BOM and labor), GET /v1/clients, GET /v1/clients/:id, GET /v1/jobs, GET /v1/jobs/:id, and GET /v1/drawings/:id/bom (aggregated device list from a floor plan). A machine-readable OpenAPI spec is available at /v1/openapi.json.' },
+      { q: 'What is the base URL for the API?', a: 'All API requests go to: https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/api/v1/... — for example https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/api/v1/proposals' },
+      { q: 'How do I connect ForgePt. to Salesforce or another CRM?', a: 'Use the REST API to pull proposal data into your CRM. Authenticate with your API key, call GET /v1/proposals to list deals with status, value, and close date, and GET /v1/clients for contact records. Most CRM tools (Salesforce, HubSpot, Zoho) support custom API integrations or you can use a tool like Zapier, Make, or n8n to automate the sync.' },
+      { q: 'How do I get a BOM out of a floor plan drawing?', a: 'Call GET /v1/drawings/:id/bom with your API key. The response includes an aggregated list of every device placed on the drawing — part number, name, category, manufacturer, and quantity. The drawing ID is the UUID from the drawing URL in the Designer.' },
+      { q: 'Can I use the API with an AI agent?', a: 'Yes. The OpenAPI spec at /v1/openapi.json is a machine-readable description of every endpoint. Tools like Claude, GPT, or agent frameworks (LangChain, CrewAI) can read this spec and call the API automatically. Point your agent at the spec URL and it will discover what data is available and how to query it.' },
+      { q: 'What are API scopes?', a: 'Scopes limit what a key can access. A key with only the Proposals scope cannot read client or job data. Assign the minimum scopes needed for each integration — for example, a CRM sync key gets Proposals and Clients, while a drawing export key gets Designer only. This limits exposure if a key is ever compromised.' },
+      { q: 'How do I revoke an API key?', a: 'Go to Settings → API and click Revoke next to the key. It stops working immediately. Any integration using that key will get a 401 error and will need to be updated with a new key.' }
+    ]
   }
 ]
 
