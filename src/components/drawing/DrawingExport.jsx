@@ -32,9 +32,11 @@ const getIconPng = async (category, color, size = 16) => {
 }
 
 // ─── Label placement helpers ──────────────────────────────────────────────────
-const mkLabelBox = (cx, cy, text, fs) => {
-  const w = text.length * fs * 0.65 + fs  // char width estimate + side padding
-  const h = fs * 1.1                       // jsPDF text ascends ~1.1× above baseline
+// fs is in points; all spatial coords are in mm. 1pt = 0.353mm.
+const ptToMm = (pt) => pt * 0.353
+const mkLabelBox = (cx, cy, text, fsMm) => {
+  const w = text.length * fsMm * 0.65 + fsMm
+  const h = fsMm * 1.1
   return { x1: cx - w / 2, y1: cy - h, x2: cx + w / 2, y2: cy }
 }
 const boxesOverlap = (a, b) =>
@@ -289,30 +291,31 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       // Device label — try below, then above, right, left; fall back to below if all overlap
       if (p.device_address) {
-        const fs    = Math.max(symbolSizeMM * 0.7, 3)
+        const fs    = Math.max(symbolSizeMM * 0.7, 3)   // points — for setFontSize only
+        const fsMm  = ptToMm(fs)                         // mm — for all spatial math
         const rad   = symbolSizeMM / 2
-        const gap   = rad + fs * 0.3
+        const gap   = rad + 0.5                          // 0.5mm clearance from circle edge
         const label = p.device_address
 
         const candidates = [
-          [px,       py + gap + fs],   // below
-          [px,       py - gap],         // above
-          [px + gap, py + fs * 0.4],   // right
-          [px - gap, py + fs * 0.4],   // left
+          [px,            py + gap + fsMm],    // below
+          [px,            py - gap],            // above
+          [px + gap,      py + fsMm * 0.4],    // right
+          [px - gap,      py + fsMm * 0.4],    // left
         ]
 
         let lx = candidates[0][0], ly = candidates[0][1]
         for (const [cx, cy] of candidates) {
-          const box = mkLabelBox(cx, cy, label, fs)
+          const box = mkLabelBox(cx, cy, label, fsMm)
           if (!placedLabels.some(b => boxesOverlap(box, b))) {
             lx = cx; ly = cy
             placedLabels.push(box)
             break
           }
-          // If this is the last candidate, just use below anyway
-          if (cx === candidates[candidates.length - 1][0] && cy === candidates[candidates.length - 1][1]) {
-            placedLabels.push(mkLabelBox(lx, ly, label, fs))
-          }
+        }
+        // Always record so subsequent labels don't overlap this one
+        if (!placedLabels.some(b => boxesOverlap(mkLabelBox(lx, ly, label, fsMm), b))) {
+          placedLabels.push(mkLabelBox(lx, ly, label, fsMm))
         }
 
         pdf.setTextColor(r, g, b)
