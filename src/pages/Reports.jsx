@@ -156,7 +156,8 @@ const NAV_GROUPS = [
 ]
 
 const ALL_REPORTS    = NAV_GROUPS.flatMap(g => g.items)
-const NO_DATE_FILTER = ['user_activity', 'client_report']
+const NO_DATE_FILTER  = ['user_activity', 'client_report', 'open_jobs'] // don't filter these by created_at
+const GRAY_DATE_FILTER = ['user_activity', 'client_report']             // gray out UI for these only
 
 const REPORT_FILTERS = {
   open_quotes:      ['clients', 'rep', 'industry'],
@@ -293,6 +294,7 @@ export default function Reports(props) {
       if (selectedClientIds.length === 1) q = q.eq('client_id', selectedClientIds[0])
       if (selectedClientIds.length > 1)  q = q.in('client_id', selectedClientIds)
       const { data: rows, error } = await q
+      console.log('jobs result:', { rows, error, orgId: profile.org_id, statuses: statusMap[activeReport], from, to })
       if (error) console.error('jobs error:', error)
       setData((rows || []).map(r => ({
         'Job Title': r.title || '—',
@@ -487,7 +489,7 @@ export default function Reports(props) {
 
   const reportLabel   = ALL_REPORTS.find(r => r.key === activeReport)?.label || ''
   const columns       = data.length > 0 ? Object.keys(data[0]) : []
-  const noDate        = NO_DATE_FILTER.includes(activeReport)
+  const noDate        = GRAY_DATE_FILTER.includes(activeReport)
   const activeFilters = REPORT_FILTERS[activeReport] || []
 
   const exportExcel = () => {
