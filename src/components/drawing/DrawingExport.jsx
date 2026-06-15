@@ -31,14 +31,14 @@ const getIconPng = async (category, color, size = 16) => {
   return png
 }
 
-// ─── Label collision helpers ──────────────────────────────────────────────────
-// jsPDF baseline = bottom of text; text ascends ~fs*1.1 above that.
-const labelBounds = (cx, cy, text, fs) => {
-  const w = text.length * fs * 0.65 + fs
-  return { x1: cx - w / 2, y1: cy - fs * 1.1, x2: cx + w / 2, y2: cy }
+// ─── Label placement helpers ──────────────────────────────────────────────────
+const mkLabelBox = (cx, cy, text, fs) => {
+  const w = text.length * fs * 0.65 + fs  // char width estimate + side padding
+  const h = fs * 1.1                       // jsPDF text ascends ~1.1× above baseline
+  return { x1: cx - w / 2, y1: cy - h, x2: cx + w / 2, y2: cy }
 }
-const labelsOverlap = (a, b) =>
-  !(a.x2 + 0.8 < b.x1 || b.x2 + 0.8 < a.x1 || a.y2 + 0.8 < b.y1 || b.y2 + 0.8 < a.y1)
+const boxesOverlap = (a, b) =>
+  !(a.x2 + 0.5 < b.x1 || b.x2 + 0.5 < a.x1 || a.y2 + 0.5 < b.y1 || b.y2 + 0.5 < a.y1)
 
 // ─── DrawingExport ────────────────────────────────────────────────────────────
 // Export tab — Client Overview, Shop Drawings, As-Builts, CSV BOM
@@ -228,7 +228,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
     // Device markers + FOV
     const sheetPlacements = placementsBySheet[sheet.id] || []
-    const placedLabelBounds = []
+    const placedLabels = []
     for (const p of sheetPlacements) {
       const px  = imgX + p.x * imgW
       const py  = imgY + p.y * imgH
@@ -287,28 +287,31 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.addImage(iconPng, 'PNG', px - iconSize/2, py - iconSize/2, iconSize, iconSize)
       }
 
-      // Device label — collision-aware placement
+      // Device label — try below, then above, right, left; fall back to below if all overlap
       if (p.device_address) {
         const fs    = Math.max(symbolSizeMM * 0.7, 3)
         const rad   = symbolSizeMM / 2
-        const off   = rad + fs * 0.8
+        const gap   = rad + fs * 0.3
         const label = p.device_address
 
-        // Four directions only — below, above, right, left
         const candidates = [
-          [px,       py + off + fs],   // below
-          [px,       py - off],         // above
-          [px + off, py + fs * 0.4],   // right
-          [px - off, py + fs * 0.4],   // left
+          [px,       py + gap + fs],   // below
+          [px,       py - gap],         // above
+          [px + gap, py + fs * 0.4],   // right
+          [px - gap, py + fs * 0.4],   // left
         ]
 
         let lx = candidates[0][0], ly = candidates[0][1]
         for (const [cx, cy] of candidates) {
-          const b = labelBounds(cx, cy, label, fs)
-          if (!placedLabelBounds.some(pb => labelsOverlap(b, pb))) {
+          const box = mkLabelBox(cx, cy, label, fs)
+          if (!placedLabels.some(b => boxesOverlap(box, b))) {
             lx = cx; ly = cy
-            placedLabelBounds.push(b)
+            placedLabels.push(box)
             break
+          }
+          // If this is the last candidate, just use below anyway
+          if (cx === candidates[candidates.length - 1][0] && cy === candidates[candidates.length - 1][1]) {
+            placedLabels.push(mkLabelBox(lx, ly, label, fs))
           }
         }
 
