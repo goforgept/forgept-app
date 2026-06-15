@@ -285,7 +285,7 @@ export default function Reports(props) {
       const statusMap = { open_jobs: ['Active', 'On Hold'], closed_jobs: ['Completed', 'Cancelled'] }
       let q = supabase
         .from('jobs')
-        .select('name, job_number, status, start_date, address, created_at, clients(company)')
+        .select('name, job_number, status, created_at, clients(company)')
         .eq('org_id', profile.org_id)
         .in('status', statusMap[activeReport])
         .order('created_at', { ascending: false })
@@ -296,13 +296,11 @@ export default function Reports(props) {
       const { data: rows, error } = await q
       if (error) console.error('jobs error:', error)
       setData((rows || []).map(r => ({
-        'Job #':     r.job_number || '—',
-        'Job Name':  r.name || '—',
-        'Status':    r.status,
-        'Client':    r.clients?.company || '—',
-        'Start':     r.start_date || '—',
-        'Address':   r.address || '—',
-        'Created':   r.created_at?.slice(0, 10) || '—',
+        'Job #':    r.job_number || '—',
+        'Job Name': r.name || '—',
+        'Status':   r.status,
+        'Client':   r.clients?.company || '—',
+        'Created':  r.created_at?.slice(0, 10) || '—',
       })))
     }
 
@@ -443,7 +441,7 @@ export default function Reports(props) {
         .eq('org_id', profile.org_id)
         .or(`company.ilike.%${client.label}%,client_name.ilike.%${client.label}%`),
       supabase.from('jobs')
-        .select('name, status, start_date, created_at')
+        .select('name, job_number, status, created_at')
         .eq('org_id', profile.org_id).eq('client_id', client.value),
       supabase.from('service_tickets')
         .select('ticket_number, title, status, priority, created_at')
@@ -481,7 +479,7 @@ export default function Reports(props) {
         'Margin': p.total_gross_margin_percent ? `${Number(p.total_gross_margin_percent).toFixed(1)}%` : '—',
         'Created': p.created_at?.slice(0, 10) || '—',
       })),
-      jobs: jobs.map(j => ({ 'Job Name': j.name || '—', 'Status': j.status, 'Start': j.start_date || '—', 'Created': j.created_at?.slice(0, 10) || '—' })),
+      jobs: jobs.map(j => ({ 'Job #': j.job_number || '—', 'Job Name': j.name || '—', 'Status': j.status, 'Created': j.created_at?.slice(0, 10) || '—' })),
       tickets: tickets.map(t => ({ 'Ticket #': t.ticket_number || '—', 'Title': t.title || '—', 'Status': t.status, 'Priority': t.priority || '—', 'Created': t.created_at?.slice(0, 10) || '—' })),
     })
     setClientLoading(false)
