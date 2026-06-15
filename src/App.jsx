@@ -39,6 +39,7 @@ import ServiceTicketDetail from './pages/ServiceTicketDetail'
 import Dispatch from './pages/Dispatch'
 import Contracts from './pages/Contracts'
 import ProductLibrary from './pages/ProductLibrary'
+import Reports from './pages/Reports'
 import Designer from './pages/Designer'
 import DesignerProjects from './pages/DesignerProjects'
 import DrawingReview from './pages/DrawingReview'
@@ -169,6 +170,7 @@ function App() {
             <Route path="/integrations/square/callback" element={<SquareCallback />} />
             <Route path="/integrations/google/callback" element={<GoogleCallback />} />
             <Route path="/integrations/microsoft/callback" element={<MicrosoftCallback />} />
+            {isAdmin && <Route path="/reports" element={<Reports {...sharedProps} />} />}
             <Route path="/product-library" element={<ProductLibrary {...sharedProps} />} />
             {(features.sla || features.monitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
             <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />
