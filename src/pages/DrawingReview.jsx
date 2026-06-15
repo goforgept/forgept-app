@@ -10,7 +10,7 @@ const FOV_CATEGORIES = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Senso
 // Range/marker size uses natW to convert from original-pixel coordinates.
 function SheetViewer({ sheet, placements }) {
   const [imgSrc,  setImgSrc]  = useState(null)
-  const [svgDims, setSvgDims] = useState(null) // { w, h, natW }
+  const [svgDims, setSvgDims] = useState(null) // { w, h, natW, natH }
   const imgRef = useRef(null)
 
   useEffect(() => {
@@ -23,7 +23,6 @@ function SheetViewer({ sheet, placements }) {
       const { getR2Url } = await import('../r2')
       const signedUrl = await getR2Url(sheet.storage_path, 3600)
       if (!signedUrl) return
-
       if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
         const pdfjsLib = await import('pdfjs-dist')
         pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -50,7 +49,7 @@ function SheetViewer({ sheet, placements }) {
   const updateDims = () => {
     const img = imgRef.current
     if (!img || !img.naturalWidth) return
-    setSvgDims({ w: img.offsetWidth, h: img.offsetHeight, natW: img.naturalWidth })
+    setSvgDims({ w: img.offsetWidth, h: img.offsetHeight, natW: img.naturalWidth, natH: img.naturalHeight })
   }
 
   useEffect(() => {
@@ -69,13 +68,7 @@ function SheetViewer({ sheet, placements }) {
       </div>
       <div className="relative bg-white">
         {imgSrc ? (
-          <img
-            ref={imgRef}
-            src={imgSrc}
-            alt={sheet.name}
-            className="w-full block"
-            onLoad={updateDims}
-          />
+          <img ref={imgRef} src={imgSrc} alt={sheet.name} className="w-full block" onLoad={updateDims} />
         ) : (
           <div className="h-64 flex items-center justify-center bg-[#0F1C2E]">
             <svg className="w-5 h-5 animate-spin text-[#C8622A]" fill="none" viewBox="0 0 24 24">
@@ -87,58 +80,76 @@ function SheetViewer({ sheet, placements }) {
         {svgDims && (
           <svg
             className="absolute inset-0 pointer-events-none"
-            width={svgDims.w}
-            height={svgDims.h}
+            width={svgDims.w} height={svgDims.h}
             viewBox={`0 0 ${svgDims.w} ${svgDims.h}`}
-            preserveAspectRatio="none"
           >
             {placements.map(p => {
-              const cx       = p.x * svgDims.w
-              const cy       = p.y * svgDims.h
-              const col      = p.marker_color || '#C8622A'
-              const markerR  = Math.max((p.symbol_size || 32) * (svgDims.w / svgDims.natW), 4)
+              const cx  = p.x * svgDims.w
+              const cy  = p.y * svgDims.h
+              const col = p.marker_color || '#C8622A'
+
+              // symbol_size is a diameter in original canvas pixels — halve it for radius,
+              // then scale to how much the image is shrunk for display.
+              const displayScale = svgDims.w / svgDims.natW
+              const markerR = Math.min(Math.max((p.symbol_size || 32) * 0.5 * displayScale, 3), 10)
+              const fs      = Math.max(markerR * 0.85, 6)
+
               const category = p.global_products?.category || ''
 
+              // FOV overlay
               let fovEl = null
               if (FOV_CATEGORIES.includes(category)) {
                 const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
                 const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
-                const range = sheet.scale_ratio
-                  ? Math.min((rangeInFeet / sheet.scale_ratio) * (svgDims.w / svgDims.natW), svgDims.w * 0.25)
+                const range = sheet.scale_ratio && isFinite(sheet.scale_ratio) && sheet.scale_ratio > 0
+                  ? Math.min((rangeInFeet / sheet.scale_ratio) * displayScale, svgDims.w * 0.25)
                   : svgDims.w * 0.06
 
                 if (category === 'PTZ Camera' || fovAngle >= 355) {
-                  fovEl = (
-                    <circle key={`fov_${p.id}`} cx={cx} cy={cy} r={range}
-                      fill={col} fillOpacity={0.08}
-                      stroke={col} strokeOpacity={0.3} strokeWidth={1} />
-                  )
+                  fovEl = <circle key={`fov_${p.id}`} cx={cx} cy={cy} r={range}
+                    fill={col} fillOpacity={0.08} stroke={col} strokeOpacity={0.3} strokeWidth={0.5} />
                 } else {
-                  const startAngle = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
-                  const endAngle   = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
-                  const x1 = cx + Math.cos(startAngle) * range
-                  const y1 = cy + Math.sin(startAngle) * range
-                  const x2 = cx + Math.cos(endAngle) * range
-                  const y2 = cy + Math.sin(endAngle) * range
-                  fovEl = (
-                    <path key={`fov_${p.id}`}
-                      d={`M ${cx} ${cy} L ${x1} ${y1} A ${range} ${range} 0 ${fovAngle > 180 ? 1 : 0} 1 ${x2} ${y2} Z`}
-                      fill={col} fillOpacity={0.12}
-                      stroke={col} strokeOpacity={0.4} strokeWidth={1} />
-                  )
+                  const sa = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
+                  const ea = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
+                  const x1 = cx + Math.cos(sa) * range, y1 = cy + Math.sin(sa) * range
+                  const x2 = cx + Math.cos(ea) * range, y2 = cy + Math.sin(ea) * range
+                  fovEl = <path key={`fov_${p.id}`}
+                    d={`M ${cx} ${cy} L ${x1} ${y1} A ${range} ${range} 0 ${fovAngle > 180 ? 1 : 0} 1 ${x2} ${y2} Z`}
+                    fill={col} fillOpacity={0.1} stroke={col} strokeOpacity={0.35} strokeWidth={0.5} />
                 }
               }
+
+              const labelY  = cy + markerR + fs + 1
+              const labelW  = p.device_address ? Math.max(p.device_address.length * fs * 0.6 + 4, 16) : 0
 
               return (
                 <g key={p.id}>
                   {fovEl}
+
+                  {/* Outer ring */}
+                  <circle cx={cx} cy={cy} r={markerR + 1.5} fill="white" fillOpacity={0.7} />
+                  {/* Filled marker */}
                   <circle cx={cx} cy={cy} r={markerR} fill={col} />
+                  {/* Inner white dot */}
+                  <circle cx={cx} cy={cy} r={markerR * 0.35} fill="white" fillOpacity={0.9} />
+
+                  {/* Label with pill background */}
                   {p.device_address && (
-                    <text x={cx} y={cy + markerR + markerR * 0.8}
-                      textAnchor="middle" fill={col}
-                      fontSize={Math.max(markerR * 0.75, 8)} fontWeight="bold">
-                      {p.device_address}
-                    </text>
+                    <g>
+                      <rect
+                        x={cx - labelW / 2} y={labelY - fs - 0.5}
+                        width={labelW} height={fs + 3}
+                        rx={2} fill={col} fillOpacity={0.85}
+                      />
+                      <text
+                        x={cx} y={labelY}
+                        textAnchor="middle" fill="white"
+                        fontSize={fs} fontWeight="600"
+                        fontFamily="system-ui, sans-serif"
+                      >
+                        {p.device_address}
+                      </text>
+                    </g>
                   )}
                 </g>
               )

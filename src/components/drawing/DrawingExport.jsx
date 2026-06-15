@@ -32,12 +32,14 @@ const getIconPng = async (category, color, size = 16) => {
 }
 
 // ─── Label collision helpers ──────────────────────────────────────────────────
+// jsPDF draws text with `y` at the baseline; text ascends ~fs above that.
+// We add a generous pad so nearby labels don't visually crowd each other.
 const labelBounds = (cx, cy, text, fs) => {
-  const w = text.length * fs * 0.55
-  const h = fs * 0.45
-  return { x1: cx - w / 2, y1: cy - h, x2: cx + w / 2, y2: cy }
+  const w = text.length * fs * 0.65 + fs   // char estimate + side padding
+  const h = fs * 1.2                        // full ascent above baseline
+  return { x1: cx - w / 2, y1: cy - h, x2: cx + w / 2, y2: cy + fs * 0.3 }
 }
-const labelsOverlap = (a, b, pad = 0.4) =>
+const labelsOverlap = (a, b, pad = 1) =>
   !(a.x2 + pad < b.x1 || b.x2 + pad < a.x1 || a.y2 + pad < b.y1 || b.y2 + pad < a.y1)
 
 // ─── DrawingExport ────────────────────────────────────────────────────────────
@@ -284,22 +286,23 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       if (p.device_address) {
         const fs    = Math.max(symbolSizeMM * 0.7, 3)
         const rad   = symbolSizeMM / 2
-        const gap   = rad + fs * 0.6
+        const gap   = rad + fs * 1.4          // clear the marker circle
+        const step  = fs * 3                  // label-width-based step so moves are meaningful
         const label = p.device_address
 
-        // Try positions in priority order: below, right, above, left, diagonals, further out
+        // Candidates spread in label-sized steps so each option actually clears the previous
         const candidates = [
-          [0,          gap],
-          [gap,        0],
-          [0,          -gap],
-          [-gap,       0],
-          [gap * 0.75, gap * 0.75],
-          [-gap * 0.75,gap * 0.75],
-          [gap * 0.75, -gap * 0.75],
-          [-gap * 0.75,-gap * 0.75],
-          [0,          gap * 1.8],
-          [gap * 1.6,  0],
-          [-gap * 1.6, 0],
+          [0,      gap],           // below (default)
+          [step,   gap],           // below-right
+          [-step,  gap],           // below-left
+          [step,   0],             // right
+          [-step,  0],             // left
+          [0,      -gap],          // above
+          [step,   -gap],          // above-right
+          [-step,  -gap],          // above-left
+          [0,      gap + step],    // far below
+          [step*2, gap],           // far right
+          [-step*2,gap],           // far left
         ]
 
         let lx = px, ly = py + gap, placed = false
@@ -314,12 +317,13 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         }
         if (!placed) placedLabelBounds.push(labelBounds(lx, ly, label, fs))
 
-        // Leader line if label was moved from default below position
-        const defaultLy = py + gap
-        if (Math.abs(lx - px) > 0.5 || Math.abs(ly - defaultLy) > 0.5) {
-          pdf.setLineWidth(0.15)
+        // Leader line if label was moved from the default below position
+        const movedX = Math.abs(lx - px) > fs * 0.5
+        const movedY = Math.abs(ly - (py + gap)) > fs * 0.5
+        if (movedX || movedY) {
+          pdf.setLineWidth(0.2)
           pdf.setDrawColor(r, g, b)
-          pdf.line(px, py + rad * 0.6, lx, ly - fs * 0.4)
+          pdf.line(px, py + rad, lx, ly - fs * 1.0)
         }
 
         pdf.setTextColor(r, g, b)
