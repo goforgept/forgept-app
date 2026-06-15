@@ -177,7 +177,7 @@ function today()    { return new Date().toISOString().slice(0, 10) }
 function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
 const fmt$ = (n) => n != null ? `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '—'
 
-const BLANK_FILTERS = { clients: [], rep: '', industry: '', tech: '', status: '', priority: '', vendorName: '' }
+const BLANK_FILTERS = { clients: [], rep: '', industry: '', tech: '', status: '', priority: '', vendorName: '', vendorSearch: '' }
 
 export default function Reports(props) {
   const { profile } = useProfile()
@@ -193,6 +193,9 @@ export default function Reports(props) {
   const [selectedClient, setSelectedClient] = useState(null)
   const [clientReport, setClientReport]     = useState(null)
   const [clientLoading, setClientLoading]   = useState(false)
+
+  const [vendorLineItems, setVendorLineItems] = useState({}) // vendor → grouped items
+  const [expandedVendor, setExpandedVendor]   = useState(null)
 
   const [clients,    setClients]    = useState([])
   const [reps,       setReps]       = useState([])
@@ -383,25 +386,40 @@ export default function Reports(props) {
 
     // ── Vendor Summary ────────────────────────────────────────────────────────
     if (activeReport === 'vendor_spend') {
+      setExpandedVendor(null)
       let pq = supabase.from('proposals').select('id').eq('org_id', profile.org_id)
       if (from) pq = pq.gte('created_at', from)
       if (to)   pq = pq.lte('created_at', to + 'T23:59:59')
       const { data: proposals } = await pq
       const ids = (proposals || []).map(p => p.id)
-      if (ids.length === 0) { setData([]); setLoading(false); return }
+      if (ids.length === 0) { setData([]); setVendorLineItems({}); setLoading(false); return }
       const { data: rows } = await supabase
         .from('bom_line_items')
-        .select('manufacturer, your_cost_unit, quantity, customer_price_total')
+        .select('manufacturer, item_name, part_number_sku, category, your_cost_unit, quantity, customer_price_total')
         .in('proposal_id', ids)
+
       const byVendor = {}
+      const byVendorItems = {}
       for (const r of (rows || [])) {
         const v = r.manufacturer || 'Unknown'
-        if (!byVendor[v]) byVendor[v] = { items: 0, units: 0, cost: 0, revenue: 0 }
+        if (!byVendor[v]) { byVendor[v] = { items: 0, units: 0, cost: 0, revenue: 0 }; byVendorItems[v] = {} }
         byVendor[v].items++
         byVendor[v].units   += Number(r.quantity) || 0
         byVendor[v].cost    += (Number(r.your_cost_unit) || 0) * (Number(r.quantity) || 0)
         byVendor[v].revenue += Number(r.customer_price_total) || 0
+        // Group by part number within vendor
+        const key = r.part_number_sku || r.item_name || 'Unknown'
+        if (!byVendorItems[v][key]) byVendorItems[v][key] = { name: r.item_name || '—', sku: r.part_number_sku || '—', category: r.category || '—', qty: 0, cost: 0, revenue: 0 }
+        byVendorItems[v][key].qty     += Number(r.quantity) || 0
+        byVendorItems[v][key].cost    += (Number(r.your_cost_unit) || 0) * (Number(r.quantity) || 0)
+        byVendorItems[v][key].revenue += Number(r.customer_price_total) || 0
       }
+
+      setVendorLineItems(
+        Object.fromEntries(Object.entries(byVendorItems).map(([v, items]) => [
+          v, Object.values(items).sort((a, b) => b.cost - a.cost)
+        ]))
+      )
       setData(Object.entries(byVendor).sort((a, b) => b[1].cost - a[1].cost).map(([vendor, v]) => ({
         'Vendor': vendor, 'Line Items': v.items, 'Total Units': v.units,
         'Total Cost': fmt$(v.cost), 'Total Revenue': fmt$(v.revenue),
@@ -745,6 +763,78 @@ export default function Reports(props) {
                       <div className="text-center text-[#8A9AB0] py-16 text-sm">Loading…</div>
                     ) : data.length === 0 ? (
                       <div className="text-center text-[#8A9AB0] py-16 text-sm">No data for this report</div>
+                    ) : activeReport === 'vendor_spend' ? (
+                      /* Vendor summary — expandable rows */
+                      <div>
+                        <div className="px-4 py-3 border-b border-[#2a3d55]">
+                          <input
+                            type="text"
+                            placeholder="Search vendor…"
+                            value={filters.vendorSearch || ''}
+                            onChange={e => setFilter('vendorSearch', e.target.value)}
+                            className="bg-[#0F1C2E] border border-[#2a3d55] text-white text-sm rounded-lg px-3 py-1.5 w-56 focus:outline-none focus:border-[#C8622A]"
+                          />
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-[#2a3d55]">
+                                <th className="text-left px-4 py-3 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide w-6" />
+                                {columns.map(col => <th key={col} className="text-left px-4 py-3 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{col}</th>)}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {data
+                                .filter(row => !filters.vendorSearch || row['Vendor'].toLowerCase().includes(filters.vendorSearch.toLowerCase()))
+                                .map((row, i) => {
+                                const vendor = row['Vendor']
+                                const isOpen = expandedVendor === vendor
+                                const items  = vendorLineItems[vendor] || []
+                                return (
+                                  <>
+                                    <tr key={i}
+                                      onClick={() => setExpandedVendor(isOpen ? null : vendor)}
+                                      className="border-b border-[#0F1C2E]/60 hover:bg-[#0F1C2E]/40 transition-colors cursor-pointer">
+                                      <td className="px-4 py-3 text-[#8A9AB0] text-xs">{isOpen ? '▾' : '▸'}</td>
+                                      {columns.map(col => <td key={col} className="px-4 py-3 text-white whitespace-nowrap">{row[col]}</td>)}
+                                    </tr>
+                                    {isOpen && (
+                                      <tr key={`${i}-detail`} className="border-b border-[#0F1C2E]/60 bg-[#0F1C2E]/60">
+                                        <td colSpan={columns.length + 1} className="px-6 py-3">
+                                          <table className="w-full text-xs">
+                                            <thead>
+                                              <tr className="border-b border-[#2a3d55]">
+                                                <th className="text-left py-2 pr-4 text-[#8A9AB0] font-semibold uppercase tracking-wide">Item</th>
+                                                <th className="text-left py-2 pr-4 text-[#8A9AB0] font-semibold uppercase tracking-wide">SKU</th>
+                                                <th className="text-left py-2 pr-4 text-[#8A9AB0] font-semibold uppercase tracking-wide">Category</th>
+                                                <th className="text-right py-2 pr-4 text-[#8A9AB0] font-semibold uppercase tracking-wide">Qty</th>
+                                                <th className="text-right py-2 pr-4 text-[#8A9AB0] font-semibold uppercase tracking-wide">Total Cost</th>
+                                                <th className="text-right py-2 text-[#8A9AB0] font-semibold uppercase tracking-wide">Total Rev</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {items.map((item, j) => (
+                                                <tr key={j} className="border-b border-[#2a3d55]/40">
+                                                  <td className="py-1.5 pr-4 text-white">{item.name}</td>
+                                                  <td className="py-1.5 pr-4 text-[#8A9AB0] font-mono">{item.sku}</td>
+                                                  <td className="py-1.5 pr-4 text-[#8A9AB0]">{item.category}</td>
+                                                  <td className="py-1.5 pr-4 text-white text-right">{item.qty}</td>
+                                                  <td className="py-1.5 pr-4 text-white text-right">{fmt$(item.cost)}</td>
+                                                  <td className="py-1.5 text-white text-right">{fmt$(item.revenue)}</td>
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
