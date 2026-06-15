@@ -23,6 +23,7 @@ const emptyBillingForm = { plan: 'Trial', billing_status: 'trial', monthly_rate:
 export default function SuperAdmin() {
   const [orgs, setOrgs] = useState([])
   const [profiles, setProfiles] = useState([])
+  const [saUsers, setSaUsers] = useState([])
   const [requests, setRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab,      setActiveTab]      = useState('requests')
@@ -57,22 +58,43 @@ export default function SuperAdmin() {
   const [pinLookupLoading, setPinLookupLoading] = useState(false)
   const [pinError, setPinError] = useState(null)
 
+  // Password gate
+  const [passwordInput, setPasswordInput] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordChecking, setPasswordChecking] = useState(false)
+  const [unlocked, setUnlocked] = useState(() => !!sessionStorage.getItem('sa_unlocked'))
+
+  // SA Users tab state
+  const [saUserEmail, setSaUserEmail] = useState('')
+  const [saUserMsg, setSaUserMsg] = useState('')
+  const [saUserWorking, setSaUserWorking] = useState(false)
+
   const navigate = useNavigate()
 
-  useEffect(() => { fetchData() }, [])
+  const getSaPassword = () => sessionStorage.getItem('sa_password') || ''
+
+  const handleUnlock = async () => {
+    if (!passwordInput.trim()) return
+    setPasswordChecking(true)
+    setPasswordError('')
+    const result = await supabase.functions.invoke('superadmin-get-data', {
+      body: { sa_password: passwordInput.trim(), probe: true }
+    })
+    if (result.error || result.data?.error) {
+      setPasswordError('Incorrect password.')
+      setPasswordChecking(false)
+      return
+    }
+    sessionStorage.setItem('sa_unlocked', 'true')
+    sessionStorage.setItem('sa_password', passwordInput.trim())
+    setUnlocked(true)
+    setPasswordChecking(false)
+  }
+
+  useEffect(() => { if (unlocked) fetchData() }, [unlocked])
 
   const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setUnauthorized(true); setLoading(false); return }
-
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (profile?.role !== 'superadmin') { setUnauthorized(true); setLoading(false); return }
-
+    const saPassword = getSaPassword()
     const [
       { data: orgsData },
       { data: requestsData },
@@ -84,25 +106,32 @@ export default function SuperAdmin() {
       supabase.from('access_requests').select('*').order('created_at', { ascending: false }),
       supabase.from('proposals').select('id, org_id, created_at, status, proposal_value, proposal_name').order('created_at', { ascending: false }),
       supabase.from('clients').select('id, org_id'),
-      supabase.functions.invoke('superadmin-get-data'),
+      supabase.functions.invoke('superadmin-get-data', { body: { sa_password: saPassword } }),
     ])
+
+    if (profilesResult?.data?.error === 'Invalid password') {
+      sessionStorage.removeItem('sa_unlocked')
+      sessionStorage.removeItem('sa_password')
+      setUnlocked(false)
+      setLoading(false)
+      return
+    }
 
     const profilesData = profilesResult?.data?.profiles || []
 
     const orgsResult = orgsData || []
     setOrgs(orgsResult)
     setProfiles(profilesData)
+    setSaUsers(profilesResult?.data?.sa_users || [])
     setRequests(requestsData || [])
     setAllProposals(proposalsData || [])
     setAllClients(clientsData || [])
 
-    // Build orgNotes map from superadmin_notes column
     const notesMap = {}
     for (const org of orgsResult) {
       if (org.superadmin_notes) notesMap[org.id] = org.superadmin_notes
     }
     setOrgNotes(notesMap)
-
     setLoading(false)
   }
 
@@ -383,6 +412,40 @@ export default function SuperAdmin() {
   const activeOrgs = orgs.filter(o => o.billing_status === 'active').length
   const trialOrgs = orgs.filter(o => o.billing_status === 'trial').length
 
+  if (!unlocked) return (
+    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
+      <div className="bg-[#1a2d45] rounded-2xl p-8 w-full max-w-sm shadow-2xl">
+        <div className="text-center mb-6">
+          <h1 className="text-white text-2xl font-bold mb-1">ForgePt<span className="text-[#C8622A]">.</span></h1>
+          <span className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded-full font-semibold">Super Admin</span>
+          <p className="text-[#8A9AB0] text-sm mt-3">Enter your admin password to continue</p>
+        </div>
+        <div className="space-y-3">
+          <input
+            type="password"
+            value={passwordInput}
+            onChange={e => { setPasswordInput(e.target.value); setPasswordError('') }}
+            onKeyDown={e => e.key === 'Enter' && handleUnlock()}
+            placeholder="Password"
+            className="w-full bg-[#0F1C2E] border border-[#2a3d55] text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#C8622A]"
+            autoFocus
+          />
+          {passwordError && <p className="text-red-400 text-xs">{passwordError}</p>}
+          <button
+            onClick={handleUnlock}
+            disabled={passwordChecking || !passwordInput.trim()}
+            className="w-full bg-[#C8622A] hover:bg-[#C8622A]/80 disabled:opacity-50 text-white font-semibold py-3 rounded-lg text-sm transition-colors"
+          >
+            {passwordChecking ? 'Verifying…' : 'Unlock'}
+          </button>
+          <button onClick={() => navigate('/')} className="w-full text-[#8A9AB0] hover:text-white text-sm py-2 transition-colors">
+            ← Back to App
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+
   if (unauthorized) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
       <div className="text-center">
@@ -461,14 +524,15 @@ export default function SuperAdmin() {
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {[
             { key: 'requests', label: `Access Requests${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}` },
-            { key: 'orgs', label: 'Organizations' },
-            { key: 'billing',   label: 'Billing & Plans' },
-            { key: 'metrics',   label: 'Metrics' },
-            { key: 'products',  label: 'Global Products' },
-            { key: 'api',       label: 'API Keys' },
+            { key: 'orgs',     label: 'Organizations' },
+            { key: 'billing',  label: 'Billing & Plans' },
+            { key: 'metrics',  label: 'Metrics' },
+            { key: 'products', label: 'Global Products' },
+            { key: 'api',      label: 'API Keys' },
+            { key: 'sa_users', label: 'Admin Users' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
@@ -1098,6 +1162,106 @@ export default function SuperAdmin() {
 
       {/* ── API KEYS TAB ── */}
       {activeTab === 'api' && <APIKeysPanel orgs={orgs} />}
+
+      {activeTab === 'sa_users' && (
+        <div className="space-y-6">
+          {/* Add new superadmin */}
+          <div className="bg-[#1a2d45] rounded-xl p-5">
+            <p className="text-white font-semibold mb-1">Add Admin User</p>
+            <p className="text-[#8A9AB0] text-xs mb-3">Enter the email of an existing ForgePt user to grant superadmin access.</p>
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
+                <input
+                  type="email"
+                  value={saUserEmail}
+                  onChange={e => { setSaUserEmail(e.target.value); setSaUserMsg('') }}
+                  placeholder="user@example.com"
+                  className="w-full bg-[#0F1C2E] border border-[#2a3d55] text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                />
+              </div>
+              <button
+                disabled={saUserWorking || !saUserEmail.trim()}
+                onClick={async () => {
+                  setSaUserWorking(true); setSaUserMsg('')
+                  const { data, error } = await supabase.functions.invoke('superadmin-manage-sa-user', {
+                    body: { sa_password: getSaPassword(), action: 'add', email: saUserEmail.trim() }
+                  })
+                  if (error || data?.error) setSaUserMsg(`Error: ${data?.error || error?.message}`)
+                  else { setSaUserMsg('Access granted.'); setSaUserEmail(''); fetchData() }
+                  setSaUserWorking(false)
+                }}
+                className="px-4 py-2 bg-[#C8622A] hover:bg-[#C8622A]/80 disabled:opacity-50 text-white text-sm font-semibold rounded-lg transition-colors"
+              >
+                {saUserWorking ? 'Working…' : 'Grant Access'}
+              </button>
+            </div>
+            {saUserMsg && <p className={`text-xs mt-2 ${saUserMsg.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>{saUserMsg}</p>}
+          </div>
+
+          {/* Current admins */}
+          <div className="bg-[#1a2d45] rounded-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#2a3d55]">
+              <p className="text-white font-semibold">Admin Users ({saUsers.length})</p>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#2a3d55]">
+                  <th className="text-left px-5 py-3 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Name</th>
+                  <th className="text-left px-5 py-3 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Email</th>
+                  <th className="text-left px-5 py-3 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Last Login</th>
+                  <th className="text-left px-5 py-3 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Member Since</th>
+                  <th className="px-5 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {saUsers.map(u => (
+                  <tr key={u.id} className="border-b border-[#0F1C2E]/60 hover:bg-[#0F1C2E]/30 transition-colors">
+                    <td className="px-5 py-3 text-white font-medium">{u.full_name || '—'}</td>
+                    <td className="px-5 py-3 text-[#8A9AB0]">{u.email}</td>
+                    <td className="px-5 py-3 text-[#8A9AB0]">
+                      {u.last_login
+                        ? new Date(u.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+                        : 'Never'}
+                    </td>
+                    <td className="px-5 py-3 text-[#8A9AB0]">{u.created_at?.slice(0, 10)}</td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Remove superadmin access for ${u.email}?`)) return
+                          setSaUserWorking(true)
+                          const { data, error } = await supabase.functions.invoke('superadmin-manage-sa-user', {
+                            body: { sa_password: getSaPassword(), action: 'remove', user_id: u.id }
+                          })
+                          if (error || data?.error) alert(data?.error || error?.message)
+                          else fetchData()
+                          setSaUserWorking(false)
+                        }}
+                        className="text-red-400 hover:text-red-300 text-xs font-medium transition-colors"
+                      >
+                        Revoke
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Lock SuperAdmin */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('sa_unlocked')
+                sessionStorage.removeItem('sa_password')
+                setUnlocked(false)
+              }}
+              className="text-[#8A9AB0] hover:text-white text-sm transition-colors"
+            >
+              🔒 Lock SuperAdmin
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   )
