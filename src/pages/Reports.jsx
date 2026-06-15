@@ -184,7 +184,7 @@ export default function Reports(props) {
   const navigate    = useNavigate()
 
   const [activeReport, setActiveReport] = useState('open_quotes')
-  const [dateFrom, setDateFrom]         = useState(daysAgo(30))
+  const [dateFrom, setDateFrom]         = useState(daysAgo(90))
   const [dateTo, setDateTo]             = useState(today())
   const [filters, setFilters]           = useState(BLANK_FILTERS)
   const [loading, setLoading]           = useState(false)
