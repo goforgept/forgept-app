@@ -31,6 +31,15 @@ const getIconPng = async (category, color, size = 16) => {
   return png
 }
 
+// ─── Label collision helpers ──────────────────────────────────────────────────
+const labelBounds = (cx, cy, text, fs) => {
+  const w = text.length * fs * 0.55
+  const h = fs * 0.45
+  return { x1: cx - w / 2, y1: cy - h, x2: cx + w / 2, y2: cy }
+}
+const labelsOverlap = (a, b, pad = 0.4) =>
+  !(a.x2 + pad < b.x1 || b.x2 + pad < a.x1 || a.y2 + pad < b.y1 || b.y2 + pad < a.y1)
+
 // ─── DrawingExport ────────────────────────────────────────────────────────────
 // Export tab — Client Overview, Shop Drawings, As-Builts, CSV BOM
 export default function DrawingExport({ proposalId, orgId, sheets, proposal, stageRefs }) {
@@ -212,6 +221,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
     // Device markers + FOV
     const sheetPlacements = placementsBySheet[sheet.id] || []
+    const placedLabelBounds = []
     for (const p of sheetPlacements) {
       const px  = imgX + p.x * imgW
       const py  = imgY + p.y * imgH
@@ -270,12 +280,52 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.addImage(iconPng, 'PNG', px - iconSize/2, py - iconSize/2, iconSize, iconSize)
       }
 
-      // Device label
+      // Device label — collision-aware placement
       if (p.device_address) {
+        const fs    = Math.max(symbolSizeMM * 0.7, 3)
+        const rad   = symbolSizeMM / 2
+        const gap   = rad + fs * 0.6
+        const label = p.device_address
+
+        // Try positions in priority order: below, right, above, left, diagonals, further out
+        const candidates = [
+          [0,          gap],
+          [gap,        0],
+          [0,          -gap],
+          [-gap,       0],
+          [gap * 0.75, gap * 0.75],
+          [-gap * 0.75,gap * 0.75],
+          [gap * 0.75, -gap * 0.75],
+          [-gap * 0.75,-gap * 0.75],
+          [0,          gap * 1.8],
+          [gap * 1.6,  0],
+          [-gap * 1.6, 0],
+        ]
+
+        let lx = px, ly = py + gap, placed = false
+        for (const [dx, dy] of candidates) {
+          const cx = px + dx, cy = py + dy
+          const b  = labelBounds(cx, cy, label, fs)
+          if (!placedLabelBounds.some(pb => labelsOverlap(b, pb))) {
+            lx = cx; ly = cy; placed = true
+            placedLabelBounds.push(b)
+            break
+          }
+        }
+        if (!placed) placedLabelBounds.push(labelBounds(lx, ly, label, fs))
+
+        // Leader line if label was moved from default below position
+        const defaultLy = py + gap
+        if (Math.abs(lx - px) > 0.5 || Math.abs(ly - defaultLy) > 0.5) {
+          pdf.setLineWidth(0.15)
+          pdf.setDrawColor(r, g, b)
+          pdf.line(px, py + rad * 0.6, lx, ly - fs * 0.4)
+        }
+
         pdf.setTextColor(r, g, b)
-        pdf.setFontSize(Math.max(symbolSizeMM * 0.7, 3))
+        pdf.setFontSize(fs)
         pdf.setFont('helvetica', 'bold')
-        pdf.text(p.device_address, px, py + symbolSizeMM / 2 + symbolSizeMM * 0.4, { align: 'center' })
+        pdf.text(label, lx, ly, { align: 'center' })
       }
     }
   }
