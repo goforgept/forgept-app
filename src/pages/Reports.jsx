@@ -8,14 +8,15 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
 const REPORTS = [
-  { key: 'open_jobs',    label: 'Open Jobs',      icon: '🔨' },
-  { key: 'closed_jobs',  label: 'Closed Jobs',     icon: '✅' },
-  { key: 'open_quotes',  label: 'Open Quotes',     icon: '📋' },
-  { key: 'vendor_spend', label: 'Vendor Summary',  icon: '🏭' },
+  { key: 'open_jobs',     label: 'Open Jobs',      icon: '🔨' },
+  { key: 'closed_jobs',   label: 'Closed Jobs',    icon: '✅' },
+  { key: 'open_quotes',   label: 'Open Quotes',    icon: '📋' },
+  { key: 'vendor_spend',  label: 'Vendor Summary', icon: '🏭' },
+  { key: 'user_activity', label: 'User Activity',  icon: '👥' },
 ]
 
-const JOB_OPEN_STATUSES = ['scheduled', 'in_progress', 'on_hold', 'pending']
-const JOB_CLOSED_STATUSES = ['completed', 'cancelled']
+const JOB_OPEN_STATUSES   = ['Active', 'On Hold']
+const JOB_CLOSED_STATUSES = ['Completed', 'Cancelled']
 
 export default function Reports(props) {
   const { profile } = useProfile()
@@ -110,13 +111,19 @@ export default function Reports(props) {
     }
 
     if (activeReport === 'vendor_spend') {
-      let q = supabase
+      // Get proposal IDs for this org first (PostgREST can't filter on joined table in JS client)
+      let pq = supabase.from('proposals').select('id').eq('org_id', profile.org_id)
+      if (dateFrom) pq = pq.gte('created_at', dateFrom)
+      if (dateTo)   pq = pq.lte('created_at', dateTo + 'T23:59:59')
+      const { data: proposals } = await pq
+      const proposalIds = (proposals || []).map(p => p.id)
+
+      if (proposalIds.length === 0) { setData([]); setLoading(false); return }
+
+      const { data: rows } = await supabase
         .from('bom_line_items')
-        .select('manufacturer, your_cost_unit, quantity, customer_price_total, proposals!inner(org_id, created_at)')
-        .eq('proposals.org_id', profile.org_id)
-      if (dateFrom) q = q.gte('proposals.created_at', dateFrom)
-      if (dateTo)   q = q.lte('proposals.created_at', dateTo + 'T23:59:59')
-      const { data: rows } = await q
+        .select('manufacturer, your_cost_unit, quantity, customer_price_total')
+        .in('proposal_id', proposalIds)
 
       const byVendor = {}
       for (const r of (rows || [])) {
@@ -139,6 +146,24 @@ export default function Reports(props) {
             'Total Revenue':         `$${v.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
           }))
       )
+    }
+
+    if (activeReport === 'user_activity') {
+      const { data: rows } = await supabase
+        .from('profiles')
+        .select('full_name, email, org_role, last_login, created_at')
+        .eq('org_id', profile.org_id)
+        .order('last_login', { ascending: false, nullsFirst: false })
+
+      setData((rows || []).map(r => ({
+        'Name':       r.full_name || '—',
+        'Email':      r.email || '—',
+        'Role':       r.org_role || '—',
+        'Last Login': r.last_login
+          ? new Date(r.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+          : 'Never',
+        'Member Since': r.created_at?.slice(0, 10) || '—',
+      })))
     }
 
     setLoading(false)
@@ -228,7 +253,7 @@ export default function Reports(props) {
             {/* Right — filters + table */}
             <div className="flex-1 min-w-0">
               {/* Filters */}
-              <div className="bg-[#1a2d45] rounded-xl p-4 mb-4 flex flex-wrap items-end gap-4">
+              <div className={`bg-[#1a2d45] rounded-xl p-4 mb-4 flex flex-wrap items-end gap-4 ${activeReport === 'user_activity' ? 'opacity-40 pointer-events-none' : ''}`}>
                 <div>
                   <label className="block text-[#8A9AB0] text-xs font-medium mb-1">From</label>
                   <input
