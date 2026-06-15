@@ -177,7 +177,7 @@ function today()    { return new Date().toISOString().slice(0, 10) }
 function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
 const fmt$ = (n) => n != null ? `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '—'
 
-const BLANK_FILTERS = { clients: [], rep: '', industry: '', tech: '', status: '', priority: '', vendorName: '', vendorSearch: '' }
+const BLANK_FILTERS = { clients: [], rep: '', industry: '', tech: '', status: '', priority: '', vendorName: '' }
 
 export default function Reports(props) {
   const { profile } = useProfile()
@@ -196,6 +196,7 @@ export default function Reports(props) {
 
   const [vendorLineItems, setVendorLineItems] = useState({}) // vendor → grouped items
   const [expandedVendor, setExpandedVendor]   = useState(null)
+  const [vendorSearch, setVendorSearch]       = useState('')
 
   const [clients,    setClients]    = useState([])
   const [reps,       setReps]       = useState([])
@@ -232,6 +233,7 @@ export default function Reports(props) {
   const switchReport = (key) => {
     setActiveReport(key)
     setFilters(BLANK_FILTERS)
+    setVendorSearch('')
     setData([])
     if (key !== 'client_report') setClientReport(null)
   }
@@ -509,9 +511,28 @@ export default function Reports(props) {
   const activeFilters = REPORT_FILTERS[activeReport] || []
 
   const exportExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(data); const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, reportLabel)
-    XLSX.writeFile(wb, `ForgePt_${reportLabel.replace(/ /g, '_')}_${today()}.xlsx`)
+    const wb = XLSX.utils.book_new()
+    const filename = `ForgePt_${reportLabel.replace(/ /g, '_')}_${today()}.xlsx`
+
+    if (activeReport === 'vendor_spend') {
+      const filtered = vendorSearch
+        ? data.filter(r => r['Vendor'].toLowerCase().includes(vendorSearch.toLowerCase()))
+        : data
+      const ws1 = XLSX.utils.json_to_sheet(filtered)
+      XLSX.utils.book_append_sheet(wb, ws1, 'Vendor Summary')
+      const itemRows = []
+      for (const row of filtered) {
+        for (const item of (vendorLineItems[row['Vendor']] || [])) {
+          itemRows.push({ 'Vendor': row['Vendor'], 'Item': item.name, 'SKU': item.sku, 'Category': item.category, 'Qty': item.qty, 'Total Cost': fmt$(item.cost), 'Total Revenue': fmt$(item.revenue) })
+        }
+      }
+      const ws2 = XLSX.utils.json_to_sheet(itemRows.length ? itemRows : [{}])
+      XLSX.utils.book_append_sheet(wb, ws2, 'Line Items')
+    } else {
+      const ws = XLSX.utils.json_to_sheet(data)
+      XLSX.utils.book_append_sheet(wb, ws, reportLabel)
+    }
+    XLSX.writeFile(wb, filename)
   }
 
   const exportPDF = () => {
@@ -520,12 +541,43 @@ export default function Reports(props) {
     doc.setTextColor(40, 40, 40); doc.setFontSize(12); doc.text(reportLabel, 14, 24)
     doc.setFontSize(9); doc.setTextColor(120, 120, 120)
     doc.text(`Generated ${new Date().toLocaleDateString()}${noDate ? '' : `  ·  ${dateFrom || ''} – ${dateTo || ''}`}`, 14, 30)
-    autoTable(doc, {
-      startY: 36, head: [columns], body: data.map(row => columns.map(c => row[c])),
-      headStyles: { fillColor: [26, 45, 69], textColor: 255, fontStyle: 'bold', fontSize: 8 },
-      bodyStyles: { fontSize: 8, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
-      margin: { left: 14, right: 14 },
-    })
+
+    if (activeReport === 'vendor_spend') {
+      const filtered = vendorSearch
+        ? data.filter(r => r['Vendor'].toLowerCase().includes(vendorSearch.toLowerCase()))
+        : data
+      autoTable(doc, {
+        startY: 36, head: [columns], body: filtered.map(row => columns.map(c => row[c])),
+        headStyles: { fillColor: [26, 45, 69], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { left: 14, right: 14 },
+      })
+      const itemCols = ['Vendor', 'Item', 'SKU', 'Category', 'Qty', 'Total Cost', 'Total Revenue']
+      const itemRows = []
+      for (const row of filtered) {
+        for (const item of (vendorLineItems[row['Vendor']] || [])) {
+          itemRows.push([row['Vendor'], item.name, item.sku, item.category, item.qty, fmt$(item.cost), fmt$(item.revenue)])
+        }
+      }
+      if (itemRows.length) {
+        const afterY = doc.lastAutoTable?.finalY ?? 60
+        doc.setFontSize(11); doc.setTextColor(40, 40, 40)
+        doc.text('Line Items Detail', 14, afterY + 10)
+        autoTable(doc, {
+          startY: afterY + 15, head: [itemCols], body: itemRows,
+          headStyles: { fillColor: [26, 45, 69], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+          bodyStyles: { fontSize: 7, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { left: 14, right: 14 },
+        })
+      }
+    } else {
+      autoTable(doc, {
+        startY: 36, head: [columns], body: data.map(row => columns.map(c => row[c])),
+        headStyles: { fillColor: [26, 45, 69], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { left: 14, right: 14 },
+      })
+    }
     doc.save(`ForgePt_${reportLabel.replace(/ /g, '_')}_${today()}.pdf`)
   }
 
@@ -770,8 +822,8 @@ export default function Reports(props) {
                           <input
                             type="text"
                             placeholder="Search vendor…"
-                            value={filters.vendorSearch || ''}
-                            onChange={e => setFilter('vendorSearch', e.target.value)}
+                            value={vendorSearch}
+                            onChange={e => setVendorSearch(e.target.value)}
                             className="bg-[#0F1C2E] border border-[#2a3d55] text-white text-sm rounded-lg px-3 py-1.5 w-56 focus:outline-none focus:border-[#C8622A]"
                           />
                         </div>
@@ -785,7 +837,7 @@ export default function Reports(props) {
                             </thead>
                             <tbody>
                               {data
-                                .filter(row => !filters.vendorSearch || row['Vendor'].toLowerCase().includes(filters.vendorSearch.toLowerCase()))
+                                .filter(row => !vendorSearch || row['Vendor'].toLowerCase().includes(vendorSearch.toLowerCase()))
                                 .map((row, i) => {
                                 const vendor = row['Vendor']
                                 const isOpen = expandedVendor === vendor
