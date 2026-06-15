@@ -119,8 +119,7 @@ function SheetViewer({ sheet, placements }) {
                 }
               }
 
-              const labelY  = cy + markerR + fs + 1
-              const labelW  = p.device_address ? Math.max(p.device_address.length * fs * 0.6 + 4, 16) : 0
+              const labelFs = Math.max(markerR * 1.0, 8)
 
               return (
                 <g key={p.id}>
@@ -133,23 +132,18 @@ function SheetViewer({ sheet, placements }) {
                   {/* Inner white dot */}
                   <circle cx={cx} cy={cy} r={markerR * 0.35} fill="white" fillOpacity={0.9} />
 
-                  {/* Label with pill background */}
+                  {/* Label — white stroke halo keeps it readable on any background */}
                   {p.device_address && (
-                    <g>
-                      <rect
-                        x={cx - labelW / 2} y={labelY - fs - 0.5}
-                        width={labelW} height={fs + 3}
-                        rx={2} fill={col} fillOpacity={0.85}
-                      />
-                      <text
-                        x={cx} y={labelY}
-                        textAnchor="middle" fill="white"
-                        fontSize={fs} fontWeight="600"
-                        fontFamily="system-ui, sans-serif"
-                      >
-                        {p.device_address}
-                      </text>
-                    </g>
+                    <text
+                      x={cx} y={cy + markerR + labelFs + 2}
+                      textAnchor="middle"
+                      fill={col} fontSize={labelFs} fontWeight="700"
+                      fontFamily="system-ui, sans-serif"
+                      stroke="white" strokeWidth="3"
+                      paintOrder="stroke fill"
+                    >
+                      {p.device_address}
+                    </text>
                   )}
                 </g>
               )
