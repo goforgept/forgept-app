@@ -45,6 +45,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [shareLink,     setShareLink]     = useState(null)
   const [sharing,       setSharing]       = useState(false)
   const [shareCopied,   setShareCopied]   = useState(false)
+  const [exportFOV,     setExportFOV]     = useState(true)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -169,7 +170,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     }
   }
 
-  const drawSheetOnPDF = async (pdf, sheet, imgData, imgX, imgY, imgW, imgH) => {
+  const drawSheetOnPDF = async (pdf, sheet, imgData, imgX, imgY, imgW, imgH, showFOV = true) => {
     // Background
     pdf.setFillColor(255, 255, 255)
     pdf.rect(imgX, imgY, imgW, imgH, 'F')
@@ -223,7 +224,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       // FOV cone — mirrors canvas rendering in DrawingSheet
       const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera']
       const category = p.global_products?.category || ''
-      if (fovCategories.includes(category) && isFinite(px) && isFinite(py)) {
+      if (showFOV && fovCategories.includes(category) && isFinite(px) && isFinite(py)) {
         const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
         const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
         const fallbackMM  = Math.min(imgW, imgH) * 0.08
@@ -531,7 +532,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
         // Draw floor plan maintaining aspect ratio
         const imgData = await getFloorPlanImage(sheet.id)
-        await drawSheetOnPDF(pdf, sheet, imgData, margin, imgY, maxImgW, maxImgH)
+        await drawSheetOnPDF(pdf, sheet, imgData, margin, imgY, maxImgW, maxImgH, exportFOV)
 
         // Title block footer — same style as shop drawings
         const tbY = pageH - titleBlockH
@@ -1012,6 +1013,16 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       <p className="text-[#8A9AB0] text-sm mb-6">
         {placements.length} devices · {cableRuns.length} cable runs · {sheets.length} sheets
       </p>
+
+      {/* Export options */}
+      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl px-4 py-3 mb-4 flex flex-wrap gap-4">
+        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide self-center">Drawing Options</p>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={exportFOV} onChange={e => setExportFOV(e.target.checked)}
+            className="accent-[#C8622A] w-3.5 h-3.5" />
+          <span className="text-white text-xs">Include FOV overlays</span>
+        </label>
+      </div>
 
       <div className="grid grid-cols-1 gap-4">
         {exports.map(exp => (
