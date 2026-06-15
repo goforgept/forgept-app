@@ -763,7 +763,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         const imgW = pageW - margin * 2
 
         const imgData = await getFloorPlanImage(sheet.id)
-        await drawSheetOnPDF(pdf, sheet, imgData, margin, imgY, imgW, imgH)
+        await drawSheetOnPDF(pdf, sheet, imgData, margin, imgY, imgW, imgH, exportFOV)
 
         drawTitleBlock(sheet.name, i + 4)
       }
