@@ -89,10 +89,13 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
   const [sourceComponents,  setSourceComponents]  = useState([])
   const saveTimer = useRef(null)
 
+  // Only these fields have visible impact on the canvas marker — all others are text-only
+  const VISUAL_FIELDS = new Set(['symbol_size', 'rotation', 'marker_color', 'fov_angle', 'fov_range', 'device_address'])
+
   const update = (field, value) => {
     const updated = { ...form, [field]: value }
     setForm(updated)
-    onUpdate?.({ ...placement, ...updated })
+    if (VISUAL_FIELDS.has(field)) onUpdate?.({ ...placement, ...updated })
 
     // Debounced auto-save — outside setForm so timer persists correctly
     if (saveTimer.current) clearTimeout(saveTimer.current)
