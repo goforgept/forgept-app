@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -7,25 +7,49 @@ import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
-const REPORTS = [
-  { key: 'open_jobs',     label: 'Open Jobs',      icon: '🔨' },
-  { key: 'closed_jobs',   label: 'Closed Jobs',    icon: '✅' },
-  { key: 'open_quotes',   label: 'Open Quotes',    icon: '📋' },
-  { key: 'vendor_spend',  label: 'Vendor Summary', icon: '🏭' },
-  { key: 'user_activity', label: 'User Activity',  icon: '👥' },
+const NAV_GROUPS = [
+  {
+    label: 'Quotes',
+    items: [
+      { key: 'open_quotes', label: 'Open Quotes',  icon: '📋' },
+      { key: 'won_quotes',  label: 'Won Quotes',   icon: '🏆' },
+      { key: 'lost_quotes', label: 'Lost Quotes',  icon: '❌' },
+    ]
+  },
+  {
+    label: 'Jobs',
+    items: [
+      { key: 'open_jobs',   label: 'Open Jobs',    icon: '🔨' },
+      { key: 'closed_jobs', label: 'Closed Jobs',  icon: '✅' },
+    ]
+  },
+  {
+    label: 'Other',
+    items: [
+      { key: 'vendor_spend',  label: 'Vendor Summary', icon: '🏭' },
+      { key: 'user_activity', label: 'User Activity',  icon: '👥' },
+    ]
+  },
 ]
 
-const JOB_OPEN_STATUSES   = ['Active', 'On Hold']
-const JOB_CLOSED_STATUSES = ['Completed', 'Cancelled']
+const ALL_REPORTS = NAV_GROUPS.flatMap(g => g.items)
+const NO_DATE_FILTER = ['user_activity']
+
+function today()    { return new Date().toISOString().slice(0, 10) }
+function daysAgo(n) {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return d.toISOString().slice(0, 10)
+}
 
 export default function Reports(props) {
   const { profile } = useProfile()
   const navigate = useNavigate()
-  const [activeReport, setActiveReport] = useState('open_jobs')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [data, setData] = useState([])
+  const [activeReport, setActiveReport] = useState('open_quotes')
+  const [dateFrom, setDateFrom] = useState(daysAgo(30))
+  const [dateTo, setDateTo]     = useState(today())
+  const [loading, setLoading]   = useState(false)
+  const [data, setData]         = useState([])
 
   useEffect(() => {
     if (!props.isAdmin) { navigate('/'); return }
@@ -40,45 +64,60 @@ export default function Reports(props) {
     setLoading(true)
     setData([])
 
-    if (activeReport === 'open_jobs') {
+    const from = NO_DATE_FILTER.includes(activeReport) ? null : dateFrom
+    const to   = NO_DATE_FILTER.includes(activeReport) ? null : dateTo
+
+    // ── Quotes ────────────────────────────────────────────────────────────────
+    if (['open_quotes', 'won_quotes', 'lost_quotes'].includes(activeReport)) {
+      const statusMap = {
+        open_quotes: ['Draft', 'Sent'],
+        won_quotes:  ['Won'],
+        lost_quotes: ['Lost'],
+      }
       let q = supabase
-        .from('jobs')
-        .select('title, status, address, city, state, scheduled_date, created_at, clients(company), proposals(proposal_name, proposal_value), profiles!jobs_assigned_pm_fkey(full_name)')
+        .from('proposals')
+        .select('proposal_name, quote_number, status, client_name, company, industry, proposal_value, total_gross_margin_percent, close_date, created_at, rep_name')
         .eq('org_id', profile.org_id)
-        .in('status', JOB_OPEN_STATUSES)
+        .in('status', statusMap[activeReport])
         .order('created_at', { ascending: false })
-      if (dateFrom) q = q.gte('created_at', dateFrom)
-      if (dateTo)   q = q.lte('created_at', dateTo + 'T23:59:59')
-      const { data: rows } = await q
+      if (from) q = q.gte('created_at', from)
+      if (to)   q = q.lte('created_at', to + 'T23:59:59')
+      const { data: rows, error } = await q
+      if (error) console.error('quotes error:', error)
       setData((rows || []).map(r => ({
-        'Job Title':       r.title,
-        'Status':          r.status,
-        'Client':          r.clients?.company || '—',
-        'Proposal':        r.proposals?.proposal_name || '—',
-        'Value':           r.proposals?.proposal_value ? `$${Number(r.proposals.proposal_value).toLocaleString()}` : '—',
-        'PM':              r.profiles?.full_name || '—',
-        'Scheduled':       r.scheduled_date || '—',
-        'Location':        [r.city, r.state].filter(Boolean).join(', ') || '—',
-        'Created':         r.created_at?.slice(0, 10) || '—',
+        'Quote #':    r.quote_number || '—',
+        'Name':       r.proposal_name || '—',
+        'Status':     r.status,
+        'Client':     r.company || r.client_name || '—',
+        'Industry':   r.industry || '—',
+        'Rep':        r.rep_name || '—',
+        'Value':      r.proposal_value ? `$${Number(r.proposal_value).toLocaleString()}` : '—',
+        'Margin':     r.total_gross_margin_percent ? `${Number(r.total_gross_margin_percent).toFixed(1)}%` : '—',
+        'Close Date': r.close_date || '—',
+        'Created':    r.created_at?.slice(0, 10) || '—',
       })))
     }
 
-    if (activeReport === 'closed_jobs') {
+    // ── Jobs ──────────────────────────────────────────────────────────────────
+    if (['open_jobs', 'closed_jobs'].includes(activeReport)) {
+      const statusMap = {
+        open_jobs:   ['Active', 'On Hold'],
+        closed_jobs: ['Completed', 'Cancelled'],
+      }
       let q = supabase
         .from('jobs')
-        .select('title, status, address, city, state, scheduled_date, created_at, clients(company), proposals(proposal_name, proposal_value), profiles!jobs_assigned_pm_fkey(full_name)')
+        .select('title, status, city, state, scheduled_date, created_at, clients(company), profiles!jobs_assigned_pm_fkey(full_name)')
         .eq('org_id', profile.org_id)
-        .in('status', JOB_CLOSED_STATUSES)
+        .in('status', statusMap[activeReport])
         .order('created_at', { ascending: false })
-      if (dateFrom) q = q.gte('created_at', dateFrom)
-      if (dateTo)   q = q.lte('created_at', dateTo + 'T23:59:59')
-      const { data: rows } = await q
+      if (from) q = q.gte('created_at', from)
+      if (to)   q = q.lte('created_at', to + 'T23:59:59')
+      const { data: rows, error } = await q
+      if (error) console.error('jobs error:', error)
       setData((rows || []).map(r => ({
-        'Job Title':  r.title,
+        'Job Title':  r.title || '—',
         'Status':     r.status,
         'Client':     r.clients?.company || '—',
-        'Proposal':   r.proposals?.proposal_name || '—',
-        'Value':      r.proposals?.proposal_value ? `$${Number(r.proposals.proposal_value).toLocaleString()}` : '—',
         'PM':         r.profiles?.full_name || '—',
         'Scheduled':  r.scheduled_date || '—',
         'Location':   [r.city, r.state].filter(Boolean).join(', ') || '—',
@@ -86,80 +125,56 @@ export default function Reports(props) {
       })))
     }
 
-    if (activeReport === 'open_quotes') {
-      let q = supabase
-        .from('proposals')
-        .select('proposal_name, quote_number, status, client_name, company, industry, total_price, total_gross_margin_percent, close_date, created_at, rep_name')
-        .eq('org_id', profile.org_id)
-        .in('status', ['Draft', 'Sent'])
-        .order('created_at', { ascending: false })
-      if (dateFrom) q = q.gte('created_at', dateFrom)
-      if (dateTo)   q = q.lte('created_at', dateTo + 'T23:59:59')
-      const { data: rows } = await q
-      setData((rows || []).map(r => ({
-        'Quote #':    r.quote_number || '—',
-        'Name':       r.proposal_name,
-        'Status':     r.status,
-        'Client':     r.company || r.client_name || '—',
-        'Industry':   r.industry || '—',
-        'Rep':        r.rep_name || '—',
-        'Total':      r.total_price ? `$${Number(r.total_price).toLocaleString()}` : '—',
-        'Margin':     r.total_gross_margin_percent ? `${Number(r.total_gross_margin_percent).toFixed(1)}%` : '—',
-        'Close Date': r.close_date || '—',
-        'Created':    r.created_at?.slice(0, 10) || '—',
-      })))
-    }
-
+    // ── Vendor Summary ────────────────────────────────────────────────────────
     if (activeReport === 'vendor_spend') {
-      // Get proposal IDs for this org first (PostgREST can't filter on joined table in JS client)
       let pq = supabase.from('proposals').select('id').eq('org_id', profile.org_id)
-      if (dateFrom) pq = pq.gte('created_at', dateFrom)
-      if (dateTo)   pq = pq.lte('created_at', dateTo + 'T23:59:59')
+      if (from) pq = pq.gte('created_at', from)
+      if (to)   pq = pq.lte('created_at', to + 'T23:59:59')
       const { data: proposals } = await pq
-      const proposalIds = (proposals || []).map(p => p.id)
-
-      if (proposalIds.length === 0) { setData([]); setLoading(false); return }
+      const ids = (proposals || []).map(p => p.id)
+      if (ids.length === 0) { setData([]); setLoading(false); return }
 
       const { data: rows } = await supabase
         .from('bom_line_items')
         .select('manufacturer, your_cost_unit, quantity, customer_price_total')
-        .in('proposal_id', proposalIds)
+        .in('proposal_id', ids)
 
       const byVendor = {}
       for (const r of (rows || [])) {
-        const vendor = r.manufacturer || 'Unknown'
-        if (!byVendor[vendor]) byVendor[vendor] = { items: 0, units: 0, cost: 0, revenue: 0 }
-        byVendor[vendor].items++
-        byVendor[vendor].units   += Number(r.quantity) || 0
-        byVendor[vendor].cost    += (Number(r.your_cost_unit) || 0) * (Number(r.quantity) || 0)
-        byVendor[vendor].revenue += Number(r.customer_price_total) || 0
+        const v = r.manufacturer || 'Unknown'
+        if (!byVendor[v]) byVendor[v] = { items: 0, units: 0, cost: 0, revenue: 0 }
+        byVendor[v].items++
+        byVendor[v].units   += Number(r.quantity) || 0
+        byVendor[v].cost    += (Number(r.your_cost_unit) || 0) * (Number(r.quantity) || 0)
+        byVendor[v].revenue += Number(r.customer_price_total) || 0
       }
 
       setData(
         Object.entries(byVendor)
           .sort((a, b) => b[1].cost - a[1].cost)
           .map(([vendor, v]) => ({
-            'Vendor / Manufacturer': vendor,
-            'Line Items':            v.items,
-            'Total Units':           v.units,
-            'Total Cost':            `$${v.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-            'Total Revenue':         `$${v.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            'Vendor':        vendor,
+            'Line Items':    v.items,
+            'Total Units':   v.units,
+            'Total Cost':    `$${v.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            'Total Revenue': `$${v.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
           }))
       )
     }
 
+    // ── User Activity ─────────────────────────────────────────────────────────
     if (activeReport === 'user_activity') {
-      const { data: rows } = await supabase
+      const { data: rows, error } = await supabase
         .from('profiles')
         .select('full_name, email, org_role, last_login, created_at')
         .eq('org_id', profile.org_id)
         .order('last_login', { ascending: false, nullsFirst: false })
-
+      if (error) console.error('user_activity error:', error)
       setData((rows || []).map(r => ({
-        'Name':       r.full_name || '—',
-        'Email':      r.email || '—',
-        'Role':       r.org_role || '—',
-        'Last Login': r.last_login
+        'Name':         r.full_name || '—',
+        'Email':        r.email || '—',
+        'Role':         r.org_role || '—',
+        'Last Login':   r.last_login
           ? new Date(r.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
           : 'Never',
         'Member Since': r.created_at?.slice(0, 10) || '—',
@@ -169,14 +184,15 @@ export default function Reports(props) {
     setLoading(false)
   }
 
-  const reportLabel = REPORTS.find(r => r.key === activeReport)?.label || ''
-  const columns = data.length > 0 ? Object.keys(data[0]) : []
+  const reportLabel = ALL_REPORTS.find(r => r.key === activeReport)?.label || ''
+  const columns     = data.length > 0 ? Object.keys(data[0]) : []
+  const noDate      = NO_DATE_FILTER.includes(activeReport)
 
   const exportExcel = () => {
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, reportLabel)
-    XLSX.writeFile(wb, `ForgePt_${reportLabel.replace(/ /g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    XLSX.writeFile(wb, `ForgePt_${reportLabel.replace(/ /g, '_')}_${today()}.xlsx`)
   }
 
   const exportPDF = () => {
@@ -189,7 +205,8 @@ export default function Reports(props) {
     doc.text(reportLabel, 14, 24)
     doc.setFontSize(9)
     doc.setTextColor(120, 120, 120)
-    doc.text(`Generated ${new Date().toLocaleDateString()}${dateFrom || dateTo ? `  ·  ${dateFrom || ''}${dateTo ? ' – ' + dateTo : ''}` : ''}`, 14, 30)
+    const dateLabel = noDate ? '' : `  ·  ${dateFrom || ''}${dateTo ? ' – ' + dateTo : ''}`
+    doc.text(`Generated ${new Date().toLocaleDateString()}${dateLabel}`, 14, 30)
     autoTable(doc, {
       startY: 36,
       head: [columns],
@@ -199,7 +216,7 @@ export default function Reports(props) {
       alternateRowStyles: { fillColor: [245, 247, 250] },
       margin: { left: 14, right: 14 },
     })
-    doc.save(`ForgePt_${reportLabel.replace(/ /g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`)
+    doc.save(`ForgePt_${reportLabel.replace(/ /g, '_')}_${today()}.pdf`)
   }
 
   return (
@@ -233,27 +250,36 @@ export default function Reports(props) {
           </div>
 
           <div className="flex gap-6">
-            {/* Left — report picker */}
-            <div className="w-52 shrink-0 space-y-1">
-              {REPORTS.map(r => (
-                <button
-                  key={r.key}
-                  onClick={() => setActiveReport(r.key)}
-                  className={`w-full text-left px-4 py-3 rounded-lg text-sm font-medium flex items-center gap-3 transition-all ${
-                    activeReport === r.key
-                      ? 'bg-[#C8622A]/20 text-[#C8622A]'
-                      : 'text-[#8A9AB0] hover:text-white hover:bg-[#1a2d45]'
-                  }`}
-                >
-                  <span>{r.icon}</span>{r.label}
-                </button>
+
+            {/* Left nav */}
+            <div className="w-48 shrink-0 space-y-4">
+              {NAV_GROUPS.map(group => (
+                <div key={group.label}>
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wider px-3 mb-1">{group.label}</p>
+                  <div className="space-y-0.5">
+                    {group.items.map(r => (
+                      <button
+                        key={r.key}
+                        onClick={() => setActiveReport(r.key)}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2.5 transition-all ${
+                          activeReport === r.key
+                            ? 'bg-[#C8622A]/20 text-[#C8622A]'
+                            : 'text-[#8A9AB0] hover:text-white hover:bg-[#1a2d45]'
+                        }`}
+                      >
+                        <span>{r.icon}</span>{r.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
 
             {/* Right — filters + table */}
             <div className="flex-1 min-w-0">
+
               {/* Filters */}
-              <div className={`bg-[#1a2d45] rounded-xl p-4 mb-4 flex flex-wrap items-end gap-4 ${activeReport === 'user_activity' ? 'opacity-40 pointer-events-none' : ''}`}>
+              <div className={`bg-[#1a2d45] rounded-xl p-4 mb-4 flex flex-wrap items-end gap-4 ${noDate ? 'opacity-40 pointer-events-none select-none' : ''}`}>
                 <div>
                   <label className="block text-[#8A9AB0] text-xs font-medium mb-1">From</label>
                   <input
@@ -272,14 +298,11 @@ export default function Reports(props) {
                     className="bg-[#0F1C2E] border border-[#2a3d55] text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]"
                   />
                 </div>
-                {(dateFrom || dateTo) && (
-                  <button
-                    onClick={() => { setDateFrom(''); setDateTo('') }}
-                    className="text-[#8A9AB0] hover:text-white text-sm pb-0.5"
-                  >
-                    Clear
-                  </button>
-                )}
+                <div className="flex gap-2 pb-0.5">
+                  <button onClick={() => { setDateFrom(daysAgo(30)); setDateTo(today()) }} className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">Last 30d</button>
+                  <button onClick={() => { setDateFrom(daysAgo(90)); setDateTo(today()) }} className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">Last 90d</button>
+                  <button onClick={() => { setDateFrom(''); setDateTo('') }}               className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">All time</button>
+                </div>
                 <div className="ml-auto text-[#8A9AB0] text-sm">
                   {!loading && <span>{data.length} row{data.length !== 1 ? 's' : ''}</span>}
                 </div>
@@ -318,6 +341,7 @@ export default function Reports(props) {
                   </div>
                 )}
               </div>
+
             </div>
           </div>
         </div>
