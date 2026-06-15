@@ -214,6 +214,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     for (const p of sheetPlacements) {
       const px  = imgX + p.x * imgW
       const py  = imgY + p.y * imgH
+      if (!isFinite(px) || !isFinite(py)) continue
       const col = p.marker_color || '#C8622A'
       const r   = parseInt(col.slice(1,3),16)
       const g   = parseInt(col.slice(3,5),16)
@@ -222,18 +223,14 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       // FOV cone — mirrors canvas rendering in DrawingSheet
       const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera']
       const category = p.global_products?.category || ''
-      if (fovCategories.includes(category)) {
+      if (fovCategories.includes(category) && isFinite(px) && isFinite(py)) {
         const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
         const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
-        // feet → mm: same formula as canvas (feet / scale_ratio gives original px, scaled to PDF image width)
-        // scale_ratio = feet per pixel at 96dpi
-        // imgW/imgNaturalW = pdf mm per canvas pixel
-        const pdfMmPerFoot = imgNaturalW
-          ? imgW / (imgNaturalW * sheet.scale_ratio)
+        const fallbackMM  = Math.min(imgW, imgH) * 0.08
+        const computed    = imgNaturalW && sheet.scale_ratio
+          ? (imgW / (imgNaturalW * sheet.scale_ratio)) * rangeInFeet
           : null
-        const rangeInMM = pdfMmPerFoot
-          ? rangeInFeet * pdfMmPerFoot
-          : Math.min(imgW, imgH) * 0.08
+        const rangeInMM   = (computed && isFinite(computed) && computed > 0) ? computed : fallbackMM
         pdf.saveGraphicsState()
         pdf.setGState(pdf.GState({ opacity: 0.12, 'stroke-opacity': 0.4 }))
         pdf.setFillColor(r, g, b)
@@ -253,7 +250,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           }
           pts.push([px, py])
           const deltas = pts.slice(1).map((pt, i) => [pt[0] - pts[i][0], pt[1] - pts[i][1]])
-          pdf.lines(deltas, pts[0][0], pts[0][1], [1, 1], 'FD')
+          if (deltas.every(d => isFinite(d[0]) && isFinite(d[1]))) {
+            pdf.lines(deltas, pts[0][0], pts[0][1], [1, 1], 'FD')
+          }
         }
         pdf.restoreGraphicsState()
       }
