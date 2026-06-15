@@ -271,6 +271,10 @@ function CategoryIcon({ category }) {
       return <svg {...props}><circle cx="20" cy="20" r="8" strokeWidth="1.5"/><path d="M9 11 Q6 9 8 6 M31 11 Q34 9 32 6 M9 29 Q6 31 8 34 M31 29 Q34 31 32 34" strokeLinecap="round" strokeWidth="1"/><circle cx="20" cy="20" r="3" fill="currentColor"/></svg>
     case 'Door Operator':
       return <svg {...props}><path d="M6 6 L6 32" strokeWidth="1.5" strokeLinecap="round"/><path d="M6 32 A26 26 0 0 0 32 6" strokeDasharray="3 3" strokeWidth="1"/><rect x="28" y="2" width="10" height="8" rx="1" strokeWidth="1.5"/><circle cx="33" cy="6" r="2" fill="currentColor" stroke="none"/></svg>
+    case 'Point to Point':
+      return <svg {...props}><rect x="2" y="15" width="8" height="10" rx="1" strokeWidth="1.5"/><path d="M10 18 L15 20 L10 22 Z" fill="currentColor" stroke="none"/><path d="M15 20 L25 20" strokeDasharray="2 2" strokeWidth="1.5" strokeLinecap="round"/><path d="M30 18 L25 20 L30 22 Z" fill="currentColor" stroke="none"/><rect x="30" y="15" width="8" height="10" rx="1" strokeWidth="1.5"/><path d="M6 25 L6 38" strokeWidth="1.5" strokeLinecap="round"/><path d="M34 25 L34 38" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Power Box':
+      return <svg {...props}><rect x="4" y="6" width="32" height="26" rx="3" strokeWidth="1.5"/><path d="M4 14 L36 14" strokeWidth="1.5"/><path d="M21 18 L17 24 L20 24 L20 29 L24 23 L21 23 Z" fill="currentColor" stroke="none"/><rect x="6" y="27" width="4" height="3" rx="0.5" strokeWidth="1"/><rect x="12" y="27" width="4" height="3" rx="0.5" strokeWidth="1"/><circle cx="31" cy="24" r="2.5" strokeWidth="1.2"/><path d="M29 24 L29 21 Q29 19 31 19 Q33 19 33 21 L33 24" strokeWidth="1.2"/></svg>
     default:
       return <svg {...props}><rect x="10" y="10" width="20" height="20" rx="4" strokeWidth="1.5"/><circle cx="20" cy="20" r="4" strokeWidth="1.5"/></svg>
   }

@@ -535,6 +535,28 @@ const CATEGORY_SVGS = {
       <circle cx="33" cy="6" r="2" fill="${color}" stroke="none"/>
     </svg>`,
 
+  'Point to Point': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="2" y="15" width="8" height="10" rx="1"/>
+      <path d="M10 18 L15 20 L10 22 Z" fill="${color}" stroke="none"/>
+      <path d="M15 20 L25 20" stroke-dasharray="2 2"/>
+      <path d="M30 18 L25 20 L30 22 Z" fill="${color}" stroke="none"/>
+      <rect x="30" y="15" width="8" height="10" rx="1"/>
+      <path d="M6 25 L6 38"/>
+      <path d="M34 25 L34 38"/>
+    </svg>`,
+
+  'Power Box': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="6" width="32" height="26" rx="3"/>
+      <path d="M4 14 L36 14"/>
+      <path d="M21 18 L17 24 L20 24 L20 29 L24 23 L21 23 Z" fill="${color}" stroke="none"/>
+      <rect x="6" y="27" width="4" height="3" rx="0.5"/>
+      <rect x="12" y="27" width="4" height="3" rx="0.5"/>
+      <circle cx="31" cy="24" r="2.5"/>
+      <path d="M29 24 L29 21 Q29 19 31 19 Q33 19 33 21 L33 24" stroke-width="1.2"/>
+    </svg>`,
+
   'default': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
       <rect x="10" y="10" width="20" height="20" rx="4"/>

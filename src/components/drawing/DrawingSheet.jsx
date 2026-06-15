@@ -36,6 +36,8 @@ const LABEL_PREFIXES = {
   'DSP':                 'DSP',
   'Switcher':            'SWTCH',
   'Thermostat':          'THERM',
+  'Point to Point':      'P2P',
+  'Power Box':           'PWR',
 }
 
 const getNextLabel = async (category, sheetIds) => {
