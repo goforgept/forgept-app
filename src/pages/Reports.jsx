@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -7,6 +7,77 @@ import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
+// ── Searchable combobox ───────────────────────────────────────────────────────
+function SearchSelect({ options, value, onChange, placeholder = 'Search…', labelKey = 'label', valueKey = 'value' }) {
+  const [query, setQuery]     = useState('')
+  const [open, setOpen]       = useState(false)
+  const [display, setDisplay] = useState('')
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!value) { setDisplay(''); setQuery('') }
+  }, [value])
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const filtered = options.filter(o =>
+    (o[labelKey] || '').toLowerCase().includes(query.toLowerCase())
+  ).slice(0, 50)
+
+  const select = (opt) => {
+    setDisplay(opt[labelKey])
+    setQuery('')
+    setOpen(false)
+    onChange(opt)
+  }
+
+  const clear = () => {
+    setDisplay('')
+    setQuery('')
+    onChange(null)
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="flex items-center bg-[#0F1C2E] border border-[#2a3d55] rounded-lg px-3 py-2 gap-2 focus-within:border-[#C8622A]">
+        <input
+          className="bg-transparent text-white text-sm outline-none flex-1 min-w-[160px]"
+          placeholder={display || placeholder}
+          value={open ? query : ''}
+          onFocus={() => { setOpen(true); setQuery('') }}
+          onChange={e => { setQuery(e.target.value); setOpen(true) }}
+        />
+        {display && !open && <span className="text-white text-sm truncate max-w-[140px]">{display}</span>}
+        {display
+          ? <button onClick={clear} className="text-[#8A9AB0] hover:text-white text-xs shrink-0">✕</button>
+          : <span className="text-[#8A9AB0] text-xs shrink-0">▾</span>
+        }
+      </div>
+      {open && (
+        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-[#1a2d45] border border-[#2a3d55] rounded-lg shadow-xl max-h-56 overflow-y-auto">
+          {filtered.length === 0
+            ? <p className="text-[#8A9AB0] text-sm px-3 py-2">No results</p>
+            : filtered.map(opt => (
+              <button
+                key={opt[valueKey]}
+                onClick={() => select(opt)}
+                className="w-full text-left px-3 py-2 text-sm text-white hover:bg-[#0F1C2E] transition-colors"
+              >
+                {opt[labelKey]}
+              </button>
+            ))
+          }
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Nav config ────────────────────────────────────────────────────────────────
 const NAV_GROUPS = [
   {
     label: 'Quotes',
@@ -34,6 +105,7 @@ const NAV_GROUPS = [
   {
     label: 'Other',
     items: [
+      { key: 'client_report', label: 'Client Report',  icon: '🏢' },
       { key: 'vendor_spend',  label: 'Vendor Summary', icon: '🏭' },
       { key: 'user_activity', label: 'User Activity',  icon: '👥' },
     ]
@@ -41,9 +113,8 @@ const NAV_GROUPS = [
 ]
 
 const ALL_REPORTS    = NAV_GROUPS.flatMap(g => g.items)
-const NO_DATE_FILTER = ['user_activity', 'open_jobs']
+const NO_DATE_FILTER = ['user_activity', 'open_jobs', 'client_report']
 
-// Which filter dropdowns each report shows
 const REPORT_FILTERS = {
   open_quotes:      ['client', 'rep', 'industry'],
   won_quotes:       ['client', 'rep', 'industry'],
@@ -53,14 +124,16 @@ const REPORT_FILTERS = {
   service_tickets:  ['client', 'tech', 'status', 'priority'],
   invoices:         ['client', 'status'],
   purchase_orders:  ['vendor', 'status'],
+  client_report:    [],
   vendor_spend:     [],
   user_activity:    [],
 }
 
 function today()    { return new Date().toISOString().slice(0, 10) }
 function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10) }
+const fmt$ = (n) => n != null ? `$${Number(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}` : '—'
 
-const BLANK_FILTERS = { client: '', rep: '', industry: '', tech: '', status: '', priority: '', vendor: '' }
+const BLANK_FILTERS = { clientId: '', clientName: '', rep: '', industry: '', tech: '', status: '', priority: '', vendorName: '' }
 
 export default function Reports(props) {
   const { profile } = useProfile()
@@ -73,7 +146,11 @@ export default function Reports(props) {
   const [loading, setLoading]           = useState(false)
   const [data, setData]                 = useState([])
 
-  // Option lists for dropdowns
+  // Client report state
+  const [clientReport, setClientReport] = useState(null)
+  const [clientLoading, setClientLoading] = useState(false)
+
+  // Option lists
   const [clients,    setClients]    = useState([])
   const [reps,       setReps]       = useState([])
   const [industries, setIndustries] = useState([])
@@ -84,7 +161,6 @@ export default function Reports(props) {
     if (!props.isAdmin) { navigate('/'); return }
   }, [props.isAdmin])
 
-  // Load filter options once
   useEffect(() => {
     if (!profile?.org_id) return
     const load = async () => {
@@ -94,24 +170,26 @@ export default function Reports(props) {
         supabase.from('profiles').select('id, full_name').eq('org_id', profile.org_id).eq('org_role', 'technician'),
         supabase.from('vendors').select('id, vendor_name').eq('org_id', profile.org_id).eq('active', true).order('vendor_name'),
       ])
-      setClients(clientsRes.data || [])
+      setClients((clientsRes.data || []).map(c => ({ value: c.id, label: c.company })))
       const allReps = [...new Set((propsRes.data || []).map(r => r.rep_name).filter(Boolean))].sort()
       const allInd  = [...new Set((propsRes.data || []).map(r => r.industry).filter(Boolean))].sort()
       setReps(allReps)
       setIndustries(allInd)
-      setTechs(techsRes.data || [])
-      setVendors(vendorsRes.data || [])
+      setTechs((techsRes.data || []).map(t => ({ value: t.id, label: t.full_name })))
+      setVendors((vendorsRes.data || []).map(v => ({ value: v.id, label: v.vendor_name })))
     }
     load()
   }, [profile?.org_id])
 
   useEffect(() => {
-    if (profile?.org_id) fetchReport()
+    if (profile?.org_id && activeReport !== 'client_report') fetchReport()
   }, [profile?.org_id, activeReport, dateFrom, dateTo, filters])
 
   const switchReport = (key) => {
     setActiveReport(key)
     setFilters(BLANK_FILTERS)
+    setData([])
+    if (key !== 'client_report') setClientReport(null)
   }
 
   const setFilter = (key, val) => setFilters(prev => ({ ...prev, [key]: val }))
@@ -134,11 +212,11 @@ export default function Reports(props) {
         .eq('org_id', profile.org_id)
         .in('status', statusMap[activeReport])
         .order('created_at', { ascending: false })
-      if (from)               q = q.gte('created_at', from)
-      if (to)                 q = q.lte('created_at', to + 'T23:59:59')
-      if (filters.rep)        q = q.eq('rep_name', filters.rep)
-      if (filters.industry)   q = q.eq('industry', filters.industry)
-      if (filters.client)     q = q.or(`company.ilike.%${filters.client}%,client_name.ilike.%${filters.client}%`)
+      if (from)                q = q.gte('created_at', from)
+      if (to)                  q = q.lte('created_at', to + 'T23:59:59')
+      if (filters.rep)         q = q.eq('rep_name', filters.rep)
+      if (filters.industry)    q = q.eq('industry', filters.industry)
+      if (filters.clientName)  q = q.or(`company.ilike.%${filters.clientName}%,client_name.ilike.%${filters.clientName}%`)
       const { data: rows, error } = await q
       if (error) console.error(error)
       setData((rows || []).map(r => ({
@@ -148,7 +226,7 @@ export default function Reports(props) {
         'Client':     r.company || r.client_name || '—',
         'Industry':   r.industry || '—',
         'Rep':        r.rep_name || '—',
-        'Value':      r.proposal_value ? `$${Number(r.proposal_value).toLocaleString()}` : '—',
+        'Value':      r.proposal_value ? fmt$(r.proposal_value) : '—',
         'Margin':     r.total_gross_margin_percent ? `${Number(r.total_gross_margin_percent).toFixed(1)}%` : '—',
         'Close Date': r.close_date || '—',
         'Created':    r.created_at?.slice(0, 10) || '—',
@@ -160,13 +238,13 @@ export default function Reports(props) {
       const statusMap = { open_jobs: ['Active', 'On Hold'], closed_jobs: ['Completed', 'Cancelled'] }
       let q = supabase
         .from('jobs')
-        .select('title, status, city, state, scheduled_date, created_at, client_id, clients(id, company)')
+        .select('title, status, city, state, scheduled_date, created_at, clients(id, company)')
         .eq('org_id', profile.org_id)
         .in('status', statusMap[activeReport])
         .order('created_at', { ascending: false })
-      if (from)           q = q.gte('created_at', from)
-      if (to)             q = q.lte('created_at', to + 'T23:59:59')
-      if (filters.client) q = q.eq('client_id', filters.client)
+      if (from)             q = q.gte('created_at', from)
+      if (to)               q = q.lte('created_at', to + 'T23:59:59')
+      if (filters.clientId) q = q.eq('client_id', filters.clientId)
       const { data: rows, error } = await q
       if (error) console.error(error)
       setData((rows || []).map(r => ({
@@ -188,20 +266,20 @@ export default function Reports(props) {
         .order('created_at', { ascending: false })
       if (from)             q = q.gte('created_at', from)
       if (to)               q = q.lte('created_at', to + 'T23:59:59')
-      if (filters.client)   q = q.eq('client_id', filters.client)
+      if (filters.clientId) q = q.eq('client_id', filters.clientId)
       if (filters.tech)     q = q.eq('assigned_tech_id', filters.tech)
       if (filters.status)   q = q.eq('status', filters.status)
       if (filters.priority) q = q.eq('priority', filters.priority)
       const { data: rows, error } = await q
       if (error) console.error(error)
       setData((rows || []).map(r => ({
-        'Ticket #':  r.ticket_number || '—',
-        'Title':     r.title || '—',
-        'Status':    r.status,
-        'Priority':  r.priority || '—',
-        'Client':    r.clients?.company || '—',
-        'Tech':      r.profiles?.full_name || '—',
-        'Created':   r.created_at?.slice(0, 10) || '—',
+        'Ticket #': r.ticket_number || '—',
+        'Title':    r.title || '—',
+        'Status':   r.status,
+        'Priority': r.priority || '—',
+        'Client':   r.clients?.company || '—',
+        'Tech':     r.profiles?.full_name || '—',
+        'Created':  r.created_at?.slice(0, 10) || '—',
       })))
     }
 
@@ -218,18 +296,20 @@ export default function Reports(props) {
       const { data: rows, error } = await q
       if (error) console.error(error)
       const now = new Date()
-      setData((rows || []).map(r => {
+      let mapped = (rows || []).map(r => {
         const overdue = r.status === 'Sent' && r.due_date && new Date(r.due_date) < now
         return {
           'Invoice #': r.invoice_number || '—',
           'Client':    r.proposals?.company || r.proposals?.client_name || '—',
           'Proposal':  r.proposals?.proposal_name || '—',
           'Status':    overdue ? 'Overdue' : (r.status || '—'),
-          'Balance':   r.balance_due != null ? `$${Number(r.balance_due).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—',
+          'Balance':   r.balance_due != null ? fmt$(r.balance_due) : '—',
           'Due Date':  r.due_date || '—',
           'Created':   r.created_at?.slice(0, 10) || '—',
         }
-      }).filter(r => !filters.client || r['Client'].toLowerCase().includes(filters.client.toLowerCase())))
+      })
+      if (filters.clientName) mapped = mapped.filter(r => r['Client'].toLowerCase().includes(filters.clientName.toLowerCase()))
+      setData(mapped)
     }
 
     // ── Purchase Orders ───────────────────────────────────────────────────────
@@ -239,19 +319,19 @@ export default function Reports(props) {
         .select('po_number, vendor_name, status, total_amount, created_at, proposals(proposal_name, company)')
         .eq('org_id', profile.org_id)
         .order('created_at', { ascending: false })
-      if (from)           q = q.gte('created_at', from)
-      if (to)             q = q.lte('created_at', to + 'T23:59:59')
-      if (filters.status) q = q.eq('status', filters.status)
-      if (filters.vendor) q = q.ilike('vendor_name', `%${filters.vendor}%`)
+      if (from)                q = q.gte('created_at', from)
+      if (to)                  q = q.lte('created_at', to + 'T23:59:59')
+      if (filters.status)      q = q.eq('status', filters.status)
+      if (filters.vendorName)  q = q.ilike('vendor_name', `%${filters.vendorName}%`)
       const { data: rows, error } = await q
       if (error) console.error(error)
       setData((rows || []).map(r => ({
-        'PO #':      r.po_number || '—',
-        'Vendor':    r.vendor_name || '—',
-        'Proposal':  r.proposals?.company || r.proposals?.proposal_name || '—',
-        'Status':    r.status || '—',
-        'Total':     r.total_amount != null ? `$${Number(r.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—',
-        'Created':   r.created_at?.slice(0, 10) || '—',
+        'PO #':     r.po_number || '—',
+        'Vendor':   r.vendor_name || '—',
+        'Proposal': r.proposals?.company || r.proposals?.proposal_name || '—',
+        'Status':   r.status || '—',
+        'Total':    r.total_amount != null ? fmt$(r.total_amount) : '—',
+        'Created':  r.created_at?.slice(0, 10) || '—',
       })))
     }
 
@@ -276,17 +356,13 @@ export default function Reports(props) {
         byVendor[v].cost    += (Number(r.your_cost_unit) || 0) * (Number(r.quantity) || 0)
         byVendor[v].revenue += Number(r.customer_price_total) || 0
       }
-      setData(
-        Object.entries(byVendor)
-          .sort((a, b) => b[1].cost - a[1].cost)
-          .map(([vendor, v]) => ({
-            'Vendor':        vendor,
-            'Line Items':    v.items,
-            'Total Units':   v.units,
-            'Total Cost':    `$${v.cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-            'Total Revenue': `$${v.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-          }))
-      )
+      setData(Object.entries(byVendor).sort((a, b) => b[1].cost - a[1].cost).map(([vendor, v]) => ({
+        'Vendor':        vendor,
+        'Line Items':    v.items,
+        'Total Units':   v.units,
+        'Total Cost':    fmt$(v.cost),
+        'Total Revenue': fmt$(v.revenue),
+      })))
     }
 
     // ── User Activity ─────────────────────────────────────────────────────────
@@ -311,9 +387,93 @@ export default function Reports(props) {
     setLoading(false)
   }
 
-  const reportLabel = ALL_REPORTS.find(r => r.key === activeReport)?.label || ''
-  const columns     = data.length > 0 ? Object.keys(data[0]) : []
-  const noDate      = NO_DATE_FILTER.includes(activeReport)
+  // ── Client Report ───────────────────────────────────────────────────────────
+  const [selectedClient, setSelectedClient] = useState(null)
+
+  const fetchClientReport = async (client) => {
+    if (!client || !profile?.org_id) return
+    setSelectedClient(client)
+    setClientLoading(true)
+    setClientReport(null)
+
+    const [proposalsRes, jobsRes, ticketsRes, invoicesRes] = await Promise.all([
+      supabase.from('proposals')
+        .select('status, proposal_value, total_gross_margin_percent, created_at')
+        .eq('org_id', profile.org_id)
+        .or(`company.ilike.%${client.label}%,client_name.ilike.%${client.label}%`),
+      supabase.from('jobs')
+        .select('title, status, scheduled_date, created_at')
+        .eq('org_id', profile.org_id)
+        .eq('client_id', client.value),
+      supabase.from('service_tickets')
+        .select('ticket_number, title, status, priority, created_at')
+        .eq('org_id', profile.org_id)
+        .eq('client_id', client.value)
+        .order('created_at', { ascending: false }),
+      supabase.from('invoices')
+        .select('invoice_number, status, balance_due, due_date, created_at')
+        .eq('org_id', profile.org_id)
+        .order('created_at', { ascending: false }),
+    ])
+
+    const proposals = proposalsRes.data || []
+    const jobs      = jobsRes.data || []
+    const tickets   = ticketsRes.data || []
+    const now = new Date()
+
+    // Invoice rows joined via proposal company — filter client-side since invoices go through proposals
+    const allInvoices = invoicesRes.data || []
+
+    const won  = proposals.filter(p => p.status === 'Won')
+    const open = proposals.filter(p => ['Draft','Sent'].includes(p.status))
+    const totalWonValue  = won.reduce((s, p) => s + (Number(p.proposal_value) || 0), 0)
+    const totalOpenValue = open.reduce((s, p) => s + (Number(p.proposal_value) || 0), 0)
+    const avgMargin = won.length
+      ? (won.reduce((s, p) => s + (Number(p.total_gross_margin_percent) || 0), 0) / won.length)
+      : 0
+    const openJobs   = jobs.filter(j => ['Active','On Hold'].includes(j.status))
+    const closedJobs = jobs.filter(j => ['Completed','Cancelled'].includes(j.status))
+    const outstandingInvoices = allInvoices.filter(i => ['Sent','Overdue'].includes(i.status) || (i.status === 'Sent' && i.due_date && new Date(i.due_date) < now))
+    const totalOutstanding = outstandingInvoices.reduce((s, i) => s + (Number(i.balance_due) || 0), 0)
+
+    setClientReport({
+      summary: {
+        wonDeals:         won.length,
+        totalWonValue,
+        openQuotes:       open.length,
+        totalOpenValue,
+        avgMargin,
+        openJobs:         openJobs.length,
+        closedJobs:       closedJobs.length,
+        openTickets:      tickets.filter(t => !['Resolved','Cancelled'].includes(t.status)).length,
+        totalOutstanding,
+      },
+      proposals: proposals.map(p => ({
+        'Status':    p.status,
+        'Value':     fmt$(p.proposal_value),
+        'Margin':    p.total_gross_margin_percent ? `${Number(p.total_gross_margin_percent).toFixed(1)}%` : '—',
+        'Created':   p.created_at?.slice(0, 10) || '—',
+      })),
+      jobs: jobs.map(j => ({
+        'Title':     j.title || '—',
+        'Status':    j.status,
+        'Scheduled': j.scheduled_date || '—',
+        'Created':   j.created_at?.slice(0, 10) || '—',
+      })),
+      tickets: tickets.map(t => ({
+        'Ticket #':  t.ticket_number || '—',
+        'Title':     t.title || '—',
+        'Status':    t.status,
+        'Priority':  t.priority || '—',
+        'Created':   t.created_at?.slice(0, 10) || '—',
+      })),
+    })
+    setClientLoading(false)
+  }
+
+  const reportLabel   = ALL_REPORTS.find(r => r.key === activeReport)?.label || ''
+  const columns       = data.length > 0 ? Object.keys(data[0]) : []
+  const noDate        = NO_DATE_FILTER.includes(activeReport)
   const activeFilters = REPORT_FILTERS[activeReport] || []
 
   const exportExcel = () => {
@@ -333,8 +493,7 @@ export default function Reports(props) {
     const dateLabel = noDate ? '' : `  ·  ${dateFrom || ''}${dateTo ? ' – ' + dateTo : ''}`
     doc.text(`Generated ${new Date().toLocaleDateString()}${dateLabel}`, 14, 30)
     autoTable(doc, {
-      startY: 36,
-      head: [columns],
+      startY: 36, head: [columns],
       body: data.map(row => columns.map(c => row[c])),
       headStyles: { fillColor: [26, 45, 69], textColor: 255, fontStyle: 'bold', fontSize: 8 },
       bodyStyles: { fontSize: 8, textColor: 40 },
@@ -345,6 +504,27 @@ export default function Reports(props) {
   }
 
   const selClass = "bg-[#0F1C2E] border border-[#2a3d55] text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]"
+
+  const MiniTable = ({ rows }) => {
+    if (!rows?.length) return <p className="text-[#8A9AB0] text-sm py-3">None</p>
+    const cols = Object.keys(rows[0])
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-[#2a3d55]">
+            {cols.map(c => <th key={c} className="text-left px-3 py-2 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{c}</th>)}
+          </tr></thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i} className="border-b border-[#0F1C2E]/60">
+                {cols.map(c => <td key={c} className="px-3 py-2 text-white whitespace-nowrap">{row[c]}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
@@ -358,16 +538,18 @@ export default function Reports(props) {
               <h1 className="text-white text-2xl font-bold">Reports</h1>
               <p className="text-[#8A9AB0] text-sm mt-1">Export data as Excel or PDF</p>
             </div>
-            <div className="flex gap-3">
-              <button onClick={exportExcel} disabled={data.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-[#1a7a4a] hover:bg-[#1a7a4a]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
-                <span>📊</span> Export Excel
-              </button>
-              <button onClick={exportPDF} disabled={data.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] hover:bg-[#C8622A]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
-                <span>📄</span> Export PDF
-              </button>
-            </div>
+            {activeReport !== 'client_report' && (
+              <div className="flex gap-3">
+                <button onClick={exportExcel} disabled={data.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#1a7a4a] hover:bg-[#1a7a4a]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
+                  <span>📊</span> Export Excel
+                </button>
+                <button onClick={exportPDF} disabled={data.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] hover:bg-[#C8622A]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
+                  <span>📄</span> Export PDF
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-6">
@@ -390,143 +572,216 @@ export default function Reports(props) {
               ))}
             </div>
 
-            {/* Right — filters + table */}
+            {/* Right panel */}
             <div className="flex-1 min-w-0">
 
-              {/* Date + filters row */}
-              <div className="bg-[#1a2d45] rounded-xl p-4 mb-4 space-y-3">
-                <div className="flex flex-wrap items-end gap-3">
-                  {/* Date range */}
-                  <div className={`flex flex-wrap items-end gap-3 ${noDate ? 'opacity-40 pointer-events-none select-none' : ''}`}>
-                    <div>
-                      <label className="block text-[#8A9AB0] text-xs font-medium mb-1">From</label>
-                      <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={selClass} />
-                    </div>
-                    <div>
-                      <label className="block text-[#8A9AB0] text-xs font-medium mb-1">To</label>
-                      <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={selClass} />
-                    </div>
-                    <div className="flex gap-2 pb-0.5">
-                      <button onClick={() => { setDateFrom(daysAgo(30)); setDateTo(today()) }} className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">30d</button>
-                      <button onClick={() => { setDateFrom(daysAgo(90)); setDateTo(today()) }} className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">90d</button>
-                      <button onClick={() => { setDateFrom(''); setDateTo('') }}               className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">All</button>
+              {/* ── Client Report ── */}
+              {activeReport === 'client_report' ? (
+                <div>
+                  <div className="bg-[#1a2d45] rounded-xl p-4 mb-4">
+                    <label className="block text-[#8A9AB0] text-xs font-medium mb-2">Search Client</label>
+                    <div className="max-w-xs">
+                      <SearchSelect
+                        options={clients}
+                        value={selectedClient?.value}
+                        onChange={(opt) => opt ? fetchClientReport(opt) : (setSelectedClient(null), setClientReport(null))}
+                        placeholder="Type client name…"
+                      />
                     </div>
                   </div>
-                  <div className="ml-auto text-[#8A9AB0] text-sm self-end pb-0.5">
-                    {!loading && <span>{data.length} row{data.length !== 1 ? 's' : ''}</span>}
-                  </div>
+
+                  {clientLoading && <div className="text-center text-[#8A9AB0] py-16 text-sm">Loading…</div>}
+
+                  {!clientLoading && !clientReport && (
+                    <div className="text-center text-[#8A9AB0] py-16 text-sm">Search for a client to see their report</div>
+                  )}
+
+                  {clientReport && (
+                    <div className="space-y-4">
+                      {/* Summary cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {[
+                          { label: 'Won Deals',        value: clientReport.summary.wonDeals,        sub: fmt$(clientReport.summary.totalWonValue) },
+                          { label: 'Open Quotes',      value: clientReport.summary.openQuotes,      sub: fmt$(clientReport.summary.totalOpenValue) + ' pipeline' },
+                          { label: 'Avg Margin',       value: `${clientReport.summary.avgMargin.toFixed(1)}%`, sub: 'on won deals' },
+                          { label: 'Outstanding',      value: fmt$(clientReport.summary.totalOutstanding), sub: 'unpaid invoices' },
+                          { label: 'Open Jobs',        value: clientReport.summary.openJobs,        sub: '' },
+                          { label: 'Completed Jobs',   value: clientReport.summary.closedJobs,      sub: '' },
+                          { label: 'Open Tickets',     value: clientReport.summary.openTickets,     sub: '' },
+                        ].map(card => (
+                          <div key={card.label} className="bg-[#1a2d45] rounded-xl p-4">
+                            <p className="text-[#8A9AB0] text-xs font-medium mb-1">{card.label}</p>
+                            <p className="text-white text-xl font-bold">{card.value}</p>
+                            {card.sub && <p className="text-[#8A9AB0] text-xs mt-0.5">{card.sub}</p>}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Proposals */}
+                      <div className="bg-[#1a2d45] rounded-xl p-4">
+                        <p className="text-white font-semibold mb-3">Proposals ({clientReport.proposals.length})</p>
+                        <MiniTable rows={clientReport.proposals} />
+                      </div>
+
+                      {/* Jobs */}
+                      <div className="bg-[#1a2d45] rounded-xl p-4">
+                        <p className="text-white font-semibold mb-3">Jobs ({clientReport.jobs.length})</p>
+                        <MiniTable rows={clientReport.jobs} />
+                      </div>
+
+                      {/* Tickets */}
+                      <div className="bg-[#1a2d45] rounded-xl p-4">
+                        <p className="text-white font-semibold mb-3">Service Tickets ({clientReport.tickets.length})</p>
+                        <MiniTable rows={clientReport.tickets} />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Contextual filters */}
-                {activeFilters.length > 0 && (
-                  <div className="flex flex-wrap gap-3 pt-1 border-t border-[#2a3d55]">
-                    {activeFilters.includes('client') && (
-                      <div>
-                        <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Client</label>
-                        <select value={filters.client} onChange={e => setFilter('client', e.target.value)} className={selClass}>
-                          <option value="">All Clients</option>
-                          {clients.map(c => <option key={c.id} value={
-                            /* jobs filter by id, others by name string */
-                            ['open_jobs','closed_jobs'].includes(activeReport) ? c.id : c.company
-                          }>{c.company}</option>)}
-                        </select>
+              ) : (
+                /* ── Standard reports ── */
+                <>
+                  <div className="bg-[#1a2d45] rounded-xl p-4 mb-4 space-y-3">
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className={`flex flex-wrap items-end gap-3 ${noDate ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+                        <div>
+                          <label className="block text-[#8A9AB0] text-xs font-medium mb-1">From</label>
+                          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={selClass} />
+                        </div>
+                        <div>
+                          <label className="block text-[#8A9AB0] text-xs font-medium mb-1">To</label>
+                          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={selClass} />
+                        </div>
+                        <div className="flex gap-2 pb-0.5">
+                          <button onClick={() => { setDateFrom(daysAgo(30)); setDateTo(today()) }} className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">30d</button>
+                          <button onClick={() => { setDateFrom(daysAgo(90)); setDateTo(today()) }} className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">90d</button>
+                          <button onClick={() => { setDateFrom(''); setDateTo('') }}               className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">All</button>
+                        </div>
                       </div>
-                    )}
-                    {activeFilters.includes('rep') && (
-                      <div>
-                        <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Rep</label>
-                        <select value={filters.rep} onChange={e => setFilter('rep', e.target.value)} className={selClass}>
-                          <option value="">All Reps</option>
-                          {reps.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
+                      <div className="ml-auto text-[#8A9AB0] text-sm self-end pb-0.5">
+                        {!loading && <span>{data.length} row{data.length !== 1 ? 's' : ''}</span>}
                       </div>
-                    )}
-                    {activeFilters.includes('industry') && (
-                      <div>
-                        <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Industry</label>
-                        <select value={filters.industry} onChange={e => setFilter('industry', e.target.value)} className={selClass}>
-                          <option value="">All Industries</option>
-                          {industries.map(i => <option key={i} value={i}>{i}</option>)}
-                        </select>
-                      </div>
-                    )}
-                    {activeFilters.includes('tech') && (
-                      <div>
-                        <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Technician</label>
-                        <select value={filters.tech} onChange={e => setFilter('tech', e.target.value)} className={selClass}>
-                          <option value="">All Techs</option>
-                          {techs.map(t => <option key={t.id} value={t.id}>{t.full_name}</option>)}
-                        </select>
-                      </div>
-                    )}
-                    {activeFilters.includes('status') && (
-                      <div>
-                        <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Status</label>
-                        <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className={selClass}>
-                          <option value="">All Statuses</option>
-                          {activeReport === 'service_tickets' && ['Open','In Progress','Resolved','Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
-                          {activeReport === 'invoices'        && ['Draft','Sent','Paid','Overdue'].map(s => <option key={s} value={s}>{s}</option>)}
-                          {activeReport === 'purchase_orders' && ['Draft','Sent','Partial','Received','Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
-                        </select>
-                      </div>
-                    )}
-                    {activeFilters.includes('priority') && (
-                      <div>
-                        <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Priority</label>
-                        <select value={filters.priority} onChange={e => setFilter('priority', e.target.value)} className={selClass}>
-                          <option value="">All Priorities</option>
-                          {['Low','Normal','High','Urgent'].map(p => <option key={p} value={p}>{p}</option>)}
-                        </select>
-                      </div>
-                    )}
-                    {activeFilters.includes('vendor') && (
-                      <div>
-                        <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Vendor</label>
-                        <select value={filters.vendor} onChange={e => setFilter('vendor', e.target.value)} className={selClass}>
-                          <option value="">All Vendors</option>
-                          {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
-                        </select>
-                      </div>
-                    )}
-                    {Object.values(filters).some(Boolean) && (
-                      <div className="self-end pb-0.5">
-                        <button onClick={() => setFilters(BLANK_FILTERS)} className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">Clear filters</button>
+                    </div>
+
+                    {activeFilters.length > 0 && (
+                      <div className="flex flex-wrap gap-3 pt-2 border-t border-[#2a3d55]">
+                        {activeFilters.includes('client') && (
+                          <div>
+                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Client</label>
+                            <SearchSelect
+                              options={clients}
+                              value={filters.clientId || filters.clientName}
+                              onChange={(opt) => {
+                                if (!opt) { setFilter('clientId', ''); setFilter('clientName', '') }
+                                else if (['open_jobs','closed_jobs','service_tickets'].includes(activeReport)) {
+                                  setFilter('clientId', opt.value); setFilter('clientName', '')
+                                } else {
+                                  setFilter('clientName', opt.label); setFilter('clientId', '')
+                                }
+                              }}
+                              placeholder="All clients…"
+                            />
+                          </div>
+                        )}
+                        {activeFilters.includes('rep') && (
+                          <div>
+                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Rep</label>
+                            <select value={filters.rep} onChange={e => setFilter('rep', e.target.value)} className={selClass}>
+                              <option value="">All Reps</option>
+                              {reps.map(r => <option key={r} value={r}>{r}</option>)}
+                            </select>
+                          </div>
+                        )}
+                        {activeFilters.includes('industry') && (
+                          <div>
+                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Industry</label>
+                            <select value={filters.industry} onChange={e => setFilter('industry', e.target.value)} className={selClass}>
+                              <option value="">All Industries</option>
+                              {industries.map(i => <option key={i} value={i}>{i}</option>)}
+                            </select>
+                          </div>
+                        )}
+                        {activeFilters.includes('tech') && (
+                          <div>
+                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Technician</label>
+                            <SearchSelect
+                              options={techs}
+                              value={filters.tech}
+                              onChange={(opt) => setFilter('tech', opt?.value || '')}
+                              placeholder="All techs…"
+                            />
+                          </div>
+                        )}
+                        {activeFilters.includes('status') && (
+                          <div>
+                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Status</label>
+                            <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className={selClass}>
+                              <option value="">All Statuses</option>
+                              {activeReport === 'service_tickets' && ['Open','In Progress','Resolved','Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
+                              {activeReport === 'invoices'        && ['Draft','Sent','Paid'].map(s => <option key={s} value={s}>{s}</option>)}
+                              {activeReport === 'purchase_orders' && ['Draft','Sent','Partial','Received','Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                          </div>
+                        )}
+                        {activeFilters.includes('priority') && (
+                          <div>
+                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Priority</label>
+                            <select value={filters.priority} onChange={e => setFilter('priority', e.target.value)} className={selClass}>
+                              <option value="">All Priorities</option>
+                              {['Low','Normal','High','Urgent'].map(p => <option key={p} value={p}>{p}</option>)}
+                            </select>
+                          </div>
+                        )}
+                        {activeFilters.includes('vendor') && (
+                          <div>
+                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Vendor</label>
+                            <SearchSelect
+                              options={vendors}
+                              value={filters.vendorName}
+                              onChange={(opt) => setFilter('vendorName', opt?.label || '')}
+                              placeholder="All vendors…"
+                            />
+                          </div>
+                        )}
+                        {Object.values(filters).some(Boolean) && (
+                          <div className="self-end pb-0.5">
+                            <button onClick={() => setFilters(BLANK_FILTERS)} className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">Clear filters</button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
 
-              {/* Table */}
-              <div className="bg-[#1a2d45] rounded-xl overflow-hidden">
-                {loading ? (
-                  <div className="text-center text-[#8A9AB0] py-16 text-sm">Loading...</div>
-                ) : data.length === 0 ? (
-                  <div className="text-center text-[#8A9AB0] py-16 text-sm">No data for this report</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[#2a3d55]">
-                          {columns.map(col => (
-                            <th key={col} className="text-left px-4 py-3 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{col}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.map((row, i) => (
-                          <tr key={i} className="border-b border-[#0F1C2E]/60 hover:bg-[#0F1C2E]/40 transition-colors">
-                            {columns.map(col => (
-                              <td key={col} className="px-4 py-3 text-white whitespace-nowrap">{row[col]}</td>
+                  <div className="bg-[#1a2d45] rounded-xl overflow-hidden">
+                    {loading ? (
+                      <div className="text-center text-[#8A9AB0] py-16 text-sm">Loading…</div>
+                    ) : data.length === 0 ? (
+                      <div className="text-center text-[#8A9AB0] py-16 text-sm">No data for this report</div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-[#2a3d55]">
+                              {columns.map(col => (
+                                <th key={col} className="text-left px-4 py-3 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{col}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.map((row, i) => (
+                              <tr key={i} className="border-b border-[#0F1C2E]/60 hover:bg-[#0F1C2E]/40 transition-colors">
+                                {columns.map(col => (
+                                  <td key={col} className="px-4 py-3 text-white whitespace-nowrap">{row[col]}</td>
+                                ))}
+                              </tr>
                             ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-
+                </>
+              )}
             </div>
           </div>
         </div>
