@@ -209,6 +209,7 @@ export default function DrawingReview() {
           ? supabase.from('drawing_placements')
               .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
               .in('drawing_sheet_id', sheetIds)
+              .order('created_at', { ascending: true })
           : Promise.resolve({ data: [] }),
         supabase.from('profiles')
           .select('company_name, logo_url, primary_color')
@@ -218,7 +219,14 @@ export default function DrawingReview() {
       ])
 
       setSheets(sheetData || [])
-      setPlacements(placementData || [])
+      // Sort by sheet order, then chronologically within each sheet
+      const sortedPlacements = (placementData || []).sort((a, b) => {
+        const ai = sheetIds.indexOf(a.drawing_sheet_id)
+        const bi = sheetIds.indexOf(b.drawing_sheet_id)
+        if (ai !== bi) return ai - bi
+        return new Date(a.created_at) - new Date(b.created_at)
+      })
+      setPlacements(sortedPlacements)
       setOrgProfile(profileData)
     } catch {
       setError('Failed to load drawing review.')

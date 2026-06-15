@@ -32,15 +32,13 @@ const getIconPng = async (category, color, size = 16) => {
 }
 
 // ─── Label collision helpers ──────────────────────────────────────────────────
-// jsPDF draws text with `y` at the baseline; text ascends ~fs above that.
-// We add a generous pad so nearby labels don't visually crowd each other.
+// jsPDF baseline = bottom of text; text ascends ~fs*1.1 above that.
 const labelBounds = (cx, cy, text, fs) => {
-  const w = text.length * fs * 0.65 + fs   // char estimate + side padding
-  const h = fs * 1.2                        // full ascent above baseline
-  return { x1: cx - w / 2, y1: cy - h, x2: cx + w / 2, y2: cy + fs * 0.3 }
+  const w = text.length * fs * 0.65 + fs
+  return { x1: cx - w / 2, y1: cy - fs * 1.1, x2: cx + w / 2, y2: cy }
 }
-const labelsOverlap = (a, b, pad = 1) =>
-  !(a.x2 + pad < b.x1 || b.x2 + pad < a.x1 || a.y2 + pad < b.y1 || b.y2 + pad < a.y1)
+const labelsOverlap = (a, b) =>
+  !(a.x2 + 0.8 < b.x1 || b.x2 + 0.8 < a.x1 || a.y2 + 0.8 < b.y1 || b.y2 + 0.8 < a.y1)
 
 // ─── DrawingExport ────────────────────────────────────────────────────────────
 // Export tab — Client Overview, Shop Drawings, As-Builts, CSV BOM
@@ -74,7 +72,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         supabase.from('drawing_placements')
           .select('*, global_products(id, name, part_number, manufacturer, category, specs, accessories)')
           .in('drawing_sheet_id', sheetIds)
-          .order('drawing_sheet_id'),
+          .order('created_at', { ascending: true }),
         supabase.from('cable_runs').select('*').in('drawing_sheet_id', sheetIds),
         supabase.from('vertical_rises').select('*').eq('proposal_id', proposalId),
         supabase.from('placement_components')
@@ -87,7 +85,14 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           .single(),
       ])
 
-      setPlacements(placementData    || [])
+      // Sort by sheet order first, then by placement creation time within each sheet
+      const sorted = (placementData || []).sort((a, b) => {
+        const sheetOrderA = sheetIds.indexOf(a.drawing_sheet_id)
+        const sheetOrderB = sheetIds.indexOf(b.drawing_sheet_id)
+        if (sheetOrderA !== sheetOrderB) return sheetOrderA - sheetOrderB
+        return new Date(a.created_at) - new Date(b.created_at)
+      })
+      setPlacements(sorted)
       setCableRuns(cableData         || [])
       setVerticalRises(riseData      || [])
       // Aggregate components by type+name+part_number
@@ -286,44 +291,25 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       if (p.device_address) {
         const fs    = Math.max(symbolSizeMM * 0.7, 3)
         const rad   = symbolSizeMM / 2
-        const gap   = rad + fs * 1.4          // clear the marker circle
-        const step  = fs * 3                  // label-width-based step so moves are meaningful
+        const off   = rad + fs * 0.8
         const label = p.device_address
 
-        // Candidates spread in label-sized steps so each option actually clears the previous
+        // Four directions only — below, above, right, left
         const candidates = [
-          [0,      gap],           // below (default)
-          [step,   gap],           // below-right
-          [-step,  gap],           // below-left
-          [step,   0],             // right
-          [-step,  0],             // left
-          [0,      -gap],          // above
-          [step,   -gap],          // above-right
-          [-step,  -gap],          // above-left
-          [0,      gap + step],    // far below
-          [step*2, gap],           // far right
-          [-step*2,gap],           // far left
+          [px,       py + off + fs],   // below
+          [px,       py - off],         // above
+          [px + off, py + fs * 0.4],   // right
+          [px - off, py + fs * 0.4],   // left
         ]
 
-        let lx = px, ly = py + gap, placed = false
-        for (const [dx, dy] of candidates) {
-          const cx = px + dx, cy = py + dy
-          const b  = labelBounds(cx, cy, label, fs)
+        let lx = candidates[0][0], ly = candidates[0][1]
+        for (const [cx, cy] of candidates) {
+          const b = labelBounds(cx, cy, label, fs)
           if (!placedLabelBounds.some(pb => labelsOverlap(b, pb))) {
-            lx = cx; ly = cy; placed = true
+            lx = cx; ly = cy
             placedLabelBounds.push(b)
             break
           }
-        }
-        if (!placed) placedLabelBounds.push(labelBounds(lx, ly, label, fs))
-
-        // Leader line if label was moved from the default below position
-        const movedX = Math.abs(lx - px) > fs * 0.5
-        const movedY = Math.abs(ly - (py + gap)) > fs * 0.5
-        if (movedX || movedY) {
-          pdf.setLineWidth(0.2)
-          pdf.setDrawColor(r, g, b)
-          pdf.line(px, py + rad, lx, ly - fs * 1.0)
         }
 
         pdf.setTextColor(r, g, b)
