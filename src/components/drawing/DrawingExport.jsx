@@ -53,10 +53,14 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [orgProfile,    setOrgProfile]    = useState(null)
   const [loading,       setLoading]       = useState(true)
   const [generating,    setGenerating]    = useState(false)
-  const [shareLink,     setShareLink]     = useState(null)
   const [sharing,       setSharing]       = useState(false)
-  const [shareCopied,   setShareCopied]   = useState(false)
   const [exportFOV,     setExportFOV]     = useState(true)
+  const [packages,      setPackages]      = useState([])
+  const [copiedId,      setCopiedId]      = useState(null)
+  const [shareExpiry,   setShareExpiry]   = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10)
+  })
+  const [sharePin,      setSharePin]      = useState('')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -95,8 +99,18 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         return new Date(a.created_at) - new Date(b.created_at)
       })
       setPlacements(sorted)
-      setCableRuns(cableData         || [])
-      setVerticalRises(riseData      || [])
+      setCableRuns(cableData || [])
+      setVerticalRises(riseData || [])
+
+      // Load existing share links
+      const { data: pkgData } = await supabase
+        .from('drawing_packages')
+        .select('id, share_token, share_expires_at, share_pin, created_at, client_approved, client_approved_by, client_approved_at')
+        .eq('proposal_id', proposalId)
+        .not('share_token', 'is', null)
+        .order('created_at', { ascending: false })
+      setPackages(pkgData || [])
+
       // Aggregate components by type+name+part_number
       const compMap = {}
       ;(compData || []).forEach(c => {
@@ -974,13 +988,12 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     }
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Share helpers ───────────────────────────────────────────────────────────
   const handleShare = async () => {
     setSharing(true)
     try {
-      const token    = crypto.randomUUID()
-      const expires  = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
-
+      const token   = crypto.randomUUID()
+      const expires = shareExpiry ? new Date(shareExpiry + 'T23:59:59').toISOString() : null
       const { data, error } = await supabase
         .from('drawing_packages')
         .insert({
@@ -991,26 +1004,30 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           status:           'submitted',
           share_token:      token,
           shared_at:        new Date().toISOString(),
-          share_expires_at: expires.toISOString(),
+          share_expires_at: expires,
+          share_pin:        sharePin.trim() || null,
         })
-        .select('share_token')
+        .select('id, share_token, share_expires_at, share_pin, created_at, client_approved, client_approved_by, client_approved_at')
         .single()
-
       if (!error && data) {
-        const link = `${window.location.origin}/designer/review/${data.share_token}`
-        setShareLink(link)
+        setPackages(prev => [data, ...prev])
+        setSharePin('')
       }
-    } catch (err) {
-      console.error('Share failed:', err)
-    } finally {
-      setSharing(false)
-    }
+    } catch (err) { console.error('Share failed:', err) }
+    finally { setSharing(false) }
   }
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareLink)
-    setShareCopied(true)
-    setTimeout(() => setShareCopied(false), 2000)
+  const handleCopyLink = (token, id) => {
+    const link = `${window.location.origin}/designer/review/${token}`
+    navigator.clipboard.writeText(link)
+    setCopiedId(id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const handleRevoke = async (id) => {
+    if (!window.confirm('Revoke this link? The client will no longer be able to access it.')) return
+    await supabase.from('drawing_packages').update({ share_token: null }).eq('id', id)
+    setPackages(prev => prev.filter(p => p.id !== id))
   }
 
   const exports = [
@@ -1104,53 +1121,96 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       )}
 
       {/* Share for client review */}
-      <div className="border-t border-[#2a3d55] pt-6 mt-2">
+      <div className="border-t border-[#2a3d55] pt-6 mt-2 space-y-4">
+
+        {/* Active links */}
+        {packages.length > 0 && (
+          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-[#2a3d55]">
+              <p className="text-white font-semibold text-sm">Active Review Links</p>
+            </div>
+            <div className="divide-y divide-[#2a3d55]">
+              {packages.map(pkg => {
+                const expired = pkg.share_expires_at && new Date(pkg.share_expires_at) < new Date()
+                const link    = `${window.location.origin}/designer/review/${pkg.share_token}`
+                return (
+                  <div key={pkg.id} className="px-5 py-3 flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {pkg.client_approved && (
+                          <span className="text-xs bg-green-900/40 text-green-400 border border-green-800/40 px-2 py-0.5 rounded-full font-semibold">Approved</span>
+                        )}
+                        {expired && (
+                          <span className="text-xs bg-red-900/30 text-red-400 border border-red-800/30 px-2 py-0.5 rounded-full font-semibold">Expired</span>
+                        )}
+                        {pkg.share_pin && (
+                          <span className="text-xs bg-[#0F1C2E] text-[#8A9AB0] border border-[#2a3d55] px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            PIN protected
+                          </span>
+                        )}
+                        {pkg.client_approved_by && (
+                          <span className="text-xs text-[#8A9AB0]">by {pkg.client_approved_by}</span>
+                        )}
+                      </div>
+                      <p className="text-[#4a5a6a] text-xs mt-1 truncate">{link}</p>
+                      {pkg.share_expires_at && (
+                        <p className="text-[#4a5a6a] text-xs mt-0.5">
+                          {expired ? 'Expired' : 'Expires'} {new Date(pkg.share_expires_at).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    <button onClick={() => handleCopyLink(pkg.share_token, pkg.id)}
+                      className="text-xs font-semibold text-[#C8622A] hover:text-white transition-colors flex-shrink-0 px-2 py-1">
+                      {copiedId === pkg.id ? 'Copied!' : 'Copy'}
+                    </button>
+                    <button onClick={() => handleRevoke(pkg.id)}
+                      className="text-xs text-[#4a5a6a] hover:text-red-400 transition-colors flex-shrink-0">
+                      Revoke
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Create new link */}
         <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[#0F1C2E] flex items-center justify-center text-2xl flex-shrink-0">
-                🔗
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-[#0F1C2E] flex items-center justify-center text-xl flex-shrink-0">🔗</div>
+            <div>
+              <p className="text-white font-semibold text-sm">Create Review Link</p>
+              <p className="text-[#8A9AB0] text-xs mt-0.5">Client can view the design, add notes, and approve.</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Expiration Date</label>
+                <input type="date" value={shareExpiry} onChange={e => setShareExpiry(e.target.value)}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
               </div>
               <div>
-                <p className="text-white font-semibold text-sm">Share for Client Review</p>
-                <p className="text-[#8A9AB0] text-xs mt-0.5">
-                  Generate a link your client can use to view the design and approve it.
-                  Link expires in 30 days.
-                </p>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">PIN Code <span className="text-[#4a5a6a]">(optional)</span></label>
+                <input type="text" value={sharePin} onChange={e => setSharePin(e.target.value)}
+                  placeholder="e.g. 4821"
+                  maxLength={12}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
               </div>
             </div>
-            {!shareLink && (
-              <button
-                onClick={handleShare}
-                disabled={sharing || sheets.length === 0}
-                className={`flex-shrink-0 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  sharing || sheets.length === 0
-                    ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
-                    : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
-                }`}>
-                {sharing ? 'Generating...' : 'Generate Link'}
-              </button>
+            {sharePin.trim() && (
+              <p className="text-xs text-yellow-400/80">Client will be required to enter this PIN before viewing the design.</p>
             )}
+            <button onClick={handleShare} disabled={sharing || sheets.length === 0}
+              className={`w-full py-2.5 text-sm font-semibold rounded-lg transition-colors ${
+                sharing || sheets.length === 0
+                  ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
+                  : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
+              }`}>
+              {sharing ? 'Generating…' : 'Generate Link'}
+            </button>
           </div>
-
-          {shareLink && (
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center gap-2 bg-[#0F1C2E] border border-[#2a3d55] rounded-lg px-3 py-2">
-                <span className="text-[#8A9AB0] text-xs flex-1 truncate">{shareLink}</span>
-                <button onClick={handleCopyLink}
-                  className="text-xs font-semibold text-[#C8622A] hover:text-white transition-colors flex-shrink-0">
-                  {shareCopied ? 'Copied!' : 'Copy'}
-                </button>
-              </div>
-              <p className="text-[#4a5a6a] text-xs">
-                This link is valid for 30 days. Your client can view the design and approve it without logging in.
-              </p>
-              <button onClick={() => { setShareLink(null) }}
-                className="text-xs text-[#8A9AB0] hover:text-white transition-colors">
-                Generate new link
-              </button>
-            </div>
-          )}
         </div>
       </div>
 

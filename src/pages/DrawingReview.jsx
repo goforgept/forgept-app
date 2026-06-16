@@ -316,6 +316,9 @@ export default function DrawingReview() {
   const [approvalName,  setApprovalName]  = useState('')
   const [approvalTitle, setApprovalTitle] = useState('')
   const [showSchedule,  setShowSchedule]  = useState(true)
+  const [pinVerified,   setPinVerified]   = useState(false)
+  const [pinInput,      setPinInput]      = useState('')
+  const [pinError,      setPinError]      = useState(false)
 
   useEffect(() => { load() }, [token])
 
@@ -432,6 +435,45 @@ export default function DrawingReview() {
         <p className="text-4xl mb-4">🔒</p>
         <p className="text-white font-bold text-lg mb-2">Link Unavailable</p>
         <p className="text-[#8A9AB0] text-sm">{error}</p>
+      </div>
+    </div>
+  )
+
+  // ── PIN gate ─────────────────────────────────────────────────────────────────
+  if (pkg?.share_pin && !pinVerified) return (
+    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center p-4">
+      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-2xl p-8 max-w-sm w-full text-center">
+        <div className="w-14 h-14 rounded-full bg-[#C8622A]/10 border border-[#C8622A]/30 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-7 h-7 text-[#C8622A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+        </div>
+        <p className="text-white font-bold text-lg mb-1">{orgProfile?.company_name || 'Design Review'}</p>
+        <p className="text-[#8A9AB0] text-sm mb-6">Enter the PIN provided by your integrator to view this design.</p>
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="Enter PIN"
+          value={pinInput}
+          onChange={e => { setPinInput(e.target.value); setPinError(false) }}
+          onKeyDown={e => { if (e.key === 'Enter') {
+            if (pinInput === pkg.share_pin) { setPinVerified(true) }
+            else { setPinError(true); setPinInput('') }
+          }}}
+          className={`w-full text-center text-white text-xl font-bold tracking-widest bg-[#0F1C2E] border rounded-xl px-4 py-3 mb-3 focus:outline-none transition-colors ${
+            pinError ? 'border-red-500 animate-shake' : 'border-[#2a3d55] focus:border-[#C8622A]'
+          }`}
+        />
+        {pinError && <p className="text-red-400 text-sm mb-3">Incorrect PIN. Please try again.</p>}
+        <button
+          onClick={() => {
+            if (pinInput === pkg.share_pin) { setPinVerified(true) }
+            else { setPinError(true); setPinInput('') }
+          }}
+          disabled={!pinInput.trim()}
+          className="w-full py-3 bg-[#C8622A] text-white font-bold rounded-xl hover:bg-[#b5571f] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          Continue
+        </button>
       </div>
     </div>
   )
