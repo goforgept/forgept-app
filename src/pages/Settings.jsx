@@ -299,27 +299,17 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
 
   const handleChangePassword = async () => {
     setPasswordError(null); setPasswordSuccess(null)
-    if (!passwordForm.current) { setPasswordError('Current password is required'); return }
     if (!passwordForm.newPass || !passwordForm.confirm) { setPasswordError('Please fill in all fields'); return }
     if (passwordForm.newPass !== passwordForm.confirm) { setPasswordError('New passwords do not match'); return }
     if (passwordForm.newPass.length < 8) { setPasswordError('Password must be at least 8 characters'); return }
     setSavingPassword(true)
     try {
-      // Re-authenticate first — Supabase requires a fresh session to change password
-      const { data: { user } } = await supabase.auth.getUser()
-      const { error: reAuthError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: passwordForm.current,
-      })
-      if (reAuthError) { setPasswordError('Current password is incorrect'); return }
-
       const { error } = await supabase.auth.updateUser({ password: passwordForm.newPass })
       if (error) { setPasswordError(error.message); return }
-
       setPasswordSuccess('Password updated successfully')
       setPasswordForm({ current: '', newPass: '', confirm: '' })
     } catch (err) {
-      setPasswordError('Something went wrong. Please try again.')
+      setPasswordError(String(err))
     } finally {
       setSavingPassword(false)
     }

@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { validateUser, corsHeaders } from "../_shared/auth.ts"
+import { sendEmail } from "../_shared/email.ts"
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -32,7 +33,7 @@ Deno.serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    const brevoKey = Deno.env.get('BREVO_API_KEY') ?? ''
+    // brevoKey no longer needed — using Google Workspace SMTP
     const adminSupabase = createClient(supabaseUrl, serviceKey)
 
     const tempPassword = Math.random().toString(36).slice(-10) + 'A1!'
@@ -106,35 +107,28 @@ Deno.serve(async (req) => {
       throw new Error('org_id failed to stamp on profile — check DB triggers or constraints')
     }
 
-    // Step 4: send invite email
-    await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': brevoKey
-      },
-      body: JSON.stringify({
-        sender: { name: 'ForgePt.', email: 'followups@goforgept.com' },
-        to: [{ email, name: fullName }],
-        subject: "You've been invited to ForgePt.",
-        htmlContent: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #0F1C2E;">You're invited to ForgePt.</h2>
-            <p>Hi ${fullName},</p>
-            <p>You've been added to your team's ForgePt. account. Here are your login details:</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Temporary Password:</strong> ${tempPassword}</p>
-            <p>Please log in and change your password in Settings right away.</p>
-            <br/>
-            <a href="https://app.goforgept.com" style="background: #C8622A; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
-              Log In to ForgePt.
-            </a>
-            <br/><br/>
-            <p>If you have any questions just reply to this email.</p>
-            <p>— The ForgePt. Team</p>
-          </div>
-        `
-      })
+    // Step 4: send invite email via Google Workspace SMTP
+    await sendEmail({
+      to: email,
+      subject: "You've been invited to ForgePt.",
+      replyTo: profile.email,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #0F1C2E;">You're invited to ForgePt.</h2>
+          <p>Hi ${fullName},</p>
+          <p>You've been added to your team's ForgePt. account. Here are your login details:</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+          <p>Please log in and change your password in Settings right away.</p>
+          <br/>
+          <a href="https://app.goforgept.com" style="background: #C8622A; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">
+            Log In to ForgePt.
+          </a>
+          <br/><br/>
+          <p>If you have any questions just reply to this email.</p>
+          <p>— The ForgePt. Team</p>
+        </div>
+      `
     })
 
     return new Response(JSON.stringify({ success: true }), {
