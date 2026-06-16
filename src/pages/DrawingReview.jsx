@@ -1,154 +1,291 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
+import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Line } from 'react-konva'
+import { useCategoryIcons } from '../components/drawing/useCategoryIcons'
 
-const FOV_CATEGORIES = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera']
+const FOV_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Fisheye Camera']
 
-// ── SheetViewer ────────────────────────────────────────────────────────────────
-// SVG viewBox uses rendered CSS pixel dimensions (not natural image pixels) so
-// preserveAspectRatio="none" is safe — no letterboxing, no scaling artifacts.
-// Range/marker size uses natW to convert from original-pixel coordinates.
-function SheetViewer({ sheet, placements }) {
-  const [imgSrc,  setImgSrc]  = useState(null)
-  const [svgDims, setSvgDims] = useState(null) // { w, h, natW, natH }
-  const imgRef = useRef(null)
+// ── SheetCanvas ────────────────────────────────────────────────────────────────
+function SheetCanvas({ sheet, placements, comments, addingNote, onCanvasClick, onNoteClick, selectedNoteId }) {
+  const containerRef = useRef(null)
+  const stageRef     = useRef(null)
+  const isPanning    = useRef(false)
+  const lastPointer  = useRef(null)
+  const lastDist     = useRef(0)
+  const lastTouchPos = useRef(null)
 
+  const [bgImage,   setBgImage]   = useState(null)
+  const [imageSize, setImageSize] = useState({ w: 1200, h: 900 })
+  const [stageSize, setStageSize] = useState({ w: 800, h: 600 })
+  const [scale,     setScale]     = useState(1)
+  const [position,  setPosition]  = useState({ x: 0, y: 0 })
+  const [loading,   setLoading]   = useState(true)
+
+  const { getIcon, ready: iconsReady } = useCategoryIcons('white', 40)
+
+  // Measure container
   useEffect(() => {
-    if (!sheet.storage_path || ['blank','pending'].includes(sheet.storage_path)) return
-    loadImage()
-  }, [sheet.id])
+    const measure = () => {
+      if (containerRef.current)
+        setStageSize({ w: containerRef.current.offsetWidth, h: containerRef.current.offsetHeight })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    if (containerRef.current) ro.observe(containerRef.current)
+    return () => ro.disconnect()
+  }, [])
 
-  const loadImage = async () => {
+  // Load floor plan
+  useEffect(() => {
+    if (!sheet?.storage_path || ['blank', 'pending'].includes(sheet.storage_path)) {
+      setLoading(false); return
+    }
+    loadFloorPlan()
+  }, [sheet?.storage_path])
+
+  const loadImageFromUrl = (url) => new Promise((resolve, reject) => {
+    const img = new window.Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => { setBgImage(img); setImageSize({ w: img.naturalWidth, h: img.naturalHeight }); fitToStage(img.naturalWidth, img.naturalHeight); resolve() }
+    img.onerror = reject
+    img.src = url
+  })
+
+  const loadFloorPlan = async () => {
+    setLoading(true)
     try {
       const { getR2Url } = await import('../r2')
-      const signedUrl = await getR2Url(sheet.storage_path, 3600)
-      if (!signedUrl) return
+      const url = await getR2Url(sheet.storage_path, 3600)
+      if (!url) { setLoading(false); return }
       if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
         const pdfjsLib = await import('pdfjs-dist')
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-          'pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url
-        ).toString()
-        const response = await fetch(signedUrl)
-        const buf      = await response.arrayBuffer()
-        const pdfDoc   = await pdfjsLib.getDocument({ data: buf }).promise
-        const page     = await pdfDoc.getPage(sheet.page_number || 1)
-        const vp       = page.getViewport({ scale: 2 })
-        const canvas   = document.createElement('canvas')
-        canvas.width   = vp.width
-        canvas.height  = vp.height
+        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
+        const buf    = await (await fetch(url)).arrayBuffer()
+        const pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise
+        const page   = await pdfDoc.getPage(sheet.page_number || 1)
+        const vp     = page.getViewport({ scale: 2 })
+        const canvas = document.createElement('canvas')
+        canvas.width = vp.width; canvas.height = vp.height
         await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise
-        setImgSrc(canvas.toDataURL('image/png'))
+        await loadImageFromUrl(canvas.toDataURL('image/png'))
       } else {
-        setImgSrc(signedUrl)
+        await loadImageFromUrl(url)
       }
-    } catch (err) {
-      console.error('Sheet image load failed:', err)
+    } catch (err) { console.error('Floor plan load failed:', err) }
+    finally { setLoading(false) }
+  }
+
+  const fitToStage = useCallback((imgW, imgH) => {
+    if (!containerRef.current) return
+    const sw = containerRef.current.offsetWidth
+    const sh = containerRef.current.offsetHeight
+    const fit = Math.min(sw / imgW, sh / imgH) * 0.92
+    setScale(fit)
+    setPosition({ x: (sw - imgW * fit) / 2, y: (sh - imgH * fit) / 2 })
+  }, [])
+
+  const canvasW = imageSize.w
+  const canvasH = imageSize.h
+
+  const handleWheel = useCallback((e) => {
+    e.evt.preventDefault()
+    const stage   = stageRef.current
+    const pointer = stage.getPointerPosition()
+    const factor  = e.evt.deltaY < 0 ? 1.12 : 0.9
+    const ns      = Math.min(Math.max(scale * factor, 0.05), 15)
+    const mx      = (pointer.x - position.x) / scale
+    const my      = (pointer.y - position.y) / scale
+    setScale(ns)
+    setPosition({ x: pointer.x - mx * ns, y: pointer.y - my * ns })
+  }, [scale, position])
+
+  const handleMouseDown = useCallback((e) => {
+    if (e.evt.button === 1 || e.evt.button === 0) {
+      isPanning.current = true
+      lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY }
     }
-  }
+  }, [])
 
-  const updateDims = () => {
-    const img = imgRef.current
-    if (!img || !img.naturalWidth) return
-    setSvgDims({ w: img.offsetWidth, h: img.offsetHeight, natW: img.naturalWidth, natH: img.naturalHeight })
-  }
+  const handleMouseMove = useCallback((e) => {
+    if (!isPanning.current || !lastPointer.current) return
+    const dx = e.evt.clientX - lastPointer.current.x
+    const dy = e.evt.clientY - lastPointer.current.y
+    lastPointer.current = { x: e.evt.clientX, y: e.evt.clientY }
+    setPosition(p => ({ x: p.x + dx, y: p.y + dy }))
+  }, [])
 
-  useEffect(() => {
-    const img = imgRef.current
-    if (!img) return
-    const ro = new ResizeObserver(updateDims)
-    ro.observe(img)
-    return () => ro.disconnect()
-  }, [imgSrc])
+  const handleMouseUp = useCallback(() => { isPanning.current = false }, [])
+
+  const handleTouchStart = useCallback((e) => {
+    const t = e.evt.touches
+    if (t.length === 2) lastDist.current = Math.sqrt((t[0].clientX - t[1].clientX) ** 2 + (t[0].clientY - t[1].clientY) ** 2)
+    else if (t.length === 1) lastTouchPos.current = { x: t[0].clientX, y: t[0].clientY }
+  }, [])
+
+  const handleTouchMove = useCallback((e) => {
+    const t = e.evt.touches
+    if (t.length === 2) {
+      const dist = Math.sqrt((t[0].clientX - t[1].clientX) ** 2 + (t[0].clientY - t[1].clientY) ** 2)
+      if (lastDist.current) setScale(s => Math.min(Math.max(s * dist / lastDist.current, 0.05), 15))
+      lastDist.current = dist
+    } else if (t.length === 1 && lastTouchPos.current) {
+      const dx = t[0].clientX - lastTouchPos.current.x
+      const dy = t[0].clientY - lastTouchPos.current.y
+      setPosition(p => ({ x: p.x + dx, y: p.y + dy }))
+      lastTouchPos.current = { x: t[0].clientX, y: t[0].clientY }
+    }
+  }, [])
+
+  const handleTouchEnd = useCallback(() => { lastDist.current = 0; lastTouchPos.current = null }, [])
+
+  const handleClick = useCallback((e) => {
+    if (e.evt.button === 2) return
+    const onBg = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name?.() ?? '')
+    if (!onBg || !addingNote) return
+    const pointer = stageRef.current.getPointerPosition()
+    const x = Math.min(Math.max((pointer.x - position.x) / scale / canvasW, 0.01), 0.99)
+    const y = Math.min(Math.max((pointer.y - position.y) / scale / canvasH, 0.01), 0.99)
+    onCanvasClick?.({ x, y })
+  }, [addingNote, position, scale, canvasW, canvasH, onCanvasClick])
+
+  const zoomIn  = () => setScale(s => Math.min(s * 1.2, 15))
+  const zoomOut = () => setScale(s => Math.max(s * 0.8, 0.05))
+  const zoomFit = () => bgImage ? fitToStage(imageSize.w, imageSize.h) : (setScale(1), setPosition({ x: 0, y: 0 }))
 
   return (
-    <div className="bg-[#0F1C2E] rounded-xl overflow-hidden border border-[#2a3d55]">
-      <div className="bg-[#1a2d45] px-4 py-3 border-b border-[#2a3d55] flex items-center justify-between">
-        <p className="text-white text-sm font-semibold">{sheet.name}</p>
-        <p className="text-[#8A9AB0] text-xs">{placements.length} device{placements.length !== 1 ? 's' : ''}</p>
+    <div className="flex flex-col h-full">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a3d55] bg-[#1a2d45] flex-shrink-0 text-xs">
+        <span>
+          {addingNote
+            ? <span className="flex items-center gap-1.5 text-yellow-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse inline-block" />
+                Click anywhere on the floor plan to pin a note
+              </span>
+            : <span className="text-[#8A9AB0]">Scroll to zoom · Drag to pan · {placements.length} device{placements.length !== 1 ? 's' : ''}</span>
+          }
+        </span>
+        <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5">
+          <button onClick={zoomOut} className="w-7 h-7 flex items-center justify-center text-[#8A9AB0] hover:text-white rounded transition-colors">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/></svg>
+          </button>
+          <span className="text-[#8A9AB0] w-12 text-center tabular-nums">{Math.round(scale * 100)}%</span>
+          <button onClick={zoomIn} className="w-7 h-7 flex items-center justify-center text-[#8A9AB0] hover:text-white rounded transition-colors">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>
+          </button>
+          <button onClick={zoomFit} title="Fit" className="w-7 h-7 flex items-center justify-center text-[#8A9AB0] hover:text-white rounded transition-colors">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+          </button>
+        </div>
       </div>
-      <div className="relative bg-white">
-        {imgSrc ? (
-          <img ref={imgRef} src={imgSrc} alt={sheet.name} className="w-full block" onLoad={updateDims} />
-        ) : (
-          <div className="h-64 flex items-center justify-center bg-[#0F1C2E]">
-            <svg className="w-5 h-5 animate-spin text-[#C8622A]" fill="none" viewBox="0 0 24 24">
+
+      {/* Canvas */}
+      <div ref={containerRef} className="flex-1 overflow-hidden bg-[#060f1c] relative"
+        style={{ cursor: addingNote ? 'crosshair' : 'grab' }}>
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+            <svg className="w-8 h-8 animate-spin text-[#C8622A]" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
             </svg>
           </div>
         )}
-        {svgDims && (
-          <svg
-            className="absolute inset-0 pointer-events-none"
-            width={svgDims.w} height={svgDims.h}
-            viewBox={`0 0 ${svgDims.w} ${svgDims.h}`}
-          >
-            {placements.map(p => {
-              const cx  = p.x * svgDims.w
-              const cy  = p.y * svgDims.h
-              const col = p.marker_color || '#C8622A'
+        {!loading && stageSize.w > 0 && (
+          <Stage ref={stageRef} width={stageSize.w} height={stageSize.h}
+            onWheel={handleWheel}
+            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
+            onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+            onClick={handleClick} onTap={handleClick}>
 
-              // symbol_size is a diameter in original canvas pixels — halve it for radius,
-              // then scale to how much the image is shrunk for display.
-              const displayScale = svgDims.w / svgDims.natW
-              const markerR = Math.min(Math.max((p.symbol_size || 32) * 0.5 * displayScale, 3), 10)
-              const fs      = Math.max(markerR * 0.85, 6)
-
-              const category = p.global_products?.category || ''
-
-              // FOV overlay
-              let fovEl = null
-              if (FOV_CATEGORIES.includes(category)) {
-                const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
-                const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
-                const range = sheet.scale_ratio && isFinite(sheet.scale_ratio) && sheet.scale_ratio > 0
-                  ? Math.min((rangeInFeet / sheet.scale_ratio) * displayScale, svgDims.w * 0.25)
-                  : svgDims.w * 0.06
-
-                if (category === 'PTZ Camera' || fovAngle >= 355) {
-                  fovEl = <circle key={`fov_${p.id}`} cx={cx} cy={cy} r={range}
-                    fill={col} fillOpacity={0.08} stroke={col} strokeOpacity={0.3} strokeWidth={0.5} />
-                } else {
-                  const sa = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
-                  const ea = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
-                  const x1 = cx + Math.cos(sa) * range, y1 = cy + Math.sin(sa) * range
-                  const x2 = cx + Math.cos(ea) * range, y2 = cy + Math.sin(ea) * range
-                  fovEl = <path key={`fov_${p.id}`}
-                    d={`M ${cx} ${cy} L ${x1} ${y1} A ${range} ${range} 0 ${fovAngle > 180 ? 1 : 0} 1 ${x2} ${y2} Z`}
-                    fill={col} fillOpacity={0.1} stroke={col} strokeOpacity={0.35} strokeWidth={0.5} />
-                }
+            {/* Floor plan */}
+            <Layer>
+              {bgImage
+                ? <KonvaImage name="bg-image" image={bgImage} x={position.x} y={position.y} width={canvasW * scale} height={canvasH * scale} listening={true} />
+                : <Rect name="bg-blank" x={position.x} y={position.y} width={canvasW * scale} height={canvasH * scale} fill="#1a1a2e" stroke="#2a3d55" strokeWidth={1} listening={true} />
               }
+            </Layer>
 
-              const labelFs = Math.max(markerR * 1.0, 8)
+            {/* FOV overlays */}
+            <Layer listening={false}>
+              {placements.map(p => {
+                const product = p.global_products
+                if (!product || !FOV_CATEGORIES.includes(product.category)) return null
+                const fovAngle    = p.fov_angle || product.specs?.fov_angle || (product.category === 'PTZ Camera' ? 360 : 90)
+                const rangeInFeet = p.fov_range || product.specs?.ir_range || 30
+                const range = sheet.scale_ratio
+                  ? Math.min((rangeInFeet / sheet.scale_ratio) * scale, 3000)
+                  : 150 * Math.min(scale, 1)
+                const px  = position.x + p.x * canvasW * scale
+                const py  = position.y + p.y * canvasH * scale
+                const col = p.marker_color || '#C8622A'
+                if (product.category === 'PTZ Camera' || fovAngle >= 355) {
+                  return <Circle key={`fov_${p.id}`} x={px} y={py} radius={range} fill={col} opacity={0.08} stroke={col} strokeWidth={1} listening={false} />
+                }
+                const sa = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
+                const ea = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
+                const steps = Math.max(16, Math.floor(fovAngle / 5))
+                const pts = [px, py]
+                for (let i = 0; i <= steps; i++) {
+                  const a = sa + (ea - sa) * (i / steps)
+                  pts.push(px + Math.cos(a) * range, py + Math.sin(a) * range)
+                }
+                pts.push(px, py)
+                return <Line key={`fov_${p.id}`} points={pts} fill={col} opacity={0.12} stroke={col} strokeWidth={1} closed={true} listening={false} />
+              })}
+            </Layer>
 
-              return (
-                <g key={p.id}>
-                  {fovEl}
+            {/* Device markers */}
+            <Layer listening={false}>
+              {iconsReady && placements.map(p => {
+                const product = p.global_products
+                if (!product) return null
+                const markerSize = Math.max((p.symbol_size || 32) * Math.min(scale, 1.5), 14)
+                const px   = position.x + p.x * canvasW * scale
+                const py   = position.y + p.y * canvasH * scale
+                const col  = p.marker_color || '#C8622A'
+                const icon = getIcon(product.category)
+                const iconSize = markerSize * 0.65
+                return (
+                  <Group key={p.id}>
+                    <Circle x={px} y={py} radius={markerSize / 2} fill={col} />
+                    {icon && <KonvaImage image={icon} x={px - iconSize / 2} y={py - iconSize / 2} width={iconSize} height={iconSize} />}
+                    {p.device_address && (
+                      <Text text={p.device_address}
+                        x={px - 40} y={py + markerSize / 2 + 2}
+                        width={80} align="center"
+                        fontSize={Math.max(markerSize * 0.4, 9)}
+                        fill={col} fontStyle="bold" />
+                    )}
+                  </Group>
+                )
+              })}
+            </Layer>
 
-                  {/* Outer ring */}
-                  <circle cx={cx} cy={cy} r={markerR + 1.5} fill="white" fillOpacity={0.7} />
-                  {/* Filled marker */}
-                  <circle cx={cx} cy={cy} r={markerR} fill={col} />
-                  {/* Inner white dot */}
-                  <circle cx={cx} cy={cy} r={markerR * 0.35} fill="white" fillOpacity={0.9} />
-
-                  {/* Label — white stroke halo keeps it readable on any background */}
-                  {p.device_address && (
-                    <text
-                      x={cx} y={cy + markerR + labelFs + 2}
-                      textAnchor="middle"
-                      fill={col} fontSize={labelFs} fontWeight="700"
-                      fontFamily="system-ui, sans-serif"
-                      stroke="white" strokeWidth="3"
-                      paintOrder="stroke fill"
-                    >
-                      {p.device_address}
-                    </text>
-                  )}
-                </g>
-              )
-            })}
-          </svg>
+            {/* Note pins */}
+            <Layer>
+              {comments.map((c, idx) => {
+                const px = position.x + c.x * canvasW * scale
+                const py = position.y + c.y * canvasH * scale
+                const r  = Math.max(10 * Math.min(scale, 1.5), 8)
+                const isSelected = selectedNoteId === c.id
+                return (
+                  <Group key={c.id}
+                    onClick={(e) => { e.cancelBubble = true; onNoteClick?.(c) }}
+                    onTap={(e)   => { e.cancelBubble = true; onNoteClick?.(c) }}>
+                    <Circle x={px} y={py - r} radius={r}
+                      fill={isSelected ? '#f59e0b' : '#fbbf24'}
+                      stroke="white" strokeWidth={2} />
+                    <Text text={String(idx + 1)}
+                      x={px - r} y={py - r * 2 + r * 0.15}
+                      width={r * 2} align="center"
+                      fontSize={Math.max(r * 0.9, 7)}
+                      fill="white" fontStyle="bold" listening={false} />
+                  </Group>
+                )
+              })}
+            </Layer>
+          </Stage>
         )}
       </div>
     </div>
@@ -159,104 +296,121 @@ function SheetViewer({ sheet, placements }) {
 export default function DrawingReview() {
   const { token } = useParams()
 
-  const [pkg,          setPkg]          = useState(null)
-  const [sheets,       setSheets]       = useState([])
-  const [placements,   setPlacements]   = useState([])
-  const [orgProfile,   setOrgProfile]   = useState(null)
-  const [loading,      setLoading]      = useState(true)
-  const [error,        setError]        = useState(null)
-  const [approving,    setApproving]    = useState(false)
-  const [approved,     setApproved]     = useState(false)
-  const [approvalForm, setApprovalForm] = useState({ name: '', title: '' })
+  const [pkg,           setPkg]           = useState(null)
+  const [sheets,        setSheets]        = useState([])
+  const [placements,    setPlacements]    = useState([])
+  const [orgProfile,    setOrgProfile]    = useState(null)
+  const [loading,       setLoading]       = useState(true)
+  const [error,         setError]         = useState(null)
+  const [approved,      setApproved]      = useState(false)
+
+  const [activeSheetId, setActiveSheetId] = useState(null)
+  const [comments,      setComments]      = useState([])
+  const [addingNote,    setAddingNote]    = useState(false)
+  const [pendingPos,    setPendingPos]    = useState(null)   // {x,y} waiting for text
+  const [noteText,      setNoteText]      = useState('')
+  const [authorName,    setAuthorName]    = useState('')
+  const [selectedNote,  setSelectedNote]  = useState(null)
+  const [savingNote,    setSavingNote]    = useState(false)
+  const [approving,     setApproving]     = useState(false)
+  const [approvalName,  setApprovalName]  = useState('')
+  const [approvalTitle, setApprovalTitle] = useState('')
+  const [showSchedule,  setShowSchedule]  = useState(true)
 
   useEffect(() => { load() }, [token])
 
   const load = async () => {
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
       const { data: pkgData, error: pkgErr } = await supabase
-        .from('drawing_packages')
-        .select('*')
-        .eq('share_token', token)
-        .single()
-
+        .from('drawing_packages').select('*').eq('share_token', token).single()
       if (pkgErr || !pkgData) { setError('This link is invalid or has expired.'); return }
       if (pkgData.share_expires_at && new Date(pkgData.share_expires_at) < new Date()) {
-        setError('This review link has expired. Please contact the sender for a new link.')
-        return
+        setError('This review link has expired. Please contact the sender for a new link.'); return
       }
-
       setPkg(pkgData)
       setApproved(pkgData.client_approved || false)
 
       const { data: sheetData } = await supabase
-        .from('drawing_sheets')
-        .select('*')
-        .eq('proposal_id', pkgData.proposal_id)
-        .order('sort_order', { ascending: true })
+        .from('drawing_sheets').select('*').eq('proposal_id', pkgData.proposal_id).order('sort_order', { ascending: true })
 
       const sheetIds = (sheetData || []).map(s => s.id)
+      if (sheetIds.length) setActiveSheetId(sheetIds[0])
 
-      const [{ data: placementData }, { data: profileData }] = await Promise.all([
+      const [{ data: placementData }, { data: profileData }, { data: commentData }] = await Promise.all([
         sheetIds.length
           ? supabase.from('drawing_placements')
               .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
               .in('drawing_sheet_id', sheetIds)
               .order('created_at', { ascending: true })
           : Promise.resolve({ data: [] }),
-        supabase.from('profiles')
-          .select('company_name, logo_url, primary_color')
-          .eq('org_id', pkgData.org_id)
-          .limit(1)
-          .single(),
+        supabase.from('profiles').select('company_name, logo_url, primary_color').eq('org_id', pkgData.org_id).limit(1).single(),
+        supabase.from('drawing_review_comments').select('*').eq('share_token', token).order('created_at', { ascending: true }),
       ])
 
       setSheets(sheetData || [])
-      // Sort by sheet order, then chronologically within each sheet
-      const sortedPlacements = (placementData || []).sort((a, b) => {
-        const ai = sheetIds.indexOf(a.drawing_sheet_id)
-        const bi = sheetIds.indexOf(b.drawing_sheet_id)
+      const sorted = (placementData || []).sort((a, b) => {
+        const ai = sheetIds.indexOf(a.drawing_sheet_id), bi = sheetIds.indexOf(b.drawing_sheet_id)
         if (ai !== bi) return ai - bi
         return new Date(a.created_at) - new Date(b.created_at)
       })
-      setPlacements(sortedPlacements)
+      setPlacements(sorted)
       setOrgProfile(profileData)
-    } catch {
-      setError('Failed to load drawing review.')
-    } finally {
-      setLoading(false)
-    }
+      setComments(commentData || [])
+    } catch { setError('Failed to load drawing review.') }
+    finally { setLoading(false) }
+  }
+
+  const handleCanvasClick = ({ x, y }) => {
+    setPendingPos({ x, y })
+    setAddingNote(false)
+  }
+
+  const handleSaveNote = async () => {
+    if (!noteText.trim() || !pendingPos) return
+    setSavingNote(true)
+    try {
+      const { data, error } = await supabase.from('drawing_review_comments').insert({
+        share_token: token,
+        sheet_id:    activeSheetId,
+        x:           pendingPos.x,
+        y:           pendingPos.y,
+        comment:     noteText.trim(),
+        author_name: authorName.trim() || null,
+      }).select().single()
+      if (!error && data) {
+        setComments(prev => [...prev, data])
+        setNoteText('')
+        setPendingPos(null)
+        setSelectedNote(data)
+      }
+    } finally { setSavingNote(false) }
+  }
+
+  const handleDeleteNote = async (id) => {
+    await supabase.from('drawing_review_comments').delete().eq('id', id)
+    setComments(prev => prev.filter(c => c.id !== id))
+    if (selectedNote?.id === id) setSelectedNote(null)
   }
 
   const handleApprove = async () => {
-    if (!approvalForm.name.trim()) { alert('Please enter your name.'); return }
+    if (!approvalName.trim()) return
     setApproving(true)
     try {
-      const { error } = await supabase
-        .from('drawing_packages')
-        .update({
-          client_approved:       true,
-          client_approved_at:    new Date().toISOString(),
-          client_approved_by:    approvalForm.name.trim(),
-          client_approved_title: approvalForm.title.trim(),
-        })
-        .eq('share_token', token)
-
-      if (error) throw error
-      setApproved(true)
-    } catch {
-      alert('Approval failed. Please try again.')
-    } finally {
-      setApproving(false)
-    }
+      const { error } = await supabase.from('drawing_packages').update({
+        client_approved:       true,
+        client_approved_at:    new Date().toISOString(),
+        client_approved_by:    approvalName.trim(),
+        client_approved_title: approvalTitle.trim(),
+      }).eq('share_token', token)
+      if (!error) setApproved(true)
+    } catch { alert('Approval failed. Please try again.') }
+    finally { setApproving(false) }
   }
 
-  const placementsBySheet = {}
-  placements.forEach(p => {
-    if (!placementsBySheet[p.drawing_sheet_id]) placementsBySheet[p.drawing_sheet_id] = []
-    placementsBySheet[p.drawing_sheet_id].push(p)
-  })
+  const activeSheet     = sheets.find(s => s.id === activeSheetId) || null
+  const sheetPlacements = placements.filter(p => p.drawing_sheet_id === activeSheetId)
+  const sheetComments   = comments.filter(c => c.sheet_id === activeSheetId)
 
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -266,7 +420,7 @@ export default function DrawingReview() {
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
         </svg>
-        <span className="text-[#8A9AB0] text-sm">Loading drawing review...</span>
+        <span className="text-[#8A9AB0] text-sm">Loading drawing review…</span>
       </div>
     </div>
   )
@@ -292,77 +446,215 @@ export default function DrawingReview() {
           </svg>
         </div>
         <p className="text-white font-bold text-lg mb-2">Design Approved</p>
-        <p className="text-[#8A9AB0] text-sm">
-          Thank you for reviewing and approving this design.
-          Your integrator has been notified.
-        </p>
+        <p className="text-[#8A9AB0] text-sm">Thank you for reviewing and approving this design. Your integrator has been notified.</p>
         {pkg?.client_approved_at && (
           <p className="text-[#8A9AB0] text-xs mt-4">
-            Approved on {new Date(pkg.client_approved_at).toLocaleDateString()} by {pkg.client_approved_by}
+            Approved {new Date(pkg.client_approved_at).toLocaleDateString()} by {pkg.client_approved_by}
           </p>
+        )}
+        {comments.length > 0 && (
+          <p className="text-[#8A9AB0] text-xs mt-1">{comments.length} note{comments.length !== 1 ? 's' : ''} submitted with this review</p>
         )}
       </div>
     </div>
   )
 
+  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]"
+
   // ── Main ─────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-[#0F1C2E]">
+    <div className="min-h-screen bg-[#0F1C2E] flex flex-col" style={{ height: '100vh' }}>
 
       {/* Header */}
-      <div className="bg-[#1a2d45] border-b border-[#2a3d55] px-6 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
+      <div className="bg-[#1a2d45] border-b border-[#2a3d55] px-5 py-3 flex-shrink-0">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-white font-bold text-lg">
+            <h1 className="text-white font-bold text-base">
               {orgProfile?.company_name || 'ForgePt'}<span className="text-[#C8622A]">.</span>
             </h1>
-            <p className="text-[#8A9AB0] text-xs mt-0.5">Design Review · {pkg?.revision || 'Rev 0'}</p>
+            <p className="text-[#8A9AB0] text-xs mt-0.5">{pkg?.revision || 'Rev 0'} · Design Review</p>
           </div>
           <span className="text-xs bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/30 px-3 py-1 rounded-full font-semibold">
-            Awaiting Review
+            Pending Approval
           </span>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+      {/* Sheet tabs */}
+      {sheets.length > 1 && (
+        <div className="flex items-center gap-1 px-4 py-2 border-b border-[#2a3d55] bg-[#1a2d45] flex-shrink-0 overflow-x-auto">
+          {sheets.map(sheet => (
+            <button key={sheet.id} onClick={() => { setActiveSheetId(sheet.id); setPendingPos(null); setAddingNote(false) }}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
+                activeSheetId === sheet.id
+                  ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/40'
+                  : 'text-[#8A9AB0] hover:bg-[#0F1C2E] border border-transparent'
+              }`}>
+              {sheet.name}
+              {comments.filter(c => c.sheet_id === sheet.id).length > 0 && (
+                <span className="bg-yellow-500 text-black text-xs font-bold px-1.5 py-0.5 rounded-full leading-none">
+                  {comments.filter(c => c.sheet_id === sheet.id).length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
-        {/* Floor plan sheets */}
-        {sheets.length > 0 ? (
-          <div className="space-y-6">
-            {sheets.map(sheet => (
-              <SheetViewer
-                key={sheet.id}
-                sheet={sheet}
-                placements={placementsBySheet[sheet.id] || []}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-8 text-center">
-            <p className="text-[#8A9AB0] text-sm">No floor plan sheets found for this project.</p>
-          </div>
-        )}
+      {/* Body */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
 
-        {/* Device schedule */}
-        {placements.length > 0 && (
-          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-[#2a3d55]">
-              <p className="text-[#C8622A] font-bold text-sm tracking-wide uppercase">Device Schedule</p>
-              <p className="text-[#8A9AB0] text-xs mt-0.5">{placements.length} device{placements.length !== 1 ? 's' : ''} across {sheets.length} sheet{sheets.length !== 1 ? 's' : ''}</p>
+        {/* Canvas */}
+        <div className="flex-1 overflow-hidden min-w-0">
+          {activeSheet ? (
+            <SheetCanvas
+              sheet={activeSheet}
+              placements={sheetPlacements}
+              comments={sheetComments}
+              addingNote={addingNote}
+              onCanvasClick={handleCanvasClick}
+              onNoteClick={(c) => setSelectedNote(prev => prev?.id === c.id ? null : c)}
+              selectedNoteId={selectedNote?.id}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-[#8A9AB0] text-sm">No floor plan</div>
+          )}
+        </div>
+
+        {/* Right panel */}
+        <div className="w-72 border-l border-[#2a3d55] flex flex-col flex-shrink-0 bg-[#0F1C2E] overflow-hidden">
+
+          {/* Notes section */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-[#2a3d55] flex items-center justify-between flex-shrink-0">
+              <div>
+                <p className="text-white text-sm font-semibold">Notes</p>
+                <p className="text-[#8A9AB0] text-xs mt-0.5">{sheetComments.length} on this sheet</p>
+              </div>
+              <button
+                onClick={() => { setAddingNote(a => !a); setPendingPos(null) }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                  addingNote
+                    ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40'
+                    : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white border border-[#2a3d55]'
+                }`}>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
+                </svg>
+                {addingNote ? 'Cancel' : 'Add Note'}
+              </button>
             </div>
-            <div className="overflow-x-auto">
+
+            {/* Pending note input */}
+            {pendingPos && (
+              <div className="px-4 py-3 border-b border-[#2a3d55] bg-yellow-500/5 flex-shrink-0">
+                <p className="text-yellow-400 text-xs font-semibold mb-2">New note</p>
+                <textarea
+                  autoFocus
+                  placeholder="Describe your note or question…"
+                  value={noteText}
+                  onChange={e => setNoteText(e.target.value)}
+                  rows={3}
+                  className="w-full bg-[#0F1C2E] text-white border border-yellow-500/40 rounded-lg px-2.5 py-2 text-xs focus:outline-none focus:border-yellow-400 placeholder-[#4a5a6a] resize-none"
+                />
+                {!authorName && (
+                  <input
+                    placeholder="Your name (optional)"
+                    value={authorName}
+                    onChange={e => setAuthorName(e.target.value)}
+                    className="w-full mt-2 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]"
+                  />
+                )}
+                <div className="flex gap-2 mt-2">
+                  <button onClick={() => { setPendingPos(null); setNoteText('') }}
+                    className="flex-1 py-1.5 text-xs text-[#8A9AB0] border border-[#2a3d55] rounded-lg hover:text-white transition-colors">
+                    Cancel
+                  </button>
+                  <button onClick={handleSaveNote} disabled={!noteText.trim() || savingNote}
+                    className="flex-1 py-1.5 text-xs font-semibold bg-yellow-500 text-black rounded-lg hover:bg-yellow-400 disabled:opacity-50 transition-colors">
+                    {savingNote ? 'Saving…' : 'Save Note'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Notes list */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              {sheetComments.length === 0 && !pendingPos && (
+                <p className="text-[#4a5a6a] text-xs text-center py-6">
+                  {addingNote ? 'Click on the floor plan to drop a pin' : 'No notes on this sheet yet'}
+                </p>
+              )}
+              {sheetComments.map((c, idx) => {
+                const isSelected = selectedNote?.id === c.id
+                return (
+                  <div key={c.id}
+                    onClick={() => setSelectedNote(prev => prev?.id === c.id ? null : c)}
+                    className={`rounded-lg p-3 border cursor-pointer transition-all ${
+                      isSelected
+                        ? 'border-yellow-500/50 bg-yellow-500/10'
+                        : 'border-[#2a3d55] bg-[#1a2d45] hover:border-yellow-500/30'
+                    }`}>
+                    <div className="flex items-start gap-2">
+                      <span className="w-5 h-5 rounded-full bg-yellow-500 text-black text-xs font-bold flex items-center justify-center flex-shrink-0 mt-0.5">
+                        {idx + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-xs leading-snug">{c.comment}</p>
+                        {c.author_name && <p className="text-[#8A9AB0] text-xs mt-1">{c.author_name}</p>}
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteNote(c.id) }}
+                        className="text-[#4a5a6a] hover:text-red-400 transition-colors flex-shrink-0">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Approval section */}
+          <div className="border-t border-[#2a3d55] flex-shrink-0 p-4 space-y-3">
+            <p className="text-white text-sm font-semibold">Approve Design</p>
+            <p className="text-[#8A9AB0] text-xs">Confirm device placement meets your requirements. Notes above will be sent with your approval.</p>
+            <input placeholder="Your name *" value={approvalName} onChange={e => setApprovalName(e.target.value)} className={inputClass} />
+            <input placeholder="Your title (optional)" value={approvalTitle} onChange={e => setApprovalTitle(e.target.value)} className={inputClass} />
+            <button
+              onClick={handleApprove}
+              disabled={approving || !approvalName.trim()}
+              className={`w-full py-2.5 text-sm font-bold rounded-lg transition-colors ${
+                approving || !approvalName.trim()
+                  ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
+                  : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
+              }`}>
+              {approving ? 'Submitting…' : 'Approve Design ✓'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Device schedule — collapsible footer */}
+      {placements.length > 0 && (
+        <div className="border-t border-[#2a3d55] flex-shrink-0 bg-[#1a2d45]">
+          <button onClick={() => setShowSchedule(s => !s)}
+            className="w-full flex items-center justify-between px-5 py-2.5 text-xs font-semibold text-[#8A9AB0] hover:text-white transition-colors">
+            <span>Device Schedule ({placements.length} devices)</span>
+            <svg className={`w-3.5 h-3.5 transition-transform ${showSchedule ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          {showSchedule && (
+            <div className="overflow-x-auto max-h-48 border-t border-[#2a3d55]">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-[#0F1C2E] text-[#C8622A] text-left">
-                    <th className="px-4 py-3 font-semibold">#</th>
-                    <th className="px-4 py-3 font-semibold">Address</th>
-                    <th className="px-4 py-3 font-semibold">Part Number</th>
-                    <th className="px-4 py-3 font-semibold">Description</th>
-                    <th className="px-4 py-3 font-semibold">Manufacturer</th>
-                    <th className="px-4 py-3 font-semibold">Category</th>
-                    <th className="px-4 py-3 font-semibold">Qty</th>
-                    <th className="px-4 py-3 font-semibold">Sheet</th>
-                    <th className="px-4 py-3 font-semibold">Runs To</th>
+                  <tr className="bg-[#0F1C2E] text-[#C8622A] text-left sticky top-0">
+                    {['#','Address','Part Number','Description','Manufacturer','Category','Sheet'].map(h => (
+                      <th key={h} className="px-4 py-2 font-semibold whitespace-nowrap">{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -371,70 +663,22 @@ export default function DrawingReview() {
                     const sheet = sheets.find(s => s.id === p.drawing_sheet_id)
                     return (
                       <tr key={p.id} className={idx % 2 === 0 ? 'bg-[#1a2d45]' : 'bg-[#162338]'}>
-                        <td className="px-4 py-2.5 text-[#8A9AB0]">{idx + 1}</td>
-                        <td className="px-4 py-2.5 text-white font-medium">{p.device_address || '—'}</td>
-                        <td className="px-4 py-2.5 text-[#8A9AB0] font-mono">{p.part_number_override || gp?.part_number || '—'}</td>
-                        <td className="px-4 py-2.5 text-white">{p.description_override || gp?.name || '—'}</td>
-                        <td className="px-4 py-2.5 text-[#8A9AB0]">{p.manufacturer_override || gp?.manufacturer || '—'}</td>
-                        <td className="px-4 py-2.5 text-[#8A9AB0]">{gp?.category || '—'}</td>
-                        <td className="px-4 py-2.5 text-[#8A9AB0]">{p.quantity || 1}</td>
-                        <td className="px-4 py-2.5 text-[#8A9AB0]">{sheet?.name || '—'}</td>
-                        <td className="px-4 py-2.5 text-[#8A9AB0]">{p.runs_to_label || '—'}</td>
+                        <td className="px-4 py-2 text-[#8A9AB0]">{idx + 1}</td>
+                        <td className="px-4 py-2 text-white font-medium whitespace-nowrap">{p.device_address || '—'}</td>
+                        <td className="px-4 py-2 text-[#8A9AB0] font-mono whitespace-nowrap">{p.part_number_override || gp?.part_number || '—'}</td>
+                        <td className="px-4 py-2 text-white whitespace-nowrap">{p.description_override || gp?.name || '—'}</td>
+                        <td className="px-4 py-2 text-[#8A9AB0] whitespace-nowrap">{p.manufacturer_override || gp?.manufacturer || '—'}</td>
+                        <td className="px-4 py-2 text-[#8A9AB0] whitespace-nowrap">{gp?.category || '—'}</td>
+                        <td className="px-4 py-2 text-[#8A9AB0] whitespace-nowrap">{sheet?.name || '—'}</td>
                       </tr>
                     )
                   })}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
-
-        {/* Approval section */}
-        {!approved && (
-          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-6">
-            <h3 className="text-white font-bold text-base mb-2">Approve This Design</h3>
-            <p className="text-[#8A9AB0] text-sm mb-4">
-              By approving this design you confirm the device placement and coverage
-              meets your requirements. This is not a legal contract — your integrator
-              will follow up with a formal proposal.
-            </p>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Your Name *</label>
-                <input
-                  type="text"
-                  placeholder="John Smith"
-                  value={approvalForm.name}
-                  onChange={e => setApprovalForm(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                />
-              </div>
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Your Title (optional)</label>
-                <input
-                  type="text"
-                  placeholder="Facilities Manager"
-                  value={approvalForm.title}
-                  onChange={e => setApprovalForm(prev => ({ ...prev, title: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                />
-              </div>
-            </div>
-            <button
-              onClick={handleApprove}
-              disabled={approving || !approvalForm.name.trim()}
-              className={`w-full py-3 text-sm font-bold rounded-lg transition-colors ${
-                approving || !approvalForm.name.trim()
-                  ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
-                  : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
-              }`}
-            >
-              {approving ? 'Submitting...' : 'Approve Design ✓'}
-            </button>
-          </div>
-        )}
-
-      </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
