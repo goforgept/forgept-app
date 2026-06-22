@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../supabase'
 import { useProfile } from '../../context/ProfileContext'
 import AccessoriesEditor from '../AccessoriesEditor'
+import * as XLSX from 'xlsx'
 
 const INDUSTRIES = ['Security', 'AV', 'IT / Networking', 'Low Voltage', 'Fire Alarm', 'HVAC', 'Electrical', 'Telecom', 'Other']
 
@@ -109,6 +110,86 @@ export default function DesignerTab() {
     setTimeout(() => setLaborSaved(false), 2000)
   }
 
+  const downloadTemplate = () => {
+    const wb = XLSX.utils.book_new()
+
+    // Instructions sheet
+    const instructions = [
+      ['ForgePt — Labor Defaults Template'],
+      [''],
+      ['HOW TO USE THIS FILE:'],
+      ['1. Go to the "Labor Defaults" sheet (the second tab).'],
+      ['2. For each device category you want to include labor for, fill in:'],
+      ['   • Labor Role  — must match a role name exactly from your Rate Card in ForgePt Settings.'],
+      ['   • Hours Per Device  — the default number of hours to install one device of this type.'],
+      ['3. Leave "Labor Role" blank for any category you do NOT want labor calculated on.'],
+      ['4. Save the file and upload it back in ForgePt Settings → Designer → Labor Estimation.'],
+      [''],
+      ['NOTES:'],
+      ['• Do not rename or delete the column headers in the Labor Defaults sheet.'],
+      ['• Do not add or remove rows from the Category column — the list is fixed.'],
+      ['• Hours can be decimals, e.g. 0.5 for 30 minutes, 1.5 for 90 minutes.'],
+      ['• Pricing is NOT set here — rates are pulled from your Rate Card when drawings are pushed to a proposal.'],
+      ['• Re-uploading this file will replace all existing labor defaults.'],
+    ]
+    const wsInstr = XLSX.utils.aoa_to_sheet(instructions)
+    wsInstr['!cols'] = [{ wch: 80 }]
+    XLSX.utils.book_append_sheet(wb, wsInstr, 'Instructions')
+
+    // Data sheet
+    const rows = ALL_CATEGORIES.map(cat => {
+      const existing = laborDefaults.find(d => d.category === cat)
+      return {
+        'Category':         cat,
+        'Labor Role':       existing?.labor_role     || '',
+        'Hours Per Device': existing?.hours_per_unit ?? 1.0,
+      }
+    })
+    const wsData = XLSX.utils.json_to_sheet(rows)
+    wsData['!cols'] = [{ wch: 30 }, { wch: 22 }, { wch: 16 }]
+    XLSX.utils.book_append_sheet(wb, wsData, 'Labor Defaults')
+
+    XLSX.writeFile(wb, 'ForgePt_Labor_Defaults.xlsx')
+  }
+
+  const uploadRef = useRef(null)
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = async (evt) => {
+      try {
+        const wb   = XLSX.read(evt.target.result, { type: 'binary' })
+        const ws   = wb.Sheets[wb.SheetNames[0]]
+        const data = XLSX.utils.sheet_to_json(ws, { defval: '' })
+        const imported = data
+          .map(row => ({
+            category:       String(row['Category'] || '').trim(),
+            labor_role:     String(row['Labor Role'] || '').trim(),
+            hours_per_unit: parseFloat(row['Hours Per Device']) || 1.0,
+          }))
+          .filter(r => r.category && r.labor_role && ALL_CATEGORIES.includes(r.category))
+
+        if (imported.length === 0) { alert('No valid rows found. Make sure columns are: Category, Labor Role, Hours Per Device'); return }
+
+        setLaborDefaults(imported)
+        // Auto-save
+        setSavingLabor(true)
+        await supabase.from('designer_labor_defaults').delete().eq('org_id', profile.org_id)
+        await supabase.from('designer_labor_defaults').insert(
+          imported.map(d => ({ org_id: profile.org_id, ...d }))
+        )
+        setSavingLabor(false)
+        setLaborSaved(true)
+        setTimeout(() => setLaborSaved(false), 2000)
+      } catch (err) {
+        alert('Failed to parse file: ' + err.message)
+      }
+    }
+    reader.readAsBinaryString(file)
+    e.target.value = ''
+  }
+
   const handleAdd = async () => {
     if (!form.name.trim() || !form.part_number.trim() || !form.manufacturer.trim()) return
     setSaving(true)
@@ -211,16 +292,33 @@ export default function DesignerTab() {
               </div>
             )}
 
-            <div className="flex items-center gap-3 mt-3">
+            <div className="flex items-center gap-3 mt-3 flex-wrap">
               <button onClick={saveLaborDefaults} disabled={savingLabor}
                 className="px-4 py-2 bg-[#C8622A] text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] disabled:opacity-50 transition-colors">
                 {savingLabor ? 'Saving…' : 'Save Defaults'}
               </button>
+              <button onClick={downloadTemplate}
+                className="flex items-center gap-1.5 px-3 py-2 bg-[#0F1C2E] text-[#8A9AB0] hover:text-white text-sm rounded-lg border border-[#2a3d55] hover:border-[#C8622A] transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                Download Template
+              </button>
+              <label className="flex items-center gap-1.5 px-3 py-2 bg-[#0F1C2E] text-[#8A9AB0] hover:text-white text-sm rounded-lg border border-[#2a3d55] hover:border-[#C8622A] transition-colors cursor-pointer">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12"/>
+                </svg>
+                Upload Excel / CSV
+                <input ref={uploadRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
+              </label>
               {laborSaved && <span className="text-green-400 text-xs">✓ Saved</span>}
               {laborRates.length === 0 && (
                 <p className="text-yellow-400 text-xs">Add roles to your Rate Card first to assign them here.</p>
               )}
             </div>
+            <p className="text-[#4a5a6a] text-xs mt-2">
+              Tip: Download the template, fill in the Labor Role and hours for each device type, then upload it back. Instructions are included in the first tab of the file.
+            </p>
           </div>
         )}
       </div>
