@@ -9,7 +9,7 @@ const supabase = createClient(
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 
 function json(data: unknown, status = 200) {
@@ -114,6 +114,27 @@ Deno.serve(async (req) => {
     return json({ data: { ...proposal, line_items: lineItems ?? [], labor_items: laborItems ?? [] } })
   }
 
+  // ── POST /v1/proposals ────────────────────────────────────────────────────
+  if (req.method === 'POST' && path === '/v1/proposals') {
+    if (!hasScope(scopes, 'read:proposals')) return err('This key does not have the proposals scope.', 403)
+    let body: any = {}
+    try { body = await req.json() } catch { return err('Invalid JSON body', 400) }
+    const { proposal_name, company, client_name, client_email, industry, close_date } = body
+    if (!proposal_name) return err('proposal_name is required', 400)
+    const { data, error } = await supabase.from('proposals').insert({
+      org_id:        orgId,
+      proposal_name: proposal_name.trim(),
+      company:       company ?? null,
+      client_name:   client_name ?? null,
+      client_email:  client_email ?? null,
+      industry:      industry ?? 'Security',
+      close_date:    close_date ?? null,
+      status:        'Draft',
+    }).select('id, proposal_name, quote_number, status, industry, company, client_name, client_email, created_at').single()
+    if (error) return err(error.message, 500)
+    return json({ data }, 201)
+  }
+
   // ── GET /v1/clients ────────────────────────────────────────────────────────
   if (req.method === 'GET' && path === '/v1/clients') {
     if (!hasScope(scopes, 'read:clients')) return err('This key does not have the clients scope.', 403)
@@ -162,29 +183,121 @@ Deno.serve(async (req) => {
     return json({ data })
   }
 
-  // ── GET /v1/drawings/:id/bom ───────────────────────────────────────────────
-  const drawingMatch = path.match(/^\/v1\/drawings\/([^/]+)\/bom$/)
-  if (req.method === 'GET' && drawingMatch) {
+  // ── GET /v1/drawings ──────────────────────────────────────────────────────
+  if (req.method === 'GET' && path === '/v1/drawings') {
     if (!hasScope(scopes, 'read:drawings')) return err('This key does not have the drawings scope.', 403)
-    const drawingId = drawingMatch[1]
-    const { data: drawing } = await supabase
-      .from('proposal_drawings')
-      .select('id, name, org_id')
-      .eq('id', drawingId).eq('org_id', orgId).single()
-    if (!drawing) return err('Drawing not found.', 404)
+    // Return proposals that have at least one drawing sheet
+    const { data: sheets } = await supabase
+      .from('drawing_sheets')
+      .select('proposal_id, proposals!inner(id, proposal_name, quote_number, status, client_name, company)')
+      .eq('org_id', orgId)
+    if (!sheets) return json({ data: [], count: 0 })
+    // Deduplicate by proposal_id
+    const seen = new Set<string>()
+    const drawings: any[] = []
+    for (const s of sheets as any[]) {
+      if (!seen.has(s.proposal_id)) {
+        seen.add(s.proposal_id)
+        drawings.push({
+          proposal_id:    s.proposal_id,
+          proposal_name:  s.proposals?.proposal_name,
+          quote_number:   s.proposals?.quote_number,
+          status:         s.proposals?.status,
+          client_name:    s.proposals?.client_name,
+          company:        s.proposals?.company,
+        })
+      }
+    }
+    return json({ data: drawings, count: drawings.length })
+  }
+
+  // ── GET /v1/drawings/:proposalId ──────────────────────────────────────────
+  const drawingDetailMatch = path.match(/^\/v1\/drawings\/([^/]+)$/)
+  if (req.method === 'GET' && drawingDetailMatch) {
+    if (!hasScope(scopes, 'read:drawings')) return err('This key does not have the drawings scope.', 403)
+    const proposalId = drawingDetailMatch[1]
+    // Verify proposal belongs to org
+    const { data: proposal } = await supabase
+      .from('proposals').select('id, proposal_name, quote_number, status').eq('id', proposalId).eq('org_id', orgId).single()
+    if (!proposal) return err('Drawing not found.', 404)
+    const { data: sheets } = await supabase
+      .from('drawing_sheets')
+      .select('id, name, sort_order, created_at')
+      .eq('proposal_id', proposalId)
+      .neq('storage_path', 'pending')
+      .order('sort_order')
+    return json({ data: { ...proposal, sheets: sheets ?? [] } })
+  }
+
+  // ── GET /v1/drawings/:proposalId/placements ────────────────────────────────
+  const placementsMatch = path.match(/^\/v1\/drawings\/([^/]+)\/placements$/)
+  if (req.method === 'GET' && placementsMatch) {
+    if (!hasScope(scopes, 'read:drawings')) return err('This key does not have the drawings scope.', 403)
+    const proposalId = placementsMatch[1]
+    const { data: proposal } = await supabase
+      .from('proposals').select('id').eq('id', proposalId).eq('org_id', orgId).single()
+    if (!proposal) return err('Drawing not found.', 404)
+    const { data: sheets } = await supabase
+      .from('drawing_sheets').select('id, name').eq('proposal_id', proposalId).neq('storage_path', 'pending')
+    const sheetIds = (sheets ?? []).map((s: any) => s.id)
+    const sheetMap: Record<string, string> = {}
+    ;(sheets ?? []).forEach((s: any) => { sheetMap[s.id] = s.name })
+    if (sheetIds.length === 0) return json({ data: [], count: 0 })
     const { data: placements } = await supabase
       .from('drawing_placements')
-      .select('global_product_id, global_products(name, part_number, category, manufacturer, industry)')
-      .eq('drawing_id', drawingId)
+      .select('id, drawing_sheet_id, device_address, x, y, rotation, quantity, notes, fov_angle, fov_range, part_number_override, manufacturer_override, description_override, global_products(name, part_number, category, manufacturer)')
+      .in('drawing_sheet_id', sheetIds)
+    const out = (placements ?? []).map((p: any) => ({
+      id:             p.id,
+      sheet_id:       p.drawing_sheet_id,
+      sheet_name:     sheetMap[p.drawing_sheet_id],
+      device_address: p.device_address,
+      x:              p.x,
+      y:              p.y,
+      rotation:       p.rotation,
+      quantity:       p.quantity ?? 1,
+      notes:          p.notes,
+      fov_angle:      p.fov_angle,
+      fov_range:      p.fov_range,
+      part_number:    p.part_number_override || p.global_products?.part_number,
+      name:           p.description_override || p.global_products?.name,
+      manufacturer:   p.manufacturer_override || p.global_products?.manufacturer,
+      category:       p.global_products?.category,
+    }))
+    return json({ data: out, count: out.length })
+  }
 
-    const bom: Record<string, { part_number: string; name: string; category: string; manufacturer: string; industry: string; quantity: number }> = {}
+  // ── GET /v1/drawings/:proposalId/bom ──────────────────────────────────────
+  const drawingBomMatch = path.match(/^\/v1\/drawings\/([^/]+)\/bom$/)
+  if (req.method === 'GET' && drawingBomMatch) {
+    if (!hasScope(scopes, 'read:drawings')) return err('This key does not have the drawings scope.', 403)
+    const proposalId = drawingBomMatch[1]
+    const { data: proposal } = await supabase
+      .from('proposals').select('id, proposal_name').eq('id', proposalId).eq('org_id', orgId).single()
+    if (!proposal) return err('Drawing not found.', 404)
+    const { data: sheets } = await supabase
+      .from('drawing_sheets').select('id').eq('proposal_id', proposalId).neq('storage_path', 'pending')
+    const sheetIds = (sheets ?? []).map((s: any) => s.id)
+    if (sheetIds.length === 0) return json({ proposal_id: proposalId, proposal_name: proposal.proposal_name, data: [], count: 0 })
+    const { data: placements } = await supabase
+      .from('drawing_placements')
+      .select('quantity, part_number_override, manufacturer_override, description_override, global_products(name, part_number, category, manufacturer)')
+      .in('drawing_sheet_id', sheetIds)
+    const bom: Record<string, any> = {}
     for (const p of (placements ?? []) as any[]) {
-      const prod = p.global_products
-      if (!prod) continue
-      if (bom[prod.part_number]) bom[prod.part_number].quantity++
-      else bom[prod.part_number] = { ...prod, quantity: 1 }
+      const key  = p.part_number_override || p.global_products?.part_number || 'unassigned'
+      const qty  = p.quantity ?? 1
+      if (bom[key]) { bom[key].quantity += qty }
+      else bom[key] = {
+        part_number:  key === 'unassigned' ? null : key,
+        name:         p.description_override || p.global_products?.name,
+        manufacturer: p.manufacturer_override || p.global_products?.manufacturer,
+        category:     p.global_products?.category,
+        quantity:     qty,
+      }
     }
-    return json({ drawing_id: drawingId, drawing_name: drawing.name, data: Object.values(bom) })
+    const data = Object.values(bom).sort((a: any, b: any) => (a.category ?? '').localeCompare(b.category ?? ''))
+    return json({ proposal_id: proposalId, proposal_name: proposal.proposal_name, data, count: data.length })
   }
 
   return err('Endpoint not found. See /v1/openapi.json for available routes.', 404)
@@ -213,6 +326,22 @@ function buildOpenAPISpec() {
           description: 'Returns all proposals. Filter by status with ?status=Won',
           parameters: [{ name: 'status', in: 'query', schema: { type: 'string', enum: ['Draft','Sent','Won','Lost'] } }],
           responses: { '200': { description: 'Array of proposals with status, value, client, close date' } }
+        },
+        post: {
+          summary: 'Create proposal',
+          description: 'Create a new proposal/design project. Returns the new proposal including its id, which can be passed to the embed designer.',
+          requestBody: {
+            required: true,
+            content: { 'application/json': { schema: { type: 'object', required: ['proposal_name'], properties: {
+              proposal_name: { type: 'string' },
+              company:       { type: 'string' },
+              client_name:   { type: 'string' },
+              client_email:  { type: 'string' },
+              industry:      { type: 'string', default: 'Security' },
+              close_date:    { type: 'string', format: 'date' },
+            }}}}
+          },
+          responses: { '201': { description: 'Created proposal with id' } }
         }
       },
       '/proposals/{id}': {
@@ -242,12 +371,35 @@ function buildOpenAPISpec() {
           responses: { '200': { description: 'Job record' }, '404': { description: 'Not found' } }
         }
       },
-      '/drawings/{id}/bom': {
+      '/drawings': {
+        get: {
+          summary: 'List drawings',
+          description: 'Returns all proposals that have at least one drawing sheet.',
+          responses: { '200': { description: 'Array of { proposal_id, proposal_name, quote_number, status, client_name, company }' } }
+        }
+      },
+      '/drawings/{proposalId}': {
+        get: {
+          summary: 'Get drawing project',
+          description: 'Returns proposal info and list of sheets.',
+          parameters: [{ name: 'proposalId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          responses: { '200': { description: 'Proposal with sheets array' }, '404': { description: 'Not found' } }
+        }
+      },
+      '/drawings/{proposalId}/placements': {
+        get: {
+          summary: 'Get all device placements',
+          description: 'Returns every device placed on every sheet, with position (x/y as 0–1 normalized), label, notes, FOV, and product info.',
+          parameters: [{ name: 'proposalId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          responses: { '200': { description: 'Array of placement records' }, '404': { description: 'Not found' } }
+        }
+      },
+      '/drawings/{proposalId}/bom': {
         get: {
           summary: 'Get drawing BOM',
-          description: 'Returns device quantities aggregated by part number from a floor plan.',
-          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
-          responses: { '200': { description: 'Array of { part_number, name, category, manufacturer, quantity }' } }
+          description: 'Returns device quantities aggregated by part number across all sheets of a drawing project.',
+          parameters: [{ name: 'proposalId', in: 'path', required: true, schema: { type: 'string', format: 'uuid' } }],
+          responses: { '200': { description: 'Array of { part_number, name, category, manufacturer, quantity } sorted by category' }, '404': { description: 'Not found' } }
         }
       }
     }

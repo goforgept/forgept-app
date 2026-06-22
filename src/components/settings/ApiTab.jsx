@@ -3,10 +3,11 @@ import { supabase } from '../../supabase'
 import { useProfile } from '../../context/ProfileContext'
 
 const SCOPES = [
-  { value: 'read:proposals', label: 'Proposals', desc: 'Read proposals, BOM line items, labor' },
-  { value: 'read:clients',   label: 'Clients',   desc: 'Read clients and contacts' },
-  { value: 'read:jobs',      label: 'Jobs',       desc: 'Read jobs and job details' },
-  { value: 'read:drawings',  label: 'Designer',   desc: 'Read floor plans and device placements' },
+  { value: 'read:proposals',  label: 'Proposals', desc: 'Read proposals, BOM line items, labor' },
+  { value: 'read:clients',    label: 'Clients',   desc: 'Read clients and contacts' },
+  { value: 'read:jobs',       label: 'Jobs',       desc: 'Read jobs and job details' },
+  { value: 'read:drawings',   label: 'Designer (read)', desc: 'Read floor plans and device placements via API' },
+  { value: 'embed:designer',  label: 'Designer (embed)', desc: 'Embed the interactive designer in your own platform' },
 ]
 
 async function sha256hex(str) {
@@ -234,15 +235,79 @@ export default function ApiTab({ featureApi }) {
         </div>
       ) : null}
 
-      {/* Docs hint */}
+      {/* Docs */}
       {keys.length > 0 && (
-        <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
-          <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Using the API</p>
-          <p className="text-[#8A9AB0] text-xs mb-2">Include your key in the Authorization header on every request:</p>
-          <code className="block bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-2 rounded-lg">
-            Authorization: Bearer fpk_your_key_here
-          </code>
-          <p className="text-[#4a5d75] text-xs mt-2">Base URL: https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/api</p>
+        <div className="space-y-4">
+          <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
+            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Authentication</p>
+            <p className="text-[#8A9AB0] text-xs mb-2">Include your key in the Authorization header on every request:</p>
+            <code className="block bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-2 rounded-lg">
+              Authorization: Bearer fpk_your_key_here
+            </code>
+            <p className="text-[#4a5d75] text-xs mt-2">Base URL: https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/api/v1</p>
+          </div>
+
+          {keys.some(k => k.scopes.includes('embed:designer')) && (
+            <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
+              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Embedding the Designer</p>
+              <p className="text-[#8A9AB0] text-xs mb-3">
+                Your server exchanges an API key for a 24-hour session token, then passes it to an iframe. The API key never touches the browser.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[#8A9AB0] text-xs mb-1 font-semibold">Step 1 — Generate a session token (server-side)</p>
+                  <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`POST https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/embed-session
+Authorization: Bearer fpk_your_key_here
+
+# Response:
+{ "access_token": "eyJ...", "expires_at": "..." }`}</pre>
+                </div>
+                <div>
+                  <p className="text-[#8A9AB0] text-xs mb-1 font-semibold">Step 2 — Embed the iframe</p>
+                  <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`<iframe
+  src="https://app.forgept.com/embed?session=SESSION_TOKEN&proposal=PROPOSAL_UUID"
+  width="100%" height="700" frameborder="0"
+/>`}</pre>
+                </div>
+                <div>
+                  <p className="text-[#8A9AB0] text-xs mb-1 font-semibold">Step 3 — Receive the BOM export</p>
+                  <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`window.addEventListener('message', (e) => {
+  if (e.data?.type === 'forgept:export') {
+    const { proposal_id, devices, cables } = e.data
+    // push to your CRM, cart, or quoting system
+  }
+})`}</pre>
+                </div>
+              </div>
+              <p className="text-[#4a5d75] text-xs mt-3">Omit <code>?proposal=</code> to auto-create a new design project on load.</p>
+            </div>
+          )}
+
+          <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
+            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Available Endpoints</p>
+            <div className="space-y-2">
+              {[
+                { method: 'GET', path: '/proposals', desc: 'List all proposals (filter with ?status=Won)', scope: 'proposals' },
+                { method: 'GET', path: '/proposals/:id', desc: 'Get proposal with full BOM and labor', scope: 'proposals' },
+                { method: 'GET', path: '/clients', desc: 'List clients', scope: 'clients' },
+                { method: 'GET', path: '/clients/:id', desc: 'Get client details', scope: 'clients' },
+                { method: 'GET', path: '/jobs', desc: 'List jobs', scope: 'jobs' },
+                { method: 'GET', path: '/jobs/:id', desc: 'Get job details', scope: 'jobs' },
+                { method: 'GET', path: '/drawings', desc: 'List proposals with drawing projects', scope: 'drawings' },
+                { method: 'GET', path: '/drawings/:proposalId', desc: 'Get drawing project and sheet list', scope: 'drawings' },
+                { method: 'GET', path: '/drawings/:proposalId/placements', desc: 'All device placements with position, label, FOV, notes', scope: 'drawings' },
+                { method: 'GET', path: '/drawings/:proposalId/bom', desc: 'Aggregate BOM by part number across all sheets', scope: 'drawings' },
+              ].map(e => (
+                <div key={e.path} className="flex items-start gap-3">
+                  <span className="shrink-0 text-xs font-mono font-bold text-green-400 w-10">{e.method}</span>
+                  <span className="shrink-0 text-xs font-mono text-[#C8622A] w-64">{e.path}</span>
+                  <span className="text-xs text-[#8A9AB0]">{e.desc}</span>
+                  <span className="shrink-0 text-xs text-[#4a5d75] italic">{e.scope}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-[#4a5d75] text-xs mt-3">Full schema: /v1/openapi.json</p>
+          </div>
         </div>
       )}
     </div>

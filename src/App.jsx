@@ -43,6 +43,7 @@ import Reports from './pages/Reports'
 import Designer from './pages/Designer'
 import DesignerProjects from './pages/DesignerProjects'
 import DrawingReview from './pages/DrawingReview'
+import EmbedDesigner from './pages/EmbedDesigner'
 
 function App() {
   const { session, profile, features, loading } = useProfile()
@@ -124,6 +125,7 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/sign/:token" element={<SignProposal />} />
         <Route path="/rfq-response/:token" element={<RFQResponse />} />
+        <Route path="/embed" element={<EmbedDesigner />} />
         {!session ? (
           <Route path="*" element={<Login />} />
         ) : (
