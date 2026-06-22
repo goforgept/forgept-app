@@ -114,7 +114,6 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
       ] : []),
       ...(featureProposals && orgType !== 'manufacturer' ? [
         { label: 'Proposals', path: '/proposals', icon: '📋' },
-        { label: 'New Proposal', path: '/new', icon: '➕' },
       ] : []),
       { label: 'Clients', path: '/clients', icon: '🏢' },
       ...(featureDrawingTool && orgType !== 'manufacturer' ? [{ label: 'Designer', path: '/designer', icon: '📐' }] : []),
