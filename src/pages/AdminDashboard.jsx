@@ -4,7 +4,7 @@ import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
 
-export default function AdminDashboard({ isAdmin, featureProposals = true, featureCRM = false, role = 'admin', isSalesManager = false, isPM = false, defaultMode = null }) {
+export default function AdminDashboard({ isAdmin, featureProposals = true, featureCRM = false, role = 'admin', isSalesManager = false, isPM = false, defaultMode = null, featureRegions = false }) {
   const { profile } = useProfile()
   const [proposals, setProposals] = useState([])
   const [dashboardMode, setDashboardMode] = useState(() => defaultMode || localStorage.getItem('dashboardMode') || (isPM ? 'pm' : 'sales'))
@@ -40,7 +40,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).order('created_at', { ascending: false }),
       supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id'),
       supabase.from('clients').select('*').eq('org_id', profile.org_id),
-      supabase.from('profiles').select('id, full_name, email').eq('org_id', profile.org_id),
+      supabase.from('profiles').select('id, full_name, email, region_id').eq('org_id', profile.org_id),
       supabase.from('targets').select('*').eq('org_id', profile.org_id),
       supabase.from('invoices').select('*').eq('org_id', profile.org_id),
       supabase.from('purchase_orders').select('*').eq('org_id', profile.org_id),
@@ -51,20 +51,37 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       supabase.from('bom_line_items').select('proposal_id').eq('pricing_status', 'RFQ Sent').lt('rfq_expires_at', today).not('rfq_expires_at', 'is', null),
     ])
 
-    setProposals(proposalsRes.data || [])
+    // If regions are enabled and this user is a regional VP, scope data to their region
+    const isRegionalVP = featureRegions && profile?.is_regional_vp && profile?.region_id
+    const allProfiles  = profilesRes.data || []
+    const regionUserIds = isRegionalVP
+      ? new Set(allProfiles.filter(p => p.region_id === profile.region_id).map(p => p.id))
+      : null
+
+    const allProposals = proposalsRes.data || []
+    const scopedProposals = regionUserIds
+      ? allProposals.filter(p => regionUserIds.has(p.user_id))
+      : allProposals
+    const scopedProposalIds = new Set(scopedProposals.map(p => p.id))
+
+    const allInvoices = invoicesRes.data || []
+    const allPOs      = posRes.data || []
+    const allTargets  = targetsRes.data || []
+
+    setProposals(scopedProposals)
     setJobs(jobsRes.data || [])
     setTechLogs(logsRes.data || [])
     setPendingCOs(coRes.data || [])
-    const uniqueExpired = [...new Set((expiredRes.data || []).map(i => i.proposal_id))]
+    const uniqueExpired = [...new Set((expiredRes.data || []).map(i => i.proposal_id))].filter(id => !scopedProposalIds.size || scopedProposalIds.has(id))
     setExpiredPricingCount(uniqueExpired.length)
     setExpiredPricingProposals(uniqueExpired)
-    setLineItems(lineItemsRes.data || [])
+    setLineItems((lineItemsRes.data || []).filter(li => !scopedProposalIds.size || scopedProposalIds.has(li.proposal_id)))
     setClients(clientsRes.data || [])
-    setProfiles(profilesRes.data || [])
-    setTargets(targetsRes.data || [])
-    setInvoices(invoicesRes.data || [])
-    setPurchaseOrders(posRes.data || [])
-    setRecurringItems(recurringRes.data || [])
+    setProfiles(regionUserIds ? allProfiles.filter(p => regionUserIds.has(p.id)) : allProfiles)
+    setTargets(regionUserIds ? allTargets.filter(t => regionUserIds.has(t.profile_id)) : allTargets)
+    setInvoices(regionUserIds ? allInvoices.filter(i => scopedProposalIds.has(i.proposal_id)) : allInvoices)
+    setPurchaseOrders(regionUserIds ? allPOs.filter(po => scopedProposalIds.has(po.proposal_id)) : allPOs)
+    setRecurringItems((recurringRes.data || []).filter(li => !regionUserIds || scopedProposalIds.has(li.proposal_id)))
     setLoading(false)
   }
 
@@ -286,7 +303,12 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
         <div className="sticky top-0 z-10 bg-[#0F1C2E] pt-2 pb-4 mb-2 border-b border-[#2a3d55]">
           <div className="flex justify-between items-center">
-            <h2 className="text-white text-2xl font-bold">Team Dashboard</h2>
+            <div>
+              <h2 className="text-white text-2xl font-bold">Team Dashboard</h2>
+              {featureRegions && profile?.is_regional_vp && profile?.region_id && (
+                <p className="text-[#8A9AB0] text-xs mt-0.5">Showing your region only</p>
+              )}
+            </div>
             <div className="flex gap-2">
               {Object.entries(periodLabels).map(([key, label]) => (
                 <button key={key} onClick={() => setPeriod(key)}
