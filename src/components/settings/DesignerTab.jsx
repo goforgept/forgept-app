@@ -7,18 +7,22 @@ import * as XLSX from 'xlsx'
 const INDUSTRIES = ['Security', 'AV', 'IT / Networking', 'Low Voltage', 'Fire Alarm', 'HVAC', 'Electrical', 'Telecom', 'Other']
 
 const ALL_CATEGORIES = [
-  'Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera','LPR Camera',
-  'Access Reader','Controller','Motion Sensor','Sensor','NVR','Network','Panel','Intercom',
-  'Door Contact','Door Operator','Wireless Lock','PIR Detector','Dual Tech Detector','Glass Break',
-  'Alarm Panel','Alarm Keypad','Smoke Detector','Heat Detector','Horn Strobe','Pull Station','FACP',
-  'Interior Siren','Exterior Siren','Panic Button','Shock Sensor','Guard Tour',
-  'Speaker','Ceiling Speaker','Subwoofer','Microphone','Wireless Mic','Amplifier','DSP','Switcher',
-  'Display','Projector','Projection Screen','Touch Panel','Control Processor','Video Conference',
-  'Media Player','Document Camera','Digital Signage','Streaming Encoder','Clock','HDMI Extender','AV Receiver',
-  'UPS','Rack','Data Drop','Patch Panel','Fiber Panel','Cable Tray','Junction Box',
-  'Thermostat','Diffuser','Outlet','Lighting','Disconnect',
-  'Point to Point','Power Box',
-].sort()
+  'Access Control Door',
+  'Access Reader','Alarm Keypad','Alarm Panel','Amplifier','AV Receiver',
+  'Bullet Camera','Cable Tray','Ceiling Speaker','Clock','Control Processor',
+  'Controller','Data Drop','Diffuser','Digital Signage','Disconnect',
+  'Document Camera','Dome Camera','Door Contact','Door Operator','DSP',
+  'Dual Tech Detector','Exterior Siren','FACP','Fiber Panel','Fisheye Camera',
+  'Glass Break','Guard Tour','HDMI Extender','Heat Detector','Horn Strobe',
+  'Interior Siren','Intercom','Junction Box','LPR Camera','Lighting',
+  'Media Player','Microphone','Motion Sensor','Multi-Lens Camera',
+  'Network','NVR','Outlet','Panel','Panic Button','Patch Panel',
+  'PIR Detector','Point to Point','Power Box','Projection Screen',
+  'Projector','PTZ Camera','Pull Station','Rack','Sensor',
+  'Shock Sensor','Smoke Detector','Speaker','Streaming Encoder',
+  'Subwoofer','Switcher','Thermostat','Touch Panel','UPS',
+  'Video Conference','Wall Plate','Wireless Lock','Wireless Mic',
+]
 
 const CATEGORY_MAP = {
   'Security':        ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','Bullet Camera','Controller','Door Contact','Door Operator','Dome Camera','Dual Tech Detector','Exterior Siren','Glass Break','Interior Siren','Motion Sensor','Network','NVR','Panel','Panic Button','PIR Detector','PTZ Camera','Shock Sensor'],

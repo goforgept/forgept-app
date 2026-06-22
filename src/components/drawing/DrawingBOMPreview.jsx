@@ -38,7 +38,7 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
       // Load device placements
       const { data: placements, error: placementErr } = await supabase
         .from('drawing_placements')
-        .select('id, quantity, drawing_sheet_id, part_number_override, manufacturer_override, model_number_override, description_override, labor_hours_override, global_products(id, name, part_number, model_number, manufacturer, category)')
+        .select('id, quantity, drawing_sheet_id, part_number_override, manufacturer_override, model_number_override, description_override, labor_overrides, global_products(id, name, part_number, model_number, manufacturer, category)')
         .in('drawing_sheet_id', sheetIds)
       if (placementErr) throw placementErr
 
@@ -117,11 +117,15 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
       if (enabled && defaults?.length) {
         const byRole = {}
         ;(placements || []).forEach(p => {
-          const cat = p.global_products?.category
-          const def = defaults.find(d => d.category === cat)
-          if (!def?.labor_role) return
-          const hrs = (p.labor_hours_override ?? def.hours_per_unit ?? 1) * (p.quantity ?? 1)
-          byRole[def.labor_role] = (byRole[def.labor_role] || 0) + hrs
+          const cat      = p.global_products?.category
+          const defs     = defaults.filter(d => d.category === cat)
+          const qty      = p.quantity ?? 1
+          const overrides = p.labor_overrides || {}
+          defs.forEach(def => {
+            if (!def.labor_role) return
+            const hrs = (parseFloat(overrides[def.labor_role] ?? def.hours_per_unit ?? 1)) * qty
+            byRole[def.labor_role] = (byRole[def.labor_role] || 0) + hrs
+          })
         })
         setLaborSummary(Object.entries(byRole).map(([role, hrs]) => ({ role, totalHrs: Math.round(hrs * 100) / 100 })))
       } else {

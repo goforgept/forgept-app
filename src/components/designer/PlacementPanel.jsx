@@ -45,7 +45,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
     switch_name:            p.switch_name            || '',
     switch_port:            p.switch_port            || '',
     patch_panel_label:      p.patch_panel_label      || '',
-    labor_hours_override:   p.labor_hours_override   ?? '',
+    labor_overrides:        p.labor_overrides        || {},
   })
 
   const [form, setForm] = useState(() => getInitialForm(placement))
@@ -123,7 +123,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
         switch_name:           updated.switch_name           || null,
         switch_port:           updated.switch_port           || null,
         patch_panel_label:     updated.patch_panel_label     || null,
-        labor_hours_override:  updated.labor_hours_override !== '' ? parseFloat(updated.labor_hours_override) : null,
+        labor_overrides: Object.keys(updated.labor_overrides || {}).length > 0 ? updated.labor_overrides : null,
       }).eq('id', placement.id)
       if (!error) {
         setSaved(true)
@@ -420,12 +420,14 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
 
         {/* ── Labor ── */}
         {laborEnabled && (() => {
-          const def = laborDefaults.find(d => d.category === product.category)
-          if (!def) return null
-          const defaultHrs = def.hours_per_unit ?? 1
-          const qty        = parseInt(form.quantity) || 1
-          const hrs        = form.labor_hours_override !== '' ? parseFloat(form.labor_hours_override) : defaultHrs
-          const totalHrs   = (hrs * qty).toFixed(2)
+          const defs = laborDefaults.filter(d => d.category === product.category)
+          if (!defs.length) return null
+          const qty      = parseInt(form.quantity) || 1
+          const overrides = form.labor_overrides || {}
+          const totalHrs = defs.reduce((sum, d) => {
+            const hrs = parseFloat(overrides[d.labor_role] ?? d.hours_per_unit ?? 1)
+            return sum + hrs * qty
+          }, 0)
           return (
             <div className="border-t border-[#2a3d55] pt-3">
               <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5">
@@ -434,28 +436,35 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                 </svg>
                 Labor
               </p>
-              <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55] space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-[#8A9AB0]">Role</span>
-                  <span className="text-white font-medium">{def.labor_role}</span>
+              <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] divide-y divide-[#2a3d55]">
+                {defs.map(def => {
+                  const defaultHrs = def.hours_per_unit ?? 1
+                  const val = overrides[def.labor_role] ?? defaultHrs
+                  return (
+                    <div key={def.labor_role} className="flex items-center justify-between px-3 py-2 gap-2">
+                      <span className="text-white text-xs font-medium truncate flex-1">{def.labor_role}</span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <input
+                          type="number" min="0.25" step="0.25"
+                          value={val}
+                          onChange={e => {
+                            const next = { ...overrides, [def.labor_role]: parseFloat(e.target.value) || defaultHrs }
+                            update('labor_overrides', next)
+                          }}
+                          className="w-14 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-1.5 py-0.5 text-xs text-center focus:outline-none focus:border-[#C8622A]"
+                        />
+                        <span className="text-[#8A9AB0] text-xs">hr</span>
+                      </div>
+                    </div>
+                  )
+                })}
+                <div className="flex justify-between px-3 py-2 text-xs">
+                  <span className="text-[#8A9AB0]">Total{qty > 1 ? ` (×${qty})` : ''}</span>
+                  <span className="text-[#C8622A] font-bold">{totalHrs.toFixed(2)}h</span>
                 </div>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-[#8A9AB0]">Hrs / device</span>
-                  <input
-                    type="number" min="0.25" step="0.25"
-                    value={form.labor_hours_override !== '' ? form.labor_hours_override : defaultHrs}
-                    onChange={e => update('labor_hours_override', e.target.value)}
-                    placeholder={defaultHrs}
-                    className="w-16 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-0.5 text-xs text-center focus:outline-none focus:border-[#C8622A]"
-                  />
+                <div className="px-3 py-1.5">
+                  <p className="text-[#4a5a6a] text-xs">Rates applied when pushed to proposal</p>
                 </div>
-                {qty > 1 && (
-                  <div className="flex justify-between text-xs border-t border-[#2a3d55] pt-2">
-                    <span className="text-[#8A9AB0]">Total hrs ({qty} devices)</span>
-                    <span className="text-[#C8622A] font-bold">{totalHrs}h</span>
-                  </div>
-                )}
-                <p className="text-[#4a5a6a] text-xs pt-1">Rates applied when pushed to proposal</p>
               </div>
             </div>
           )
