@@ -109,6 +109,7 @@ function App() {
     featureDrawingTool:    features.drawingTool,
     featureDesignerOnly:   features.designerOnly,
     featureApi:            features.api,
+    featureRegions:        features.regions,
   }
 
   return (

@@ -50,10 +50,11 @@ export default function BomSection({
   onOpenSaveTemplateModal,
   onMoveLineToSection,
   fmt,
+  canEdit = true,
 }) {
   return (
     <div className="bg-[#1a2d45] rounded-xl p-6">
-      <div className="mb-4 relative">
+      {canEdit && <div className="mb-4 relative">
         <input
           type="text"
           placeholder="🔍 Search product library..."
@@ -139,11 +140,11 @@ export default function BomSection({
             )}
           </div>
         )}
-      </div>
+      </div>}
 
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-white font-bold text-lg">BOM Line Items ({lineItems.length})</h3>
-        {!editingBOM ? (
+        {canEdit && (!editingBOM ? (
           <div className="flex gap-2 flex-wrap">
             {proposal?.status === 'Won' && lineItems.length > 0 && orgType === 'manufacturer' && (
               <button onClick={onOpenOrderModal} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">🏭 Convert to Order</button>
@@ -180,7 +181,7 @@ export default function BomSection({
             <button onClick={onCancelEditing} className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
             <button onClick={onSaveBOM} disabled={saving} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{saving ? 'Saving...' : 'Save BOM'}</button>
           </div>
-        )}
+        ))}
       </div>
 
       {/* RFQ Status */}
@@ -456,9 +457,11 @@ export default function BomSection({
             <p className="text-[#8A9AB0] text-xs">
               {editSections.length > 0 ? `${editSections.length} section${editSections.length !== 1 ? 's' : ''} — items without a section appear in General` : 'No sections — add a section to group items by area or system'}
             </p>
-            <button onClick={onAddSection} className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors">
-              + Add Section
-            </button>
+            {canEdit && (
+              <button onClick={onAddSection} className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors">
+                + Add Section
+              </button>
+            )}
           </div>
 
           {/* Bulk Edit Bar */}

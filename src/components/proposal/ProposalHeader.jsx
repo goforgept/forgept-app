@@ -8,12 +8,13 @@ export default function ProposalHeader({
   updateCloseDate, updateTaxExempt, updateTaxRate,
   setShowDealSummaryModal, setDealSummary,
   setShowShareModal, setDeleteConfirmText, setShowDeleteModal,
+  canEdit = true,
 }) {
   return (
     <div className="bg-[#1a2d45] rounded-xl p-6">
       <div className="flex justify-between items-start">
         <div>
-          {editingProposalName ? (
+          {canEdit && editingProposalName ? (
             <div className="flex items-center gap-2">
               <input autoFocus type="text" value={proposalNameDraft}
                 onChange={e => setProposalNameDraft(e.target.value)}
@@ -25,13 +26,17 @@ export default function ProposalHeader({
           ) : (
             <div className="flex items-center gap-2 group">
               <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
-              <button onClick={() => { setProposalNameDraft(proposal?.proposal_name || ''); setEditingProposalName(true) }}
-                className="opacity-0 group-hover:opacity-100 text-[#8A9AB0] hover:text-white text-xs transition-all">✏️</button>
+              {canEdit && (
+                <button onClick={() => { setProposalNameDraft(proposal?.proposal_name || ''); setEditingProposalName(true) }}
+                  className="opacity-0 group-hover:opacity-100 text-[#8A9AB0] hover:text-white text-xs transition-all">✏️</button>
+              )}
             </div>
           )}
           <div className="flex items-center gap-2 mt-1">
             <p className="text-[#8A9AB0]">{proposal?.company} · {proposal?.client_name}</p>
-            <button onClick={openEditClientModal} className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors" title="Edit client info">✏️</button>
+            {canEdit && (
+              <button onClick={openEditClientModal} className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors" title="Edit client info">✏️</button>
+            )}
           </div>
           <p className="text-[#8A9AB0] text-sm">{proposal?.client_email}</p>
           {locationName && <span className="inline-flex items-center gap-1 bg-[#2a3d55] text-[#8A9AB0] text-xs px-2 py-0.5 rounded-full mt-1">📍 {locationName}</span>}
@@ -60,14 +65,18 @@ export default function ProposalHeader({
             className="bg-[#2a3d55] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-1">
             👥 Share{collaborators.length > 0 ? ` (${collaborators.length})` : ''}
           </button>
-          {isAdmin && proposal?.status !== 'Won' && (
+          {isAdmin && canEdit && proposal?.status !== 'Won' && (
             <button onClick={() => { setDeleteConfirmText(''); setShowDeleteModal(true) }}
               className="bg-red-900/30 text-red-400 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-red-900/50 transition-colors">Delete</button>
           )}
-          <select value={proposal?.status} onChange={e => updateStatus(e.target.value)}
-            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-            {['Draft', 'Sent', 'Won', 'Lost'].map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+          {canEdit ? (
+            <select value={proposal?.status} onChange={e => updateStatus(e.target.value)}
+              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+              {['Draft', 'Sent', 'Won', 'Lost'].map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          ) : (
+            <span className="bg-[#0F1C2E] text-[#8A9AB0] border border-[#2a3d55] rounded-lg px-3 py-2 text-sm">{proposal?.status}</span>
+          )}
         </div>
       </div>
 
@@ -75,7 +84,7 @@ export default function ProposalHeader({
         <div><p className="text-[#8A9AB0] text-xs">Rep</p><p className="text-white text-sm font-medium">{proposal?.rep_name}</p></div>
         <div>
           <p className="text-[#8A9AB0] text-xs mb-1">Quote #</p>
-          {editingQuoteNumber ? (
+          {canEdit && editingQuoteNumber ? (
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-1">
                 <input type="text" value={quoteNumberDraft}
@@ -87,36 +96,48 @@ export default function ProposalHeader({
               </div>
               {quoteNumberError && <p className="text-red-400 text-xs">{quoteNumberError}</p>}
             </div>
-          ) : (
+          ) : canEdit ? (
             <button onClick={() => { setQuoteNumberDraft(proposal?.quote_number || ''); setEditingQuoteNumber(true) }}
               className="text-white text-sm font-medium hover:text-[#C8622A] transition-colors group flex items-center gap-1" title="Click to edit quote number">
               {proposal?.quote_number || <span className="text-[#8A9AB0] italic">Add #</span>}
               <span className="text-[#2a3d55] group-hover:text-[#C8622A] text-xs transition-colors">✏️</span>
             </button>
+          ) : (
+            <p className="text-white text-sm font-medium">{proposal?.quote_number || <span className="text-[#8A9AB0] italic">—</span>}</p>
           )}
         </div>
         <div>
           <p className="text-[#8A9AB0] text-xs">Close Date</p>
-          <input type="date" value={proposal?.close_date || ''} onChange={e => updateCloseDate(e.target.value)}
-            className="bg-transparent text-white text-sm font-medium focus:outline-none focus:border-b focus:border-[#C8622A] cursor-pointer" />
+          {canEdit ? (
+            <input type="date" value={proposal?.close_date || ''} onChange={e => updateCloseDate(e.target.value)}
+              className="bg-transparent text-white text-sm font-medium focus:outline-none focus:border-b focus:border-[#C8622A] cursor-pointer" />
+          ) : (
+            <p className="text-white text-sm font-medium">{proposal?.close_date || '—'}</p>
+          )}
         </div>
         <div><p className="text-[#8A9AB0] text-xs">Industry</p><p className="text-white text-sm font-medium">{proposal?.industry}</p></div>
         <div><p className="text-[#8A9AB0] text-xs">Margin</p><p className="text-[#C8622A] text-sm font-medium">{proposal?.total_gross_margin_percent ? `${proposal.total_gross_margin_percent.toFixed(1)}%` : '—'}</p></div>
         <div>
           <p className="text-[#8A9AB0] text-xs mb-1">Tax Exempt</p>
-          <button onClick={() => updateTaxExempt(!proposal?.tax_exempt)}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${proposal?.tax_exempt ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-[#0F1C2E] text-[#8A9AB0] border border-[#2a3d55] hover:text-white'}`}>
-            {proposal?.tax_exempt ? 'Exempt' : 'Taxable'}
-          </button>
+          {canEdit ? (
+            <button onClick={() => updateTaxExempt(!proposal?.tax_exempt)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${proposal?.tax_exempt ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-[#0F1C2E] text-[#8A9AB0] border border-[#2a3d55] hover:text-white'}`}>
+              {proposal?.tax_exempt ? 'Exempt' : 'Taxable'}
+            </button>
+          ) : (
+            <p className="text-sm font-medium">{proposal?.tax_exempt ? <span className="text-green-400">Exempt</span> : <span className="text-[#8A9AB0]">Taxable</span>}</p>
+          )}
         </div>
         <div>
           <p className="text-[#8A9AB0] text-xs mb-1">Tax Rate %</p>
           {proposal?.tax_exempt ? (
             <p className="text-[#8A9AB0] text-sm">—</p>
-          ) : (
+          ) : canEdit ? (
             <input type="number" step="0.01" placeholder="e.g. 8.5" value={proposal?.tax_rate ?? ''}
               onChange={e => updateTaxRate(e.target.value)}
               className="w-full bg-transparent text-white text-sm font-medium border-b border-[#2a3d55] focus:outline-none focus:border-[#C8622A]" />
+          ) : (
+            <p className="text-white text-sm font-medium">{proposal?.tax_rate ?? '—'}</p>
           )}
         </div>
       </div>

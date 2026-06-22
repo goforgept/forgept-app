@@ -25,10 +25,12 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
     key: 'operations',
     label: 'Operations',
     links: [
-      { label: 'Jobs', path: '/jobs', icon: '🔨' },
-      { label: 'Tech Log', path: '/tech-log', icon: '📋' },
-      { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
-      { label: 'Dispatch', path: '/dispatch', icon: '🗺' },
+      ...(orgType !== 'manufacturer' ? [
+        { label: 'Jobs', path: '/jobs', icon: '🔨' },
+        { label: 'Tech Log', path: '/tech-log', icon: '📋' },
+        { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
+        { label: 'Dispatch', path: '/dispatch', icon: '🗺' },
+      ] : []),
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(orgType !== 'manufacturer' && featureProposals ? [
         { label: 'Vendors', path: '/vendors', icon: '🏭' },
@@ -108,26 +110,30 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
       ...(featureCRM ? [
         { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
         { label: 'Tasks', path: '/tasks', icon: '✅' },
+        { label: 'Forecast', path: '/forecast', icon: '📈' },
       ] : []),
-      ...(featureProposals ? [
+      ...(featureProposals && orgType !== 'manufacturer' ? [
         { label: 'Proposals', path: '/proposals', icon: '📋' },
         { label: 'New Proposal', path: '/new', icon: '➕' },
       ] : []),
       { label: 'Clients', path: '/clients', icon: '🏢' },
-      ...(featureDrawingTool ? [{ label: 'Designer', path: '/designer', icon: '📐' }] : []),
+      ...(featureDrawingTool && orgType !== 'manufacturer' ? [{ label: 'Designer', path: '/designer', icon: '📐' }] : []),
     ]
   },
   {
     key: 'operations',
     label: 'Operations',
     links: [
-      { label: 'Jobs', path: '/jobs', icon: '🔨' },
-      { label: 'Tech Log', path: '/tech-log', icon: '📋' },
-      { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
-      { label: 'Dispatch', path: '/dispatch', icon: '📍' },
+      ...(orgType !== 'manufacturer' ? [
+        { label: 'Jobs', path: '/jobs', icon: '🔨' },
+        { label: 'Tech Log', path: '/tech-log', icon: '📋' },
+        { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
+        { label: 'Dispatch', path: '/dispatch', icon: '📍' },
+      ] : []),
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(orgType === 'manufacturer' ? [
         { label: 'Catalog', path: '/catalog', icon: '📦' },
+        { label: 'Orders', path: '/orders', icon: '📦' },
       ] : []),
       ...((featureSla || featureMonitoring) ? [{ label: 'Contracts', path: '/contracts', icon: '📋' }] : []),
     ].filter(l => l)

@@ -64,6 +64,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [templateName, setTemplateName] = useState('')
   const [savingTemplate, setSavingTemplate] = useState(false)
   const orgType = profile?.organizations?.org_type || 'integrator'
+  const [canEdit, setCanEdit] = useState(true) // computed after proposal loads
   const [showSendModal, setShowSendModal] = useState(false)
   const [sendingProposal, setSendingProposal] = useState(false)
   const [sendForm, setSendForm] = useState({ subject: '', message: '' })
@@ -197,6 +198,24 @@ export default function ProposalDetail({ isAdmin }) {
     setProposal(data)
     setCollaborators(data?.collaborator_ids || [])
     setQboInvoiceId(data?.qbo_invoice_id || null)
+
+    // Compute edit permission
+    // Admins always can edit. Owner can edit. Collaborators can edit.
+    // Regional managers can edit all quotes owned by someone in their region.
+    const currentUserId  = profile?.id
+    const isOwner        = data?.user_id === currentUserId
+    const isCollaborator = (data?.collaborator_ids || []).includes(currentUserId)
+    const isAdminUser    = profile?.role === 'admin' || profile?.org_role === 'admin'
+    const regionsFeature = profile?.organizations?.feature_regions
+
+    let isRegionalManagerOfDeal = false
+    if (regionsFeature && profile?.is_regional_vp && profile?.region_id && data?.user_id) {
+      const { data: ownerProfile } = await supabase
+        .from('profiles').select('region_id').eq('id', data.user_id).single()
+      isRegionalManagerOfDeal = ownerProfile?.region_id === profile.region_id
+    }
+
+    setCanEdit(isAdminUser || isOwner || isCollaborator || isRegionalManagerOfDeal)
 
     // Backward-compat: fall back to old singular columns if new arrays are empty
     let slaArr = (data?.sla_contracts?.length > 0) ? data.sla_contracts : (data?.sla_contract ? [data.sla_contract] : [])
@@ -2510,6 +2529,20 @@ const analyzeDrawing = async () => {
     <div className="flex min-h-screen bg-[#0F1C2E]">
       <Sidebar isAdmin={isAdmin} featureProposals={features.proposals} featureCRM={features.crm} />
       <div className="flex-1 p-6 space-y-6">
+        {/* Read-only banner */}
+        {!canEdit && (
+          <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl px-5 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+              </svg>
+              <p className="text-yellow-300 text-sm font-medium">
+                You have view-only access to this quote. Ask the owner to add you as a collaborator to make changes.
+              </p>
+            </div>
+          </div>
+        )}
+
         {contractNotification && (
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl px-5 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -2536,6 +2569,7 @@ const analyzeDrawing = async () => {
           setShowDealSummaryModal={setShowDealSummaryModal} setDealSummary={setDealSummary}
           setShowShareModal={setShowShareModal}
           setDeleteConfirmText={setDeleteConfirmText} setShowDeleteModal={setShowDeleteModal}
+          canEdit={canEdit}
         />
 
         <ScopeSection
@@ -2550,6 +2584,7 @@ const analyzeDrawing = async () => {
           qboConnected={qboConnected} qboInvoiceId={qboInvoiceId} sendingToQBO={sendingToQBO} sendToQBO={sendToQBO}
           setShowPricingModal={setShowPricingModal} downloadPDF={downloadPDF} downloadDOCX={downloadDOCX}
           setShowPhotosModal={setShowPhotosModal}
+          canEdit={canEdit}
         />
 
         <BomSection
@@ -2616,6 +2651,7 @@ const analyzeDrawing = async () => {
           onOpenSaveTemplateModal={() => { setTemplateName(proposal?.proposal_name || ''); setShowSaveTemplateModal(true) }}
           onMoveLineToSection={(i) => { setMoveLineIndex(i); setMoveType('move'); setShowMoveModal(true) }}
           fmt={fmt}
+          canEdit={canEdit}
         />
 
         <RecurringSection proposal={proposal} lineItems={lineItems} renewalDates={renewalDates} saveRenewalDate={saveRenewalDate} />

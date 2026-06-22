@@ -13,6 +13,7 @@ import DesignerTab from '../components/settings/DesignerTab'
 import EmailTemplatesTab from '../components/settings/EmailTemplatesTab'
 import TeamSettingsTab from '../components/settings/TeamSettingsTab'
 import ApiTab from '../components/settings/ApiTab'
+import RegionsTab from '../components/settings/RegionsTab'
 
 export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, featureDesignerOnly = false, featureApi = false, role, isSalesManager, isPM, isTechnician }) {
   const { profile } = useProfile()
@@ -70,6 +71,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     payment_instructions_zelle: '', payment_instructions_notes: '',
   })
   const [savingInvoicing, setSavingInvoicing] = useState(false)
+  const [regionsEnabled, setRegionsEnabled] = useState(false)
   const [slaEnabled, setSlaEnabled] = useState(false)
   const [slaAutoAttach, setSlaAutoAttach] = useState(false)
   const [monitoringEnabled, setMonitoringEnabled] = useState(false)
@@ -192,7 +194,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     })
     if (data?.org_id) {
       try {
-        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply').eq('id', data.org_id).single()
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
         setOrgTimezone(orgData?.timezone || 'America/Chicago')
         setOrgId(data.org_id)
@@ -202,6 +204,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         setInboundVerified(orgData?.inbound_email_verified || false); setInboundAutoReply(orgData?.inbound_email_auto_reply || '')
         setGoogleConnected(data?.google_calendar_connected || false); setGoogleEmail(data?.google_email || '')
         setMicrosoftConnected(data?.microsoft_calendar_connected || false); setMicrosoftEmail(data?.microsoft_email || '')
+        setRegionsEnabled(orgData?.feature_regions || false)
         setSlaEnabled(orgData?.feature_sla || false); setSlaAutoAttach(orgData?.sla_auto_attach || false)
         setMonitoringEnabled(orgData?.feature_monitoring || false); setMonitoringAutoAttach(orgData?.monitoring_auto_attach || false)
         const savedSLA = orgData?.sla_templates || {}
@@ -357,6 +360,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const handleSaveSLA = async () => {
     setSavingSLA(true); setSuccess(null)
     await supabase.from('organizations').update({
+      feature_regions: regionsEnabled,
       feature_sla: slaEnabled, sla_auto_attach: slaAutoAttach, sla_templates: slaTemplates,
       feature_monitoring: monitoringEnabled, monitoring_auto_attach: monitoringAutoAttach, monitoring_templates: monitoringTemplates,
     }).eq('id', orgId)
@@ -378,7 +382,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         { key: 'data',         label: 'Data & Import' },
       ]
     }] : []),
-    ...(isAdmin ? [{ items: [{ key: 'designer', label: 'Designer' }, { key: 'api', label: 'API' }] }] : []),
+    ...(isAdmin ? [{ items: [{ key: 'designer', label: 'Designer' }, { key: 'regions', label: 'Regions' }, { key: 'api', label: 'API' }] }] : []),
     ...(featureDesignerOnly ? [{ label: 'Team', items: [{ key: 'team', label: 'Team' }] }] : []),
   ]
 
@@ -462,6 +466,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
 
           {activeTab === 'designer' && isAdmin && <DesignerTab />}
 
+          {activeTab === 'regions' && isAdmin && <RegionsTab regionsEnabled={regionsEnabled} setRegionsEnabled={setRegionsEnabled} />}
           {activeTab === 'api' && isAdmin && <ApiTab featureApi={featureApi} />}
 
           {activeTab === 'data' && isAdmin && (
