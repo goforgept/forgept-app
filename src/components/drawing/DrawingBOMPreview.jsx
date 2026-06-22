@@ -15,6 +15,8 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
   const [components,    setComponents]    = useState([])
   const [loading,       setLoading]       = useState(true)
   const [error,         setError]         = useState(null)
+  const [laborEnabled,  setLaborEnabled]  = useState(false)
+  const [laborSummary,  setLaborSummary]  = useState([]) // [{role, totalHrs}]
   const [showRiseModal, setShowRiseModal] = useState(false)
   const [riseForm,      setRiseForm]      = useState({
     from_sheet_id: '',
@@ -36,7 +38,7 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
       // Load device placements
       const { data: placements, error: placementErr } = await supabase
         .from('drawing_placements')
-        .select('id, quantity, drawing_sheet_id, part_number_override, manufacturer_override, model_number_override, description_override, global_products(id, name, part_number, model_number, manufacturer, category)')
+        .select('id, quantity, drawing_sheet_id, part_number_override, manufacturer_override, model_number_override, description_override, labor_hours_override, global_products(id, name, part_number, model_number, manufacturer, category)')
         .in('drawing_sheet_id', sheetIds)
       if (placementErr) throw placementErr
 
@@ -104,6 +106,27 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
       setCableRuns(runs || [])
       setVerticalRises(rises || [])
       setComponents(components)
+
+      // Load labor settings and compute summary
+      const [{ data: org }, { data: defaults }] = await Promise.all([
+        supabase.from('organizations').select('designer_labor_enabled').eq('id', orgId).single(),
+        supabase.from('designer_labor_defaults').select('category, labor_role, hours_per_unit').eq('org_id', orgId),
+      ])
+      const enabled = org?.designer_labor_enabled ?? false
+      setLaborEnabled(enabled)
+      if (enabled && defaults?.length) {
+        const byRole = {}
+        ;(placements || []).forEach(p => {
+          const cat = p.global_products?.category
+          const def = defaults.find(d => d.category === cat)
+          if (!def?.labor_role) return
+          const hrs = (p.labor_hours_override ?? def.hours_per_unit ?? 1) * (p.quantity ?? 1)
+          byRole[def.labor_role] = (byRole[def.labor_role] || 0) + hrs
+        })
+        setLaborSummary(Object.entries(byRole).map(([role, hrs]) => ({ role, totalHrs: Math.round(hrs * 100) / 100 })))
+      } else {
+        setLaborSummary([])
+      }
     } catch (err) {
       setError('Failed to load BOM preview.')
       console.error(err)
@@ -412,6 +435,40 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
       </div>
 
     
+
+      {/* ── Labor Summary ── */}
+      {laborEnabled && laborSummary.length > 0 && (
+        <div className="border-t border-[#2a3d55]">
+          <div className="px-4 py-2 bg-[#1a2d45] border-b border-[#2a3d55]">
+            <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide">Estimated Labor</p>
+            <p className="text-[#4a5a6a] text-xs mt-0.5">Hours only — rates applied when pushed to proposal</p>
+          </div>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-[#2a3d55] bg-[#1a2d45]">
+                <th className="text-left px-4 py-2 font-medium text-[#8A9AB0]">Role</th>
+                <th className="text-right px-4 py-2 font-medium text-[#8A9AB0]">Total Hours</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#2a3d55]/50">
+              {laborSummary.map(row => (
+                <tr key={row.role} className="hover:bg-[#1a2d45]/50">
+                  <td className="px-4 py-2.5 text-white font-medium">{row.role}</td>
+                  <td className="text-right px-4 py-2.5 text-[#C8622A] font-bold font-mono">{row.totalHrs}h</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-[#2a3d55] bg-[#1a2d45] font-semibold">
+                <td className="px-4 py-2.5 text-[#8A9AB0] text-right">Total labor hours</td>
+                <td className="text-right px-4 py-2.5 text-[#C8622A] font-mono">
+                  {laborSummary.reduce((s, r) => s + r.totalHrs, 0).toFixed(2)}h
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
 
       {/* ── Add Vertical Rise Modal ── */}
       {showRiseModal && (

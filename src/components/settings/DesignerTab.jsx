@@ -5,6 +5,20 @@ import AccessoriesEditor from '../AccessoriesEditor'
 
 const INDUSTRIES = ['Security', 'AV', 'IT / Networking', 'Low Voltage', 'Fire Alarm', 'HVAC', 'Electrical', 'Telecom', 'Other']
 
+const ALL_CATEGORIES = [
+  'Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera','LPR Camera',
+  'Access Reader','Controller','Motion Sensor','Sensor','NVR','Network','Panel','Intercom',
+  'Door Contact','Door Operator','Wireless Lock','PIR Detector','Dual Tech Detector','Glass Break',
+  'Alarm Panel','Alarm Keypad','Smoke Detector','Heat Detector','Horn Strobe','Pull Station','FACP',
+  'Interior Siren','Exterior Siren','Panic Button','Shock Sensor','Guard Tour',
+  'Speaker','Ceiling Speaker','Subwoofer','Microphone','Wireless Mic','Amplifier','DSP','Switcher',
+  'Display','Projector','Projection Screen','Touch Panel','Control Processor','Video Conference',
+  'Media Player','Document Camera','Digital Signage','Streaming Encoder','Clock','HDMI Extender','AV Receiver',
+  'UPS','Rack','Data Drop','Patch Panel','Fiber Panel','Cable Tray','Junction Box',
+  'Thermostat','Diffuser','Outlet','Lighting','Disconnect',
+  'Point to Point','Power Box',
+].sort()
+
 const CATEGORY_MAP = {
   'Security':        ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','Bullet Camera','Controller','Door Contact','Door Operator','Dome Camera','Dual Tech Detector','Exterior Siren','Glass Break','Interior Siren','Motion Sensor','Network','NVR','Panel','Panic Button','PIR Detector','PTZ Camera','Shock Sensor'],
   'AV':              ['Accessory','AV Receiver','Ceiling Speaker','Clock','Control Processor','Digital Signage','Display','Document Camera','HDMI Extender','Media Player','Microphone','Network','Projection Screen','Projector','Speaker','Streaming Encoder','Subwoofer','Touch Panel','Video Conference','Wall Plate','Wireless Mic'],
@@ -23,15 +37,22 @@ const EMPTY_FORM = { name: '', part_number: '', model_number: '', manufacturer: 
 
 export default function DesignerTab() {
   const { profile } = useProfile()
-  const [products, setProducts] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [form, setForm] = useState(EMPTY_FORM)
-  const [saving, setSaving] = useState(false)
+  const [products,       setProducts]       = useState([])
+  const [loading,        setLoading]        = useState(true)
+  const [showModal,      setShowModal]      = useState(false)
+  const [form,           setForm]           = useState(EMPTY_FORM)
+  const [saving,         setSaving]         = useState(false)
   const [editingAccessories, setEditingAccessories] = useState(null)
 
+  // Labor
+  const [laborEnabled,   setLaborEnabled]   = useState(false)
+  const [laborDefaults,  setLaborDefaults]  = useState([]) // [{category, labor_role, hours_per_unit}]
+  const [laborRates,     setLaborRates]     = useState([])
+  const [savingLabor,    setSavingLabor]    = useState(false)
+  const [laborSaved,     setLaborSaved]     = useState(false)
+
   useEffect(() => {
-    if (profile?.org_id) loadProducts()
+    if (profile?.org_id) { loadProducts(); loadLaborSettings() }
   }, [profile?.org_id])
 
   const loadProducts = async () => {
@@ -39,6 +60,53 @@ export default function DesignerTab() {
     const { data } = await supabase.from('org_products').select('*').eq('org_id', profile.org_id).order('name')
     setProducts(data || [])
     setLoading(false)
+  }
+
+  const loadLaborSettings = async () => {
+    const [{ data: org }, { data: defaults }, { data: rates }] = await Promise.all([
+      supabase.from('organizations').select('designer_labor_enabled').eq('id', profile.org_id).single(),
+      supabase.from('designer_labor_defaults').select('*').eq('org_id', profile.org_id).order('category'),
+      supabase.from('labor_rates').select('role').eq('org_id', profile.org_id).order('sort_order'),
+    ])
+    setLaborEnabled(org?.designer_labor_enabled ?? false)
+    setLaborDefaults(defaults || [])
+    setLaborRates(rates || [])
+  }
+
+  const toggleLabor = async () => {
+    const next = !laborEnabled
+    setLaborEnabled(next)
+    await supabase.from('organizations').update({ designer_labor_enabled: next }).eq('id', profile.org_id)
+  }
+
+  const addLaborDefault = () => {
+    setLaborDefaults(prev => [...prev, { category: ALL_CATEGORIES[0], labor_role: '', hours_per_unit: 1.0 }])
+  }
+
+  const removeLaborDefault = (idx) => setLaborDefaults(prev => prev.filter((_, i) => i !== idx))
+
+  const updateLaborDefault = (idx, field, val) => {
+    setLaborDefaults(prev => prev.map((d, i) => i === idx ? { ...d, [field]: val } : d))
+  }
+
+  const saveLaborDefaults = async () => {
+    setSavingLabor(true)
+    await supabase.from('designer_labor_defaults').delete().eq('org_id', profile.org_id)
+    if (laborDefaults.length > 0) {
+      await supabase.from('designer_labor_defaults').insert(
+        laborDefaults
+          .filter(d => d.category && d.labor_role)
+          .map(d => ({
+            org_id:         profile.org_id,
+            category:       d.category,
+            labor_role:     d.labor_role,
+            hours_per_unit: parseFloat(d.hours_per_unit) || 1.0,
+          }))
+      )
+    }
+    setSavingLabor(false)
+    setLaborSaved(true)
+    setTimeout(() => setLaborSaved(false), 2000)
   }
 
   const handleAdd = async () => {
@@ -88,6 +156,73 @@ export default function DesignerTab() {
             </select>
           </div>
         </div>
+      </div>
+
+      {/* Labor Estimation */}
+      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-6">
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <h3 className="text-white font-bold text-base">Labor Estimation</h3>
+            <p className="text-[#8A9AB0] text-xs mt-0.5">Automatically calculate labor hours per device in the designer. Hours push to the proposal labor table when drawings are approved — rates come from your rate card.</p>
+          </div>
+          <button onClick={toggleLabor}
+            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${laborEnabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+            <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${laborEnabled ? 'translate-x-5' : ''}`} />
+          </button>
+        </div>
+
+        {laborEnabled && (
+          <div className="mt-5">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Default Hours per Device Category</p>
+              <button onClick={addLaborDefault} className="text-xs text-[#C8622A] hover:text-white transition-colors">+ Add Category</button>
+            </div>
+
+            {laborDefaults.length === 0 ? (
+              <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] p-6 text-center">
+                <p className="text-[#8A9AB0] text-sm">No labor defaults yet</p>
+                <p className="text-[#8A9AB0] text-xs mt-1">Add a category to set default hours per device</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="grid grid-cols-12 gap-2 px-2 pb-1">
+                  <p className="col-span-4 text-[#8A9AB0] text-xs">Category</p>
+                  <p className="col-span-4 text-[#8A9AB0] text-xs">Labor Role</p>
+                  <p className="col-span-3 text-[#8A9AB0] text-xs">Hrs / Device</p>
+                </div>
+                {laborDefaults.map((def, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-[#0F1C2E] rounded-lg px-2 py-2 border border-[#2a3d55]">
+                    <select value={def.category} onChange={e => updateLaborDefault(idx, 'category', e.target.value)}
+                      className="col-span-4 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                      {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                    <select value={def.labor_role} onChange={e => updateLaborDefault(idx, 'labor_role', e.target.value)}
+                      className="col-span-4 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                      <option value="">— Select role —</option>
+                      {laborRates.map(r => <option key={r.role} value={r.role}>{r.role}</option>)}
+                    </select>
+                    <input type="number" min="0.25" step="0.25" value={def.hours_per_unit}
+                      onChange={e => updateLaborDefault(idx, 'hours_per_unit', e.target.value)}
+                      className="col-span-3 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:border-[#C8622A]" />
+                    <button onClick={() => removeLaborDefault(idx)}
+                      className="col-span-1 text-[#8A9AB0] hover:text-red-400 transition-colors text-center">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 mt-3">
+              <button onClick={saveLaborDefaults} disabled={savingLabor}
+                className="px-4 py-2 bg-[#C8622A] text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] disabled:opacity-50 transition-colors">
+                {savingLabor ? 'Saving…' : 'Save Defaults'}
+              </button>
+              {laborSaved && <span className="text-green-400 text-xs">✓ Saved</span>}
+              {laborRates.length === 0 && (
+                <p className="text-yellow-400 text-xs">Add roles to your Rate Card first to assign them here.</p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Symbol Library */}

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../supabase'
 import ComponentsSection from './ComponentsSection'
 
-export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, currentSheetId, proposalId, allSheetIds }) {
+export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, currentSheetId, proposalId, allSheetIds, laborEnabled = false, laborDefaults = [] }) {
   const [attachedRun, setAttachedRun] = useState(null)
 
   useEffect(() => {
@@ -45,6 +45,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
     switch_name:            p.switch_name            || '',
     switch_port:            p.switch_port            || '',
     patch_panel_label:      p.patch_panel_label      || '',
+    labor_hours_override:   p.labor_hours_override   ?? '',
   })
 
   const [form, setForm] = useState(() => getInitialForm(placement))
@@ -122,6 +123,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
         switch_name:           updated.switch_name           || null,
         switch_port:           updated.switch_port           || null,
         patch_panel_label:     updated.patch_panel_label     || null,
+        labor_hours_override:  updated.labor_hours_override !== '' ? parseFloat(updated.labor_hours_override) : null,
       }).eq('id', placement.id)
       if (!error) {
         setSaved(true)
@@ -415,6 +417,49 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
             </div>
           </div>
         </div>
+
+        {/* ── Labor ── */}
+        {laborEnabled && (() => {
+          const def = laborDefaults.find(d => d.category === product.category)
+          if (!def) return null
+          const defaultHrs = def.hours_per_unit ?? 1
+          const qty        = parseInt(form.quantity) || 1
+          const hrs        = form.labor_hours_override !== '' ? parseFloat(form.labor_hours_override) : defaultHrs
+          const totalHrs   = (hrs * qty).toFixed(2)
+          return (
+            <div className="border-t border-[#2a3d55] pt-3">
+              <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Labor
+              </p>
+              <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55] space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#8A9AB0]">Role</span>
+                  <span className="text-white font-medium">{def.labor_role}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-[#8A9AB0]">Hrs / device</span>
+                  <input
+                    type="number" min="0.25" step="0.25"
+                    value={form.labor_hours_override !== '' ? form.labor_hours_override : defaultHrs}
+                    onChange={e => update('labor_hours_override', e.target.value)}
+                    placeholder={defaultHrs}
+                    className="w-16 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-0.5 text-xs text-center focus:outline-none focus:border-[#C8622A]"
+                  />
+                </div>
+                {qty > 1 && (
+                  <div className="flex justify-between text-xs border-t border-[#2a3d55] pt-2">
+                    <span className="text-[#8A9AB0]">Total hrs ({qty} devices)</span>
+                    <span className="text-[#C8622A] font-bold">{totalHrs}h</span>
+                  </div>
+                )}
+                <p className="text-[#4a5a6a] text-xs pt-1">Rates applied when pushed to proposal</p>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* ── Components ── */}
         <ComponentsSection placementId={placement.id} orgId={placement.org_id} category={product.category} product={product} />

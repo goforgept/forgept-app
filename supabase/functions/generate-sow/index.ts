@@ -132,13 +132,19 @@ Write 2 short professional paragraphs as the Scope of Work only. Do NOT list the
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 1000,
         messages: [{ role: 'user', content: prompt }]
       })
     })
 
     const claudeData = await claudeResponse.json()
+
+    if (!claudeResponse.ok || claudeData.type === 'error' || !claudeData.content?.[0]?.text) {
+      const msg = claudeData.error?.message ?? claudeData.message ?? `Claude API error ${claudeResponse.status}`
+      throw new Error(msg)
+    }
+
     const sow = claudeData.content[0].text
 
     // Step 7: Write back using service role — but only to verified proposal
