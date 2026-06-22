@@ -192,8 +192,8 @@ export default function EmbedDesigner() {
         supabase.from('cable_runs').select('cable_type, total_footage').in('drawing_sheet_id', sheetIds),
       ])
 
-      const bom: Record<string, any> = {}
-      for (const p of (placements || []) as any[]) {
+      const bom = {}
+      for (const p of placements || []) {
         const key = p.part_number_override || p.global_products?.part_number || 'unassigned'
         const qty = p.quantity ?? 1
         if (bom[key]) bom[key].quantity += qty
@@ -204,15 +204,15 @@ export default function EmbedDesigner() {
           category:     p.global_products?.category,
           quantity:     qty,
         }
-        for (const c of (p.placement_components || []) as any[]) {
+        for (const c of p.placement_components || []) {
           const ck = c.part_number || c.name
           if (bom[ck]) bom[ck].quantity += c.quantity ?? 1
           else bom[ck] = { part_number: c.part_number || null, name: c.name, manufacturer: c.manufacturer || null, category: c.component_type, quantity: c.quantity ?? 1 }
         }
       }
 
-      const cableSummary: Record<string, number> = {}
-      for (const c of (cables || []) as any[]) {
+      const cableSummary = {}
+      for (const c of cables || []) {
         cableSummary[c.cable_type] = (cableSummary[c.cable_type] || 0) + (c.total_footage || 0)
       }
 
