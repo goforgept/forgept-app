@@ -96,6 +96,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   const { getIcon, ready: iconsReady } = useCategoryIcons('white', 40)
   const [showFOV,        setShowFOV]        = useState(true)
+  const [draggingFOV,    setDraggingFOV]    = useState(null) // {rotation, fov_angle, fov_range} while handle is dragged
   const [cableMode,      setCableMode]      = useState(false)
   const [cableType,      setCableType]      = useState('Cat6')
   const [cableRuns,      setCableRuns]      = useState([])
@@ -364,6 +365,9 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       prev.map(p => p.id === updatedPlacement.id ? { ...p, ...updatedPlacement } : p)
     )
   }, [updatedPlacement])
+
+  // Reset FOV drag state when selection changes
+  useEffect(() => { setDraggingFOV(null) }, [selectedId])
 
   useEffect(() => {
     if (!updatedCable) return
@@ -1034,10 +1038,9 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               )}
             </Layer>
 
-           {/* FOV overlay layer */}
+           {/* FOV overlay layer — interactive handles on selected camera */}
             {showFOV && (
               <Layer>
-                
                 {placements.map(placement => {
                   const product = placement.global_products
                   if (!product) return null
@@ -1045,49 +1048,152 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   const fovCategories = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Fisheye Camera']
                   if (!fovCategories.includes(category)) return null
 
-                  const fovAngle    = placement.fov_angle || product.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
-                  const rangeInFeet = placement.fov_range || product.specs?.ir_range || 30
-                  // If scale calibrated use real footage, otherwise use fixed 150px as default
+                  const isSelected = selectedId === placement.id
+                  const drag       = isSelected ? draggingFOV : null
+                  const col        = placement.marker_color || '#C8622A'
+
+                  const rotation    = drag?.rotation    ?? placement.rotation    ?? 0
+                  const fovAngle    = drag?.fov_angle   ?? placement.fov_angle   ?? product.specs?.fov_angle ?? (category === 'PTZ Camera' ? 360 : 90)
+                  const rangeInFeet = drag?.fov_range   ?? placement.fov_range   ?? product.specs?.ir_range  ?? 30
+
                   const range = sheet.scale_ratio
                     ? Math.min((rangeInFeet / sheet.scale_ratio) * scale, 3000)
                     : 150 * Math.min(scale, 1)
-                  const px          = position.x + placement.x * canvasW * scale
-                  const py          = position.y + placement.y * canvasH * scale
+                  const px = position.x + placement.x * canvasW * scale
+                  const py = position.y + placement.y * canvasH * scale
 
-                  // PTZ — full circle
+                  // Helper: screen px distance → feet
+                  const pxToFt = (px) => sheet.scale_ratio
+                    ? Math.max(5, Math.round((px / scale) * sheet.scale_ratio))
+                    : Math.max(5, Math.round(px / scale / (canvasW * 0.005)))
+
+                  // Commit drag values to DB and update local state
+                  const commitFOV = async (updates) => {
+                    await supabase.from('drawing_placements').update(updates).eq('id', placement.id)
+                    setPlacements(prev => prev.map(p => p.id === placement.id ? { ...p, ...updates } : p))
+                    onPlacementSelect?.({ ...placement, ...updates })
+                    setDraggingFOV(null)
+                  }
+
+                  // PTZ / full circle
                   if (category === 'PTZ Camera' || fovAngle >= 355) {
                     return (
-                      <Circle key={`fov_${placement.id}`}
-                        x={px} y={py} radius={range}
-                        fill="rgba(200,98,42,0.08)"
-                        stroke="rgba(200,98,42,0.3)"
-                        strokeWidth={1} listening={false} />
+                      <Group key={`fov_${placement.id}`}>
+                        <Circle x={px} y={py} radius={range}
+                          fill={`${col}14`} stroke={`${col}55`} strokeWidth={isSelected ? 1.5 : 1}
+                          listening={false} />
+                        {/* Range handle — drag south edge to resize */}
+                        {isSelected && (
+                          <Circle x={px} y={py + range} radius={7}
+                            fill={col} stroke="white" strokeWidth={2}
+                            draggable listening
+                            onMouseEnter={() => { const s = stageRef.current; if (s) s.container().style.cursor = 'ns-resize' }}
+                            onMouseLeave={() => { const s = stageRef.current; if (s) s.container().style.cursor = selectedSymbol ? 'crosshair' : 'grab' }}
+                            onDragMove={(e) => {
+                              e.cancelBubble = true
+                              const dx = e.target.x() - px, dy = e.target.y() - py
+                              setDraggingFOV({ rotation, fov_angle: fovAngle, fov_range: pxToFt(Math.sqrt(dx*dx + dy*dy)) })
+                            }}
+                            onDragEnd={async () => { if (draggingFOV) await commitFOV({ fov_range: draggingFOV.fov_range }) }}
+                          />
+                        )}
+                      </Group>
                     )
                   }
 
-                  // Directional — wedge using Shape with local coords
-                  const startAngle = ((placement.rotation || 0) - fovAngle / 2) * Math.PI / 180
-                  const endAngle   = ((placement.rotation || 0) + fovAngle / 2) * Math.PI / 180
-                  const steps      = Math.max(16, Math.floor(fovAngle / 5))
-
-                  // Build points array for Line — center + arc points + back to center
+                  // Directional cone
+                  const rotRad   = rotation * Math.PI / 180
+                  const halfRad  = (fovAngle / 2) * Math.PI / 180
+                  const sa = rotRad - halfRad
+                  const ea = rotRad + halfRad
+                  const steps = Math.max(16, Math.floor(fovAngle / 5))
                   const linePoints = [px, py]
                   for (let i = 0; i <= steps; i++) {
-                    const angle = startAngle + (endAngle - startAngle) * (i / steps)
-                    linePoints.push(px + Math.cos(angle) * range)
-                    linePoints.push(py + Math.sin(angle) * range)
+                    const a = sa + (ea - sa) * (i / steps)
+                    linePoints.push(px + Math.cos(a) * range, py + Math.sin(a) * range)
                   }
                   linePoints.push(px, py)
 
+                  // Handle positions
+                  const dhx = px + Math.cos(rotRad) * range        // center-front (direction + range)
+                  const dhy = py + Math.sin(rotRad) * range
+                  const lhx = px + Math.cos(sa) * range            // left edge (angle)
+                  const lhy = py + Math.sin(sa) * range
+                  const rhx = px + Math.cos(ea) * range            // right edge (angle)
+                  const rhy = py + Math.sin(ea) * range
+
                   return (
-                    <Line key={`fov_${placement.id}`}
-                      points={linePoints}
-                      fill="rgba(200,98,42,0.12)"
-                      stroke="rgba(200,98,42,0.4)"
-                      strokeWidth={1}
-                      closed={true}
-                      listening={false}
-                    />
+                    <Group key={`fov_${placement.id}`}>
+                      {/* Cone fill */}
+                      <Line points={linePoints}
+                        fill={isSelected ? `${col}22` : `${col}1a`}
+                        stroke={isSelected ? col : `${col}55`}
+                        strokeWidth={isSelected ? 1.5 : 1}
+                        closed={true} listening={false} />
+
+                      {/* Interactive handles — only for selected camera */}
+                      {isSelected && !cableMode && (
+                        <>
+                          {/* ── Direction + range handle (center-front of cone) ── */}
+                          <Circle x={dhx} y={dhy} radius={7}
+                            fill={col} stroke="white" strokeWidth={2.5}
+                            draggable listening
+                            onMouseEnter={() => { const s = stageRef.current; if (s) s.container().style.cursor = 'move' }}
+                            onMouseLeave={() => { const s = stageRef.current; if (s) s.container().style.cursor = selectedSymbol ? 'crosshair' : 'grab' }}
+                            onDragMove={(e) => {
+                              e.cancelBubble = true
+                              const dx = e.target.x() - px, dy = e.target.y() - py
+                              const newRot = Math.round(Math.atan2(dy, dx) * 180 / Math.PI)
+                              const newRange = pxToFt(Math.sqrt(dx*dx + dy*dy))
+                              setDraggingFOV(prev => ({ fov_angle: fovAngle, ...(prev||{}), rotation: newRot, fov_range: newRange }))
+                            }}
+                            onDragEnd={async () => {
+                              if (draggingFOV) await commitFOV({ rotation: draggingFOV.rotation, fov_range: draggingFOV.fov_range })
+                            }}
+                          />
+
+                          {/* ── Left edge handle (FOV angle) ── */}
+                          <Circle x={lhx} y={lhy} radius={5}
+                            fill="white" stroke={col} strokeWidth={2}
+                            draggable listening
+                            onMouseEnter={() => { const s = stageRef.current; if (s) s.container().style.cursor = 'ew-resize' }}
+                            onMouseLeave={() => { const s = stageRef.current; if (s) s.container().style.cursor = selectedSymbol ? 'crosshair' : 'grab' }}
+                            onDragMove={(e) => {
+                              e.cancelBubble = true
+                              const dx = e.target.x() - px, dy = e.target.y() - py
+                              let diff = (Math.atan2(dy, dx) * 180 / Math.PI) - rotation
+                              while (diff > 180) diff -= 360
+                              while (diff < -180) diff += 360
+                              const newAngle = Math.max(10, Math.min(350, Math.round(Math.abs(diff) * 2)))
+                              setDraggingFOV(prev => ({ rotation, fov_range: rangeInFeet, ...(prev||{}), fov_angle: newAngle }))
+                            }}
+                            onDragEnd={async () => {
+                              if (draggingFOV) await commitFOV({ fov_angle: draggingFOV.fov_angle })
+                            }}
+                          />
+
+                          {/* ── Right edge handle (FOV angle, mirrors left) ── */}
+                          <Circle x={rhx} y={rhy} radius={5}
+                            fill="white" stroke={col} strokeWidth={2}
+                            draggable listening
+                            onMouseEnter={() => { const s = stageRef.current; if (s) s.container().style.cursor = 'ew-resize' }}
+                            onMouseLeave={() => { const s = stageRef.current; if (s) s.container().style.cursor = selectedSymbol ? 'crosshair' : 'grab' }}
+                            onDragMove={(e) => {
+                              e.cancelBubble = true
+                              const dx = e.target.x() - px, dy = e.target.y() - py
+                              let diff = (Math.atan2(dy, dx) * 180 / Math.PI) - rotation
+                              while (diff > 180) diff -= 360
+                              while (diff < -180) diff += 360
+                              const newAngle = Math.max(10, Math.min(350, Math.round(Math.abs(diff) * 2)))
+                              setDraggingFOV(prev => ({ rotation, fov_range: rangeInFeet, ...(prev||{}), fov_angle: newAngle }))
+                            }}
+                            onDragEnd={async () => {
+                              if (draggingFOV) await commitFOV({ fov_angle: draggingFOV.fov_angle })
+                            }}
+                          />
+                        </>
+                      )}
+                    </Group>
                   )
                 })}
               </Layer>
