@@ -219,7 +219,7 @@ export default function EmbedDesigner() {
       const payload = {
         type:        'forgept:export',
         proposal_id: proposalId,
-        devices:     Object.values(bom).sort((a: any, b: any) => (a.category || '').localeCompare(b.category || '')),
+        devices:     Object.values(bom).sort((a, b) => (a.category || '').localeCompare(b.category || '')),
         cables:      Object.entries(cableSummary).map(([cable_type, footage]) => ({ cable_type, footage })),
       }
 
