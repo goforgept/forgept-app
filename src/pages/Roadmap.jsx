@@ -46,29 +46,60 @@ const emptyForm = { title: '', description: '', category: 'feature', target_quar
 
 export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices }) {
   const { profile } = useProfile()
-  const [items, setItems]             = useState([])
-  const [teamMembers, setTeamMembers] = useState([])
-  const [loading, setLoading]         = useState(true)
-  const [showModal, setShowModal]     = useState(false)
-  const [editItem, setEditItem]       = useState(null)
-  const [form, setForm]               = useState(emptyForm)
-  const [saving, setSaving]           = useState(false)
-  const [error, setError]             = useState(null)
-  const [showRequest, setShowRequest] = useState(false)
-  const [reqForm, setReqForm]         = useState({ title: '', description: '', category: 'feature' })
-  const [submitting, setSubmitting]   = useState(false)
-  const [drawer, setDrawer]           = useState(null)
-  const [view, setView]               = useState('board') // 'board' | 'report'
+  const [items, setItems]               = useState([])
+  const [assigneesMap, setAssigneesMap] = useState({}) // { [item_id]: [{profile_id, full_name, org_role}] }
+  const [teamMembers, setTeamMembers]   = useState([])
+  const [loading, setLoading]           = useState(true)
+  const [showModal, setShowModal]       = useState(false)
+  const [editItem, setEditItem]         = useState(null)
+  const [form, setForm]                 = useState(emptyForm)
+  const [saving, setSaving]             = useState(false)
+  const [error, setError]               = useState(null)
+  const [showRequest, setShowRequest]   = useState(false)
+  const [reqForm, setReqForm]           = useState({ title: '', description: '', category: 'feature' })
+  const [submitting, setSubmitting]     = useState(false)
+  const [drawer, setDrawer]             = useState(null)
+  const [view, setView]                 = useState('board') // 'board' | 'mywork' | 'report'
 
-  const orgId       = profile?.org_id
-  const userIsAdmin = profile?.org_role === 'admin' || profile?.role === 'admin' || isDevTeam || isProductManager
+  const orgId           = profile?.org_id
+  const profileId       = profile?.id
+  const userIsAdmin     = profile?.org_role === 'admin' || profile?.role === 'admin' || isDevTeam || isProductManager
 
-  useEffect(() => {
-    if (orgId) { fetchItems(); fetchTeamMembers() }
-  }, [orgId])
+  useEffect(() => { if (orgId) loadAll() }, [orgId])
+
+  const loadAll = async () => {
+    setLoading(true)
+    const [{ data: itemData }, { data: assigneeData }, { data: memberData }] = await Promise.all([
+      supabase
+        .from('roadmap_items')
+        .select('*, profiles!roadmap_items_requested_by_fkey(full_name)')
+        .eq('org_id', orgId)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('roadmap_item_assignees')
+        .select('item_id, profile_id, profiles(full_name, org_role)'),
+      supabase
+        .from('profiles')
+        .select('id, full_name, org_role')
+        .eq('org_id', orgId)
+        .in('org_role', ['admin', 'dev', 'product_manager'])
+        .order('full_name'),
+    ])
+
+    setItems(itemData || [])
+    setTeamMembers(memberData || [])
+
+    const map = {}
+    for (const row of (assigneeData || [])) {
+      if (!map[row.item_id]) map[row.item_id] = []
+      map[row.item_id].push({ profile_id: row.profile_id, ...row.profiles })
+    }
+    setAssigneesMap(map)
+    setLoading(false)
+  }
 
   const fetchItems = async () => {
-    setLoading(true)
     const { data } = await supabase
       .from('roadmap_items')
       .select('*, profiles!roadmap_items_requested_by_fkey(full_name)')
@@ -76,20 +107,28 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
       .order('sort_order', { ascending: true })
       .order('created_at', { ascending: false })
     setItems(data || [])
-    setLoading(false)
   }
 
-  const fetchTeamMembers = async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, org_role')
-      .eq('org_id', orgId)
-      .in('org_role', ['admin', 'dev', 'product_manager'])
-      .order('full_name')
-    setTeamMembers(data || [])
+  const addAssignee = async (itemId, pid) => {
+    if (!pid) return
+    if ((assigneesMap[itemId] || []).find(a => a.profile_id === pid)) return
+    await supabase.from('roadmap_item_assignees').insert({ item_id: itemId, profile_id: pid })
+    const member = teamMembers.find(m => m.id === pid)
+    setAssigneesMap(prev => ({
+      ...prev,
+      [itemId]: [...(prev[itemId] || []), { profile_id: pid, full_name: member?.full_name, org_role: member?.org_role }],
+    }))
   }
 
-  const assigneeName = (id) => teamMembers.find(m => m.id === id)?.full_name || null
+  const removeAssignee = async (itemId, pid) => {
+    await supabase.from('roadmap_item_assignees').delete().eq('item_id', itemId).eq('profile_id', pid)
+    setAssigneesMap(prev => ({
+      ...prev,
+      [itemId]: (prev[itemId] || []).filter(a => a.profile_id !== pid),
+    }))
+  }
+
+  const getAssignees = (itemId) => assigneesMap[itemId] || []
 
   const openCreate = () => { setForm(emptyForm); setEditItem(null); setShowModal(true); setError(null) }
   const openEdit   = (item) => {
@@ -114,7 +153,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
   }
 
   const updateStatus = async (id, status) => {
-    const updates = { status, ...(status !== 'backlog' && status !== 'declined' ? { approved_by: profile?.id } : {}) }
+    const updates = { status, ...(status !== 'backlog' && status !== 'declined' ? { approved_by: profileId } : {}) }
     await supabase.from('roadmap_items').update(updates).eq('id', id)
     setItems(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i))
   }
@@ -131,7 +170,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
     setSubmitting(true)
     await supabase.from('roadmap_items').insert({
       org_id: orgId, title: reqForm.title, description: reqForm.description,
-      category: reqForm.category, status: 'backlog', requested_by: profile?.id,
+      category: reqForm.category, status: 'backlog', requested_by: profileId,
     })
     setSubmitting(false)
     setShowRequest(false)
@@ -139,8 +178,9 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
     fetchItems()
   }
 
-  const byStatus = (status) => items.filter(i => i.status === status)
-  const drawerItem = items.find(i => i.id === drawer) || null
+  const byStatus    = (status) => items.filter(i => i.status === status)
+  const myItems     = items.filter(i => getAssignees(i.id).some(a => a.profile_id === profileId))
+  const drawerItem  = items.find(i => i.id === drawer) || null
 
   const sidebarProps = { isAdmin, isDevTeam, isProductManager, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices }
 
@@ -166,38 +206,39 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {/* View toggle — admin only */}
+            {/* View toggle */}
             {userIsAdmin && (
               <div className="flex bg-[#1a2d45] border border-[#2a3d55] rounded-lg p-1 gap-1">
                 <button onClick={() => setView('board')}
                   className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'board' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
                   Board
                 </button>
-                <button onClick={() => setView('report')}
-                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'report' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
-                  Report
-                </button>
+                {isDevTeam && (
+                  <button onClick={() => setView('mywork')}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'mywork' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                    My Work {myItems.length > 0 && <span className="ml-1 bg-white/20 rounded-full px-1.5">{myItems.length}</span>}
+                  </button>
+                )}
+                {(isAdmin || isProductManager) && (
+                  <button onClick={() => setView('report')}
+                    className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'report' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                    Report
+                  </button>
+                )}
               </div>
             )}
-            {!userIsAdmin && (
-              <button onClick={() => setShowRequest(true)}
-                className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
-                + Submit Request
+
+            <button onClick={() => setShowRequest(true)}
+              className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
+              + Submit Request
+            </button>
+            {userIsAdmin && view === 'board' && (
+              <button onClick={openCreate}
+                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                + Add Item
               </button>
             )}
-            {userIsAdmin && view === 'board' && (
-              <>
-                <button onClick={() => setShowRequest(true)}
-                  className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
-                  + Submit Request
-                </button>
-                <button onClick={openCreate}
-                  className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-                  + Add Item
-                </button>
-              </>
-            )}
-            {userIsAdmin && view === 'report' && (
+            {view === 'report' && (
               <button onClick={() => window.print()}
                 className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
                 🖨 Print / Export
@@ -206,91 +247,139 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
           </div>
         </div>
 
-        {/* ── Board view ── */}
-        {(view === 'board' || !userIsAdmin) && (
-          <>
-            {userIsAdmin ? (
-              <div className="grid grid-cols-5 gap-4">
-                {ADMIN_COLUMNS.map(status => {
+        {/* ── Board ── */}
+        {view === 'board' && userIsAdmin && (
+          <div className="grid grid-cols-5 gap-4">
+            {ADMIN_COLUMNS.map(status => {
+              const meta = STATUS_META[status]
+              const col  = byStatus(status)
+              return (
+                <div key={status} className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={`w-2 h-2 rounded-full ${meta.dot}`} />
+                    <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>{meta.label}</span>
+                    <span className="text-[#8A9AB0] text-xs ml-auto">{col.length}</span>
+                  </div>
+                  {col.length === 0 && (
+                    <div className="border border-dashed border-[#2a3d55] rounded-xl p-4 text-center">
+                      <p className="text-[#8A9AB0] text-xs">Empty</p>
+                    </div>
+                  )}
+                  {col.map(item => (
+                    <AdminCard key={item.id} item={item} currentStatus={status}
+                      assignees={getAssignees(item.id)}
+                      onOpen={() => setDrawer(item.id)}
+                      onEdit={() => openEdit(item)}
+                      onDelete={() => deleteItem(item.id)}
+                      onStatusChange={(s) => updateStatus(item.id, s)} />
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* ── My Work (dev only) ── */}
+        {view === 'mywork' && isDevTeam && (
+          <div className="space-y-8 max-w-4xl">
+            {myItems.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-white font-semibold mb-2">Nothing assigned to you yet.</p>
+                <p className="text-[#8A9AB0] text-sm">Ask your product manager to assign items to you.</p>
+              </div>
+            ) : (
+              <>
+                {['in_progress', 'planned', 'backlog', 'released', 'declined'].map(status => {
+                  const mine = myItems.filter(i => i.status === status)
+                  if (mine.length === 0) return null
                   const meta = STATUS_META[status]
-                  const col  = byStatus(status)
                   return (
-                    <div key={status} className="flex flex-col gap-3">
-                      <div className="flex items-center gap-2 mb-1">
+                    <div key={status}>
+                      <div className="flex items-center gap-2 mb-4">
                         <div className={`w-2 h-2 rounded-full ${meta.dot}`} />
-                        <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>{meta.label}</span>
-                        <span className="text-[#8A9AB0] text-xs ml-auto">{col.length}</span>
+                        <h3 className={`font-semibold text-sm uppercase tracking-wide ${meta.color}`}>{meta.label}</h3>
+                        <span className="text-[#8A9AB0] text-xs">({mine.length})</span>
                       </div>
-                      {col.length === 0 && (
-                        <div className="border border-dashed border-[#2a3d55] rounded-xl p-4 text-center">
-                          <p className="text-[#8A9AB0] text-xs">Empty</p>
-                        </div>
-                      )}
-                      {col.map(item => (
-                        <AdminCard key={item.id} item={item} currentStatus={status}
-                          assigneeName={assigneeName(item.assigned_to)}
-                          onOpen={() => setDrawer(item.id)}
-                          onEdit={() => openEdit(item)}
-                          onDelete={() => deleteItem(item.id)}
-                          onStatusChange={(s) => updateStatus(item.id, s)} />
-                      ))}
+                      <div className="space-y-2">
+                        {mine.map(item => {
+                          const release = item.target_quarter || fmtDate(item.target_date)
+                          return (
+                            <button key={item.id} onClick={() => setDrawer(item.id)}
+                              className="w-full text-left bg-[#1a2d45] border border-[#2a3d55] hover:border-[#C8622A]/40 rounded-xl px-5 py-4 flex items-start gap-4 transition-colors">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white font-semibold text-sm">{item.title}</p>
+                                {item.description && <p className="text-[#8A9AB0] text-xs mt-1 line-clamp-2">{item.description}</p>}
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[item.category]}`}>
+                                  {CATEGORY_LABELS[item.category]}
+                                </span>
+                                {release && <span className="text-[#C8622A] text-xs font-semibold">{release}</span>}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
                   )
                 })}
-              </div>
-            ) : (
-              <div className="space-y-8">
-                <div>
-                  <div className="flex items-center gap-2 mb-4">
-                    <div className="w-2 h-2 rounded-full bg-blue-400" />
-                    <h3 className="text-white font-semibold">Coming Up</h3>
-                    <span className="text-[#8A9AB0] text-xs">{byStatus('planned').length + byStatus('in_progress').length} items</span>
-                  </div>
-                  {byStatus('planned').length === 0 && byStatus('in_progress').length === 0 ? (
-                    <p className="text-[#8A9AB0] text-sm">Nothing planned yet — check back soon.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {[...byStatus('in_progress'), ...byStatus('planned')].map(item => (
-                        <RepCard key={item.id} item={item} onOpen={() => setDrawer(item.id)} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {byStatus('released').length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="w-2 h-2 rounded-full bg-green-400" />
-                      <h3 className="text-white font-semibold">Released</h3>
-                      <span className="text-[#8A9AB0] text-xs">{byStatus('released').length} items</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {byStatus('released').map(item => (
-                        <RepCard key={item.id} item={item} released onOpen={() => setDrawer(item.id)} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {items.filter(i => i.requested_by === profile?.id).length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 mb-4">
-                      <div className="w-2 h-2 rounded-full bg-[#C8622A]" />
-                      <h3 className="text-white font-semibold">My Requests</h3>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {items.filter(i => i.requested_by === profile?.id).map(item => (
-                        <RepCard key={item.id} item={item} showStatus onOpen={() => setDrawer(item.id)} />
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              </>
             )}
-          </>
+          </div>
         )}
 
-        {/* ── Report view ── */}
-        {view === 'report' && userIsAdmin && (
-          <ReportView items={items} teamMembers={teamMembers} assigneeName={assigneeName} />
+        {/* ── Report ── */}
+        {view === 'report' && (isAdmin || isProductManager) && (
+          <ReportView items={items} getAssignees={getAssignees} />
+        )}
+
+        {/* ── Rep view ── */}
+        {!userIsAdmin && (
+          <div className="space-y-8">
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 rounded-full bg-blue-400" />
+                <h3 className="text-white font-semibold">Coming Up</h3>
+                <span className="text-[#8A9AB0] text-xs">{byStatus('planned').length + byStatus('in_progress').length} items</span>
+              </div>
+              {byStatus('planned').length === 0 && byStatus('in_progress').length === 0 ? (
+                <p className="text-[#8A9AB0] text-sm">Nothing planned yet — check back soon.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {[...byStatus('in_progress'), ...byStatus('planned')].map(item => (
+                    <RepCard key={item.id} item={item} onOpen={() => setDrawer(item.id)} />
+                  ))}
+                </div>
+              )}
+            </div>
+            {byStatus('released').length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-2 h-2 rounded-full bg-green-400" />
+                  <h3 className="text-white font-semibold">Released</h3>
+                  <span className="text-[#8A9AB0] text-xs">{byStatus('released').length} items</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {byStatus('released').map(item => (
+                    <RepCard key={item.id} item={item} released onOpen={() => setDrawer(item.id)} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {items.filter(i => i.requested_by === profileId).length > 0 && (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-2 h-2 rounded-full bg-[#C8622A]" />
+                  <h3 className="text-white font-semibold">My Requests</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {items.filter(i => i.requested_by === profileId).map(item => (
+                    <RepCard key={item.id} item={item} showStatus onOpen={() => setDrawer(item.id)} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -302,6 +391,9 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
           profile={profile}
           userIsAdmin={userIsAdmin}
           teamMembers={teamMembers}
+          assignees={getAssignees(drawerItem.id)}
+          onAddAssignee={(pid) => addAssignee(drawerItem.id, pid)}
+          onRemoveAssignee={(pid) => removeAssignee(drawerItem.id, pid)}
           onClose={() => setDrawer(null)}
           onEdit={() => { openEdit(drawerItem); setDrawer(null) }}
           onStatusChange={(s) => updateStatus(drawerItem.id, s)}
@@ -309,7 +401,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
         />
       )}
 
-      {/* Admin add/edit modal */}
+      {/* Add/edit modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
@@ -362,7 +454,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
         </div>
       )}
 
-      {/* Rep / team request modal */}
+      {/* Request modal */}
       {showRequest && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
@@ -403,32 +495,26 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
   )
 }
 
-// ── Leadership Report View ─────────────────────────────────────────────────────
-function ReportView({ items, teamMembers, assigneeName }) {
+// ── Leadership Report ──────────────────────────────────────────────────────────
+function ReportView({ items, getAssignees }) {
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-
-  const REPORT_SECTIONS = [
+  const SECTIONS = [
     { status: 'in_progress', label: 'In Progress',  border: 'border-blue-500/30',   dot: 'bg-blue-400' },
     { status: 'planned',     label: 'Planned',       border: 'border-yellow-500/30', dot: 'bg-yellow-400' },
     { status: 'released',    label: 'Released',      border: 'border-green-500/30',  dot: 'bg-green-400' },
     { status: 'backlog',     label: 'Backlog',       border: 'border-[#2a3d55]',     dot: 'bg-[#8A9AB0]' },
     { status: 'declined',    label: 'Declined',      border: 'border-red-500/30',    dot: 'bg-red-400' },
   ]
-
   const byStatus = (s) => items.filter(i => i.status === s)
-  const total = items.length
 
   return (
     <div className="max-w-4xl mx-auto print:max-w-none">
-      {/* Report header */}
       <div className="mb-8 pb-6 border-b border-[#2a3d55] print:border-gray-300">
         <h1 className="text-white text-3xl font-bold mb-1 print:text-black">Product Roadmap</h1>
         <p className="text-[#8A9AB0] text-sm print:text-gray-500">Generated {today}</p>
       </div>
-
-      {/* Summary stats */}
       <div className="grid grid-cols-5 gap-3 mb-8">
-        {REPORT_SECTIONS.map(s => (
+        {SECTIONS.map(s => (
           <div key={s.status} className={`bg-[#1a2d45] border ${s.border} rounded-xl p-4 text-center print:bg-white print:border-gray-200`}>
             <div className={`w-2 h-2 rounded-full ${s.dot} mx-auto mb-2`} />
             <p className="text-white text-2xl font-bold print:text-black">{byStatus(s.status).length}</p>
@@ -436,9 +522,7 @@ function ReportView({ items, teamMembers, assigneeName }) {
           </div>
         ))}
       </div>
-
-      {/* Sections */}
-      {REPORT_SECTIONS.filter(s => byStatus(s.status).length > 0).map(s => (
+      {SECTIONS.filter(s => byStatus(s.status).length > 0).map(s => (
         <div key={s.status} className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <div className={`w-2.5 h-2.5 rounded-full ${s.dot}`} />
@@ -447,26 +531,22 @@ function ReportView({ items, teamMembers, assigneeName }) {
           </div>
           <div className="space-y-2">
             {byStatus(s.status).map(item => {
-              const release = item.target_quarter || fmtDate(item.target_date)
-              const owner   = assigneeName(item.assigned_to)
+              const assignees = getAssignees(item.id)
+              const release   = item.target_quarter || fmtDate(item.target_date)
               return (
                 <div key={item.id} className={`bg-[#1a2d45] border ${s.border} rounded-xl px-5 py-4 flex items-start gap-4 print:bg-white print:border-gray-200`}>
                   <div className="flex-1 min-w-0">
                     <p className="text-white font-semibold text-sm print:text-black">{item.title}</p>
-                    {item.description && (
-                      <p className="text-[#8A9AB0] text-xs mt-1 leading-relaxed print:text-gray-500">{item.description}</p>
-                    )}
+                    {item.description && <p className="text-[#8A9AB0] text-xs mt-1 leading-relaxed print:text-gray-500">{item.description}</p>}
                   </div>
-                  <div className="flex items-center gap-3 flex-shrink-0 text-right">
+                  <div className="flex items-center gap-3 flex-shrink-0">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[item.category]}`}>
                       {CATEGORY_LABELS[item.category]}
                     </span>
-                    {owner && (
-                      <span className="text-[#8A9AB0] text-xs print:text-gray-500">{owner}</span>
+                    {assignees.length > 0 && (
+                      <span className="text-[#8A9AB0] text-xs">{assignees.map(a => a.full_name).join(', ')}</span>
                     )}
-                    {release && (
-                      <span className="text-[#C8622A] text-xs font-semibold">{release}</span>
-                    )}
+                    {release && <span className="text-[#C8622A] text-xs font-semibold">{release}</span>}
                   </div>
                 </div>
               )
@@ -474,16 +554,12 @@ function ReportView({ items, teamMembers, assigneeName }) {
           </div>
         </div>
       ))}
-
-      {total === 0 && (
-        <p className="text-[#8A9AB0] text-center py-12">No roadmap items yet.</p>
-      )}
     </div>
   )
 }
 
 // ── Item Drawer ────────────────────────────────────────────────────────────────
-function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, onClose, onEdit, onStatusChange, onItemUpdate }) {
+function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees, onAddAssignee, onRemoveAssignee, onClose, onEdit, onStatusChange, onItemUpdate }) {
   const [notes, setNotes]               = useState([])
   const [noteBody, setNoteBody]         = useState('')
   const [posting, setPosting]           = useState(false)
@@ -496,6 +572,8 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, onClose, o
 
   const moves = NEXT_STATUSES[item.status] || []
   const meta  = STATUS_META[item.status]
+
+  const unassigned = teamMembers.filter(m => !assignees.find(a => a.profile_id === m.id))
 
   useEffect(() => { fetchNotes() }, [item.id])
 
@@ -535,12 +613,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, onClose, o
     setEditingRelease(false)
   }
 
-  const assignTo = async (userId) => {
-    const patch = { assigned_to: userId || null }
-    await supabase.from('roadmap_items').update(patch).eq('id', item.id)
-    onItemUpdate(patch)
-  }
-
+  const roleLabel = (r) => r === 'product_manager' ? 'Product Mgr' : r === 'dev' ? 'Dev' : 'Admin'
   const displayRelease = item.target_quarter || fmtDateLong(item.target_date)
 
   return (
@@ -572,7 +645,6 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, onClose, o
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
 
-          {/* Description */}
           {item.description && (
             <div>
               <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">Description</p>
@@ -580,21 +652,41 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, onClose, o
             </div>
           )}
 
-          {/* Assigned To */}
+          {/* Assignees */}
           {userIsAdmin && (
             <div>
               <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Assigned To</p>
-              <select
-                value={item.assigned_to || ''}
-                onChange={e => assignTo(e.target.value || null)}
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                <option value="">— Unassigned —</option>
-                {teamMembers.map(m => (
-                  <option key={m.id} value={m.id}>
-                    {m.full_name} ({m.org_role === 'product_manager' ? 'Product Mgr' : m.org_role === 'dev' ? 'Dev' : 'Admin'})
-                  </option>
-                ))}
-              </select>
+              {/* Current assignees as chips */}
+              {assignees.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {assignees.map(a => (
+                    <div key={a.profile_id} className="flex items-center gap-1.5 bg-[#0F1C2E] border border-[#2a3d55] rounded-full pl-3 pr-2 py-1">
+                      <span className="text-white text-xs font-medium">{a.full_name}</span>
+                      <span className="text-[#8A9AB0] text-xs">· {roleLabel(a.org_role)}</span>
+                      <button onClick={() => onRemoveAssignee(a.profile_id)}
+                        className="text-[#8A9AB0] hover:text-red-400 transition-colors ml-1 text-xs leading-none">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Add person */}
+              {unassigned.length > 0 && (
+                <select
+                  value=""
+                  onChange={e => { if (e.target.value) onAddAssignee(e.target.value) }}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  <option value="">+ Add person…</option>
+                  {unassigned.map(m => (
+                    <option key={m.id} value={m.id}>{m.full_name} ({roleLabel(m.org_role)})</option>
+                  ))}
+                </select>
+              )}
+              {unassigned.length === 0 && assignees.length > 0 && (
+                <p className="text-[#8A9AB0] text-xs">All team members assigned.</p>
+              )}
+              {teamMembers.length === 0 && (
+                <p className="text-[#8A9AB0] text-xs">No dev or product manager profiles in this org yet.</p>
+              )}
             </div>
           )}
 
@@ -660,7 +752,6 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, onClose, o
             </div>
           )}
 
-          {/* Edit details */}
           {userIsAdmin && (
             <button onClick={onEdit}
               className="w-full px-3 py-2 bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] hover:text-white rounded-lg text-xs font-medium transition-colors text-left">
@@ -668,7 +759,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, onClose, o
             </button>
           )}
 
-          {/* Team notes — admin/dev/PM only */}
+          {/* Team notes */}
           {userIsAdmin && (
             <div>
               <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">
@@ -707,9 +798,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, onClose, o
         {/* Note input */}
         {userIsAdmin && (
           <div className="px-6 py-4 border-t border-[#2a3d55] flex-shrink-0">
-            <textarea
-              ref={textareaRef}
-              value={noteBody}
+            <textarea ref={textareaRef} value={noteBody}
               onChange={e => setNoteBody(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) postNote() }}
               placeholder="Add a team note… (⌘↵ to post)"
@@ -735,7 +824,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, onClose, o
 }
 
 // ── Admin Kanban card ──────────────────────────────────────────────────────────
-function AdminCard({ item, currentStatus, assigneeName, onOpen, onEdit, onDelete, onStatusChange }) {
+function AdminCard({ item, currentStatus, assignees, onOpen, onEdit, onDelete, onStatusChange }) {
   const moves = (NEXT_STATUSES[currentStatus] || []).slice(0, 2)
   const displayRelease = item.target_quarter || fmtDate(item.target_date)
 
@@ -763,12 +852,15 @@ function AdminCard({ item, currentStatus, assigneeName, onOpen, onEdit, onDelete
           </span>
         )}
       </div>
-      <div className="flex items-center justify-between mb-2 min-h-[16px]">
+      {/* Requestor + assignees */}
+      <div className="mb-2 space-y-0.5">
         {item.profiles?.full_name && (
           <p className="text-[#8A9AB0] text-xs">↑ {item.profiles.full_name}</p>
         )}
-        {assigneeName && (
-          <p className="text-blue-400 text-xs ml-auto">→ {assigneeName}</p>
+        {assignees.length > 0 && (
+          <p className="text-blue-400 text-xs">
+            → {assignees.slice(0, 2).map(a => a.full_name).join(', ')}{assignees.length > 2 ? ` +${assignees.length - 2}` : ''}
+          </p>
         )}
       </div>
       <div className="flex flex-col gap-1">
@@ -786,7 +878,7 @@ function AdminCard({ item, currentStatus, assigneeName, onOpen, onEdit, onDelete
   )
 }
 
-// ── Rep read-only card ─────────────────────────────────────────────────────────
+// ── Rep card ──────────────────────────────────────────────────────────────────
 function RepCard({ item, released = false, showStatus = false, onOpen }) {
   const statusBadge = {
     backlog: 'bg-[#8A9AB0]/20 text-[#8A9AB0]', planned: 'bg-yellow-500/20 text-yellow-400',
