@@ -60,6 +60,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
   const [submitting, setSubmitting]     = useState(false)
   const [drawer, setDrawer]             = useState(null)
   const [view, setView]                 = useState('board') // 'board' | 'mywork' | 'report'
+  const [showArchived, setShowArchived] = useState(false)
 
   const orgId           = profile?.org_id
   const profileId       = profile?.id
@@ -165,6 +166,19 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
     if (drawer === id) setDrawer(null)
   }
 
+  const archiveItem = async (id) => {
+    const archived_at = new Date().toISOString()
+    await supabase.from('roadmap_items').update({ archived_at }).eq('id', id)
+    setItems(prev => prev.map(i => i.id === id ? { ...i, archived_at } : i))
+    setDrawer(null)
+  }
+
+  const restoreItem = async (id) => {
+    await supabase.from('roadmap_items').update({ archived_at: null }).eq('id', id)
+    setItems(prev => prev.map(i => i.id === id ? { ...i, archived_at: null } : i))
+    setDrawer(null)
+  }
+
   const submitRequest = async () => {
     if (!reqForm.title.trim()) return
     setSubmitting(true)
@@ -178,9 +192,12 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
     fetchItems()
   }
 
-  const byStatus    = (status) => items.filter(i => i.status === status)
-  const myItems     = items.filter(i => getAssignees(i.id).some(a => a.profile_id === profileId))
-  const drawerItem  = items.find(i => i.id === drawer) || null
+  const activeItems   = items.filter(i => !i.archived_at)
+  const archivedItems = items.filter(i => !!i.archived_at)
+  const visibleItems  = showArchived ? archivedItems : activeItems
+  const byStatus      = (status) => visibleItems.filter(i => i.status === status)
+  const myItems       = activeItems.filter(i => getAssignees(i.id).some(a => a.profile_id === profileId))
+  const drawerItem    = items.find(i => i.id === drawer) || null
 
   const sidebarProps = { isAdmin, isDevTeam, isProductManager, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices }
 
@@ -228,11 +245,20 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
               </div>
             )}
 
-            <button onClick={() => setShowRequest(true)}
-              className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
-              + Submit Request
-            </button>
-            {userIsAdmin && view === 'board' && (
+            {userIsAdmin && (
+              <button
+                onClick={() => { setShowArchived(p => !p); setDrawer(null) }}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors border ${showArchived ? 'bg-[#2a3d55] border-[#2a3d55] text-white' : 'bg-[#1a2d45] border-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+                {showArchived ? '← Active Board' : `Archive${archivedItems.length > 0 ? ` (${archivedItems.length})` : ''}`}
+              </button>
+            )}
+            {!showArchived && (
+              <button onClick={() => setShowRequest(true)}
+                className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
+                + Submit Request
+              </button>
+            )}
+            {userIsAdmin && view === 'board' && !showArchived && (
               <button onClick={openCreate}
                 className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                 + Add Item
@@ -247,8 +273,64 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
           </div>
         </div>
 
+        {/* ── Archived view ── */}
+        {showArchived && userIsAdmin && (
+          <div className="max-w-4xl">
+            {archivedItems.length === 0 ? (
+              <div className="text-center py-16">
+                <p className="text-white font-semibold mb-2">No archived items.</p>
+                <p className="text-[#8A9AB0] text-sm">Archive items from the board to clean up old releases.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {['released', 'declined', 'in_progress', 'planned', 'backlog'].map(status => {
+                  const group = archivedItems.filter(i => i.status === status)
+                  if (group.length === 0) return null
+                  const meta = STATUS_META[status]
+                  return (
+                    <div key={status} className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className={`w-2 h-2 rounded-full ${meta.dot}`} />
+                        <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>{meta.label}</span>
+                        <span className="text-[#8A9AB0] text-xs">({group.length})</span>
+                      </div>
+                      <div className="space-y-2">
+                        {group.map(item => {
+                          const assignees = getAssignees(item.id)
+                          const release   = item.target_quarter || fmtDate(item.target_date)
+                          return (
+                            <button key={item.id} onClick={() => setDrawer(item.id)}
+                              className="w-full text-left bg-[#1a2d45] border border-[#2a3d55] hover:border-[#C8622A]/40 rounded-xl px-5 py-4 flex items-start gap-4 transition-colors opacity-70 hover:opacity-100">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white font-semibold text-sm">{item.title}</p>
+                                {item.description && <p className="text-[#8A9AB0] text-xs mt-1 line-clamp-1">{item.description}</p>}
+                                <p className="text-[#8A9AB0] text-xs mt-1">
+                                  Archived {new Date(item.archived_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[item.category]}`}>
+                                  {CATEGORY_LABELS[item.category]}
+                                </span>
+                                {assignees.length > 0 && (
+                                  <span className="text-[#8A9AB0] text-xs">{assignees.map(a => a.full_name).join(', ')}</span>
+                                )}
+                                {release && <span className="text-[#C8622A] text-xs font-semibold">{release}</span>}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Board ── */}
-        {view === 'board' && userIsAdmin && (
+        {!showArchived && view === 'board' && userIsAdmin && (
           <div className="grid grid-cols-5 gap-4">
             {ADMIN_COLUMNS.map(status => {
               const meta = STATUS_META[status]
@@ -280,7 +362,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
         )}
 
         {/* ── My Work (dev only) ── */}
-        {view === 'mywork' && isDevTeam && (
+        {!showArchived && view === 'mywork' && isDevTeam && (
           <div className="space-y-8 max-w-4xl">
             {myItems.length === 0 ? (
               <div className="text-center py-16">
@@ -329,12 +411,12 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
         )}
 
         {/* ── Report ── */}
-        {view === 'report' && (isAdmin || isProductManager) && (
+        {!showArchived && view === 'report' && (isAdmin || isProductManager) && (
           <ReportView items={items} getAssignees={getAssignees} />
         )}
 
         {/* ── Rep view ── */}
-        {!userIsAdmin && (
+        {!showArchived && !userIsAdmin && (
           <div className="space-y-8">
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -398,6 +480,8 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
           onEdit={() => { openEdit(drawerItem); setDrawer(null) }}
           onStatusChange={(s) => updateStatus(drawerItem.id, s)}
           onItemUpdate={(patch) => setItems(prev => prev.map(i => i.id === drawerItem.id ? { ...i, ...patch } : i))}
+          onArchive={() => archiveItem(drawerItem.id)}
+          onRestore={() => restoreItem(drawerItem.id)}
         />
       )}
 
@@ -559,7 +643,7 @@ function ReportView({ items, getAssignees }) {
 }
 
 // ── Item Drawer ────────────────────────────────────────────────────────────────
-function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees, onAddAssignee, onRemoveAssignee, onClose, onEdit, onStatusChange, onItemUpdate }) {
+function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees, onAddAssignee, onRemoveAssignee, onClose, onEdit, onStatusChange, onItemUpdate, onArchive, onRestore }) {
   const [notes, setNotes]               = useState([])
   const [noteBody, setNoteBody]         = useState('')
   const [posting, setPosting]           = useState(false)
@@ -753,10 +837,23 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees,
           )}
 
           {userIsAdmin && (
-            <button onClick={onEdit}
-              className="w-full px-3 py-2 bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] hover:text-white rounded-lg text-xs font-medium transition-colors text-left">
-              Edit Title & Description
-            </button>
+            <div className="flex gap-2">
+              <button onClick={onEdit}
+                className="flex-1 px-3 py-2 bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] hover:text-white rounded-lg text-xs font-medium transition-colors text-left">
+                Edit Title & Description
+              </button>
+              {item.archived_at ? (
+                <button onClick={onRestore}
+                  className="px-3 py-2 bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 rounded-lg text-xs font-medium transition-colors">
+                  Restore
+                </button>
+              ) : (
+                <button onClick={onArchive}
+                  className="px-3 py-2 bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] hover:text-yellow-400 hover:border-yellow-500/30 rounded-lg text-xs font-medium transition-colors">
+                  Archive
+                </button>
+              )}
+            </div>
           )}
 
           {/* Team notes */}
