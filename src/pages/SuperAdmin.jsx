@@ -20,6 +20,33 @@ const ORG_TYPES = [
 
 const emptyBillingForm = { plan: 'Trial', billing_status: 'trial', monthly_rate: 0, trial_ends_at: '' }
 
+function DesignerMfrPicker({ selected, onChange }) {
+  const [manufacturers, setManufacturers] = useState([])
+  useEffect(() => {
+    supabase.from('global_products').select('manufacturer').eq('is_active', true)
+      .then(({ data }) => {
+        const unique = [...new Set((data || []).map(r => r.manufacturer).filter(Boolean))].sort()
+        setManufacturers(unique)
+      })
+  }, [])
+  const toggle = (mfr) => {
+    if (selected.includes(mfr)) onChange(selected.filter(m => m !== mfr))
+    else onChange([...selected, mfr])
+  }
+  if (!manufacturers.length) return <p className="text-[#8A9AB0] text-xs">Loading manufacturers…</p>
+  return (
+    <div className="max-h-48 overflow-y-auto border border-[#2a3d55] rounded-lg divide-y divide-[#2a3d55]">
+      {manufacturers.map(mfr => (
+        <label key={mfr} className="flex items-center gap-3 px-3 py-2 bg-[#0F1C2E] cursor-pointer hover:bg-[#1a2d45] transition-colors">
+          <input type="checkbox" checked={selected.includes(mfr)} onChange={() => toggle(mfr)}
+            className="w-4 h-4 rounded accent-[#C8622A]" />
+          <span className="text-white text-sm">{mfr}</span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
 export default function SuperAdmin() {
   const [orgs, setOrgs] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -274,19 +301,21 @@ export default function SuperAdmin() {
     setEditingOrg(org.id)
     setOrgForm({
       org_type: org.org_type || 'integrator',
-      feature_proposals: org.feature_proposals !== false,
-      feature_crm: org.feature_crm || false,
-      feature_send_proposal: org.feature_send_proposal || false,
-      feature_ai_email: org.feature_ai_email || false,
+      feature_proposals:      org.feature_proposals !== false,
+      feature_crm:            org.feature_crm            || false,
+      feature_send_proposal:  org.feature_send_proposal  || false,
+      feature_ai_email:       org.feature_ai_email       || false,
       feature_purchase_orders: org.feature_purchase_orders !== false,
-      feature_invoices: org.feature_invoices !== false,
-      feature_ai_bom: org.feature_ai_bom || false,
-      feature_site_photos: org.feature_site_photos !== false,
+      feature_invoices:       org.feature_invoices !== false,
+      feature_ai_bom:         org.feature_ai_bom         || false,
+      feature_site_photos:    org.feature_site_photos !== false,
       feature_drawing_tool:   org.feature_drawing_tool   || false,
       feature_designer_only:  org.feature_designer_only  || false,
       feature_spec_reader:    org.feature_spec_reader    || false,
       feature_drawing_reader: org.feature_drawing_reader || false,
       feature_api:            org.feature_api            || false,
+      feature_regions:        org.feature_regions        || false,
+      designer_allowed_manufacturers: org.designer_allowed_manufacturers || null,
     })
   }
 
@@ -306,6 +335,8 @@ export default function SuperAdmin() {
       feature_spec_reader:    orgForm.feature_spec_reader,
       feature_drawing_reader: orgForm.feature_drawing_reader,
       feature_api:            orgForm.feature_api,
+      feature_regions:        orgForm.feature_regions,
+      designer_allowed_manufacturers: orgForm.designer_allowed_manufacturers?.length ? orgForm.designer_allowed_manufacturers : null,
     }).eq('id', orgId)
     setEditingOrg(null)
     fetchData()
@@ -686,85 +717,80 @@ export default function SuperAdmin() {
                             </div>
                           </div>
 
-                          <div className="space-y-3">
+                          <div className="space-y-4">
                             <label className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Feature Access</label>
 
-                            <div>
-                              <p className="text-[#8A9AB0] text-xs mb-1.5 font-medium">Core</p>
-                              <div className="grid grid-cols-5 gap-2">
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_proposals: !p.feature_proposals }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_proposals ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_proposals ? '✓' : '○'}</span> Proposals
-                                </button>
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_crm: !p.feature_crm }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_crm ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_crm ? '✓' : '○'}</span> CRM
-                                </button>
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_send_proposal: !p.feature_send_proposal }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_send_proposal ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_send_proposal ? '✓' : '○'}</span> Send Proposal
-                                </button>
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_purchase_orders: !p.feature_purchase_orders }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_purchase_orders ? 'border-blue-400 bg-blue-500/10 text-blue-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_purchase_orders ? '✓' : '○'}</span> Purchase Orders
-                                </button>
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_invoices: !p.feature_invoices }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_invoices ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_invoices ? '✓' : '○'}</span> Invoices
-                                </button>
-                              </div>
-                            </div>
-
-                            <div>
-                              <p className="text-[#8A9AB0] text-xs mb-1.5 font-medium">AI Tools</p>
-                              <div className="grid grid-cols-4 gap-2">
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_ai_email: !p.feature_ai_email }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_ai_email ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_ai_email ? '✓' : '○'}</span> AI Email
-                                </button>
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_ai_bom: !p.feature_ai_bom }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_ai_bom ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_ai_bom ? '✓' : '○'}</span> AI BOM
-                                </button>
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_drawing_reader: !p.feature_drawing_reader }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_drawing_reader ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_drawing_reader ? '✓' : '○'}</span> Drawing Reader
-                                </button>
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_spec_reader: !p.feature_spec_reader }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_spec_reader ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_spec_reader ? '✓' : '○'}</span> Spec Reader
-                                </button>
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_api: !p.feature_api }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_api ? 'border-blue-400 bg-blue-500/10 text-blue-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_api ? '✓' : '○'}</span> API Access
-                                </button>
-                              </div>
-                            </div>
-
-                            <div>
-                              <p className="text-[#8A9AB0] text-xs mb-1.5 font-medium">Designer & Other</p>
-                              <div className="grid grid-cols-4 gap-2">
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_drawing_tool: !p.feature_drawing_tool }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_drawing_tool ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_drawing_tool ? '✓' : '○'}</span> Designer
-                                </button>
-                                <button onClick={() => setOrgForm(p => ({
-                                  ...p,
-                                  feature_designer_only: !p.feature_designer_only,
-                                  feature_drawing_tool: !p.feature_designer_only ? true : p.feature_drawing_tool
-                                }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_designer_only ? 'border-purple-400 bg-purple-500/10 text-purple-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_designer_only ? '✓' : '○'}</span> Designer Only
-                                </button>
-                                <button onClick={() => setOrgForm(p => ({ ...p, feature_site_photos: !p.feature_site_photos }))}
-                                  className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors ${orgForm.feature_site_photos ? 'border-blue-400 bg-blue-500/10 text-blue-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  <span>{orgForm.feature_site_photos ? '✓' : '○'}</span> Site Photos
-                                </button>
-                                <div className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-semibold ${orgForm.feature_proposals && orgForm.feature_crm ? 'border-green-400 bg-green-500/10 text-green-400' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0]'}`}>
-                                  {orgForm.feature_proposals && orgForm.feature_crm ? '✓ Full Suite' : '○ Full Suite'}
+                            {/* Feature flag list */}
+                            {[
+                              { key: 'feature_proposals',      label: 'Proposals',       group: 'Core' },
+                              { key: 'feature_crm',            label: 'CRM',             group: 'Core' },
+                              { key: 'feature_send_proposal',  label: 'Send Proposal',   group: 'Core' },
+                              { key: 'feature_purchase_orders',label: 'Purchase Orders', group: 'Core' },
+                              { key: 'feature_invoices',       label: 'Invoices',        group: 'Core' },
+                              { key: 'feature_site_photos',    label: 'Site Photos',     group: 'Core' },
+                              { key: 'feature_ai_email',       label: 'AI Email',        group: 'AI Tools' },
+                              { key: 'feature_ai_bom',         label: 'AI BOM',          group: 'AI Tools' },
+                              { key: 'feature_drawing_reader', label: 'Drawing Reader',  group: 'AI Tools' },
+                              { key: 'feature_spec_reader',    label: 'Spec Reader',     group: 'AI Tools' },
+                              { key: 'feature_drawing_tool',   label: 'Designer',        group: 'Designer' },
+                              { key: 'feature_designer_only',  label: 'Designer Only Mode', group: 'Designer' },
+                              { key: 'feature_api',            label: 'API Access',      group: 'Other' },
+                              { key: 'feature_regions',        label: 'Regions',         group: 'Other' },
+                            ].reduce((groups, flag) => {
+                              if (!groups[flag.group]) groups[flag.group] = []
+                              groups[flag.group].push(flag)
+                              return groups
+                            }, {})}
+                            {Object.entries(
+                              [
+                                { key: 'feature_proposals',      label: 'Proposals',          group: 'Core' },
+                                { key: 'feature_crm',            label: 'CRM',                group: 'Core' },
+                                { key: 'feature_send_proposal',  label: 'Send Proposal',      group: 'Core' },
+                                { key: 'feature_purchase_orders',label: 'Purchase Orders',    group: 'Core' },
+                                { key: 'feature_invoices',       label: 'Invoices',           group: 'Core' },
+                                { key: 'feature_site_photos',    label: 'Site Photos',        group: 'Core' },
+                                { key: 'feature_ai_email',       label: 'AI Email',           group: 'AI Tools' },
+                                { key: 'feature_ai_bom',         label: 'AI BOM',             group: 'AI Tools' },
+                                { key: 'feature_drawing_reader', label: 'Drawing Reader',     group: 'AI Tools' },
+                                { key: 'feature_spec_reader',    label: 'Spec Reader',        group: 'AI Tools' },
+                                { key: 'feature_drawing_tool',   label: 'Designer',           group: 'Designer' },
+                                { key: 'feature_designer_only',  label: 'Designer Only Mode', group: 'Designer' },
+                                { key: 'feature_api',            label: 'API Access',         group: 'Other' },
+                                { key: 'feature_regions',        label: 'Regions',            group: 'Other' },
+                              ].reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc }, {})
+                            ).map(([group, flags]) => (
+                              <div key={group}>
+                                <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">{group}</p>
+                                <div className="divide-y divide-[#2a3d55] border border-[#2a3d55] rounded-lg overflow-hidden">
+                                  {flags.map(flag => (
+                                    <div key={flag.key} className="flex items-center justify-between px-3 py-2.5 bg-[#0F1C2E]">
+                                      <span className="text-white text-sm">{flag.label}</span>
+                                      <button
+                                        onClick={() => setOrgForm(p => {
+                                          const next = { ...p, [flag.key]: !p[flag.key] }
+                                          if (flag.key === 'feature_designer_only' && !p.feature_designer_only) next.feature_drawing_tool = true
+                                          return next
+                                        })}
+                                        className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${orgForm[flag.key] ? 'bg-[#C8622A]' : 'bg-[#4B5563]'}`}>
+                                        <span className={`inline-block w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${orgForm[flag.key] ? 'translate-x-6' : 'translate-x-1'}`} />
+                                      </button>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
-                            </div>
+                            ))}
+
+                            {/* Designer manufacturer filter */}
+                            {orgForm.feature_drawing_tool && (
+                              <div>
+                                <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">Designer — Allowed Manufacturers</p>
+                                <p className="text-[#8A9AB0] text-xs mb-2">Leave all unchecked to show every manufacturer. Check specific ones to restrict this org to only those products.</p>
+                                <DesignerMfrPicker
+                                  selected={orgForm.designer_allowed_manufacturers || []}
+                                  onChange={v => setOrgForm(p => ({ ...p, designer_allowed_manufacturers: v }))}
+                                />
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex justify-end">

@@ -11,7 +11,7 @@ const INDUSTRY_LABELS = {
   low_voltage: 'Low Voltage',
 }
 
-export default function SymbolPicker({ selectedSymbol, onSelect, orgId }) {
+export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedManufacturers }) {
   const [industry,      setIndustry]      = useState('all')
   const [manufacturer,  setManufacturer]  = useState('Generic')
   const [category,      setCategory]      = useState(null)
@@ -30,7 +30,10 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId }) {
         supabase.from('global_products').select('*').eq('is_active', true).order('category').order('name'),
         orgId ? supabase.from('org_products').select('*').eq('org_id', orgId).eq('is_active', true).order('name') : Promise.resolve({ data: [] }),
       ])
-      setAllProducts([...(global || []), ...(org || []).map(p => ({ ...p, is_custom: true }))])
+      const globalFiltered = allowedManufacturers?.length
+        ? (global || []).filter(p => p.manufacturer === 'Generic' || allowedManufacturers.includes(p.manufacturer))
+        : (global || [])
+      setAllProducts([...globalFiltered, ...(org || []).map(p => ({ ...p, is_custom: true }))])
       setLoading(false)
     }
     loadAll()
