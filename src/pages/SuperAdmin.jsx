@@ -720,27 +720,6 @@ export default function SuperAdmin() {
                           <div className="space-y-4">
                             <label className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Feature Access</label>
 
-                            {/* Feature flag list */}
-                            {[
-                              { key: 'feature_proposals',      label: 'Proposals',       group: 'Core' },
-                              { key: 'feature_crm',            label: 'CRM',             group: 'Core' },
-                              { key: 'feature_send_proposal',  label: 'Send Proposal',   group: 'Core' },
-                              { key: 'feature_purchase_orders',label: 'Purchase Orders', group: 'Core' },
-                              { key: 'feature_invoices',       label: 'Invoices',        group: 'Core' },
-                              { key: 'feature_site_photos',    label: 'Site Photos',     group: 'Core' },
-                              { key: 'feature_ai_email',       label: 'AI Email',        group: 'AI Tools' },
-                              { key: 'feature_ai_bom',         label: 'AI BOM',          group: 'AI Tools' },
-                              { key: 'feature_drawing_reader', label: 'Drawing Reader',  group: 'AI Tools' },
-                              { key: 'feature_spec_reader',    label: 'Spec Reader',     group: 'AI Tools' },
-                              { key: 'feature_drawing_tool',   label: 'Designer',        group: 'Designer' },
-                              { key: 'feature_designer_only',  label: 'Designer Only Mode', group: 'Designer' },
-                              { key: 'feature_api',            label: 'API Access',      group: 'Other' },
-                              { key: 'feature_regions',        label: 'Regions',         group: 'Other' },
-                            ].reduce((groups, flag) => {
-                              if (!groups[flag.group]) groups[flag.group] = []
-                              groups[flag.group].push(flag)
-                              return groups
-                            }, {})}
                             {Object.entries(
                               [
                                 { key: 'feature_proposals',      label: 'Proposals',          group: 'Core' },
