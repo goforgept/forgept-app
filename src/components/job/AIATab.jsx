@@ -53,6 +53,8 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
   const [exportingPDF, setExportingPDF] = useState(false)
+  const [pendingApprove, setPendingApprove] = useState(false)
+  const [approveDueDate, setApproveDueDate] = useState('')
 
   useEffect(() => { if (job?.id) fetchApplications() }, [job?.id])
 
@@ -111,13 +113,17 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
     setLineItems(buildScheduleOfValues(jobLineItems, proposal, changeOrders))
   }
 
+  const startApprove = () => {
+    if (currentPaymentDue <= 0) { alert('Current Payment Due is $0.00 — nothing to invoice.'); return }
+    const due = new Date()
+    due.setDate(due.getDate() + 30)
+    setApproveDueDate(due.toISOString().split('T')[0])
+    setPendingApprove(true)
+  }
+
   const approveApplication = async () => {
-    if (currentPaymentDue <= 0) {
-      alert('Current Payment Due is $0.00 — nothing to invoice.')
-      return
-    }
-    if (!window.confirm(`Approve Application #${appForm.application_number} and create an invoice for $${fmt(currentPaymentDue)}?`)) return
     setSaving(true)
+    setPendingApprove(false)
     try {
       await persistApp()
 
@@ -136,6 +142,7 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
         invoice_number: invoiceNumber,
         status: 'Draft',
         issued_date: new Date().toISOString().split('T')[0],
+        due_date: approveDueDate || null,
         subtotal: currentPaymentDue,
         tax_percent: 0,
         tax_amount: 0,
@@ -486,11 +493,30 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
               View Invoice →
             </button>
           )}
-          {selectedApp && selectedApp.status !== 'Approved' && (
-            <button onClick={approveApplication} disabled={saving}
+          {selectedApp && selectedApp.status !== 'Approved' && !pendingApprove && (
+            <button onClick={startApprove} disabled={saving}
               className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50">
               {saving ? 'Processing...' : `✓ Approve & Invoice ($${fmt(currentPaymentDue)})`}
             </button>
+          )}
+          {selectedApp && selectedApp.status !== 'Approved' && pendingApprove && (
+            <div className="flex items-center gap-2 bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-1.5">
+              <span className="text-green-400 text-xs font-semibold whitespace-nowrap">Due date:</span>
+              <input
+                type="date"
+                value={approveDueDate}
+                onChange={e => setApproveDueDate(e.target.value)}
+                className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-green-500"
+              />
+              <button onClick={approveApplication} disabled={saving}
+                className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 whitespace-nowrap">
+                {saving ? 'Creating...' : 'Confirm'}
+              </button>
+              <button onClick={() => setPendingApprove(false)}
+                className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
+                Cancel
+              </button>
+            </div>
           )}
           {selectedApp && (
             <button onClick={() => deleteApp(selectedApp.id)}
