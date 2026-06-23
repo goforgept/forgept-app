@@ -47,8 +47,9 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
     key: 'manage',
     label: 'Manage',
     links: [
-      { label: 'Product Library', path: '/product-library', icon: '📦' },
+      ...(orgType !== 'manufacturer' ? [{ label: 'Product Library', path: '/product-library', icon: '📦' }] : []),
       ...(featureDrawingTool ? [{ label: 'Designer', path: '/designer', icon: '📐' }] : []),
+      ...(orgType === 'manufacturer' ? [{ label: 'Roadmap', path: '/roadmap', icon: '🗺️' }] : []),
       { label: 'Reports', path: '/reports', icon: '📊' },
       { label: 'Team', path: '/reps', icon: '👥' },
       { label: 'Settings', path: '/settings', icon: '⚙️' },
@@ -141,6 +142,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
     key: 'manage',
     label: 'Manage',
     links: [
+      ...(orgType === 'manufacturer' ? [{ label: 'Roadmap', path: '/roadmap', icon: '🗺️' }] : []),
       { label: 'Settings', path: '/settings', icon: '⚙️' },
       { label: 'Help', path: '/faq', icon: '❓' },
     ]

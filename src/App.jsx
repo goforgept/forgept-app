@@ -44,6 +44,7 @@ import Designer from './pages/Designer'
 import DesignerProjects from './pages/DesignerProjects'
 import DrawingReview from './pages/DrawingReview'
 import EmbedDesigner from './pages/EmbedDesigner'
+import Roadmap from './pages/Roadmap'
 
 function App() {
   const { session, profile, features, loading } = useProfile()
@@ -180,6 +181,7 @@ function App() {
             <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />
             {features.designerOnly && <Route path="*" element={<Navigate to="/designer" replace />} />}
             <Route path="/designer/review/:token" element={<DrawingReview />} />
+            <Route path="/roadmap" element={<Roadmap {...sharedProps} />} />
           </>
         )}
       </Routes>

@@ -351,30 +351,30 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           )}
         </div>
 
-        {/* Dashboard Mode Toggle */}
-        <div className="flex justify-end mb-2">
-          {!isPM && (
-            <div className="flex bg-[#0F1C2E] rounded-lg p-1 gap-1">
-              {!isPM && (
+        {/* Dashboard Mode Toggle — hidden for manufacturers (no PM/jobs) */}
+        {orgType !== 'manufacturer' && (
+          <div className="flex justify-end mb-2">
+            {!isPM && (
+              <div className="flex bg-[#0F1C2E] rounded-lg p-1 gap-1">
                 <button
                   onClick={() => { setDashboardMode('sales'); localStorage.setItem('dashboardMode', 'sales') }}
                   className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'sales' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
                   📊 Sales
                 </button>
-              )}
-              {(isAdmin || isPM) && (
-                <button
-                  onClick={() => { setDashboardMode('pm'); localStorage.setItem('dashboardMode', 'pm') }}
-                  className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'pm' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
-                  🔨 PM
-                </button>
-              )}
-            </div>
-          )}
-          {isPM && (
-            <span className="text-[#8A9AB0] text-sm font-semibold">🔨 PM Dashboard</span>
-          )}
-        </div>
+                {(isAdmin || isPM) && (
+                  <button
+                    onClick={() => { setDashboardMode('pm'); localStorage.setItem('dashboardMode', 'pm') }}
+                    className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'pm' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                    🔨 PM
+                  </button>
+                )}
+              </div>
+            )}
+            {isPM && (
+              <span className="text-[#8A9AB0] text-sm font-semibold">🔨 PM Dashboard</span>
+            )}
+          </div>
+        )}
 
         {/* PM Dashboard */}
         {dashboardMode === 'pm' && !loading && (() => {
