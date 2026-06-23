@@ -36,8 +36,9 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
 
     const { data, error } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number,archived_at')
+      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id')
       .eq('org_id', profile.org_id)
+      .eq('is_current_revision', true)
       .order('created_at', { ascending: false })
 
     if (!error) setProposals(data)
@@ -196,6 +197,9 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                     <p className="text-white font-semibold">{proposal.proposal_name}</p>
                     {proposal.quote_number && (
                       <span className="text-[#8A9AB0] text-xs font-mono bg-[#2a3d55] px-2 py-0.5 rounded">{proposal.quote_number}</span>
+                    )}
+                    {proposal.revision_number > 1 && (
+                      <span className="text-blue-400 text-xs bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded font-semibold">Rev {proposal.revision_number}</span>
                     )}
                     {proposal.archived_at && (
                       <span className="text-[#8A9AB0] text-xs bg-[#2a3d55] px-2 py-0.5 rounded">Archived</span>

@@ -8,7 +8,7 @@ export default function ProposalHeader({
   updateCloseDate, updateTaxExempt, updateTaxRate,
   setShowDealSummaryModal, setDealSummary,
   setShowShareModal, setDeleteConfirmText, setShowDeleteModal,
-  onArchive, onRestore,
+  onArchive, onRestore, onCreateRevision,
   canEdit = true,
 }) {
   return (
@@ -27,6 +27,11 @@ export default function ProposalHeader({
           ) : (
             <div className="flex items-center gap-2 group">
               <h2 className="text-white text-2xl font-bold">{proposal?.proposal_name}</h2>
+              {(proposal?.revision_number > 1 || proposal?.original_proposal_id) && (
+                <span className="text-blue-400 text-xs bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded font-semibold">
+                  Rev {proposal.revision_number}
+                </span>
+              )}
               {canEdit && (
                 <button onClick={() => { setProposalNameDraft(proposal?.proposal_name || ''); setEditingProposalName(true) }}
                   className="opacity-0 group-hover:opacity-100 text-[#8A9AB0] hover:text-white text-xs transition-all">✏️</button>
@@ -66,6 +71,12 @@ export default function ProposalHeader({
             className="bg-[#2a3d55] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-1">
             👥 Share{collaborators.length > 0 ? ` (${collaborators.length})` : ''}
           </button>
+          {isAdmin && !proposal?.archived_at && onCreateRevision && (
+            <button onClick={onCreateRevision}
+              className="bg-blue-900/30 text-blue-400 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-blue-900/50 transition-colors">
+              + New Revision
+            </button>
+          )}
           {isAdmin && (
             proposal?.archived_at ? (
               <button onClick={onRestore}

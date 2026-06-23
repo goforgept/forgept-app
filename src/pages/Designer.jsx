@@ -43,6 +43,8 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const [fireAlarmAck,    setFireAlarmAck]    = useState({
     licensed: false, liability: false, estimates: false, ahj: false
   })
+  const [showRevisionModal, setShowRevisionModal] = useState(false)
+  const [creatingRevision,  setCreatingRevision]  = useState(false)
   const [nicetNumber, setNicetNumber] = useState('')
 
   useEffect(() => {
@@ -217,7 +219,71 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
     await load()
   }
 
-  const handleApprove = async () => {
+  const createRevision = async () => {
+    if (!proposal || !proposalId) return
+    setCreatingRevision(true)
+    try {
+      const originalId = proposal.original_proposal_id || proposalId
+
+      // Find highest revision number in the chain
+      const { data: siblings } = await supabase
+        .from('proposals')
+        .select('revision_number')
+        .or(`id.eq.${originalId},original_proposal_id.eq.${originalId}`)
+        .order('revision_number', { ascending: false })
+        .limit(1)
+      const nextRevNum = (siblings?.[0]?.revision_number || 1) + 1
+
+      // Duplicate proposal row
+      const { id: _id, created_at, archived_at, ...fields } = proposal
+      const { data: newProposal, error: propErr } = await supabase
+        .from('proposals')
+        .insert({ ...fields, status: 'Draft', revision_number: nextRevNum, original_proposal_id: originalId, is_current_revision: true })
+        .select().single()
+      if (propErr || !newProposal) throw propErr || new Error('Failed to create revision')
+
+      // Copy BOM line items
+      const { data: lineItems } = await supabase.from('bom_line_items').select('*').eq('proposal_id', proposalId)
+      if (lineItems?.length) {
+        await supabase.from('bom_line_items').insert(
+          lineItems.map(({ id: _, created_at: __, ...li }) => ({ ...li, proposal_id: newProposal.id }))
+        )
+      }
+
+      // Copy proposal sections
+      const { data: sects } = await supabase.from('proposal_sections').select('*').eq('proposal_id', proposalId)
+      if (sects?.length) {
+        await supabase.from('proposal_sections').insert(
+          sects.map(({ id: _, ...s }) => ({ ...s, proposal_id: newProposal.id }))
+        )
+      }
+
+      // Copy drawing sheets (floor plan references, no placements — clean canvas for revision)
+      const { data: dSheets } = await supabase.from('drawing_sheets').select('*').eq('proposal_id', proposalId)
+      if (dSheets?.length) {
+        await supabase.from('drawing_sheets').insert(
+          dSheets.map(({ id: _, created_at: __, ...ds }) => ({ ...ds, proposal_id: newProposal.id, status: 'draft' }))
+        )
+      }
+
+      // Mark current proposal as no longer the current revision
+      await supabase.from('proposals').update({ is_current_revision: false }).eq('id', proposalId)
+
+      setShowRevisionModal(false)
+      navigate(`/designer/${newProposal.id}`)
+    } catch (err) {
+      setError('Failed to create revision: ' + err.message)
+    } finally {
+      setCreatingRevision(false)
+    }
+  }
+
+  const handleApprove = async (skipRevisionCheck = false) => {
+    // If all sheets already approved, ask if they want a new revision first
+    if (allApproved && !skipRevisionCheck) {
+      setShowRevisionModal(true)
+      return
+    }
     try {
     const sheetIds = sheets.map(s => s.id)
     const [{ data: placementData }, { data: cableData }, { data: riseData }] = await Promise.all([
@@ -658,6 +724,52 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
             }`}>
             {approving ? 'Pushing to BOM...' : allApproved ? 'Re-approve & Sync BOM' : 'Approve & Push to BOM'}
           </button>
+        </div>
+      )}
+
+      {/* ── Revision choice modal ── */}
+      {showRevisionModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-2xl w-full max-w-md shadow-2xl p-6">
+            <h2 className="text-white font-bold text-lg mb-1">This design was already approved</h2>
+            <p className="text-[#8A9AB0] text-sm mb-6">
+              Would you like to create a new revision of this proposal, or update the BOM on the current one?
+            </p>
+            <div className="space-y-3 mb-6">
+              <button
+                onClick={createRevision}
+                disabled={creatingRevision}
+                className="w-full flex items-start gap-3 px-4 py-3.5 bg-blue-900/20 border border-blue-500/30 rounded-xl text-left hover:bg-blue-900/30 transition-colors disabled:opacity-50"
+              >
+                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-blue-400 font-semibold text-sm">{creatingRevision ? 'Creating revision...' : 'Create New Revision'}</p>
+                  <p className="text-[#8A9AB0] text-xs mt-0.5">Duplicates the proposal with a new revision number. Floor plans copy over, placements start fresh. Original is preserved.</p>
+                </div>
+              </button>
+              <button
+                onClick={() => { setShowRevisionModal(false); handleApprove(true) }}
+                className="w-full flex items-start gap-3 px-4 py-3.5 bg-[#0F1C2E] border border-[#2a3d55] rounded-xl text-left hover:border-[#C8622A]/40 transition-colors"
+              >
+                <div className="w-8 h-8 rounded-lg bg-[#C8622A]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-[#C8622A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-white font-semibold text-sm">Update Current BOM</p>
+                  <p className="text-[#8A9AB0] text-xs mt-0.5">Replaces the existing drawing-sourced BOM items on this proposal. No new revision created.</p>
+                </div>
+              </button>
+            </div>
+            <button onClick={() => setShowRevisionModal(false)} className="w-full text-center text-[#8A9AB0] hover:text-white text-sm transition-colors">
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
