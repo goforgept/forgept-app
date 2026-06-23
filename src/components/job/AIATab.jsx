@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../supabase'
 
 const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -40,6 +41,7 @@ const buildScheduleOfValues = (lineItems, proposal, changeOrders) => {
 }
 
 export default function AIATab({ job, profile, lineItems: jobLineItems = [], proposal, changeOrders = [] }) {
+  const navigate = useNavigate()
   const [applications, setApplications] = useState([])
   const [view, setView] = useState('list')
   const [selectedApp, setSelectedApp] = useState(null)
@@ -109,8 +111,78 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
     setLineItems(buildScheduleOfValues(jobLineItems, proposal, changeOrders))
   }
 
-  const saveApp = async () => {
+  const approveApplication = async () => {
+    if (currentPaymentDue <= 0) {
+      alert('Current Payment Due is $0.00 — nothing to invoice.')
+      return
+    }
+    if (!window.confirm(`Approve Application #${appForm.application_number} and create an invoice for $${fmt(currentPaymentDue)}?`)) return
     setSaving(true)
+    try {
+      await persistApp()
+
+      const { data: invoiceNumber } = await supabase.rpc('get_next_invoice_number', { org_id_input: profile.org_id })
+
+      const periodLabel = appForm.period_to
+        ? ` — Period to ${new Date(appForm.period_to + 'T12:00:00').toLocaleDateString()}`
+        : ''
+      const description = `AIA Application #${appForm.application_number}${periodLabel}`
+
+      const { data: inv } = await supabase.from('invoices').insert({
+        org_id: profile.org_id,
+        proposal_id: job?.proposal_id || null,
+        invoice_number: invoiceNumber,
+        status: 'Draft',
+        issued_date: new Date().toISOString().split('T')[0],
+        subtotal: currentPaymentDue,
+        tax_percent: 0,
+        tax_amount: 0,
+        total: currentPaymentDue,
+        amount_paid: 0,
+        balance_due: currentPaymentDue,
+        description,
+        notes: `AIA G702 Application #${appForm.application_number}. Contract Sum to Date: $${fmt(contractSumToDate)}. Total Completed & Stored: $${fmt(totalCompletedStored)}. Retainage (${appForm.retainage_percent}%): $${fmt(totalRetainage)}.`,
+      }).select().single()
+
+      if (!inv) throw new Error('Failed to create invoice')
+
+      // Line items: gross this-period work per G703 line + a retainage deduction
+      const grossThisPeriod = totalThisPeriod + totalStoredMaterials
+      const retainageThisPeriod = grossThisPeriod * (retainagePct / 100)
+
+      const invoiceLines = lineItems
+        .filter(l => parseFloat(l.work_this_period) > 0 || parseFloat(l.stored_materials) > 0)
+        .map(l => {
+          const amt = (parseFloat(l.work_this_period) || 0) + (parseFloat(l.stored_materials) || 0)
+          return { invoice_id: inv.id, description: l.description || `Item ${l.item_no}`, quantity: 1, unit_price: amt, total: amt }
+        })
+
+      if (retainageThisPeriod > 0) {
+        invoiceLines.push({
+          invoice_id: inv.id,
+          description: `Less Retainage (${appForm.retainage_percent}%)`,
+          quantity: 1,
+          unit_price: -retainageThisPeriod,
+          total: -retainageThisPeriod,
+        })
+      }
+
+      if (invoiceLines.length > 0) {
+        await supabase.from('invoice_line_items').insert(invoiceLines)
+      }
+
+      // Mark application approved and link the invoice
+      await supabase.from('aia_applications').update({ status: 'Approved', invoice_id: inv.id }).eq('id', selectedApp.id)
+      await fetchApplications()
+
+      navigate(`/invoices/${inv.id}`)
+    } catch (err) {
+      alert('Error creating invoice: ' + err.message)
+      setSaving(false)
+    }
+  }
+
+  const persistApp = async () => {
     const payload = {
       job_id: job.id,
       org_id: profile?.org_id,
@@ -122,6 +194,7 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
       original_contract_sum: parseFloat(appForm.original_contract_sum) || 0,
       net_change_by_co: parseFloat(appForm.net_change_by_co) || 0,
       retainage_percent: parseFloat(appForm.retainage_percent) || 10,
+      status: selectedApp?.status || 'Draft',
     }
 
     let appId
@@ -152,6 +225,12 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
     }
 
     await fetchApplications()
+    return appId
+  }
+
+  const saveApp = async () => {
+    setSaving(true)
+    await persistApp()
     setSaving(false)
   }
 
@@ -357,6 +436,11 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
                       <p className="text-[#8A9AB0] text-xs">Retainage</p>
                       <p className="text-[#C8622A] font-semibold text-sm">{app.retainage_percent || 10}%</p>
                     </div>
+                    <span className={`text-xs px-2 py-1 rounded font-semibold ${
+                      app.status === 'Approved' ? 'bg-green-500/20 text-green-400' :
+                      app.status === 'Submitted' ? 'bg-blue-500/20 text-blue-400' :
+                      'bg-[#2a3d55] text-[#8A9AB0]'
+                    }`}>{app.status || 'Draft'}</span>
                     <span className="text-[#8A9AB0] group-hover:text-white text-xs transition-colors">Open →</span>
                   </div>
                 </div>
@@ -382,8 +466,27 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
           <span className="text-white font-semibold text-sm">
             {selectedApp ? `Application #${appForm.application_number}` : 'New Application'}
           </span>
+          {selectedApp && (
+            <span className={`text-xs px-2 py-1 rounded font-semibold ${
+              selectedApp.status === 'Approved' ? 'bg-green-500/20 text-green-400' :
+              selectedApp.status === 'Submitted' ? 'bg-blue-500/20 text-blue-400' :
+              'bg-[#2a3d55] text-[#8A9AB0]'
+            }`}>{selectedApp.status || 'Draft'}</span>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {selectedApp && selectedApp.status === 'Approved' && selectedApp.invoice_id && (
+            <button onClick={() => navigate(`/invoices/${selectedApp.invoice_id}`)}
+              className="bg-green-500/20 text-green-400 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-500/30 transition-colors">
+              View Invoice →
+            </button>
+          )}
+          {selectedApp && selectedApp.status !== 'Approved' && (
+            <button onClick={approveApplication} disabled={saving}
+              className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50">
+              {saving ? 'Processing...' : `✓ Approve & Invoice ($${fmt(currentPaymentDue)})`}
+            </button>
+          )}
           {selectedApp && (
             <button onClick={() => deleteApp(selectedApp.id)}
               className="text-red-400 hover:text-red-300 text-xs px-3 py-2 transition-colors">
@@ -394,7 +497,7 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
             className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors disabled:opacity-50">
             {exportingPDF ? 'Exporting...' : '↓ Export PDF'}
           </button>
-          <button onClick={saveApp} disabled={saving}
+          <button onClick={saveApp} disabled={saving || selectedApp?.status === 'Approved'}
             className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
             {saving ? 'Saving...' : 'Save'}
           </button>
