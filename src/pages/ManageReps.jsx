@@ -303,8 +303,8 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
                                   <button
                                     onClick={() => togglePerm(rep, flag.key, !currentVal)}
                                     disabled={!!savingPerm[stateKey]}
-                                    className={`relative w-10 h-5 rounded-full transition-colors disabled:opacity-50 ${currentVal ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
-                                    <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${currentVal ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                                    className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors duration-200 disabled:opacity-50 focus:outline-none ${currentVal ? 'bg-[#C8622A]' : 'bg-[#4B5563]'}`}>
+                                    <span className={`inline-block w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${currentVal ? 'translate-x-6' : 'translate-x-1'}`} />
                                   </button>
                                   {isOverridden && (
                                     <button onClick={() => {
