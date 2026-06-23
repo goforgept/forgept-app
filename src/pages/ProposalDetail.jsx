@@ -1862,6 +1862,16 @@ export default function ProposalDetail({ isAdmin }) {
     setSendingToQBO(false)
   }
 
+  const archiveProposal = async () => {
+    await supabase.from('proposals').update({ archived_at: new Date().toISOString() }).eq('id', id)
+    setProposal(prev => ({ ...prev, archived_at: new Date().toISOString() }))
+  }
+
+  const restoreProposal = async () => {
+    await supabase.from('proposals').update({ archived_at: null }).eq('id', id)
+    setProposal(prev => ({ ...prev, archived_at: null }))
+  }
+
   const deleteProposal = async () => {
     if (deleteConfirmText !== proposal?.proposal_name) return
     setDeletingProposal(true)
@@ -2569,6 +2579,7 @@ const analyzeDrawing = async () => {
           setShowDealSummaryModal={setShowDealSummaryModal} setDealSummary={setDealSummary}
           setShowShareModal={setShowShareModal}
           setDeleteConfirmText={setDeleteConfirmText} setShowDeleteModal={setShowDeleteModal}
+          onArchive={archiveProposal} onRestore={restoreProposal}
           canEdit={canEdit}
         />
 

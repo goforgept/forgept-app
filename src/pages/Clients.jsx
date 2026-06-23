@@ -42,6 +42,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
   const [form, setForm] = useState(emptyForm)
   const [search, setSearch] = useState('')
   const [filterIndustry, setFilterIndustry] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
   const [companySuggestions, setCompanySuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const navigate = useNavigate()
@@ -97,6 +98,20 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
     setSaving(false)
   }
 
+  const archiveCompany = async (e, company) => {
+    e.stopPropagation()
+    const ids = clients.filter(c => c.company === company).map(c => c.id)
+    await supabase.from('clients').update({ archived_at: new Date().toISOString() }).in('id', ids)
+    setClients(prev => prev.map(c => ids.includes(c.id) ? { ...c, archived_at: new Date().toISOString() } : c))
+  }
+
+  const restoreCompany = async (e, company) => {
+    e.stopPropagation()
+    const ids = clients.filter(c => c.company === company).map(c => c.id)
+    await supabase.from('clients').update({ archived_at: null }).in('id', ids)
+    setClients(prev => prev.map(c => ids.includes(c.id) ? { ...c, archived_at: null } : c))
+  }
+
   // Group clients by company
   const grouped = clients.reduce((acc, client) => {
     const company = client.company || 'No Company'
@@ -105,7 +120,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
     return acc
   }, {})
 
-  // One card per company — use first contact's details for the card
+  // One card per company — archived if all contacts are archived
   const companies = Object.entries(grouped).map(([company, contacts]) => ({
     company,
     contacts,
@@ -114,17 +129,22 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
     location: [contacts[0]?.city, contacts[0]?.state].filter(Boolean).join(', '),
     email: contacts[0]?.email || '',
     phone: contacts[0]?.phone || '',
+    isArchived: contacts.every(c => !!c.archived_at),
   }))
 
-  const filtered = companies.filter(c => {
-    const q = search.toLowerCase()
-    const matchSearch = !q ||
-      c.company.toLowerCase().includes(q) ||
-      c.contacts.some(x => (x.client_name || '').toLowerCase().includes(q)) ||
-      c.email.toLowerCase().includes(q)
-    const matchIndustry = !filterIndustry || c.industry === filterIndustry
-    return matchSearch && matchIndustry
-  })
+  const archivedCount = companies.filter(c => c.isArchived).length
+
+  const filtered = companies
+    .filter(c => showArchived ? c.isArchived : !c.isArchived)
+    .filter(c => {
+      const q = search.toLowerCase()
+      const matchSearch = !q ||
+        c.company.toLowerCase().includes(q) ||
+        c.contacts.some(x => (x.client_name || '').toLowerCase().includes(q)) ||
+        c.email.toLowerCase().includes(q)
+      const matchIndustry = !filterIndustry || c.industry === filterIndustry
+      return matchSearch && matchIndustry
+    })
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
@@ -135,15 +155,29 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-white text-2xl font-bold">Clients</h2>
+            <h2 className="text-white text-2xl font-bold">{showArchived ? 'Archived Clients' : 'Clients'}</h2>
             <p className="text-[#8A9AB0] text-sm mt-0.5">{clients.length} total · {companies.length} companies</p>
           </div>
-          <button
-            onClick={() => { setShowModal(true); setError(null) }}
-            className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
-          >
-            + Add Client
-          </button>
+          <div className="flex items-center gap-3">
+            {archivedCount > 0 && (
+              <button
+                onClick={() => setShowArchived(v => !v)}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                  showArchived ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/30' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
+                }`}
+              >
+                {showArchived ? '← Active' : `Archive (${archivedCount})`}
+              </button>
+            )}
+            {!showArchived && (
+              <button
+                onClick={() => { setShowModal(true); setError(null) }}
+                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+              >
+                + Add Client
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Search + Filter bar */}
@@ -175,7 +209,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map(({ company, contacts, primary, industry, location, email, phone }) => {
+            {filtered.map(({ company, contacts, primary, industry, location, email, phone, isArchived }) => {
               const initials = company.slice(0, 2).toUpperCase()
               const badgeClass = industryColors[industry] || industryColors['Other']
               const fullAddress = [primary?.address, primary?.city, primary?.state, primary?.zip].filter(Boolean).join(', ')
@@ -249,17 +283,34 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                         return locCount > 0 ? <span className="text-[#8A9AB0] text-xs">· {locCount} {locCount === 1 ? 'location' : 'locations'}</span> : null
                       })()}
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={e => {
-                          e.stopPropagation()
-                          setForm(prev => ({ ...prev, company }))
-                          setShowModal(true)
-                        }}
-                        className="text-[#8A9AB0] hover:text-white text-xs transition-colors"
-                      >
-                        + Contact
-                      </button>
+                    <div className="flex gap-2 items-center">
+                      {!isArchived && (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            setForm(prev => ({ ...prev, company }))
+                            setShowModal(true)
+                          }}
+                          className="text-[#8A9AB0] hover:text-white text-xs transition-colors"
+                        >
+                          + Contact
+                        </button>
+                      )}
+                      {isArchived ? (
+                        <button
+                          onClick={e => restoreCompany(e, company)}
+                          className="text-[#8A9AB0] hover:text-green-400 text-xs transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          Restore
+                        </button>
+                      ) : (
+                        <button
+                          onClick={e => archiveCompany(e, company)}
+                          className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          Archive
+                        </button>
+                      )}
                       <span className="text-[#8A9AB0] text-xs group-hover:text-[#C8622A] transition-colors">→</span>
                     </div>
                   </div>

@@ -8,6 +8,7 @@ export default function ProposalHeader({
   updateCloseDate, updateTaxExempt, updateTaxRate,
   setShowDealSummaryModal, setDealSummary,
   setShowShareModal, setDeleteConfirmText, setShowDeleteModal,
+  onArchive, onRestore,
   canEdit = true,
 }) {
   return (
@@ -65,7 +66,16 @@ export default function ProposalHeader({
             className="bg-[#2a3d55] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-1">
             👥 Share{collaborators.length > 0 ? ` (${collaborators.length})` : ''}
           </button>
-          {isAdmin && canEdit && proposal?.status !== 'Won' && (
+          {isAdmin && (
+            proposal?.archived_at ? (
+              <button onClick={onRestore}
+                className="bg-green-900/30 text-green-400 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-green-900/50 transition-colors">Restore</button>
+            ) : (
+              <button onClick={onArchive}
+                className="bg-[#2a3d55] text-[#8A9AB0] px-3 py-2 rounded-lg text-xs font-semibold hover:text-white transition-colors">Archive</button>
+            )
+          )}
+          {isAdmin && canEdit && proposal?.status !== 'Won' && !proposal?.archived_at && (
             <button onClick={() => { setDeleteConfirmText(''); setShowDeleteModal(true) }}
               className="bg-red-900/30 text-red-400 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-red-900/50 transition-colors">Delete</button>
           )}

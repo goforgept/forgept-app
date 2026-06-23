@@ -18,6 +18,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [showArchived, setShowArchived] = useState(false)
 
   useEffect(() => { if (profile?.org_id) fetchJobs() }, [profile?.org_id])
 
@@ -34,19 +35,29 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
     setLoading(false)
   }
 
-  const filtered = jobs.filter(j => {
-    const matchStatus = statusFilter === 'All' || j.status === statusFilter
-    const q = search.toLowerCase()
-    const matchSearch = !q || j.name?.toLowerCase().includes(q) || j.clients?.company?.toLowerCase().includes(q) || j.job_number?.toLowerCase().includes(q)
-    return matchStatus && matchSearch
-  })
-
-  const deleteJob = async (e, jobId) => {
+  const archiveJob = async (e, jobId) => {
     e.stopPropagation()
-    if (!window.confirm('Delete this job? This cannot be undone.')) return
-    await supabase.from('jobs').delete().eq('id', jobId)
-    setJobs(prev => prev.filter(j => j.id !== jobId))
+    await supabase.from('jobs').update({ archived_at: new Date().toISOString() }).eq('id', jobId)
+    setJobs(prev => prev.map(j => j.id === jobId ? { ...j, archived_at: new Date().toISOString() } : j))
   }
+
+  const restoreJob = async (e, jobId) => {
+    e.stopPropagation()
+    await supabase.from('jobs').update({ archived_at: null }).eq('id', jobId)
+    setJobs(prev => prev.map(j => j.id === jobId ? { ...j, archived_at: null } : j))
+  }
+
+  const archivedCount = jobs.filter(j => !!j.archived_at).length
+  const activeJobs = jobs.filter(j => !j.archived_at)
+
+  const filtered = jobs
+    .filter(j => showArchived ? !!j.archived_at : !j.archived_at)
+    .filter(j => {
+      const matchStatus = statusFilter === 'All' || j.status === statusFilter
+      const q = search.toLowerCase()
+      const matchSearch = !q || j.name?.toLowerCase().includes(q) || j.clients?.company?.toLowerCase().includes(q) || j.job_number?.toLowerCase().includes(q)
+      return matchStatus && matchSearch
+    })
 
   const getProgress = (job) => {
     const items = job.job_checklist_items || []
@@ -63,18 +74,28 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-white text-2xl font-bold">Jobs</h2>
+            <h2 className="text-white text-2xl font-bold">{showArchived ? 'Archived Jobs' : 'Jobs'}</h2>
             <p className="text-[#8A9AB0] text-sm mt-0.5">{filtered.length} of {jobs.length} jobs</p>
           </div>
+          {archivedCount > 0 && (
+            <button
+              onClick={() => setShowArchived(v => !v)}
+              className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${
+                showArchived ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/30' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
+              }`}
+            >
+              {showArchived ? '← Active' : `Archive (${archivedCount})`}
+            </button>
+          )}
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-4 gap-4">
           {[
-            { label: 'Active', value: jobs.filter(j => j.status === 'Active').length, color: 'text-green-400' },
-            { label: 'On Hold', value: jobs.filter(j => j.status === 'On Hold').length, color: 'text-yellow-400' },
-            { label: 'Completed', value: jobs.filter(j => j.status === 'Completed').length, color: 'text-blue-400' },
-            { label: 'Total Value', value: `$${jobs.reduce((sum, j) => sum + (j.proposals?.proposal_value || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}`, color: 'text-[#C8622A]' },
+            { label: 'Active', value: activeJobs.filter(j => j.status === 'Active').length, color: 'text-green-400' },
+            { label: 'On Hold', value: activeJobs.filter(j => j.status === 'On Hold').length, color: 'text-yellow-400' },
+            { label: 'Completed', value: activeJobs.filter(j => j.status === 'Completed').length, color: 'text-blue-400' },
+            { label: 'Total Value', value: `$${activeJobs.reduce((sum, j) => sum + (j.proposals?.proposal_value || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 0 })}`, color: 'text-[#C8622A]' },
           ].map(stat => (
             <div key={stat.label} className="bg-[#1a2d45] rounded-xl p-4">
               <p className="text-[#8A9AB0] text-xs mb-1">{stat.label}</p>
@@ -141,7 +162,11 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
                         {job.status}
                       </span>
                       {isAdmin && (
-                        <button onClick={e => deleteJob(e, job.id)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors opacity-0 group-hover:opacity-100">Delete</button>
+                        job.archived_at ? (
+                          <button onClick={e => restoreJob(e, job.id)} className="text-[#8A9AB0] hover:text-green-400 text-xs transition-colors opacity-0 group-hover:opacity-100">Restore</button>
+                        ) : (
+                          <button onClick={e => archiveJob(e, job.id)} className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors opacity-0 group-hover:opacity-100">Archive</button>
+                        )
                       )}
                       <span className="text-[#8A9AB0] group-hover:text-white transition-colors">→</span>
                     </div>
