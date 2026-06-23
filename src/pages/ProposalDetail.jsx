@@ -1934,7 +1934,7 @@ export default function ProposalDetail({ isAdmin }) {
       const photoData = await supabase.from('proposal_photos').select('url').eq('proposal_id', id)
       for (const photo of (photoData.data || [])) {
         const path = photo.url.split('/proposal-photos/')[1]
-        if (path) await supabase.storage.from('proposal-photos').remove([path])
+        // R2 cleanup handled via maintenance queue
       }
       const r1 = await supabase.from('proposal_photos').delete().eq('proposal_id', id)
       if (r1.error) { console.error('proposal_photos delete error:', r1.error); alert('Error: ' + r1.error.message); setDeletingProposal(false); return }

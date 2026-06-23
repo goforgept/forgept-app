@@ -25,17 +25,10 @@ export async function getR2Url(path, expiresIn = 3600, bucket = BUCKETS.FLOOR_PL
     })
     const json = await res.json()
     if (json.url) return json.url
-
-    // Fallback to Supabase Storage for unmigrated files
-    console.warn('R2 failed, falling back to Supabase:', path)
-    const { data } = await supabase.storage.from('floor-plans').createSignedUrl(path, expiresIn)
-    return data?.signedUrl || null
+    return null
   } catch (err) {
     console.error('R2 sign error:', err)
-    try {
-      const { data } = await supabase.storage.from('floor-plans').createSignedUrl(path, expiresIn)
-      return data?.signedUrl || null
-    } catch { return null }
+    return null
   }
 }
 
