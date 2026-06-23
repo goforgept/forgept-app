@@ -9,6 +9,8 @@ const ROLES = [
   { value: 'rep', label: 'Sales Rep', color: 'bg-blue-500/20 text-blue-400', desc: 'Creates and manages their own proposals and clients' },
   { value: 'project_manager', label: 'Project Manager', color: 'bg-purple-500/20 text-purple-400', desc: 'Manages active jobs, POs, change orders, and tech logs' },
   { value: 'technician', label: 'Technician', color: 'bg-green-500/20 text-green-400', desc: 'Field access only — tech daily log and job viewing' },
+  { value: 'product_manager', label: 'Product Manager', color: 'bg-indigo-500/20 text-indigo-400', desc: 'Manages the product roadmap, catalog, and release planning' },
+  { value: 'dev', label: 'Dev Team', color: 'bg-teal-500/20 text-teal-400', desc: 'Works on roadmap items — bug fixes, features, and improvements' },
 ]
 
 const getRoleStyle = (role) => ROLES.find(r => r.value === role)?.color || 'bg-[#8A9AB0]/20 text-[#8A9AB0]'
