@@ -223,8 +223,9 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
                         {/* Expand toggle (admin only, not self) */}
                         {isAdmin && !isCurrentUser && currentRole !== 'admin' && (
                           <button onClick={() => setExpanded(p => ({ ...p, [rep.id]: !p[rep.id] }))}
-                            className="text-[#8A9AB0] hover:text-white transition-colors text-xs w-4 text-center">
-                            {isOpen ? '▾' : '▸'}
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#0F1C2E] border border-[#2a3d55] hover:border-[#C8622A]/40 text-[#8A9AB0] hover:text-white transition-colors text-xs font-medium">
+                            <span>{isOpen ? '▾' : '▸'}</span>
+                            <span>Permissions</span>
                           </button>
                         )}
                         <div>
