@@ -121,7 +121,9 @@ function SearchSelect({ options, value, onChange, placeholder = 'Search…' }) {
 }
 
 // ── Nav config ────────────────────────────────────────────────────────────────
-const NAV_GROUPS = [
+const MANUFACTURER_HIDDEN = new Set(['open_jobs', 'closed_jobs', 'service_tickets', 'purchase_orders', 'vendor_spend'])
+
+const ALL_NAV_GROUPS = [
   {
     label: 'Quotes',
     items: [
@@ -155,7 +157,14 @@ const NAV_GROUPS = [
   },
 ]
 
-const ALL_REPORTS    = NAV_GROUPS.flatMap(g => g.items)
+const getNavGroups = (orgType) => {
+  if (orgType !== 'manufacturer') return ALL_NAV_GROUPS
+  return ALL_NAV_GROUPS
+    .map(g => ({ ...g, items: g.items.filter(i => !MANUFACTURER_HIDDEN.has(i.key)) }))
+    .filter(g => g.items.length > 0)
+}
+
+const ALL_REPORTS = ALL_NAV_GROUPS.flatMap(g => g.items)
 const NO_DATE_FILTER  = ['user_activity', 'client_report', 'open_jobs'] // don't filter these by created_at
 const GRAY_DATE_FILTER = ['user_activity', 'client_report']             // gray out UI for these only
 
@@ -183,6 +192,9 @@ export default function Reports(props) {
   const { profile } = useProfile()
   const navigate    = useNavigate()
 
+  const orgType   = profile?.organizations?.org_type || 'integrator'
+  const navGroups = getNavGroups(orgType)
+
   const [activeReport, setActiveReport] = useState('open_quotes')
   const [dateFrom, setDateFrom]         = useState(daysAgo(90))
   const [dateTo, setDateTo]             = useState(today())
@@ -207,6 +219,13 @@ export default function Reports(props) {
   useEffect(() => {
     if (!props.isAdmin) { navigate('/'); return }
   }, [props.isAdmin])
+
+  // If orgType loads and the active report is now hidden, reset to first available
+  useEffect(() => {
+    if (orgType === 'manufacturer' && MANUFACTURER_HIDDEN.has(activeReport)) {
+      setActiveReport('open_quotes')
+    }
+  }, [orgType])
 
   useEffect(() => {
     if (!profile?.org_id) return
@@ -630,7 +649,7 @@ export default function Reports(props) {
           <div className="flex gap-6">
             {/* Left nav */}
             <div className="w-48 shrink-0 space-y-4">
-              {NAV_GROUPS.map(group => (
+              {navGroups.map(group => (
                 <div key={group.label}>
                   <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wider px-3 mb-1">{group.label}</p>
                   <div className="space-y-0.5">

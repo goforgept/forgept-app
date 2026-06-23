@@ -37,8 +37,8 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
         ...(featurePurchaseOrders ? [{ label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' }] : []),
       ] : []),
       ...(orgType === 'manufacturer' ? [
-        { label: 'Catalog', path: '/catalog', icon: '📦' },
-        { label: 'Orders', path: '/orders', icon: '📦' },
+        { label: 'Catalog', path: '/catalog', icon: '📚' },
+        { label: 'Orders', path: '/orders', icon: '🛒' },
       ] : []),
       ...((featureSla || featureMonitoring) ? [{ label: 'Contracts', path: '/contracts', icon: '📋' }] : []),
     ].filter(l => l)
@@ -89,7 +89,7 @@ const NAV_GROUPS_PRODUCT_MANAGER = () => [
     label: 'Roadmap',
     links: [
       { label: 'Roadmap', path: '/roadmap', icon: '🗺️' },
-      { label: 'Catalog', path: '/catalog', icon: '📦' },
+      { label: 'Catalog', path: '/catalog', icon: '📚' },
     ]
   },
   {
@@ -127,7 +127,7 @@ const NAV_GROUPS_DEV = () => [
     label: 'Roadmap',
     links: [
       { label: 'Roadmap', path: '/roadmap', icon: '🗺️' },
-      { label: 'Catalog', path: '/catalog', icon: '📦' },
+      { label: 'Catalog', path: '/catalog', icon: '📚' },
     ]
   },
   {
@@ -170,8 +170,8 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
       ] : []),
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(orgType === 'manufacturer' ? [
-        { label: 'Catalog', path: '/catalog', icon: '📦' },
-        { label: 'Orders', path: '/orders', icon: '📦' },
+        { label: 'Catalog', path: '/catalog', icon: '📚' },
+        { label: 'Orders', path: '/orders', icon: '🛒' },
       ] : []),
       ...((featureSla || featureMonitoring) ? [{ label: 'Contracts', path: '/contracts', icon: '📋' }] : []),
     ].filter(l => l)
