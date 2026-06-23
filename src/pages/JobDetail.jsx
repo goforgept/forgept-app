@@ -1116,6 +1116,13 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                     {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                   </select>
                 </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#8A9AB0] text-xs">💰 Billing:</span>
+                  <select value={job?.billing_type || 'Lump Sum'} onChange={e => updateBillingType(e.target.value)}
+                    className="bg-[#0F1C2E] text-white text-xs border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]">
+                    {['Lump Sum', 'T&M', 'AIA', 'Unit Price'].map(b => <option key={b}>{b}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -1135,13 +1142,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
                 📄 Final Packet
               </button>
-              <div className="flex flex-col items-end gap-0.5">
-                <span className="text-[#8A9AB0] text-xs">Billing Type</span>
-                <select value={job?.billing_type || 'Lump Sum'} onChange={e => updateBillingType(e.target.value)}
-                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                  {['Lump Sum', 'T&M', 'AIA', 'Unit Price'].map(b => <option key={b}>{b}</option>)}
-                </select>
-              </div>
               <select value={job?.status || 'Active'} onChange={e => updateJobStatus(e.target.value)} disabled={savingStatus}
                 className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
                 {['Active', 'On Hold', 'Completed', 'Cancelled'].map(s => <option key={s}>{s}</option>)}
@@ -1300,7 +1300,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
         {/* AIA TAB */}
         {activeTab === 'aia' && (
-          <AIATab job={job} profile={profile} />
+          <AIATab job={job} profile={profile} lineItems={lineItems} proposal={proposal} changeOrders={changeOrders} />
         )}
       </div>
 

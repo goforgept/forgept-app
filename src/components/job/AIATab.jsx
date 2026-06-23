@@ -5,7 +5,41 @@ const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, 
 
 const EMPTY_LINE = { item_no: '', description: '', scheduled_value: '', work_prev_completed: '', work_this_period: '', stored_materials: '' }
 
-export default function AIATab({ job, profile }) {
+const buildScheduleOfValues = (lineItems, proposal, changeOrders) => {
+  const rows = []
+  let i = 1
+
+  ;(lineItems || []).forEach(item => {
+    rows.push({
+      ...EMPTY_LINE,
+      item_no: String(i++),
+      description: item.item_name || '',
+      scheduled_value: String(item.customer_price_total || item.customer_price_unit * item.quantity || ''),
+    })
+  })
+
+  ;(proposal?.labor_items || []).forEach(l => {
+    rows.push({
+      ...EMPTY_LINE,
+      item_no: String(i++),
+      description: l.role ? `Labor — ${l.role}` : 'Labor',
+      scheduled_value: String(parseFloat(l.customer_price) || ''),
+    })
+  })
+
+  ;(changeOrders || []).filter(co => co.status === 'Approved').forEach(co => {
+    rows.push({
+      ...EMPTY_LINE,
+      item_no: String(i++),
+      description: `CO — ${co.name}`,
+      scheduled_value: String(co.amount || ''),
+    })
+  })
+
+  return rows.length > 0 ? rows : [{ ...EMPTY_LINE, item_no: '1' }]
+}
+
+export default function AIATab({ job, profile, lineItems: jobLineItems = [], proposal, changeOrders = [] }) {
   const [applications, setApplications] = useState([])
   const [view, setView] = useState('list')
   const [selectedApp, setSelectedApp] = useState(null)
@@ -58,13 +92,21 @@ export default function AIATab({ job, profile }) {
 
   const startNew = () => {
     setSelectedApp(null)
+    const approvedCOTotal = changeOrders.filter(co => co.status === 'Approved').reduce((s, co) => s + (co.amount || 0), 0)
     setAppForm({
       application_number: String(applications.length + 1),
       period_to: '', architect: '', contract_for: '', contract_date: '',
-      original_contract_sum: '', net_change_by_co: '0', retainage_percent: '10',
+      original_contract_sum: String(proposal?.proposal_value || ''),
+      net_change_by_co: String(approvedCOTotal || '0'),
+      retainage_percent: '10',
     })
-    setLineItems([{ ...EMPTY_LINE, item_no: '1' }])
+    setLineItems(buildScheduleOfValues(jobLineItems, proposal, changeOrders))
     setView('detail')
+  }
+
+  const reimportSchedule = () => {
+    if (!window.confirm('Replace current G703 lines with materials, labor, and change orders from this job?')) return
+    setLineItems(buildScheduleOfValues(jobLineItems, proposal, changeOrders))
   }
 
   const saveApp = async () => {
@@ -449,10 +491,18 @@ export default function AIATab({ job, profile }) {
       <div className="bg-[#1a2d45] rounded-xl p-6">
         <div className="flex justify-between items-center mb-4">
           <h4 className="text-white font-bold">G703 — Continuation Sheet</h4>
-          <button onClick={addLineItem}
-            className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors">
-            + Add Line
-          </button>
+          <div className="flex gap-2">
+            {(jobLineItems.length > 0 || (proposal?.labor_items || []).length > 0) && (
+              <button onClick={reimportSchedule}
+                className="bg-[#0F1C2E] text-[#8A9AB0] px-3 py-1.5 rounded-lg text-xs hover:text-white transition-colors border border-[#2a3d55]">
+                ↺ Reimport from Job
+              </button>
+            )}
+            <button onClick={addLineItem}
+              className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors">
+              + Add Line
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
