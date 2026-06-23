@@ -121,7 +121,9 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
     try {
       await persistApp()
 
-      const { data: invoiceNumber } = await supabase.rpc('get_next_invoice_number', { org_id_input: profile.org_id })
+      const { data: invoiceNumber, error: rpcErr } = await supabase.rpc('get_next_invoice_number', { org_id_input: profile.org_id })
+      if (rpcErr) throw new Error('Invoice number RPC: ' + rpcErr.message)
+      if (!invoiceNumber) throw new Error(`Invoice number generation failed — org_id sent: ${profile.org_id}`)
 
       const periodLabel = appForm.period_to
         ? ` — Period to ${new Date(appForm.period_to + 'T12:00:00').toLocaleDateString()}`
