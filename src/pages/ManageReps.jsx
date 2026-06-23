@@ -74,10 +74,10 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
   const fetchReps = async (orgId) => {
     const { data } = await supabase
       .from('profiles')
-      .select('id, full_name, email, role, org_role, permissions, created_at')
+      .select('id, full_name, email, role, org_role, created_at, permissions')
       .eq('org_id', orgId)
       .order('created_at', { ascending: false })
-    setReps(data || [])
+    setReps((data || []).map(r => ({ ...r, permissions: r.permissions || {} })))
     setLoading(false)
   }
 
