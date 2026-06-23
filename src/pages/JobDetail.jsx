@@ -14,6 +14,7 @@ import POModal from '../components/job/POModal'
 import ScheduleModal from '../components/job/ScheduleModal'
 import NotifyModal from '../components/job/NotifyModal'
 import ChangeOrderModal from '../components/job/ChangeOrderModal'
+import AIATab from '../components/job/AIATab'
 
 const AUTO_CHECK_TYPES = [
   { type: 'proposal_signed', label: 'Proposal signed', icon: '✍️' },
@@ -310,6 +311,11 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     await supabase.from('jobs').update({ status }).eq('id', id)
     setJob(prev => ({ ...prev, status }))
     setSavingStatus(false)
+  }
+
+  const updateBillingType = async (billing_type) => {
+    await supabase.from('jobs').update({ billing_type }).eq('id', id)
+    setJob(prev => ({ ...prev, billing_type }))
   }
 
   const updateJobDates = async (field, value) => {
@@ -1129,6 +1135,13 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
                 📄 Final Packet
               </button>
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="text-[#8A9AB0] text-xs">Billing Type</span>
+                <select value={job?.billing_type || 'Lump Sum'} onChange={e => updateBillingType(e.target.value)}
+                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  {['Lump Sum', 'T&M', 'AIA', 'Unit Price'].map(b => <option key={b}>{b}</option>)}
+                </select>
+              </div>
               <select value={job?.status || 'Active'} onChange={e => updateJobStatus(e.target.value)} disabled={savingStatus}
                 className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
                 {['Active', 'On Hold', 'Completed', 'Cancelled'].map(s => <option key={s}>{s}</option>)}
@@ -1203,6 +1216,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             { key: 'techlog', label: `Tech Log (${techLogs.length})` },
             { key: 'proposal', label: 'Proposal' },
             { key: 'photos', label: `📷 Photos (${photos.length})` },
+            ...(job?.billing_type === 'AIA' ? [{ key: 'aia', label: 'AIA Applications' }] : []),
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
@@ -1282,6 +1296,11 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         {/* PROPOSAL TAB */}
         {activeTab === 'proposal' && (
           <ProposalTab job={job} proposal={proposal} navigate={navigate} />
+        )}
+
+        {/* AIA TAB */}
+        {activeTab === 'aia' && (
+          <AIATab job={job} profile={profile} />
         )}
       </div>
 

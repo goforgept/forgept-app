@@ -158,6 +158,11 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
                           <p className="text-white font-semibold">${(job.proposals.proposal_value || 0).toLocaleString()}</p>
                         </div>
                       )}
+                      {job.billing_type && job.billing_type !== 'Lump Sum' && (
+                        <span className="px-2 py-1 rounded text-xs font-semibold bg-[#2a3d55] text-[#8A9AB0]">
+                          {job.billing_type}
+                        </span>
+                      )}
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[job.status] || 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
                         {job.status}
                       </span>
