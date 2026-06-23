@@ -26,8 +26,9 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   })
   const [lineItems, setLineItems] = useState([])
   const [includedCOs, setIncludedCOs] = useState([])
-  const [contractFees, setContractFees] = useState([]) // { label, amount, included }
+  const [contractFees, setContractFees] = useState([])
   const [includedContractFees, setIncludedContractFees] = useState({})
+  const [aiaWarning, setAiaWarning] = useState(false)
 
   useEffect(() => { if (profile?.org_id) fetchData() }, [profile?.org_id])
 
@@ -98,14 +99,29 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       })
     })
 
-    // Load approved change orders
+    // Load job for billing type, client terms, and change orders
     const { data: jobData } = await supabase
       .from('jobs')
-      .select('id')
+      .select('id, billing_type, client_id')
       .eq('proposal_id', proposalId)
       .maybeSingle()
 
     if (jobData?.id) {
+      // AIA billing type warning
+      setAiaWarning(jobData.billing_type === 'AIA')
+
+      // Auto-set due date from client NET terms
+      if (jobData.client_id) {
+        const { data: clientData } = await supabase.from('clients').select('net_terms').eq('id', jobData.client_id).single()
+        if (clientData?.net_terms) {
+          const termDays = clientData.net_terms === 'Due on Receipt' ? 0
+            : parseInt(clientData.net_terms.replace('NET ', '')) || 30
+          const due = new Date()
+          due.setDate(due.getDate() + termDays)
+          setForm(prev => ({ ...prev, due_date: due.toISOString().split('T')[0] }))
+        }
+      }
+
       const { data: coData } = await supabase
         .from('change_orders')
         .select('*')
@@ -226,6 +242,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
   const handleProposalChange = (proposalId) => {
     setForm(prev => ({ ...prev, proposal_id: proposalId, service_ticket_id: '' }))
+    setAiaWarning(false)
     if (proposalId) loadProposalItems(proposalId, proposals)
     else { setSelectedProposal(null); setLineItems([]) }
   }
@@ -345,11 +362,20 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
                     <option key={p.id} value={p.id}>{p.proposal_name} — {p.company}</option>
                   ))}
                 </select>
-                {selectedProposal && (
+                {selectedProposal && !aiaWarning && (
                   <p className="text-green-400 text-xs mt-1">
                     ✓ Line items loaded from proposal
                     {includedCOs.length > 0 && ` + ${includedCOs.length} approved change order${includedCOs.length !== 1 ? 's' : ''}`}
                   </p>
+                )}
+                {aiaWarning && (
+                  <div className="mt-2 flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2">
+                    <span className="text-yellow-400 text-sm mt-0.5">⚠</span>
+                    <div>
+                      <p className="text-yellow-400 text-xs font-semibold">This job is billed via AIA Applications</p>
+                      <p className="text-yellow-400/70 text-xs">Payment applications should be created from the AIA Applications tab on the job. Creating a manual invoice here may result in duplicate billing.</p>
+                    </div>
+                  </div>
                 )}
               </div>
             )}

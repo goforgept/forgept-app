@@ -28,6 +28,8 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   const [sendingToSquare, setSendingToSquare] = useState(false)
   const [squareError, setSquareError] = useState(null)
   const [copiedLink, setCopiedLink] = useState(false)
+  const [editingDueDate, setEditingDueDate] = useState(false)
+  const [dueDateValue, setDueDateValue] = useState('')
 
   useEffect(() => {
     fetchAll()
@@ -50,6 +52,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setInvoice(inv)
     setNotesValue(inv?.notes || '')
     setDescriptionValue(inv?.description || '')
+    setDueDateValue(inv?.due_date || '')
     if (inv?.org_id) {
       const { data: orgData } = await supabase.from('organizations').select('square_connected').eq('id', inv.org_id).single()
       setSquareConnected(orgData?.square_connected || false)
@@ -246,6 +249,12 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setInvoice(prev => ({ ...prev, status }))
   }
 
+  const saveDueDate = async () => {
+    await supabase.from('invoices').update({ due_date: dueDateValue || null }).eq('id', id)
+    setInvoice(prev => ({ ...prev, due_date: dueDateValue || null }))
+    setEditingDueDate(false)
+  }
+
   const recordPayment = async () => {
     if (!paymentForm.amount || parseFloat(paymentForm.amount) <= 0) return
     setSavingPayment(true)
@@ -369,9 +378,16 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
             <div>
               <div className="flex items-center gap-3 mb-1">
                 <h2 className="text-white text-2xl font-bold">{invoice.invoice_number}</h2>
-                <span className={`text-xs font-semibold px-2 py-1 rounded ${STATUS_COLORS[invoice.status] || 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
-                  {invoice.status}
-                </span>
+                <select
+                  value={invoice.status || 'Draft'}
+                  onChange={e => updateStatus(e.target.value)}
+                  className={`text-xs font-semibold px-2 py-1 rounded border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#C8622A] ${STATUS_COLORS[invoice.status] || 'bg-[#2a3d55] text-[#8A9AB0]'}`}
+                  style={{ background: 'transparent' }}
+                >
+                  {['Draft', 'Sent', 'Partially Paid', 'Paid', 'Overdue'].map(s => (
+                    <option key={s} value={s} className="bg-[#1a2d45] text-white">{s}</option>
+                  ))}
+                </select>
               </div>
               <p className="text-[#8A9AB0]">{invoice.proposals?.company} · {invoice.proposals?.client_name}</p>
               <p className="text-[#8A9AB0] text-xs mt-0.5">{invoice.proposals?.proposal_name}</p>
@@ -428,7 +444,21 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
           <div className="grid grid-cols-4 gap-4 mt-6">
             <div><p className="text-[#8A9AB0] text-xs">Invoice Date</p><p className="text-white text-sm font-medium">{invoice.issued_date ? new Date(invoice.issued_date).toLocaleDateString() : '—'}</p></div>
-            <div><p className="text-[#8A9AB0] text-xs">Due Date</p><p className="text-white text-sm font-medium">{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '—'}</p></div>
+            <div>
+              <p className="text-[#8A9AB0] text-xs">Due Date</p>
+              {editingDueDate ? (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <input type="date" value={dueDateValue} onChange={e => setDueDateValue(e.target.value)}
+                    className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-0.5 text-xs focus:outline-none focus:border-[#C8622A]" />
+                  <button onClick={saveDueDate} className="text-[#C8622A] text-xs font-semibold hover:text-white transition-colors">Save</button>
+                  <button onClick={() => { setDueDateValue(invoice.due_date || ''); setEditingDueDate(false) }} className="text-[#8A9AB0] text-xs hover:text-white transition-colors">✕</button>
+                </div>
+              ) : (
+                <button onClick={() => setEditingDueDate(true)} className="text-white text-sm font-medium hover:text-[#C8622A] transition-colors text-left">
+                  {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : <span className="text-[#8A9AB0]">Set date</span>}
+                </button>
+              )}
+            </div>
             <div><p className="text-[#8A9AB0] text-xs">Total</p><p className="text-white text-sm font-bold">${(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
             <div><p className="text-[#8A9AB0] text-xs">Balance Due</p><p className={`text-sm font-bold ${invoice.balance_due > 0 ? 'text-[#C8622A]' : 'text-green-400'}`}>${(invoice.balance_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
           </div>
