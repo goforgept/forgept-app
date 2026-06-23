@@ -155,7 +155,7 @@ function App() {
             <Route path="/vendors" element={<Vendors {...sharedProps} />} />
             <Route path="/settings" element={<Settings {...sharedProps} />} />
             <Route path="/clients" element={<Clients {...sharedProps} />} />
-            <Route path="/superadmin" element={<SuperAdmin />} />
+            {profile?.is_superadmin && <Route path="/superadmin" element={<SuperAdmin />} />}
             <Route path="/client/:id" element={<ClientDetail {...sharedProps} />} />
             <Route path="/purchase-orders" element={<PurchaseOrders {...sharedProps} />} />
             <Route path="/faq" element={<FAQ {...sharedProps} />} />
