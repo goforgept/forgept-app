@@ -198,18 +198,14 @@ export default function ProposalDetail({ isAdmin }) {
 
     setProposal(data)
 
-    // Load revision history if this proposal is part of a revision chain
-    if (data?.original_proposal_id || data?.revision_number > 1) {
-      const originalId = data.original_proposal_id || data.id
-      const { data: allRevisions } = await supabase
-        .from('proposals')
-        .select('id, proposal_name, revision_number, status, created_at, is_current_revision')
-        .or(`id.eq.${originalId},original_proposal_id.eq.${originalId}`)
-        .order('revision_number', { ascending: true })
-      setRevisions(allRevisions || [])
-    } else {
-      setRevisions([])
-    }
+    // Load revision history — always check so rev 1 can see newer revisions
+    const originalId = data.original_proposal_id || data.id
+    const { data: allRevisions } = await supabase
+      .from('proposals')
+      .select('id, proposal_name, revision_number, status, created_at, is_current_revision')
+      .or(`id.eq.${originalId},original_proposal_id.eq.${originalId}`)
+      .order('revision_number', { ascending: true })
+    setRevisions(allRevisions?.length > 1 ? allRevisions : [])
     setCollaborators(data?.collaborator_ids || [])
     setQboInvoiceId(data?.qbo_invoice_id || null)
 
@@ -2730,42 +2726,66 @@ const analyzeDrawing = async () => {
         <DrawingToolSummary proposalId={id} featureEnabled={features.drawingTool} />
 
         {revisions.length > 1 && (
-          <div className="mt-6 bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Revision History</p>
-            <div className="space-y-2">
-              {revisions.map(rev => {
-                const isCurrent = rev.id === id
-                return (
-                  <div key={rev.id} onClick={() => !isCurrent && navigate(`/proposal/${rev.id}`)}
-                    className={`flex items-center justify-between px-4 py-2.5 rounded-lg border transition-colors ${
-                      isCurrent
-                        ? 'bg-[#0F1C2E] border-[#C8622A]/30'
-                        : 'border-[#2a3d55] hover:border-[#C8622A]/30 cursor-pointer hover:bg-[#0F1C2E]'
-                    }`}>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                        isCurrent ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-blue-500/10 text-blue-400'
-                      }`}>Rev {rev.revision_number}</span>
-                      <span className="text-white text-sm">{rev.proposal_name}</span>
-                      {!rev.is_current_revision && (
-                        <span className="text-[#8A9AB0] text-xs">superseded</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        rev.status === 'Won' ? 'bg-green-500/20 text-green-400' :
-                        rev.status === 'Sent' ? 'bg-blue-500/20 text-blue-400' :
-                        rev.status === 'Lost' ? 'bg-red-500/20 text-red-400' :
-                        'bg-[#8A9AB0]/20 text-[#8A9AB0]'
-                      }`}>{rev.status}</span>
-                      <span className="text-[#8A9AB0] text-xs">{new Date(rev.created_at).toLocaleDateString()}</span>
-                      {!isCurrent && <span className="text-[#8A9AB0] text-xs">→</span>}
-                    </div>
+          <>
+            {/* Superseded banner — show when viewing an old revision */}
+            {!proposal?.is_current_revision && (() => {
+              const current = revisions.find(r => r.is_current_revision)
+              return current ? (
+                <div className="mt-6 flex items-center justify-between bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-5 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-yellow-400 text-sm">⚠</span>
+                    <span className="text-yellow-400 text-sm font-semibold">You're viewing an older revision</span>
+                    <span className="text-yellow-400/70 text-xs">— Rev {proposal?.revision_number} of {revisions.length}</span>
                   </div>
-                )
-              })}
+                  <button
+                    onClick={() => navigate(`/proposal/${current.id}`)}
+                    className="text-yellow-400 hover:text-white text-xs font-semibold bg-yellow-500/20 hover:bg-yellow-500/30 px-3 py-1.5 rounded-lg transition-colors">
+                    Go to Current (Rev {current.revision_number}) →
+                  </button>
+                </div>
+              ) : null
+            })()}
+
+            <div className="mt-6 bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5">
+              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Revision History</p>
+              <div className="space-y-2">
+                {revisions.map(rev => {
+                  const isViewing = rev.id === id
+                  return (
+                    <div key={rev.id} onClick={() => !isViewing && navigate(`/proposal/${rev.id}`)}
+                      className={`flex items-center justify-between px-4 py-2.5 rounded-lg border transition-colors ${
+                        isViewing
+                          ? 'bg-[#0F1C2E] border-[#C8622A]/30'
+                          : 'border-[#2a3d55] hover:border-[#C8622A]/30 cursor-pointer hover:bg-[#0F1C2E]'
+                      }`}>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                          isViewing ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-blue-500/10 text-blue-400'
+                        }`}>Rev {rev.revision_number}</span>
+                        <span className="text-white text-sm">{rev.proposal_name}</span>
+                        {rev.is_current_revision && (
+                          <span className="text-green-400 text-xs font-medium">current</span>
+                        )}
+                        {!rev.is_current_revision && !isViewing && (
+                          <span className="text-[#8A9AB0] text-xs">superseded</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          rev.status === 'Won' ? 'bg-green-500/20 text-green-400' :
+                          rev.status === 'Sent' ? 'bg-blue-500/20 text-blue-400' :
+                          rev.status === 'Lost' ? 'bg-red-500/20 text-red-400' :
+                          'bg-[#8A9AB0]/20 text-[#8A9AB0]'
+                        }`}>{rev.status}</span>
+                        <span className="text-[#8A9AB0] text-xs">{new Date(rev.created_at).toLocaleDateString()}</span>
+                        {!isViewing && <span className="text-[#8A9AB0] text-xs">→</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         <ActivityFeed proposalId={id} clientId={proposal?.client_id} orgId={proposal?.org_id} refreshKey={activityRefreshKey} />
