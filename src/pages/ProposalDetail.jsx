@@ -171,7 +171,7 @@ export default function ProposalDetail({ isAdmin }) {
     fetchRFQRequests()
     fetchPhotos()
     fetchVendors()
-  }, [])
+  }, [id])
 
   useEffect(() => {
     if (!profile?.org_id) return
