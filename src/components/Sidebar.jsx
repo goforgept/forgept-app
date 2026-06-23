@@ -102,6 +102,25 @@ const NAV_GROUPS_TECH = () => [
   }
 ]
 
+const NAV_GROUPS_DEV = () => [
+  {
+    key: 'roadmap',
+    label: 'Roadmap',
+    links: [
+      { label: 'Roadmap', path: '/roadmap', icon: '🗺️' },
+      { label: 'Catalog', path: '/catalog', icon: '📦' },
+    ]
+  },
+  {
+    key: 'manage',
+    label: 'Manage',
+    links: [
+      { label: 'Settings', path: '/settings', icon: '⚙️' },
+      { label: 'Help', path: '/faq', icon: '❓' },
+    ]
+  }
+]
+
 const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool) => [
   {
     key: 'sales',
@@ -149,7 +168,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
   }
 ]
 
-export default function Sidebar({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, featureDesignerOnly = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
+export default function Sidebar({ isAdmin, isDevTeam = false, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, featureDesignerOnly = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
   const location = useLocation()
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
@@ -201,6 +220,8 @@ const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featu
           { label: 'Settings', path: '/settings', icon: '⚙️' },
         ]
       }]
+    : isDevTeam
+    ? NAV_GROUPS_DEV()
     : isAdmin || isSalesManager
     ? NAV_GROUPS_ADMIN(featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool || sessionStorage.getItem('featureDrawingTool') === 'true')
     : isPM
@@ -222,9 +243,9 @@ const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featu
             <h1 className="text-white text-xl font-bold">
               ForgePt<span className="text-[#C8622A]">.</span>
             </h1>
-            {(isAdmin || isSalesManager || isPM || isTechnician) && (
+            {(isAdmin || isSalesManager || isPM || isTechnician || isDevTeam) && (
               <span className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-semibold mt-1 inline-block">
-                {isAdmin ? 'Admin' : isSalesManager ? 'Sales Mgr' : isPM ? 'PM' : 'Technician'}
+                {isAdmin ? 'Admin' : isSalesManager ? 'Sales Mgr' : isPM ? 'PM' : isTechnician ? 'Technician' : 'Dev Team'}
               </span>
             )}
           </div>

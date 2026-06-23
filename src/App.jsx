@@ -91,13 +91,14 @@ function App() {
   const isSalesManager = role === 'sales_manager'
   const isPM           = role === 'project_manager'
   const isTechnician   = role === 'technician'
+  const isDevTeam      = role === 'dev'
 
   const impersonation = (() => {
     try { return JSON.parse(localStorage.getItem('sa_impersonate') || 'null') } catch { return null }
   })()
 
   const sharedProps = {
-    isAdmin, role, isSalesManager, isPM, isTechnician,
+    isAdmin, role, isSalesManager, isPM, isTechnician, isDevTeam,
     featureProposals:      features.proposals,
     featureCRM:            features.crm,
     featureSendProposal:   features.sendProposal,
@@ -134,6 +135,8 @@ function App() {
             <Route path="/" element={
               features.designerOnly
                 ? <Navigate to="/designer" replace />
+                : isDevTeam
+                ? <Navigate to="/roadmap" replace />
                 : isAdmin || isSalesManager
                 ? <AdminDashboard {...sharedProps} />
                 : isPM

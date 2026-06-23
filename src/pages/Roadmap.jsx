@@ -33,7 +33,7 @@ const NEXT_STATUSES = {
 const QUARTER_OPTIONS = (() => {
   const opts = []
   const now = new Date()
-  for (let y = now.getFullYear(); y <= now.getFullYear() + 2; y++) {
+  for (let y = now.getFullYear(); y <= now.getFullYear() + 5; y++) {
     for (let q = 1; q <= 4; q++) opts.push(`Q${q} ${y}`)
   }
   return opts
@@ -41,7 +41,7 @@ const QUARTER_OPTIONS = (() => {
 
 const emptyForm = { title: '', description: '', category: 'feature', target_quarter: '', target_date: '' }
 
-export default function Roadmap({ isAdmin, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices }) {
+export default function Roadmap({ isAdmin, isDevTeam, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices }) {
   const { profile } = useProfile()
   const [items, setItems]             = useState([])
   const [loading, setLoading]         = useState(true)
@@ -53,10 +53,10 @@ export default function Roadmap({ isAdmin, featureProposals, featureCRM, feature
   const [showRequest, setShowRequest] = useState(false)
   const [reqForm, setReqForm]         = useState({ title: '', description: '', category: 'feature' })
   const [submitting, setSubmitting]   = useState(false)
-  const [drawer, setDrawer]           = useState(null) // roadmap_item id
+  const [drawer, setDrawer]           = useState(null)
 
   const orgId       = profile?.org_id
-  const userIsAdmin = profile?.org_role === 'admin' || profile?.role === 'admin'
+  const userIsAdmin = profile?.org_role === 'admin' || profile?.role === 'admin' || isDevTeam
 
   useEffect(() => { if (orgId) fetchItems() }, [orgId])
 
@@ -86,13 +86,12 @@ export default function Roadmap({ isAdmin, featureProposals, featureCRM, feature
     const payload = { title: form.title, description: form.description, category: form.category, target_quarter: form.target_quarter || null, target_date: form.target_date || null }
     if (editItem) {
       await supabase.from('roadmap_items').update(payload).eq('id', editItem.id)
-      setItems(prev => prev.map(i => i.id === editItem.id ? { ...i, ...payload } : i))
     } else {
-      const { data } = await supabase.from('roadmap_items').insert({ org_id: orgId, ...payload, status: 'planned' }).select('*, profiles!roadmap_items_requested_by_fkey(full_name)').single()
-      if (data) setItems(prev => [data, ...prev])
+      await supabase.from('roadmap_items').insert({ org_id: orgId, ...payload, status: 'planned' })
     }
     setSaving(false)
     setShowModal(false)
+    fetchItems()
   }
 
   const updateStatus = async (id, status) => {
@@ -286,7 +285,7 @@ export default function Roadmap({ isAdmin, featureProposals, featureCRM, feature
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Specific Date</label>
-                  <input type="month" value={form.target_date} onChange={e => setForm(p => ({ ...p, target_date: e.target.value }))}
+                  <input type="date" value={form.target_date} onChange={e => setForm(p => ({ ...p, target_date: e.target.value }))}
                     className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
               </div>
@@ -398,7 +397,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
   }
 
   const displayRelease = item.target_quarter || (item.target_date
-    ? new Date(item.target_date + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    ? new Date(item.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : null)
 
   return (
@@ -462,7 +461,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
                 </div>
                 <div>
                   <label className="text-[#8A9AB0] text-xs mb-1 block">Specific Month</label>
-                  <input type="month" value={releaseForm.target_date} onChange={e => setReleaseForm(p => ({ ...p, target_date: e.target.value }))}
+                  <input type="date" value={releaseForm.target_date} onChange={e => setReleaseForm(p => ({ ...p, target_date: e.target.value }))}
                     className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
                 <div className="flex gap-2">
@@ -481,7 +480,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
                 <span className="text-white text-sm font-semibold">{displayRelease}</span>
                 {item.target_quarter && item.target_date && (
                   <span className="text-[#8A9AB0] text-xs">
-                    · {new Date(item.target_date + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                    · {new Date(item.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                   </span>
                 )}
               </div>
@@ -586,7 +585,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
 function AdminCard({ item, currentStatus, onOpen, onEdit, onDelete, onStatusChange }) {
   const moves = (NEXT_STATUSES[currentStatus] || []).slice(0, 2)
   const displayRelease = item.target_quarter || (item.target_date
-    ? new Date(item.target_date + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    ? new Date(item.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : null)
 
   return (
@@ -642,7 +641,7 @@ function RepCard({ item, released = false, showStatus = false, onOpen }) {
   }
   const statusLabel = { backlog: 'Pending', planned: 'Planned', in_progress: 'In Progress', released: 'Released', declined: 'Declined' }
   const displayRelease = item.target_quarter || (item.target_date
-    ? new Date(item.target_date + '-01').toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    ? new Date(item.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : null)
 
   return (
