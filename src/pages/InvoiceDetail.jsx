@@ -77,7 +77,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
   }
 
-  const generateInvoicePDF = (descOverride) => {
+  const generateInvoicePDF = async (descOverride) => {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
@@ -87,8 +87,23 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
     doc.rect(0, 0, pageWidth, 40, 'F')
     if (profile?.logo_url) {
-      const img = new Image(); img.src = profile.logo_url
-      doc.addImage(img, 'PNG', 14, 8, 40, 24)
+      try {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.src = profile.logo_url
+        await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve })
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth
+        canvas.height = img.naturalHeight
+        canvas.getContext('2d').drawImage(img, 0, 0)
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+        const maxW = 40, maxH = 24
+        const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+        doc.addImage(dataUrl, 'JPEG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+      } catch {
+        doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont('helvetica', 'bold')
+        doc.text(companyName, 14, 20)
+      }
     } else {
       doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont('helvetica', 'bold')
       doc.text(companyName, 14, 20)
@@ -221,8 +236,8 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     return doc
   }
 
-  const downloadPDF = () => {
-    const doc = generateInvoicePDF(descriptionValue)
+  const downloadPDF = async () => {
+    const doc = await generateInvoicePDF(descriptionValue)
     doc.save(`${invoice?.invoice_number || 'Invoice'}.pdf`)
   }
 
@@ -265,7 +280,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     if (!invoice?.proposals?.client_email) { alert('No client email on linked proposal.'); return }
     setSendingInvoice(true)
     try {
-      const doc = generateInvoicePDF(descriptionValue)
+      const doc = await generateInvoicePDF(descriptionValue)
       const pdfBase64 = doc.output('datauristring').split(',')[1]
 
       const { data: { session } } = await supabase.auth.getSession()
