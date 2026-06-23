@@ -314,7 +314,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   }
 
   const updateBillingType = async (billing_type) => {
-    await supabase.from('jobs').update({ billing_type }).eq('id', id)
+    const { error } = await supabase.from('jobs').update({ billing_type }).eq('id', id)
+    if (error) { console.error('billing_type save error:', error); alert('Could not save billing type: ' + error.message); return }
     setJob(prev => ({ ...prev, billing_type }))
   }
 
