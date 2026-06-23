@@ -128,7 +128,7 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
         : ''
       const description = `AIA Application #${appForm.application_number}${periodLabel}`
 
-      const { data: inv } = await supabase.from('invoices').insert({
+      const { data: inv, error: invErr } = await supabase.from('invoices').insert({
         org_id: profile.org_id,
         proposal_id: job?.proposal_id || null,
         invoice_number: invoiceNumber,
@@ -144,7 +144,7 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
         notes: `AIA G702 Application #${appForm.application_number}. Contract Sum to Date: $${fmt(contractSumToDate)}. Total Completed & Stored: $${fmt(totalCompletedStored)}. Retainage (${appForm.retainage_percent}%): $${fmt(totalRetainage)}.`,
       }).select().single()
 
-      if (!inv) throw new Error('Failed to create invoice')
+      if (invErr) throw new Error(invErr.message)
 
       // Line items: gross this-period work per G703 line + a retainage deduction
       const grossThisPeriod = totalThisPeriod + totalStoredMaterials
