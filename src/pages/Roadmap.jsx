@@ -39,11 +39,15 @@ const QUARTER_OPTIONS = (() => {
   return opts
 })()
 
+const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null
+const fmtDateLong = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null
+
 const emptyForm = { title: '', description: '', category: 'feature', target_quarter: '', target_date: '' }
 
-export default function Roadmap({ isAdmin, isDevTeam, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices }) {
+export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices }) {
   const { profile } = useProfile()
   const [items, setItems]             = useState([])
+  const [teamMembers, setTeamMembers] = useState([])
   const [loading, setLoading]         = useState(true)
   const [showModal, setShowModal]     = useState(false)
   const [editItem, setEditItem]       = useState(null)
@@ -54,11 +58,14 @@ export default function Roadmap({ isAdmin, isDevTeam, featureProposals, featureC
   const [reqForm, setReqForm]         = useState({ title: '', description: '', category: 'feature' })
   const [submitting, setSubmitting]   = useState(false)
   const [drawer, setDrawer]           = useState(null)
+  const [view, setView]               = useState('board') // 'board' | 'report'
 
   const orgId       = profile?.org_id
-  const userIsAdmin = profile?.org_role === 'admin' || profile?.role === 'admin' || isDevTeam
+  const userIsAdmin = profile?.org_role === 'admin' || profile?.role === 'admin' || isDevTeam || isProductManager
 
-  useEffect(() => { if (orgId) fetchItems() }, [orgId])
+  useEffect(() => {
+    if (orgId) { fetchItems(); fetchTeamMembers() }
+  }, [orgId])
 
   const fetchItems = async () => {
     setLoading(true)
@@ -71,6 +78,18 @@ export default function Roadmap({ isAdmin, isDevTeam, featureProposals, featureC
     setItems(data || [])
     setLoading(false)
   }
+
+  const fetchTeamMembers = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, full_name, org_role')
+      .eq('org_id', orgId)
+      .in('org_role', ['admin', 'dev', 'product_manager'])
+      .order('full_name')
+    setTeamMembers(data || [])
+  }
+
+  const assigneeName = (id) => teamMembers.find(m => m.id === id)?.full_name || null
 
   const openCreate = () => { setForm(emptyForm); setEditItem(null); setShowModal(true); setError(null) }
   const openEdit   = (item) => {
@@ -110,127 +129,168 @@ export default function Roadmap({ isAdmin, isDevTeam, featureProposals, featureC
   const submitRequest = async () => {
     if (!reqForm.title.trim()) return
     setSubmitting(true)
-    const { data } = await supabase.from('roadmap_items').insert({
+    await supabase.from('roadmap_items').insert({
       org_id: orgId, title: reqForm.title, description: reqForm.description,
       category: reqForm.category, status: 'backlog', requested_by: profile?.id,
-    }).select('*, profiles!roadmap_items_requested_by_fkey(full_name)').single()
-    if (data) setItems(prev => [...prev, data])
+    })
     setSubmitting(false)
     setShowRequest(false)
     setReqForm({ title: '', description: '', category: 'feature' })
+    fetchItems()
   }
 
   const byStatus = (status) => items.filter(i => i.status === status)
   const drawerItem = items.find(i => i.id === drawer) || null
 
+  const sidebarProps = { isAdmin, isDevTeam, isProductManager, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices }
+
   if (loading) return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} />
+      <Sidebar {...sidebarProps} />
       <div className="flex-1 flex items-center justify-center"><p className="text-[#8A9AB0]">Loading...</p></div>
     </div>
   )
 
   return (
     <div className="flex min-h-screen bg-[#0F1C2E]">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} />
+      <Sidebar {...sidebarProps} />
 
-      <div className="flex-1 p-6 min-w-0">
+      <div className="flex-1 p-6 min-w-0 print:p-0 print:bg-white">
+
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-6 print:hidden">
           <div>
             <h2 className="text-white text-2xl font-bold">Roadmap</h2>
             <p className="text-[#8A9AB0] text-sm mt-0.5">
-              {userIsAdmin ? "Manage your team's feature pipeline." : 'See what\'s planned and submit a request.'}
+              {userIsAdmin ? "Manage your team's feature pipeline." : "See what's planned and submit a request."}
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowRequest(true)}
-              className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
-              + Submit Request
-            </button>
+            {/* View toggle — admin only */}
             {userIsAdmin && (
-              <button onClick={openCreate}
-                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-                + Add Item
+              <div className="flex bg-[#1a2d45] border border-[#2a3d55] rounded-lg p-1 gap-1">
+                <button onClick={() => setView('board')}
+                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'board' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                  Board
+                </button>
+                <button onClick={() => setView('report')}
+                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'report' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                  Report
+                </button>
+              </div>
+            )}
+            {!userIsAdmin && (
+              <button onClick={() => setShowRequest(true)}
+                className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
+                + Submit Request
+              </button>
+            )}
+            {userIsAdmin && view === 'board' && (
+              <>
+                <button onClick={() => setShowRequest(true)}
+                  className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
+                  + Submit Request
+                </button>
+                <button onClick={openCreate}
+                  className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                  + Add Item
+                </button>
+              </>
+            )}
+            {userIsAdmin && view === 'report' && (
+              <button onClick={() => window.print()}
+                className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
+                🖨 Print / Export
               </button>
             )}
           </div>
         </div>
 
-        {userIsAdmin ? (
-          <div className="grid grid-cols-5 gap-4">
-            {ADMIN_COLUMNS.map(status => {
-              const meta = STATUS_META[status]
-              const col  = byStatus(status)
-              return (
-                <div key={status} className="flex flex-col gap-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className={`w-2 h-2 rounded-full ${meta.dot}`} />
-                    <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>{meta.label}</span>
-                    <span className="text-[#8A9AB0] text-xs ml-auto">{col.length}</span>
+        {/* ── Board view ── */}
+        {(view === 'board' || !userIsAdmin) && (
+          <>
+            {userIsAdmin ? (
+              <div className="grid grid-cols-5 gap-4">
+                {ADMIN_COLUMNS.map(status => {
+                  const meta = STATUS_META[status]
+                  const col  = byStatus(status)
+                  return (
+                    <div key={status} className="flex flex-col gap-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className={`w-2 h-2 rounded-full ${meta.dot}`} />
+                        <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>{meta.label}</span>
+                        <span className="text-[#8A9AB0] text-xs ml-auto">{col.length}</span>
+                      </div>
+                      {col.length === 0 && (
+                        <div className="border border-dashed border-[#2a3d55] rounded-xl p-4 text-center">
+                          <p className="text-[#8A9AB0] text-xs">Empty</p>
+                        </div>
+                      )}
+                      {col.map(item => (
+                        <AdminCard key={item.id} item={item} currentStatus={status}
+                          assigneeName={assigneeName(item.assigned_to)}
+                          onOpen={() => setDrawer(item.id)}
+                          onEdit={() => openEdit(item)}
+                          onDelete={() => deleteItem(item.id)}
+                          onStatusChange={(s) => updateStatus(item.id, s)} />
+                      ))}
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="space-y-8">
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-2 h-2 rounded-full bg-blue-400" />
+                    <h3 className="text-white font-semibold">Coming Up</h3>
+                    <span className="text-[#8A9AB0] text-xs">{byStatus('planned').length + byStatus('in_progress').length} items</span>
                   </div>
-                  {col.length === 0 && (
-                    <div className="border border-dashed border-[#2a3d55] rounded-xl p-4 text-center">
-                      <p className="text-[#8A9AB0] text-xs">Empty</p>
+                  {byStatus('planned').length === 0 && byStatus('in_progress').length === 0 ? (
+                    <p className="text-[#8A9AB0] text-sm">Nothing planned yet — check back soon.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {[...byStatus('in_progress'), ...byStatus('planned')].map(item => (
+                        <RepCard key={item.id} item={item} onOpen={() => setDrawer(item.id)} />
+                      ))}
                     </div>
                   )}
-                  {col.map(item => (
-                    <AdminCard key={item.id} item={item} currentStatus={status}
-                      onOpen={() => setDrawer(item.id)}
-                      onEdit={() => openEdit(item)}
-                      onDelete={() => deleteItem(item.id)}
-                      onStatusChange={(s) => updateStatus(item.id, s)} />
-                  ))}
                 </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="space-y-8">
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <div className="w-2 h-2 rounded-full bg-blue-400" />
-                <h3 className="text-white font-semibold">Coming Up</h3>
-                <span className="text-[#8A9AB0] text-xs">{byStatus('planned').length + byStatus('in_progress').length} items</span>
-              </div>
-              {byStatus('planned').length === 0 && byStatus('in_progress').length === 0 ? (
-                <p className="text-[#8A9AB0] text-sm">Nothing planned yet — check back soon.</p>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {[...byStatus('in_progress'), ...byStatus('planned')].map(item => (
-                    <RepCard key={item.id} item={item} onOpen={() => setDrawer(item.id)} />
-                  ))}
-                </div>
-              )}
-            </div>
-            {byStatus('released').length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-2 h-2 rounded-full bg-green-400" />
-                  <h3 className="text-white font-semibold">Released</h3>
-                  <span className="text-[#8A9AB0] text-xs">{byStatus('released').length} items</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {byStatus('released').map(item => (
-                    <RepCard key={item.id} item={item} released onOpen={() => setDrawer(item.id)} />
-                  ))}
-                </div>
+                {byStatus('released').length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-2 h-2 rounded-full bg-green-400" />
+                      <h3 className="text-white font-semibold">Released</h3>
+                      <span className="text-[#8A9AB0] text-xs">{byStatus('released').length} items</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {byStatus('released').map(item => (
+                        <RepCard key={item.id} item={item} released onOpen={() => setDrawer(item.id)} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {items.filter(i => i.requested_by === profile?.id).length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-2 h-2 rounded-full bg-[#C8622A]" />
+                      <h3 className="text-white font-semibold">My Requests</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {items.filter(i => i.requested_by === profile?.id).map(item => (
+                        <RepCard key={item.id} item={item} showStatus onOpen={() => setDrawer(item.id)} />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
-            {items.filter(i => i.requested_by === profile?.id).length > 0 && (
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="w-2 h-2 rounded-full bg-[#C8622A]" />
-                  <h3 className="text-white font-semibold">My Requests</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {items.filter(i => i.requested_by === profile?.id).map(item => (
-                    <RepCard key={item.id} item={item} showStatus onOpen={() => setDrawer(item.id)} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          </>
+        )}
+
+        {/* ── Report view ── */}
+        {view === 'report' && userIsAdmin && (
+          <ReportView items={items} teamMembers={teamMembers} assigneeName={assigneeName} />
         )}
       </div>
 
@@ -241,6 +301,7 @@ export default function Roadmap({ isAdmin, isDevTeam, featureProposals, featureC
           orgId={orgId}
           profile={profile}
           userIsAdmin={userIsAdmin}
+          teamMembers={teamMembers}
           onClose={() => setDrawer(null)}
           onEdit={() => { openEdit(drawerItem); setDrawer(null) }}
           onStatusChange={(s) => updateStatus(drawerItem.id, s)}
@@ -301,7 +362,7 @@ export default function Roadmap({ isAdmin, isDevTeam, featureProposals, featureC
         </div>
       )}
 
-      {/* Rep request modal */}
+      {/* Rep / team request modal */}
       {showRequest && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
@@ -342,14 +403,94 @@ export default function Roadmap({ isAdmin, isDevTeam, featureProposals, featureC
   )
 }
 
+// ── Leadership Report View ─────────────────────────────────────────────────────
+function ReportView({ items, teamMembers, assigneeName }) {
+  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+
+  const REPORT_SECTIONS = [
+    { status: 'in_progress', label: 'In Progress',  border: 'border-blue-500/30',   dot: 'bg-blue-400' },
+    { status: 'planned',     label: 'Planned',       border: 'border-yellow-500/30', dot: 'bg-yellow-400' },
+    { status: 'released',    label: 'Released',      border: 'border-green-500/30',  dot: 'bg-green-400' },
+    { status: 'backlog',     label: 'Backlog',       border: 'border-[#2a3d55]',     dot: 'bg-[#8A9AB0]' },
+    { status: 'declined',    label: 'Declined',      border: 'border-red-500/30',    dot: 'bg-red-400' },
+  ]
+
+  const byStatus = (s) => items.filter(i => i.status === s)
+  const total = items.length
+
+  return (
+    <div className="max-w-4xl mx-auto print:max-w-none">
+      {/* Report header */}
+      <div className="mb-8 pb-6 border-b border-[#2a3d55] print:border-gray-300">
+        <h1 className="text-white text-3xl font-bold mb-1 print:text-black">Product Roadmap</h1>
+        <p className="text-[#8A9AB0] text-sm print:text-gray-500">Generated {today}</p>
+      </div>
+
+      {/* Summary stats */}
+      <div className="grid grid-cols-5 gap-3 mb-8">
+        {REPORT_SECTIONS.map(s => (
+          <div key={s.status} className={`bg-[#1a2d45] border ${s.border} rounded-xl p-4 text-center print:bg-white print:border-gray-200`}>
+            <div className={`w-2 h-2 rounded-full ${s.dot} mx-auto mb-2`} />
+            <p className="text-white text-2xl font-bold print:text-black">{byStatus(s.status).length}</p>
+            <p className="text-[#8A9AB0] text-xs mt-0.5 print:text-gray-500">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Sections */}
+      {REPORT_SECTIONS.filter(s => byStatus(s.status).length > 0).map(s => (
+        <div key={s.status} className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <div className={`w-2.5 h-2.5 rounded-full ${s.dot}`} />
+            <h2 className="text-white font-bold text-lg print:text-black">{s.label}</h2>
+            <span className="text-[#8A9AB0] text-sm">({byStatus(s.status).length})</span>
+          </div>
+          <div className="space-y-2">
+            {byStatus(s.status).map(item => {
+              const release = item.target_quarter || fmtDate(item.target_date)
+              const owner   = assigneeName(item.assigned_to)
+              return (
+                <div key={item.id} className={`bg-[#1a2d45] border ${s.border} rounded-xl px-5 py-4 flex items-start gap-4 print:bg-white print:border-gray-200`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white font-semibold text-sm print:text-black">{item.title}</p>
+                    {item.description && (
+                      <p className="text-[#8A9AB0] text-xs mt-1 leading-relaxed print:text-gray-500">{item.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0 text-right">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[item.category]}`}>
+                      {CATEGORY_LABELS[item.category]}
+                    </span>
+                    {owner && (
+                      <span className="text-[#8A9AB0] text-xs print:text-gray-500">{owner}</span>
+                    )}
+                    {release && (
+                      <span className="text-[#C8622A] text-xs font-semibold">{release}</span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      {total === 0 && (
+        <p className="text-[#8A9AB0] text-center py-12">No roadmap items yet.</p>
+      )}
+    </div>
+  )
+}
+
 // ── Item Drawer ────────────────────────────────────────────────────────────────
-function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStatusChange, onItemUpdate }) {
-  const [notes, setNotes]         = useState([])
-  const [noteBody, setNoteBody]   = useState('')
-  const [posting, setPosting]     = useState(false)
+function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, onClose, onEdit, onStatusChange, onItemUpdate }) {
+  const [notes, setNotes]               = useState([])
+  const [noteBody, setNoteBody]         = useState('')
+  const [posting, setPosting]           = useState(false)
   const [loadingNotes, setLoadingNotes] = useState(true)
+  const [noteInternal, setNoteInternal] = useState(true)
   const [editingRelease, setEditingRelease] = useState(false)
-  const [releaseForm, setReleaseForm] = useState({ target_quarter: item.target_quarter || '', target_date: item.target_date || '' })
+  const [releaseForm, setReleaseForm]   = useState({ target_quarter: item.target_quarter || '', target_date: item.target_date || '' })
   const [savingRelease, setSavingRelease] = useState(false)
   const textareaRef = useRef(null)
 
@@ -357,8 +498,6 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
   const meta  = STATUS_META[item.status]
 
   useEffect(() => { fetchNotes() }, [item.id])
-
-  const [noteInternal, setNoteInternal] = useState(true)
 
   const fetchNotes = async () => {
     setLoadingNotes(true)
@@ -396,17 +535,18 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
     setEditingRelease(false)
   }
 
-  const displayRelease = item.target_quarter || (item.target_date
-    ? new Date(item.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    : null)
+  const assignTo = async (userId) => {
+    const patch = { assigned_to: userId || null }
+    await supabase.from('roadmap_items').update(patch).eq('id', item.id)
+    onItemUpdate(patch)
+  }
+
+  const displayRelease = item.target_quarter || fmtDateLong(item.target_date)
 
   return (
     <>
-      {/* Backdrop */}
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
-
-      {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 w-[420px] bg-[#1a2d45] border-l border-[#2a3d55] z-50 flex flex-col shadow-2xl">
+      <div className="fixed right-0 top-0 bottom-0 w-[440px] bg-[#1a2d45] border-l border-[#2a3d55] z-50 flex flex-col shadow-2xl">
 
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-4 border-b border-[#2a3d55] flex-shrink-0">
@@ -429,7 +569,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
           </button>
         </div>
 
-        {/* Scrollable body */}
+        {/* Body */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
 
           {/* Description */}
@@ -437,6 +577,24 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
             <div>
               <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">Description</p>
               <p className="text-white text-sm leading-relaxed">{item.description}</p>
+            </div>
+          )}
+
+          {/* Assigned To */}
+          {userIsAdmin && (
+            <div>
+              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Assigned To</p>
+              <select
+                value={item.assigned_to || ''}
+                onChange={e => assignTo(e.target.value || null)}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                <option value="">— Unassigned —</option>
+                {teamMembers.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.full_name} ({m.org_role === 'product_manager' ? 'Product Mgr' : m.org_role === 'dev' ? 'Dev' : 'Admin'})
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -460,7 +618,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
                   </select>
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Specific Month</label>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Specific Date</label>
                   <input type="date" value={releaseForm.target_date} onChange={e => setReleaseForm(p => ({ ...p, target_date: e.target.value }))}
                     className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
@@ -479,9 +637,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
                 </svg>
                 <span className="text-white text-sm font-semibold">{displayRelease}</span>
                 {item.target_quarter && item.target_date && (
-                  <span className="text-[#8A9AB0] text-xs">
-                    · {new Date(item.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                  </span>
+                  <span className="text-[#8A9AB0] text-xs">· {fmtDateLong(item.target_date)}</span>
                 )}
               </div>
             ) : (
@@ -489,7 +645,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
             )}
           </div>
 
-          {/* Status moves — admin only */}
+          {/* Status moves */}
           {userIsAdmin && moves.length > 0 && (
             <div>
               <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Move To</p>
@@ -504,17 +660,15 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
             </div>
           )}
 
-          {/* Admin actions */}
+          {/* Edit details */}
           {userIsAdmin && (
-            <div className="flex gap-2">
-              <button onClick={onEdit}
-                className="flex-1 px-3 py-2 bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] hover:text-white rounded-lg text-xs font-medium transition-colors">
-                Edit Details
-              </button>
-            </div>
+            <button onClick={onEdit}
+              className="w-full px-3 py-2 bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] hover:text-white rounded-lg text-xs font-medium transition-colors text-left">
+              Edit Title & Description
+            </button>
           )}
 
-          {/* Notes thread — internal only for admins */}
+          {/* Team notes — admin/dev/PM only */}
           {userIsAdmin && (
             <div>
               <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">
@@ -523,7 +677,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
               {loadingNotes ? (
                 <p className="text-[#8A9AB0] text-xs">Loading...</p>
               ) : notes.length === 0 ? (
-                <p className="text-[#8A9AB0] text-sm">No notes yet. Add the first update below.</p>
+                <p className="text-[#8A9AB0] text-sm">No notes yet.</p>
               ) : (
                 <div className="space-y-3">
                   {notes.map(note => (
@@ -538,7 +692,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
                         <div className="flex items-center gap-2">
                           <span className="text-[#8A9AB0] text-xs">{new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                           <button onClick={() => deleteNote(note.id)}
-                            className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors opacity-0 group-hover:opacity-100">✕</button>
+                            className="text-[#8A9AB0] hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
                         </div>
                       </div>
                       <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">{note.body}</p>
@@ -550,9 +704,9 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
           )}
         </div>
 
-        {/* Note input — admin only */}
+        {/* Note input */}
         {userIsAdmin && (
-          <div className="px-6 py-4 border-t border-[#2a3d55] flex-shrink-0 bg-[#1a2d45]">
+          <div className="px-6 py-4 border-t border-[#2a3d55] flex-shrink-0">
             <textarea
               ref={textareaRef}
               value={noteBody}
@@ -563,12 +717,11 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
               className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none placeholder-[#8A9AB0] mb-2"
             />
             <div className="flex items-center gap-3 mb-2">
-              <button
-                onClick={() => setNoteInternal(!noteInternal)}
+              <button onClick={() => setNoteInternal(!noteInternal)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${noteInternal ? 'bg-[#2a3d55] border-[#2a3d55] text-[#8A9AB0]' : 'bg-blue-500/10 border-blue-500/30 text-blue-400'}`}>
                 {noteInternal ? '🔒 Internal only' : '👁 Visible to reps'}
               </button>
-              <span className="text-[#8A9AB0] text-xs">{noteInternal ? 'Only admins see this' : 'Rep who submitted can see this'}</span>
+              <span className="text-[#8A9AB0] text-xs">{noteInternal ? 'Only team sees this' : 'Rep who submitted can see this'}</span>
             </div>
             <button onClick={postNote} disabled={posting || !noteBody.trim()}
               className="w-full bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
@@ -582,11 +735,9 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, onClose, onEdit, onStat
 }
 
 // ── Admin Kanban card ──────────────────────────────────────────────────────────
-function AdminCard({ item, currentStatus, onOpen, onEdit, onDelete, onStatusChange }) {
+function AdminCard({ item, currentStatus, assigneeName, onOpen, onEdit, onDelete, onStatusChange }) {
   const moves = (NEXT_STATUSES[currentStatus] || []).slice(0, 2)
-  const displayRelease = item.target_quarter || (item.target_date
-    ? new Date(item.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : null)
+  const displayRelease = item.target_quarter || fmtDate(item.target_date)
 
   return (
     <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-4 group hover:border-[#C8622A]/30 transition-colors">
@@ -595,8 +746,8 @@ function AdminCard({ item, currentStatus, onOpen, onEdit, onDelete, onStatusChan
           {item.title}
         </button>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          <button onClick={onEdit} className="text-[#8A9AB0] hover:text-white text-xs transition-colors p-0.5">✏️</button>
-          <button onClick={onDelete} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors p-0.5">✕</button>
+          <button onClick={onEdit} className="text-[#8A9AB0] hover:text-white text-xs p-0.5">✏️</button>
+          <button onClick={onDelete} className="text-[#8A9AB0] hover:text-red-400 text-xs p-0.5">✕</button>
         </div>
       </div>
       {item.description && (
@@ -612,9 +763,14 @@ function AdminCard({ item, currentStatus, onOpen, onEdit, onDelete, onStatusChan
           </span>
         )}
       </div>
-      {item.profiles?.full_name && (
-        <p className="text-[#8A9AB0] text-xs mb-2">↑ {item.profiles.full_name}</p>
-      )}
+      <div className="flex items-center justify-between mb-2 min-h-[16px]">
+        {item.profiles?.full_name && (
+          <p className="text-[#8A9AB0] text-xs">↑ {item.profiles.full_name}</p>
+        )}
+        {assigneeName && (
+          <p className="text-blue-400 text-xs ml-auto">→ {assigneeName}</p>
+        )}
+      </div>
       <div className="flex flex-col gap-1">
         <button onClick={onOpen} className="w-full text-left text-xs px-2 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white hover:bg-[#2a3d55] transition-colors">
           View details & notes →
@@ -633,16 +789,11 @@ function AdminCard({ item, currentStatus, onOpen, onEdit, onDelete, onStatusChan
 // ── Rep read-only card ─────────────────────────────────────────────────────────
 function RepCard({ item, released = false, showStatus = false, onOpen }) {
   const statusBadge = {
-    backlog:     'bg-[#8A9AB0]/20 text-[#8A9AB0]',
-    planned:     'bg-yellow-500/20 text-yellow-400',
-    in_progress: 'bg-blue-500/20 text-blue-400',
-    released:    'bg-green-500/20 text-green-400',
-    declined:    'bg-red-500/20 text-red-400',
+    backlog: 'bg-[#8A9AB0]/20 text-[#8A9AB0]', planned: 'bg-yellow-500/20 text-yellow-400',
+    in_progress: 'bg-blue-500/20 text-blue-400', released: 'bg-green-500/20 text-green-400', declined: 'bg-red-500/20 text-red-400',
   }
   const statusLabel = { backlog: 'Pending', planned: 'Planned', in_progress: 'In Progress', released: 'Released', declined: 'Declined' }
-  const displayRelease = item.target_quarter || (item.target_date
-    ? new Date(item.target_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    : null)
+  const displayRelease = item.target_quarter || fmtDateLong(item.target_date)
 
   return (
     <button onClick={onOpen} className={`w-full text-left bg-[#1a2d45] border rounded-xl p-4 hover:border-[#C8622A]/40 transition-colors ${released ? 'border-green-500/20' : 'border-[#2a3d55]'}`}>
