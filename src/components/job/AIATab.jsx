@@ -199,18 +199,20 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
 
     let appId
     if (selectedApp) {
-      await supabase.from('aia_applications').update(payload).eq('id', selectedApp.id)
+      const { error: updateErr } = await supabase.from('aia_applications').update(payload).eq('id', selectedApp.id)
+      if (updateErr) { alert('Save error: ' + updateErr.message); return null }
       appId = selectedApp.id
       await supabase.from('aia_line_items').delete().eq('aia_application_id', appId)
     } else {
-      const { data: newApp } = await supabase.from('aia_applications').insert(payload).select().single()
+      const { data: newApp, error: insertErr } = await supabase.from('aia_applications').insert(payload).select().single()
+      if (insertErr) { alert('Save error: ' + insertErr.message); return null }
       appId = newApp?.id
       setSelectedApp(newApp)
     }
 
     const validLines = lineItems.filter(l => l.description || parseFloat(l.scheduled_value))
     if (appId && validLines.length > 0) {
-      await supabase.from('aia_line_items').insert(
+      const { error: lineErr } = await supabase.from('aia_line_items').insert(
         validLines.map((l, i) => ({
           aia_application_id: appId,
           sort_order: i,
@@ -222,6 +224,7 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
           stored_materials: parseFloat(l.stored_materials) || 0,
         }))
       )
+      if (lineErr) { alert('Line item save error: ' + lineErr.message); return null }
     }
 
     await fetchApplications()
