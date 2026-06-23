@@ -1,12 +1,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { validateUser, corsHeaders } from "../_shared/auth.ts"
+import { sendEmail } from "../_shared/email.ts"
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const { profile, error } = await validateUser(req)
+  const { profile: _profile, error } = await validateUser(req)
   if (error) {
     return new Response(JSON.stringify({ error }), {
       status: 401,
@@ -15,9 +16,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const brevoKey = Deno.env.get('BREVO_API_KEY') ?? ''
-    const SENDER_EMAIL = 'followups@goforgept.com'
-
     const {
       toEmail,
       toName,
@@ -26,7 +24,7 @@ Deno.serve(async (req) => {
       subject,
       proposalName,
       signingUrl,
-      orgId,
+      orgId: _orgId,
       logoUrl,
       companyName,
     } = await req.json()
@@ -67,37 +65,20 @@ Deno.serve(async (req) => {
       </div>
     `
 
-    const emailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': brevoKey
-      },
-      body: JSON.stringify({
-        sender: { name: fromName || 'ForgePt.', email: SENDER_EMAIL },
-        to: [{ email: toEmail, name: toName || '' }],
-        replyTo: fromEmail ? { email: fromEmail } : undefined,
-        subject: subject || `Please sign your proposal: ${proposalName}`,
-        htmlContent
-      })
+    await sendEmail({
+      to:       toEmail,
+      subject:  subject || `Please sign your proposal: ${proposalName}`,
+      html:     htmlContent,
+      replyTo:  fromEmail || undefined,
+      fromName: fromName || 'ForgePt.',
     })
 
-    if (!emailRes.ok) {
-      const errText = await emailRes.text()
-      console.error('Brevo error:', errText)
-      return new Response(JSON.stringify({ error: 'Email send failed', detail: errText }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    const result = await emailRes.json()
-
-    return new Response(JSON.stringify({ success: true, messageId: result.messageId }), {
+    return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err?.message ?? 'Unknown error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }

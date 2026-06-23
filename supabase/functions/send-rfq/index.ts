@@ -1,9 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { validateUser, corsHeaders } from "../_shared/auth.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { sendEmail } from "../_shared/email.ts"
 
-const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY') ?? ''
-const SENDER_EMAIL = 'followups@goforgept.com'
 const SENDER_NAME = 'ForgePt.'
 
 Deno.serve(async (req) => {
@@ -21,7 +20,7 @@ Deno.serve(async (req) => {
     const {
       lineItemIds, items, vendorEmail, vendorName,
       proposalName, repName, repEmail, company,
-      excelBase64, expiresAt, responseLink
+      excelBase64, expiresAt: _expiresAt, responseLink
     } = await req.json()
 
     if (!vendorEmail || !vendorName) {
@@ -89,8 +88,6 @@ Deno.serve(async (req) => {
       </tr>
     `).join('')
 
-    const expiryNote = ''
-
     const htmlContent = `
       <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:700px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
         <div style="background:#0f1c2e;padding:20px 28px;">
@@ -115,7 +112,6 @@ Deno.serve(async (req) => {
             <tbody>${itemRows}</tbody>
           </table>
 
-          ${expiryNote}
           ${excelBase64 ? '<p style="color:#444;font-size:13px;">An Excel spreadsheet is attached for your convenience. Please fill in your pricing and reply to this email.</p>' : ''}
 
           ${responseLink ? `
@@ -134,39 +130,26 @@ Deno.serve(async (req) => {
       </div>
     `
 
-    const emailPayload: any = {
-      sender: { name: repName || SENDER_NAME, email: SENDER_EMAIL },
-      to: [{ email: vendorEmail, name: vendorName }],
-      replyTo: { email: repEmail || SENDER_EMAIL },
-      subject: `RFQ: ${proposalName} — ${items.length} item${items.length !== 1 ? 's' : ''}`,
-      htmlContent
-    }
-
-    // Attach Excel if provided
-    if (excelBase64) {
-      emailPayload.attachment = [{
-        name: `RFQ_${proposalName.replace(/[^a-z0-9]/gi, '_')}_${vendorName.replace(/[^a-z0-9]/gi, '_')}.xlsx`,
-        content: excelBase64
-      }]
-    }
-
-    const emailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'api-key': BREVO_API_KEY },
-      body: JSON.stringify(emailPayload)
+    await sendEmail({
+      to:       vendorEmail,
+      subject:  `RFQ: ${proposalName} — ${items.length} item${items.length !== 1 ? 's' : ''}`,
+      html:     htmlContent,
+      replyTo:  repEmail || undefined,
+      fromName: repName || SENDER_NAME,
+      // Attach Excel spreadsheet if provided
+      attachments: excelBase64 ? [{
+        content:  excelBase64,
+        filename: `RFQ_${proposalName.replace(/[^a-z0-9]/gi, '_')}_${vendorName.replace(/[^a-z0-9]/gi, '_')}.xlsx`,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }] : undefined,
     })
-
-    if (!emailRes.ok) {
-      const errText = await emailRes.text()
-      throw new Error(`Brevo error: ${errText}`)
-    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err?.message ?? 'Unknown error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }

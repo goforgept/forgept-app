@@ -1,11 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { sendEmail } from "../_shared/email.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const SENDER_EMAIL = 'followups@goforgept.com'
 const SENDER_NAME = 'ForgePt.'
 
 const fillTemplate = (template: string, vars: Record<string, string>) => {
@@ -24,7 +24,6 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  const brevoKey = Deno.env.get('BREVO_API_KEY') ?? ''
   const cronSecret = Deno.env.get('CRON_SECRET') ?? ''
 
   const dbHeaders = {
@@ -40,7 +39,7 @@ Deno.serve(async (req) => {
     // These require user JWT auth since they're called by logged-in users
     if (body.type === 'ai_email' || body.type === 'share_notification' || body.type === 'meeting_confirmation' || body.type === 'meeting_cancellation') {
       const authHeader = req.headers.get('Authorization')
-      
+
       // Accept either a valid user JWT or the cron secret
       const isCron = cronSecret && authHeader === `Bearer ${cronSecret}`
       if (!isCron && !authHeader?.startsWith('Bearer ')) {
@@ -49,7 +48,7 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
-      const { toEmail, toName, fromName, fromEmail, subject, body: emailBody, orgId } = body
+      const { toEmail, toName, fromName, fromEmail, subject, body: emailBody } = body
 
       if (!toEmail || !subject || !emailBody) {
         return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -58,15 +57,12 @@ Deno.serve(async (req) => {
       }
 
       // Build .ics attachment for meeting confirmations
-      let attachment = undefined
+      let icsAttachment: { content: string; filename: string; mimeType: string } | undefined
       if ((body.type === 'meeting_confirmation' || body.type === 'meeting_cancellation') && body.meetingDate) {
         const { meetingDate, meetingTime, meetingDuration, meetingTitle, meetingLink, meetingNotes, organizerName, organizerEmail } = body
 
         const startTime = meetingTime || '09:00'
-        const [startHour, startMin] = startTime.split(':').map(Number)
         const durationMins = parseInt(meetingDuration) || 60
-
-        const startDate = new Date(`${meetingDate}T${startTime}:00`)
         const timezone = body.orgTimezone || 'America/Chicago'
 
         const formatICSLocal = (d: Date) => {
@@ -93,7 +89,7 @@ Deno.serve(async (req) => {
           `SUMMARY:${meetingTitle || 'Meeting'}`,
           `DESCRIPTION:${(meetingNotes || '').replace(/\n/g, '\\n')}${meetingLink ? `\\n\\nJoin: ${meetingLink}` : ''}`,
           meetingLink ? `URL:${meetingLink}` : '',
-          `ORGANIZER;CN=${organizerName || 'ForgePt'}:mailto:${organizerEmail || SENDER_EMAIL}`,
+          `ORGANIZER;CN=${organizerName || 'ForgePt'}:mailto:${organizerEmail || 'followups@goforgept.com'}`,
           `ATTENDEE;CN=${toName || toEmail}:mailto:${toEmail}`,
           body.type === 'meeting_cancellation' ? 'STATUS:CANCELLED' : 'STATUS:CONFIRMED',
           'SEQUENCE:0',
@@ -101,39 +97,23 @@ Deno.serve(async (req) => {
           'END:VCALENDAR',
         ].filter(Boolean).join('\r\n')
 
-        const icsBase64 = btoa(unescape(encodeURIComponent(icsLines)))
-        attachment = [{
-          content: icsBase64,
-          name: 'meeting.ics',
-          type: 'text/calendar; method=REQUEST',
-        }]
+        icsAttachment = {
+          content:  btoa(unescape(encodeURIComponent(icsLines))),
+          filename: 'meeting.ics',
+          mimeType: 'text/calendar; method=REQUEST',
+        }
       }
 
-      const brevoPayload: Record<string, unknown> = {
-        sender: { name: fromName || 'ForgePt.', email: SENDER_EMAIL },
-        to: [{ email: toEmail, name: toName || toEmail }],
-        replyTo: fromEmail ? { email: fromEmail } : undefined,
+      await sendEmail({
+        to:          toEmail,
         subject,
-        htmlContent: emailBody,
-      }
-
-      if (attachment) brevoPayload.attachment = attachment
-
-      const res = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
-        body: JSON.stringify(brevoPayload)
+        html:        emailBody,
+        replyTo:     fromEmail,
+        fromName:    fromName || SENDER_NAME,
+        attachments: icsAttachment ? [icsAttachment] : undefined,
       })
 
-      const result = await res.json()
-      if (!res.ok) {
-        console.error('Brevo direct send error:', result)
-        return new Response(JSON.stringify({ error: result.message || 'Brevo error' }), {
-          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
-      }
-
-      return new Response(JSON.stringify({ success: true, messageId: result.messageId }), {
+      return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
@@ -202,7 +182,7 @@ Deno.serve(async (req) => {
 
         const companyName = profile.company_name || proposal.company || 'our team'
         const repName = proposal.rep_name || 'Your representative'
-        const repEmail = profile.email || proposal.rep_email || SENDER_EMAIL
+        const repEmail = profile.email || proposal.rep_email || 'followups@goforgept.com'
         const clientName = proposal.client_name || 'there'
         const proposalValue = `$${(proposal.total_customer_value || proposal.proposal_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
@@ -242,19 +222,18 @@ Deno.serve(async (req) => {
         const emailFooter = `<br/><p style="color:#aaa;font-size:11px;">This email was sent on behalf of ${repName} at ${companyName}.</p>`
 
         if (proposal.client_email) {
-          const clientEmailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
-            body: JSON.stringify({
-              sender: { name: repName, email: SENDER_EMAIL },
-              to: [{ email: proposal.client_email, name: clientName }],
-              replyTo: { email: repEmail },
-              subject: clientSubjectFilled,
-              htmlContent: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">${logoHeader}<div style="padding:28px;">${clientBodyFilled}${emailFooter}</div></div>`
+          try {
+            await sendEmail({
+              to:       proposal.client_email,
+              subject:  clientSubjectFilled,
+              html:     `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">${logoHeader}<div style="padding:28px;">${clientBodyFilled}${emailFooter}</div></div>`,
+              replyTo:  repEmail,
+              fromName: repName,
             })
-          })
-          if (clientEmailRes.ok) emailsSent++
-          else console.error(`Client email failed for ${proposal.id}:`, await clientEmailRes.text())
+            emailsSent++
+          } catch (e) {
+            console.error(`Client email failed for ${proposal.id}:`, e)
+          }
         }
 
         // Rep notification email
@@ -271,18 +250,16 @@ Deno.serve(async (req) => {
           repUrgency = `A follow-up email has been sent to ${clientName} at ${proposal.company}. The close date is ${daysUntilClose} days away.`
         }
 
-        const repEmailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
-          body: JSON.stringify({
-            sender: { name: SENDER_NAME, email: SENDER_EMAIL },
-            to: [{ email: repEmail, name: repName }],
+        try {
+          await sendEmail({
+            to:      repEmail,
             subject: repSubject,
-            htmlContent: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">${logoHeader}<div style="padding:28px;"><h2 style="color:#0F1C2E;margin-top:0;">Proposal Follow-up Reminder</h2><p>Hi ${repName},</p><p>${repUrgency}</p><table style="width:100%;border-collapse:collapse;margin:20px 0;"><tr style="background:#0F1C2E;color:white;"><th style="padding:10px;text-align:left;">Proposal</th><th style="padding:10px;text-align:left;">Client</th><th style="padding:10px;text-align:left;">Value</th><th style="padding:10px;text-align:left;">Close Date</th></tr><tr style="background:#f5f5f5;"><td style="padding:10px;">${proposal.proposal_name}</td><td style="padding:10px;">${proposal.client_name} — ${proposal.company}</td><td style="padding:10px;">${proposalValue}</td><td style="padding:10px;">${proposal.close_date}</td></tr></table><p><a href="https://app.goforgept.com/proposal/${proposal.id}" style="background:#C8622A;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">View Proposal</a></p><br/><p style="color:#888;font-size:12px;">Powered by ForgePt.</p></div></div>`
+            html:    `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">${logoHeader}<div style="padding:28px;"><h2 style="color:#0F1C2E;margin-top:0;">Proposal Follow-up Reminder</h2><p>Hi ${repName},</p><p>${repUrgency}</p><table style="width:100%;border-collapse:collapse;margin:20px 0;"><tr style="background:#0F1C2E;color:white;"><th style="padding:10px;text-align:left;">Proposal</th><th style="padding:10px;text-align:left;">Client</th><th style="padding:10px;text-align:left;">Value</th><th style="padding:10px;text-align:left;">Close Date</th></tr><tr style="background:#f5f5f5;"><td style="padding:10px;">${proposal.proposal_name}</td><td style="padding:10px;">${proposal.client_name} — ${proposal.company}</td><td style="padding:10px;">${proposalValue}</td><td style="padding:10px;">${proposal.close_date}</td></tr></table><p><a href="https://app.goforgept.com/proposal/${proposal.id}" style="background:#C8622A;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">View Proposal</a></p><br/><p style="color:#888;font-size:12px;">Powered by ForgePt.</p></div></div>`,
           })
-        })
-        if (repEmailRes.ok) emailsSent++
-        else console.error(`Rep email failed for ${proposal.id}:`, await repEmailRes.text())
+          emailsSent++
+        } catch (e) {
+          console.error(`Rep email failed for ${proposal.id}:`, e)
+        }
 
         await fetch(`${supabaseUrl}/rest/v1/followup_log`, {
           method: 'POST',
@@ -302,9 +279,9 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
-  } catch (error) {
+  } catch (err: any) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: err?.message ?? 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

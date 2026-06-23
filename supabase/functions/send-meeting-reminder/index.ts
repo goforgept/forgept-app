@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { sendEmail } from "../_shared/email.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,22 +8,8 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY')!
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
-async function sendBrevoEmail(to: string, toName: string, subject: string, html: string) {
-  await fetch('https://api.brevo.com/v3/smtp/email', {
-    method: 'POST',
-    headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      sender: { name: 'ForgePt.', email: 'no-reply@goforgept.com' },
-      to: [{ email: to, name: toName }],
-      subject,
-      htmlContent: html,
-    }),
-  })
-}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -84,7 +71,11 @@ Deno.serve(async (req) => {
       </div>
     `
 
-    await sendBrevoEmail(clientEmail, clientName, `Reminder: ${task.meeting_type} tomorrow — ${task.title}`, html)
+    await sendEmail({
+      to:      clientEmail,
+      subject: `Reminder: ${task.meeting_type} tomorrow — ${task.title}`,
+      html,
+    })
     await supabase.from('tasks').update({ reminder_sent: true }).eq('id', task.id)
     sent++
   }

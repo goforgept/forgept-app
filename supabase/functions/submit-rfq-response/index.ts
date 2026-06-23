@@ -1,13 +1,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { sendEmail } from "../_shared/email.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY') ?? ''
-const SENDER_EMAIL = 'followups@goforgept.com'
+const SENDER_NAME = 'ForgePt.'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -15,7 +15,7 @@ Deno.serve(async (req) => {
   try {
     const {
       token, prices, quoteNumber, quoteExpiry,
-      vendorNotes, pdfBase64, pdfFileName
+      vendorNotes, pdfBase64, pdfFileName: _pdfFileName
     } = await req.json()
 
     if (!token) {
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     // Verify line items belong to this RFQ
     const rfqLineItemIds = rfq.line_item_ids || []
     const submittedIds = Object.keys(prices || {})
-    const validIds = submittedIds.filter(id => rfqLineItemIds.includes(id))
+    const validIds = submittedIds.filter((id: string) => rfqLineItemIds.includes(id))
 
     // Upload PDF if provided
     let pdfUrl = null
@@ -85,8 +85,8 @@ Deno.serve(async (req) => {
       vendor_notes: vendorNotes || null,
       vendor_response_pdf_url: pdfUrl,
       parsed_items: validIds
-        .filter(id => prices[id])
-        .map(id => ({ id, price: parseFloat(prices[id]) || 0 }))
+        .filter((id: string) => prices[id])
+        .map((id: string) => ({ id, price: parseFloat(prices[id]) || 0 }))
     }).eq('token', token)
 
     // Update bom_line_items — only valid IDs, vendor cost only
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
       }).eq('id', itemId)
     }
 
-    // Notify rep via Brevo
+    // Notify rep via SMTP
     const proposal = rfq.proposals
     if (proposal?.rep_email) {
       const { data: repProfile } = await adminSupabase
@@ -124,31 +124,27 @@ Deno.serve(async (req) => {
         ? `<div style="background:#0F1C2E;padding:20px 28px;"><img src="${repProfile.logo_url}" style="max-height:48px;max-width:200px;" /></div>`
         : `<div style="background:#0F1C2E;padding:20px 28px;"><span style="color:#fff;font-size:20px;font-weight:bold;">${repProfile?.company_name || 'ForgePt.'}</span></div>`
 
-      await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'api-key': BREVO_API_KEY },
-        body: JSON.stringify({
-          sender: { name: 'ForgePt.', email: SENDER_EMAIL },
-          to: [{ email: proposal.rep_email, name: proposal.rep_name || 'Rep' }],
-          subject: `Vendor quote received — ${proposal.proposal_name}`,
-          htmlContent: `
-            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
-              ${logoHeader}
-              <div style="padding:28px;">
-                <h2 style="color:#0F1C2E;margin-top:0;">📦 Vendor Quote Received</h2>
-                <p>Hi ${proposal.rep_name || 'there'},</p>
-                <p><strong>${rfq.vendor_name}</strong> has submitted pricing on <strong>${proposal.proposal_name}</strong>.</p>
-                ${quoteNumber ? `<p>Quote #: <strong>${quoteNumber}</strong></p>` : ''}
-                ${quoteExpiry ? `<p>Quote expires: <strong>${new Date(quoteExpiry).toLocaleDateString()}</strong></p>` : ''}
-                ${vendorNotes ? `<p>Vendor notes: ${vendorNotes}</p>` : ''}
-                <p style="color:#C8622A;font-weight:bold;">⚠ Review pricing and apply your margin before sending to client.</p>
-                <p><a href="https://app.goforgept.com/proposal/${rfq.proposal_id}" style="background:#C8622A;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">Review Proposal →</a></p>
-                <br/>
-                <p style="color:#888;font-size:12px;">Powered by ForgePt.</p>
-              </div>
+      await sendEmail({
+        to:      proposal.rep_email,
+        subject: `Vendor quote received — ${proposal.proposal_name}`,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
+            ${logoHeader}
+            <div style="padding:28px;">
+              <h2 style="color:#0F1C2E;margin-top:0;">📦 Vendor Quote Received</h2>
+              <p>Hi ${proposal.rep_name || 'there'},</p>
+              <p><strong>${rfq.vendor_name}</strong> has submitted pricing on <strong>${proposal.proposal_name}</strong>.</p>
+              ${quoteNumber ? `<p>Quote #: <strong>${quoteNumber}</strong></p>` : ''}
+              ${quoteExpiry ? `<p>Quote expires: <strong>${new Date(quoteExpiry).toLocaleDateString()}</strong></p>` : ''}
+              ${vendorNotes ? `<p>Vendor notes: ${vendorNotes}</p>` : ''}
+              <p style="color:#C8622A;font-weight:bold;">⚠ Review pricing and apply your margin before sending to client.</p>
+              <p><a href="https://app.goforgept.com/proposal/${rfq.proposal_id}" style="background:#C8622A;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">Review Proposal →</a></p>
+              <br/>
+              <p style="color:#888;font-size:12px;">Powered by ForgePt.</p>
             </div>
-          `
-        })
+          </div>
+        `,
+        fromName: SENDER_NAME,
       })
     }
 
@@ -156,8 +152,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err?.message ?? 'Unknown error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }

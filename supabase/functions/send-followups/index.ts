@@ -1,11 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { sendEmail } from "../_shared/email.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const SENDER_EMAIL = 'followups@goforgept.com'
 const SENDER_NAME = 'ForgePt.'
 
 Deno.serve(async (req) => {
@@ -25,7 +25,6 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
   const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  const brevoKey = Deno.env.get('BREVO_API_KEY') ?? ''
 
   const dbHeaders = {
     'apikey': supabaseKey,
@@ -97,7 +96,7 @@ Deno.serve(async (req) => {
 
         const companyName = profile.company_name || proposal.company || 'our team'
         const repName = profile.full_name || proposal.rep_name || 'Your representative'
-        const repEmail = profile.email || proposal.rep_email || SENDER_EMAIL
+        const repEmail = profile.email || proposal.rep_email || 'followups@goforgept.com'
         const clientName = proposal.client_name || 'there'
         const proposalValue = (
           proposal.total_customer_value || proposal.proposal_value || 0
@@ -149,15 +148,11 @@ Deno.serve(async (req) => {
         `
 
         if (proposal.client_email) {
-          const clientEmailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
-            body: JSON.stringify({
-              sender: { name: repName, email: SENDER_EMAIL },
-              to: [{ email: proposal.client_email, name: clientName }],
-              replyTo: { email: repEmail },
-              subject: clientSubject,
-              htmlContent: `
+          try {
+            await sendEmail({
+              to:       proposal.client_email,
+              subject:  clientSubject,
+              html:     `
                 <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
                   ${logoHeader}
                   <div style="padding:28px;">
@@ -165,11 +160,14 @@ Deno.serve(async (req) => {
                     ${emailFooter}
                   </div>
                 </div>
-              `
+              `,
+              replyTo:  repEmail,
+              fromName: repName,
             })
-          })
-          if (clientEmailRes.ok) emailsSent++
-          else console.error(`Client email failed for ${proposal.id}:`, await clientEmailRes.text())
+            emailsSent++
+          } catch (e) {
+            console.error(`Client email failed for ${proposal.id}:`, e)
+          }
         }
 
         let repSubject = ''
@@ -186,14 +184,11 @@ Deno.serve(async (req) => {
           repUrgency = `A follow-up email has been sent to ${clientName} at ${proposal.company}. The close date is ${daysUntilClose} days away.`
         }
 
-        const repEmailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
-          body: JSON.stringify({
-            sender: { name: SENDER_NAME, email: SENDER_EMAIL },
-            to: [{ email: repEmail, name: repName }],
+        try {
+          await sendEmail({
+            to:      repEmail,
             subject: repSubject,
-            htmlContent: `
+            html:    `
               <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
                 ${logoHeader}
                 <div style="padding:28px;">
@@ -219,11 +214,12 @@ Deno.serve(async (req) => {
                   <p style="color:#888;font-size:12px;">Powered by ForgePt.</p>
                 </div>
               </div>
-            `
+            `,
           })
-        })
-        if (repEmailRes.ok) emailsSent++
-        else console.error(`Rep email failed for ${proposal.id}:`, await repEmailRes.text())
+          emailsSent++
+        } catch (e) {
+          console.error(`Rep email failed for ${proposal.id}:`, e)
+        }
 
         await fetch(`${supabaseUrl}/rest/v1/followup_log`, {
           method: 'POST',
@@ -304,7 +300,7 @@ Deno.serve(async (req) => {
       }
 
       // Build task digest email
-      const overdueRows = overdue.map(t => `
+      const overdueRows = overdue.map((t: any) => `
         <tr style="background:#fff5f5;">
           <td style="padding:10px;border-bottom:1px solid #f0f0f0;">
             <strong style="color:#ef4444;">⚠ Overdue</strong><br/>
@@ -315,7 +311,7 @@ Deno.serve(async (req) => {
         </tr>
       `).join('')
 
-      const todayRows = todayTasks.map(t => `
+      const todayRows = todayTasks.map((t: any) => `
         <tr style="background:#fffbf5;">
           <td style="padding:10px;border-bottom:1px solid #f0f0f0;">
             <strong style="color:#C8622A;">● Due Today</strong><br/>
@@ -326,14 +322,11 @@ Deno.serve(async (req) => {
         </tr>
       `).join('')
 
-      const digestEmailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
-        body: JSON.stringify({
-          sender: { name: SENDER_NAME, email: SENDER_EMAIL },
-          to: [{ email: rep.email, name: rep.full_name || rep.email }],
+      try {
+        await sendEmail({
+          to:      rep.email,
           subject: `Your task digest — ${totalCount} task${totalCount !== 1 ? 's' : ''} need${totalCount === 1 ? 's' : ''} attention`,
-          htmlContent: `
+          html:    `
             <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
               <div style="background:#0F1C2E;padding:20px 28px;">
                 <span style="color:#ffffff;font-size:20px;font-weight:bold;">ForgePt<span style="color:#C8622A;">.</span></span>
@@ -361,12 +354,13 @@ Deno.serve(async (req) => {
                 <p style="color:#888;font-size:12px;">Powered by ForgePt. · <a href="https://app.goforgept.com" style="color:#888;">app.goforgept.com</a></p>
               </div>
             </div>
-          `
+          `,
+          fromName: SENDER_NAME,
         })
-      })
-
-      if (digestEmailRes.ok) taskDigestsSent++
-      else console.error(`Task digest failed for ${rep.email}:`, await digestEmailRes.text())
+        taskDigestsSent++
+      } catch (e) {
+        console.error(`Task digest failed for ${rep.email}:`, e)
+      }
     }
 
     return new Response(
@@ -374,9 +368,9 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
-  } catch (error) {
+  } catch (err: any) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: err?.message ?? 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

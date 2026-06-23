@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  const brevoApiKey = Deno.env.get('BREVO_API_KEY')
+  // brevoApiKey removed — using Google Workspace SMTP
   const appUrl = Deno.env.get('APP_URL') || 'https://app.goforgept.com'
 
   try {
@@ -86,29 +86,20 @@ Deno.serve(async (req) => {
         })
       })
 
-      // Notify SuperAdmin via Brevo
-      if (brevoApiKey) {
-        await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: {
-            'api-key': brevoApiKey,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            sender: { name: 'ForgePt.', email: 'tickets@goforgept.com' },
-            to: [{ email: 'cody@goforgept.com', name: 'Cody' }],
-            subject: `⚠️ Unmatched inbound email from ${fromDomain}`,
-            htmlContent: `
-              <p>An inbound email was received but could not be matched to any org.</p>
-              <p><strong>From:</strong> ${from}</p>
-              <p><strong>Domain:</strong> ${fromDomain}</p>
-              <p><strong>Subject:</strong> ${subject}</p>
-              <p><strong>Body preview:</strong> ${body?.slice(0, 200) || 'No body'}</p>
-              <p><a href="${appUrl}/superadmin">Review in SuperAdmin →</a></p>
-            `
-          })
-        })
-      }
+      // Notify SuperAdmin via Google Workspace SMTP
+      const { sendEmail } = await import('../_shared/email.ts')
+      await sendEmail({
+        to: 'cody@goforgept.com',
+        subject: `⚠️ Unmatched inbound email from ${fromDomain}`,
+        html: `
+          <p>An inbound email was received but could not be matched to any org.</p>
+          <p><strong>From:</strong> ${from}</p>
+          <p><strong>Domain:</strong> ${fromDomain}</p>
+          <p><strong>Subject:</strong> ${subject}</p>
+          <p><strong>Body preview:</strong> ${body?.slice(0, 200) || 'No body'}</p>
+          <p><a href="${appUrl}/superadmin">Review in SuperAdmin →</a></p>
+        `
+      })
 
       return new Response(JSON.stringify({ status: 'quarantined', domain: fromDomain }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -168,25 +159,16 @@ Deno.serve(async (req) => {
     const tickets = await ticketRes.json()
     const ticket = tickets?.[0]
 
-    // Send auto-reply to client via Brevo
-    if (brevoApiKey) {
-      const autoReplyBody = org.inbound_email_auto_reply ||
-        `Hi ${fromName || 'there'},\n\nThank you for reaching out. We've received your request and created a support ticket (${ticketNumber}).\n\nOur team will review your request and be in touch shortly.\n\nThank you for your patience.`
+    // Send auto-reply to client via Google Workspace SMTP
+    const { sendEmail } = await import('../_shared/email.ts')
+    const autoReplyBody = org.inbound_email_auto_reply ||
+      `Hi ${fromName || 'there'},<br><br>Thank you for reaching out. We've received your request and created a support ticket (${ticketNumber}).<br><br>Our team will review your request and be in touch shortly.<br><br>Thank you for your patience.`
 
-      await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-          'api-key': brevoApiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sender: { name: 'Support', email: 'tickets@goforgept.com' },
-          to: [{ email: fromEmail, name: fromName }],
-          subject: `Re: ${subject} [${ticketNumber}]`,
-          htmlContent: autoReplyBody.replace(/\n/g, '<br>')
-        })
-      })
-    }
+    await sendEmail({
+      to: fromEmail,
+      subject: `Re: ${subject} [${ticketNumber}]`,
+      html: autoReplyBody.replace(/\n/g, '<br>')
+    })
 
     return new Response(JSON.stringify({
       status: 'created',

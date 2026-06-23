@@ -1,7 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { validateUser, corsHeaders } from "../_shared/auth.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-const SENDER_EMAIL = 'followups@goforgept.com'
+import { sendEmail } from "../_shared/email.ts"
+
+const SENDER_NAME = 'ForgePt.'
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -18,12 +20,9 @@ Deno.serve(async (req) => {
 
   try {
     const {
-      proposalId, clientEmail, clientName, repName, repEmail,
+      proposalId, clientEmail, clientName: _clientName, repName, repEmail,
       companyName, proposalName, subject, message, logoUrl, pdfBase64
     } = await req.json()
-
-    const brevoKey = Deno.env.get('BREVO_API_KEY') ?? ''
-    
 
     const logoHeader = logoUrl
       ? `<div style="background:#0F1C2E;padding:20px 28px;text-align:left;"><img src="${logoUrl}" alt="${companyName}" style="max-height:48px;max-width:200px;object-fit:contain;" /></div>`
@@ -41,32 +40,18 @@ Deno.serve(async (req) => {
       </div>
     `
 
-    const emailPayload: any = {
-      sender: { name: repName, email: SENDER_EMAIL },
-      to: [{ email: clientEmail, name: clientName }],
-      replyTo: { email: repEmail },
+    await sendEmail({
+      to:       clientEmail,
       subject,
-      htmlContent: bodyHtml,
-    }
-
-    // Attach PDF if provided
-    if (pdfBase64) {
-      emailPayload.attachment = [{
-        name: `${proposalName}.pdf`,
-        content: pdfBase64
-      }]
-    }
-
-    const emailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
-      body: JSON.stringify(emailPayload)
+      html:     bodyHtml,
+      replyTo:  repEmail,
+      fromName: repName || SENDER_NAME,
+      attachments: pdfBase64 ? [{
+        content:  pdfBase64,
+        filename: `${proposalName}.pdf`,
+        mimeType: 'application/pdf',
+      }] : undefined,
     })
-
-    if (!emailRes.ok) {
-      const err = await emailRes.text()
-      throw new Error(`Brevo error: ${err}`)
-    }
 
     // Mark proposal as Sent — scoped to caller's org
     const adminSupabase = createClient(
@@ -85,9 +70,9 @@ Deno.serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
-  } catch (error) {
+  } catch (err: any) {
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: err?.message ?? 'Unknown error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

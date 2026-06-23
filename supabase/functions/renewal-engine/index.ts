@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
+import { sendEmail } from "../_shared/email.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,7 +21,6 @@ Deno.serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  const brevoKey = Deno.env.get('BREVO_API_KEY') ?? ''
 
   const dbHeaders = {
     'apikey': serviceKey,
@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
     let created = 0
     let notified = 0
 
-    for (const [clientKey, items] of Object.entries(clientGroups)) {
+    for (const [_clientKey, items] of Object.entries(clientGroups)) {
       // Sort items by renewal date
       items.sort((a: any, b: any) => new Date(a.renewal_date).getTime() - new Date(b.renewal_date).getTime())
       const earliestDate = items[0].renewal_date
@@ -153,37 +153,32 @@ Deno.serve(async (req) => {
         if (!repProfile?.email) continue
 
         const totalValue = items.reduce((sum: number, i: any) => sum + (i.customer_price_total || 0), 0)
-        const itemsList = items.map((i: any) => `• ${i.item_name} — $${(i.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`).join('\n')
 
-        const emailRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
-          body: JSON.stringify({
-            sender: { name: 'ForgePt.', email: 'followups@goforgept.com' },
-            to: [{ email: repProfile.email, name: repProfile.full_name }],
-            subject: `Renewal coming up in ${daysUntil} days — ${proposal.company}`,
-            htmlContent: `
-              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-                <div style="background:#0F1C2E;padding:20px 28px;">
-                  <span style="color:#ffffff;font-size:20px;font-weight:bold;">ForgePt.</span>
-                </div>
-                <div style="padding:28px;">
-                  <h2 style="color:#0F1C2E;">🔄 Renewal Reminder — ${daysUntil} Days</h2>
-                  <p>Hi ${repProfile.full_name},</p>
-                  <p><strong>${proposal.company}</strong> has recurring items coming up for renewal on <strong>${new Date(earliestDate).toLocaleDateString()}</strong>.</p>
-                  <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:16px 0;">
-                    <p style="margin:0 0 8px;font-weight:bold;">Renewal Items:</p>
-                    ${items.map((i: any) => `<p style="margin:4px 0;">• ${i.item_name} — $${(i.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>`).join('')}
-                    <p style="margin:12px 0 0;font-weight:bold;color:#C8622A;">Total: $${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                  </div>
-                  ${daysUntil === 90 ? '<p>A renewal proposal has been created in your pipeline as a Draft. Review and send when ready.</p>' : '<p>Don\'t forget to follow up with this client about their upcoming renewal.</p>'}
-                  <p><a href="https://app.goforgept.com/clients" style="background:#C8622A;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">View Client →</a></p>
-                </div>
+        await sendEmail({
+          to:      repProfile.email,
+          subject: `Renewal coming up in ${daysUntil} days — ${proposal.company}`,
+          html: `
+            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+              <div style="background:#0F1C2E;padding:20px 28px;">
+                <span style="color:#ffffff;font-size:20px;font-weight:bold;">ForgePt.</span>
               </div>
-            `
-          })
+              <div style="padding:28px;">
+                <h2 style="color:#0F1C2E;">🔄 Renewal Reminder — ${daysUntil} Days</h2>
+                <p>Hi ${repProfile.full_name},</p>
+                <p><strong>${proposal.company}</strong> has recurring items coming up for renewal on <strong>${new Date(earliestDate).toLocaleDateString()}</strong>.</p>
+                <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:16px 0;">
+                  <p style="margin:0 0 8px;font-weight:bold;">Renewal Items:</p>
+                  ${items.map((i: any) => `<p style="margin:4px 0;">• ${i.item_name} — $${(i.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>`).join('')}
+                  <p style="margin:12px 0 0;font-weight:bold;color:#C8622A;">Total: $${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                </div>
+                ${daysUntil === 90 ? '<p>A renewal proposal has been created in your pipeline as a Draft. Review and send when ready.</p>' : '<p>Don\'t forget to follow up with this client about their upcoming renewal.</p>'}
+                <p><a href="https://app.goforgept.com/clients" style="background:#C8622A;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">View Client →</a></p>
+              </div>
+            </div>
+          `,
+          fromName: 'ForgePt.',
         })
-        if (emailRes.ok) notified++
+        notified++
       }
     }
 
@@ -215,28 +210,24 @@ Deno.serve(async (req) => {
         ? '<p style="color:#16a34a;font-weight:bold;">✓ This contract is set to auto-renew.</p>'
         : '<p style="color:#C8622A;font-weight:bold;">⚠ This contract is NOT set to auto-renew. Action may be required.</p>'
 
-      await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'api-key': brevoKey },
-        body: JSON.stringify({
-          sender: { name: 'ForgePt.', email: 'followups@goforgept.com' },
-          to: [{ email: rep.email, name: rep.full_name }],
-          subject: `${typeLabel} expiring in ${daysUntilEnd} days — ${proposal.company}`,
-          htmlContent: `
-            <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
-              <div style="background:#0F1C2E;padding:20px 28px;">
-                <span style="color:#ffffff;font-size:20px;font-weight:bold;">ForgePt.</span>
-              </div>
-              <div style="padding:28px;">
-                <h2 style="color:#0F1C2E;">📋 ${typeLabel} Expiring — ${daysUntilEnd} Days</h2>
-                <p>Hi ${rep.full_name},</p>
-                <p><strong>${proposal.company}</strong>'s ${typeLabel} <strong>"${contract.name}"</strong> expires on <strong>${new Date(contract.end_date).toLocaleDateString()}</strong>.</p>
-                ${autoRenewNote}
-                <p><a href="https://app.goforgept.com/proposal/${proposal.id}" style="background:#C8622A;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">View Proposal →</a></p>
-              </div>
+      await sendEmail({
+        to:      rep.email,
+        subject: `${typeLabel} expiring in ${daysUntilEnd} days — ${proposal.company}`,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+            <div style="background:#0F1C2E;padding:20px 28px;">
+              <span style="color:#ffffff;font-size:20px;font-weight:bold;">ForgePt.</span>
             </div>
-          `
-        })
+            <div style="padding:28px;">
+              <h2 style="color:#0F1C2E;">📋 ${typeLabel} Expiring — ${daysUntilEnd} Days</h2>
+              <p>Hi ${rep.full_name},</p>
+              <p><strong>${proposal.company}</strong>'s ${typeLabel} <strong>"${contract.name}"</strong> expires on <strong>${new Date(contract.end_date).toLocaleDateString()}</strong>.</p>
+              ${autoRenewNote}
+              <p><a href="https://app.goforgept.com/proposal/${proposal.id}" style="background:#C8622A;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold;">View Proposal →</a></p>
+            </div>
+          </div>
+        `,
+        fromName: 'ForgePt.',
       })
 
       // Log activity on the proposal
@@ -259,8 +250,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err?.message ?? 'Unknown error' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }
