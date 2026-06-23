@@ -2,7 +2,7 @@ export default function ProposalHeader({
   proposal, profile, features, isAdmin,
   editingProposalName, proposalNameDraft, setProposalNameDraft, setEditingProposalName, saveProposalName,
   openEditClientModal, locationName, collaborators, orgProfiles,
-  updateStatus,
+  updateStatus, onUpdateRep,
   editingQuoteNumber, quoteNumberDraft, setQuoteNumberDraft, quoteNumberError, setQuoteNumberError,
   saveQuoteNumber, setEditingQuoteNumber,
   updateCloseDate, updateTaxExempt, updateTaxRate,
@@ -102,7 +102,24 @@ export default function ProposalHeader({
       </div>
 
       <div className="grid grid-cols-6 gap-4 mt-6">
-        <div><p className="text-[#8A9AB0] text-xs">Rep</p><p className="text-white text-sm font-medium">{proposal?.rep_name}</p></div>
+        <div>
+          <p className="text-[#8A9AB0] text-xs mb-1">Rep</p>
+          {isAdmin && onUpdateRep && orgProfiles?.length > 0 ? (
+            <select
+              value={proposal?.user_id || ''}
+              onChange={e => {
+                const p = orgProfiles.find(o => o.id === e.target.value)
+                if (p) onUpdateRep(p)
+              }}
+              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-0.5 text-sm focus:outline-none focus:border-[#C8622A] cursor-pointer hover:border-[#C8622A]/50 transition-colors">
+              {orgProfiles.map(p => (
+                <option key={p.id} value={p.id}>{p.full_name}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-white text-sm font-medium">{proposal?.rep_name}</p>
+          )}
+        </div>
         <div>
           <p className="text-[#8A9AB0] text-xs mb-1">Quote #</p>
           {canEdit && editingQuoteNumber ? (

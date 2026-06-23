@@ -436,6 +436,16 @@ export default function ProposalDetail({ isAdmin }) {
     logActivity(`Close date updated to ${newDate}`)
   }
 
+  const updateRep = async (repProfile) => {
+    await supabase.from('proposals').update({
+      user_id:   repProfile.id,
+      rep_name:  repProfile.full_name,
+      rep_email: repProfile.email,
+    }).eq('id', id)
+    setProposal(prev => ({ ...prev, user_id: repProfile.id, rep_name: repProfile.full_name, rep_email: repProfile.email }))
+    logActivity(`Rep changed to ${repProfile.full_name}`)
+  }
+
   const toggleLumpSum = async () => {
     const newVal = !proposal?.lump_sum_pricing
     await supabase.from('proposals').update({ lump_sum_pricing: newVal }).eq('id', id)
@@ -2621,7 +2631,7 @@ const analyzeDrawing = async () => {
           saveProposalName={saveProposalName}
           openEditClientModal={openEditClientModal} locationName={locationName}
           collaborators={collaborators} orgProfiles={orgProfiles}
-          updateStatus={updateStatus}
+          updateStatus={updateStatus} onUpdateRep={updateRep}
           editingQuoteNumber={editingQuoteNumber} quoteNumberDraft={quoteNumberDraft}
           setQuoteNumberDraft={setQuoteNumberDraft} quoteNumberError={quoteNumberError}
           setQuoteNumberError={setQuoteNumberError} saveQuoteNumber={saveQuoteNumber}
