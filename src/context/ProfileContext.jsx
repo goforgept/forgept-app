@@ -73,8 +73,9 @@ export function ProfileProvider({ children }) {
   }, [])
 
   // Auto-logout after 1 hour of inactivity
+  const loggedIn = !!session
   useEffect(() => {
-    if (!session) return
+    if (!loggedIn) return
 
     const IDLE_TIMEOUT = 60 * 60 * 1000
     let timer
@@ -94,7 +95,7 @@ export function ProfileProvider({ children }) {
       clearTimeout(timer)
       events.forEach(e => window.removeEventListener(e, resetTimer))
     }
-  }, [session])
+  }, [loggedIn])
 
   const refreshProfile = () => {
     if (session?.user?.id) fetchProfile(session.user.id)
