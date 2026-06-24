@@ -158,7 +158,7 @@ export default function BomSection({
               </button>
             )}
             {orgType !== 'manufacturer' && (
-              <button onClick={onOpenRFQModal} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Send All RFQs</button>
+              <button onClick={onOpenRFQModal} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Send RFQs</button>
             )}
             <button onClick={onOpenSaveTemplateModal} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Save as Template</button>
             {features.aiBom && (

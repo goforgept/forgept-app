@@ -1,6 +1,5 @@
 export default function RFQModal({ lineItems, rfqVendorData, setRfqVendorData, sendingRFQs, onSend, onClose }) {
-  const needsPricing = lineItems.filter(l => l.pricing_status === 'Needs Pricing' && l.vendor)
-  const byVendor = needsPricing.reduce((acc, item) => {
+  const byVendor = lineItems.reduce((acc, item) => {
     const vendor = item.vendor || 'Unknown Vendor'
     if (!acc[vendor]) acc[vendor] = []
     acc[vendor].push(item)

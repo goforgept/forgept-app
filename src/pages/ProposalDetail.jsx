@@ -93,6 +93,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [librarySelectedVendor, setLibrarySelectedVendor] = useState({})
   const [librarySelectedItems, setLibrarySelectedItems] = useState(new Set())
   const [rfqVendorData, setRfqVendorData] = useState({})
+  const [rfqItems, setRfqItems] = useState([])
   const [sendingRFQs, setSendingRFQs] = useState(false)
   const [showAIBOMModal, setShowAIBOMModal] = useState(false)
   const [aiBOMPrompt, setAIBOMPrompt] = useState('')
@@ -847,6 +848,7 @@ export default function ProposalDetail({ isAdmin }) {
       const found = vendors.find(vr => vr.vendor_name === v)
       initData[v] = { email: found?.contact_email || '', attachExcel: false }
     })
+    setRfqItems(candidates)
     setRfqVendorData(initData)
     setShowRFQModal(true)
   }
@@ -2820,7 +2822,7 @@ const analyzeDrawing = async () => {
 
       </div>
 
-      {showRFQModal && <RFQModal lineItems={lineItems} rfqVendorData={rfqVendorData} setRfqVendorData={setRfqVendorData} sendingRFQs={sendingRFQs} onSend={sendAllRFQs} onClose={() => setShowRFQModal(false)} />}
+      {showRFQModal && <RFQModal lineItems={rfqItems} rfqVendorData={rfqVendorData} setRfqVendorData={setRfqVendorData} sendingRFQs={sendingRFQs} onSend={sendAllRFQs} onClose={() => setShowRFQModal(false)} />}
 
       {showEditClientModal && <EditClientModal allClients={allClients} editClientForm={editClientForm} setEditClientForm={setEditClientForm} savingClient={savingClient} onSave={saveClientInfo} onClose={() => setShowEditClientModal(false)} />}
 
