@@ -539,13 +539,19 @@ export default function Reports(props) {
         : data
       const ws1 = XLSX.utils.json_to_sheet(filtered)
       XLSX.utils.book_append_sheet(wb, ws1, 'Vendor Summary')
-      const itemRows = []
+
+      // Line items grouped by vendor — matches PDF layout
+      const aoa = [['Manufacturer', 'Item', 'SKU', 'Category', 'Qty', 'Total Cost', 'Total Revenue']]
       for (const row of filtered) {
-        for (const item of (vendorLineItems[row['Vendor']] || [])) {
-          itemRows.push({ 'Vendor': row['Vendor'], 'Item': item.name, 'SKU': item.sku, 'Category': item.category, 'Qty': item.qty, 'Total Cost': fmt$(item.cost), 'Total Revenue': fmt$(item.revenue) })
+        const items = vendorLineItems[row['Vendor']] || []
+        if (!items.length) continue
+        aoa.push([row['Vendor'], '', '', '', '', '', '']) // vendor header row
+        for (const item of items) {
+          aoa.push(['', item.name, item.sku, item.category, item.qty, item.cost, item.revenue])
         }
+        aoa.push([]) // blank row between vendors
       }
-      const ws2 = XLSX.utils.json_to_sheet(itemRows.length ? itemRows : [{}])
+      const ws2 = XLSX.utils.aoa_to_sheet(aoa.length > 1 ? aoa : [['No line items']])
       XLSX.utils.book_append_sheet(wb, ws2, 'Line Items')
     } else {
       const ws = XLSX.utils.json_to_sheet(data)

@@ -920,12 +920,15 @@ export default function ProposalDetail({ isAdmin }) {
       }
 
       try {
-        const { data: { session: currentSession } } = await supabase.auth.refreshSession()
-        await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-rfq', {
+        const { data: sessionData } = await supabase.auth.getSession()
+        const token = sessionData?.session?.access_token
+        if (!token) throw new Error('No auth session — please refresh and try again.')
+
+        const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-rfq', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${currentSession?.access_token}`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             lineItemIds: items.map(i => i.id),
@@ -947,8 +950,17 @@ export default function ProposalDetail({ isAdmin }) {
             responseLink
           })
         })
+        if (!res.ok) {
+          const body = await res.text()
+          throw new Error(`Send failed (${res.status}): ${body}`)
+        }
       } catch (err) {
         console.error(`RFQ error for ${vendorName}:`, err)
+        await fetchLineItems()
+        await fetchRFQRequests()
+        setSendingRFQs(false)
+        alert(`Failed to send RFQ to ${vendorName}: ${err.message}`)
+        return
       }
     }
 
