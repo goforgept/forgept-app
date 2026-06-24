@@ -252,9 +252,19 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     const { data: bomItems } = await supabase.from('bom_line_items').select('po_status').eq('proposal_id', jobData.proposal_id)
     const hasPOs = (bomItems || []).some(l => l.po_status === 'PO Sent')
     checks['parts_received'] = hasPOs && (bomItems || []).every(l => !l.po_status || l.po_status === 'Received')
-    const { data: invoices } = await supabase.from('invoices').select('id, status').eq('proposal_id', jobData.proposal_id)
+    const { data: invoices } = await supabase.from('invoices').select('id, status, total').eq('proposal_id', jobData.proposal_id)
     checks['invoice_sent'] = (invoices || []).some(i => i.status === 'Sent' || i.status === 'Paid')
     checks['payment_received'] = (invoices || []).some(i => i.status === 'Paid')
+
+    // AIA jobs: don't check off until the full contract amount has been invoiced
+    if (jobData.billing_type === 'AIA' && jobData.proposal_id) {
+      const { data: prop } = await supabase.from('proposals').select('total_customer_value').eq('id', jobData.proposal_id).single()
+      const contractSum = prop?.total_customer_value || 0
+      const totalInvoiced = (invoices || []).reduce((sum, inv) => sum + (inv.total || 0), 0)
+      const fullyInvoiced = contractSum > 0 && totalInvoiced >= contractSum * 0.99
+      checks['invoice_sent'] = fullyInvoiced
+      checks['payment_received'] = fullyInvoiced && (invoices || []).every(i => i.status === 'Paid')
+    }
     const { data: photos } = await supabase.from('proposal_photos').select('id').eq('proposal_id', jobData.proposal_id)
     checks['photos_uploaded'] = (photos || []).length > 0
     const { data: activities } = await supabase.from('activities').select('type').eq('proposal_id', jobData.proposal_id)
