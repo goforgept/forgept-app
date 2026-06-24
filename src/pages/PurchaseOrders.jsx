@@ -179,7 +179,8 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
       // Get PO number
       let finalPONumber = poForm.po_number_manual.trim()
       if (poForm.po_number_mode === 'auto' || !finalPONumber) {
-        const { data: org } = await supabase.from('organizations').select('po_counter').eq('id', profile.org_id).single()
+        const { data: org, error: orgErr } = await supabase.from('organizations').select('po_counter').eq('id', profile.org_id).single()
+        if (orgErr || !org) throw new Error('Could not fetch PO counter: ' + (orgErr?.message || 'org not found'))
         finalPONumber = `PO-${org.po_counter}`
         await supabase.from('organizations').update({ po_counter: org.po_counter + 1 }).eq('id', profile.org_id)
       }
