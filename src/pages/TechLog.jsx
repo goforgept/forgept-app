@@ -89,7 +89,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
       .select('materials_used, hours_worked')
       .eq('job_id', jobId)
 
-    const runningTotals = {}
+    const runningTotals = Object.create(null)
     let totalHours = 0
     ;(existingLogs || []).forEach(log => {
       totalHours += parseFloat(log.hours_worked) || 0
@@ -215,7 +215,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
   // Compute per-job running totals from all logs (for list view)
   const jobLogTotals = {}
   logs.forEach(log => {
-    if (!jobLogTotals[log.job_id]) jobLogTotals[log.job_id] = { hours: 0, materials: {} }
+    if (!jobLogTotals[log.job_id]) jobLogTotals[log.job_id] = { hours: 0, materials: Object.create(null) }
     jobLogTotals[log.job_id].hours += parseFloat(log.hours_worked) || 0
     const parsed = parseMaterials(log.materials_used)
     if (Array.isArray(parsed)) {

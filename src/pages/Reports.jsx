@@ -419,11 +419,11 @@ export default function Reports(props) {
         .select('manufacturer, item_name, part_number_sku, category, your_cost_unit, quantity, customer_price_total')
         .in('proposal_id', ids)
 
-      const byVendor = {}
-      const byVendorItems = {}
+      const byVendor = Object.create(null)
+      const byVendorItems = Object.create(null)
       for (const r of (rows || [])) {
         const v = r.manufacturer || 'Unknown'
-        if (!byVendor[v]) { byVendor[v] = { items: 0, units: 0, cost: 0, revenue: 0 }; byVendorItems[v] = {} }
+        if (!byVendor[v]) { byVendor[v] = { items: 0, units: 0, cost: 0, revenue: 0 }; byVendorItems[v] = Object.create(null) }
         byVendor[v].items++
         byVendor[v].units   += Number(r.quantity) || 0
         byVendor[v].cost    += (Number(r.your_cost_unit) || 0) * (Number(r.quantity) || 0)

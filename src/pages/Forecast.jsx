@@ -83,7 +83,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
   }, [monthlyWon, proposals])
 
   const repForecast = useMemo(() => {
-    const repMap = {}
+    const repMap = Object.create(null)
     proposals.filter(p => p.status !== 'Lost').forEach(p => {
       const rep = p.rep_name || 'Unknown'
       if (!repMap[rep]) repMap[rep] = { name: rep, pipeline: 0, won: 0, count: 0 }

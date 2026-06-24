@@ -182,7 +182,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
   const topVendors = useMemo(() => {
     const proposalIds = new Set(filteredProposals.map(p => p.id))
-    const vendorMap = {}
+    const vendorMap = Object.create(null)
     lineItems.filter(l => proposalIds.has(l.proposal_id) && l.vendor).forEach(l => {
       if (!vendorMap[l.vendor]) vendorMap[l.vendor] = { name: l.vendor, total: 0, count: 0 }
       vendorMap[l.vendor].total += l.customer_price_total || 0
@@ -246,7 +246,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     })
 
     // Group needsQuoting by client
-    const groups = {}
+    const groups = Object.create(null)
     needsQuoting.forEach(item => {
       const cid = item.proposals?.client_id || item.proposals?.company || 'unknown'
       if (!groups[cid]) groups[cid] = { clientId: item.proposals?.client_id, company: item.proposals?.company, repName: item.proposals?.rep_name, items: [], earliestDate: item.renewal_date }
@@ -256,7 +256,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const upcomingGroups = Object.values(groups).sort((a, b) => new Date(a.earliestDate) - new Date(b.earliestDate))
 
     // Per-client breakdown for drill-down modal (all recurring items)
-    const allGroups = {}
+    const allGroups = Object.create(null)
     recurringItems.forEach(item => {
       const cid = item.proposals?.client_id || item.proposals?.company || 'unknown'
       if (!allGroups[cid]) allGroups[cid] = { clientId: item.proposals?.client_id, company: item.proposals?.company, repName: item.proposals?.rep_name, proposalName: item.proposals?.proposal_name, items: [], totalValue: 0 }
@@ -266,7 +266,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const allClientGroups = Object.values(allGroups).sort((a, b) => b.totalValue - a.totalValue)
 
     // Period groups for revenue drill-down
-    const periodGroups = {}
+    const periodGroups = Object.create(null)
     inPeriod.forEach(item => {
       const cid = item.proposals?.client_id || item.proposals?.company || 'unknown'
       if (!periodGroups[cid]) periodGroups[cid] = { clientId: item.proposals?.client_id, company: item.proposals?.company, repName: item.proposals?.rep_name, proposalName: item.proposals?.proposal_name, items: [], totalValue: 0 }

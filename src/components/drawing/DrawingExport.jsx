@@ -112,7 +112,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       setPackages(pkgData || [])
 
       // Aggregate components by type+name+part_number
-      const compMap = {}
+      const compMap = Object.create(null)
       ;(compData || []).forEach(c => {
         const key = `${c.component_type}|${c.name || ''}|${c.part_number || ''}`
         if (!compMap[key]) compMap[key] = { ...c, quantity: 0 }
@@ -142,7 +142,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   })
 
   // ── Cable summary ──────────────────────────────────────────────────────────
-  const cableByType = {}
+  const cableByType = Object.create(null)
   cableRuns.forEach(r => {
     const t = r.cable_type || 'Unknown'
     if (!cableByType[t]) cableByType[t] = { footage: 0, total_footage: 0, runs: 0 }

@@ -56,7 +56,7 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
         .in('drawing_placements.drawing_sheet_id', sheetIds)
 
       // Aggregate components by type+name+part_number
-      const compMap = {}
+      const compMap = Object.create(null)
       ;(rawComponents || []).forEach(c => {
         const key = `${c.component_type}|${c.name || ''}|${c.part_number || ''}`
         if (!compMap[key]) compMap[key] = { ...c, quantity: 0 }
@@ -72,7 +72,7 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
         .order('created_at')
 
       // Group placements by part number
-      const grouped = {}
+      const grouped = Object.create(null)
       ;(placements || []).forEach(p => {
        const gp           = p.global_products
         const partNumber   = p.part_number_override   || gp.part_number
@@ -115,7 +115,7 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
       const enabled = org?.designer_labor_enabled ?? false
       setLaborEnabled(enabled)
       if (enabled && defaults?.length) {
-        const byRole = {}
+        const byRole = Object.create(null)
         ;(placements || []).forEach(p => {
           const cat      = p.global_products?.category
           const defs     = defaults.filter(d => d.category === cat)
@@ -140,7 +140,7 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
   useEffect(() => { loadAll() }, [loadAll, refreshKey])
 
   // ── Aggregate cable runs by type ──────────────────────────────────────────
-  const cableByType = {}
+  const cableByType = Object.create(null)
   cableRuns.forEach(run => {
     const type = run.cable_type || 'Unknown'
     if (!cableByType[type]) cableByType[type] = { footage: 0, total_footage: 0, runs: 0 }
