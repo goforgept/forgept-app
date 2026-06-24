@@ -456,12 +456,24 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.rect(0, 0, pageWidth, 40, 'F')
       if (profileData?.logo_url) {
-        const img = new Image()
-        img.src = profileData.logo_url
-        await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
-        const maxW = 50, maxH = 26
-        const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
-        doc.addImage(img, 'PNG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+        try {
+          const img = new Image()
+          img.crossOrigin = 'anonymous'
+          img.src = profileData.logo_url
+          await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+          if (img.naturalWidth > 0) {
+            const canvas = document.createElement('canvas')
+            canvas.width = img.naturalWidth; canvas.height = img.naturalHeight
+            canvas.getContext('2d').drawImage(img, 0, 0)
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+            const maxW = 50, maxH = 26
+            const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+            doc.addImage(dataUrl, 'JPEG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+          } else { throw new Error('load failed') }
+        } catch {
+          doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+          doc.text(profileData?.company_name || 'ForgePt.', 14, 22)
+        }
       } else {
         doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
         doc.text(profileData?.company_name || 'ForgePt.', 14, 22)

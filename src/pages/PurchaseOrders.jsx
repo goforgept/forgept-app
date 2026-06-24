@@ -55,7 +55,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     setVendors(vendorData || [])
 
     const { data: jobData } = await supabase
-      .from('jobs').select('id, name, job_number')
+      .from('jobs').select('id, name, job_number, proposal_id')
       .eq('org_id', profile.org_id).in('status', ['Active', 'On Hold']).order('created_at', { ascending: false })
     setJobs(jobData || [])
 
@@ -125,6 +125,24 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     setJobBudget({ totalCost, totalPOs, remaining: totalCost - totalPOs })
   }
 
+  const loadJobLines = async (jobId) => {
+    const job = jobs.find(j => j.id === jobId)
+    if (!job?.proposal_id) return
+    const { data: bomItems } = await supabase
+      .from('bom_line_items')
+      .select('item_name, part_number, quantity, unit, cost_unit')
+      .eq('proposal_id', job.proposal_id)
+    if (!bomItems?.length) return
+    setPOLines(bomItems.filter(i => i.item_name).map(i => ({
+      id: crypto.randomUUID(),
+      item_name: i.item_name || '',
+      part_number: i.part_number || '',
+      quantity: parseFloat(i.quantity) || 1,
+      unit: i.unit || 'ea',
+      unit_cost: i.cost_unit != null ? String(i.cost_unit) : '',
+    })))
+  }
+
   const handleVendorChange = (vendorId) => {
     const v = vendors.find(v => v.id === vendorId)
     setPOForm(p => ({
@@ -189,11 +207,22 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
       doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.rect(0, 0, pageWidth, 40, 'F')
       if (profileData?.logo_url) {
-        const img = new Image(); img.src = profileData.logo_url
-        await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
-        const maxW = 50, maxH = 26
-        const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
-        doc.addImage(img, 'PNG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+        try {
+          const img = new Image(); img.crossOrigin = 'anonymous'; img.src = profileData.logo_url
+          await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+          if (img.naturalWidth > 0) {
+            const canvas = document.createElement('canvas')
+            canvas.width = img.naturalWidth; canvas.height = img.naturalHeight
+            canvas.getContext('2d').drawImage(img, 0, 0)
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+            const maxW = 50, maxH = 26
+            const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+            doc.addImage(dataUrl, 'JPEG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+          } else { throw new Error('load failed') }
+        } catch {
+          doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+          doc.text(profileData?.company_name || 'ForgePt.', 14, 22)
+        }
       } else {
         doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
         doc.text(profileData?.company_name || 'ForgePt.', 14, 22)
@@ -497,7 +526,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                 </div>
                 {poForm.link_type === 'job' && (
                   <>
-                    <select value={poForm.job_id} onChange={e => { setPOForm(p => ({ ...p, job_id: e.target.value })); fetchJobBudget(e.target.value) }} className={inputClass}>
+                    <select value={poForm.job_id} onChange={e => { setPOForm(p => ({ ...p, job_id: e.target.value })); fetchJobBudget(e.target.value); loadJobLines(e.target.value) }} className={inputClass}>
                       <option value="">— Select job —</option>
                       {jobs.map(j => <option key={j.id} value={j.id}>{j.job_number ? `${j.job_number} — ` : ''}{j.name}</option>)}
                     </select>
