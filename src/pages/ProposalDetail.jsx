@@ -829,12 +829,14 @@ export default function ProposalDetail({ isAdmin }) {
   }
 
   const openRFQModal = () => {
-    const needsPricing = lineItems.filter(l => l.pricing_status === 'Needs Pricing' && l.vendor)
-    if (needsPricing.length === 0) {
-      alert('No items need pricing or no vendors assigned.')
+    const candidates = selectedForPO.size > 0
+      ? lineItems.filter(l => selectedForPO.has(l.id) && l.vendor)
+      : lineItems.filter(l => l.pricing_status === 'Needs Pricing' && l.vendor)
+    if (candidates.length === 0) {
+      alert(selectedForPO.size > 0 ? 'Checked items have no vendor assigned.' : 'No items need pricing or no vendors assigned.')
       return
     }
-    const byVendor = needsPricing.reduce((acc, item) => {
+    const byVendor = candidates.reduce((acc, item) => {
       const vendor = item.vendor || 'Unknown Vendor'
       if (!acc[vendor]) acc[vendor] = []
       acc[vendor].push(item)
@@ -851,8 +853,10 @@ export default function ProposalDetail({ isAdmin }) {
 
   const sendAllRFQs = async () => {
     setSendingRFQs(true)
-    const needsPricing = lineItems.filter(l => l.pricing_status === 'Needs Pricing' && l.vendor)
-    const byVendor = needsPricing.reduce((acc, item) => {
+    const candidates = selectedForPO.size > 0
+      ? lineItems.filter(l => selectedForPO.has(l.id) && l.vendor)
+      : lineItems.filter(l => l.pricing_status === 'Needs Pricing' && l.vendor)
+    const byVendor = candidates.reduce((acc, item) => {
       const vendor = item.vendor || 'Unknown Vendor'
       if (!acc[vendor]) acc[vendor] = []
       acc[vendor].push(item)
