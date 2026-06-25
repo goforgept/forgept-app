@@ -49,6 +49,7 @@ export default function BomSection({
   onOpenSpecModal,
   onOpenSaveTemplateModal,
   onMoveLineToSection,
+  onDeleteRFQ,
   fmt,
   canEdit = true,
 }) {
@@ -237,11 +238,18 @@ export default function BomSection({
                           View Quote PDF →
                         </a>
                       )}
-                      {!isResponded && (
+                      {rfq.token && (
                         <button
                           onClick={() => navigator.clipboard.writeText(`https://app.goforgept.com/rfq-response/${rfq.token}`)}
                           className="text-xs text-[#8A9AB0] hover:text-white transition-colors">
                           Copy Link
+                        </button>
+                      )}
+                      {onDeleteRFQ && (
+                        <button
+                          onClick={() => onDeleteRFQ(rfq)}
+                          className="text-xs text-red-400 hover:text-red-300 transition-colors">
+                          Delete
                         </button>
                       )}
                     </div>

@@ -79,22 +79,11 @@ Deno.serve(async (req) => {
       role: orgRole,
     }
 
-    const { error: updateError, count } = await adminSupabase
+    const { error: upsertError } = await adminSupabase
       .from('profiles')
-      .update({ org_id: profile.org_id, org_role: orgRole, role: orgRole, full_name: fullName, email })
-      .eq('id', userId)
-      .select('id', { count: 'exact', head: true })
+      .upsert(profilePayload, { onConflict: 'id' })
 
-    if (updateError) throw new Error(`Profile update failed: ${updateError.message}`)
-
-    if (!count || count === 0) {
-      // No existing profile row (trigger didn't fire) — insert it
-      const { error: insertError } = await adminSupabase
-        .from('profiles')
-        .insert(profilePayload)
-
-      if (insertError) throw new Error(`Profile insert failed: ${insertError.message}`)
-    }
+    if (upsertError) throw new Error(`Profile upsert failed: ${upsertError.message}`)
 
     // Step 3: verify
     const { data: verifyProfile } = await adminSupabase

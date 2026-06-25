@@ -2008,6 +2008,18 @@ const fetchRFQRequests = async () => {
     setRfqRequests(data || [])
   }
 
+  const deleteRFQ = async (rfq) => {
+    if (!window.confirm(`Delete RFQ for ${rfq.vendor_name}? This cannot be undone.`)) return
+    await supabase.from('rfq_requests').delete().eq('id', rfq.id)
+    if (rfq.line_item_ids?.length > 0) {
+      await supabase.from('bom_line_items')
+        .update({ pricing_status: 'Needs Pricing', rfq_request_id: null, rfq_expires_at: null })
+        .in('id', rfq.line_item_ids)
+    }
+    await fetchRFQRequests()
+    await fetchLineItems()
+  }
+
 const generateDealSummary = async () => {
     setGeneratingDealSummary(true)
     setDealSummary(null)
@@ -2686,6 +2698,7 @@ const analyzeDrawing = async () => {
           lineItems={lineItems}
           sections={sections}
           rfqRequests={rfqRequests}
+          onDeleteRFQ={deleteRFQ}
           renewalDates={renewalDates}
           categories={categories}
           vendors={vendors}

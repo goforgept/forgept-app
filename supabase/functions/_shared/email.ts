@@ -1,7 +1,4 @@
-// Shared email helper — sends via Google Workspace SMTP (denomailer)
-// Replaces all Brevo API calls across Edge Functions
-
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts"
+// Shared email helper — sends via Postmark API
 
 export interface EmailAttachment {
   /** Base64-encoded file content */
@@ -23,42 +20,39 @@ interface EmailOptions {
 }
 
 export async function sendEmail(opts: EmailOptions): Promise<void> {
-  const SMTP_HOST = Deno.env.get('SMTP_HOST') ?? 'smtp.gmail.com'
-  const SMTP_PORT = parseInt(Deno.env.get('SMTP_PORT') ?? '465')
-  const SMTP_USER = Deno.env.get('SMTP_USER')!
-  const SMTP_PASS = Deno.env.get('SMTP_PASS')!
+  const POSTMARK_API_KEY = Deno.env.get('POSTMARK_API_KEY')!
+  const FROM_EMAIL = Deno.env.get('FROM_EMAIL') ?? 'hello@goforgept.com'
 
-  const client = new SMTPClient({
-    connection: {
-      hostname: SMTP_HOST,
-      port:     SMTP_PORT,
-      tls:      true,
-      auth: {
-        username: SMTP_USER,
-        password: SMTP_PASS,
-      },
+  const body: Record<string, unknown> = {
+    From:     `${opts.fromName || 'ForgePt.'} <${FROM_EMAIL}>`,
+    To:       Array.isArray(opts.to) ? opts.to.join(',') : opts.to,
+    Subject:  opts.subject,
+    HtmlBody: opts.html,
+  }
+
+  if (opts.replyTo)    body.ReplyTo = opts.replyTo
+  if (opts.cc?.length) body.Cc = opts.cc.join(',')
+
+  if (opts.attachments?.length) {
+    body.Attachments = opts.attachments.map(a => ({
+      Name:        a.filename,
+      Content:     a.content,
+      ContentType: a.mimeType ?? 'application/octet-stream',
+    }))
+  }
+
+  const res = await fetch('https://api.postmarkapp.com/email', {
+    method: 'POST',
+    headers: {
+      'Accept':                  'application/json',
+      'Content-Type':            'application/json',
+      'X-Postmark-Server-Token': POSTMARK_API_KEY,
     },
+    body: JSON.stringify(body),
   })
 
-  // Map our attachment shape to denomailer's attachment shape
-  const attachments = opts.attachments?.map(a => ({
-    encoding: 'base64' as const,
-    mimeType: a.mimeType ?? 'application/octet-stream',
-    filename: a.filename,
-    content:  a.content,
-  }))
-
-  try {
-    await client.send({
-      from:        `${opts.fromName || 'ForgePt.'} <${SMTP_USER}>`,
-      to:          Array.isArray(opts.to) ? opts.to : [opts.to],
-      cc:          opts.cc,
-      replyTo:     opts.replyTo,
-      subject:     opts.subject,
-      html:        opts.html,
-      attachments,
-    })
-  } finally {
-    await client.close()
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Postmark error (${res.status}): ${err}`)
   }
 }
