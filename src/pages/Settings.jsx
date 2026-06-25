@@ -313,9 +313,9 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         email: user.email,
         password: passwordForm.current,
       })
-      if (signInError) { setPasswordError('Current password is incorrect'); return }
+      if (signInError) { setPasswordError(`Current password incorrect: ${signInError.message}`); return }
       const { error } = await supabase.auth.updateUser({ password: passwordForm.newPass })
-      if (error) { setPasswordError(error.message); return }
+      if (error) { setPasswordError(`Update failed: ${error.message}`); return }
       setPasswordSuccess('Password updated successfully')
       setPasswordForm({ current: '', newPass: '', confirm: '' })
     } catch (err) {
