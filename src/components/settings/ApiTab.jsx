@@ -247,41 +247,123 @@ export default function ApiTab({ featureApi }) {
             <p className="text-[#4a5d75] text-xs mt-2">Base URL: https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/api/v1</p>
           </div>
 
-          {keys.some(k => k.scopes.includes('embed:designer')) && (
-            <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Embedding the Designer</p>
-              <p className="text-[#8A9AB0] text-xs mb-3">
-                Your server exchanges an API key for a 24-hour session token, then passes it to an iframe. The API key never touches the browser.
-              </p>
+          <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55] space-y-5">
+            <div>
+              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">Embedded Designer API</p>
+              <p className="text-[#8A9AB0] text-xs">Drop the ForgePt designer canvas into your own platform. Your server generates a short-lived session token; the iframe never sees your API key.</p>
+              <p className="text-[#4a5d75] text-xs mt-1">Required scope: <span className="text-[#C8622A] font-mono">embed:designer</span></p>
+            </div>
+
+            {/* Step 1 */}
+            <div>
+              <p className="text-white text-xs font-semibold mb-1">Step 1 — Exchange API key for session token <span className="text-[#4a5d75] font-normal">(server-side only)</span></p>
+              <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`POST https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/embed-session
+Authorization: Bearer fpk_your_key_here
+Content-Type: application/json
+
+# Response 200
+{
+  "access_token": "eyJhbGciOiJIUzI1NiJ9...",
+  "expires_at":   "2026-06-26T10:00:00.000Z",
+  "org_id":       "uuid"
+}`}</pre>
+              <p className="text-[#4a5d75] text-xs mt-1">Token is valid for 24 hours. Cache it server-side and reuse it — only regenerate when within ~5 min of expiry.</p>
+            </div>
+
+            {/* Step 2 */}
+            <div>
+              <p className="text-white text-xs font-semibold mb-1">Step 2 — Render the iframe</p>
+              <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`<iframe
+  src="https://app.goforgept.com/embed?session=ACCESS_TOKEN&proposal=PROPOSAL_UUID"
+  width="100%"
+  height="700"
+  frameborder="0"
+  allow="clipboard-write"
+/>`}</pre>
+              <div className="mt-2 space-y-1">
+                {[
+                  { param: 'session', req: true,  desc: 'The access_token from Step 1.' },
+                  { param: 'proposal', req: false, desc: 'UUID of an existing proposal/design to load. Omit to auto-create a new blank project.' },
+                ].map(p => (
+                  <div key={p.param} className="flex items-start gap-2">
+                    <code className="shrink-0 text-[#C8622A] font-mono text-xs w-20">{p.param}</code>
+                    <span className={`shrink-0 text-xs w-16 ${p.req ? 'text-yellow-400' : 'text-[#4a5d75]'}`}>{p.req ? 'required' : 'optional'}</span>
+                    <span className="text-[#8A9AB0] text-xs">{p.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Step 3 */}
+            <div>
+              <p className="text-white text-xs font-semibold mb-1">Step 3 — Listen for the BOM export</p>
+              <p className="text-[#8A9AB0] text-xs mb-2">When the user clicks <strong>Export BOM</strong> inside the designer, the iframe fires a <code className="text-[#C8622A]">postMessage</code> to your page:</p>
+              <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`window.addEventListener('message', (event) => {
+  if (event.data?.type !== 'forgept:export') return
+
+  const { proposal_id, devices, cables } = event.data
+  // push to CRM, cart, quoting system, etc.
+})`}</pre>
+            </div>
+
+            {/* Payload schema */}
+            <div>
+              <p className="text-white text-xs font-semibold mb-2">Export payload schema</p>
               <div className="space-y-3">
                 <div>
-                  <p className="text-[#8A9AB0] text-xs mb-1 font-semibold">Step 1 — Generate a session token (server-side)</p>
-                  <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`POST https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/embed-session
-Authorization: Bearer fpk_your_key_here
-
-# Response:
-{ "access_token": "eyJ...", "expires_at": "..." }`}</pre>
+                  <p className="text-[#8A9AB0] text-xs font-semibold mb-1">devices — array</p>
+                  <div className="space-y-1 pl-2">
+                    {[
+                      { field: 'part_number',  type: 'string | null', desc: 'Manufacturer part number' },
+                      { field: 'name',         type: 'string',        desc: 'Product / component name' },
+                      { field: 'manufacturer', type: 'string | null', desc: 'Manufacturer name' },
+                      { field: 'category',     type: 'string | null', desc: 'Product category (Camera, NVR, Switch, …)' },
+                      { field: 'quantity',     type: 'number',        desc: 'Total count across all sheets' },
+                    ].map(f => (
+                      <div key={f.field} className="flex items-start gap-2">
+                        <code className="shrink-0 text-[#C8622A] font-mono text-xs w-28">{f.field}</code>
+                        <span className="shrink-0 text-[#4a5d75] text-xs w-24">{f.type}</span>
+                        <span className="text-[#8A9AB0] text-xs">{f.desc}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 <div>
-                  <p className="text-[#8A9AB0] text-xs mb-1 font-semibold">Step 2 — Embed the iframe</p>
-                  <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`<iframe
-  src="https://app.forgept.com/embed?session=SESSION_TOKEN&proposal=PROPOSAL_UUID"
-  width="100%" height="700" frameborder="0"
-/>`}</pre>
-                </div>
-                <div>
-                  <p className="text-[#8A9AB0] text-xs mb-1 font-semibold">Step 3 — Receive the BOM export</p>
-                  <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`window.addEventListener('message', (e) => {
-  if (e.data?.type === 'forgept:export') {
-    const { proposal_id, devices, cables } = e.data
-    // push to your CRM, cart, or quoting system
-  }
-})`}</pre>
+                  <p className="text-[#8A9AB0] text-xs font-semibold mb-1">cables — array</p>
+                  <div className="space-y-1 pl-2">
+                    {[
+                      { field: 'cable_type', type: 'string', desc: 'Cable type label (e.g. CAT6, Fiber, Coax)' },
+                      { field: 'footage',    type: 'number', desc: 'Total footage across all runs on all sheets' },
+                    ].map(f => (
+                      <div key={f.field} className="flex items-start gap-2">
+                        <code className="shrink-0 text-[#C8622A] font-mono text-xs w-28">{f.field}</code>
+                        <span className="shrink-0 text-[#4a5d75] text-xs w-24">{f.type}</span>
+                        <span className="text-[#8A9AB0] text-xs">{f.desc}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <p className="text-[#4a5d75] text-xs mt-3">Omit <code>?proposal=</code> to auto-create a new design project on load.</p>
             </div>
-          )}
+
+            {/* Errors */}
+            <div>
+              <p className="text-white text-xs font-semibold mb-2">Error responses (embed-session)</p>
+              <div className="space-y-1">
+                {[
+                  { status: '401', msg: 'Missing API key / Invalid or revoked API key' },
+                  { status: '403', msg: 'Key lacks embed:designer scope / API not enabled for org' },
+                  { status: '500', msg: 'Failed to create embed session user (contact support)' },
+                ].map(e => (
+                  <div key={e.status} className="flex items-start gap-2">
+                    <span className="shrink-0 text-red-400 font-mono text-xs w-8">{e.status}</span>
+                    <span className="text-[#8A9AB0] text-xs">{e.msg}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[#4a5d75] text-xs mt-2">If the session token expires mid-session, the iframe shows an expiry message. Regenerate a token server-side and reload the iframe src.</p>
+            </div>
+          </div>
 
           <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
             <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Available Endpoints</p>
