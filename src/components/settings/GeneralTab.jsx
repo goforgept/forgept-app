@@ -32,6 +32,10 @@ export default function GeneralTab({
         {passwordError && <p className="text-red-400 text-sm mb-4">{passwordError}</p>}
         {passwordSuccess && <p className="text-green-400 text-sm mb-4">{passwordSuccess}</p>}
         <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="col-span-2">
+            <label className="text-[#8A9AB0] text-xs mb-1 block">Current Password</label>
+            <input type="password" value={passwordForm.current} onChange={e => setPasswordForm(prev => ({ ...prev, current: e.target.value }))} placeholder="••••••••" className={inputClass} />
+          </div>
           <div>
             <label className="text-[#8A9AB0] text-xs mb-1 block">New Password</label>
             <input type="password" value={passwordForm.newPass} onChange={e => setPasswordForm(prev => ({ ...prev, newPass: e.target.value }))} placeholder="••••••••" className={inputClass} />
@@ -41,7 +45,7 @@ export default function GeneralTab({
             <input type="password" value={passwordForm.confirm} onChange={e => setPasswordForm(prev => ({ ...prev, confirm: e.target.value }))} placeholder="••••••••" className={inputClass} />
           </div>
         </div>
-        <button onClick={handleChangePassword} disabled={savingPassword || !passwordForm.newPass || !passwordForm.confirm}
+        <button onClick={handleChangePassword} disabled={savingPassword || !passwordForm.current || !passwordForm.newPass || !passwordForm.confirm}
           className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
           {savingPassword ? 'Updating...' : 'Update Password'}
         </button>
