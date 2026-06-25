@@ -960,6 +960,57 @@ export default function ProposalDetail({ isAdmin }) {
           const body = await res.text()
           throw new Error(`Send failed (${res.status}): ${body}`)
         }
+
+        // Send to competing vendors (same items, separate rfq_requests rows)
+        for (const cv of (vendorInfo.competing || [])) {
+          if (!cv.email) continue
+          const { data: cvRequest } = await supabase
+            .from('rfq_requests')
+            .insert({
+              proposal_id: proposal.id,
+              org_id: proposal.org_id,
+              vendor_name: cv.name || cv.email,
+              vendor_email: cv.email,
+              line_item_ids: items.map(i => i.id),
+              expires_at: expiresAt.toISOString(),
+              status: 'pending'
+            })
+            .select('id, token')
+            .single()
+
+          const cvLink = cvRequest?.token
+            ? `https://app.goforgept.com/rfq-response/${cvRequest.token}`
+            : null
+
+          const cvRes = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-rfq', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({
+              lineItemIds: [],
+              items: items.map(i => ({
+                itemName: i.item_name,
+                manufacturer: i.manufacturer || '',
+                partNumber: i.part_number_sku || '',
+                quantity: i.quantity,
+                unit: i.unit || 'ea'
+              })),
+              vendorEmail: cv.email,
+              vendorName: cv.name || cv.email,
+              proposalName: proposal.proposal_name,
+              repName: proposal.rep_name,
+              repEmail: proposal.rep_email,
+              company: profile?.company_name || proposal.company,
+              excelBase64,
+              expiresAt: expiresAtStr,
+              responseLink: cvLink,
+              skipVendorCheck: true,
+            })
+          })
+          if (!cvRes.ok) {
+            const body = await cvRes.text()
+            console.warn(`Competing vendor send failed for ${cv.email}:`, body)
+          }
+        }
       } catch (err) {
         console.error(`RFQ error for ${vendorName}:`, err)
         await fetchLineItems()

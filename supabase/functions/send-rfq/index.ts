@@ -20,7 +20,8 @@ Deno.serve(async (req) => {
     const {
       lineItemIds, items, vendorEmail, vendorName,
       proposalName, repName, repEmail, company,
-      excelBase64, expiresAt: _expiresAt, responseLink
+      excelBase64, expiresAt: _expiresAt, responseLink,
+      skipVendorCheck,
     } = await req.json()
 
     if (!vendorEmail || !vendorName) {
@@ -42,18 +43,20 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Verify vendor email belongs to a vendor in the caller's org
-    const { data: vendor } = await adminSupabase
-      .from('vendors')
-      .select('id')
-      .eq('org_id', profile.org_id)
-      .eq('contact_email', vendorEmail)
-      .single()
+    // For competing vendors, skip the vendor table check
+    if (!skipVendorCheck) {
+      const { data: vendor } = await adminSupabase
+        .from('vendors')
+        .select('id')
+        .eq('org_id', profile.org_id)
+        .eq('contact_email', vendorEmail)
+        .single()
 
-    if (!vendor) {
-      return new Response(JSON.stringify({ error: 'Vendor not found in your organization' }), {
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      if (!vendor) {
+        return new Response(JSON.stringify({ error: 'Vendor not found in your organization' }), {
+          status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
     }
 
     // Update pricing_status to RFQ Sent — verify line items belong to caller's org
