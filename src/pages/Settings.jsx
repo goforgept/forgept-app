@@ -308,14 +308,11 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     if (passwordForm.newPass.length < 8) { setPasswordError('Password must be at least 8 characters'); return }
     setSavingPassword(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: passwordForm.current,
+      const { error } = await supabase.auth.updateUser({
+        password: passwordForm.newPass,
+        nonce: passwordForm.current,
       })
-      if (signInError) { setPasswordError(`Current password incorrect: ${signInError.message}`); return }
-      const { error } = await supabase.auth.updateUser({ password: passwordForm.newPass })
-      if (error) { setPasswordError(`Update failed: ${error.message}`); return }
+      if (error) { setPasswordError(error.message); return }
       setPasswordSuccess('Password updated successfully')
       setPasswordForm({ current: '', newPass: '', confirm: '' })
     } catch (err) {
