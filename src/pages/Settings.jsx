@@ -308,11 +308,17 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     if (passwordForm.newPass.length < 8) { setPasswordError('Password must be at least 8 characters'); return }
     setSavingPassword(true)
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: passwordForm.newPass,
-        nonce: passwordForm.current,
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      if (!token) { setPasswordError('No active session — please refresh and try again.'); return }
+
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/update-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword: passwordForm.current, newPassword: passwordForm.newPass }),
       })
-      if (error) { setPasswordError(error.message); return }
+      const body = await res.json()
+      if (!res.ok) { setPasswordError(body.error || 'Failed to update password'); return }
       setPasswordSuccess('Password updated successfully')
       setPasswordForm({ current: '', newPass: '', confirm: '' })
     } catch (err) {
