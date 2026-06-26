@@ -68,9 +68,14 @@ export default function ApiTab({ featureApi }) {
   }
 
   const handleRevoke = async (id) => {
-    if (!window.confirm('Revoke this API key? Any integrations using it will stop working immediately.')) return
+    if (!window.confirm('Delete this API key? Any integrations using it will stop working immediately.')) return
     setRevoking(id)
-    await supabase.from('api_keys').delete().eq('id', id)
+    const { error } = await supabase.from('api_keys').delete().eq('id', id)
+    if (error) {
+      alert(`Failed to delete key: ${error.message}`)
+      setRevoking(null)
+      return
+    }
     setKeys(prev => prev.filter(k => k.id !== id))
     setRevoking(null)
   }
@@ -194,44 +199,32 @@ export default function ApiTab({ featureApi }) {
           <p className="text-[#8A9AB0] text-xs mt-1">Generate a key to start integrating with external tools.</p>
         </div>
       ) : keys.length > 0 ? (
-        <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#2a3d55] bg-[#0F1C2E]">
-                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Name</th>
-                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Key</th>
-                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Scopes</th>
-                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Last Used</th>
-                <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium">Created</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#2a3d55]/50">
-              {keys.map(k => (
-                <tr key={k.id} className="hover:bg-[#0F1C2E]/30">
-                  <td className="px-4 py-3 text-white font-medium">{k.name}</td>
-                  <td className="px-4 py-3 font-mono text-[#8A9AB0] text-xs">{k.key_prefix}••••••••••••••••••••••••••••••••••••••</td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {k.scopes.map(s => (
-                        <span key={s} className="text-xs bg-[#C8622A]/15 text-[#C8622A] px-2 py-0.5 rounded font-medium">
-                          {s.replace('read:', '')}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-[#8A9AB0] text-xs">{k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'}</td>
-                  <td className="px-4 py-3 text-[#8A9AB0] text-xs">{new Date(k.created_at).toLocaleDateString()}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => handleRevoke(k.id)} disabled={revoking === k.id}
-                      className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors disabled:opacity-50">
-                      {revoking === k.id ? 'Revoking...' : 'Revoke'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="space-y-2">
+          {keys.map(k => (
+            <div key={k.id} className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl px-4 py-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-white font-medium text-sm truncate">{k.name}</p>
+                  <p className="font-mono text-[#8A9AB0] text-xs mt-0.5 truncate">{k.key_prefix}••••••••••••••</p>
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {k.scopes.map(s => (
+                      <span key={s} className="text-xs bg-[#C8622A]/15 text-[#C8622A] px-2 py-0.5 rounded font-medium">
+                        {s.replace('read:', '').replace('embed:', '')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="shrink-0 text-right space-y-1">
+                  <p className="text-[#4a5d75] text-xs">Created {new Date(k.created_at).toLocaleDateString()}</p>
+                  <p className="text-[#4a5d75] text-xs">Last used: {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'}</p>
+                  <button onClick={() => handleRevoke(k.id)} disabled={revoking === k.id}
+                    className="text-red-400 hover:text-red-300 text-xs transition-colors disabled:opacity-50 block ml-auto">
+                    {revoking === k.id ? 'Deleting...' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
 
