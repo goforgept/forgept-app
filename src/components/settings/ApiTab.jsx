@@ -154,6 +154,39 @@ export default function ApiTab({ featureApi }) {
         )}
       </div>
 
+      {/* Key type overview */}
+      {!showForm && (
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            {
+              title: 'Data API',
+              scopes: 'read:proposals · read:clients · read:jobs · read:drawings',
+              desc: 'Pull proposals, BOMs, clients, jobs, and drawing projects into your CRM, ERP, or automation tools like n8n, Zapier, or Make.',
+              examples: ['Push won proposals to Salesforce or HubSpot', 'Export BOMs to your ordering system', 'Sync job status with your project management tool'],
+            },
+            {
+              title: 'Embedded Designer',
+              scopes: 'embed:designer',
+              desc: 'Drop the ForgePt system design canvas into your own platform. Customers design on your site; you receive the BOM via postMessage.',
+              examples: ['Embed on a manufacturer or distributor portal', 'Let customers configure their own system', 'Receive device & cable list for quoting or ordering'],
+            },
+          ].map(card => (
+            <div key={card.title} className="bg-[#0F1C2E] border border-[#2a3d55] rounded-xl p-4">
+              <p className="text-white font-semibold text-sm mb-1">{card.title}</p>
+              <p className="text-[#C8622A] font-mono text-xs mb-2">{card.scopes}</p>
+              <p className="text-[#8A9AB0] text-xs mb-3">{card.desc}</p>
+              <ul className="space-y-1">
+                {card.examples.map(ex => (
+                  <li key={ex} className="text-[#4a5d75] text-xs flex gap-1.5">
+                    <span className="text-[#C8622A] shrink-0">›</span>{ex}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Generate form */}
       {showForm && (
         <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5 space-y-4">
@@ -194,9 +227,12 @@ export default function ApiTab({ featureApi }) {
       {loading ? (
         <p className="text-[#8A9AB0] text-sm">Loading...</p>
       ) : keys.length === 0 && !showForm ? (
-        <div className="bg-[#1a2d45] border border-dashed border-[#2a3d55] rounded-xl p-8 text-center">
-          <p className="text-[#8A9AB0]">No API keys yet.</p>
-          <p className="text-[#8A9AB0] text-xs mt-1">Generate a key to start integrating with external tools.</p>
+        <div className="bg-[#1a2d45] border border-dashed border-[#2a3d55] rounded-xl p-6 text-center">
+          <p className="text-white font-medium mb-1">No API keys yet</p>
+          <p className="text-[#8A9AB0] text-xs mb-4">Choose a key type above and click Generate Key to get started.</p>
+          <button onClick={() => setShowForm(true)} className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+            + Generate Your First Key
+          </button>
         </div>
       ) : keys.length > 0 ? (
         <div className="space-y-2">
