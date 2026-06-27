@@ -95,7 +95,7 @@ async function exportGanttPDF(items, getAssignees) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(18)
   doc.setTextColor(255, 255, 255)
-  doc.text('Product Roadmap — Gantt', MARGIN, 36)
+  doc.text('Product Roadmap - Gantt', MARGIN, 36)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   doc.setTextColor(138, 154, 176)
@@ -166,7 +166,7 @@ async function exportGanttPDF(items, getAssignees) {
     doc.setFontSize(8)
     doc.setTextColor(255, 255, 255)
     const maxTitle = 28
-    const title = item.title.length > maxTitle ? item.title.slice(0, maxTitle) + '…' : item.title
+    const title = item.title.length > maxTitle ? item.title.slice(0, maxTitle) + '...' : item.title
     doc.text(title, MARGIN + 16, y + 10)
 
     // assignees / status below title
@@ -189,7 +189,7 @@ async function exportGanttPDF(items, getAssignees) {
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(7)
       doc.setTextColor(255, 255, 255)
-      doc.text('●', bx + bw / 2, by + bh / 2 + 2.5, { align: 'center' })
+      doc.text(itemQ, bx + bw / 2, by + bh / 2 + 2.5, { align: 'center' })
     }
 
     // column dividers
