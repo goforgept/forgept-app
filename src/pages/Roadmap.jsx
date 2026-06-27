@@ -59,7 +59,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
   const [reqForm, setReqForm]           = useState({ title: '', description: '', category: 'feature' })
   const [submitting, setSubmitting]     = useState(false)
   const [drawer, setDrawer]             = useState(null)
-  const [view, setView]                 = useState('board') // 'board' | 'mywork' | 'report'
+  const [view, setView]                 = useState('board') // 'board' | 'mywork' | 'table' | 'gantt' | 'report'
   const [showArchived, setShowArchived] = useState(false)
 
   const orgId           = profile?.org_id
@@ -230,6 +230,14 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
                   className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'board' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
                   Board
                 </button>
+                <button onClick={() => setView('table')}
+                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'table' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                  Table
+                </button>
+                <button onClick={() => setView('gantt')}
+                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'gantt' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                  Gantt
+                </button>
                 {isDevTeam && (
                   <button onClick={() => setView('mywork')}
                     className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'mywork' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
@@ -258,7 +266,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
                 + Submit Request
               </button>
             )}
-            {userIsAdmin && view === 'board' && !showArchived && (
+            {userIsAdmin && (view === 'board' || view === 'table') && !showArchived && (
               <button onClick={openCreate}
                 className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                 + Add Item
@@ -359,6 +367,17 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
               )
             })}
           </div>
+        )}
+
+        {/* ── Table ── */}
+        {!showArchived && view === 'table' && userIsAdmin && (
+          <TableView items={visibleItems} getAssignees={getAssignees} onOpen={(id) => setDrawer(id)}
+            onStatusChange={updateStatus} userIsAdmin={userIsAdmin} />
+        )}
+
+        {/* ── Gantt ── */}
+        {!showArchived && view === 'gantt' && userIsAdmin && (
+          <GanttView items={visibleItems} getAssignees={getAssignees} onOpen={(id) => setDrawer(id)} />
         )}
 
         {/* ── My Work (dev only) ── */}
@@ -971,6 +990,262 @@ function AdminCard({ item, currentStatus, assignees, onOpen, onEdit, onDelete, o
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+// ── Table View ────────────────────────────────────────────────────────────────
+const TABLE_SORT_DEFAULT = { col: 'status', dir: 'asc' }
+const STATUS_ORDER = { backlog: 0, planned: 1, in_progress: 2, released: 3, declined: 4 }
+
+function TableView({ items, getAssignees, onOpen }) {
+  const [sort, setSort] = useState(TABLE_SORT_DEFAULT)
+  const [filter, setFilter] = useState({ status: '', category: '' })
+
+  const toggleSort = (col) => {
+    setSort(prev => prev.col === col ? { col, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { col, dir: 'asc' })
+  }
+
+  const sorted = [...items]
+    .filter(i => (!filter.status || i.status === filter.status) && (!filter.category || i.category === filter.category))
+    .sort((a, b) => {
+      let va, vb
+      if (sort.col === 'status')   { va = STATUS_ORDER[a.status] ?? 9; vb = STATUS_ORDER[b.status] ?? 9 }
+      else if (sort.col === 'title')    { va = a.title.toLowerCase();    vb = b.title.toLowerCase() }
+      else if (sort.col === 'category') { va = a.category;               vb = b.category }
+      else if (sort.col === 'target')   {
+        va = a.target_quarter || a.target_date || 'zzz'
+        vb = b.target_quarter || b.target_date || 'zzz'
+      }
+      else { va = a[sort.col]; vb = b[sort.col] }
+      if (va < vb) return sort.dir === 'asc' ? -1 : 1
+      if (va > vb) return sort.dir === 'asc' ?  1 : -1
+      return 0
+    })
+
+  const SortIcon = ({ col }) => {
+    if (sort.col !== col) return <span className="text-[#2a3d55] ml-1">↕</span>
+    return <span className="text-[#C8622A] ml-1">{sort.dir === 'asc' ? '↑' : '↓'}</span>
+  }
+
+  const thClass = 'px-4 py-3 text-left text-xs font-semibold text-[#8A9AB0] uppercase tracking-wide cursor-pointer hover:text-white transition-colors select-none'
+
+  return (
+    <div className="space-y-4">
+      {/* Filters */}
+      <div className="flex items-center gap-3">
+        <select value={filter.status} onChange={e => setFilter(p => ({ ...p, status: e.target.value }))}
+          className="bg-[#1a2d45] border border-[#2a3d55] text-[#8A9AB0] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]">
+          <option value="">All Statuses</option>
+          {ADMIN_COLUMNS.map(s => <option key={s} value={s}>{STATUS_META[s].label}</option>)}
+        </select>
+        <select value={filter.category} onChange={e => setFilter(p => ({ ...p, category: e.target.value }))}
+          className="bg-[#1a2d45] border border-[#2a3d55] text-[#8A9AB0] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]">
+          <option value="">All Categories</option>
+          {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+        </select>
+        <span className="text-[#8A9AB0] text-xs ml-auto">{sorted.length} item{sorted.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      {/* Table */}
+      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
+        <table className="w-full border-collapse">
+          <thead className="border-b border-[#2a3d55] bg-[#0F1C2E]">
+            <tr>
+              <th className={thClass} onClick={() => toggleSort('title')}>Title <SortIcon col="title" /></th>
+              <th className={thClass} onClick={() => toggleSort('status')}>Status <SortIcon col="status" /></th>
+              <th className={thClass} onClick={() => toggleSort('category')}>Category <SortIcon col="category" /></th>
+              <th className={`${thClass} hidden md:table-cell`}>Assignees</th>
+              <th className={`${thClass} hidden lg:table-cell`} onClick={() => toggleSort('target')}>Target <SortIcon col="target" /></th>
+              <th className={`${thClass} hidden xl:table-cell`}>Requested By</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.length === 0 && (
+              <tr><td colSpan={6} className="text-center py-12 text-[#8A9AB0] text-sm">No items match the current filters.</td></tr>
+            )}
+            {sorted.map((item, idx) => {
+              const meta      = STATUS_META[item.status]
+              const assignees = getAssignees(item.id)
+              const target    = item.target_quarter || fmtDate(item.target_date)
+              return (
+                <tr key={item.id}
+                  onClick={() => onOpen(item.id)}
+                  className={`border-b border-[#2a3d55] hover:bg-[#0F1C2E]/60 cursor-pointer transition-colors ${idx % 2 === 0 ? '' : 'bg-[#0F1C2E]/20'}`}>
+                  <td className="px-4 py-3">
+                    <p className="text-white text-sm font-semibold">{item.title}</p>
+                    {item.description && <p className="text-[#8A9AB0] text-xs mt-0.5 line-clamp-1">{item.description}</p>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${meta.badge}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                      {meta.label}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[item.category]}`}>
+                      {CATEGORY_LABELS[item.category]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {assignees.length > 0
+                      ? <span className="text-[#8A9AB0] text-xs">{assignees.map(a => a.full_name).join(', ')}</span>
+                      : <span className="text-[#2a3d55] text-xs">—</span>}
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell">
+                    {target
+                      ? <span className="text-[#C8622A] text-xs font-semibold">{target}</span>
+                      : <span className="text-[#2a3d55] text-xs">—</span>}
+                  </td>
+                  <td className="px-4 py-3 hidden xl:table-cell">
+                    <span className="text-[#8A9AB0] text-xs">{item.profiles?.full_name || '—'}</span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ── Gantt View ────────────────────────────────────────────────────────────────
+function quarterToDate(q) {
+  if (!q) return null
+  const [quarter, year] = q.split(' ')
+  const month = { Q1: 0, Q2: 3, Q3: 6, Q4: 9 }[quarter]
+  return new Date(parseInt(year), month, 1)
+}
+
+function dateToQuarter(d) {
+  const date = new Date(d + 'T00:00:00')
+  const q    = Math.floor(date.getMonth() / 3) + 1
+  return `Q${q} ${date.getFullYear()}`
+}
+
+function getItemQuarter(item) {
+  if (item.target_quarter) return item.target_quarter
+  if (item.target_date)    return dateToQuarter(item.target_date)
+  return null
+}
+
+function GanttView({ items, getAssignees, onOpen }) {
+  const now = new Date()
+  const currentQ = `Q${Math.floor(now.getMonth() / 3) + 1} ${now.getFullYear()}`
+
+  // Collect all quarters that appear in items
+  const quarterSet = new Set()
+  items.forEach(i => { const q = getItemQuarter(i); if (q) quarterSet.add(q) })
+
+  // Build a sorted list of quarters spanning from current to max (at least 6 quarters)
+  const allQuarters = []
+  const startYear  = now.getFullYear()
+  for (let y = startYear; y <= startYear + 3; y++) {
+    for (let q = 1; q <= 4; q++) {
+      allQuarters.push(`Q${q} ${y}`)
+    }
+  }
+  // Ensure any item quarter that falls outside range is included
+  quarterSet.forEach(q => { if (!allQuarters.includes(q)) allQuarters.push(q) })
+  allQuarters.sort((a, b) => quarterToDate(a) - quarterToDate(b))
+
+  // Trim: show from 1 quarter before current to 1 quarter after last item (min 6, max 12)
+  const firstItemIdx = allQuarters.findIndex(q => quarterSet.has(q))
+  const lastItemIdx  = allQuarters.reduceRight((acc, q, i) => acc === -1 && quarterSet.has(q) ? i : acc, -1)
+  const currentIdx   = allQuarters.indexOf(currentQ)
+  const startIdx     = Math.max(0, Math.min(currentIdx, firstItemIdx === -1 ? 0 : firstItemIdx) - 0)
+  const endIdx       = Math.min(allQuarters.length - 1, Math.max(currentIdx + 3, lastItemIdx === -1 ? currentIdx + 5 : lastItemIdx + 1))
+  const quarters     = allQuarters.slice(startIdx, endIdx + 1)
+
+  const scheduled   = items.filter(i => getItemQuarter(i))
+  const unscheduled = items.filter(i => !getItemQuarter(i))
+
+  const ganttRowClass = 'flex items-stretch border-b border-[#2a3d55] last:border-b-0 hover:bg-[#0F1C2E]/30 cursor-pointer group'
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-x-auto">
+        {/* Quarter headers */}
+        <div className="flex border-b border-[#2a3d55] bg-[#0F1C2E] sticky top-0 z-10" style={{ minWidth: `${240 + quarters.length * 120}px` }}>
+          <div className="w-60 flex-shrink-0 px-4 py-3 text-xs font-semibold text-[#8A9AB0] uppercase tracking-wide">Item</div>
+          {quarters.map(q => (
+            <div key={q} className={`flex-1 min-w-[120px] px-2 py-3 text-center text-xs font-semibold tracking-wide border-l border-[#2a3d55] ${q === currentQ ? 'text-[#C8622A] bg-[#C8622A]/5' : 'text-[#8A9AB0]'}`}>
+              {q}
+              {q === currentQ && <div className="w-1.5 h-1.5 rounded-full bg-[#C8622A] mx-auto mt-1" />}
+            </div>
+          ))}
+        </div>
+
+        {/* Rows */}
+        {scheduled.length === 0 && (
+          <div className="py-12 text-center text-[#8A9AB0] text-sm">No items have a target quarter set yet.</div>
+        )}
+        {scheduled.map(item => {
+          const meta   = STATUS_META[item.status]
+          const itemQ  = getItemQuarter(item)
+          const qIdx   = quarters.indexOf(itemQ)
+          const assignees = getAssignees(item.id)
+
+          return (
+            <div key={item.id} onClick={() => onOpen(item.id)}
+              className={ganttRowClass} style={{ minWidth: `${240 + quarters.length * 120}px` }}>
+              {/* Label */}
+              <div className="w-60 flex-shrink-0 px-4 py-3 flex flex-col justify-center min-w-0">
+                <p className="text-white text-xs font-semibold truncate group-hover:text-[#C8622A] transition-colors">{item.title}</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded-full ${meta.badge}`}>
+                    <span className={`w-1 h-1 rounded-full ${meta.dot}`} />
+                    {meta.label}
+                  </span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[item.category]}`}>
+                    {CATEGORY_LABELS[item.category]}
+                  </span>
+                </div>
+                {assignees.length > 0 && (
+                  <p className="text-[#8A9AB0] text-xs mt-1 truncate">{assignees.map(a => a.full_name?.split(' ')[0]).join(', ')}</p>
+                )}
+              </div>
+
+              {/* Quarter cells */}
+              {quarters.map((q, i) => {
+                const isCurrent  = q === currentQ
+                const isTarget   = i === qIdx
+                return (
+                  <div key={q} className={`flex-1 min-w-[120px] border-l border-[#2a3d55] flex items-center justify-center px-2 py-3 ${isCurrent ? 'bg-[#C8622A]/5' : ''}`}>
+                    {isTarget && (
+                      <div className={`w-full rounded-lg px-2 py-1.5 text-center ${meta.badge} border border-current/30`}>
+                        <span className="text-xs font-bold">●</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Unscheduled */}
+      {unscheduled.length > 0 && (
+        <div>
+          <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Unscheduled ({unscheduled.length})</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+            {unscheduled.map(item => {
+              const meta = STATUS_META[item.status]
+              return (
+                <button key={item.id} onClick={() => onOpen(item.id)}
+                  className="text-left bg-[#1a2d45] border border-[#2a3d55] hover:border-[#C8622A]/40 rounded-lg px-3 py-2.5 transition-colors">
+                  <p className="text-white text-xs font-semibold truncate">{item.title}</p>
+                  <div className="flex items-center gap-1 mt-1">
+                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${meta.badge}`}>{meta.label}</span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
