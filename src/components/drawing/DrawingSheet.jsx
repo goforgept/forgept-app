@@ -129,11 +129,15 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     return `1" = ${feetPerInch}ft`
   }
 
+  // Local copy of scale_ratio so it updates immediately after calibration
+  // without waiting for the parent to re-fetch the sheet from the DB.
+  const [scaleRatio,      setScaleRatio]      = useState(sheet.scale_ratio ?? null)
   const [calibratedScale, setCalibratedScale] = useState(
     getScaleLabel(sheet.scale_ratio)
   )
 
   useEffect(() => {
+    setScaleRatio(sheet.scale_ratio ?? null)
     setCalibratedScale(getScaleLabel(sheet.scale_ratio))
   }, [sheet.scale_ratio, sheet.id])
   const [pickingPoint,    setPickingPoint]    = useState(null) // 'A' | 'B' | null
@@ -676,7 +680,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       if (!ratio || ratio <= 0) { alert('Invalid calibration.'); return }
     }
 
-    const label = `1px = ${ratio.toFixed(4)}ft`
+    setScaleRatio(ratio)
     setCalibratedScale(getScaleLabel(ratio))
     if (applyToAll) {
       // Update all sheets on this proposal
@@ -701,8 +705,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       .select('*')
       .eq('drawing_sheet_id', sheet.id)
 
-    if (existingRuns?.length > 0 && imageSizeRef.current) {
-      const { w: imgW, h: imgH } = imageSizeRef.current
+    if (existingRuns?.length > 0 && imageSize.w && imageSize.h) {
+      const { w: imgW, h: imgH } = imageSize
       for (const run of existingRuns) {
         if (!run.points || run.points.length < 2) continue
         let pixels = 0
@@ -1002,7 +1006,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 pixels += Math.sqrt(dx*dx + dy*dy)
               }
               // scale_ratio = feet per pixel at original image resolution
-              const footage = sheet.scale_ratio ? Math.round(pixels * sheet.scale_ratio) : 0
+              const footage = scaleRatio ? Math.round(pixels * scaleRatio) : 0
               const totalFootage = Math.round(footage * (1 + wasteFactor / 100))
 
               const firstPoint = activePoints[0]
@@ -1056,15 +1060,15 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   const fovAngle    = drag?.fov_angle   ?? placement.fov_angle   ?? product.specs?.fov_angle ?? (category === 'PTZ Camera' ? 360 : 90)
                   const rangeInFeet = drag?.fov_range   ?? placement.fov_range   ?? product.specs?.ir_range  ?? 30
 
-                  const range = sheet.scale_ratio
-                    ? Math.min((rangeInFeet / sheet.scale_ratio) * scale, 3000)
+                  const range = scaleRatio
+                    ? Math.min((rangeInFeet / scaleRatio) * scale, 3000)
                     : 150 * Math.min(scale, 1)
                   const px = position.x + placement.x * canvasW * scale
                   const py = position.y + placement.y * canvasH * scale
 
                   // Helper: screen px distance → feet
-                  const pxToFt = (px) => sheet.scale_ratio
-                    ? Math.max(5, Math.round((px / scale) * sheet.scale_ratio))
+                  const pxToFt = (px) => scaleRatio
+                    ? Math.max(5, Math.round((px / scale) * scaleRatio))
                     : Math.max(5, Math.round(px / scale / (canvasW * 0.005)))
 
                   // Commit drag values to DB and update local state
@@ -1308,7 +1312,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                                 const dy = (updatedPoints[j].y - updatedPoints[j-1].y) * imageSize.h
                                 pixels += Math.sqrt(dx*dx + dy*dy)
                               }
-                              const footage      = sheet.scale_ratio ? Math.round(pixels * sheet.scale_ratio) : 0
+                              const footage      = scaleRatio ? Math.round(pixels * scaleRatio) : 0
                               const totalFootage = Math.round(footage * (1 + (run.waste_factor || 10) / 100))
                               await supabase.from('cable_runs').update({
                                 points: updatedPoints, footage, total_footage: totalFootage

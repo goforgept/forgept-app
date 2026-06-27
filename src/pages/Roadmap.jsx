@@ -44,6 +44,27 @@ const fmtDateLong = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-
 
 const emptyForm = { title: '', description: '', category: 'feature', target_quarter: '', target_date: '' }
 
+function exportTableCSV(items, getAssignees) {
+  const headers = ['Title', 'Status', 'Category', 'Assignees', 'Target', 'Requested By', 'Description']
+  const rows = items.map(i => [
+    `"${(i.title || '').replace(/"/g, '""')}"`,
+    STATUS_META[i.status]?.label || i.status,
+    CATEGORY_LABELS[i.category] || i.category,
+    `"${getAssignees(i.id).map(a => a.full_name).join('; ')}"`,
+    i.target_quarter || (i.target_date ? fmtDate(i.target_date) : ''),
+    i.profiles?.full_name || '',
+    `"${(i.description || '').replace(/"/g, '""')}"`,
+  ])
+  const csv  = [headers, ...rows].map(r => r.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href = url
+  a.download = `roadmap-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices }) {
   const { profile } = useProfile()
   const [items, setItems]               = useState([])
@@ -272,10 +293,16 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
                 + Add Item
               </button>
             )}
-            {view === 'report' && (
+            {(view === 'report' || view === 'gantt') && (
               <button onClick={() => window.print()}
                 className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
-                🖨 Print / Export
+                Print / Export
+              </button>
+            )}
+            {view === 'table' && !showArchived && (
+              <button onClick={() => exportTableCSV(activeItems, getAssignees)}
+                className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
+                Export CSV
               </button>
             )}
           </div>
