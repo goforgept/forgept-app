@@ -44,6 +44,207 @@ const fmtDateLong = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-
 
 const emptyForm = { title: '', description: '', category: 'feature', target_quarter: '', target_date: '' }
 
+async function exportGanttPDF(items, getAssignees) {
+  const { default: jsPDF } = await import('jspdf')
+
+  const now      = new Date()
+  const currentQ = `Q${Math.floor(now.getMonth() / 3) + 1} ${now.getFullYear()}`
+
+  // Build quarter list (same logic as GanttView)
+  const quarterSet = new Set()
+  items.forEach(i => { const q = getItemQuarter(i); if (q) quarterSet.add(q) })
+  const allQ = []
+  for (let y = now.getFullYear(); y <= now.getFullYear() + 3; y++)
+    for (let q = 1; q <= 4; q++) allQ.push(`Q${q} ${y}`)
+  quarterSet.forEach(q => { if (!allQ.includes(q)) allQ.push(q) })
+  allQ.sort((a, b) => quarterToDate(a) - quarterToDate(b))
+  const curIdx   = allQ.indexOf(currentQ)
+  const lastIdx  = allQ.reduceRight((acc, q, i) => acc === -1 && quarterSet.has(q) ? i : acc, -1)
+  const firstIdx = allQ.findIndex(q => quarterSet.has(q))
+  const startIdx = Math.max(0, Math.min(curIdx, firstIdx === -1 ? 0 : firstIdx))
+  const endIdx   = Math.min(allQ.length - 1, Math.max(curIdx + 3, lastIdx === -1 ? curIdx + 5 : lastIdx + 1))
+  const quarters = allQ.slice(startIdx, endIdx + 1)
+
+  const scheduled   = items.filter(i => getItemQuarter(i))
+  const unscheduled = items.filter(i => !getItemQuarter(i))
+
+  // ── Page layout ────────────────────────────────────────────────────────────
+  const doc        = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' })
+  const PW         = doc.internal.pageSize.getWidth()   // 792
+  const PH         = doc.internal.pageSize.getHeight()  // 612
+  const MARGIN     = 36
+  const LABEL_W    = 180
+  const AVAIL_W    = PW - MARGIN * 2 - LABEL_W
+  const COL_W      = Math.max(48, Math.floor(AVAIL_W / quarters.length))
+  const ROW_H      = 22
+  const HEADER_H   = 28
+  const TOP        = 80   // below title
+
+  // Status colours (RGB)
+  const STATUS_RGB = {
+    backlog:     [138, 154, 176],
+    planned:     [234, 179,  8],
+    in_progress: [ 59, 130, 246],
+    released:    [ 34, 197, 94],
+    declined:    [239,  68,  68],
+  }
+
+  // ── Title block ─────────────────────────────────────────────────────────────
+  doc.setFillColor(15, 28, 46)
+  doc.rect(0, 0, PW, 56, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(18)
+  doc.setTextColor(255, 255, 255)
+  doc.text('Product Roadmap — Gantt', MARGIN, 36)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.setTextColor(138, 154, 176)
+  doc.text(`Generated ${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`, MARGIN, 50)
+
+  // ── Quarter header row ───────────────────────────────────────────────────────
+  let y = TOP
+  doc.setFillColor(26, 45, 69)
+  doc.rect(MARGIN, y, LABEL_W + COL_W * quarters.length, HEADER_H, 'F')
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(138, 154, 176)
+  doc.text('Item', MARGIN + 6, y + 18)
+
+  quarters.forEach((q, i) => {
+    const cx = MARGIN + LABEL_W + i * COL_W
+    const isCurrent = q === currentQ
+    if (isCurrent) {
+      doc.setFillColor(200, 98, 42, 0.12)
+      doc.rect(cx, y, COL_W, HEADER_H, 'F')
+    }
+    doc.setTextColor(isCurrent ? [200, 98, 42] : [138, 154, 176])
+    doc.setFont('helvetica', isCurrent ? 'bold' : 'normal')
+    doc.text(q, cx + COL_W / 2, y + 18, { align: 'center' })
+    // column divider
+    doc.setDrawColor(42, 61, 85)
+    doc.line(cx, y, cx, y + HEADER_H)
+  })
+  doc.setDrawColor(42, 61, 85)
+  doc.rect(MARGIN, y, LABEL_W + COL_W * quarters.length, HEADER_H)
+
+  y += HEADER_H
+
+  // ── Item rows ────────────────────────────────────────────────────────────────
+  const totalW = LABEL_W + COL_W * quarters.length
+  scheduled.forEach((item, idx) => {
+    const isCur = (y + ROW_H > PH - MARGIN)
+    if (isCur) {
+      doc.addPage()
+      y = MARGIN
+    }
+
+    const bg = idx % 2 === 0 ? [15, 28, 46] : [22, 38, 60]
+    doc.setFillColor(...bg)
+    doc.rect(MARGIN, y, totalW, ROW_H, 'F')
+
+    // column shading for current quarter
+    const curQIdx = quarters.indexOf(currentQ)
+    if (curQIdx >= 0) {
+      const cx = MARGIN + LABEL_W + curQIdx * COL_W
+      doc.setFillColor(200, 98, 42)
+      doc.setGlobalAlpha?.(0.05)
+      doc.rect(cx, y, COL_W, ROW_H, 'F')
+      doc.setGlobalAlpha?.(1)
+    }
+
+    // label area
+    const meta    = STATUS_META[item.status]
+    const rgb     = STATUS_RGB[item.status] || [138, 154, 176]
+    const assignees = getAssignees(item.id)
+
+    // status dot
+    doc.setFillColor(...rgb)
+    doc.circle(MARGIN + 8, y + ROW_H / 2, 3, 'F')
+
+    // item title
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(255, 255, 255)
+    const maxTitle = 28
+    const title = item.title.length > maxTitle ? item.title.slice(0, maxTitle) + '…' : item.title
+    doc.text(title, MARGIN + 16, y + 10)
+
+    // assignees / status below title
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(6.5)
+    doc.setTextColor(138, 154, 176)
+    const sub = [meta?.label, assignees.map(a => a.full_name?.split(' ')[0]).join(', ')].filter(Boolean).join(' · ')
+    doc.text(sub, MARGIN + 16, y + 18)
+
+    // target quarter bar
+    const itemQ = getItemQuarter(item)
+    const qIdx  = quarters.indexOf(itemQ)
+    if (qIdx >= 0) {
+      const bx = MARGIN + LABEL_W + qIdx * COL_W + 4
+      const bw = COL_W - 8
+      const bh = ROW_H - 8
+      const by = y + 4
+      doc.setFillColor(...rgb)
+      doc.roundedRect(bx, by, bw, bh, 3, 3, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7)
+      doc.setTextColor(255, 255, 255)
+      doc.text('●', bx + bw / 2, by + bh / 2 + 2.5, { align: 'center' })
+    }
+
+    // column dividers
+    doc.setDrawColor(42, 61, 85)
+    quarters.forEach((_, i) => {
+      doc.line(MARGIN + LABEL_W + i * COL_W, y, MARGIN + LABEL_W + i * COL_W, y + ROW_H)
+    })
+    doc.rect(MARGIN, y, totalW, ROW_H)
+
+    y += ROW_H
+  })
+
+  // ── Unscheduled section ──────────────────────────────────────────────────────
+  if (unscheduled.length > 0) {
+    y += 12
+    if (y + 20 > PH - MARGIN) { doc.addPage(); y = MARGIN }
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(138, 154, 176)
+    doc.text(`Unscheduled (${unscheduled.length})`, MARGIN, y + 8)
+    y += 14
+    unscheduled.forEach(item => {
+      if (y + 14 > PH - MARGIN) { doc.addPage(); y = MARGIN }
+      const rgb = STATUS_RGB[item.status] || [138, 154, 176]
+      doc.setFillColor(...rgb)
+      doc.circle(MARGIN + 6, y + 6, 2.5, 'F')
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7.5)
+      doc.setTextColor(200, 200, 200)
+      doc.text(item.title, MARGIN + 14, y + 9)
+      y += 14
+    })
+  }
+
+  // ── Legend ───────────────────────────────────────────────────────────────────
+  y += 16
+  if (y + 18 > PH - MARGIN) { doc.addPage(); y = MARGIN }
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7)
+  doc.setTextColor(138, 154, 176)
+  doc.text('Status:', MARGIN, y + 8)
+  let lx = MARGIN + 36
+  Object.entries(STATUS_RGB).forEach(([status, rgb]) => {
+    doc.setFillColor(...rgb)
+    doc.circle(lx, y + 5, 3, 'F')
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(180, 180, 180)
+    doc.text(STATUS_META[status]?.label || status, lx + 6, y + 8)
+    lx += 70
+  })
+
+  doc.save(`roadmap-gantt-${now.toISOString().slice(0, 10)}.pdf`)
+}
+
 function exportTableCSV(items, getAssignees) {
   const headers = ['Title', 'Status', 'Category', 'Assignees', 'Target', 'Requested By', 'Description']
   const rows = items.map(i => [
@@ -293,10 +494,16 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
                 + Add Item
               </button>
             )}
-            {(view === 'report' || view === 'gantt') && (
+            {view === 'report' && (
               <button onClick={() => window.print()}
                 className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
                 Print / Export
+              </button>
+            )}
+            {view === 'gantt' && !showArchived && (
+              <button onClick={() => exportGanttPDF(activeItems, getAssignees)}
+                className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
+                Export PDF
               </button>
             )}
             {view === 'table' && !showArchived && (
