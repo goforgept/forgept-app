@@ -50,7 +50,8 @@ Deno.serve(async (req) => {
         email,
         password: tempPassword,
         email_confirm: true,
-        user_metadata: { full_name: fullName }
+        user_metadata: { full_name: fullName },
+        app_metadata: { must_change_password: true }
       })
     })
 

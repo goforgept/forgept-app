@@ -115,10 +115,11 @@ async function exportGanttPDF(items, getAssignees) {
     const cx = MARGIN + LABEL_W + i * COL_W
     const isCurrent = q === currentQ
     if (isCurrent) {
-      doc.setFillColor(200, 98, 42, 0.12)
+      doc.setFillColor(60, 35, 20)
       doc.rect(cx, y, COL_W, HEADER_H, 'F')
     }
-    doc.setTextColor(isCurrent ? [200, 98, 42] : [138, 154, 176])
+    if (isCurrent) doc.setTextColor(200, 98, 42)
+    else doc.setTextColor(138, 154, 176)
     doc.setFont('helvetica', isCurrent ? 'bold' : 'normal')
     doc.text(q, cx + COL_W / 2, y + 18, { align: 'center' })
     // column divider
@@ -143,14 +144,12 @@ async function exportGanttPDF(items, getAssignees) {
     doc.setFillColor(...bg)
     doc.rect(MARGIN, y, totalW, ROW_H, 'F')
 
-    // column shading for current quarter
+    // subtle current-quarter column highlight (dark solid, no alpha)
     const curQIdx = quarters.indexOf(currentQ)
     if (curQIdx >= 0) {
       const cx = MARGIN + LABEL_W + curQIdx * COL_W
-      doc.setFillColor(200, 98, 42)
-      doc.setGlobalAlpha?.(0.05)
+      doc.setFillColor(idx % 2 === 0 ? 22 : 28, idx % 2 === 0 ? 22 : 28, idx % 2 === 0 ? 14 : 18)
       doc.rect(cx, y, COL_W, ROW_H, 'F')
-      doc.setGlobalAlpha?.(1)
     }
 
     // label area

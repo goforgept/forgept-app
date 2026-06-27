@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useState } from 'react'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabase'
 import { useProfile } from './context/ProfileContext'
 import Login from './pages/Login'
@@ -124,6 +125,9 @@ function App() {
           <button onClick={() => { localStorage.removeItem('sa_impersonate'); window.location.reload() }} className="underline hover:no-underline ml-4">Exit</button>
         </div>
       )}
+      {session?.user?.app_metadata?.must_change_password && (
+        <TempPasswordBanner />
+      )}
       <Routes location={location} key={location.key}>
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/sign/:token" element={<SignProposal />} />
@@ -190,6 +194,27 @@ function App() {
         )}
       </Routes>
     </>
+  )
+}
+
+function TempPasswordBanner() {
+  const navigate  = useNavigate()
+  const [hidden, setHidden] = useState(false)
+  if (hidden) return null
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[9998] bg-[#C8622A] text-white text-xs flex items-center justify-between px-4 py-2 shadow-lg">
+      <span className="font-medium">
+        You're using a temporary password — please change it to secure your account.
+      </span>
+      <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+        <button
+          onClick={() => { navigate('/settings'); setHidden(true) }}
+          className="bg-white text-[#C8622A] font-semibold px-3 py-1 rounded text-xs hover:bg-orange-50 transition-colors">
+          Change Password
+        </button>
+        <button onClick={() => setHidden(true)} className="text-white/70 hover:text-white transition-colors text-sm leading-none">✕</button>
+      </div>
+    </div>
   )
 }
 
