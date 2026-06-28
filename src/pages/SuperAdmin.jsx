@@ -52,6 +52,7 @@ export default function SuperAdmin() {
   const [profiles, setProfiles] = useState([])
   const [saUsers, setSaUsers] = useState([])
   const [requests, setRequests] = useState([])
+  const [roadmapItems, setRoadmapItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab,      setActiveTab]      = useState('requests')
   const [showImport,     setShowImport]     = useState(false)
@@ -153,6 +154,7 @@ export default function SuperAdmin() {
     setRequests(requestsData || [])
     setAllProposals(proposalsData || [])
     setAllClients(clientsData || [])
+    setRoadmapItems(profilesResult?.data?.roadmap_items || [])
 
     const notesMap = {}
     for (const org of orgsResult) {
@@ -564,6 +566,7 @@ export default function SuperAdmin() {
             { key: 'products', label: 'Global Products' },
             { key: 'api',      label: 'API Keys' },
             { key: 'sa_users', label: 'Admin Users' },
+            { key: 'roadmap',  label: 'Roadmap' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
@@ -1268,6 +1271,200 @@ export default function SuperAdmin() {
         </div>
       )}
 
+      {/* ── ROADMAP TAB ── */}
+      {activeTab === 'roadmap' && (
+        <SAoadmapPanel
+          items={roadmapItems}
+          orgs={orgs}
+          onStatusChange={async (id, status) => {
+            await supabase.from('roadmap_items').update({ status }).eq('id', id)
+            setRoadmapItems(prev => prev.map(i => i.id === id ? { ...i, status } : i))
+          }}
+          onDelete={async (id) => {
+            if (!window.confirm('Delete this roadmap item?')) return
+            await supabase.from('roadmap_items').delete().eq('id', id)
+            setRoadmapItems(prev => prev.filter(i => i.id !== id))
+          }}
+        />
+      )}
+
+    </div>
+  )
+}
+
+// ─── SAoadmapPanel ─────────────────────────────────────────────────────────────
+const SA_STATUS_META = {
+  backlog:     { label: 'Backlog',     dot: 'bg-[#8A9AB0]',  badge: 'bg-[#8A9AB0]/20 text-[#8A9AB0]' },
+  planned:     { label: 'Planned',     dot: 'bg-yellow-400', badge: 'bg-yellow-500/20 text-yellow-400' },
+  in_progress: { label: 'In Progress', dot: 'bg-blue-400',   badge: 'bg-blue-500/20 text-blue-400' },
+  released:    { label: 'Released',    dot: 'bg-green-400',  badge: 'bg-green-500/20 text-green-400' },
+  declined:    { label: 'Declined',    dot: 'bg-red-400',    badge: 'bg-red-500/20 text-red-400' },
+}
+const SA_CATEGORY_COLORS = {
+  feature:     'bg-blue-500/20 text-blue-400',
+  product:     'bg-purple-500/20 text-purple-400',
+  improvement: 'bg-yellow-500/20 text-yellow-400',
+  bug_fix:     'bg-red-500/20 text-red-400',
+}
+const SA_CATEGORY_LABELS = { feature: 'Feature', product: 'Product', improvement: 'Improvement', bug_fix: 'Bug Fix' }
+const SA_COLUMNS = ['backlog', 'planned', 'in_progress', 'released', 'declined']
+const SA_NEXT = {
+  backlog:     [{ v: 'planned', l: 'Approve' }, { v: 'declined', l: 'Decline' }],
+  planned:     [{ v: 'in_progress', l: 'Start' }, { v: 'released', l: 'Release' }, { v: 'backlog', l: 'Back' }],
+  in_progress: [{ v: 'released', l: 'Release' }, { v: 'planned', l: 'Back' }],
+  released:    [{ v: 'in_progress', l: 'Reopen' }],
+  declined:    [{ v: 'backlog', l: 'Reopen' }],
+}
+
+function SAoadmapPanel({ items, orgs, onStatusChange, onDelete }) {
+  const [filter, setFilter] = useState('')
+  const [orgFilter, setOrgFilter] = useState('')
+  const [view, setView] = useState('board') // 'board' | 'list'
+
+  const orgMap = Object.fromEntries(orgs.map(o => [o.id, o.company_name]))
+
+  const filtered = items.filter(i => {
+    if (orgFilter && i.org_id !== orgFilter) return false
+    if (filter && !i.title.toLowerCase().includes(filter.toLowerCase())) return false
+    return true
+  })
+
+  const byStatus = (s) => filtered.filter(i => i.status === s)
+
+  return (
+    <div className="space-y-4">
+      {/* Controls */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <input type="text" placeholder="Search items..." value={filter} onChange={e => setFilter(e.target.value)}
+          className="bg-[#1a2d45] border border-[#2a3d55] text-white text-xs rounded-lg px-3 py-2 w-52 focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
+        <select value={orgFilter} onChange={e => setOrgFilter(e.target.value)}
+          className="bg-[#1a2d45] border border-[#2a3d55] text-[#8A9AB0] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]">
+          <option value="">All Organizations</option>
+          {orgs.filter(o => items.some(i => i.org_id === o.id)).map(o => (
+            <option key={o.id} value={o.id}>{o.company_name}</option>
+          ))}
+        </select>
+        <div className="flex bg-[#1a2d45] border border-[#2a3d55] rounded-lg p-1 gap-1 ml-auto">
+          <button onClick={() => setView('board')} className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${view === 'board' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>Board</button>
+          <button onClick={() => setView('list')}  className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${view === 'list'  ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>List</button>
+        </div>
+        <span className="text-[#8A9AB0] text-xs">{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span>
+      </div>
+
+      {/* Board */}
+      {view === 'board' && (
+        <div className="grid grid-cols-5 gap-3">
+          {SA_COLUMNS.map(status => {
+            const meta = SA_STATUS_META[status]
+            const col  = byStatus(status)
+            return (
+              <div key={status} className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className={`w-2 h-2 rounded-full ${meta.dot}`} />
+                  <span className="text-xs font-semibold text-[#8A9AB0] uppercase tracking-wide">{meta.label}</span>
+                  <span className="text-[#8A9AB0] text-xs ml-auto">{col.length}</span>
+                </div>
+                {col.length === 0 && (
+                  <div className="border border-dashed border-[#2a3d55] rounded-xl p-3 text-center">
+                    <p className="text-[#8A9AB0] text-xs">Empty</p>
+                  </div>
+                )}
+                {col.map(item => (
+                  <div key={item.id} className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-3 hover:border-[#C8622A]/30 transition-colors group">
+                    <div className="flex items-start justify-between gap-1 mb-1.5">
+                      <p className="text-white text-xs font-semibold leading-tight flex-1">{item.title}</p>
+                      <button onClick={() => onDelete(item.id)} className="text-[#8A9AB0] hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">✕</button>
+                    </div>
+                    {item.description && <p className="text-[#8A9AB0] text-xs mb-2 line-clamp-2">{item.description}</p>}
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${SA_CATEGORY_COLORS[item.category] || 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                        {SA_CATEGORY_LABELS[item.category] || item.category}
+                      </span>
+                      {item.target_quarter && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-[#C8622A]/10 text-[#C8622A] font-medium">{item.target_quarter}</span>
+                      )}
+                    </div>
+                    {(item.requester?.full_name || item.org?.company_name) && (
+                      <p className="text-[#8A9AB0] text-xs mb-2 truncate">
+                        {item.requester?.full_name && <span>{item.requester.full_name}</span>}
+                        {item.org?.company_name && <span className="text-[#C8622A]"> · {item.org.company_name}</span>}
+                      </p>
+                    )}
+                    <div className="flex flex-col gap-1">
+                      {(SA_NEXT[status] || []).map(m => (
+                        <button key={m.v} onClick={() => onStatusChange(item.id, m.v)}
+                          className="w-full text-left text-xs px-2 py-1 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white hover:bg-[#2a3d55] transition-colors">
+                          {m.l} →
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* List */}
+      {view === 'list' && (
+        <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
+          <table className="w-full text-xs">
+            <thead className="bg-[#0F1C2E] border-b border-[#2a3d55]">
+              <tr>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Title</th>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Status</th>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Category</th>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Org</th>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Requested By</th>
+                <th className="text-left px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Target</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#2a3d55]/50">
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} className="text-center py-10 text-[#8A9AB0]">No items found.</td></tr>
+              )}
+              {filtered.map(item => {
+                const meta = SA_STATUS_META[item.status] || SA_STATUS_META.backlog
+                return (
+                  <tr key={item.id} className="hover:bg-[#0F1C2E]/50 transition-colors">
+                    <td className="px-4 py-3">
+                      <p className="text-white font-semibold">{item.title}</p>
+                      {item.description && <p className="text-[#8A9AB0] mt-0.5 line-clamp-1">{item.description}</p>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <div className={`w-1.5 h-1.5 rounded-full ${meta.dot}`} />
+                        <span className={`px-2 py-0.5 rounded-full font-medium ${meta.badge}`}>{meta.label}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(SA_NEXT[item.status] || []).map(m => (
+                          <button key={m.v} onClick={() => onStatusChange(item.id, m.v)}
+                            className="px-1.5 py-0.5 rounded bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">
+                            {m.l}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`px-2 py-0.5 rounded-full font-medium ${SA_CATEGORY_COLORS[item.category] || 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                        {SA_CATEGORY_LABELS[item.category] || item.category}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-[#8A9AB0]">{item.org?.company_name || orgMap[item.org_id] || '-'}</td>
+                    <td className="px-4 py-3 text-[#8A9AB0]">{item.requester?.full_name || '-'}</td>
+                    <td className="px-4 py-3 text-[#C8622A] font-medium">{item.target_quarter || '-'}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button onClick={() => onDelete(item.id)} className="text-[#8A9AB0] hover:text-red-400 transition-colors">✕</button>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }
@@ -1574,8 +1771,9 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
     name:         product.name,
     category:     product.category,
     manufacturer: product.manufacturer,
-    fov_angle:    product.specs?.fov_angle || '',
-    ir_range:     product.specs?.ir_range  || '',
+    fov_angle:    product.specs?.fov_angle    || '',
+    ir_range:     product.specs?.ir_range     || '',
+    power_watts:  product.specs?.power_watts  || '',
     is_active:    product.is_active,
   })
   const [saving, setSaving] = useState(false)
@@ -1602,8 +1800,9 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
       is_active:    form.is_active,
       specs: {
         ...product.specs,
-        ...(form.fov_angle ? { fov_angle: parseFloat(form.fov_angle) } : {}),
-        ...(form.ir_range  ? { ir_range:  parseFloat(form.ir_range)  } : {}),
+        ...(form.fov_angle   ? { fov_angle:   parseFloat(form.fov_angle)   } : {}),
+        ...(form.ir_range    ? { ir_range:    parseFloat(form.ir_range)    } : {}),
+        ...(form.power_watts ? { power_watts: parseFloat(form.power_watts) } : {}),
       }
     }).eq('id', product.id)
     setSaving(false)
@@ -1620,8 +1819,9 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
       </select>
       <div className="flex gap-1">
-        <input value={form.fov_angle} onChange={e => setForm(p => ({ ...p, fov_angle: e.target.value }))} className={inputClass} placeholder="FOV°" type="number" />
-        <input value={form.ir_range} onChange={e => setForm(p => ({ ...p, ir_range: e.target.value }))} className={inputClass} placeholder="IR" type="number" />
+        <input value={form.fov_angle}   onChange={e => setForm(p => ({ ...p, fov_angle: e.target.value }))}   className={inputClass} placeholder="FOV°" type="number" />
+        <input value={form.ir_range}    onChange={e => setForm(p => ({ ...p, ir_range: e.target.value }))}    className={inputClass} placeholder="IR ft" type="number" />
+        <input value={form.power_watts} onChange={e => setForm(p => ({ ...p, power_watts: e.target.value }))} className={inputClass} placeholder="W"    type="number" />
       </div>
       <div className="flex items-center justify-end gap-1.5">
         <button onClick={handleSave} disabled={saving} className="text-xs bg-[#C8622A] text-white px-2 py-0.5 rounded hover:bg-[#b5571f] transition-colors">
@@ -1639,7 +1839,10 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
       <span className="font-mono text-[#C8622A] truncate">{product.part_number}</span>
       <span className="text-white truncate">{product.name}</span>
       <span className="text-[#8A9AB0]">{product.category}</span>
-      <span className="text-[#8A9AB0]">{product.specs?.fov_angle ? `${product.specs.fov_angle}°` : '—'}</span>
+      <div className="flex gap-2 text-[#8A9AB0]">
+        <span>{product.specs?.fov_angle ? `${product.specs.fov_angle}°` : '—'}</span>
+        {product.specs?.power_watts && <span className="text-yellow-500/70">{product.specs.power_watts}W</span>}
+      </div>
       <div className="flex items-center justify-end gap-2">
         <button onClick={() => setEditing(true)} className="text-xs text-[#8A9AB0] hover:text-white transition-colors opacity-0 group-hover:opacity-100">
           Edit
@@ -1673,7 +1876,7 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
 function AddProductForm({ onAdded }) {
   const emptyRow = () => ({
     part_number: '', name: '', manufacturer: '', category: 'Dome Camera',
-    industry: 'security', fov_angle: '', ir_range: '', _id: Math.random()
+    industry: 'security', fov_angle: '', ir_range: '', power_watts: '', _id: Math.random()
   })
 
   const [rows,    setRows]    = useState([emptyRow()])
@@ -1717,8 +1920,9 @@ function AddProductForm({ onAdded }) {
       is_active:    true,
       is_basic:     false,
       specs: {
-        ...(r.fov_angle ? { fov_angle: parseFloat(r.fov_angle) } : {}),
-        ...(r.ir_range  ? { ir_range:  parseFloat(r.ir_range)  } : {}),
+        ...(r.fov_angle   ? { fov_angle:   parseFloat(r.fov_angle)   } : {}),
+        ...(r.ir_range    ? { ir_range:    parseFloat(r.ir_range)    } : {}),
+        ...(r.power_watts ? { power_watts: parseFloat(r.power_watts) } : {}),
       }
     }))
 
@@ -1751,15 +1955,13 @@ function AddProductForm({ onAdded }) {
 
       {/* Column headers */}
       <div className="grid grid-cols-12 gap-1.5 mb-1.5 px-1">
-        {['Part Number *', 'Name', 'Manufacturer *', 'Category', 'Industry', 'FOV°', 'IR Range', ''].map(h => (
+        {['Part Number *', 'Name', 'Manufacturer *', 'Category', 'Industry', 'FOV°', 'IR ft', 'Watts', ''].map(h => (
           <div key={h} className={`text-[#8A9AB0] text-xs font-medium ${
-            h === 'Part Number *' ? 'col-span-2' :
-            h === 'Name'         ? 'col-span-2' :
+            h === 'Part Number *'  ? 'col-span-2' :
+            h === 'Name'           ? 'col-span-2' :
             h === 'Manufacturer *' ? 'col-span-2' :
-            h === 'Category'     ? 'col-span-2' :
-            h === 'Industry'     ? 'col-span-1' :
-            h === 'FOV°'         ? 'col-span-1' :
-            h === 'IR Range'     ? 'col-span-1' : 'col-span-1'
+            h === 'Category'       ? 'col-span-2' :
+            'col-span-1'
           }`}>{h}</div>
         ))}
       </div>
@@ -1803,6 +2005,11 @@ function AddProductForm({ onAdded }) {
             <div className="col-span-1">
               <input placeholder="30" value={row.ir_range}
                 onChange={e => update(idx, 'ir_range', e.target.value)}
+                className={inputClass} type="number" />
+            </div>
+            <div className="col-span-1">
+              <input placeholder="7.5" value={row.power_watts}
+                onChange={e => update(idx, 'power_watts', e.target.value)}
                 className={inputClass} type="number" />
             </div>
             <div className="col-span-1 flex justify-center">

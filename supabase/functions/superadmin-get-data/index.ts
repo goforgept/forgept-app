@@ -47,13 +47,17 @@ Deno.serve(async (req) => {
     if (!authorized) return unauth()
 
     const adminClient = createClient(supabaseUrl, serviceKey)
-    const [{ data: profiles, error }, { data: authUsers }, { data: saProfiles }] = await Promise.all([
+    const [{ data: profiles, error }, { data: authUsers }, { data: saProfiles }, { data: roadmapItems }] = await Promise.all([
       adminClient
         .from('profiles')
         .select('id, full_name, email, org_id, role, org_role, company_name, created_at, team_id, is_regional_vp, is_operations_manager')
         .order('created_at', { ascending: false }),
       adminClient.auth.admin.listUsers({ perPage: 1000 }),
       adminClient.from('profiles').select('id, full_name, email, created_at').eq('role', 'superadmin').order('created_at'),
+      adminClient
+        .from('roadmap_items')
+        .select('*, requester:requested_by(full_name, email), org:org_id(company_name)')
+        .order('created_at', { ascending: false }),
     ])
 
     if (error) throw error
@@ -73,7 +77,7 @@ Deno.serve(async (req) => {
       last_login: lastSignInMap[p.id] ?? null,
     }))
 
-    return new Response(JSON.stringify({ profiles: enriched, sa_users: enrichedSA }), {
+    return new Response(JSON.stringify({ profiles: enriched, sa_users: enrichedSA, roadmap_items: roadmapItems || [] }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (err) {

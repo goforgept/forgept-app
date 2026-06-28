@@ -315,6 +315,8 @@ async function parseForgePtCSV(file) {
     if (fovStr) specs.fov_angle = parseFloat(fovStr)
     const irStr = get('IR Range')
     if (irStr)  specs.ir_range  = parseFloat(irStr)
+    const wattsStr = get('Watts')
+    if (wattsStr) specs.power_watts = parseFloat(wattsStr)
 
     const installNotes = get('Installation Notes')
     if (installNotes) specs.install_notes = installNotes
@@ -571,28 +573,28 @@ export default function GlobalProductsImport({ onClose, onImported }) {
                       onClick={(e) => {
                         // Generate and download the template
                         e.preventDefault()
-                        const csv = `Part Number,Product Name,Category,Manufacturer,Description,FOV Angle (degrees),IR Range (feet),Installation Notes
+                        const csv = `Part Number,Product Name,Category,Manufacturer,Description,FOV Angle (degrees),IR Range (feet),Watts,Installation Notes
 # ── Security Cameras ──────────────────────────────────────────────────────────
 # Valid categories: Dome Camera | Bullet Camera | PTZ Camera | Fisheye Camera | Multi Sensor Camera | Indoor Camera
-EXAMPLE-CAM-001,Example Dome Camera,Dome Camera,Example Corp,2MP IR Dome Camera,90,98,PoE required
-EXAMPLE-CAM-002,Example Bullet Camera,Bullet Camera,Example Corp,4MP Varifocal Bullet,70,164,PoE or 12VDC
+EXAMPLE-CAM-001,Example Dome Camera,Dome Camera,Example Corp,2MP IR Dome Camera,90,98,7.5,PoE required
+EXAMPLE-CAM-002,Example Bullet Camera,Bullet Camera,Example Corp,4MP Varifocal Bullet,70,164,12,PoE or 12VDC
 # ── Access Control ────────────────────────────────────────────────────────────
 # Valid categories: Access Reader | Access Control Door | Controller | Intercom | Wireless Lock | Door Operator
-EXAMPLE-ACC-001,Example Card Reader,Access Reader,Example Corp,Multi-format RFID reader,,,
-EXAMPLE-ACC-002,Example Door Controller,Access Control Door,Example Corp,2-door access controller,,,
+EXAMPLE-ACC-001,Example Card Reader,Access Reader,Example Corp,Multi-format RFID reader,,,3,
+EXAMPLE-ACC-002,Example Door Controller,Access Control Door,Example Corp,2-door access controller,,,15,
 # ── Intrusion Detection ────────────────────────────────────────────────────────
 # Valid categories: PIR Detector | Door Contact | Glass Break | Alarm Keypad | Alarm Panel | Interior Siren | Exterior Siren | Panic Button | Shock Sensor | Dual Tech Detector | Motion Sensor
-EXAMPLE-INT-001,Example PIR Detector,PIR Detector,Example Corp,Ceiling mount PIR,,,
-EXAMPLE-INT-002,Example Door Contact,Door Contact,Example Corp,Surface mount contact,,,
-EXAMPLE-INT-003,Example Alarm Keypad,Alarm Keypad,Example Corp,LCD alarm keypad,,,
+EXAMPLE-INT-001,Example PIR Detector,PIR Detector,Example Corp,Ceiling mount PIR,,,1,
+EXAMPLE-INT-002,Example Door Contact,Door Contact,Example Corp,Surface mount contact,,,0.5,
+EXAMPLE-INT-003,Example Alarm Keypad,Alarm Keypad,Example Corp,LCD alarm keypad,,,5,
 # ── AV ────────────────────────────────────────────────────────────────────────
 # Valid categories: Projector | Projection Screen | Ceiling Speaker | Subwoofer | Microphone | Wireless Mic | Touch Panel | Control Processor | Video Conference | Media Player | HDMI Extender | AV Receiver | Digital Signage | Display | Document Camera | Streaming Encoder | Wall Plate | Clock
-EXAMPLE-AV-001,Example Ceiling Speaker,Ceiling Speaker,Example Corp,8-inch 2-way ceiling speaker,,,
-EXAMPLE-AV-002,Example Projector,Projector,Example Corp,5000 lumen laser projector,,,
-EXAMPLE-AV-003,Example Touch Panel,Touch Panel,Example Corp,10-inch control touch panel,,,
+EXAMPLE-AV-001,Example Ceiling Speaker,Ceiling Speaker,Example Corp,8-inch 2-way ceiling speaker,,,70,
+EXAMPLE-AV-002,Example Projector,Projector,Example Corp,5000 lumen laser projector,,,500,
+EXAMPLE-AV-003,Example Touch Panel,Touch Panel,Example Corp,10-inch control touch panel,,,25,
 # ── Other ─────────────────────────────────────────────────────────────────────
 # Valid categories: NVR | Network | Sensor | Smoke Detector | Horn Strobe
-EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,`
+EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
                         const blob = new Blob([csv], { type: 'text/csv' })
                         const url  = URL.createObjectURL(blob)
                         const a    = document.createElement('a')

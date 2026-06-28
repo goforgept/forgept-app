@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import Sidebar from '../components/Sidebar'
+import { supabase } from '../supabase'
+import { useProfile } from '../context/ProfileContext'
 
 const faqs = [
   {
@@ -163,8 +165,28 @@ const faqs = [
 ]
 
 export default function FAQ({ isAdmin, featureProposals = true, featureCRM = false }) {
+  const { profile } = useProfile()
   const [openItem, setOpenItem] = useState(null)
   const [search, setSearch] = useState('')
+  const [reqForm, setReqForm] = useState({ title: '', description: '', category: 'feature' })
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+
+  const submitRequest = async () => {
+    if (!reqForm.title.trim() || !profile?.org_id) return
+    setSubmitting(true)
+    await supabase.from('roadmap_items').insert({
+      org_id:       profile.org_id,
+      title:        reqForm.title.trim(),
+      description:  reqForm.description.trim() || null,
+      category:     reqForm.category,
+      status:       'backlog',
+      requested_by: profile.id,
+    })
+    setSubmitting(false)
+    setSubmitted(true)
+    setReqForm({ title: '', description: '', category: 'feature' })
+  }
 
   const filtered = faqs.map(cat => ({
     ...cat,
@@ -219,6 +241,40 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
             </div>
           ))
         )}
+
+        {/* Feature request */}
+        <div className="bg-[#1a2d45] rounded-xl p-6">
+          <h3 className="text-white font-bold text-lg mb-1">Request a Feature</h3>
+          <p className="text-[#8A9AB0] text-sm mb-4">Have an idea or something you wish ForgePt could do? Let us know — we read every submission.</p>
+          {submitted ? (
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-3 flex items-center gap-3">
+              <span className="text-green-400 text-sm font-semibold">Thanks! Your request has been submitted.</span>
+              <button onClick={() => setSubmitted(false)} className="text-[#8A9AB0] hover:text-white text-xs ml-auto transition-colors">Submit another</button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <input type="text" placeholder="What do you need? (required)"
+                value={reqForm.title} onChange={e => setReqForm(p => ({ ...p, title: e.target.value }))}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
+              <textarea rows={3} placeholder="More detail — why would this help you or your customers?"
+                value={reqForm.description} onChange={e => setReqForm(p => ({ ...p, description: e.target.value }))}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0] resize-none" />
+              <div className="flex items-center gap-3">
+                <select value={reqForm.category} onChange={e => setReqForm(p => ({ ...p, category: e.target.value }))}
+                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  <option value="feature">Feature</option>
+                  <option value="improvement">Improvement</option>
+                  <option value="bug_fix">Bug Fix</option>
+                  <option value="product">Product</option>
+                </select>
+                <button onClick={submitRequest} disabled={submitting || !reqForm.title.trim()}
+                  className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {submitting ? 'Submitting...' : 'Submit Request'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="bg-[#1a2d45] rounded-xl p-6 text-center">
           <p className="text-white font-semibold mb-2">Still have questions?</p>

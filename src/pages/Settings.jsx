@@ -394,6 +394,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     }] : []),
     ...(isAdmin ? [{ items: [{ key: 'designer', label: 'Designer' }, { key: 'regions', label: 'Regions' }, { key: 'api', label: 'API' }] }] : []),
     ...(featureDesignerOnly ? [{ label: 'Team', items: [{ key: 'team', label: 'Team' }] }] : []),
+    { items: [{ key: 'feedback', label: 'Request a Feature' }] },
   ]
 
   return (
@@ -500,8 +501,81 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           )}
 
           {activeTab === 'team' && <TeamSettingsTab featureDesignerOnly={featureDesignerOnly} />}
+
+          {activeTab === 'feedback' && <FeedbackTab profile={profile} />}
         </div>
       </div>
+    </div>
+  )
+}
+
+function FeedbackTab({ profile }) {
+  const [form, setForm] = useState({ title: '', description: '', category: 'feature' })
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!form.title.trim() || !profile?.org_id) return
+    setSubmitting(true)
+    await supabase.from('roadmap_items').insert({
+      org_id:       profile.org_id,
+      title:        form.title.trim(),
+      description:  form.description.trim() || null,
+      category:     form.category,
+      status:       'backlog',
+      requested_by: profile.id,
+    })
+    setSubmitting(false)
+    setSubmitted(true)
+    setForm({ title: '', description: '', category: 'feature' })
+  }
+
+  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
+
+  return (
+    <div className="space-y-6 max-w-xl">
+      <div>
+        <h2 className="text-white font-bold text-xl mb-1">Request a Feature</h2>
+        <p className="text-[#8A9AB0] text-sm">Have an idea or something you wish ForgePt could do? Let us know — we read every submission and use this to shape the product roadmap.</p>
+      </div>
+
+      {submitted ? (
+        <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-5 py-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-green-400 font-semibold text-sm">Request submitted — thank you!</p>
+            <p className="text-[#8A9AB0] text-xs mt-0.5">We'll review it and update the roadmap accordingly.</p>
+          </div>
+          <button onClick={() => setSubmitted(false)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors flex-shrink-0">Submit another</button>
+        </div>
+      ) : (
+        <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5 space-y-4">
+          <div>
+            <label className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide block mb-1">What do you need? *</label>
+            <input type="text" placeholder="Short title for your request" value={form.title}
+              onChange={e => setForm(p => ({ ...p, title: e.target.value }))} className={inputClass} />
+          </div>
+          <div>
+            <label className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide block mb-1">More Detail</label>
+            <textarea rows={4} placeholder="Why would this help you or your customers?"
+              value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+              className={`${inputClass} resize-none`} />
+          </div>
+          <div>
+            <label className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide block mb-1">Type</label>
+            <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
+              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+              <option value="feature">New Feature</option>
+              <option value="improvement">Improvement to existing</option>
+              <option value="bug_fix">Bug Fix</option>
+              <option value="product">Product / Catalog</option>
+            </select>
+          </div>
+          <button onClick={handleSubmit} disabled={submitting || !form.title.trim()}
+            className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+            {submitting ? 'Submitting...' : 'Submit Request'}
+          </button>
+        </div>
+      )}
     </div>
   )
 }
