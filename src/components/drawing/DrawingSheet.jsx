@@ -1075,16 +1075,18 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   const fovAngle    = drag?.fov_angle   ?? placement.fov_angle   ?? product.specs?.fov_angle ?? (category === 'PTZ Camera' ? 360 : 90)
                   const rangeInFeet = drag?.fov_range   ?? placement.fov_range   ?? product.specs?.ir_range  ?? 30
 
+                  // When no scale is set, use 4px per foot so dragging visibly changes length
+                  const PX_PER_FT = 4
                   const range = scaleRatio
                     ? Math.min((rangeInFeet / scaleRatio) * scale, 3000)
-                    : 150 * Math.min(scale, 1)
+                    : Math.min(rangeInFeet * PX_PER_FT * Math.min(scale, 1), 3000)
                   const px = position.x + placement.x * canvasW * scale
                   const py = position.y + placement.y * canvasH * scale
 
                   // Helper: screen px distance → feet
-                  const pxToFt = (px) => scaleRatio
-                    ? Math.max(5, Math.round((px / scale) * scaleRatio))
-                    : Math.max(5, Math.round(px / scale / (canvasW * 0.005)))
+                  const pxToFt = (dist) => scaleRatio
+                    ? Math.max(5, Math.round((dist / scale) * scaleRatio))
+                    : Math.max(5, Math.round(dist / (PX_PER_FT * Math.min(scale, 1))))
 
                   // Commit drag values to DB and update local state
                   const commitFOV = async (updates) => {

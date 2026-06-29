@@ -42,7 +42,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
   })
 
   // For power sources: which placements on the sheet claim this as their switch
-  const connectedDevicesDerivedDerived = isPowerSource
+  const connectedDevicesDerived = isPowerSource
     ? sheetPlacements.filter(p => p.switch_placement_id === placement.id)
     : []
 
