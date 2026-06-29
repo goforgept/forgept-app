@@ -90,6 +90,16 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
 
   const [form, setForm] = useState(() => getInitialForm(placement))
 
+  // When the canvas commits a FOV drag, sync those fields back without resetting the whole form
+  useEffect(() => {
+    setForm(prev => ({
+      ...prev,
+      rotation:  placement.rotation  ?? 0,
+      fov_angle: placement.fov_angle ?? null,
+      fov_range: placement.fov_range ?? null,
+    }))
+  }, [placement.rotation, placement.fov_angle, placement.fov_range])
+
   useEffect(() => {
     setForm(getInitialForm(placement))
     setShowAsBuilt(false)
@@ -389,112 +399,116 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
 
             {/* ── Power ── */}
             <div className="border-t border-[#2a3d55] pt-3">
-              <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Power</p>
-
               {isPowerSource ? (
-                /* Switch / power-source view: show PoE budget */
+                /* Power source view (switch, NVR, UPS): how much it supplies vs. how much is drawn */
                 (() => {
-                  const budget   = product.specs?.power_watts || 0
-                  const consumed = connectedDevices.reduce((sum, d) =>
+                  const supply   = product.specs?.power_watts || 0
+                  const drawn    = connectedDevices.reduce((sum, d) =>
                     sum + (d.watts_override ?? d.global_products?.specs?.power_watts ?? 0), 0)
-                  const pct        = budget > 0 ? (consumed / budget) * 100 : 0
-                  const overBudget = budget > 0 && consumed > budget
+                  const pct        = supply > 0 ? (drawn / supply) * 100 : 0
+                  const overBudget = supply > 0 && drawn > supply
                   const nearBudget = pct >= 80
                   return (
-                    <div className="space-y-2">
-                      {budget > 0 ? (
-                        <>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-[#8A9AB0]">Budget</span>
-                            <span className="text-white font-mono">{budget}W</span>
-                          </div>
-                          <div className="flex justify-between text-xs">
-                            <span className="text-[#8A9AB0]">Consumed</span>
-                            <span className={`font-mono font-semibold ${overBudget ? 'text-red-400' : nearBudget ? 'text-yellow-400' : 'text-green-400'}`}>
-                              {consumed.toFixed(1)}W
-                            </span>
-                          </div>
-                          <div className="w-full bg-[#2a3d55] rounded-full h-1.5">
-                            <div
-                              className={`h-1.5 rounded-full transition-all ${overBudget ? 'bg-red-400' : nearBudget ? 'bg-yellow-400' : 'bg-green-400'}`}
-                              style={{ width: `${Math.min(100, pct)}%` }}
-                            />
-                          </div>
-                          {overBudget && (
-                            <p className="text-red-400 text-xs font-medium">
-                              Over budget by {(consumed - budget).toFixed(1)}W
-                            </p>
-                          )}
-                          <div className="text-right text-xs text-[#4a5a6a]">
-                            {(budget - consumed).toFixed(1)}W remaining
-                          </div>
-                        </>
-                      ) : (
-                        <p className="text-[#4a5a6a] text-xs">
-                          Add <span className="text-white font-mono">power_watts</span> to this product in SuperAdmin to enable budget tracking.
-                        </p>
-                      )}
-                      {connectedDevices.length > 0 ? (
-                        <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] divide-y divide-[#2a3d55]/50">
-                          {connectedDevices.map(d => (
-                            <div key={d.id} className="flex justify-between px-2.5 py-1.5 text-xs">
-                              <span className="text-[#8A9AB0] truncate">{d.device_address || d.global_products?.name || 'Device'}</span>
-                              <span className="text-white font-mono ml-2 flex-shrink-0">
-                                {(d.watts_override ?? d.global_products?.specs?.power_watts ?? 0)}W
+                    <>
+                      <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Power Supply</p>
+                      <div className="space-y-2">
+                        {supply > 0 ? (
+                          <>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-[#8A9AB0]">Supplies</span>
+                              <span className="text-white font-mono">{supply}W total</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-[#8A9AB0]">Devices draw</span>
+                              <span className={`font-mono font-semibold ${overBudget ? 'text-red-400' : nearBudget ? 'text-yellow-400' : 'text-green-400'}`}>
+                                {drawn.toFixed(1)}W
                               </span>
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-[#4a5a6a] text-xs">No devices assigned yet — select a device and set "Powered by" to this switch.</p>
-                      )}
-                    </div>
+                            <div className="w-full bg-[#2a3d55] rounded-full h-1.5">
+                              <div
+                                className={`h-1.5 rounded-full transition-all ${overBudget ? 'bg-red-400' : nearBudget ? 'bg-yellow-400' : 'bg-green-400'}`}
+                                style={{ width: `${Math.min(100, pct)}%` }}
+                              />
+                            </div>
+                            {overBudget && (
+                              <p className="text-red-400 text-xs font-medium">
+                                Over capacity by {(drawn - supply).toFixed(1)}W
+                              </p>
+                            )}
+                            <div className="text-right text-xs text-[#4a5a6a]">
+                              {(supply - drawn).toFixed(1)}W available
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-[#4a5a6a] text-xs">
+                            Set <span className="text-white font-mono">power_watts</span> on this product in SuperAdmin to track supply capacity.
+                          </p>
+                        )}
+                        {connectedDevices.length > 0 ? (
+                          <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] divide-y divide-[#2a3d55]/50">
+                            {connectedDevices.map(d => (
+                              <div key={d.id} className="flex justify-between px-2.5 py-1.5 text-xs">
+                                <span className="text-[#8A9AB0] truncate">{d.device_address || d.global_products?.name || 'Device'}</span>
+                                <span className="text-yellow-400/80 font-mono ml-2 flex-shrink-0">
+                                  {(d.watts_override ?? d.global_products?.specs?.power_watts ?? 0)}W draw
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[#4a5a6a] text-xs">No devices assigned yet — open a device on this sheet and set "Powered by" to this switch.</p>
+                        )}
+                      </div>
+                    </>
                   )
                 })()
               ) : (
-                /* Device view: show draw + assign to switch */
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-[#8A9AB0]">Draw</span>
-                    <span className="text-yellow-400 font-mono font-semibold">
-                      {form.watts_override || product.specs?.power_watts
-                        ? `${form.watts_override || product.specs?.power_watts}W`
-                        : '—'}
-                    </span>
-                  </div>
-                  <div>
-                    <label className={labelClass}>Watts <span className="text-[#4a5a6a]">(override product default)</span></label>
-                    <input
-                      type="number" step="0.1" min="0"
-                      value={form.watts_override}
-                      onChange={e => update('watts_override', e.target.value)}
-                      placeholder={product.specs?.power_watts ? `Default: ${product.specs.power_watts}W` : 'e.g. 7.5'}
-                      className={`${inputClass} w-32`}
-                    />
-                  </div>
-                  {sheetSwitches.length > 0 && (
-                    <div>
-                      <label className={labelClass}>Powered by</label>
-                      <select
-                        value={form.switch_placement_id || ''}
-                        onChange={e => update('switch_placement_id', e.target.value || null)}
-                        className={inputClass}
-                      >
-                        <option value="">— Not assigned —</option>
-                        {sheetSwitches.map(sw => (
-                          <option key={sw.id} value={sw.id}>
-                            {sw.device_address
-                              ? `${sw.device_address} · ${sw.global_products?.name || sw.global_products?.category}`
-                              : sw.global_products?.name || sw.global_products?.category || 'Switch'}
-                          </option>
-                        ))}
-                      </select>
+                /* Device view (camera, reader, IoT): how much it draws + what powers it */
+                <>
+                  <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Power Draw</p>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-[#8A9AB0]">This device draws</span>
+                      <span className="text-yellow-400 font-mono font-semibold">
+                        {form.watts_override || product.specs?.power_watts
+                          ? `${form.watts_override || product.specs?.power_watts}W`
+                          : '—'}
+                      </span>
                     </div>
-                  )}
-                  {sheetSwitches.length === 0 && (
-                    <p className="text-[#4a5a6a] text-xs">Place a switch (Network, NVR, or UPS) on this sheet to assign power sources.</p>
-                  )}
-                </div>
+                    <div>
+                      <label className={labelClass}>Watts draw <span className="text-[#4a5a6a]">(override product default)</span></label>
+                      <input
+                        type="number" step="0.1" min="0"
+                        value={form.watts_override}
+                        onChange={e => update('watts_override', e.target.value)}
+                        placeholder={product.specs?.power_watts ? `Default: ${product.specs.power_watts}W` : 'e.g. 7.5'}
+                        className={`${inputClass} w-32`}
+                      />
+                    </div>
+                    {sheetSwitches.length > 0 && (
+                      <div>
+                        <label className={labelClass}>Powered by</label>
+                        <select
+                          value={form.switch_placement_id || ''}
+                          onChange={e => update('switch_placement_id', e.target.value || null)}
+                          className={inputClass}
+                        >
+                          <option value="">— Not assigned —</option>
+                          {sheetSwitches.map(sw => (
+                            <option key={sw.id} value={sw.id}>
+                              {sw.device_address
+                                ? `${sw.device_address} · ${sw.global_products?.name || sw.global_products?.category}`
+                                : sw.global_products?.name || sw.global_products?.category || 'Switch'}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {sheetSwitches.length === 0 && (
+                      <p className="text-[#4a5a6a] text-xs">Place a switch, NVR, or UPS on this sheet to assign a power source.</p>
+                    )}
+                  </div>
+                </>
               )}
             </div>
 

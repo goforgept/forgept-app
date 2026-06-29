@@ -1098,7 +1098,10 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                               const dx = e.target.x() - px, dy = e.target.y() - py
                               setDraggingFOV({ rotation, fov_angle: fovAngle, fov_range: pxToFt(Math.sqrt(dx*dx + dy*dy)) })
                             }}
-                            onDragEnd={async () => { if (draggingFOV) await commitFOV({ fov_range: draggingFOV.fov_range }) }}
+                            onDragEnd={(e) => {
+                              const dx = e.target.x() - px, dy = e.target.y() - py
+                              commitFOV({ fov_range: pxToFt(Math.sqrt(dx*dx + dy*dy)) })
+                            }}
                           />
                         )}
                       </Group>
@@ -1151,8 +1154,12 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                               const newRange = pxToFt(Math.sqrt(dx*dx + dy*dy))
                               setDraggingFOV(prev => ({ fov_angle: fovAngle, ...(prev||{}), rotation: newRot, fov_range: newRange }))
                             }}
-                            onDragEnd={async () => {
-                              if (draggingFOV) await commitFOV({ rotation: draggingFOV.rotation, fov_range: draggingFOV.fov_range })
+                            onDragEnd={(e) => {
+                              const dx = e.target.x() - px, dy = e.target.y() - py
+                              commitFOV({
+                                rotation: Math.round(Math.atan2(dy, dx) * 180 / Math.PI),
+                                fov_range: pxToFt(Math.sqrt(dx*dx + dy*dy)),
+                              })
                             }}
                           />
 
@@ -1171,8 +1178,12 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                               const newAngle = Math.max(10, Math.min(350, Math.round(Math.abs(diff) * 2)))
                               setDraggingFOV(prev => ({ rotation, fov_range: rangeInFeet, ...(prev||{}), fov_angle: newAngle }))
                             }}
-                            onDragEnd={async () => {
-                              if (draggingFOV) await commitFOV({ fov_angle: draggingFOV.fov_angle })
+                            onDragEnd={(e) => {
+                              const dx = e.target.x() - px, dy = e.target.y() - py
+                              let diff = (Math.atan2(dy, dx) * 180 / Math.PI) - rotation
+                              while (diff > 180) diff -= 360
+                              while (diff < -180) diff += 360
+                              commitFOV({ fov_angle: Math.max(10, Math.min(350, Math.round(Math.abs(diff) * 2))) })
                             }}
                           />
 
@@ -1191,8 +1202,12 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                               const newAngle = Math.max(10, Math.min(350, Math.round(Math.abs(diff) * 2)))
                               setDraggingFOV(prev => ({ rotation, fov_range: rangeInFeet, ...(prev||{}), fov_angle: newAngle }))
                             }}
-                            onDragEnd={async () => {
-                              if (draggingFOV) await commitFOV({ fov_angle: draggingFOV.fov_angle })
+                            onDragEnd={(e) => {
+                              const dx = e.target.x() - px, dy = e.target.y() - py
+                              let diff = (Math.atan2(dy, dx) * 180 / Math.PI) - rotation
+                              while (diff > 180) diff -= 360
+                              while (diff < -180) diff += 360
+                              commitFOV({ fov_angle: Math.max(10, Math.min(350, Math.round(Math.abs(diff) * 2))) })
                             }}
                           />
                         </>
