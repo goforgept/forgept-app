@@ -39,7 +39,7 @@ async function buildJWT(userId: string, userEmail: string, orgId: string): Promi
   const now = Math.floor(Date.now() / 1000)
   const payload = {
     aud: 'authenticated',
-    exp: now + 86400, // 24 hours
+    exp: now + 86400,
     iat: now,
     iss: `${Deno.env.get('SUPABASE_URL')}/auth/v1`,
     sub: userId,
@@ -80,7 +80,6 @@ Deno.serve(async (req) => {
   if (!keyRow?.is_active) return err('Invalid or revoked API key', 401)
   if (!keyRow.scopes.includes('embed:designer')) return err('This key does not have the embed:designer scope', 403)
 
-  // Verify org has feature_api enabled
   const { data: org } = await supabase
     .from('organizations')
     .select('feature_api, embed_user_id')
@@ -89,37 +88,97 @@ Deno.serve(async (req) => {
 
   if (!org?.feature_api) return err('API access is not enabled for this organization', 403)
 
-  // Update last_used
   supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRow.id)
 
-  let embedUserId = org.embed_user_id
-  const embedEmail = `embed_${keyRow.org_id}@forgept.internal`
-
-  // Create embed user if it doesn't exist yet
-  if (!embedUserId) {
-    const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
-      email: embedEmail,
-      email_confirm: true,
-      user_metadata: { embed_org_id: keyRow.org_id },
-    })
-
-    if (createErr || !newUser?.user) return err('Failed to create embed session user', 500)
-    embedUserId = newUser.user.id
-
-    // Create profile for embed user
-    await supabase.from('profiles').insert({
-      id:        embedUserId,
-      org_id:    keyRow.org_id,
-      org_role:  'rep',
-      full_name: 'Embed Session',
-      email:     embedEmail,
-    })
-
-    // Save embed_user_id on org
-    await supabase.from('organizations').update({ embed_user_id: embedUserId }).eq('id', keyRow.org_id)
+  // Parse body — optional user identity for per-user sessions
+  const body = await req.json().catch(() => ({})) as {
+    user?: { id: string; email?: string; name?: string }
   }
 
-  // Generate 24h JWT
+  let embedUserId: string
+  let embedEmail: string
+  let extUserId: string | null = null
+  let extEmail: string | null  = null
+  let extName: string | null   = null
+
+  if (body.user?.id) {
+    // Per-user session: create/retrieve a shadow account for this specific user
+    extUserId = String(body.user.id)
+    extEmail  = body.user.email ?? null
+    extName   = body.user.name  ?? null
+
+    // Deterministic synthetic email — avoids conflicts with real ForgePt accounts
+    const userHash = await sha256(keyRow.org_id + extUserId)
+    embedEmail = `embed_${userHash.slice(0, 16)}@forgept.internal`
+
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', embedEmail)
+      .single()
+
+    if (existingProfile) {
+      embedUserId = existingProfile.id
+    } else {
+      const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+        email: embedEmail,
+        email_confirm: true,
+        user_metadata: {
+          embed_org_id: keyRow.org_id,
+          ext_user_id:  extUserId,
+          ext_email:    extEmail,
+          ext_name:     extName,
+        },
+      })
+      if (createErr || !newUser?.user) return err('Failed to create embed user', 500)
+      embedUserId = newUser.user.id
+
+      await supabase.from('profiles').insert({
+        id:        embedUserId,
+        org_id:    keyRow.org_id,
+        org_role:  'embed',
+        full_name: extName || extEmail || 'Embed User',
+        email:     embedEmail,
+      })
+    }
+  } else {
+    // Shared session: fall back to one embed user per org (legacy / anonymous)
+    embedEmail = `embed_${keyRow.org_id}@forgept.internal`
+    let sharedUserId = org.embed_user_id
+
+    if (!sharedUserId) {
+      const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+        email: embedEmail,
+        email_confirm: true,
+        user_metadata: { embed_org_id: keyRow.org_id },
+      })
+      if (createErr || !newUser?.user) return err('Failed to create embed session user', 500)
+      sharedUserId = newUser.user.id
+
+      await supabase.from('profiles').insert({
+        id:        sharedUserId,
+        org_id:    keyRow.org_id,
+        org_role:  'embed',
+        full_name: 'Embed Session',
+        email:     embedEmail,
+      })
+
+      await supabase.from('organizations').update({ embed_user_id: sharedUserId }).eq('id', keyRow.org_id)
+    }
+
+    embedUserId = sharedUserId
+  }
+
+  // Log session for billing / analytics
+  await supabase.from('embed_sessions').insert({
+    org_id:      keyRow.org_id,
+    api_key_id:  keyRow.id,
+    profile_id:  embedUserId,
+    ext_user_id: extUserId,
+    ext_email:   extEmail,
+    ext_name:    extName,
+  })
+
   const access_token = await buildJWT(embedUserId, embedEmail, keyRow.org_id)
   const expires_at   = new Date(Date.now() + 86400 * 1000).toISOString()
 
@@ -127,6 +186,7 @@ Deno.serve(async (req) => {
     access_token,
     expires_at,
     org_id: keyRow.org_id,
+    user_id: embedUserId,
     note: 'Pass access_token to the iframe as ?session=<token>. Do not expose your API key in the browser.'
   })
 })

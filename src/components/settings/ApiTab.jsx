@@ -290,13 +290,23 @@ export default function ApiTab({ featureApi }) {
 Authorization: Bearer fpk_your_key_here
 Content-Type: application/json
 
+# Optional: pass your logged-in user so sessions are tracked per user
+{
+  "user": {
+    "id":    "your-internal-user-id",
+    "email": "user@example.com",
+    "name":  "Jane Smith"
+  }
+}
+
 # Response 200
 {
   "access_token": "eyJhbGciOiJIUzI1NiJ9...",
   "expires_at":   "2026-06-26T10:00:00.000Z",
-  "org_id":       "uuid"
+  "org_id":       "uuid",
+  "user_id":      "uuid"
 }`}</pre>
-              <p className="text-[#4a5d75] text-xs mt-1">Token is valid for 24 hours. Cache it server-side and reuse it — only regenerate when within ~5 min of expiry.</p>
+              <p className="text-[#4a5d75] text-xs mt-1">Passing <code className="text-[#C8622A]">user</code> creates a persistent per-user session — designs are saved to that user and you can track usage per integrator. Omit it for anonymous shared sessions. Token is valid for 24 hours; cache and reuse server-side.</p>
             </div>
 
             {/* Step 2 */}

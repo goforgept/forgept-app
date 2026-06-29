@@ -47,7 +47,8 @@ Deno.serve(async (req) => {
     if (!authorized) return unauth()
 
     const adminClient = createClient(supabaseUrl, serviceKey)
-    const [{ data: profiles, error }, { data: authUsers }, { data: saProfiles }, { data: roadmapItems }] = await Promise.all([
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const [{ data: profiles, error }, { data: authUsers }, { data: saProfiles }, { data: roadmapItems }, { data: embedSessions }] = await Promise.all([
       adminClient
         .from('profiles')
         .select('id, full_name, email, org_id, role, org_role, company_name, created_at, team_id, is_regional_vp, is_operations_manager')
@@ -57,6 +58,10 @@ Deno.serve(async (req) => {
       adminClient
         .from('roadmap_items')
         .select('*, requester:requested_by(full_name, email), org:org_id(company_name)')
+        .order('created_at', { ascending: false }),
+      adminClient
+        .from('embed_sessions')
+        .select('org_id, ext_user_id, ext_email, ext_name, created_at')
         .order('created_at', { ascending: false }),
     ])
 
@@ -77,7 +82,31 @@ Deno.serve(async (req) => {
       last_login: lastSignInMap[p.id] ?? null,
     }))
 
-    return new Response(JSON.stringify({ profiles: enriched, sa_users: enrichedSA, roadmap_items: roadmapItems || [] }), {
+    // Roll up embed sessions per org for billing view
+    const embedByOrg: Record<string, { sessions_total: number; sessions_30d: number; unique_users_total: number; unique_users_30d: number; last_session: string | null }> = {}
+    for (const s of (embedSessions || [])) {
+      if (!embedByOrg[s.org_id]) embedByOrg[s.org_id] = { sessions_total: 0, sessions_30d: 0, unique_users_total: 0, unique_users_30d: 0, last_session: null }
+      const e = embedByOrg[s.org_id]
+      e.sessions_total++
+      if (s.created_at >= thirtyDaysAgo) e.sessions_30d++
+      if (!e.last_session || s.created_at > e.last_session) e.last_session = s.created_at
+    }
+    // Unique user counts (by ext_user_id per org)
+    const userSets: Record<string, { all: Set<string>; month: Set<string> }> = {}
+    for (const s of (embedSessions || [])) {
+      if (!s.ext_user_id) continue
+      if (!userSets[s.org_id]) userSets[s.org_id] = { all: new Set(), month: new Set() }
+      userSets[s.org_id].all.add(s.ext_user_id)
+      if (s.created_at >= thirtyDaysAgo) userSets[s.org_id].month.add(s.ext_user_id)
+    }
+    for (const [orgId, sets] of Object.entries(userSets)) {
+      if (embedByOrg[orgId]) {
+        embedByOrg[orgId].unique_users_total = sets.all.size
+        embedByOrg[orgId].unique_users_30d   = sets.month.size
+      }
+    }
+
+    return new Response(JSON.stringify({ profiles: enriched, sa_users: enrichedSA, roadmap_items: roadmapItems || [], embed_usage: embedByOrg }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   } catch (err) {

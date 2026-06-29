@@ -53,6 +53,7 @@ export default function SuperAdmin() {
   const [saUsers, setSaUsers] = useState([])
   const [requests, setRequests] = useState([])
   const [roadmapItems, setRoadmapItems] = useState([])
+  const [embedUsage, setEmbedUsage] = useState({})
   const [loading, setLoading] = useState(true)
   const [activeTab,      setActiveTab]      = useState('requests')
   const [showImport,     setShowImport]     = useState(false)
@@ -155,6 +156,7 @@ export default function SuperAdmin() {
     setAllProposals(proposalsData || [])
     setAllClients(clientsData || [])
     setRoadmapItems(profilesResult?.data?.roadmap_items || [])
+    setEmbedUsage(profilesResult?.data?.embed_usage || {})
 
     const notesMap = {}
     for (const org of orgsResult) {
@@ -1169,7 +1171,7 @@ export default function SuperAdmin() {
       )}
 
       {/* ── API KEYS TAB ── */}
-      {activeTab === 'api' && <APIKeysPanel orgs={orgs} />}
+      {activeTab === 'api' && <APIKeysPanel orgs={orgs} embedUsage={embedUsage} />}
 
       {activeTab === 'sa_users' && (
         <div className="space-y-6">
@@ -1470,7 +1472,7 @@ function SAoadmapPanel({ items, orgs, onStatusChange, onDelete }) {
 }
 
 // ─── APIKeysPanel ─────────────────────────────────────────────────────────────
-function APIKeysPanel({ orgs }) {
+function APIKeysPanel({ orgs, embedUsage = {} }) {
   const [keys, setKeys] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -1578,6 +1580,57 @@ function APIKeysPanel({ orgs }) {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Embed Usage / Billing */}
+      {Object.keys(embedUsage).length > 0 && (
+        <div className="space-y-3">
+          <div>
+            <p className="text-white font-semibold text-sm">Embed Usage</p>
+            <p className="text-[#8A9AB0] text-xs mt-0.5">Unique users and sessions per org — use this for billing.</p>
+          </div>
+          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
+            <table className="w-full text-xs">
+              <thead className="bg-[#0F1C2E] border-b border-[#2a3d55]">
+                <tr>
+                  <th className="text-left px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Organization</th>
+                  <th className="text-right px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Unique Users (30d)</th>
+                  <th className="text-right px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Unique Users (all)</th>
+                  <th className="text-right px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Sessions (30d)</th>
+                  <th className="text-right px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Sessions (all)</th>
+                  <th className="text-right px-4 py-3 text-[#8A9AB0] font-semibold uppercase tracking-wide">Last Session</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#2a3d55]/50">
+                {Object.entries(embedUsage)
+                  .sort((a, b) => (b[1].sessions_30d - a[1].sessions_30d))
+                  .map(([orgId, stats]) => {
+                    const orgName = orgs.find(o => o.id === orgId)?.company_name || orgId.slice(0, 8) + '…'
+                    return (
+                      <tr key={orgId} className="hover:bg-[#0F1C2E]/50 transition-colors">
+                        <td className="px-4 py-3 text-white font-medium">{orgName}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`font-bold ${stats.unique_users_30d > 0 ? 'text-[#C8622A]' : 'text-[#4a5d75]'}`}>
+                            {stats.unique_users_30d}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-[#8A9AB0]">{stats.unique_users_total}</td>
+                        <td className="px-4 py-3 text-right">
+                          <span className={`font-bold ${stats.sessions_30d > 0 ? 'text-white' : 'text-[#4a5d75]'}`}>
+                            {stats.sessions_30d}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-[#8A9AB0]">{stats.sessions_total}</td>
+                        <td className="px-4 py-3 text-right text-[#8A9AB0]">
+                          {stats.last_session ? new Date(stats.last_session).toLocaleDateString() : '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
