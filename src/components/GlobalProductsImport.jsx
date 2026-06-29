@@ -76,11 +76,25 @@ const STYLE_CATEGORY_MAP = {
 
 // ─── Parse System Surveyor Excel ──────────────────────────────────────────────
 async function parseSystemSurveyorFile(file) {
-  const { read, utils } = await import('xlsx')
+  const ExcelJS   = (await import('exceljs')).default
   const buffer    = await file.arrayBuffer()
-  const workbook  = read(buffer)
-  const ws        = workbook.Sheets[workbook.SheetNames[0]]
-  const rawRows   = utils.sheet_to_json(ws, { header: 1, defval: null })
+  const workbook  = new ExcelJS.Workbook()
+  await workbook.xlsx.load(buffer)
+  const ws        = workbook.worksheets[0]
+  const rawRows   = []
+  ws.eachRow({ includeEmpty: true }, (row) => {
+    const values = []
+    for (let i = 1; i <= Math.max(row.cellCount, row.actualCellCount); i++) {
+      const cell = row.getCell(i)
+      let val = cell.value
+      if (val == null) val = null
+      else if (typeof val === 'object' && val.richText) val = val.richText.map(r => r.text).join('')
+      else if (typeof val === 'object' && val.result !== undefined) val = val.result
+      else if (typeof val === 'object' && val.text) val = val.text
+      values.push(val)
+    }
+    rawRows.push(values)
+  })
 
   // Search first 10 rows for the element type label instead of assuming a fixed cell
   let elementType = ''
