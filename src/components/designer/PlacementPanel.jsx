@@ -5,10 +5,8 @@ import ComponentsSection from './ComponentsSection'
 // Categories that act as power sources (provide PoE / power to other devices)
 const POE_SOURCE_CATEGORIES = ['Network', 'Network Switch', 'Switch', 'NVR', 'UPS', 'Panel', 'Controller', 'Rack', 'Power Supply']
 
-export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, currentSheetId, proposalId, allSheetIds, laborEnabled = false, laborDefaults = [] }) {
+export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, currentSheetId, proposalId, allSheetIds, laborEnabled = false, laborDefaults = [], sheetPlacements = [] }) {
   const [attachedRun,      setAttachedRun]      = useState(null)
-  const [sheetSwitches,    setSheetSwitches]    = useState([])
-  const [connectedDevices, setConnectedDevices] = useState([])
 
   useEffect(() => {
     const fetchRun = async () => {
@@ -24,37 +22,6 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
     fetchRun()
   }, [placement.id])
 
-  // Fetch power-related data for the current sheet
-  useEffect(() => {
-    const fetchPowerData = async () => {
-      if (!currentSheetId) return
-      const product = placement.global_products
-      const isPowerSource = POE_SOURCE_CATEGORIES.includes(product?.category)
-
-      // Always fetch switch placements so non-switch devices can assign to one
-      const { data: allPlacements } = await supabase
-        .from('drawing_placements')
-        .select('id, device_address, global_products(name, category, specs)')
-        .eq('drawing_sheet_id', currentSheetId)
-        .neq('id', placement.id)
-
-      const switches = (allPlacements || []).filter(p =>
-        POE_SOURCE_CATEGORIES.includes(p.global_products?.category) ||
-        p.global_products?.category?.toLowerCase().includes('switch')
-      )
-      setSheetSwitches(switches)
-
-      if (isPowerSource) {
-        const { data: connected } = await supabase
-          .from('drawing_placements')
-          .select('id, device_address, watts_override, global_products(name, category, specs)')
-          .eq('drawing_sheet_id', currentSheetId)
-          .eq('switch_placement_id', placement.id)
-        setConnectedDevices(connected || [])
-      }
-    }
-    fetchPowerData()
-  }, [placement.id, currentSheetId])
   if (!placement) return null
   const product = placement.global_products
   if (!product) return null
@@ -63,6 +30,21 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
     product.category?.toLowerCase().includes('switch') ||
     product.category?.toLowerCase().includes('network') ||
     product.name?.toLowerCase().includes('switch')
+
+  // Derived from live sheetPlacements prop — always in sync with the canvas
+  const sheetSwitches = sheetPlacements.filter(p => {
+    if (p.id === placement.id) return false
+    const cat  = p.global_products?.category?.toLowerCase() || ''
+    const name = p.global_products?.name?.toLowerCase() || ''
+    return POE_SOURCE_CATEGORIES.some(c => c.toLowerCase() === cat) ||
+      cat.includes('switch') || cat.includes('network') ||
+      name.includes('switch') || name.includes('nvr') || name.includes('ups')
+  })
+
+  // For power sources: which placements on the sheet claim this as their switch
+  const connectedDevicesDerivedDerived = isPowerSource
+    ? sheetPlacements.filter(p => p.switch_placement_id === placement.id)
+    : []
 
   const getInitialForm = (p) => ({
     device_address:         p.device_address         || '',
@@ -414,7 +396,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                 /* Power source view (switch, NVR, UPS): how much it supplies vs. how much is drawn */
                 (() => {
                   const supply = parseFloat(form.watts_override) || product.specs?.power_watts || 0
-                  const drawn  = connectedDevices.reduce((sum, d) =>
+                  const drawn  = connectedDevicesDerived.reduce((sum, d) =>
                     sum + (d.watts_override ?? d.global_products?.specs?.power_watts ?? 0), 0)
                   const pct        = supply > 0 ? (drawn / supply) * 100 : 0
                   const overBudget = supply > 0 && drawn > supply
@@ -463,9 +445,9 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                         ) : (
                           <p className="text-[#4a5a6a] text-xs">Enter supply capacity above to track budget.</p>
                         )}
-                        {connectedDevices.length > 0 ? (
+                        {connectedDevicesDerived.length > 0 ? (
                           <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] divide-y divide-[#2a3d55]/50">
-                            {connectedDevices.map(d => (
+                            {connectedDevicesDerived.map(d => (
                               <div key={d.id} className="flex justify-between px-2.5 py-1.5 text-xs">
                                 <span className="text-[#8A9AB0] truncate">{d.device_address || d.global_products?.name || 'Device'}</span>
                                 <span className="text-yellow-400/80 font-mono ml-2 flex-shrink-0">

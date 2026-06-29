@@ -28,6 +28,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const [error,           setError]           = useState(null)
   const [selectedSymbol,  setSelectedSymbol]  = useState(null)
   const [selectedPlacement, setSelectedPlacement] = useState(null)
+  const [sheetPlacements,   setSheetPlacements]   = useState([])
   const [selectedCable,     setSelectedCable]     = useState(null)
   const [editingCableId,    setEditingCableId]    = useState(null)
   const [updatedCable,      setUpdatedCable]      = useState(null)
@@ -623,6 +624,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                         orgId={orgId}
                         selectedSymbol={selectedSymbol}
                         onPlacementChange={() => {}}
+                        onPlacementsChange={setSheetPlacements}
                         onPlacementSelect={(p) => { setSelectedPlacement(p); setSelectedCable(null) }}
                         onPlacementUpdate={setSelectedPlacement}
                         updatedPlacement={selectedPlacement}
@@ -661,6 +663,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                           allSheetIds={sheets.map(s => s.id)}
                           laborEnabled={laborEnabled}
                           laborDefaults={laborDefaults}
+                          sheetPlacements={sheetPlacements}
                         />
                       )}
                       {selectedCable && (

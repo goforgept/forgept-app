@@ -61,7 +61,7 @@ const getNextLabel = async (category, sheetIds) => {
   return `${prefix}-${String(next).padStart(2, '0')}`
 }
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId }) {
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
 
@@ -236,10 +236,14 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       .select('*, global_products(id, name, part_number, manufacturer, category, specs, accessories)')
       .eq('drawing_sheet_id', sheet.id)
       .order('created_at')
-    if (data) setPlacements(data)
+    if (data) {
+      setPlacements(data)
+      onPlacementsChange?.(data)
+    }
   }, [sheet.id])
 
   useEffect(() => { loadPlacements() }, [loadPlacements, placementsRefreshKey ?? 0])
+  useEffect(() => { onPlacementsChange?.(placements) }, [placements])
 
   const loadCableRuns = useCallback(async () => {
     const { data } = await supabase
