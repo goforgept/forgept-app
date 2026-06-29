@@ -318,6 +318,7 @@ export default function SuperAdmin() {
       feature_spec_reader:    org.feature_spec_reader    || false,
       feature_drawing_reader: org.feature_drawing_reader || false,
       feature_api:            org.feature_api            || false,
+      feature_embed:          org.feature_embed          || false,
       feature_regions:        org.feature_regions        || false,
       designer_allowed_manufacturers: org.designer_allowed_manufacturers || null,
     })
@@ -339,6 +340,7 @@ export default function SuperAdmin() {
       feature_spec_reader:    orgForm.feature_spec_reader,
       feature_drawing_reader: orgForm.feature_drawing_reader,
       feature_api:            orgForm.feature_api,
+      feature_embed:          orgForm.feature_embed,
       feature_regions:        orgForm.feature_regions,
       designer_allowed_manufacturers: orgForm.designer_allowed_manufacturers?.length ? orgForm.designer_allowed_manufacturers : null,
     }).eq('id', orgId)
@@ -740,26 +742,35 @@ export default function SuperAdmin() {
                                 { key: 'feature_drawing_tool',   label: 'Designer',           group: 'Designer' },
                                 { key: 'feature_designer_only',  label: 'Designer Only Mode', group: 'Designer' },
                                 { key: 'feature_api',            label: 'API Access',         group: 'Other' },
+                                { key: 'feature_embed',          label: 'Embedded Designer',  group: 'Other', sub: true, requires: 'feature_api' },
                                 { key: 'feature_regions',        label: 'Regions',            group: 'Other' },
                               ].reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc }, {})
                             ).map(([group, flags]) => (
                               <div key={group}>
                                 <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">{group}</p>
                                 <div className="divide-y divide-[#2a3d55] border border-[#2a3d55] rounded-lg overflow-hidden">
-                                  {flags.map(flag => (
-                                    <div key={flag.key} className="flex items-center justify-between px-3 py-2.5 bg-[#0F1C2E]">
-                                      <span className="text-white text-sm">{flag.label}</span>
-                                      <button
-                                        onClick={() => setOrgForm(p => {
-                                          const next = { ...p, [flag.key]: !p[flag.key] }
-                                          if (flag.key === 'feature_designer_only' && !p.feature_designer_only) next.feature_drawing_tool = true
-                                          return next
-                                        })}
-                                        className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${orgForm[flag.key] ? 'bg-[#C8622A]' : 'bg-[#4B5563]'}`}>
-                                        <span className={`inline-block w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${orgForm[flag.key] ? 'translate-x-6' : 'translate-x-1'}`} />
-                                      </button>
-                                    </div>
-                                  ))}
+                                  {flags.map(flag => {
+                                    const locked = flag.requires && !orgForm[flag.requires]
+                                    return (
+                                      <div key={flag.key} className={`flex items-center justify-between py-2.5 bg-[#0F1C2E] ${flag.sub ? 'pl-7 pr-3 border-l-2 border-[#C8622A]/20' : 'px-3'}`}>
+                                        <div>
+                                          <span className={`text-sm ${locked ? 'text-[#4a5d75]' : 'text-white'}`}>{flag.label}</span>
+                                          {flag.sub && locked && <p className="text-[#4a5d75] text-xs mt-0.5">Requires API Access</p>}
+                                        </div>
+                                        <button
+                                          disabled={locked}
+                                          onClick={() => setOrgForm(p => {
+                                            const next = { ...p, [flag.key]: !p[flag.key] }
+                                            if (flag.key === 'feature_designer_only' && !p.feature_designer_only) next.feature_drawing_tool = true
+                                            if (flag.key === 'feature_api' && p.feature_api) next.feature_embed = false
+                                            return next
+                                          })}
+                                          className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${orgForm[flag.key] ? 'bg-[#C8622A]' : 'bg-[#4B5563]'}`}>
+                                          <span className={`inline-block w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${orgForm[flag.key] ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                      </div>
+                                    )
+                                  })}
                                 </div>
                               </div>
                             ))}

@@ -82,11 +82,12 @@ Deno.serve(async (req) => {
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('feature_api, embed_user_id')
+    .select('feature_api, feature_embed, embed_user_id')
     .eq('id', keyRow.org_id)
     .single()
 
-  if (!org?.feature_api) return err('API access is not enabled for this organization', 403)
+  if (!org?.feature_api)  return err('API access is not enabled for this organization', 403)
+  if (!org?.feature_embed) return err('Embedded designer is not enabled for this organization', 403)
 
   supabase.from('api_keys').update({ last_used_at: new Date().toISOString() }).eq('id', keyRow.id)
 
