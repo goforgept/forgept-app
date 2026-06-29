@@ -276,26 +276,27 @@ Deno.serve(async (req) => {
       const totalCount = overdue.length + todayTasks.length
       if (totalCount === 0) continue
 
-      // Write notifications to DB for bell icon
-      const notificationsToInsert = []
+      // Write notifications to DB for bell icon (upsert on dedup_key to avoid duplicates)
+      const notificationsToUpsert = []
 
       for (const task of [...overdue, ...todayTasks]) {
-        notificationsToInsert.push({
+        notificationsToUpsert.push({
           org_id: rep.org_id,
           user_id: rep.id,
           type: 'task_due',
           title: task.due_date < todayStr ? `Overdue: ${task.title}` : `Due today: ${task.title}`,
           body: task.clients?.company ? `Related to ${task.clients.company}` : null,
           link: task.client_id ? `/client/${task.client_id}` : '/tasks',
-          read: false
+          read: false,
+          dedup_key: `task_due:${task.id}:${todayStr}`
         })
       }
 
-      if (notificationsToInsert.length > 0) {
+      if (notificationsToUpsert.length > 0) {
         await fetch(`${supabaseUrl}/rest/v1/notifications`, {
           method: 'POST',
-          headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
-          body: JSON.stringify(notificationsToInsert)
+          headers: { ...dbHeaders, 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
+          body: JSON.stringify(notificationsToUpsert)
         })
       }
 
