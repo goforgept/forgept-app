@@ -4,7 +4,7 @@
 -- Before running: set the two custom DB settings in Supabase Dashboard →
 --   Database → Configuration → set app.supabase_url and app.cron_secret
 -- OR run:
---   ALTER DATABASE postgres SET "app.supabase_url" = 'https://YOUR_PROJECT.supabase.co';
+--   ALTER DATABASE postgres SET "app.supabase_url" = 'https://qxypaepvmtmkhbssedki.supabase.co';
 --   ALTER DATABASE postgres SET "app.cron_secret"  = 'YOUR_CRON_SECRET_VALUE';
 
 SELECT cron.schedule(
