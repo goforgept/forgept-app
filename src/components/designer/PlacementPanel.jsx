@@ -59,7 +59,10 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
   const product = placement.global_products
   if (!product) return null
 
-  const isPowerSource = POE_SOURCE_CATEGORIES.includes(product.category)
+  const isPowerSource = POE_SOURCE_CATEGORIES.includes(product.category) ||
+    product.category?.toLowerCase().includes('switch') ||
+    product.category?.toLowerCase().includes('network') ||
+    product.name?.toLowerCase().includes('switch')
 
   const getInitialForm = (p) => ({
     device_address:         p.device_address         || '',

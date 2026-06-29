@@ -1162,16 +1162,14 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                             onDragMove={(e) => {
                               e.cancelBubble = true
                               const dx = e.target.x() - px, dy = e.target.y() - py
-                              const newRot = Math.round(Math.atan2(dy, dx) * 180 / Math.PI)
+                              const newRot = ((Math.round(Math.atan2(dy, dx) * 180 / Math.PI) % 360) + 360) % 360
                               const newRange = pxToFt(Math.sqrt(dx*dx + dy*dy))
                               setDraggingFOV(prev => ({ fov_angle: fovAngle, ...(prev||{}), rotation: newRot, fov_range: newRange }))
                             }}
                             onDragEnd={(e) => {
                               const dx = e.target.x() - px, dy = e.target.y() - py
-                              commitFOV({
-                                rotation: Math.round(Math.atan2(dy, dx) * 180 / Math.PI),
-                                fov_range: pxToFt(Math.sqrt(dx*dx + dy*dy)),
-                              })
+                              const rot = ((Math.round(Math.atan2(dy, dx) * 180 / Math.PI) % 360) + 360) % 360
+                              commitFOV({ rotation: rot, fov_range: pxToFt(Math.sqrt(dx*dx + dy*dy)) })
                             }}
                           />
 
