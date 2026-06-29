@@ -413,8 +413,8 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
               {isPowerSource ? (
                 /* Power source view (switch, NVR, UPS): how much it supplies vs. how much is drawn */
                 (() => {
-                  const supply   = product.specs?.power_watts || 0
-                  const drawn    = connectedDevices.reduce((sum, d) =>
+                  const supply = parseFloat(form.watts_override) || product.specs?.power_watts || 0
+                  const drawn  = connectedDevices.reduce((sum, d) =>
                     sum + (d.watts_override ?? d.global_products?.specs?.power_watts ?? 0), 0)
                   const pct        = supply > 0 ? (drawn / supply) * 100 : 0
                   const overBudget = supply > 0 && drawn > supply
@@ -423,16 +423,26 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                     <>
                       <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Power Supply</p>
                       <div className="space-y-2">
+                        <div>
+                          <label className={labelClass}>
+                            Supply capacity (W)
+                            {product.specs?.power_watts && !form.watts_override &&
+                              <span className="text-[#4a5a6a] ml-1">— from product default</span>}
+                          </label>
+                          <input
+                            type="number" step="1" min="0"
+                            value={form.watts_override}
+                            onChange={e => update('watts_override', e.target.value)}
+                            placeholder={product.specs?.power_watts ? `${product.specs.power_watts}W` : 'e.g. 370'}
+                            className={`${inputClass} w-32`}
+                          />
+                        </div>
                         {supply > 0 ? (
                           <>
                             <div className="flex justify-between text-xs">
-                              <span className="text-[#8A9AB0]">Supplies</span>
-                              <span className="text-white font-mono">{supply}W total</span>
-                            </div>
-                            <div className="flex justify-between text-xs">
                               <span className="text-[#8A9AB0]">Devices draw</span>
                               <span className={`font-mono font-semibold ${overBudget ? 'text-red-400' : nearBudget ? 'text-yellow-400' : 'text-green-400'}`}>
-                                {drawn.toFixed(1)}W
+                                {drawn.toFixed(1)}W / {supply}W
                               </span>
                             </div>
                             <div className="w-full bg-[#2a3d55] rounded-full h-1.5">
@@ -451,9 +461,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                             </div>
                           </>
                         ) : (
-                          <p className="text-[#4a5a6a] text-xs">
-                            Set <span className="text-white font-mono">power_watts</span> on this product in SuperAdmin to track supply capacity.
-                          </p>
+                          <p className="text-[#4a5a6a] text-xs">Enter supply capacity above to track budget.</p>
                         )}
                         {connectedDevices.length > 0 ? (
                           <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] divide-y divide-[#2a3d55]/50">
@@ -467,7 +475,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                             ))}
                           </div>
                         ) : (
-                          <p className="text-[#4a5a6a] text-xs">No devices assigned yet — open a device on this sheet and set "Powered by" to this switch.</p>
+                          <p className="text-[#4a5a6a] text-xs">No devices assigned yet — open a device and set "Powered by" to this switch.</p>
                         )}
                       </div>
                     </>
