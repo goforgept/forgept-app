@@ -139,6 +139,8 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
   const [includeComponents, setIncludeComponents] = useState(true)
   const [sourceComponents,  setSourceComponents]  = useState([])
   const saveTimer = useRef(null)
+  const formRef   = useRef(form)
+  useEffect(() => { formRef.current = form }, [form])
 
   // Only these fields have visible impact on the canvas marker — all others are text-only
   const VISUAL_FIELDS = new Set(['symbol_size', 'rotation', 'marker_color', 'fov_angle', 'fov_range', 'device_address'])
@@ -148,34 +150,36 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
     setForm(updated)
     if (VISUAL_FIELDS.has(field)) onUpdate?.({ ...placement, ...updated })
 
-    // Debounced auto-save — outside setForm so timer persists correctly
+    // Debounced auto-save — reads from formRef so it always saves the latest values,
+    // even if the canvas (commitFOV) updated rotation/fov fields after this timer was set.
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
+      const f = formRef.current
       const { error } = await supabase.from('drawing_placements').update({
-        device_address:        updated.device_address        || null,
-        part_number_override:  updated.part_number_override  || null,
-        manufacturer_override: updated.manufacturer_override || null,
-        description_override:  updated.description_override  || null,
-        notes:                 updated.notes                 || null,
-        quantity:              parseInt(updated.quantity)    || 1,
-        symbol_size:           parseInt(updated.symbol_size) || 32,
-          rotation:              parseInt(updated.rotation) || 0,
-          marker_color:          updated.marker_color || '#C8622A',
-          runs_to_sheet_id:      updated.runs_to_sheet_id || null,
-          runs_to_label:         updated.runs_to_label || null,
-          rise_height:           updated.rise_height ? parseFloat(updated.rise_height) : null,
-          rise_cable_type:       updated.rise_cable_type || null,
-          fov_angle:             updated.fov_angle ? parseInt(updated.fov_angle) : null,
-          fov_range:             updated.fov_range ? parseInt(updated.fov_range) : null,
-        serial_number:         updated.serial_number         || null,
-        ip_address:            updated.ip_address            || null,
-        mac_address:           updated.mac_address           || null,
-        switch_name:           updated.switch_name           || null,
-        switch_port:           updated.switch_port           || null,
-        patch_panel_label:     updated.patch_panel_label     || null,
-        labor_overrides: Object.keys(updated.labor_overrides || {}).length > 0 ? updated.labor_overrides : null,
-        switch_placement_id:   updated.switch_placement_id   || null,
-        watts_override:        updated.watts_override ? parseFloat(updated.watts_override) : null,
+        device_address:        f.device_address        || null,
+        part_number_override:  f.part_number_override  || null,
+        manufacturer_override: f.manufacturer_override || null,
+        description_override:  f.description_override  || null,
+        notes:                 f.notes                 || null,
+        quantity:              parseInt(f.quantity)    || 1,
+        symbol_size:           parseInt(f.symbol_size) || 32,
+          rotation:              parseInt(f.rotation) || 0,
+          marker_color:          f.marker_color || '#C8622A',
+          runs_to_sheet_id:      f.runs_to_sheet_id || null,
+          runs_to_label:         f.runs_to_label || null,
+          rise_height:           f.rise_height ? parseFloat(f.rise_height) : null,
+          rise_cable_type:       f.rise_cable_type || null,
+          fov_angle:             f.fov_angle ? parseInt(f.fov_angle) : null,
+          fov_range:             f.fov_range ? parseInt(f.fov_range) : null,
+        serial_number:         f.serial_number         || null,
+        ip_address:            f.ip_address            || null,
+        mac_address:           f.mac_address           || null,
+        switch_name:           f.switch_name           || null,
+        switch_port:           f.switch_port           || null,
+        patch_panel_label:     f.patch_panel_label     || null,
+        labor_overrides: Object.keys(f.labor_overrides || {}).length > 0 ? f.labor_overrides : null,
+        switch_placement_id:   f.switch_placement_id   || null,
+        watts_override:        f.watts_override ? parseFloat(f.watts_override) : null,
       }).eq('id', placement.id)
       if (!error) {
         setSaved(true)

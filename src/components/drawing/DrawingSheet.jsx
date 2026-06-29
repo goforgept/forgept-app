@@ -61,7 +61,7 @@ const getNextLabel = async (category, sheetIds) => {
   return `${prefix}-${String(next).padStart(2, '0')}`
 }
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey }) {
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
 
@@ -386,13 +386,24 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   }, [deletedCableId])
 
   // ── Realtime ───────────────────────────────────────────────────────────────
+  // Track which placement is open in the panel — realtime events for that row
+  // are suppressed while the panel owns its form state.
+  const suppressRealtimeFor = useRef(openPlacementId)
+  useEffect(() => { suppressRealtimeFor.current = openPlacementId }, [openPlacementId])
+
   useEffect(() => {
     const channel = supabase
       .channel(`placements_${sheet.id}`)
       .on('postgres_changes', {
         event: '*', schema: 'public', table: 'drawing_placements',
         filter: `drawing_sheet_id=eq.${sheet.id}`,
-      }, () => loadPlacements())
+      }, (payload) => {
+        const changedId = payload.new?.id || payload.old?.id
+        // Skip reload if the changed row is the one currently open in the panel —
+        // the panel owns that row's state while it's open.
+        if (changedId && changedId === suppressRealtimeFor.current) return
+        loadPlacements()
+      })
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [sheet.id, loadPlacements])
