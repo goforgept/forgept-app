@@ -14,8 +14,9 @@ import EmailTemplatesTab from '../components/settings/EmailTemplatesTab'
 import TeamSettingsTab from '../components/settings/TeamSettingsTab'
 import ApiTab from '../components/settings/ApiTab'
 import RegionsTab from '../components/settings/RegionsTab'
+import GlobalProductsImport from '../components/GlobalProductsImport'
 
-export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, featureDesignerOnly = false, featureApi = false, role, isSalesManager, isPM, isTechnician }) {
+export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, featureDesignerOnly = false, featureApi = false, role, isSalesManager, isPM, isTechnician, isDevTeam = false }) {
   const { profile } = useProfile()
   const [activeTab, setActiveTab] = useState('general')
   const [laborRates, setLaborRates] = useState([])
@@ -393,6 +394,13 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       ]
     }] : []),
     ...(isAdmin ? [{ items: [{ key: 'designer', label: 'Designer' }, { key: 'regions', label: 'Regions' }, { key: 'api', label: 'API' }] }] : []),
+    ...(isDevTeam && !isAdmin ? [{
+      label: 'Developer',
+      items: [
+        { key: 'api',     label: 'API Keys' },
+        { key: 'catalog', label: 'Product Catalog' },
+      ]
+    }] : []),
     ...(featureDesignerOnly ? [{ label: 'Team', items: [{ key: 'team', label: 'Team' }] }] : []),
     { items: [{ key: 'feedback', label: 'Request a Feature' }] },
   ]
@@ -478,7 +486,15 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           {activeTab === 'designer' && isAdmin && <DesignerTab />}
 
           {activeTab === 'regions' && isAdmin && <RegionsTab regionsEnabled={regionsEnabled} setRegionsEnabled={setRegionsEnabled} />}
-          {activeTab === 'api' && isAdmin && <ApiTab featureApi={featureApi} />}
+          {activeTab === 'api' && (isAdmin || isDevTeam) && <ApiTab featureApi={featureApi} />}
+
+          {activeTab === 'catalog' && isDevTeam && !isAdmin && (
+            <div className="p-6">
+              <h2 className="text-white text-lg font-bold mb-1">Product Catalog</h2>
+              <p className="text-[#8A9AB0] text-sm mb-6">Upload or manage your global product library used in embedded sessions.</p>
+              <GlobalProductsImport />
+            </div>
+          )}
 
           {activeTab === 'data' && isAdmin && (
             <DataImportTab
