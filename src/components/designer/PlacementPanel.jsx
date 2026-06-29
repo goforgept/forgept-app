@@ -3,7 +3,7 @@ import { supabase } from '../../supabase'
 import ComponentsSection from './ComponentsSection'
 
 // Categories that act as power sources (provide PoE / power to other devices)
-const POE_SOURCE_CATEGORIES = ['Network', 'NVR', 'UPS', 'Panel', 'Controller', 'Rack']
+const POE_SOURCE_CATEGORIES = ['Network', 'Network Switch', 'Switch', 'NVR', 'UPS', 'Panel', 'Controller', 'Rack', 'Power Supply']
 
 export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, currentSheetId, proposalId, allSheetIds, laborEnabled = false, laborDefaults = [] }) {
   const [attachedRun,      setAttachedRun]      = useState(null)
@@ -39,7 +39,8 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
         .neq('id', placement.id)
 
       const switches = (allPlacements || []).filter(p =>
-        POE_SOURCE_CATEGORIES.includes(p.global_products?.category)
+        POE_SOURCE_CATEGORIES.includes(p.global_products?.category) ||
+        p.global_products?.category?.toLowerCase().includes('switch')
       )
       setSheetSwitches(switches)
 
@@ -90,14 +91,17 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
 
   const [form, setForm] = useState(() => getInitialForm(placement))
 
-  // When the canvas commits a FOV drag, sync those fields back without resetting the whole form
+  // When the canvas commits a FOV drag, sync those fields back without resetting the whole form.
+  // Also patch formRef immediately so any pending auto-save timer reads the correct values
+  // instead of the stale snapshot captured in its closure.
   useEffect(() => {
-    setForm(prev => ({
-      ...prev,
+    const patch = {
       rotation:  placement.rotation  ?? 0,
       fov_angle: placement.fov_angle ?? null,
       fov_range: placement.fov_range ?? null,
-    }))
+    }
+    formRef.current = { ...formRef.current, ...patch }
+    setForm(prev => ({ ...prev, ...patch }))
   }, [placement.rotation, placement.fov_angle, placement.fov_range])
 
   useEffect(() => {

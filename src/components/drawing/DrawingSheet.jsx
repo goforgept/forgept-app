@@ -1084,7 +1084,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
                   // Commit drag values to DB and update local state
                   const commitFOV = async (updates) => {
-                    await supabase.from('drawing_placements').update(updates).eq('id', placement.id)
+                    const { error } = await supabase.from('drawing_placements').update(updates).eq('id', placement.id)
+                    if (error) { console.error('commitFOV save failed:', error); return }
                     setPlacements(prev => prev.map(p => p.id === placement.id ? { ...p, ...updates } : p))
                     onPlacementSelect?.({ ...placement, ...updates })
                     setDraggingFOV(null)
