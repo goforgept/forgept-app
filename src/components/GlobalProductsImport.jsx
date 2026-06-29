@@ -372,6 +372,18 @@ function dedupeByPartNumber(products) {
 }
 
 // ─── GlobalProductsImport component ──────────────────────────────────────────
+const ALL_CATEGORIES = [
+  'Dome Camera','Bullet Camera','PTZ Camera','Fisheye Camera','Multi Sensor Camera','Indoor Camera',
+  'Access Reader','Access Control Door','Controller','Intercom','Wireless Lock','Door Operator',
+  'PIR Detector','Door Contact','Glass Break','Alarm Keypad','Alarm Panel','Interior Siren',
+  'Exterior Siren','Panic Button','Shock Sensor','Dual Tech Detector','Motion Sensor',
+  'Projector','Projection Screen','Ceiling Speaker','Subwoofer','Microphone','Wireless Mic',
+  'Touch Panel','Control Processor','Video Conference','Media Player','HDMI Extender',
+  'AV Receiver','Digital Signage','Display','Document Camera','Streaming Encoder','Wall Plate','Clock',
+  'NVR','Network','Sensor','Smoke Detector','Horn Strobe','Heat Detector','Pull Station','FACP',
+  'Power Supply','UPS','Rack','Panel',
+].sort()
+
 export default function GlobalProductsImport({ onClose, onImported }) {
   const fileRef = useRef(null)
   const [step,       setStep]       = useState('upload') // upload | preview | importing | done
@@ -379,11 +391,17 @@ export default function GlobalProductsImport({ onClose, onImported }) {
   const [error,      setError]      = useState(null)
   const [importing,  setImporting]  = useState(false)
   const [progress,   setProgress]   = useState(0)
+  const [edits,      setEdits]      = useState({}) // part_number → field overrides
   const [imported,   setImported]   = useState(0)
   const [skipped,    setSkipped]    = useState(0)
   const [selected,   setSelected]   = useState(new Set())
   const [fileType,   setFileType]   = useState(null) // 'ss' | 'csv'
   const [isDragging, setIsDragging] = useState(false)
+
+  const patchEdit = (partNumber, field, value) =>
+    setEdits(prev => ({ ...prev, [partNumber]: { ...(prev[partNumber] || {}), [field]: value } }))
+
+  const getField = (p, field) => edits[p.part_number]?.[field] ?? p[field]
 
   const processFile = useCallback(async (file) => {
     if (!file) return
@@ -402,6 +420,7 @@ export default function GlobalProductsImport({ onClose, onImported }) {
 
       setParsed(result)
       setSelected(new Set(result.products.map(p => p.part_number)))
+      setEdits({})
       setStep('preview')
     } catch (err) {
       setError(`Failed to parse file: ${err.message}`)
@@ -436,7 +455,10 @@ export default function GlobalProductsImport({ onClose, onImported }) {
 
     const toImport = parsed.products
       .filter(p => selected.has(p.part_number))
-      .map(p => ({ ...p, part_number: p.part_number.toUpperCase().trim() }))
+      .map(p => {
+        const override = edits[p.part_number] || {}
+        return { ...p, ...override, part_number: p.part_number.toUpperCase().trim() }
+      })
     let importedCount = 0
     let skippedCount  = 0
     const BATCH = 50
@@ -685,22 +707,43 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
                   <tbody className="divide-y divide-[#2a3d55]/50">
                     {parsed.products.map(p => (
                       <tr key={p.part_number}
-                        onClick={() => toggleOne(p.part_number)}
-                        className={`cursor-pointer transition-colors ${
+                        className={`transition-colors ${
                           selected.has(p.part_number) ? 'bg-[#C8622A]/5' : 'hover:bg-[#1a2d45]/50'
                         }`}>
                         <td className="px-3 py-2 text-center">
                           <input type="checkbox" checked={selected.has(p.part_number)}
                             onChange={() => toggleOne(p.part_number)}
-                            className="accent-[#C8622A]" onClick={e => e.stopPropagation()}/>
+                            className="accent-[#C8622A]"/>
                         </td>
                         <td className="px-3 py-2 font-mono text-[#C8622A] whitespace-nowrap">{p.part_number}</td>
-                        <td className="px-3 py-2 text-white max-w-xs">
-                          <div className="truncate">{p.name}</div>
+                        <td className="px-2 py-1 text-white max-w-xs">
+                          <input
+                            value={getField(p, 'name')}
+                            onChange={e => patchEdit(p.part_number, 'name', e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            className="w-full bg-transparent border border-transparent hover:border-[#2a3d55] focus:border-[#C8622A] focus:bg-[#1a2d45] rounded px-1 py-0.5 text-xs outline-none transition-colors"
+                          />
                         </td>
-                        <td className="px-3 py-2 text-[#8A9AB0] whitespace-nowrap">{p.manufacturer}</td>
-                        <td className="px-3 py-2">
-                          <span className="px-2 py-0.5 rounded-full bg-[#2a3d55] text-[#8A9AB0] whitespace-nowrap">{p.category}</span>
+                        <td className="px-2 py-1 whitespace-nowrap">
+                          <input
+                            value={getField(p, 'manufacturer')}
+                            onChange={e => patchEdit(p.part_number, 'manufacturer', e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            className="w-full bg-transparent border border-transparent hover:border-[#2a3d55] focus:border-[#C8622A] focus:bg-[#1a2d45] rounded px-1 py-0.5 text-xs text-[#8A9AB0] outline-none transition-colors"
+                          />
+                        </td>
+                        <td className="px-2 py-1">
+                          <select
+                            value={getField(p, 'category')}
+                            onChange={e => patchEdit(p.part_number, 'category', e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            className="bg-[#1a2d45] border border-[#2a3d55] focus:border-[#C8622A] text-[#8A9AB0] rounded px-1 py-0.5 text-xs outline-none cursor-pointer w-full"
+                          >
+                            {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            {!ALL_CATEGORIES.includes(getField(p, 'category')) && (
+                              <option value={getField(p, 'category')}>{getField(p, 'category')}</option>
+                            )}
+                          </select>
                         </td>
                         <td className="px-3 py-2 text-[#8A9AB0] capitalize">{p.industry?.replace('_', ' ')}</td>
                         <td className="px-3 py-2 text-center text-[#8A9AB0]">

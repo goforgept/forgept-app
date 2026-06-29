@@ -926,6 +926,21 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       </div>
 
       {/* Canvas */}
+      {/* Scale-not-set banner */}
+      {!scaleRatio && (
+        <div className="flex items-center justify-between px-3 py-1.5 bg-yellow-900/30 border-b border-yellow-700/50 flex-shrink-0">
+          <span className="text-yellow-400 text-xs">
+            No scale set — FOV distances are estimates. Calibrate for accurate measurements.
+          </span>
+          <button
+            onClick={() => setShowScaleModal(true)}
+            className="text-xs font-medium text-yellow-300 hover:text-white underline underline-offset-2 ml-3 flex-shrink-0"
+          >
+            Set Scale
+          </button>
+        </div>
+      )}
+
       <div ref={containerRef} className="flex-1 overflow-hidden bg-[#060f1c] relative"
         style={{ cursor: pickingPoint ? 'crosshair' : selectedSymbol ? 'crosshair' : 'grab' }}
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
