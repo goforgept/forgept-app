@@ -532,30 +532,45 @@ export default function Reports(props) {
 
   const exportExcel = () => {
     const wb = XLSX.utils.book_new()
-    const filename = `ForgePt_${reportLabel.replace(/ /g, '_')}_${today()}.xlsx`
+    const prefix = branded && profile?.company_name ? profile.company_name.replace(/[^a-z0-9]/gi, '_') : 'ForgePt'
+    const filename = `${prefix}_${reportLabel.replace(/ /g, '_')}_${today()}.xlsx`
+
+    const brandHeader = branded && profile?.company_name ? [
+      [profile.company_name],
+      [reportLabel],
+      [`Generated ${new Date().toLocaleDateString()}${noDate ? '' : `  ·  ${dateFrom || ''} – ${dateTo || ''}`}`],
+      [],
+    ] : []
 
     if (activeReport === 'vendor_spend') {
       const filtered = vendorSearch
         ? data.filter(r => r['Vendor'].toLowerCase().includes(vendorSearch.toLowerCase()))
         : data
-      const ws1 = XLSX.utils.json_to_sheet(filtered)
+      const ws1 = XLSX.utils.aoa_to_sheet([
+        ...brandHeader,
+        columns,
+        ...filtered.map(row => columns.map(c => row[c]))
+      ])
       XLSX.utils.book_append_sheet(wb, ws1, 'Vendor Summary')
 
-      // Line items grouped by vendor — matches PDF layout
       const aoa = [['Manufacturer', 'Item', 'SKU', 'Category', 'Qty', 'Total Cost', 'Total Revenue']]
       for (const row of filtered) {
         const items = vendorLineItems[row['Vendor']] || []
         if (!items.length) continue
-        aoa.push([row['Vendor'], '', '', '', '', '', '']) // vendor header row
+        aoa.push([row['Vendor'], '', '', '', '', '', ''])
         for (const item of items) {
           aoa.push(['', item.name, item.sku, item.category, item.qty, item.cost, item.revenue])
         }
-        aoa.push([]) // blank row between vendors
+        aoa.push([])
       }
       const ws2 = XLSX.utils.aoa_to_sheet(aoa.length > 1 ? aoa : [['No line items']])
       XLSX.utils.book_append_sheet(wb, ws2, 'Line Items')
     } else {
-      const ws = XLSX.utils.json_to_sheet(data)
+      const ws = XLSX.utils.aoa_to_sheet([
+        ...brandHeader,
+        columns,
+        ...data.map(row => columns.map(c => row[c]))
+      ])
       XLSX.utils.book_append_sheet(wb, ws, reportLabel)
     }
     XLSX.writeFile(wb, filename)
