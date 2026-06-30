@@ -1,0 +1,1 @@
+ALTER TABLE drawing_sheets ADD COLUMN IF NOT EXISTS bg_rotation int NOT NULL DEFAULT 0;

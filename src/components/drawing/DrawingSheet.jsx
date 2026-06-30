@@ -129,6 +129,9 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     return `1" = ${feetPerInch}ft`
   }
 
+  const [bgRotation,      setBgRotation]      = useState(sheet.bg_rotation ?? 0)
+  const rawBgImageRef = useRef(null) // unrotated original
+
   // Local copy of scale_ratio so it updates immediately after calibration
   // without waiting for the parent to re-fetch the sheet from the DB.
   const [scaleRatio,      setScaleRatio]      = useState(sheet.scale_ratio ?? null)
@@ -207,13 +210,35 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     return pdf.numPages
   }
 
+  const applyBgRotation = (img, degrees) => {
+    if (!degrees || degrees % 360 === 0) return img
+    const canvas = document.createElement('canvas')
+    const ctx    = canvas.getContext('2d')
+    const swap   = degrees === 90 || degrees === 270
+    canvas.width  = swap ? img.naturalHeight || img.height : img.naturalWidth  || img.width
+    canvas.height = swap ? img.naturalWidth  || img.width  : img.naturalHeight || img.height
+    ctx.translate(canvas.width / 2, canvas.height / 2)
+    ctx.rotate((degrees * Math.PI) / 180)
+    ctx.drawImage(img, -(img.naturalWidth || img.width) / 2, -(img.naturalHeight || img.height) / 2)
+    const rotated  = new window.Image()
+    rotated.src    = canvas.toDataURL('image/png')
+    rotated.width  = canvas.width
+    rotated.height = canvas.height
+    rotated.naturalWidth  = canvas.width
+    rotated.naturalHeight = canvas.height
+    return rotated
+  }
+
   const loadImageFromUrl = (url) => new Promise((resolve, reject) => {
     const img = new window.Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
-      setBgImage(img)
-      setImageSize({ w: img.naturalWidth, h: img.naturalHeight })
-      fitToStage(img.naturalWidth, img.naturalHeight)
+      rawBgImageRef.current = img
+      const rot     = sheet.bg_rotation ?? 0
+      const rotated = applyBgRotation(img, rot)
+      setBgImage(rotated)
+      setImageSize({ w: rotated.width || img.naturalWidth, h: rotated.height || img.naturalHeight })
+      fitToStage(rotated.width || img.naturalWidth, rotated.height || img.naturalHeight)
       resolve()
     }
     img.onerror = reject
@@ -676,6 +701,19 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const zoomOut = () => setScale(s => Math.max(s * 0.8, 0.05))
   const zoomFit = () => bgImage ? fitToStage(imageSize.w, imageSize.h) : (setScale(1), setPosition({ x: 0, y: 0 }))
 
+  const rotateBg = async () => {
+    if (!rawBgImageRef.current) return
+    if (placements.length > 0 && !window.confirm('Rotating the floor plan will shift any devices already placed. Continue?')) return
+    const newRot = ((bgRotation + 90) % 360)
+    setBgRotation(newRot)
+    const rotated = applyBgRotation(rawBgImageRef.current, newRot)
+    const w = rotated.width, h = rotated.height
+    setBgImage(rotated)
+    setImageSize({ w, h })
+    fitToStage(w, h)
+    await supabase.from('drawing_sheets').update({ bg_rotation: newRot }).eq('id', sheet.id)
+  }
+
   // ── Save scale calibration ─────────────────────────────────────────────────
   const handleSetScale = async () => {
     let ratio = null
@@ -910,6 +948,14 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             </svg>
             {calibratedScale || 'Set Scale'}
           </button>
+          {bgImage && !isBlank && (
+            <button onClick={rotateBg} title="Rotate floor plan 90°"
+              className="w-7 h-7 flex items-center justify-center text-[#8A9AB0] hover:text-white rounded-lg hover:bg-[#0F1C2E] transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+            </button>
+          )}
           <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5">
             <button onClick={zoomOut} className="w-7 h-7 flex items-center justify-center text-[#8A9AB0] hover:text-white rounded transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4"/></svg>
