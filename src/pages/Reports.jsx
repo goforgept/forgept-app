@@ -525,6 +525,89 @@ export default function Reports(props) {
     setClientLoading(false)
   }
 
+  const exportClientPDF = async () => {
+    if (!clientReport || !selectedClient) return
+    const doc    = new jsPDF()
+    const pageW  = doc.internal.pageSize.getWidth()
+    const hexToRgb = (hex) => { const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex); return r ? [parseInt(r[1],16),parseInt(r[2],16),parseInt(r[3],16)] : [200,98,42] }
+    const accent = branded && profile?.primary_color ? hexToRgb(profile.primary_color) : [200, 98, 42]
+
+    // Header band
+    doc.setFillColor(...accent)
+    doc.rect(0, 0, pageW, 28, 'F')
+
+    if (branded && profile?.company_name) {
+      if (profile.logo_url) {
+        try {
+          const res = await fetch(profile.logo_url)
+          const blob = await res.blob()
+          const b64 = await new Promise(resolve => { const rd = new FileReader(); rd.onload = () => resolve(rd.result); rd.readAsDataURL(blob) })
+          doc.addImage(b64, 'PNG', 10, 4, 0, 20)
+        } catch { doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255); doc.text(profile.company_name, 14, 18) }
+      } else {
+        doc.setFontSize(13); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255); doc.text(profile.company_name, 14, 18)
+      }
+    } else {
+      doc.setFontSize(14); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255); doc.text('ForgePt.', 14, 18)
+    }
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(255,255,255)
+    doc.text(`Client Report — ${selectedClient.label}`, pageW - 14, 12, { align: 'right' })
+    doc.text(`Generated ${new Date().toLocaleDateString()}`, pageW - 14, 22, { align: 'right' })
+
+    // Summary cards
+    let y = 38
+    doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40)
+    doc.text('Summary', 14, y); y += 6
+
+    const cards = [
+      ['Won Deals',      clientReport.summary.wonDeals,       fmt$(clientReport.summary.totalWonValue)],
+      ['Open Quotes',    clientReport.summary.openQuotes,     fmt$(clientReport.summary.totalOpenValue) + ' pipeline'],
+      ['Avg Margin',     `${clientReport.summary.avgMargin.toFixed(1)}%`, 'on won deals'],
+      ['Outstanding',    fmt$(clientReport.summary.totalOutstanding), 'unpaid invoices'],
+      ['Open Jobs',      clientReport.summary.openJobs,       ''],
+      ['Completed Jobs', clientReport.summary.closedJobs,     ''],
+      ['Open Tickets',   clientReport.summary.openTickets,    ''],
+    ]
+    const colW = (pageW - 28) / 4
+    cards.forEach(([label, val, sub], i) => {
+      const cx = 14 + (i % 4) * colW
+      const cy = y + Math.floor(i / 4) * 22
+      doc.setFillColor(245, 247, 250); doc.rect(cx, cy, colW - 3, 18, 'F')
+      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120)
+      doc.text(String(label).toUpperCase(), cx + 3, cy + 6)
+      doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40)
+      doc.text(String(val), cx + 3, cy + 13)
+      if (sub) { doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(150,150,150); doc.text(String(sub), cx + 3, cy + 17) }
+    })
+    y += Math.ceil(cards.length / 4) * 22 + 8
+
+    const tableOpts = { headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold', fontSize: 8 }, bodyStyles: { fontSize: 8, textColor: 40 }, alternateRowStyles: { fillColor: [245,247,250] }, margin: { left: 14, right: 14 } }
+
+    if (clientReport.proposals.length) {
+      doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40)
+      doc.text(`Proposals (${clientReport.proposals.length})`, 14, y); y += 3
+      const propCols = Object.keys(clientReport.proposals[0])
+      autoTable(doc, { startY: y, head: [propCols], body: clientReport.proposals.map(r => propCols.map(c => r[c])), ...tableOpts })
+      y = doc.lastAutoTable.finalY + 8
+    }
+    if (clientReport.jobs.length) {
+      doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40)
+      doc.text(`Jobs (${clientReport.jobs.length})`, 14, y); y += 3
+      const jobCols = Object.keys(clientReport.jobs[0])
+      autoTable(doc, { startY: y, head: [jobCols], body: clientReport.jobs.map(r => jobCols.map(c => r[c])), ...tableOpts })
+      y = doc.lastAutoTable.finalY + 8
+    }
+    if (clientReport.tickets.length) {
+      doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(40,40,40)
+      doc.text(`Service Tickets (${clientReport.tickets.length})`, 14, y); y += 3
+      const tkCols = Object.keys(clientReport.tickets[0])
+      autoTable(doc, { startY: y, head: [tkCols], body: clientReport.tickets.map(r => tkCols.map(c => r[c])), ...tableOpts })
+    }
+
+    const prefix = branded && profile?.company_name ? profile.company_name.replace(/[^a-z0-9]/gi, '_') : 'ForgePt'
+    doc.save(`${prefix}_Client_Report_${selectedClient.label.replace(/[^a-z0-9]/gi,'_')}_${today()}.pdf`)
+  }
+
   const reportLabel   = ALL_REPORTS.find(r => r.key === activeReport)?.label || ''
   const columns       = data.length > 0 ? Object.keys(data[0]) : []
   const noDate        = GRAY_DATE_FILTER.includes(activeReport)
@@ -764,6 +847,16 @@ export default function Reports(props) {
                   )}
                   {clientReport && (
                     <div className="space-y-4">
+                      <div className="flex justify-end gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input type="checkbox" checked={branded} onChange={e => setBranded(e.target.checked)} className="accent-[#C8622A] w-4 h-4"/>
+                          <span className="text-[#8A9AB0] text-sm hover:text-white transition-colors">Include branding</span>
+                        </label>
+                        <button onClick={exportClientPDF}
+                          className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] hover:bg-[#C8622A]/80 text-white text-sm font-medium rounded-lg transition-colors">
+                          <span>📄</span> Export PDF
+                        </button>
+                      </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {[
                           { label: 'Won Deals',      value: clientReport.summary.wonDeals,        sub: fmt$(clientReport.summary.totalWonValue) },
