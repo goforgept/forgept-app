@@ -214,19 +214,15 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     if (!degrees || degrees % 360 === 0) return img
     const canvas = document.createElement('canvas')
     const ctx    = canvas.getContext('2d')
+    const srcW   = img.naturalWidth  || img.width
+    const srcH   = img.naturalHeight || img.height
     const swap   = degrees === 90 || degrees === 270
-    canvas.width  = swap ? img.naturalHeight || img.height : img.naturalWidth  || img.width
-    canvas.height = swap ? img.naturalWidth  || img.width  : img.naturalHeight || img.height
+    canvas.width  = swap ? srcH : srcW
+    canvas.height = swap ? srcW : srcH
     ctx.translate(canvas.width / 2, canvas.height / 2)
     ctx.rotate((degrees * Math.PI) / 180)
-    ctx.drawImage(img, -(img.naturalWidth || img.width) / 2, -(img.naturalHeight || img.height) / 2)
-    const rotated  = new window.Image()
-    rotated.src    = canvas.toDataURL('image/png')
-    rotated.width  = canvas.width
-    rotated.height = canvas.height
-    rotated.naturalWidth  = canvas.width
-    rotated.naturalHeight = canvas.height
-    return rotated
+    ctx.drawImage(img, -srcW / 2, -srcH / 2)
+    return canvas // Konva accepts HTMLCanvasElement directly
   }
 
   const loadImageFromUrl = (url) => new Promise((resolve, reject) => {
