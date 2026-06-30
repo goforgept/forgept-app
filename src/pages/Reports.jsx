@@ -201,6 +201,7 @@ export default function Reports(props) {
   const [filters, setFilters]           = useState(BLANK_FILTERS)
   const [loading, setLoading]           = useState(false)
   const [data, setData]                 = useState([])
+  const [branded, setBranded]           = useState(false)
 
   const [selectedClient, setSelectedClient] = useState(null)
   const [clientReport, setClientReport]     = useState(null)
@@ -560,20 +561,64 @@ export default function Reports(props) {
     XLSX.writeFile(wb, filename)
   }
 
-  const exportPDF = () => {
+  const exportPDF = async () => {
     const doc = new jsPDF({ orientation: columns.length > 6 ? 'landscape' : 'portrait' })
-    doc.setFontSize(16); doc.setTextColor(200, 98, 42); doc.text('ForgePt.', 14, 16)
-    doc.setTextColor(40, 40, 40); doc.setFontSize(12); doc.text(reportLabel, 14, 24)
-    doc.setFontSize(9); doc.setTextColor(120, 120, 120)
-    doc.text(`Generated ${new Date().toLocaleDateString()}${noDate ? '' : `  ·  ${dateFrom || ''} – ${dateTo || ''}`}`, 14, 30)
+    const pageW = doc.internal.pageSize.getWidth()
+
+    const hexToRgb = (hex) => {
+      const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+      return r ? [parseInt(r[1], 16), parseInt(r[2], 16), parseInt(r[3], 16)] : [200, 98, 42]
+    }
+
+    let startY = 36
+    if (branded && profile?.company_name) {
+      const accent = hexToRgb(profile.primary_color || '#C8622A')
+
+      // Header band
+      doc.setFillColor(...accent)
+      doc.rect(0, 0, pageW, 28, 'F')
+
+      // Try to load logo
+      if (profile.logo_url) {
+        try {
+          const res  = await fetch(profile.logo_url)
+          const blob = await res.blob()
+          const b64  = await new Promise(resolve => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result)
+            reader.readAsDataURL(blob)
+          })
+          doc.addImage(b64, 'PNG', 10, 4, 0, 20) // auto-width from 20px height
+        } catch {
+          doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
+          doc.text(profile.company_name, 14, 18)
+        }
+      } else {
+        doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
+        doc.text(profile.company_name, 14, 18)
+      }
+
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(255, 255, 255)
+      doc.text(reportLabel, pageW - 14, 12, { align: 'right' })
+      doc.text(`Generated ${new Date().toLocaleDateString()}${noDate ? '' : `  ·  ${dateFrom || ''} – ${dateTo || ''}`}`, pageW - 14, 22, { align: 'right' })
+
+      startY = 38
+    } else {
+      doc.setFontSize(16); doc.setTextColor(200, 98, 42); doc.text('ForgePt.', 14, 16)
+      doc.setTextColor(40, 40, 40); doc.setFontSize(12); doc.text(reportLabel, 14, 24)
+      doc.setFontSize(9); doc.setTextColor(120, 120, 120)
+      doc.text(`Generated ${new Date().toLocaleDateString()}${noDate ? '' : `  ·  ${dateFrom || ''} – ${dateTo || ''}`}`, 14, 30)
+    }
+
+    const accent = branded && profile?.primary_color ? hexToRgb(profile.primary_color) : [26, 45, 69]
 
     if (activeReport === 'vendor_spend') {
       const filtered = vendorSearch
         ? data.filter(r => r['Vendor'].toLowerCase().includes(vendorSearch.toLowerCase()))
         : data
       autoTable(doc, {
-        startY: 36, head: [columns], body: filtered.map(row => columns.map(c => row[c])),
-        headStyles: { fillColor: [26, 45, 69], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        startY, head: [columns], body: filtered.map(row => columns.map(c => row[c])),
+        headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold', fontSize: 8 },
         bodyStyles: { fontSize: 8, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
         margin: { left: 14, right: 14 },
       })
@@ -590,20 +635,21 @@ export default function Reports(props) {
         doc.text('Line Items Detail', 14, afterY + 10)
         autoTable(doc, {
           startY: afterY + 15, head: [itemCols], body: itemRows,
-          headStyles: { fillColor: [26, 45, 69], textColor: 255, fontStyle: 'bold', fontSize: 7 },
+          headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold', fontSize: 7 },
           bodyStyles: { fontSize: 7, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
           margin: { left: 14, right: 14 },
         })
       }
     } else {
       autoTable(doc, {
-        startY: 36, head: [columns], body: data.map(row => columns.map(c => row[c])),
-        headStyles: { fillColor: [26, 45, 69], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        startY, head: [columns], body: data.map(row => columns.map(c => row[c])),
+        headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold', fontSize: 8 },
         bodyStyles: { fontSize: 8, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
         margin: { left: 14, right: 14 },
       })
     }
-    doc.save(`ForgePt_${reportLabel.replace(/ /g, '_')}_${today()}.pdf`)
+    const prefix = branded && profile?.company_name ? profile.company_name.replace(/[^a-z0-9]/gi, '_') : 'ForgePt'
+    doc.save(`${prefix}_${reportLabel.replace(/ /g, '_')}_${today()}.pdf`)
   }
 
   const selClass = "bg-[#0F1C2E] border border-[#2a3d55] text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]"
@@ -639,7 +685,16 @@ export default function Reports(props) {
               <p className="text-[#8A9AB0] text-sm mt-1">Export data as Excel or PDF</p>
             </div>
             {activeReport !== 'client_report' && (
-              <div className="flex gap-3">
+              <div className="flex items-center gap-4">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={branded}
+                    onChange={e => setBranded(e.target.checked)}
+                    className="accent-[#C8622A] w-4 h-4"
+                  />
+                  <span className="text-[#8A9AB0] text-sm hover:text-white transition-colors">Include branding</span>
+                </label>
                 <button onClick={exportExcel} disabled={data.length === 0}
                   className="flex items-center gap-2 px-4 py-2 bg-[#1a7a4a] hover:bg-[#1a7a4a]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
                   <span>📊</span> Export Excel
