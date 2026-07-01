@@ -1714,7 +1714,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   <PlacementMarker key={placement.id} placement={placement} product={product}
                     icon={getIcon(product.category)} x={px} y={py} size={markerSize}
                     isSelected={isSelected} isHovered={isHovered}
-                    cableMode={cableMode}
+                    cableMode={cableMode} pathwayMode={pathwayMode}
                     showLabels={showLabels}
                     opacity={industryFilter === 'all' || placement.global_products?.industry === industryFilter ? 1 : 0.15}
                     markerColor={placement.marker_color || '#C8622A'}
@@ -1730,6 +1730,12 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                         x: placement.x,
                         y: placement.y,
                         placement_id: placement.id
+                      }])
+                    }}
+                    onPathwaySnap={() => {
+                      setActivePathwayPoints(prev => [...prev, {
+                        x: placement.x,
+                        y: placement.y,
                       }])
                     }}
                     onSelect={() => {
@@ -1995,32 +2001,34 @@ function ContextMenu({ contextMenu, copiedPlacement, onCopy, onPaste, onRotate, 
 
 // ─── PlacementMarker ──────────────────────────────────────────────────────────
 function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isHovered,
-  cableMode, showLabels, opacity, markerColor, onSelect, onCableSnap, onContextMenu, onHoverStart, onHoverEnd, onDelete, onRotate, onDragEnd }) {
+  cableMode, pathwayMode, showLabels, opacity, markerColor, onSelect, onCableSnap, onPathwaySnap, onContextMenu, onHoverStart, onHoverEnd, onDelete, onRotate, onDragEnd }) {
   const markerScale = isSelected ? 1.25 : isHovered ? 1.1 : 1
   const totalSize   = size * markerScale
   const iconSize    = totalSize * 0.65
   const btnSize     = Math.max(18, size * 0.55)
   const tooltipW    = Math.max(product.name.length * 6.5, 100)
+  const drawingMode = cableMode || pathwayMode
+  const snapHandler = cableMode ? onCableSnap : pathwayMode ? onPathwaySnap : onSelect
 
   return (
     <Group x={x} y={y}
       opacity={opacity ?? 1}
-      draggable={!cableMode}
-      onClick={cableMode ? onCableSnap : onSelect}
-      onTap={cableMode ? onCableSnap : onSelect}
+      draggable={!drawingMode}
+      onClick={snapHandler}
+      onTap={snapHandler}
       onContextMenu={(e) => { e.evt.preventDefault(); e.cancelBubble = true; onContextMenu?.(e) }}
       onMouseEnter={onHoverStart}
       onMouseLeave={onHoverEnd}
-      onDragEnd={cableMode ? undefined : onDragEnd}>
+      onDragEnd={drawingMode ? undefined : onDragEnd}>
 
       {/* Shadow */}
       <Circle x={2} y={3} radius={totalSize / 2} fill="rgba(0,0,0,0.35)" listening={false}/>
 
       {/* Circle */}
       <Circle radius={totalSize / 2}
-        fill={cableMode && isHovered ? '#3b82f6' : markerColor}
-        stroke={cableMode && isHovered ? '#60a5fa' : isSelected ? '#ff8c42' : markerColor}
-        strokeWidth={isSelected ? 3 : cableMode && isHovered ? 3 : 1.5}
+        fill={cableMode && isHovered ? '#3b82f6' : pathwayMode && isHovered ? '#4a90d9' : markerColor}
+        stroke={cableMode && isHovered ? '#60a5fa' : pathwayMode && isHovered ? '#7ab3e8' : isSelected ? '#ff8c42' : markerColor}
+        strokeWidth={isSelected ? 3 : (cableMode || pathwayMode) && isHovered ? 3 : 1.5}
         shadowColor={isSelected ? '#C8622A' : 'transparent'} shadowBlur={isSelected ? 10 : 0} shadowOpacity={0.7}/>
 
       {/* Icon */}
