@@ -310,19 +310,25 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       const tag = document.activeElement?.tagName
       const isInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)
 
-      // Delete selected cable
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedCable && !isInput) {
-        await supabase.from('cable_runs').delete().eq('id', selectedCable)
-        setCableRuns(prev => prev.filter(r => r.id !== selectedCable))
-        setSelectedCable(null)
-      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (isInput) return
 
-      // Delete selected pathway
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedPathwayId && !isInput) {
-        await supabase.from('drawing_pathways').delete().eq('id', selectedPathwayId)
-        setPathways(prev => prev.filter(p => p.id !== selectedPathwayId))
-        setSelectedPathwayId(null)
-        onPathwaySelect?.(null)
+        // Delete selected cable — then stop
+        if (selectedCable) {
+          await supabase.from('cable_runs').delete().eq('id', selectedCable)
+          setCableRuns(prev => prev.filter(r => r.id !== selectedCable))
+          setSelectedCable(null)
+          return
+        }
+
+        // Delete selected pathway — then stop
+        if (selectedPathwayId) {
+          await supabase.from('drawing_pathways').delete().eq('id', selectedPathwayId)
+          setPathways(prev => prev.filter(p => p.id !== selectedPathwayId))
+          setSelectedPathwayId(null)
+          onPathwaySelect?.(null)
+          return
+        }
       }
 
       // Delete selected placement
@@ -1408,12 +1414,19 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                           const newId = selectedPathwayId === pw.id ? null : pw.id
                           setSelectedPathwayId(newId)
                           setEditingPathwayId(null)
+                          // Clear other selections so keyboard Delete only targets pathway
+                          setSelectedCable(null)
+                          setSelectedId(null)
+                          setSelectedIds(new Set())
                           onPathwaySelect?.(newId ? pw : null)
                         }}
                         onDblClick={(e) => {
                           e.cancelBubble = true
                           setEditingPathwayId(pw.id)
                           setSelectedPathwayId(pw.id)
+                          setSelectedCable(null)
+                          setSelectedId(null)
+                          setSelectedIds(new Set())
                           onPathwaySelect?.(pw)
                         }}
                       />
