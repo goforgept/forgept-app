@@ -11,20 +11,22 @@ const CABLE_OPTIONS = [
 
 export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
   const [form, setForm] = useState({
-    pathway_type: pathway.pathway_type || 'EMT',
-    label:        pathway.label        || '',
-    notes:        pathway.notes        || '',
-    cable_types:  pathway.cable_types  || [],
+    pathway_type:  pathway.pathway_type  || 'EMT',
+    label:         pathway.label         || '',
+    notes:         pathway.notes         || '',
+    cable_types:   pathway.cable_types   || [],
+    hook_interval: pathway.hook_interval ?? 4,
   })
   const [saving,   setSaving]   = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     setForm({
-      pathway_type: pathway.pathway_type || 'EMT',
-      label:        pathway.label        || '',
-      notes:        pathway.notes        || '',
-      cable_types:  pathway.cable_types  || [],
+      pathway_type:  pathway.pathway_type  || 'EMT',
+      label:         pathway.label         || '',
+      notes:         pathway.notes         || '',
+      cable_types:   pathway.cable_types   || [],
+      hook_interval: pathway.hook_interval ?? 4,
     })
   }, [pathway.id])
 
@@ -33,10 +35,11 @@ export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
     const { data, error } = await supabase
       .from('drawing_pathways')
       .update({
-        pathway_type: form.pathway_type,
-        label:        form.label || null,
-        notes:        form.notes || null,
-        cable_types:  form.cable_types,
+        pathway_type:  form.pathway_type,
+        label:         form.label || null,
+        notes:         form.notes || null,
+        cable_types:   form.cable_types,
+        hook_interval: form.hook_interval,
       })
       .eq('id', pathway.id)
       .select()
@@ -61,7 +64,11 @@ export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
     }))
   }
 
-  const def = PATHWAY_DEFS.find(d => d.type === form.pathway_type)
+  const def         = PATHWAY_DEFS.find(d => d.type === form.pathway_type)
+  const footage     = pathway.total_footage || 0
+  const hasFootage  = footage > 0
+  const isJHook     = form.pathway_type === 'J-hook'
+  const hookCount   = isJHook && hasFootage ? Math.ceil(footage / form.hook_interval) : null
 
   return (
     <div className="flex flex-col h-full bg-[#0F1C2E]">
@@ -80,6 +87,64 @@ export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+
+        {/* Footage summary card */}
+        <div className="rounded-lg border border-[#2a3d55] bg-[#0a1628] px-3 py-2.5 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[#8A9AB0]">Total length</span>
+            <span className="text-sm font-semibold text-white">
+              {hasFootage ? `${footage} ft` : <span className="text-[#8A9AB0] text-xs">Set scale to measure</span>}
+            </span>
+          </div>
+
+          {/* Cable quantities */}
+          {hasFootage && form.cable_types.length > 0 && (
+            <div className="pt-1 border-t border-[#2a3d55]/60 space-y-1">
+              <p className="text-xs text-[#8A9AB0]">Cable needed</p>
+              {form.cable_types.map(cable => (
+                <div key={cable} className="flex items-center justify-between">
+                  <span className="text-xs text-white">{cable}</span>
+                  <span className="text-xs font-medium text-[#C8622A]">{footage} ft</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* J-hook quantity */}
+          {isJHook && hasFootage && (
+            <div className="pt-1 border-t border-[#2a3d55]/60">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-[#8A9AB0]">J-hooks needed</span>
+                <span className="text-sm font-semibold text-[#3b82f6]">{hookCount}</span>
+              </div>
+              <p className="text-xs text-[#8A9AB0]/60 mt-0.5">@ 1 per {form.hook_interval} ft</p>
+            </div>
+          )}
+        </div>
+
+        {/* J-hook interval — only shown when type is J-hook */}
+        {isJHook && (
+          <div>
+            <label className="block text-xs font-medium text-[#8A9AB0] mb-1.5">
+              Hook interval (ft)
+              <span className="ml-1 text-[#8A9AB0]/50 font-normal">BICSI recommends 4 ft max</span>
+            </label>
+            <div className="flex items-center gap-2">
+              {[2, 3, 4, 5].map(v => (
+                <button key={v}
+                  onClick={() => setForm(f => ({ ...f, hook_interval: v }))}
+                  className={`flex-1 py-1 rounded text-xs font-medium transition-colors ${
+                    form.hook_interval === v
+                      ? 'bg-[#3b82f6]/20 border border-[#3b82f6] text-[#3b82f6]'
+                      : 'bg-[#1a2d45] border border-[#2a3d55] text-[#8A9AB0] hover:text-white'
+                  }`}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Type */}
         <div>
           <label className="block text-xs font-medium text-[#8A9AB0] mb-1.5">Type</label>
@@ -104,15 +169,22 @@ export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
         {/* Cable types */}
         <div>
           <label className="block text-xs font-medium text-[#8A9AB0] mb-1.5">Cables in this pathway</label>
-          <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
+          <div className="flex flex-col gap-0.5 max-h-40 overflow-y-auto">
             {CABLE_OPTIONS.map(cable => (
               <label key={cable}
-                className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-[#1a2d45] transition-colors">
-                <input type="checkbox"
-                  checked={form.cable_types.includes(cable)}
-                  onChange={() => toggleCable(cable)}
-                  className="accent-[#C8622A]"/>
-                <span className="text-xs text-white">{cable}</span>
+                className={`flex items-center justify-between px-2 py-1.5 rounded cursor-pointer transition-colors ${
+                  form.cable_types.includes(cable) ? 'bg-[#C8622A]/10' : 'hover:bg-[#1a2d45]'
+                }`}>
+                <div className="flex items-center gap-2">
+                  <input type="checkbox"
+                    checked={form.cable_types.includes(cable)}
+                    onChange={() => toggleCable(cable)}
+                    className="accent-[#C8622A]"/>
+                  <span className="text-xs text-white">{cable}</span>
+                </div>
+                {form.cable_types.includes(cable) && hasFootage && (
+                  <span className="text-xs text-[#C8622A]/70">{footage} ft</span>
+                )}
               </label>
             ))}
           </div>
@@ -127,10 +199,7 @@ export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
             className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white placeholder-[#4a5568] focus:outline-none focus:border-[#C8622A] resize-none"/>
         </div>
 
-        {/* Point count */}
-        <div className="text-xs text-[#8A9AB0]">
-          {pathway.points?.length || 0} points drawn
-        </div>
+        <div className="text-xs text-[#8A9AB0]">{pathway.points?.length || 0} points · {pathway.pathway_type}</div>
       </div>
 
       {/* Footer */}

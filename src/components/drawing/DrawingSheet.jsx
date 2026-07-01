@@ -1150,12 +1150,20 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
               // Save pathway
               if (pathwayMode && activePathwayPoints.length >= 2) {
+                let pwPixels = 0
+                for (let i = 1; i < activePathwayPoints.length; i++) {
+                  const dx = (activePathwayPoints[i].x - activePathwayPoints[i-1].x) * imageSize.w
+                  const dy = (activePathwayPoints[i].y - activePathwayPoints[i-1].y) * imageSize.h
+                  pwPixels += Math.sqrt(dx*dx + dy*dy)
+                }
+                const pwFootage = scaleRatio ? Math.round(pwPixels * scaleRatio) : 0
                 const { data, error } = await supabase.from('drawing_pathways').insert({
                   org_id:           orgId,
                   drawing_sheet_id: sheet.id,
                   pathway_type:     pathwayType,
                   points:           activePathwayPoints,
                   cable_types:      [],
+                  total_footage:    pwFootage,
                 }).select().single()
                 if (!error && data) {
                   setPathways(prev => [...prev, data])
@@ -1377,9 +1385,10 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   let angle     = Math.atan2(dy, dx) * 180 / Math.PI
                   if (angle > 90)  angle -= 180
                   if (angle < -90) angle += 180
-                  const labelText  = pw.label || def.label
-                  const cableLabel = pw.cable_types?.length ? ` · ${pw.cable_types.join(', ')}` : ''
-                  const fullLabel  = `${labelText}${cableLabel}`
+                  const labelText   = pw.label || def.label
+                  const cableLabel  = pw.cable_types?.length ? ` · ${pw.cable_types.join(', ')}` : ''
+                  const footageText = pw.total_footage > 0 ? ` · ${pw.total_footage}ft` : ''
+                  const fullLabel   = `${labelText}${cableLabel}${footageText}`
                   const labelW     = Math.max(fullLabel.length * 5, 50)
 
                   return (
