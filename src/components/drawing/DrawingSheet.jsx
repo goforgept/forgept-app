@@ -110,6 +110,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [pathways,           setPathways]           = useState([])
   const [activePathwayPoints, setActivePathwayPoints] = useState([])
   const [selectedPathwayId,  setSelectedPathwayId]  = useState(null)
+  const [editingPathwayId,   setEditingPathwayId]   = useState(null)
+  const [hoveredPathwayWpt,  setHoveredPathwayWpt]  = useState(null) // {pathwayId, pointIndex}
   const [showPathways,       setShowPathways]       = useState(true)
   const [wasteFactor,    setWasteFactor]    = useState(10)
   const [editingCable,   setEditingCable]   = useState(null) // cable id being edited
@@ -407,13 +409,14 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         setActivePoints([])
         setActivePathwayPoints([])
         setEditingCable(null)
+        setEditingPathwayId(null)
         setContextMenu(null)
         onEditingCableDone?.()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedCable, selectedPathwayId, selectedId, copiedPlacement, cableMode, pathwayMode, placements])
+  }, [selectedCable, selectedPathwayId, selectedId, copiedPlacement, cableMode, pathwayMode, placements, editingPathwayId])
 
   useEffect(() => {
     if (!updatedPlacement) return
@@ -1366,67 +1369,156 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               <Layer>
                 {pathways.map(pw => {
                   if (!pw.points || pw.points.length < 2) return null
-                  const def = PATHWAY_DEFS.find(d => d.type === pw.pathway_type) || PATHWAY_DEFS[0]
-                  const pts = pw.points.flatMap(p => [
+                  const def       = PATHWAY_DEFS.find(d => d.type === pw.pathway_type) || PATHWAY_DEFS[0]
+                  const pts       = pw.points.flatMap(p => [
                     position.x + p.x * canvasW * scale,
                     position.y + p.y * canvasH * scale,
                   ])
                   const isSelected = selectedPathwayId === pw.id
-                  const color      = isSelected ? '#ffffff' : def.color
+                  const isEditing  = editingPathwayId  === pw.id
+                  const lineColor  = isEditing ? '#34d399' : isSelected ? '#ffffff' : def.color
 
                   // Midpoint label
-                  const midIdx  = Math.floor(pw.points.length / 2)
-                  const p1      = pw.points[Math.max(0, midIdx - 1)]
-                  const p2      = pw.points[midIdx] || p1
-                  const mx      = position.x + ((p1.x + p2.x) / 2) * canvasW * scale
-                  const my      = position.y + ((p1.y + p2.y) / 2) * canvasH * scale
-                  const dx      = (p2.x - p1.x) * canvasW * scale
-                  const dy      = (p2.y - p1.y) * canvasH * scale
-                  let angle     = Math.atan2(dy, dx) * 180 / Math.PI
+                  const midIdx = Math.floor(pw.points.length / 2)
+                  const lp1    = pw.points[Math.max(0, midIdx - 1)]
+                  const lp2    = pw.points[midIdx] || lp1
+                  const mx     = position.x + ((lp1.x + lp2.x) / 2) * canvasW * scale
+                  const my     = position.y + ((lp1.y + lp2.y) / 2) * canvasH * scale
+                  const ldx    = (lp2.x - lp1.x) * canvasW * scale
+                  const ldy    = (lp2.y - lp1.y) * canvasH * scale
+                  let angle    = Math.atan2(ldy, ldx) * 180 / Math.PI
                   if (angle > 90)  angle -= 180
                   if (angle < -90) angle += 180
-                  const labelText   = pw.label || def.label
-                  const cableLabel  = pw.cable_types?.length ? ` · ${pw.cable_types.join(', ')}` : ''
+
+                  // Normalize cable_types — supports both old string[] and new {type,qty}[] format
+                  const cables      = (pw.cable_types || []).map(c => typeof c === 'string' ? { type: c, qty: 1 } : c)
+                  const cableLabel  = cables.length ? ` · ${cables.map(c => c.qty > 1 ? `${c.qty}× ${c.type}` : c.type).join(', ')}` : ''
                   const footageText = pw.total_footage > 0 ? ` · ${pw.total_footage}ft` : ''
+                  const labelText   = pw.label || def.label
                   const fullLabel   = `${labelText}${cableLabel}${footageText}`
-                  const labelW     = Math.max(fullLabel.length * 5, 50)
+                  const labelW      = Math.max(fullLabel.length * 5, 50)
 
                   return (
                     <Group key={pw.id}>
                       {/* Hit area */}
-                      <Line points={pts} stroke="transparent" strokeWidth={16}
+                      <Line points={pts} stroke="transparent" strokeWidth={20}
                         lineCap="round" lineJoin="round" listening={true}
                         onClick={(e) => {
                           e.cancelBubble = true
                           const newId = selectedPathwayId === pw.id ? null : pw.id
                           setSelectedPathwayId(newId)
+                          setEditingPathwayId(null)
                           onPathwaySelect?.(newId ? pw : null)
                         }}
+                        onDblClick={(e) => {
+                          e.cancelBubble = true
+                          setEditingPathwayId(pw.id)
+                          setSelectedPathwayId(pw.id)
+                          onPathwaySelect?.(pw)
+                        }}
                       />
-                      {/* Visible line */}
+
+                      {/* Visible line — click to insert waypoint when editing */}
                       <Line points={pts}
-                        stroke={color}
-                        strokeWidth={isSelected ? 5 : 3}
+                        stroke={lineColor}
+                        strokeWidth={isEditing ? 8 : isSelected ? 5 : 3}
                         lineCap="round" lineJoin="round"
-                        dash={isSelected ? [] : def.dash}
-                        listening={false}
+                        dash={isEditing ? [] : isSelected ? [] : def.dash}
+                        listening={isEditing}
+                        onClick={(e) => {
+                          if (!isEditing) return
+                          e.cancelBubble = true
+                          const pointer = stageRef.current.getPointerPosition()
+                          const nx = Math.round(((pointer.x - position.x) / scale / canvasW) * 10000) / 10000
+                          const ny = Math.round(((pointer.y - position.y) / scale / canvasH) * 10000) / 10000
+
+                          let minDist = Infinity, insertAt = pw.points.length - 1
+                          for (let i = 0; i < pw.points.length - 1; i++) {
+                            const ax = position.x + pw.points[i].x * canvasW * scale
+                            const ay = position.y + pw.points[i].y * canvasH * scale
+                            const bx = position.x + pw.points[i+1].x * canvasW * scale
+                            const by = position.y + pw.points[i+1].y * canvasH * scale
+                            const abx = bx - ax, aby = by - ay
+                            const t = Math.max(0, Math.min(1, ((pointer.x - ax) * abx + (pointer.y - ay) * aby) / (abx*abx + aby*aby)))
+                            const d = Math.sqrt((pointer.x - (ax + t*abx))**2 + (pointer.y - (ay + t*aby))**2)
+                            if (d < minDist) { minDist = d; insertAt = i + 1 }
+                          }
+                          const newPoints = [...pw.points]
+                          newPoints.splice(insertAt, 0, { x: nx, y: ny })
+                          supabase.from('drawing_pathways').update({ points: newPoints }).eq('id', pw.id)
+                          setPathways(prev => prev.map(p => p.id === pw.id ? { ...p, points: newPoints } : p))
+                        }}
                       />
+
                       {/* Label */}
                       {showLabels !== false && (
                         <Group x={mx} y={my} rotation={angle} listening={false}>
                           <Rect x={-labelW/2} y={-9} width={labelW} height={13}
                             fill="#0F1C2E" opacity={0.8} cornerRadius={2}/>
-                          <Text text={fullLabel}
-                            fontSize={7} fill={color}
+                          <Text text={fullLabel} fontSize={7} fill={lineColor}
                             width={labelW} x={-labelW/2} y={-6} align="center"/>
                         </Group>
                       )}
-                      {/* Waypoints when selected */}
-                      {isSelected && pw.points.map((p, i) => (
+
+                      {/* Waypoints when editing — draggable */}
+                      {isEditing && pw.points.map((p, i) => {
+                        const wx = position.x + p.x * canvasW * scale
+                        const wy = position.y + p.y * canvasH * scale
+                        const isHovWpt = hoveredPathwayWpt?.pathwayId === pw.id && hoveredPathwayWpt?.pointIndex === i
+                        return (
+                          <Circle key={i} x={wx} y={wy}
+                            radius={isHovWpt ? 8 : 6}
+                            fill={isHovWpt ? '#ef4444' : '#0F1C2E'}
+                            stroke={isHovWpt ? '#ef4444' : '#34d399'}
+                            strokeWidth={2}
+                            draggable listening={true}
+                            onMouseEnter={() => setHoveredPathwayWpt({ pathwayId: pw.id, pointIndex: i })}
+                            onMouseLeave={() => setHoveredPathwayWpt(null)}
+                            onDragMove={(e) => {
+                              const nx = Math.min(Math.max((e.target.x() - position.x) / scale / canvasW, 0.01), 0.99)
+                              const ny = Math.min(Math.max((e.target.y() - position.y) / scale / canvasH, 0.01), 0.99)
+                              setPathways(prev => prev.map(r => {
+                                if (r.id !== pw.id) return r
+                                const newPts = [...r.points]
+                                newPts[i] = { x: nx, y: ny }
+                                return { ...r, points: newPts }
+                              }))
+                            }}
+                            onDragEnd={async (e) => {
+                              const nx = Math.round(Math.min(Math.max((e.target.x() - position.x) / scale / canvasW, 0.01), 0.99) * 10000) / 10000
+                              const ny = Math.round(Math.min(Math.max((e.target.y() - position.y) / scale / canvasH, 0.01), 0.99) * 10000) / 10000
+                              const updatedPoints = pw.points.map((pt, idx) => idx === i ? { x: nx, y: ny } : pt)
+                              // Recalculate footage
+                              let pixels = 0
+                              for (let j = 1; j < updatedPoints.length; j++) {
+                                const ddx = (updatedPoints[j].x - updatedPoints[j-1].x) * imageSize.w
+                                const ddy = (updatedPoints[j].y - updatedPoints[j-1].y) * imageSize.h
+                                pixels += Math.sqrt(ddx*ddx + ddy*ddy)
+                              }
+                              const total_footage = scaleRatio ? Math.round(pixels * scaleRatio) : 0
+                              await supabase.from('drawing_pathways').update({ points: updatedPoints, total_footage }).eq('id', pw.id)
+                              setPathways(prev => prev.map(r => r.id === pw.id ? { ...r, points: updatedPoints, total_footage } : r))
+                              onPathwaySelect?.({ ...pw, points: updatedPoints, total_footage })
+                            }}
+                            onClick={(e) => { e.cancelBubble = true }}
+                            onDblClick={(e) => {
+                              e.cancelBubble = true
+                              if (pw.points.length > 2) {
+                                const updatedPoints = pw.points.filter((_, idx) => idx !== i)
+                                supabase.from('drawing_pathways').update({ points: updatedPoints }).eq('id', pw.id)
+                                setPathways(prev => prev.map(r => r.id === pw.id ? { ...r, points: updatedPoints } : r))
+                              }
+                            }}
+                          />
+                        )
+                      })}
+
+                      {/* Waypoints when selected but not editing — static dots */}
+                      {isSelected && !isEditing && pw.points.map((p, i) => (
                         <Circle key={i}
                           x={position.x + p.x * canvasW * scale}
                           y={position.y + p.y * canvasH * scale}
-                          radius={5} fill={def.color} stroke="#fff" strokeWidth={1.5}
+                          radius={4} fill={def.color} stroke="#fff" strokeWidth={1.5}
                           listening={false}
                         />
                       ))}
