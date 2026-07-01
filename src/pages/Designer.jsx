@@ -8,6 +8,7 @@ import DrawingExport from '../components/drawing/DrawingExport'
 import SheetTab from '../components/designer/SheetTab'
 import PlacementPanel from '../components/designer/PlacementPanel'
 import CablePanel from '../components/designer/CablePanel'
+import PathwayPanel from '../components/designer/PathwayPanel'
 
 export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const { proposalId } = useParams()
@@ -33,6 +34,9 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const [editingCableId,    setEditingCableId]    = useState(null)
   const [updatedCable,      setUpdatedCable]      = useState(null)
   const [deletedCableId,    setDeletedCableId]    = useState(null)
+  const [selectedPathway,   setSelectedPathway]   = useState(null)
+  const [deletedPathwayId,  setDeletedPathwayId]  = useState(null)
+  const [activeTool,        setActiveTool]        = useState(null) // {type:'cable',cableType} | {type:'pathway',pathwayType} | null
   const [copiedPlacement,   setCopiedPlacement]   = useState(null)
   const [showLabels,        setShowLabels]        = useState(() => localStorage.getItem('designer_show_labels') !== 'false')
   const [industryFilter,    setIndustryFilter]    = useState('all')
@@ -606,9 +610,22 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                   <div className="w-60 border-r border-[#2a3d55] flex-shrink-0 overflow-y-auto min-h-0 h-full">
                     <SymbolPicker
                       selectedSymbol={selectedSymbol}
-                      onSelect={setSelectedSymbol}
+                      onSelect={(sym) => {
+                        setSelectedSymbol(sym)
+                        if (sym) setActiveTool(null)
+                      }}
                       orgId={orgId}
                       allowedManufacturers={allowedManufacturers}
+                      activeTool={activeTool}
+                      onToolSelect={(tool) => {
+                        setActiveTool(tool)
+                        if (tool) {
+                          setSelectedSymbol(null)
+                          setSelectedPlacement(null)
+                          setSelectedCable(null)
+                          setSelectedPathway(null)
+                        }
+                      }}
                     />
                   </div>
                 )}
@@ -629,11 +646,14 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                         onPlacementUpdate={setSelectedPlacement}
                         updatedPlacement={selectedPlacement}
                         openPlacementId={selectedPlacement?.id ?? null}
-                        onCableSelect={(c) => { setSelectedCable(c); setSelectedPlacement(null); setEditingCableId(null) }}
+                        activeTool={activeTool}
+                        onCableSelect={(c) => { setSelectedCable(c); setSelectedPlacement(null); setEditingCableId(null); setSelectedPathway(null) }}
                         editingCableId={editingCableId}
                         onEditingCableDone={() => setEditingCableId(null)}
                         updatedCable={updatedCable}
                         deletedCableId={deletedCableId}
+                        onPathwaySelect={(p) => { setSelectedPathway(p); setSelectedPlacement(null); setSelectedCable(null) }}
+                        deletedPathwayId={deletedPathwayId}
                         copiedPlacement={copiedPlacement}
                         onCopyPlacement={(p) => setCopiedPlacement(p)}
                         onStageReady={(stage) => { stageRefs.current[activeSheetId] = stage }}
@@ -648,8 +668,8 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                     )}
                   </div>
 
-                  {/* Right panel — selected placement or cable */}
-                  {(selectedPlacement || selectedCable) && (
+                  {/* Right panel — selected placement, cable, or pathway */}
+                  {(selectedPlacement || selectedCable || selectedPathway) && (
                     <div className="w-64 border-l border-[#2a3d55] flex-shrink-0 overflow-y-auto bg-[#0F1C2E]">
                       {selectedPlacement && (
                         <PlacementPanel
@@ -678,6 +698,17 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                           onDelete={() => {
                             setDeletedCableId(selectedCable?.id)
                             setSelectedCable(null)
+                          }}
+                        />
+                      )}
+                      {selectedPathway && (
+                        <PathwayPanel
+                          pathway={selectedPathway}
+                          onClose={() => setSelectedPathway(null)}
+                          onUpdate={(updated) => setSelectedPathway(updated)}
+                          onDelete={() => {
+                            setDeletedPathwayId(selectedPathway?.id)
+                            setSelectedPathway(null)
                           }}
                         />
                       )}

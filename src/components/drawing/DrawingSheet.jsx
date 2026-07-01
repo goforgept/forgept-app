@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Shape, Line } from 'react-konva'
 import { supabase } from '../../supabase'
 import { useCategoryIcons } from './useCategoryIcons'
+import { PATHWAY_DEFS } from './SymbolPicker'
 
 const LABEL_PREFIXES = {
   'Dome Camera':         'CAM',
@@ -61,7 +62,7 @@ const getNextLabel = async (category, sheetIds) => {
   return `${prefix}-${String(next).padStart(2, '0')}`
 }
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange }) {
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange, activeTool, onPathwaySelect, deletedPathwayId }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
 
@@ -97,13 +98,19 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const { getIcon, ready: iconsReady } = useCategoryIcons('white', 40)
   const [showFOV,        setShowFOV]        = useState(true)
   const [draggingFOV,    setDraggingFOV]    = useState(null) // {rotation, fov_angle, fov_range} while handle is dragged
-  const [cableMode,      setCableMode]      = useState(false)
-  const [cableType,      setCableType]      = useState('Cat6')
+  const cableMode      = activeTool?.type === 'cable'
+  const cableType      = activeTool?.cableType || 'Cat6'
+  const pathwayMode    = activeTool?.type === 'pathway'
+  const pathwayType    = activeTool?.pathwayType || 'EMT'
   const [cableRuns,      setCableRuns]      = useState([])
-  const [activeCable,    setActiveCable]    = useState(null) // run being drawn
-  const [activePoints,   setActivePoints]   = useState([])  // points of current run
+  const [activeCable,    setActiveCable]    = useState(null)
+  const [activePoints,   setActivePoints]   = useState([])
   const [selectedCable,     setSelectedCable]     = useState(null)
   const [showCableRuns,  setShowCableRuns]  = useState(true)
+  const [pathways,           setPathways]           = useState([])
+  const [activePathwayPoints, setActivePathwayPoints] = useState([])
+  const [selectedPathwayId,  setSelectedPathwayId]  = useState(null)
+  const [showPathways,       setShowPathways]       = useState(true)
   const [wasteFactor,    setWasteFactor]    = useState(10)
   const [editingCable,   setEditingCable]   = useState(null) // cable id being edited
   const [dragPoint,      setDragPoint]      = useState(null) // {cableId, pointIndex}
@@ -277,6 +284,17 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   useEffect(() => { loadCableRuns() }, [loadCableRuns])
 
+  const loadPathways = useCallback(async () => {
+    const { data } = await supabase
+      .from('drawing_pathways')
+      .select('*')
+      .eq('drawing_sheet_id', sheet.id)
+      .order('created_at')
+    if (data) setPathways(data)
+  }, [sheet.id])
+
+  useEffect(() => { loadPathways() }, [loadPathways])
+
   useEffect(() => {
     if (editingCableId) {
       setEditingCable(editingCableId)
@@ -295,6 +313,14 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         await supabase.from('cable_runs').delete().eq('id', selectedCable)
         setCableRuns(prev => prev.filter(r => r.id !== selectedCable))
         setSelectedCable(null)
+      }
+
+      // Delete selected pathway
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedPathwayId && !isInput) {
+        await supabase.from('drawing_pathways').delete().eq('id', selectedPathwayId)
+        setPathways(prev => prev.filter(p => p.id !== selectedPathwayId))
+        setSelectedPathwayId(null)
+        onPathwaySelect?.(null)
       }
 
       // Delete selected placement
@@ -379,6 +405,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       // Escape
       if (e.key === 'Escape') {
         setActivePoints([])
+        setActivePathwayPoints([])
         setEditingCable(null)
         setContextMenu(null)
         onEditingCableDone?.()
@@ -386,7 +413,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedCable, selectedId, copiedPlacement, cableMode, placements])
+  }, [selectedCable, selectedPathwayId, selectedId, copiedPlacement, cableMode, pathwayMode, placements])
 
   useEffect(() => {
     if (!updatedPlacement) return
@@ -409,6 +436,12 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     if (!deletedCableId) return
     setCableRuns(prev => prev.filter(r => r.id !== deletedCableId))
   }, [deletedCableId])
+
+  useEffect(() => {
+    if (!deletedPathwayId) return
+    setPathways(prev => prev.filter(p => p.id !== deletedPathwayId))
+    setSelectedPathwayId(null)
+  }, [deletedPathwayId])
 
   // ── Realtime ───────────────────────────────────────────────────────────────
   // Track which placement is open in the panel — realtime events for that row
@@ -617,12 +650,22 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       const pointer = stageRef.current.getPointerPosition()
       const snapped = snapToPlacement(pointer.x, pointer.y)
 
-      // First point — check if starting from a device
       if (activePoints.length === 0 && snapped.placement) {
         setActivePoints([{ x: snapped.x, y: snapped.y, placement_id: snapped.placement.id }])
       } else {
         setActivePoints(prev => [...prev, { x: snapped.x, y: snapped.y, placement_id: snapped.placement?.id || null }])
       }
+      return
+    }
+
+    // Pathway drawing mode
+    if (pathwayMode) {
+      const onBgClick = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
+      if (!onBgClick) return
+      const pointer = stageRef.current.getPointerPosition()
+      const nx = Math.min(Math.max((pointer.x - position.x) / scale / canvasW, 0.01), 0.99)
+      const ny = Math.min(Math.max((pointer.y - position.y) / scale / canvasH, 0.01), 0.99)
+      setActivePathwayPoints(prev => [...prev, { x: nx, y: ny }])
       return
     }
 
@@ -800,6 +843,17 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 Cable mode: {cableType} — click to add points · Double-click to finish
                 {activePoints.length > 0 && <span className="ml-2 text-blue-300">({activePoints.length} points)</span>}
               </span>
+            : pathwayMode
+            ? (() => {
+                const def = PATHWAY_DEFS.find(d => d.type === pathwayType)
+                return (
+                  <span className="flex items-center gap-1.5 font-medium" style={{ color: def?.color }}>
+                    <span className="w-2 h-2 rounded-full animate-pulse inline-block" style={{ backgroundColor: def?.color }}/>
+                    Pathway: {def?.label} — click to add points · Double-click to finish
+                    {activePathwayPoints.length > 0 && <span className="ml-2" style={{ color: def?.color + 'aa' }}>({activePathwayPoints.length} points)</span>}
+                  </span>
+                )
+              })()
             : editingCable
             ? <span className="flex items-center gap-1.5 text-green-400 font-medium">
                 <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block"/>
@@ -878,6 +932,19 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             </svg>
             Cables
           </button>
+          <button
+            onClick={() => setShowPathways(s => !s)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+              showPathways
+                ? 'border-[#4a90d9]/40 bg-[#4a90d9]/10 text-[#4a90d9]'
+                : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
+            }`}
+            title="Toggle pathways">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+            </svg>
+            Pathways
+          </button>
 
           {/* Industry filter */}
           <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5 border border-[#2a3d55]">
@@ -901,34 +968,15 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             ))}
           </div>
 
-          <button
-            onClick={() => {
-              setCableMode(s => !s)
-              if (cableMode) {
-                setActiveCable(null)
-                setActivePoints([])
-              }
-            }}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
-              cableMode
-                ? 'border-blue-400 bg-blue-500/10 text-blue-400'
-                : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
-            }`}
-            title="Cable drawing mode"
-          >
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16M4 12l4-4M4 12l4 4"/>
-            </svg>
-            Cable
-          </button>
-
-          {cableMode && (
-            <select value={cableType} onChange={e => setCableType(e.target.value)}
-              className="text-xs bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]">
-              {['Cat6', 'Cat6A', 'Cat5e', 'Fiber SM', 'Fiber MM', 'Coax RG59', 'Coax RG6', 'Speaker 16/2', 'Speaker 14/2', '18/2', '22/4', '22/6', 'Composite', 'HDMI', 'HDBaseT', 'Power', 'Plenum Cat6', 'Plenum 22/4'].map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
+          {(cableMode || pathwayMode) && (
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs ${
+              cableMode ? 'border-blue-400 bg-blue-500/10 text-blue-300' : 'border-[#4a90d9] bg-[#4a90d9]/10 text-[#4a90d9]'
+            }`}>
+              <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+              </svg>
+              {cableMode ? cableType : activeTool?.pathwayType}
+            </div>
           )}
 
           <button
@@ -1069,38 +1117,51 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               }
             }}
             onDblClick={async () => {
-              if (!cableMode || activePoints.length < 2) return
-              // Calculate footage
-              let pixels = 0
-              for (let i = 1; i < activePoints.length; i++) {
-                const dx = (activePoints[i].x - activePoints[i-1].x) * imageSize.w
-                const dy = (activePoints[i].y - activePoints[i-1].y) * imageSize.h
-                pixels += Math.sqrt(dx*dx + dy*dy)
+              // Save cable run
+              if (cableMode && activePoints.length >= 2) {
+                let pixels = 0
+                for (let i = 1; i < activePoints.length; i++) {
+                  const dx = (activePoints[i].x - activePoints[i-1].x) * imageSize.w
+                  const dy = (activePoints[i].y - activePoints[i-1].y) * imageSize.h
+                  pixels += Math.sqrt(dx*dx + dy*dy)
+                }
+                const footage = scaleRatio ? Math.round(pixels * scaleRatio) : 0
+                const totalFootage = Math.round(footage * (1 + wasteFactor / 100))
+                const firstPoint = activePoints[0]
+                const lastPoint  = activePoints[activePoints.length - 1]
+                const { data, error } = await supabase.from('cable_runs').insert({
+                  org_id:             orgId,
+                  drawing_sheet_id:   sheet.id,
+                  proposal_id:        sheet.proposal_id,
+                  cable_type:         cableType,
+                  points:             activePoints,
+                  footage,
+                  waste_factor:       wasteFactor,
+                  total_footage:      totalFootage,
+                  from_placement_id:  firstPoint?.placement_id || null,
+                  to_placement_id:    lastPoint?.placement_id  || null,
+                }).select().single()
+                if (!error && data) {
+                  setCableRuns(prev => [...prev, data])
+                  onPlacementChange?.()
+                }
+                setActivePoints([])
               }
-              // scale_ratio = feet per pixel at original image resolution
-              const footage = scaleRatio ? Math.round(pixels * scaleRatio) : 0
-              const totalFootage = Math.round(footage * (1 + wasteFactor / 100))
 
-              const firstPoint = activePoints[0]
-              const lastPoint  = activePoints[activePoints.length - 1]
-              const { data, error } = await supabase.from('cable_runs').insert({
-                org_id:             orgId,
-                drawing_sheet_id:   sheet.id,
-                proposal_id:        sheet.proposal_id,
-                cable_type:         cableType,
-                points:             activePoints,
-                footage,
-                waste_factor:       wasteFactor,
-                total_footage:      totalFootage,
-                from_placement_id:  firstPoint?.placement_id || null,
-                to_placement_id:    lastPoint?.placement_id  || null,
-              }).select().single()
-
-              if (!error && data) {
-                setCableRuns(prev => [...prev, data])
-                onPlacementChange?.()
+              // Save pathway
+              if (pathwayMode && activePathwayPoints.length >= 2) {
+                const { data, error } = await supabase.from('drawing_pathways').insert({
+                  org_id:           orgId,
+                  drawing_sheet_id: sheet.id,
+                  pathway_type:     pathwayType,
+                  points:           activePathwayPoints,
+                  cable_types:      [],
+                }).select().single()
+                if (!error && data) {
+                  setPathways(prev => [...prev, data])
+                }
+                setActivePathwayPoints([])
               }
-              setActivePoints([])
             }}>
 
             <Layer>
@@ -1291,6 +1352,108 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               </Layer>
             )}
 
+
+            {/* Pathway layer */}
+            {showPathways && (
+              <Layer>
+                {pathways.map(pw => {
+                  if (!pw.points || pw.points.length < 2) return null
+                  const def = PATHWAY_DEFS.find(d => d.type === pw.pathway_type) || PATHWAY_DEFS[0]
+                  const pts = pw.points.flatMap(p => [
+                    position.x + p.x * canvasW * scale,
+                    position.y + p.y * canvasH * scale,
+                  ])
+                  const isSelected = selectedPathwayId === pw.id
+                  const color      = isSelected ? '#ffffff' : def.color
+
+                  // Midpoint label
+                  const midIdx  = Math.floor(pw.points.length / 2)
+                  const p1      = pw.points[Math.max(0, midIdx - 1)]
+                  const p2      = pw.points[midIdx] || p1
+                  const mx      = position.x + ((p1.x + p2.x) / 2) * canvasW * scale
+                  const my      = position.y + ((p1.y + p2.y) / 2) * canvasH * scale
+                  const dx      = (p2.x - p1.x) * canvasW * scale
+                  const dy      = (p2.y - p1.y) * canvasH * scale
+                  let angle     = Math.atan2(dy, dx) * 180 / Math.PI
+                  if (angle > 90)  angle -= 180
+                  if (angle < -90) angle += 180
+                  const labelText  = pw.label || def.label
+                  const cableLabel = pw.cable_types?.length ? ` · ${pw.cable_types.join(', ')}` : ''
+                  const fullLabel  = `${labelText}${cableLabel}`
+                  const labelW     = Math.max(fullLabel.length * 5, 50)
+
+                  return (
+                    <Group key={pw.id}>
+                      {/* Hit area */}
+                      <Line points={pts} stroke="transparent" strokeWidth={16}
+                        lineCap="round" lineJoin="round" listening={true}
+                        onClick={(e) => {
+                          e.cancelBubble = true
+                          const newId = selectedPathwayId === pw.id ? null : pw.id
+                          setSelectedPathwayId(newId)
+                          onPathwaySelect?.(newId ? pw : null)
+                        }}
+                      />
+                      {/* Visible line */}
+                      <Line points={pts}
+                        stroke={color}
+                        strokeWidth={isSelected ? 5 : 3}
+                        lineCap="round" lineJoin="round"
+                        dash={isSelected ? [] : def.dash}
+                        listening={false}
+                      />
+                      {/* Label */}
+                      {showLabels !== false && (
+                        <Group x={mx} y={my} rotation={angle} listening={false}>
+                          <Rect x={-labelW/2} y={-9} width={labelW} height={13}
+                            fill="#0F1C2E" opacity={0.8} cornerRadius={2}/>
+                          <Text text={fullLabel}
+                            fontSize={7} fill={color}
+                            width={labelW} x={-labelW/2} y={-6} align="center"/>
+                        </Group>
+                      )}
+                      {/* Waypoints when selected */}
+                      {isSelected && pw.points.map((p, i) => (
+                        <Circle key={i}
+                          x={position.x + p.x * canvasW * scale}
+                          y={position.y + p.y * canvasH * scale}
+                          radius={5} fill={def.color} stroke="#fff" strokeWidth={1.5}
+                          listening={false}
+                        />
+                      ))}
+                    </Group>
+                  )
+                })}
+
+                {/* Active pathway being drawn */}
+                {pathwayMode && activePathwayPoints.length > 0 && (() => {
+                  const def = PATHWAY_DEFS.find(d => d.type === pathwayType) || PATHWAY_DEFS[0]
+                  const pts = activePathwayPoints.flatMap(p => [
+                    position.x + p.x * canvasW * scale,
+                    position.y + p.y * canvasH * scale,
+                  ])
+                  return (
+                    <Line points={pts}
+                      stroke={def.color} strokeWidth={3}
+                      lineCap="round" lineJoin="round"
+                      dash={[6, 3]} opacity={0.7} listening={false}
+                    />
+                  )
+                })()}
+
+                {/* Active pathway waypoint dots */}
+                {pathwayMode && activePathwayPoints.map((p, i) => {
+                  const def = PATHWAY_DEFS.find(d => d.type === pathwayType) || PATHWAY_DEFS[0]
+                  return (
+                    <Circle key={i}
+                      x={position.x + p.x * canvasW * scale}
+                      y={position.y + p.y * canvasH * scale}
+                      radius={4} fill={def.color} opacity={0.9} listening={false}
+                    />
+                  )
+                })}
+              </Layer>
+            )}
 
             {/* Cable runs layer */}
             {showCableRuns && (

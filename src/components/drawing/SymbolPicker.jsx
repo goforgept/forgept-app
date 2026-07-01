@@ -11,7 +11,26 @@ const INDUSTRY_LABELS = {
   low_voltage: 'Low Voltage',
 }
 
-export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedManufacturers }) {
+const CABLE_TYPES = [
+  'Cat6', 'Cat6A', 'Cat5e', 'Fiber SM', 'Fiber MM',
+  'Coax RG59', 'Coax RG6', 'Speaker 16/2', 'Speaker 14/2',
+  '18/2', '22/4', '22/6', 'Composite', 'HDMI', 'HDBaseT',
+  'Power', 'Plenum Cat6', 'Plenum 22/4',
+]
+
+export const PATHWAY_DEFS = [
+  { type: 'EMT',             color: '#4a90d9', label: 'EMT Conduit',      dash: [] },
+  { type: 'Rigid',           color: '#9ca3af', label: 'Rigid Conduit',    dash: [] },
+  { type: 'PVC',             color: '#d1d5db', label: 'PVC Conduit',      dash: [8, 4] },
+  { type: 'Flex',            color: '#eab308', label: 'Flex Conduit',     dash: [4, 4] },
+  { type: 'J-hook',          color: '#3b82f6', label: 'J-Hook',           dash: [6, 6] },
+  { type: 'Cable Tray',      color: '#f59e0b', label: 'Cable Tray',       dash: [] },
+  { type: 'Wireway',         color: '#22c55e', label: 'Wireway',          dash: [] },
+  { type: 'Surface Raceway', color: '#06b6d4', label: 'Surface Raceway',  dash: [] },
+]
+
+export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedManufacturers, activeTool, onToolSelect }) {
+  const [tab,           setTab]           = useState('devices')
   const [industry,      setIndustry]      = useState('all')
   const [manufacturer,  setManufacturer]  = useState('Generic')
   const [category,      setCategory]      = useState(null)
@@ -22,7 +41,12 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
   const [loading,       setLoading]       = useState(false)
   const [allProducts,   setAllProducts]   = useState([])
 
-  // Load global + org products on mount
+  // Sync tab with active tool type
+  useEffect(() => {
+    if (activeTool?.type === 'cable')   setTab('cable')
+    if (activeTool?.type === 'pathway') setTab('pathways')
+  }, [activeTool?.type])
+
   useEffect(() => {
     const loadAll = async () => {
       setLoading(true)
@@ -39,7 +63,6 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
     loadAll()
   }, [])
 
-  // Derive manufacturers from allProducts client-side
   useEffect(() => {
     const filtered = industry === 'all' ? allProducts : allProducts.filter(p => p.industry === industry)
     const unique = [...new Set(filtered.map(r => r.manufacturer))].sort()
@@ -48,7 +71,6 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
     setCategory(null)
   }, [industry, allProducts])
 
-  // Derive categories client-side
   useEffect(() => {
     const filtered = allProducts.filter(p => {
       if (industry !== 'all' && p.industry !== industry) return false
@@ -59,7 +81,6 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
     setCategory(null)
   }, [manufacturer, industry, allProducts])
 
-  // Derive symbols client-side
   useEffect(() => {
     const filtered = allProducts.filter(p => {
       if (!p.is_active) return false
@@ -79,80 +100,194 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
       )
     : symbols
 
+  const handleTabChange = (newTab) => {
+    setTab(newTab)
+    if (newTab === 'devices') {
+      onToolSelect?.(null)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full bg-[#0F1C2E]">
 
-      {/* Industry */}
-      <div className="px-3 pt-3 pb-2 border-b border-[#2a3d55]">
-        <p className="text-xs font-medium text-[#8A9AB0] mb-2">Industry</p>
-        <div className="flex flex-wrap gap-1">
-          {Object.entries(INDUSTRY_LABELS).map(([key, label]) => (
-            <button key={key} onClick={() => setIndustry(key)}
-              className={`px-2 py-1 text-xs rounded-md transition-colors ${
-                industry === key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
-              }`}>
-              {label}
-            </button>
-          ))}
-        </div>
+      {/* Tab bar */}
+      <div className="flex border-b border-[#2a3d55] flex-shrink-0">
+        {[
+          { id: 'devices',   label: 'Devices' },
+          { id: 'cable',     label: 'Cable' },
+          { id: 'pathways',  label: 'Pathways' },
+        ].map(t => (
+          <button key={t.id} onClick={() => handleTabChange(t.id)}
+            className={`flex-1 py-2 text-xs font-medium transition-colors ${
+              tab === t.id
+                ? 'text-white border-b-2 border-[#C8622A]'
+                : 'text-[#8A9AB0] hover:text-white'
+            }`}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* Manufacturer */}
-      <div className="px-3 py-2 border-b border-[#2a3d55]">
-        <p className="text-xs font-medium text-[#8A9AB0] mb-2">Manufacturer</p>
-        <select value={manufacturer} onChange={e => setManufacturer(e.target.value)}
-          className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white focus:outline-none focus:border-[#C8622A]">
-          {manufacturers.map(m => <option key={m} value={m}>{m}</option>)}
-        </select>
-      </div>
+      {/* DEVICES tab */}
+      {tab === 'devices' && (
+        <>
+          <div className="px-3 pt-3 pb-2 border-b border-[#2a3d55]">
+            <p className="text-xs font-medium text-[#8A9AB0] mb-2">Industry</p>
+            <div className="flex flex-wrap gap-1">
+              {Object.entries(INDUSTRY_LABELS).map(([key, label]) => (
+                <button key={key} onClick={() => setIndustry(key)}
+                  className={`px-2 py-1 text-xs rounded-md transition-colors ${
+                    industry === key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
+                  }`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {/* Category — only show when a specific industry is selected */}
-      {industry !== 'all' && categories.length > 0 && (
-        <div className="px-3 py-2 border-b border-[#2a3d55]">
-          <p className="text-xs font-medium text-[#8A9AB0] mb-2">Category</p>
-          <select
-            value={category || ''}
-            onChange={e => setCategory(e.target.value || null)}
-            className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white focus:outline-none focus:border-[#C8622A]"
-          >
-            <option value="">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
+          <div className="px-3 py-2 border-b border-[#2a3d55]">
+            <p className="text-xs font-medium text-[#8A9AB0] mb-2">Manufacturer</p>
+            <select value={manufacturer} onChange={e => setManufacturer(e.target.value)}
+              className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white focus:outline-none focus:border-[#C8622A]">
+              {manufacturers.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
+
+          {industry !== 'all' && categories.length > 0 && (
+            <div className="px-3 py-2 border-b border-[#2a3d55]">
+              <p className="text-xs font-medium text-[#8A9AB0] mb-2">Category</p>
+              <select
+                value={category || ''}
+                onChange={e => setCategory(e.target.value || null)}
+                className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white focus:outline-none focus:border-[#C8622A]"
+              >
+                <option value="">All Categories</option>
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="px-3 py-2 border-b border-[#2a3d55]">
+            <input type="text" placeholder="Search name or part #..."
+              value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white placeholder-[#8A9AB0] focus:outline-none focus:border-[#C8622A]" />
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3">
+            {loading ? (
+              <div className="flex items-center justify-center h-24 text-xs text-[#8A9AB0]">Loading...</div>
+            ) : filtered.length === 0 ? (
+              <div className="flex items-center justify-center h-24 text-xs text-[#8A9AB0]">No symbols found</div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {filtered.map(symbol => (
+                  <SymbolCard key={symbol.id} symbol={symbol}
+                    isSelected={selectedSymbol?.id === symbol.id}
+                    onSelect={() => {
+                      onToolSelect?.(null)
+                      onSelect(selectedSymbol?.id === symbol.id ? null : symbol)
+                    }} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedSymbol && (
+            <div className="px-3 py-2 border-t border-[#2a3d55] bg-[#C8622A]/10 flex-shrink-0">
+              <p className="text-xs font-medium text-[#C8622A] truncate">{selectedSymbol.name}</p>
+              <p className="text-xs text-[#C8622A]/70 font-mono truncate">{selectedSymbol.part_number}</p>
+              <p className="text-xs text-[#8A9AB0] mt-0.5">Click floor plan to place</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* CABLE tab */}
+      {tab === 'cable' && (
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="px-3 pt-3 pb-2">
+            <p className="text-xs text-[#8A9AB0]">Select a cable type then click the canvas to draw. Double-click to finish.</p>
+          </div>
+          <div className="flex-1 overflow-y-auto px-3 pb-3">
+            <div className="flex flex-col gap-1">
+              {CABLE_TYPES.map(t => {
+                const isActive = activeTool?.type === 'cable' && activeTool.cableType === t
+                return (
+                  <button key={t}
+                    onClick={() => onToolSelect?.(isActive ? null : { type: 'cable', cableType: t })}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-left transition-colors ${
+                      isActive
+                        ? 'bg-blue-500/20 border border-blue-400 text-blue-300'
+                        : 'bg-[#1a2d45] border border-[#2a3d55] text-white hover:border-blue-400/50 hover:bg-blue-500/5'
+                    }`}>
+                    <svg className="w-4 h-4 flex-shrink-0 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16M4 12l4-4M4 12l4 4"/>
+                    </svg>
+                    {t}
+                    {isActive && <span className="ml-auto text-blue-400 text-xs">Active</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {activeTool?.type === 'cable' && (
+            <div className="px-3 py-2 border-t border-blue-500/30 bg-blue-500/10 flex-shrink-0">
+              <p className="text-xs text-blue-300 font-medium">Drawing {activeTool.cableType}</p>
+              <p className="text-xs text-blue-400/70 mt-0.5">Click to add points · Double-click to finish</p>
+              <button onClick={() => onToolSelect?.(null)}
+                className="mt-1.5 text-xs text-[#8A9AB0] hover:text-white underline">
+                Exit drawing mode
+              </button>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Search */}
-      <div className="px-3 py-2 border-b border-[#2a3d55]">
-        <input type="text" placeholder="Search name or part #..."
-          value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white placeholder-[#8A9AB0] focus:outline-none focus:border-[#C8622A]" />
-      </div>
-
-      {/* Symbol grid */}
-      <div className="flex-1 overflow-y-auto p-3">
-        {loading ? (
-          <div className="flex items-center justify-center h-24 text-xs text-[#8A9AB0]">Loading...</div>
-        ) : filtered.length === 0 ? (
-          <div className="flex items-center justify-center h-24 text-xs text-[#8A9AB0]">No symbols found</div>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            {filtered.map(symbol => (
-              <SymbolCard key={symbol.id} symbol={symbol}
-                isSelected={selectedSymbol?.id === symbol.id}
-                onSelect={() => onSelect(selectedSymbol?.id === symbol.id ? null : symbol)} />
-            ))}
+      {/* PATHWAYS tab */}
+      {tab === 'pathways' && (
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="px-3 pt-3 pb-2">
+            <p className="text-xs text-[#8A9AB0]">Select a pathway type then click the canvas to draw. Double-click to finish.</p>
           </div>
-        )}
-      </div>
+          <div className="flex-1 overflow-y-auto px-3 pb-3">
+            <div className="flex flex-col gap-1">
+              {PATHWAY_DEFS.map(p => {
+                const isActive = activeTool?.type === 'pathway' && activeTool.pathwayType === p.type
+                return (
+                  <button key={p.type}
+                    onClick={() => onToolSelect?.(isActive ? null : { type: 'pathway', pathwayType: p.type })}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-left transition-colors ${
+                      isActive
+                        ? 'border text-white'
+                        : 'bg-[#1a2d45] border border-[#2a3d55] text-white hover:border-white/20'
+                    }`}
+                    style={isActive ? { backgroundColor: p.color + '22', borderColor: p.color } : {}}>
+                    <span className="w-6 h-0.5 flex-shrink-0 rounded"
+                      style={{ backgroundColor: p.color, ...(p.dash.length ? { opacity: 0.8 } : {}) }}/>
+                    <span>{p.label}</span>
+                    {isActive && <span className="ml-auto text-xs font-medium" style={{ color: p.color }}>Active</span>}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
 
-      {/* Selected info */}
-      {selectedSymbol && (
-        <div className="px-3 py-2 border-t border-[#2a3d55] bg-[#C8622A]/10">
-          <p className="text-xs font-medium text-[#C8622A] truncate">{selectedSymbol.name}</p>
-          <p className="text-xs text-[#C8622A]/70 font-mono truncate">{selectedSymbol.part_number}</p>
-          <p className="text-xs text-[#8A9AB0] mt-0.5">Click floor plan to place</p>
+          {activeTool?.type === 'pathway' && (() => {
+            const def = PATHWAY_DEFS.find(d => d.type === activeTool.pathwayType)
+            return (
+              <div className="px-3 py-2 border-t flex-shrink-0" style={{ borderColor: def?.color + '55', backgroundColor: def?.color + '15' }}>
+                <p className="text-xs font-medium" style={{ color: def?.color }}>{def?.label}</p>
+                <p className="text-xs mt-0.5" style={{ color: def?.color + 'aa' }}>Click to add points · Double-click to finish</p>
+                <button onClick={() => onToolSelect?.(null)}
+                  className="mt-1.5 text-xs text-[#8A9AB0] hover:text-white underline">
+                  Exit drawing mode
+                </button>
+              </div>
+            )
+          })()}
         </div>
       )}
     </div>
