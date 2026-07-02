@@ -263,7 +263,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const loadPlacements = useCallback(async () => {
     const { data } = await supabase
       .from('drawing_placements')
-      .select('*, global_products(id, name, part_number, manufacturer, category, specs, accessories)')
+      .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories)')
       .eq('drawing_sheet_id', sheet.id)
       .order('created_at')
     if (data) {
@@ -380,7 +380,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             fov_range:           copiedPlacement.fov_range,
             source:              'manual',
           })
-          .select('*, global_products(id, name, part_number, manufacturer, category, specs, accessories)')
+          .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories)')
           .single()
         if (!error && data) {
           // Copy components from source placement
@@ -703,7 +703,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
           device_address: await getNextLabel(selectedSymbol.category, allSheetIds || [sheet.id]),
         })
-        .select('*, global_products(id, name, part_number, manufacturer, category, specs, accessories)')
+        .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories)')
         .single()
       if (error) throw error
       setPlacements(prev => [...prev, placement])
@@ -1069,7 +1069,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
                 device_address: await getNextLabel(symbol.category, allSheetIds || [sheet.id]),
               })
-              .select('*, global_products(id, name, part_number, manufacturer, category, specs, accessories)')
+              .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories)')
               .single()
             if (!error && placement) {
               setPlacements(prev => [...prev, placement])
@@ -1907,7 +1907,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               notes: p.notes, fov_angle: p.fov_angle, fov_range: p.fov_range,
               source: 'manual',
             })
-            .select('*, global_products(id, name, part_number, manufacturer, category, specs, accessories)')
+            .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories)')
             .single()
           if (!error && data) {
             // Copy components from source placement

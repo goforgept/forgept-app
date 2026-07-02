@@ -36,6 +36,7 @@ import RecurringSection from '../components/proposal/RecurringSection'
 import ServiceAgreementSection from '../components/proposal/ServiceAgreementSection'
 import MonitoringSection from '../components/proposal/MonitoringSection'
 import BomSection from '../components/proposal/BomSection'
+import CatalogSearch from '../components/CatalogSearch'
 
 export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
@@ -86,6 +87,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [pendingRenewalItems, setPendingRenewalItems] = useState([])
   const [pendingRenewalDates, setPendingRenewalDates] = useState({})
   const [showRFQModal, setShowRFQModal] = useState(false)
+  const [showCatalogSearch, setShowCatalogSearch] = useState(false)
   const [showLibrarySearch, setShowLibrarySearch] = useState(false)
   const [librarySearch, setLibrarySearch] = useState('')
   const [libraryResults, setLibraryResults] = useState([])
@@ -827,6 +829,30 @@ export default function ProposalDetail({ isAdmin }) {
     setLibraryResults([])
     setLibrarySelectedItems(new Set())
     setLibrarySelectedVendor({})
+  }
+
+  const addFromCatalog = (item) => {
+    const newLine = {
+      proposal_id: id,
+      item_name: item.item_name,
+      manufacturer: '',
+      part_number_sku: item.part_number_sku || '',
+      quantity: '1',
+      unit: item.unit || 'ea',
+      category: item.category || '',
+      vendor: item.vendor || '',
+      your_cost_unit: item.your_cost_unit || '',
+      markup_percent: item.markup_percent || '35',
+      customer_price_unit: item.customer_price_unit || '',
+      customer_price_total: '',
+      pricing_status: item.pricing_status || 'Needs Pricing',
+    }
+    if (!editingBOM) {
+      setEditLines([...lineItems.map(l => ({ ...l })), newLine])
+      setEditingBOM(true)
+    } else {
+      setEditLines(prev => [...prev, newLine])
+    }
   }
 
   const openRFQModal = () => {
@@ -2798,6 +2824,7 @@ const analyzeDrawing = async () => {
           onAddSectionLaborLine={addSectionLaborLine}
           onRemoveSectionLaborLine={removeSectionLaborLine}
           onExcelUpload={handleExcelUpload}
+          onOpenCatalogSearch={() => setShowCatalogSearch(true)}
           onOpenOrderModal={() => setShowOrderModal(true)}
           onOpenPOModal={() => setShowPOModal(true)}
           onOpenAIBOMModal={() => setShowAIBOMModal(true)}
@@ -2885,6 +2912,8 @@ const analyzeDrawing = async () => {
         <POList proposalId={id} />
 
       </div>
+
+      {showCatalogSearch && <CatalogSearch orgId={proposal?.org_id} onAdd={addFromCatalog} onClose={() => setShowCatalogSearch(false)} />}
 
       {showRFQModal && <RFQModal lineItems={rfqItems} rfqVendorData={rfqVendorData} setRfqVendorData={setRfqVendorData} sendingRFQs={sendingRFQs} onSend={sendAllRFQs} onClose={() => setShowRFQModal(false)} />}
 
