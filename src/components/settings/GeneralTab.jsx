@@ -4,6 +4,7 @@ export default function GeneralTab({
   passwordForm, setPasswordForm, passwordError, passwordSuccess, savingPassword, handleChangePassword,
   supportPin, pinInput, setPinInput, savingPin, pinSaved, savePin, regeneratePin,
   sameAsShipTo, handleSameAsShipTo, profile, saving, handleSave,
+  isAdmin, msrpEnabled, onToggleMsrp,
 }) {
   return (
     <div className="space-y-6">
@@ -99,8 +100,12 @@ export default function GeneralTab({
             <p className="text-[#8A9AB0] text-xs mt-1">PNG or JPG recommended.</p>
           </div>
           <div>
-            <label className="text-[#8A9AB0] text-xs mb-1 block">Default Markup %</label>
-            <input type="number" value={form.default_markup_percent} onChange={e => setForm(prev => ({ ...prev, default_markup_percent: e.target.value }))} className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+            <label className="text-[#8A9AB0] text-xs mb-1 block">Brand Color</label>
+            <div className="flex items-center gap-3">
+              <input type="color" value={form.primary_color} onChange={e => setForm(prev => ({ ...prev, primary_color: e.target.value }))} className="w-12 h-10 rounded cursor-pointer border border-[#2a3d55] bg-transparent" />
+              <input type="text" value={form.primary_color} onChange={e => setForm(prev => ({ ...prev, primary_color: e.target.value }))} className="w-32 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+            </div>
+            <p className="text-[#8A9AB0] text-xs mt-1">Used in PDF proposals and purchase orders.</p>
           </div>
           <div>
             <label className="text-[#8A9AB0] text-xs mb-1 block">Timezone</label>
@@ -111,21 +116,37 @@ export default function GeneralTab({
             </select>
             <p className="text-[#8A9AB0] text-xs mt-1">Used for calendar event scheduling.</p>
           </div>
-          <div>
-            <label className="text-[#8A9AB0] text-xs mb-1 block">Default Tax Rate %</label>
-            <input type="number" step="0.01" placeholder="e.g. 8.5" value={orgTaxRate} onChange={e => setOrgTaxRate(e.target.value)} className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-            <p className="text-[#8A9AB0] text-xs mt-1">Applied as default to new proposals.</p>
-          </div>
-          <div>
-            <label className="text-[#8A9AB0] text-xs mb-1 block">Brand Color</label>
-            <div className="flex items-center gap-3">
-              <input type="color" value={form.primary_color} onChange={e => setForm(prev => ({ ...prev, primary_color: e.target.value }))} className="w-12 h-10 rounded cursor-pointer border border-[#2a3d55] bg-transparent" />
-              <input type="text" value={form.primary_color} onChange={e => setForm(prev => ({ ...prev, primary_color: e.target.value }))} className="w-32 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-            </div>
-            <p className="text-[#8A9AB0] text-xs mt-1">Used in PDF proposals and purchase orders.</p>
-          </div>
         </div>
       </div>
+
+      {/* Proposal Defaults */}
+      {isAdmin && (
+        <div className="bg-[#1a2d45] rounded-xl p-6">
+          <h3 className="text-white font-bold mb-1">Proposal Defaults</h3>
+          <p className="text-[#8A9AB0] text-sm mb-4">Default values and features applied to all proposals.</p>
+          <div className="space-y-4">
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Default Markup %</label>
+              <input type="number" value={form.default_markup_percent} onChange={e => setForm(prev => ({ ...prev, default_markup_percent: e.target.value }))} className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+            </div>
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Default Tax Rate %</label>
+              <input type="number" step="0.01" placeholder="e.g. 8.5" value={orgTaxRate} onChange={e => setOrgTaxRate(e.target.value)} className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              <p className="text-[#8A9AB0] text-xs mt-1">Applied as default to new proposals.</p>
+            </div>
+            <div className="flex items-center justify-between bg-[#0F1C2E] rounded-xl px-4 py-3">
+              <div>
+                <p className="text-white text-sm font-semibold">Enable MSRP</p>
+                <p className="text-[#8A9AB0] text-xs mt-0.5">Adds an MSRP field to the product library and BOM. Control visibility per proposal in Pricing options.</p>
+              </div>
+              <button onClick={onToggleMsrp}
+                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${msrpEnabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${msrpEnabled ? 'left-6' : 'left-1'}`} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Bill To / Ship To */}
       <div className="bg-[#1a2d45] rounded-xl p-6">

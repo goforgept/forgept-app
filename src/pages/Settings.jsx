@@ -450,34 +450,18 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           {success && <p className="text-green-400 text-sm mb-4">{success}</p>}
 
           {activeTab === 'general' && (
-            <>
-              <GeneralTab form={form} setForm={setForm} inputClass={inputClass} logoUrl={logoUrl} uploadingLogo={uploadingLogo} handleLogoUpload={handleLogoUpload}
-                orgTaxRate={orgTaxRate} setOrgTaxRate={setOrgTaxRate} orgTimezone={orgTimezone} setOrgTimezone={setOrgTimezone}
-                passwordForm={passwordForm} setPasswordForm={setPasswordForm} passwordError={passwordError} passwordSuccess={passwordSuccess}
-                savingPassword={savingPassword} handleChangePassword={handleChangePassword}
-                supportPin={supportPin} pinInput={pinInput} setPinInput={setPinInput} savingPin={savingPin} pinSaved={pinSaved} savePin={savePin} regeneratePin={regeneratePin}
-                sameAsShipTo={sameAsShipTo} handleSameAsShipTo={handleSameAsShipTo} profile={profile} saving={saving} handleSave={handleSave} />
-              {isAdmin && (
-                <div className="mt-6 bg-[#1a2d45] rounded-xl p-5">
-                  <h3 className="text-white font-bold mb-1">BOM Settings</h3>
-                  <p className="text-[#8A9AB0] text-sm mb-4">Configure what fields are available in the Bill of Materials.</p>
-                  <div className="flex items-center justify-between bg-[#0F1C2E] rounded-xl px-4 py-3">
-                    <div>
-                      <p className="text-white text-sm font-semibold">Enable MSRP</p>
-                      <p className="text-[#8A9AB0] text-xs mt-0.5">Adds an MSRP field to the product library and BOM. Control visibility per proposal in the Pricing options.</p>
-                    </div>
-                    <button onClick={async () => {
-                      const next = !msrpEnabled
-                      setMsrpEnabled(next)
-                      await supabase.from('organizations').update({ feature_msrp: next }).eq('id', orgId)
-                    }}
-                      className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${msrpEnabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
-                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${msrpEnabled ? 'left-6' : 'left-1'}`} />
-                    </button>
-                  </div>
-                </div>
-              )}
-            </>
+            <GeneralTab form={form} setForm={setForm} inputClass={inputClass} logoUrl={logoUrl} uploadingLogo={uploadingLogo} handleLogoUpload={handleLogoUpload}
+              orgTaxRate={orgTaxRate} setOrgTaxRate={setOrgTaxRate} orgTimezone={orgTimezone} setOrgTimezone={setOrgTimezone}
+              passwordForm={passwordForm} setPasswordForm={setPasswordForm} passwordError={passwordError} passwordSuccess={passwordSuccess}
+              savingPassword={savingPassword} handleChangePassword={handleChangePassword}
+              supportPin={supportPin} pinInput={pinInput} setPinInput={setPinInput} savingPin={savingPin} pinSaved={pinSaved} savePin={savePin} regeneratePin={regeneratePin}
+              sameAsShipTo={sameAsShipTo} handleSameAsShipTo={handleSameAsShipTo} profile={profile} saving={saving} handleSave={handleSave}
+              isAdmin={isAdmin} msrpEnabled={msrpEnabled}
+              onToggleMsrp={async () => {
+                const next = !msrpEnabled
+                setMsrpEnabled(next)
+                await supabase.from('organizations').update({ feature_msrp: next }).eq('id', orgId)
+              }} />
           )}
 
           {activeTab === 'invoicing' && isAdmin && (
