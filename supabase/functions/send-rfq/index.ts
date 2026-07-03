@@ -43,6 +43,29 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Load org's RFQ email template (if set)
+    const { data: profileData } = await adminSupabase
+      .from('profiles')
+      .select('email_template_rfq_subject, email_template_rfq_body')
+      .eq('id', profile.id)
+      .single()
+
+    const applyVars = (str: string) => str
+      .replace(/\{\{contactName\}\}/g, vendorContactName || vendorName)
+      .replace(/\{\{vendorName\}\}/g, vendorName)
+      .replace(/\{\{proposalName\}\}/g, proposalName)
+      .replace(/\{\{itemCount\}\}/g, String(items.length))
+      .replace(/\{\{repName\}\}/g, repName || '')
+      .replace(/\{\{companyName\}\}/g, company || '')
+
+    const emailSubject = profileData?.email_template_rfq_subject
+      ? applyVars(profileData.email_template_rfq_subject)
+      : `RFQ: ${proposalName} — ${items.length} item${items.length !== 1 ? 's' : ''}`
+
+    const introText = profileData?.email_template_rfq_body
+      ? applyVars(profileData.email_template_rfq_body).replace(/\n/g, '<br/>')
+      : `Hi ${vendorContactName || vendorName},<br/><br/>We are requesting pricing on the following items for project: <strong>${proposalName}</strong>. Please provide your best pricing at your earliest convenience.`
+
     // For competing vendors, skip the vendor table check
     if (!skipVendorCheck) {
       const { data: vendor } = await adminSupabase
@@ -98,8 +121,7 @@ Deno.serve(async (req) => {
         </div>
         <div style="padding:28px;">
           <h2 style="color:#0f1c2e;margin-top:0;font-size:18px;">Request for Quotation</h2>
-          <p style="color:#444;font-size:14px;">Hi ${vendorContactName || vendorName},</p>
-          <p style="color:#444;font-size:14px;">We are requesting pricing on the following items for project: <strong>${proposalName}</strong>. Please provide your best pricing at your earliest convenience.</p>
+          <p style="color:#444;font-size:14px;">${introText}</p>
 
           <table style="width:100%;border-collapse:collapse;margin:20px 0;border:1px solid #e0e0e0;border-radius:6px;overflow:hidden;">
             <thead>
@@ -135,7 +157,7 @@ Deno.serve(async (req) => {
 
     await sendEmail({
       to:       vendorEmail,
-      subject:  `RFQ: ${proposalName} — ${items.length} item${items.length !== 1 ? 's' : ''}`,
+      subject:  emailSubject,
       html:     htmlContent,
       replyTo:  repEmail || undefined,
       fromName: repName || SENDER_NAME,

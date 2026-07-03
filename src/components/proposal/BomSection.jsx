@@ -52,6 +52,7 @@ export default function BomSection({
   onMoveLineToSection,
   onDeleteRFQ,
   fmt,
+  featureMsrp = false,
   canEdit = true,
 }) {
   return (
@@ -295,6 +296,7 @@ export default function BomSection({
                         <th className="text-[#8A9AB0] text-left py-2 pr-4">Vendor</th>
                         <th className="text-[#8A9AB0] text-right py-2 pr-4">Qty</th>
                         <th className="text-[#8A9AB0] text-right py-2 pr-4">Unit Price</th>
+                        {featureMsrp && <th className="text-[#8A9AB0] text-right py-2 pr-4">MSRP</th>}
                         <th className="text-[#8A9AB0] text-right py-2 pr-4">Total</th>
                         <th className="text-[#8A9AB0] text-left py-2">Status</th>
                         <th className="text-[#8A9AB0] text-center py-2 pr-2">🔄</th>
@@ -323,6 +325,7 @@ export default function BomSection({
                             <td className="text-[#8A9AB0] py-3 pr-4">{item.vendor}</td>
                             <td className="text-white py-3 pr-4 text-right">{item.quantity}</td>
                             <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
+                            {featureMsrp && <td className="text-[#8A9AB0] py-3 pr-4 text-right">{item.msrp_unit ? `$${fmt(item.msrp_unit)}` : '—'}</td>}
                             <td className="text-white py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>
                             <td className="py-3">
                               <div className="flex flex-col gap-1">
@@ -541,7 +544,7 @@ export default function BomSection({
                               })
                             }} />
                         </th>
-                        {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', '🔄', ''].map(h => (
+                        {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ...(featureMsrp ? ['MSRP'] : []), '🔄', ''].map(h => (
                           <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
                         ))}
                         {editSections.length > 0 && <th className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">Move</th>}
@@ -605,6 +608,12 @@ export default function BomSection({
                               <input type="number" placeholder="0.00" value={line.customer_price_unit || ''} onChange={e => onUpdateEditLine(i, 'customer_price_unit', e.target.value)}
                                 className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
                             </td>
+                            {featureMsrp && (
+                              <td className="pr-2 py-1">
+                                <input type="number" placeholder="MSRP" value={line.msrp_unit || ''} onChange={e => onUpdateEditLine(i, 'msrp_unit', e.target.value)}
+                                  className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                              </td>
+                            )}
                             <td className="py-1 text-center">
                               <input type="checkbox" checked={!!line.recurring} onChange={e => onUpdateEditLine(i, 'recurring', e.target.checked)} className="accent-[#C8622A] cursor-pointer" title="Recurring" />
                             </td>
@@ -624,7 +633,7 @@ export default function BomSection({
                   </table>
                   <button onClick={() => setEditLines(prev => [...prev, {
                     proposal_id: proposalId, item_name: '', part_number_sku: '', quantity: '', unit: 'ea', category: '',
-                    vendor: '', your_cost_unit: '', markup_percent: '35', customer_price_unit: '', customer_price_total: '',
+                    vendor: '', your_cost_unit: '', markup_percent: '35', customer_price_unit: '', customer_price_total: '', msrp_unit: '',
                     pricing_status: 'Needs Pricing', section_id: sectionId === 'general' ? null : sectionId
                   }])} className="mt-2 text-[#C8622A] hover:text-white text-xs transition-colors">
                     + Add Item{sectionLabel ? ` to ${sectionLabel}` : ''}

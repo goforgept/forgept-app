@@ -19,7 +19,8 @@ const AgeBadge = ({ days }) => {
 }
 
 export default function ProductLibrary({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, isSalesManager = false, isPM = false, isTechnician = false }) {
-  const { profile } = useProfile()
+  const { profile, features } = useProfile()
+  const featureMsrp = features.msrp
   const [products, setProducts] = useState([])   // product_library rows
   const [pricing, setPricing] = useState({})      // { product_id: [pricing rows] }
   const [loading, setLoading] = useState(true)
@@ -33,7 +34,7 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [expandedId, setExpandedId] = useState(null)
   // Add product form
   const [showAddForm, setShowAddForm] = useState(false)
-  const [addForm, setAddForm] = useState({ item_name: '', manufacturer: '', part_number: '', category: '', unit: 'ea', description: '' })
+  const [addForm, setAddForm] = useState({ item_name: '', manufacturer: '', part_number: '', category: '', unit: 'ea', description: '', msrp: '' })
   const [saving, setSaving] = useState(false)
   // Add vendor price inline
   const [addingPriceFor, setAddingPriceFor] = useState(null) // product_id
@@ -256,10 +257,11 @@ if (!finalCost) continue
       ...addForm,
       org_id: orgId,
       part_number: addForm.part_number || null,
+      msrp: addForm.msrp ? parseFloat(addForm.msrp) : null,
       active: true,
     })
     if (err) { setError(err.message); setSaving(false); return }
-    setAddForm({ item_name: '', manufacturer: '', part_number: '', category: '', unit: 'ea', description: '' })
+    setAddForm({ item_name: '', manufacturer: '', part_number: '', category: '', unit: 'ea', description: '', msrp: '' })
     setShowAddForm(false); setSaving(false)
     const { data: newProd } = await supabase
       .from('product_library')
@@ -382,6 +384,7 @@ if (!finalCost) continue
                 </select>
               </div>
               <div><label className="text-[#8A9AB0] text-xs mb-1 block">Description</label><input type="text" value={addForm.description} onChange={e => setAddForm(p => ({ ...p, description: e.target.value }))} className={inputCls} /></div>
+              {featureMsrp && <div><label className="text-[#8A9AB0] text-xs mb-1 block">MSRP</label><input type="number" placeholder="0.00" value={addForm.msrp} onChange={e => setAddForm(p => ({ ...p, msrp: e.target.value }))} className={inputCls} /></div>}
             </div>
             <p className="text-[#8A9AB0] text-xs mb-4">After saving, the vendor pricing form will open automatically so you can add costs right away.</p>
             <button onClick={handleAddProduct} disabled={saving || !addForm.item_name}
@@ -508,6 +511,11 @@ if (!finalCost) continue
           <div><label className="text-[#8A9AB0] text-xs mb-1 block">Description</label>
             <input type="text" value={editForm.description || ''} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} className={inputCls} />
           </div>
+          {featureMsrp && (
+            <div><label className="text-[#8A9AB0] text-xs mb-1 block">MSRP</label>
+              <input type="number" placeholder="0.00" value={editForm.msrp || ''} onChange={e => setEditForm(p => ({ ...p, msrp: e.target.value }))} className={inputCls} />
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button onClick={() => setEditingProductId(null)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Cancel</button>
@@ -519,6 +527,7 @@ if (!finalCost) continue
               category: editForm.category || null,
               unit: editForm.unit || 'ea',
               description: editForm.description || null,
+              msrp: editForm.msrp ? parseFloat(editForm.msrp) : null,
             }).eq('id', p.id)
             setEditingProductId(null)
             fetchAll()

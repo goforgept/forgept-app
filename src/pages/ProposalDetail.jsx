@@ -195,7 +195,7 @@ export default function ProposalDetail({ isAdmin }) {
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,show_msrp,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
       .eq('id', id)
       .single()
 
@@ -465,6 +465,12 @@ export default function ProposalDetail({ isAdmin }) {
     const newVal = !proposal?.hide_labor_breakdown
     await supabase.from('proposals').update({ hide_labor_breakdown: newVal }).eq('id', id)
     setProposal(prev => ({ ...prev, hide_labor_breakdown: newVal }))
+  }
+
+  const toggleShowMsrp = async () => {
+    const newVal = !proposal?.show_msrp
+    await supabase.from('proposals').update({ show_msrp: newVal }).eq('id', id)
+    setProposal(prev => ({ ...prev, show_msrp: newVal }))
   }
 
   const saveProposalName = async () => {
@@ -816,6 +822,7 @@ export default function ProposalDetail({ isAdmin }) {
         customer_price_unit: isStale ? '' : (cost * 1.35).toFixed(2),
         customer_price_total: '',
         pricing_status: isStale ? 'Needs Pricing' : 'Confirmed',
+        msrp_unit: prod.msrp ? String(prod.msrp) : '',
       })
     })
     if (!editingBOM) {
@@ -2314,7 +2321,7 @@ const analyzeDrawing = async () => {
   const generatePDFDoc = async () => {
     const { data: freshProposal } = await supabase
       .from('proposals')
-      .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
+      .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, show_msrp, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
       .eq('id', id)
       .single()
     const p = freshProposal ? { ...proposal, ...freshProposal } : proposal
@@ -2379,16 +2386,21 @@ const analyzeDrawing = async () => {
       yPos += 6
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
       const isLumpSum = p?.hide_material_prices || p?.lump_sum_pricing
-      const pdfHead = isLumpSum ? [['Item', 'Part #', 'Qty']] : [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']]
+      const showMsrpCol = p?.show_msrp && features.msrp
+      const fmtMoney = (v) => `$${(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+      const pdfHead = isLumpSum
+        ? [['Item', 'Part #', 'Qty']]
+        : showMsrpCol
+          ? [['Item', 'Part #', 'Qty', 'MSRP', 'Unit Price', 'Total']]
+          : [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']]
       const pdfRow = (item) => isLumpSum
         ? [item.item_name, item.part_number_sku || '—', item.quantity]
-        : [item.item_name, item.part_number_sku || '—', item.quantity, `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
-      const pdfFoot = (total) => isLumpSum
-        ? [['', 'Section Total', `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]]
-        : [['', '', '', 'Section Total', `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]]
-      const pdfMatFoot = (total) => isLumpSum
-        ? [['', 'Materials Total', `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]]
-        : [['', '', '', 'Materials Total', `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]]
+        : showMsrpCol
+          ? [item.item_name, item.part_number_sku || '—', item.quantity, item.msrp_unit ? fmtMoney(item.msrp_unit) : '—', fmtMoney(item.customer_price_unit), fmtMoney(item.customer_price_total)]
+          : [item.item_name, item.part_number_sku || '—', item.quantity, fmtMoney(item.customer_price_unit), fmtMoney(item.customer_price_total)]
+      const emptyFiller = isLumpSum ? 1 : showMsrpCol ? 4 : 3
+      const pdfFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Section Total', fmtMoney(total)]]
+      const pdfMatFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Materials Total', fmtMoney(total)]]
       const tableStyles = { headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' }
 
       if (sections.length > 0) {
@@ -2760,6 +2772,7 @@ const analyzeDrawing = async () => {
           setEditingSOW={setEditingSOW} saveSOW={saveSOW}
           generatingSOW={generatingSOW} generateSOW={generateSOW}
           sendForm={sendForm} setSendForm={setSendForm} setShowSendModal={setShowSendModal}
+          sendTemplateSubject={profile?.email_template_send_subject} sendTemplateBody={profile?.email_template_send_body}
           requestingSignature={requestingSignature} requestSignature={requestSignature}
           uploadingSignedPDF={uploadingSignedPDF} uploadSignedPDF={uploadSignedPDF}
           qboConnected={qboConnected} qboInvoiceId={qboInvoiceId} sendingToQBO={sendingToQBO} sendToQBO={sendToQBO}
@@ -2834,6 +2847,7 @@ const analyzeDrawing = async () => {
           onOpenSaveTemplateModal={() => { setTemplateName(proposal?.proposal_name || ''); setShowSaveTemplateModal(true) }}
           onMoveLineToSection={(i) => { setMoveLineIndex(i); setMoveType('move'); setShowMoveModal(true) }}
           fmt={fmt}
+          featureMsrp={features.msrp}
           canEdit={canEdit}
         />
 
@@ -2947,7 +2961,7 @@ const analyzeDrawing = async () => {
 
       {showSendModal && <SendProposalModal proposal={proposal} sendForm={sendForm} setSendForm={setSendForm} sendingProposal={sendingProposal} onSend={sendProposal} onClose={() => setShowSendModal(false)} />}
 
-      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onClose={() => setShowPricingModal(false)} />}
+      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onClose={() => setShowPricingModal(false)} />}
 
       {showMoveModal && moveLineIndex !== null && <MoveLineModal editLines={editLines} moveLineIndex={moveLineIndex} editSections={editSections} onMove={moveLineToSection} onClose={() => { setShowMoveModal(false); setMoveLineIndex(null) }} />}
 

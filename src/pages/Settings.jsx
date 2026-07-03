@@ -42,6 +42,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     day14_days: 14, day14_subject: '', day14_body: '',
     day7_days: 7, day7_subject: '', day7_body: '',
     close_subject: '', close_body: '',
+    rfq_subject: '', rfq_body: '',
+    send_subject: '', send_body: '',
   })
   const [saving, setSaving] = useState(false)
   const [savingTemplates, setSavingTemplates] = useState(false)
@@ -73,6 +75,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   })
   const [savingInvoicing, setSavingInvoicing] = useState(false)
   const [regionsEnabled, setRegionsEnabled] = useState(false)
+  const [msrpEnabled, setMsrpEnabled] = useState(false)
   const [slaEnabled, setSlaEnabled] = useState(false)
   const [slaAutoAttach, setSlaAutoAttach] = useState(false)
   const [monitoringEnabled, setMonitoringEnabled] = useState(false)
@@ -141,7 +144,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   }, [profile?.id])
 
   const fetchProfile = async () => {
-    const { data: extraData } = await supabase.from('profiles').select('support_pin, terms_and_conditions, email_template_early_subject, email_template_early_body, email_cadence_early, email_template_14day_subject, email_template_14day_body, email_cadence_14day, email_template_7day_subject, email_template_7day_body, email_cadence_7day, email_template_close_subject, email_template_close_body, payment_instructions_bank, payment_instructions_routing, payment_instructions_account, google_email, microsoft_email').eq('id', profile.id).single()
+    const { data: extraData } = await supabase.from('profiles').select('support_pin, terms_and_conditions, email_template_early_subject, email_template_early_body, email_cadence_early, email_template_14day_subject, email_template_14day_body, email_cadence_14day, email_template_7day_subject, email_template_7day_body, email_cadence_7day, email_template_close_subject, email_template_close_body, email_template_rfq_subject, email_template_rfq_body, email_template_send_subject, email_template_send_body, payment_instructions_bank, payment_instructions_routing, payment_instructions_account, google_email, microsoft_email').eq('id', profile.id).single()
     const data = { ...profile, ...extraData }
     let pin = data?.support_pin || ''
     if (!pin) {
@@ -192,10 +195,14 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       day7_body: data?.email_template_7day_body || `Hi {{clientName}},\n\nWe're just one week away from the date we had targeted for {{proposalName}}.\n\n{{repName}}\n{{companyName}}`,
       close_subject: data?.email_template_close_subject || `Today's the day — {{proposalName}}`,
       close_body: data?.email_template_close_body || `Hi {{clientName}},\n\nToday is the date we had targeted to move forward on {{proposalName}}.\n\n{{repName}}\n{{companyName}}`,
+      rfq_subject: data?.email_template_rfq_subject || `RFQ: {{proposalName}} — {{itemCount}} item(s)`,
+      rfq_body: data?.email_template_rfq_body || `Hi {{contactName}},\n\nWe are requesting pricing on {{itemCount}} item(s) for project: {{proposalName}}. Please provide your best pricing at your earliest convenience.\n\nThank you for your time.\n\n{{repName}}\n{{companyName}}`,
+      send_subject: data?.email_template_send_subject || `Proposal: {{proposalName}}`,
+      send_body: data?.email_template_send_body || `Hi {{clientName}},\n\nPlease find your proposal attached. Don't hesitate to reach out with any questions.\n\nLooking forward to working with you.\n\n{{repName}}\n{{companyName}}`,
     })
     if (data?.org_id) {
       try {
-        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions').eq('id', data.org_id).single()
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions, feature_msrp').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
         setOrgTimezone(orgData?.timezone || 'America/Chicago')
         setOrgId(data.org_id)
@@ -206,6 +213,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         setGoogleConnected(data?.google_calendar_connected || false); setGoogleEmail(data?.google_email || '')
         setMicrosoftConnected(data?.microsoft_calendar_connected || false); setMicrosoftEmail(data?.microsoft_email || '')
         setRegionsEnabled(orgData?.feature_regions || false)
+        setMsrpEnabled(orgData?.feature_msrp || false)
         setSlaEnabled(orgData?.feature_sla || false); setSlaAutoAttach(orgData?.sla_auto_attach || false)
         setMonitoringEnabled(orgData?.feature_monitoring || false); setMonitoringAutoAttach(orgData?.monitoring_auto_attach || false)
         const savedSLA = orgData?.sla_templates || {}
@@ -281,6 +289,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       email_cadence_7day: parseInt(emailTemplates.day7_days) || 7,
       email_template_7day_subject: emailTemplates.day7_subject, email_template_7day_body: emailTemplates.day7_body,
       email_template_close_subject: emailTemplates.close_subject, email_template_close_body: emailTemplates.close_body,
+      email_template_rfq_subject: emailTemplates.rfq_subject, email_template_rfq_body: emailTemplates.rfq_body,
+      email_template_send_subject: emailTemplates.send_subject, email_template_send_body: emailTemplates.send_body,
       followup_days: `${emailTemplates.early_days},${emailTemplates.day14_days},${emailTemplates.day7_days},0`
     }).eq('id', user.id)
     setForm(prev => ({ ...prev, followup_days: `${emailTemplates.early_days},${emailTemplates.day14_days},${emailTemplates.day7_days},0` }))
@@ -372,6 +382,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setSavingSLA(true); setSuccess(null)
     await supabase.from('organizations').update({
       feature_regions: regionsEnabled,
+      feature_msrp: msrpEnabled,
       feature_sla: slaEnabled, sla_auto_attach: slaAutoAttach, sla_templates: slaTemplates,
       feature_monitoring: monitoringEnabled, monitoring_auto_attach: monitoringAutoAttach, monitoring_templates: monitoringTemplates,
     }).eq('id', orgId)
@@ -439,12 +450,34 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           {success && <p className="text-green-400 text-sm mb-4">{success}</p>}
 
           {activeTab === 'general' && (
-            <GeneralTab form={form} setForm={setForm} inputClass={inputClass} logoUrl={logoUrl} uploadingLogo={uploadingLogo} handleLogoUpload={handleLogoUpload}
-              orgTaxRate={orgTaxRate} setOrgTaxRate={setOrgTaxRate} orgTimezone={orgTimezone} setOrgTimezone={setOrgTimezone}
-              passwordForm={passwordForm} setPasswordForm={setPasswordForm} passwordError={passwordError} passwordSuccess={passwordSuccess}
-              savingPassword={savingPassword} handleChangePassword={handleChangePassword}
-              supportPin={supportPin} pinInput={pinInput} setPinInput={setPinInput} savingPin={savingPin} pinSaved={pinSaved} savePin={savePin} regeneratePin={regeneratePin}
-              sameAsShipTo={sameAsShipTo} handleSameAsShipTo={handleSameAsShipTo} profile={profile} saving={saving} handleSave={handleSave} />
+            <>
+              <GeneralTab form={form} setForm={setForm} inputClass={inputClass} logoUrl={logoUrl} uploadingLogo={uploadingLogo} handleLogoUpload={handleLogoUpload}
+                orgTaxRate={orgTaxRate} setOrgTaxRate={setOrgTaxRate} orgTimezone={orgTimezone} setOrgTimezone={setOrgTimezone}
+                passwordForm={passwordForm} setPasswordForm={setPasswordForm} passwordError={passwordError} passwordSuccess={passwordSuccess}
+                savingPassword={savingPassword} handleChangePassword={handleChangePassword}
+                supportPin={supportPin} pinInput={pinInput} setPinInput={setPinInput} savingPin={savingPin} pinSaved={pinSaved} savePin={savePin} regeneratePin={regeneratePin}
+                sameAsShipTo={sameAsShipTo} handleSameAsShipTo={handleSameAsShipTo} profile={profile} saving={saving} handleSave={handleSave} />
+              {isAdmin && (
+                <div className="mt-6 bg-[#1a2d45] rounded-xl p-5">
+                  <h3 className="text-white font-bold mb-1">BOM Settings</h3>
+                  <p className="text-[#8A9AB0] text-sm mb-4">Configure what fields are available in the Bill of Materials.</p>
+                  <div className="flex items-center justify-between bg-[#0F1C2E] rounded-xl px-4 py-3">
+                    <div>
+                      <p className="text-white text-sm font-semibold">Enable MSRP</p>
+                      <p className="text-[#8A9AB0] text-xs mt-0.5">Adds an MSRP field to the product library and BOM. Control visibility per proposal in the Pricing options.</p>
+                    </div>
+                    <button onClick={async () => {
+                      const next = !msrpEnabled
+                      setMsrpEnabled(next)
+                      await supabase.from('organizations').update({ feature_msrp: next }).eq('id', orgId)
+                    }}
+                      className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${msrpEnabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${msrpEnabled ? 'left-6' : 'left-1'}`} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {activeTab === 'invoicing' && isAdmin && (

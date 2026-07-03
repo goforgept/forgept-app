@@ -4,6 +4,7 @@ export default function ScopeSection({
   editingSOW, sowDraft, setSowDraft, setEditingSOW, saveSOW,
   generatingSOW, generateSOW,
   sendForm, setSendForm, setShowSendModal,
+  sendTemplateSubject, sendTemplateBody,
   requestingSignature, requestSignature,
   uploadingSignedPDF, uploadSignedPDF,
   qboConnected, qboInvoiceId, sendingToQBO, sendToQBO,
@@ -11,6 +12,11 @@ export default function ScopeSection({
   setShowPhotosModal,
   canEdit = true,
 }) {
+  const applyVars = (str) => (str || '')
+    .replace(/\{\{clientName\}\}/g, proposal?.client_name || 'there')
+    .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
+    .replace(/\{\{repName\}\}/g, proposal?.rep_name || '')
+    .replace(/\{\{companyName\}\}/g, proposal?.company || '')
   return (
     <div className="bg-[#1a2d45] rounded-xl p-6">
       <div className="flex justify-between items-center mb-4">
@@ -22,7 +28,10 @@ export default function ScopeSection({
                 alert('No client email on file. Edit the client info to add one.')
                 return
               }
-              setSendForm({ subject: `Proposal: ${proposal.proposal_name}`, message: `Hi ${proposal.client_name || 'there'},\n\nPlease find your proposal attached. Don't hesitate to reach out with any questions.\n\nLooking forward to working with you.` })
+              setSendForm({
+                subject: applyVars(sendTemplateSubject) || `Proposal: ${proposal.proposal_name}`,
+                message: applyVars(sendTemplateBody) || `Hi ${proposal.client_name || 'there'},\n\nPlease find your proposal attached. Don't hesitate to reach out with any questions.\n\nLooking forward to working with you.`,
+              })
               setShowSendModal(true)
             }}
               className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
