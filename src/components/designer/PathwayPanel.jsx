@@ -2,6 +2,17 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { PATHWAY_DEFS } from '../drawing/SymbolPicker'
 
+const SIZE_OPTIONS = {
+  'EMT':             ['1/2"', '3/4"', '1"', '1-1/4"', '1-1/2"', '2"', '2-1/2"', '3"', '4"'],
+  'Rigid':           ['1/2"', '3/4"', '1"', '1-1/4"', '1-1/2"', '2"', '2-1/2"', '3"', '4"'],
+  'PVC':             ['1/2"', '3/4"', '1"', '1-1/4"', '1-1/2"', '2"', '2-1/2"', '3"', '4"'],
+  'Flex':            ['1/2"', '3/4"', '1"', '1-1/4"', '1-1/2"', '2"'],
+  'J-hook':          ['1/2"', '3/4"', '1"', '1-1/2"', '2"'],
+  'Cable Tray':      ['6"W', '9"W', '12"W', '18"W', '24"W', '36"W'],
+  'Wireway':         ['2"x2"', '4"x4"', '6"x6"', '8"x8"'],
+  'Surface Raceway': ['3/4"', '1"', '1-1/2"', '2"'],
+}
+
 const CABLE_OPTIONS = [
   'Cat6', 'Cat6A', 'Cat5e', 'Fiber SM', 'Fiber MM',
   'Coax RG59', 'Coax RG6', 'Speaker 16/2', 'Speaker 14/2',
@@ -18,6 +29,7 @@ const normalizeCableTypes = (ct) => {
 export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
   const [form, setForm] = useState({
     pathway_type:  pathway.pathway_type  || 'EMT',
+    size:          pathway.size          || '',
     label:         pathway.label         || '',
     notes:         pathway.notes         || '',
     cable_types:   normalizeCableTypes(pathway.cable_types),
@@ -29,6 +41,7 @@ export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
   useEffect(() => {
     setForm({
       pathway_type:  pathway.pathway_type  || 'EMT',
+      size:          pathway.size          || '',
       label:         pathway.label         || '',
       notes:         pathway.notes         || '',
       cable_types:   normalizeCableTypes(pathway.cable_types),
@@ -42,6 +55,7 @@ export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
       .from('drawing_pathways')
       .update({
         pathway_type:  form.pathway_type,
+        size:          form.size || '',
         label:         form.label || null,
         notes:         form.notes || null,
         cable_types:   form.cable_types,
@@ -93,7 +107,9 @@ export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a3d55]">
         <div className="flex items-center gap-2">
           <span className="w-3 h-0.5 rounded inline-block" style={{ backgroundColor: def?.color }}/>
-          <span className="text-sm font-semibold text-white">{def?.label || 'Pathway'}</span>
+          <span className="text-sm font-semibold text-white">
+            {form.size ? `${form.size} ` : ''}{def?.label || 'Pathway'}
+          </span>
         </div>
         <button onClick={onClose}
           className="w-6 h-6 flex items-center justify-center text-[#8A9AB0] hover:text-white transition-colors rounded">
@@ -164,13 +180,36 @@ export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
         <div>
           <label className="block text-xs font-medium text-[#8A9AB0] mb-1.5">Type</label>
           <select value={form.pathway_type}
-            onChange={e => setForm(f => ({ ...f, pathway_type: e.target.value }))}
+            onChange={e => setForm(f => ({ ...f, pathway_type: e.target.value, size: '' }))}
             className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white focus:outline-none focus:border-[#C8622A]">
             {PATHWAY_DEFS.map(d => (
               <option key={d.type} value={d.type}>{d.label}</option>
             ))}
           </select>
         </div>
+
+        {/* Size */}
+        {SIZE_OPTIONS[form.pathway_type] && (
+          <div>
+            <label className="block text-xs font-medium text-[#8A9AB0] mb-1.5">
+              Size
+              {!form.size && <span className="ml-1 text-yellow-500/70 font-normal">required for BOM</span>}
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {SIZE_OPTIONS[form.pathway_type].map(sz => (
+                <button key={sz}
+                  onClick={() => setForm(f => ({ ...f, size: f.size === sz ? '' : sz }))}
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                    form.size === sz
+                      ? 'bg-[#C8622A]/20 border border-[#C8622A] text-[#C8622A]'
+                      : 'bg-[#1a2d45] border border-[#2a3d55] text-[#8A9AB0] hover:text-white hover:border-[#3a4d65]'
+                  }`}>
+                  {sz}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Label */}
         <div>
@@ -226,6 +265,31 @@ export default function PathwayPanel({ pathway, onClose, onUpdate, onDelete }) {
         <p className="text-xs text-[#8A9AB0]">
           {pathway.points?.length || 0} points · Double-click pathway to edit waypoints
         </p>
+        <div className="rounded-lg border border-[#2a3d55]/60 bg-[#0a1628]/60 px-3 py-2 space-y-0.5">
+          <p className="text-xs font-medium text-[#8A9AB0]">Syncs to BOM on approval:</p>
+          {hasFootage ? (
+            <>
+              {form.pathway_type !== 'J-hook' && (
+                <p className="text-xs text-white">
+                  · {form.size ? `${form.size} ` : ''}{form.pathway_type}: {footage} ft
+                </p>
+              )}
+              {isJHook && hookCount != null && (
+                <p className="text-xs text-white">
+                  · {form.size ? `${form.size} ` : ''}J-Hook: {hookCount} ea
+                </p>
+              )}
+              {form.cable_types.map(c => (
+                <p key={c.type} className="text-xs text-white">
+                  · {c.type} Cable (Pathway): {footage * c.qty} ft
+                </p>
+              ))}
+              {!form.size && <p className="text-xs text-yellow-500/80">Set a size to include in BOM line item name</p>}
+            </>
+          ) : (
+            <p className="text-xs text-[#8A9AB0]/60">Set scale on drawing to calculate footage</p>
+          )}
+        </div>
       </div>
 
       {/* Footer */}

@@ -506,8 +506,11 @@ const deleteMeeting = async (meetingId) => {
               </div>
             </div>
             <div className="flex gap-2">
-              {featureAiEmail && client?.email && (
-                <button onClick={() => { setShowEmailModal(true); setDraftedEmail(''); setEmailForm({ subject: '', context: '' }) }}
+              {featureAiEmail && (
+                <button onClick={() => {
+                  if (!client?.email) { alert('Add an email address to this client first.'); return }
+                  setShowEmailModal(true); setDraftedEmail(''); setEmailForm({ subject: '', context: '' })
+                }}
                   className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✍️ Draft Email</button>
               )}
               <button onClick={() => setEditingClient(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Edit Client</button>
@@ -793,8 +796,11 @@ const deleteMeeting = async (meetingId) => {
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-white font-bold text-lg">Email History</h3>
-              {featureAiEmail && client?.email && (
-                <button onClick={() => { setShowEmailModal(true); setDraftedEmail(''); setEmailForm({ subject: '', context: '' }) }}
+              {featureAiEmail && (
+                <button onClick={() => {
+                  if (!client?.email) { alert('Add an email address to this client first.'); return }
+                  setShowEmailModal(true); setDraftedEmail(''); setEmailForm({ subject: '', context: '' })
+                }}
                   className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✍️ Draft Email</button>
               )}
             </div>
