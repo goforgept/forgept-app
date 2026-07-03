@@ -9,6 +9,8 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [showArchived, setShowArchived] = useState(false)
+  const [closingSoon, setClosingSoon] = useState(false)
+  const [sortBy, setSortBy] = useState('newest')
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -74,8 +76,8 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
       return p.status === statusFilter
     })
     .filter(p => {
-      const params = new URLSearchParams(location.search)
-      if (params.get('closing') === '30') {
+      const urlClosing = new URLSearchParams(location.search).get('closing') === '30'
+      if (closingSoon || urlClosing) {
         if (!p.close_date) return false
         const days = Math.ceil((new Date(p.close_date) - new Date()) / (1000 * 60 * 60 * 24))
         return days <= 30 && days >= 0 && p.status !== 'Won' && p.status !== 'Lost'
@@ -92,6 +94,15 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
         p.client_name?.toLowerCase().includes(s) ||
         p.quote_number?.toLowerCase().includes(s)
       )
+    })
+    .sort((a, b) => {
+      if (sortBy === 'close_date') {
+        if (!a.close_date) return 1
+        if (!b.close_date) return -1
+        return new Date(a.close_date) - new Date(b.close_date)
+      }
+      if (sortBy === 'value') return (b.proposal_value || 0) - (a.proposal_value || 0)
+      return new Date(b.created_at) - new Date(a.created_at)
     })
 
   const params = new URLSearchParams(location.search)
@@ -155,16 +166,27 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
           </div>
         )}
 
-        <div className="flex gap-3 mb-4">
-          <input
-            type="text"
-            placeholder="Search by name, company, rep, quote #..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
-          />
+        <div className="space-y-2 mb-4">
+          <div className="flex gap-3">
+            <input
+              type="text"
+              placeholder="Search by name, company, rep, quote #..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
+            />
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              className="bg-[#1a2d45] text-[#8A9AB0] border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+            >
+              <option value="newest">Newest First</option>
+              <option value="close_date">Close Date ↑</option>
+              <option value="value">Highest Value</option>
+            </select>
+          </div>
           {!showArchived && (
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {['All', 'Active', 'Draft', 'Sent', 'Won', 'Lost'].map(s => (
                 <button
                   key={s}
@@ -176,6 +198,14 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                   {s}
                 </button>
               ))}
+              <button
+                onClick={() => setClosingSoon(v => !v)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  closingSoon || isClosingFilter ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
+                }`}
+              >
+                Closing Soon
+              </button>
             </div>
           )}
         </div>
