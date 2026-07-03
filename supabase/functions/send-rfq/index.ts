@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
 
   try {
     const {
-      lineItemIds, items, vendorEmail, vendorName,
+      lineItemIds, items, vendorEmail, vendorName, vendorContactName,
       proposalName, repName, repEmail, company,
       excelBase64, expiresAt: _expiresAt, responseLink,
       skipVendorCheck,
@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
         </div>
         <div style="padding:28px;">
           <h2 style="color:#0f1c2e;margin-top:0;font-size:18px;">Request for Quotation</h2>
-          <p style="color:#444;font-size:14px;">Hi ${vendorName},</p>
+          <p style="color:#444;font-size:14px;">Hi ${vendorContactName || vendorName},</p>
           <p style="color:#444;font-size:14px;">We are requesting pricing on the following items for project: <strong>${proposalName}</strong>. Please provide your best pricing at your earliest convenience.</p>
 
           <table style="width:100%;border-collapse:collapse;margin:20px 0;border:1px solid #e0e0e0;border-radius:6px;overflow:hidden;">

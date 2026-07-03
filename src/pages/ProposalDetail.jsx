@@ -345,7 +345,7 @@ export default function ProposalDetail({ isAdmin }) {
     const { data: { user } } = await supabase.auth.getUser()
     const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
     if (!prof?.org_id) return
-    const { data } = await supabase.from('vendors').select('id, vendor_name, contact_email').eq('org_id', prof.org_id).eq('active', true).order('vendor_name')
+    const { data } = await supabase.from('vendors').select('id, vendor_name, contact_name, contact_email').eq('org_id', prof.org_id).eq('active', true).order('vendor_name')
     setVendors(data || [])
   }
 
@@ -872,7 +872,7 @@ export default function ProposalDetail({ isAdmin }) {
     const initData = {}
     Object.keys(byVendor).forEach(v => {
       const found = vendors.find(vr => vr.vendor_name === v)
-      initData[v] = { email: found?.contact_email || '', attachExcel: false }
+      initData[v] = { email: found?.contact_email || '', contactName: found?.contact_name || '', attachExcel: false }
     })
     setRfqItems(candidates)
     setRfqVendorData(initData)
@@ -973,6 +973,7 @@ export default function ProposalDetail({ isAdmin }) {
             })),
             vendorEmail: vendorInfo.email,
             vendorName,
+            vendorContactName: vendorInfo.contactName || '',
             proposalName: proposal.proposal_name,
             repName: proposal.rep_name,
             repEmail: proposal.rep_email,
