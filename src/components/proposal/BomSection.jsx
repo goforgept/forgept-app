@@ -173,7 +173,9 @@ export default function BomSection({
             {features.specReader && (
               <button onClick={onOpenSpecModal} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">📋 Read Spec</button>
             )}
-            <button onClick={onOpenCatalogSearch} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">+ From Catalog</button>
+            {orgType === 'manufacturer' && (
+              <button onClick={onOpenCatalogSearch} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">+ From Catalog</button>
+            )}
             <button onClick={onStartEditing} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Edit BOM</button>
             <label className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors cursor-pointer">
               Upload Excel

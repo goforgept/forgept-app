@@ -17,7 +17,7 @@ import RegionsTab from '../components/settings/RegionsTab'
 import GlobalProductsImport from '../components/GlobalProductsImport'
 
 export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, featureDesignerOnly = false, featureApi = false, role, isSalesManager, isPM, isTechnician, isDevTeam = false }) {
-  const { profile } = useProfile()
+  const { profile, refreshProfile } = useProfile()
   const [activeTab, setActiveTab] = useState('general')
   const [laborRates, setLaborRates] = useState([])
   const [savingRates, setSavingRates] = useState(false)
@@ -461,6 +461,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                 const next = !msrpEnabled
                 setMsrpEnabled(next)
                 await supabase.from('organizations').update({ feature_msrp: next }).eq('id', orgId)
+                refreshProfile()
               }} />
           )}
 

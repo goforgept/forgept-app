@@ -802,12 +802,11 @@ export default function ProposalDetail({ isAdmin }) {
     libraryResults.forEach(prod => {
       if (!librarySelectedItems.has(prod.id)) return
       const selectedPricing = librarySelectedVendor[prod.id] || prod.product_library_pricing?.[0]
-      if (!selectedPricing) return
-      const days = selectedPricing.pricing_date
+      const days = selectedPricing?.pricing_date
         ? Math.floor((new Date() - new Date(selectedPricing.pricing_date)) / (1000 * 60 * 60 * 24))
         : null
-      const isStale = days === null || days > STALE_DAYS
-      const cost = parseFloat(selectedPricing.your_cost) || 0
+      const isStale = !selectedPricing || days === null || days > STALE_DAYS
+      const cost = parseFloat(selectedPricing?.your_cost) || 0
       newLines.push({
         proposal_id: id,
         item_name: prod.item_name,
@@ -816,7 +815,7 @@ export default function ProposalDetail({ isAdmin }) {
         quantity: '1',
         unit: prod.unit || 'ea',
         category: prod.category || '',
-        vendor: selectedPricing.vendor || '',
+        vendor: selectedPricing?.vendor || '',
         your_cost_unit: isStale ? '' : String(cost),
         markup_percent: '35',
         customer_price_unit: isStale ? '' : (cost * 1.35).toFixed(2),
