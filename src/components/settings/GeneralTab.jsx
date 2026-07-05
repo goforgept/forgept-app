@@ -5,6 +5,8 @@ export default function GeneralTab({
   supportPin, pinInput, setPinInput, savingPin, pinSaved, savePin, regeneratePin,
   sameAsShipTo, handleSameAsShipTo, profile, saving, handleSave,
   isAdmin, msrpEnabled, onToggleMsrp,
+  docFont = 'helvetica', onChangeDocFont,
+  pdfTableStyle = 'striped', onChangePdfTableStyle,
 }) {
   return (
     <div className="space-y-6">
@@ -142,6 +144,31 @@ export default function GeneralTab({
               <button onClick={onToggleMsrp}
                 className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${msrpEnabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
                 <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${msrpEnabled ? 'left-6' : 'left-1'}`} />
+              </button>
+            </div>
+            <div>
+              <p className="text-white text-sm font-semibold mb-2">PDF Font</p>
+              <div className="flex gap-2">
+                {[
+                  { value: 'helvetica', label: 'Sans-serif' },
+                  { value: 'times', label: 'Serif' },
+                  { value: 'courier', label: 'Monospace' },
+                ].map(opt => (
+                  <button key={opt.value} onClick={() => onChangeDocFont?.(opt.value)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${docFont === opt.value ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white border border-[#2a3d55]'}`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between bg-[#0F1C2E] rounded-xl px-4 py-3">
+              <div>
+                <p className="text-white text-sm font-semibold">Striped Table Rows</p>
+                <p className="text-[#8A9AB0] text-xs mt-0.5">Alternates row shading in PDF tables. Turn off for a plain white table.</p>
+              </div>
+              <button onClick={onChangePdfTableStyle}
+                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${pdfTableStyle === 'striped' ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${pdfTableStyle === 'striped' ? 'left-6' : 'left-1'}`} />
               </button>
             </div>
           </div>

@@ -42,6 +42,8 @@ export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const { profile, features } = useProfile()
+  const pdfFont = profile?.organizations?.doc_font || 'helvetica'
+  const pdfStriped = (profile?.organizations?.pdf_table_style || 'striped') === 'striped'
   const [proposal, setProposal] = useState(null)
   const [lineItems, setLineItems] = useState([])
   const [laborItems, setLaborItems] = useState([
@@ -1548,26 +1550,26 @@ export default function ProposalDetail({ isAdmin }) {
         const logoY = 8 + (maxH - logoH) / 2
         doc.addImage(img, 'PNG', 14, logoY, logoW, logoH)
       } else {
-        doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+        doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont(pdfFont, 'bold')
         doc.text(profile?.company_name || 'ForgePt.', 14, 22)
       }
 
-      doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+      doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont(pdfFont, 'bold')
       doc.text('PURCHASE ORDER', pageWidth - 14, 18, { align: 'right' })
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10); doc.setFont(pdfFont, 'normal')
       doc.text(finalPONumber, pageWidth - 14, 28, { align: 'right' })
 
       const billToLines = [profile?.company_name || '', profile?.bill_to_address || '', [profile?.bill_to_city, profile?.bill_to_state, profile?.bill_to_zip].filter(Boolean).join(', ')].filter(Boolean)
       const shipToLines = [profile?.company_name || '', profile?.ship_to_address || '', [profile?.ship_to_city, profile?.ship_to_state, profile?.ship_to_zip].filter(Boolean).join(', ')].filter(Boolean)
 
-      doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+      doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont(pdfFont, 'normal')
       doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52)
       doc.text(`Project: ${proposal?.proposal_name || ''}`, 14, 60)
 
       const col1 = 14, col2 = pageWidth / 2 - 10, col3 = pageWidth / 2 + 30
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(9); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('VENDOR', col1, 74); doc.text('BILL TO', col2, 74); doc.text('SHIP TO', col3, 74)
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40); doc.setFontSize(9)
+      doc.setFont(pdfFont, 'normal'); doc.setTextColor(40, 40, 40); doc.setFontSize(9)
       doc.text(vendorNames || poVendorEmail || '—', col1, 81)
       billToLines.forEach((line, i) => doc.text(line, col2, 81 + i * 6))
       shipToLines.forEach((line, i) => doc.text(line, col3, 81 + i * 6))
@@ -2345,23 +2347,23 @@ const analyzeDrawing = async () => {
           const logoY = 8 + (maxH - logoH) / 2
           doc.addImage(img, 'PNG', 14, logoY, logoW, logoH)
         } catch {
-          doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont('helvetica', 'bold')
+          doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
           doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
         }
       } else {
-        doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont('helvetica', 'bold')
+        doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
         doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
       }
     } else {
-      doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont('helvetica', 'bold')
+      doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
       doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(200, 98, 42)
+      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(200, 98, 42)
       doc.text('Scope it. Send it. Close it.', 14, 30)
     }
 
-    doc.setTextColor(0, 0, 0); doc.setFontSize(18); doc.setFont('helvetica', 'bold')
+    doc.setTextColor(0, 0, 0); doc.setFontSize(18); doc.setFont(pdfFont, 'bold')
     doc.text(proposal?.proposal_name || 'Proposal', 14, 55)
-    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100)
+    doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100)
     doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
     if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, 72)
     doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, clientAddress ? 79 : 72)
@@ -2369,10 +2371,10 @@ const analyzeDrawing = async () => {
     let yPos = 92
 
     if (p?.scope_of_work) {
-      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Scope of Work', 14, yPos)
       yPos += 8
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
       const cleanSOW = p.scope_of_work.replace(/^\*\*Scope of Work\*\*\s*/i, '').replace(/\*\*(.*?)\*\*/g, '$1').trim()
       const sowLines = doc.splitTextToSize(cleanSOW, pageWidth - 28)
       doc.text(sowLines, 14, yPos)
@@ -2380,7 +2382,7 @@ const analyzeDrawing = async () => {
     }
 
     if (lineItems.length > 0) {
-      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Materials & Pricing', 14, yPos)
       yPos += 6
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
@@ -2400,13 +2402,13 @@ const analyzeDrawing = async () => {
       const emptyFiller = isLumpSum ? 1 : showMsrpCol ? 4 : 3
       const pdfFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Section Total', fmtMoney(total)]]
       const pdfMatFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Materials Total', fmtMoney(total)]]
-      const tableStyles = { headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage' }
+      const tableStyles = { headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 }, showFoot: 'lastPage' }
 
       if (sections.length > 0) {
         // Unsectioned items first
         const unsectioned = lineItems.filter(l => !l.section_id)
         if (unsectioned.length > 0) {
-          doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+          doc.setFontSize(10); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
           doc.text('General', 14, yPos + 4)
           doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
           doc.line(14, yPos + 6, pageWidth - 14, yPos + 6)
@@ -2426,7 +2428,7 @@ const analyzeDrawing = async () => {
           // Section header bar
           doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
           doc.rect(14, yPos, pageWidth - 28, 8, 'F')
-          doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
+          doc.setFontSize(10); doc.setFont(pdfFont, 'bold'); doc.setTextColor(255, 255, 255)
           doc.text(section.name || 'Untitled Section', 17, yPos + 5.5)
           yPos += 10
           if (secItems.length > 0) {
@@ -2434,7 +2436,7 @@ const analyzeDrawing = async () => {
             yPos = doc.lastAutoTable.finalY + 4
           }
           if (secLabor.length > 0) {
-            doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(100, 100, 100)
+            doc.setFontSize(8); doc.setFont(pdfFont, 'bold'); doc.setTextColor(100, 100, 100)
             doc.text('Section Labor', 14, yPos + 4); yPos += 6
             const lHead = p?.hide_labor_breakdown ? [['Role', 'Qty', 'Unit']] : [['Role', 'Qty', 'Unit', 'Total Labor']]
             const lRow = (l) => p?.hide_labor_breakdown
@@ -2444,7 +2446,7 @@ const analyzeDrawing = async () => {
             yPos = doc.lastAutoTable.finalY + 4
           }
           // Section subtotal line
-          doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+          doc.setFontSize(9); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
           doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
           yPos += 8
         }
@@ -2465,7 +2467,7 @@ const analyzeDrawing = async () => {
 
     if (pdfLaborItems.length > 0 && pdfLaborItems.some(l => l.role)) {
       const tableEnd = sections.length > 0 ? yPos + 6 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12)
-      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Labor', 14, tableEnd)
       const namedLaborItems = pdfLaborItems.filter(l => l.role)
       const namedLaborTotal = namedLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
@@ -2477,7 +2479,7 @@ const analyzeDrawing = async () => {
           foot: [['', '', `Total Labor: $${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
           footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
+          ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 }, showFoot: 'lastPage'
         })
       } else {
         autoTable(doc, {
@@ -2487,7 +2489,7 @@ const analyzeDrawing = async () => {
           foot: [['', '', 'Total Labor', `$${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
           footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [245, 245, 245] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
+          ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 }, showFoot: 'lastPage'
         })
       }
       yPos = doc.lastAutoTable.finalY + 8
@@ -2503,7 +2505,7 @@ const analyzeDrawing = async () => {
     doc.setDrawColor(200, 200, 200)
     doc.line(summaryX, yPos, pageWidth - 14, yPos)
     yPos += 6
-    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+    doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
     doc.text('Materials Total:', summaryX, yPos)
     doc.text(`$${pdfMaterialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
     yPos += 7
@@ -2519,23 +2521,23 @@ const analyzeDrawing = async () => {
     }
     doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
     doc.line(summaryX, yPos - 2, pageWidth - 14, yPos - 2)
-    doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.setFontSize(11); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
     doc.text('Grand Total:', summaryX, yPos + 4)
     doc.setTextColor(200, 98, 42)
     doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos + 4, { align: 'right' })
 
     if (profile?.terms_and_conditions) {
       doc.addPage()
-      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Terms and Conditions', 14, 20)
-      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+      doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
       const termsLines = doc.splitTextToSize(profile.terms_and_conditions, pageWidth - 28)
       doc.text(termsLines, 14, 32)
       const tLen = termsLines.length
       const afterTermsY = 32 + tLen * 4.5 + 16
-      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Accepted and Agreed', 14, afterTermsY)
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
+      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
       const s1 = afterTermsY + 18
       doc.text('Client Signature:', 14, s1); doc.line(50, s1, 140, s1)
       doc.text('Date:', 150, s1); doc.line(163, s1, pageWidth - 14, s1)
@@ -2543,9 +2545,9 @@ const analyzeDrawing = async () => {
       const s3 = s2 + 20; doc.text('Title:', 14, s3); doc.line(30, s3, pageWidth - 14, s3)
     } else {
       const afterY = yPos + 20
-      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Accepted and Agreed', 14, afterY)
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
+      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
       const s1 = afterY + 18
       doc.text('Client Signature:', 14, s1); doc.line(50, s1, 140, s1)
       doc.text('Date:', 150, s1); doc.line(163, s1, pageWidth - 14, s1)
@@ -2555,12 +2557,12 @@ const analyzeDrawing = async () => {
 
     for (const slaC of slaContracts) {
       doc.addPage()
-      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text(slaC.name || 'Service Level Agreement', 14, 20)
       doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.line(14, 24, pageWidth - 14, 24)
       let slaY = 34
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
+      doc.setFontSize(9); doc.setFont(pdfFont, 'bold'); doc.setTextColor(60, 60, 60)
       const slaDetails = [
         slaC.response_time_hours ? ['Response Time', `${slaC.response_time_hours} hours`] : null,
         ['Billing', slaC.billing_frequency || 'Quarterly'],
@@ -2573,13 +2575,13 @@ const analyzeDrawing = async () => {
         slaC.auto_renew ? ['Auto-Renew', 'Yes'] : null,
       ].filter(Boolean)
       slaDetails.forEach(([label, value]) => {
-        doc.setFont('helvetica', 'bold'); doc.text(`${label}:`, 14, slaY)
-        doc.setFont('helvetica', 'normal'); doc.text(value, 70, slaY)
+        doc.setFont(pdfFont, 'bold'); doc.text(`${label}:`, 14, slaY)
+        doc.setFont(pdfFont, 'normal'); doc.text(value, 70, slaY)
         slaY += 7
       })
       if (slaC.body) {
         slaY += 4
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
+        doc.setFont(pdfFont, 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
         const resolvedSLABody = slaC.body
           .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
           .replace(/\{\{clientName\}\}/g, proposal?.company || '')
@@ -2596,9 +2598,9 @@ const analyzeDrawing = async () => {
         doc.text(bodyLines, 14, slaY)
         slaY += bodyLines.length * 4.5 + 10
       } else { slaY += 10 }
-      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(11); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Service Agreement Acceptance', 14, slaY)
-      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
+      doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
       const ss1 = slaY + 14
       doc.text('Client Signature:', 14, ss1); doc.line(50, ss1, 140, ss1)
       doc.text('Date:', 150, ss1); doc.line(163, ss1, pageWidth - 14, ss1)
@@ -2607,12 +2609,12 @@ const analyzeDrawing = async () => {
 
     for (const monC of monitoringContracts) {
       doc.addPage()
-      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text(monC.name || 'Monitoring Contract', 14, 20)
       doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.line(14, 24, pageWidth - 14, 24)
       let monY = 34
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(60, 60, 60)
+      doc.setFontSize(9); doc.setFont(pdfFont, 'bold'); doc.setTextColor(60, 60, 60)
       const monDetails = [
         ['Monthly Fee', `$${monC.monthly_fee || 49}/mo`],
         ['Monitored Systems', monC.monitored_systems || '—'],
@@ -2622,13 +2624,13 @@ const analyzeDrawing = async () => {
         monC.auto_renew ? ['Auto-Renew', 'Yes'] : null,
       ].filter(Boolean)
       monDetails.forEach(([label, value]) => {
-        doc.setFont('helvetica', 'bold'); doc.text(`${label}:`, 14, monY)
-        doc.setFont('helvetica', 'normal'); doc.text(String(value), 70, monY)
+        doc.setFont(pdfFont, 'bold'); doc.text(`${label}:`, 14, monY)
+        doc.setFont(pdfFont, 'normal'); doc.text(String(value), 70, monY)
         monY += 7
       })
       if (monC.body) {
         monY += 4
-        doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
+        doc.setFont(pdfFont, 'normal'); doc.setFontSize(9); doc.setTextColor(60, 60, 60)
         const resolvedMonBody = monC.body
           .replace(/\{\{companyName\}\}/g, profile?.company_name || proposal?.company || '')
           .replace(/\{\{clientName\}\}/g, proposal?.company || '')
@@ -2641,9 +2643,9 @@ const analyzeDrawing = async () => {
         doc.text(monBodyLines, 14, monY)
         monY += monBodyLines.length * 4.5 + 10
       } else { monY += 10 }
-      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(11); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Monitoring Contract Acceptance', 14, monY)
-      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
+      doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
       const ms1 = monY + 14
       doc.text('Client Signature:', 14, ms1); doc.line(50, ms1, 140, ms1)
       doc.text('Date:', 150, ms1); doc.line(163, ms1, pageWidth - 14, ms1)
@@ -2652,7 +2654,7 @@ const analyzeDrawing = async () => {
 
     if (photos && photos.length > 0) {
       doc.addPage()
-      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Site Photos', 14, 20)
       doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.line(14, 23, pageWidth - 14, 23)
@@ -2677,7 +2679,7 @@ const analyzeDrawing = async () => {
             img.src = URL.createObjectURL(blob)
           })
           doc.addImage(base64, 'JPEG', photoX, photoY, photoWidth, photoHeight)
-          if (photos[i].caption) { doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100); doc.text(photos[i].caption, photoX, photoY + photoHeight + 4, { maxWidth: photoWidth }) }
+          if (photos[i].caption) { doc.setFontSize(8); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100); doc.text(photos[i].caption, photoX, photoY + photoHeight + 4, { maxWidth: photoWidth }) }
           if (i % 2 === 0) { photoX = photoX + photoWidth + 14 } else { photoX = 14; photoY = photoY + photoHeight + 16; if (photoY > 250) { doc.addPage(); photoY = 20 } }
         } catch (e) { console.error('Photo load error:', e) }
       }
