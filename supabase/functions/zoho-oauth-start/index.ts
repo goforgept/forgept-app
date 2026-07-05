@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
     scope:         scopes,
     redirect_uri:  REDIRECT_URI,
     access_type:   'offline',
-    state:         Buffer.from(state).toString('base64'),
+    state:         btoa(state),
   })
 
   const authUrl = `https://accounts.zoho.com/oauth/v2/auth?${params.toString()}`
