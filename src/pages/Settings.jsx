@@ -114,6 +114,14 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     if (params.get('tab') === 'integrations') setActiveTab('integrations')
     if (params.get('qbo_success')) setQboMessage({ type: 'success', text: 'QuickBooks connected successfully!' })
     if (params.get('qbo_error')) setQboMessage({ type: 'error', text: `QuickBooks connection failed: ${params.get('qbo_error')}` })
+      if (params.get('zoho') === 'connected') {
+      const scope = params.get('scope')
+      // Trigger a page reload of integrations tab to show connected status
+      setActiveTab('integrations')
+    }
+    if (params.get('zoho') === 'error') {
+      setActiveTab('integrations')
+    }
     if (params.get('square_success')) setSquareMessage({ type: 'success', text: 'Square connected successfully! You can now generate payment links on invoices.' })
     if (params.get('square_error')) setSquareMessage({ type: 'error', text: `Square connection failed: ${params.get('square_error')}` })
     if (params.get('google_success')) setGoogleMessage({ type: 'success', text: 'Google Calendar connected successfully!' })

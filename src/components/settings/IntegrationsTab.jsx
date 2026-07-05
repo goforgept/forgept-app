@@ -1,4 +1,5 @@
 import { supabase } from '../../supabase'
+import { useState } from 'react'
 
 export default function IntegrationsTab({
   qboMessage, setQboMessage, qboConnected, setQboConnected, qboCompanyName, setQboCompanyName, connectingQBO, setConnectingQBO,
@@ -9,6 +10,60 @@ export default function IntegrationsTab({
   squareMessage, setSquareMessage, squareConnected, setSquareConnected, squareMerchantId, setSquareMerchantId, connectingSquare, setConnectingSquare,
   orgId, profile,
 }) {
+  const [showZohoModal, setShowZohoModal] = useState(false)
+  const [zohoConnecting, setZohoConnecting] = useState(null) // 'crm' | 'books' | null
+  const [zohoMessage, setZohoMessage] = useState(null)
+  const [zohoStatus, setZohoStatus] = useState({
+    crm: false, books: false
+  })
+
+  // Load Zoho status on mount
+  useState(() => {
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      if (!profile?.org_id) return
+      const { data: org } = await supabase.from('organizations')
+        .select('zoho_crm_connected, zoho_books_connected')
+        .eq('id', profile.org_id).single()
+      if (org) setZohoStatus({ crm: org.zoho_crm_connected || false, books: org.zoho_books_connected || false })
+    }
+    load()
+  }, [])
+
+  const connectZoho = async (scope) => {
+    setZohoConnecting(scope)
+    setZohoMessage(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-oauth-start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ scope })
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else setZohoMessage({ type: 'error', text: data.error || 'Could not start Zoho connection.' })
+    } catch (err) { setZohoMessage({ type: 'error', text: err.message }) }
+    setZohoConnecting(null)
+  }
+
+  const disconnectZoho = async (scope) => {
+    if (!window.confirm(`Disconnect Zoho ${scope === 'crm' ? 'CRM' : 'Books'}?`)) return
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+    const update = scope === 'crm'
+      ? { zoho_crm_connected: false }
+      : { zoho_books_connected: false }
+    // If both disconnected clear tokens
+    if (!zohoStatus.crm && !zohoStatus.books) {
+      Object.assign(update, { zoho_access_token: null, zoho_refresh_token: null, zoho_connected: false })
+    }
+    await supabase.from('organizations').update(update).eq('id', profile.org_id)
+    setZohoStatus(prev => ({ ...prev, [scope]: false }))
+    setZohoMessage({ type: 'success', text: `Zoho ${scope === 'crm' ? 'CRM' : 'Books'} disconnected.` })
+  }
+
   const connectQBO = async () => {
     setConnectingQBO(true); setQboMessage(null)
     try {
@@ -342,6 +397,116 @@ export default function IntegrationsTab({
           </div>
         )}
       </div>
+
+      {msgBanner(zohoMessage)}
+
+      {/* Zoho */}
+      <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="flex justify-between items-start">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-red-500/10 rounded-xl flex items-center justify-center text-2xl">🔴</div>
+            <div>
+              <h3 className="text-white font-bold">Zoho</h3>
+              <p className="text-[#8A9AB0] text-sm mt-0.5">Connect Zoho CRM and Books to sync clients, deals and invoices.</p>
+              <div className="flex items-center gap-3 mt-1">
+                {zohoStatus.crm && <span className="text-green-400 text-xs">✓ CRM Connected</span>}
+                {zohoStatus.books && <span className="text-green-400 text-xs">✓ Books Connected</span>}
+              </div>
+            </div>
+          </div>
+          <button onClick={() => setShowZohoModal(true)}
+            className="bg-red-600/80 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors">
+            {zohoStatus.crm || zohoStatus.books ? 'Manage' : 'Connect'}
+          </button>
+        </div>
+      </div>
+
+      {/* Zoho Modal */}
+      {showZohoModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-2xl w-full max-w-lg shadow-2xl">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a3d55]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-500/10 rounded-xl flex items-center justify-center text-xl">🔴</div>
+                <div>
+                  <h3 className="text-white font-bold">Zoho Integration</h3>
+                  <p className="text-[#8A9AB0] text-xs">Connect your Zoho products to ForgePt.</p>
+                </div>
+              </div>
+              <button onClick={() => setShowZohoModal(false)} className="text-[#8A9AB0] hover:text-white transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+
+              {/* CRM */}
+              <div className="bg-[#0F1C2E] rounded-xl p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="text-white font-semibold text-sm">Zoho CRM</h4>
+                      {zohoStatus.crm && <span className="bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-full">✓ Connected</span>}
+                    </div>
+                    <p className="text-[#8A9AB0] text-xs mb-3">Sync clients and contacts. New proposals automatically create deals in Zoho CRM with the correct stage.</p>
+                    <div className="space-y-1 text-xs text-[#8A9AB0] mb-3">
+                      {['Import existing Zoho Accounts → ForgePt Clients','New clients sync both ways automatically','Proposal status → Zoho Deal stage','Rep attribution by email match'].map(t => (
+                        <div key={t} className="flex items-center gap-1.5"><span className="text-green-400">✓</span>{t}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                {zohoStatus.crm ? (
+                  <button onClick={() => disconnectZoho('crm')}
+                    className="text-red-400 hover:text-red-300 text-xs transition-colors">
+                    Disconnect Zoho CRM
+                  </button>
+                ) : (
+                  <button onClick={() => connectZoho('crm')} disabled={zohoConnecting === 'crm'}
+                    className="w-full bg-red-600/80 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">
+                    {zohoConnecting === 'crm' ? 'Connecting...' : 'Connect Zoho CRM'}
+                  </button>
+                )}
+              </div>
+
+              {/* Books */}
+              <div className="bg-[#0F1C2E] rounded-xl p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="text-white font-semibold text-sm">Zoho Books</h4>
+                      {zohoStatus.books && <span className="bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-full">✓ Connected</span>}
+                      <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs px-2 py-0.5 rounded-full">Coming Soon</span>
+                    </div>
+                    <p className="text-[#8A9AB0] text-xs mb-3">Sync invoices and estimates between ForgePt and Zoho Books for seamless accounting.</p>
+                    <div className="space-y-1 text-xs text-[#8A9AB0]">
+                      {['Won proposals → Zoho Books estimates','Invoices sync both ways','Payment status updates automatically','Tax rates synced from Zoho Books'].map(t => (
+                        <div key={t} className="flex items-center gap-1.5"><span className="text-[#4a5a6a]">○</span>{t}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="bg-[#0F1C2E]/50 rounded-xl p-4">
+                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Setup Instructions</p>
+                <div className="space-y-1.5 text-xs text-[#8A9AB0]">
+                  <p>1. Click <span className="text-white">Connect Zoho CRM</span> above</p>
+                  <p>2. Sign in to your Zoho account and approve permissions</p>
+                  <p>3. You'll be redirected back to ForgePt automatically</p>
+                  <p>4. Run the initial client import to sync existing contacts</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
 
       {msgBanner(squareMessage)}
 
