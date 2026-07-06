@@ -8,6 +8,7 @@ const INDUSTRY_LABELS = {
   av:          'AV',
   hvac:        'HVAC',
   electrical:  'Electrical',
+  das:         'DAS',
   low_voltage: 'Low Voltage',
 }
 
@@ -413,6 +414,83 @@ function CategoryIcon({ category }) {
       return <svg {...props}><rect x="2" y="15" width="8" height="10" rx="1" strokeWidth="1.5"/><path d="M10 18 L15 20 L10 22 Z" fill="currentColor" stroke="none"/><path d="M15 20 L25 20" strokeDasharray="2 2" strokeWidth="1.5" strokeLinecap="round"/><path d="M30 18 L25 20 L30 22 Z" fill="currentColor" stroke="none"/><rect x="30" y="15" width="8" height="10" rx="1" strokeWidth="1.5"/><path d="M6 25 L6 38" strokeWidth="1.5" strokeLinecap="round"/><path d="M34 25 L34 38" strokeWidth="1.5" strokeLinecap="round"/></svg>
     case 'Power Box':
       return <svg {...props}><rect x="4" y="6" width="32" height="26" rx="3" strokeWidth="1.5"/><path d="M4 14 L36 14" strokeWidth="1.5"/><path d="M21 18 L17 24 L20 24 L20 29 L24 23 L21 23 Z" fill="currentColor" stroke="none"/><rect x="6" y="27" width="4" height="3" rx="0.5" strokeWidth="1"/><rect x="12" y="27" width="4" height="3" rx="0.5" strokeWidth="1"/><circle cx="31" cy="24" r="2.5" strokeWidth="1.2"/><path d="M29 24 L29 21 Q29 19 31 19 Q33 19 33 21 L33 24" strokeWidth="1.2"/></svg>
+    // ── HVAC ──────────────────────────────────────────────────────────────────
+    case 'Air Handler':
+      return <svg {...props}><rect x="4" y="10" width="32" height="20" rx="2" strokeWidth="1.5"/><circle cx="20" cy="20" r="6" strokeWidth="1.5"/><path d="M20 14 L20 26 M14 20 L26 20 M15.5 15.5 L24.5 24.5 M24.5 15.5 L15.5 24.5" strokeWidth="1" strokeLinecap="round"/><path d="M4 14 L0 14 M4 26 L0 26 M36 14 L40 14 M36 26 L40 26" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'VAV Box':
+      return <svg {...props}><rect x="4" y="12" width="32" height="16" rx="2" strokeWidth="1.5"/><path d="M10 20 L16 14 M16 14 L22 26 M22 26 L28 14 M28 14 L34 20" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" fill="none"/><path d="M4 20 L0 20 M36 20 L40 20" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Fan Coil Unit':
+      return <svg {...props}><rect x="4" y="8" width="32" height="24" rx="2" strokeWidth="1.5"/><circle cx="14" cy="20" r="6" strokeWidth="1.5"/><path d="M14 14 L14 26 M8 20 L20 20" strokeWidth="1" strokeLinecap="round"/><path d="M24 13 L32 13 M24 17 L32 17 M24 21 L32 21 M24 25 L32 25" strokeWidth="1.2" strokeLinecap="round"/></svg>
+    case 'Exhaust Fan':
+      return <svg {...props}><circle cx="20" cy="20" r="14" strokeWidth="1.5"/><circle cx="20" cy="20" r="3" strokeWidth="1.5"/><path d="M20 17 Q26 14 26 20" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M20 23 Q14 26 14 20" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M23 20 Q26 26 20 26" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M17 20 Q14 14 20 14" strokeLinecap="round" strokeWidth="1.5" fill="none"/></svg>
+    case 'Damper':
+      return <svg {...props}><rect x="4" y="8" width="32" height="24" rx="2" strokeWidth="1.5"/><path d="M8 32 L32 8" strokeWidth="2" strokeLinecap="round"/><path d="M8 26 L26 8 M14 32 L32 14" strokeWidth="1" strokeLinecap="round" opacity="0.5"/></svg>
+    case 'CO2 Sensor':
+      return <svg {...props}><rect x="8" y="8" width="24" height="24" rx="3" strokeWidth="1.5"/><path d="M12 24 Q12 20 14 18 Q16 16 18 18 Q20 20 20 20" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M22 16 Q24 14 26 16 Q28 18 28 20 Q28 22 26 24 Q24 26 22 24 Q20 22 20 20" strokeLinecap="round" strokeWidth="1.5" fill="none"/></svg>
+    case 'VRF Indoor Unit':
+      return <svg {...props}><rect x="4" y="14" width="32" height="12" rx="6" strokeWidth="1.5"/><path d="M10 17 L10 23 M14 16 L14 24 M18 15 L18 25 M22 15 L22 25 M26 16 L26 24 M30 17 L30 23" strokeWidth="1" strokeLinecap="round" opacity="0.6"/><path d="M8 10 Q20 6 32 10" strokeLinecap="round" strokeWidth="1.5" fill="none"/></svg>
+    case 'VRF Outdoor Unit':
+      return <svg {...props}><rect x="4" y="8" width="32" height="28" rx="2" strokeWidth="1.5"/><circle cx="20" cy="24" r="8" strokeWidth="1.5"/><path d="M20 18 L20 30 M14 24 L26 24 M15.8 19.8 L24.2 28.2 M24.2 19.8 L15.8 28.2" strokeWidth="1" strokeLinecap="round"/><path d="M8 8 L8 4 M14 8 L14 4 M20 8 L20 4 M26 8 L26 4 M32 8 L32 4" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Chiller':
+      return <svg {...props}><ellipse cx="20" cy="22" rx="14" ry="10" strokeWidth="1.5"/><ellipse cx="20" cy="16" rx="14" ry="6" strokeWidth="1.5"/><path d="M6 22 L6 16 M34 22 L34 16" strokeWidth="1.5"/><path d="M20 8 L20 4 M16 30 L16 36 M24 30 L24 36" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Boiler':
+      return <svg {...props}><rect x="8" y="10" width="24" height="22" rx="12" strokeWidth="1.5"/><path d="M14 22 Q16 18 18 22 Q20 26 22 22 Q24 18 26 22" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M14 8 L14 10 M20 6 L20 10 M26 8 L26 10" strokeWidth="1.5" strokeLinecap="round"/><path d="M14 32 L14 36 M26 32 L26 36" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'BACnet Controller':
+      return <svg {...props}><rect x="4" y="10" width="32" height="20" rx="2" strokeWidth="1.5"/><rect x="8" y="14" width="8" height="6" rx="1" strokeWidth="1.5"/><circle cx="24" cy="16" r="1.5" fill="currentColor"/><circle cx="29" cy="16" r="1.5" fill="currentColor"/><circle cx="24" cy="22" r="1.5" fill="currentColor"/><circle cx="29" cy="22" r="1.5" fill="currentColor"/><path d="M4 20 L0 20 M36 17 L40 17 M36 23 L40 23" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Zone Controller':
+      return <svg {...props}><rect x="6" y="8" width="28" height="24" rx="2" strokeWidth="1.5"/><path d="M6 20 L34 20" strokeWidth="1" strokeDasharray="3 2"/><rect x="10" y="12" width="8" height="5" rx="1" strokeWidth="1"/><rect x="22" y="12" width="8" height="5" rx="1" strokeWidth="1"/><rect x="10" y="23" width="8" height="5" rx="1" strokeWidth="1"/><rect x="22" y="23" width="8" height="5" rx="1" strokeWidth="1"/></svg>
+    case 'Humidifier':
+      return <svg {...props}><path d="M20 6 Q28 16 28 22 Q28 30 20 34 Q12 30 12 22 Q12 16 20 6 Z" strokeWidth="1.5" fill="none"/><path d="M14 24 Q16 20 18 24 M20 22 Q22 18 24 22" strokeLinecap="round" strokeWidth="1.5" fill="none"/></svg>
+    // ── Electrical ─────────────────────────────────────────────────────────────
+    case 'Sub Panel':
+      return <svg {...props}><rect x="12" y="4" width="16" height="32" rx="2" strokeWidth="1.5"/><path d="M16 10 L24 10 M16 14 L24 14 M16 18 L24 18 M16 22 L24 22 M16 26 L22 26" strokeWidth="1" strokeLinecap="round"/><path d="M12 20 L8 20 M28 20 L32 20" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Transformer':
+      return <svg {...props}><circle cx="14" cy="20" r="8" strokeWidth="1.5" fill="none"/><circle cx="26" cy="20" r="8" strokeWidth="1.5" fill="none"/><path d="M4 20 L6 20 M34 20 L36 20 M4 14 L4 26 M36 14 L36 26" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'UPS':
+      return <svg {...props}><rect x="4" y="10" width="32" height="20" rx="2" strokeWidth="1.5"/><rect x="12" y="14" width="16" height="8" rx="1" strokeWidth="1.5"/><path d="M19 16 L17 20 L20 20 L21 24 L23 20 L20 20" fill="currentColor" strokeWidth="0.5"/><path d="M14 30 L14 34 M26 30 L26 34" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Generator':
+      return <svg {...props}><rect x="4" y="12" width="32" height="16" rx="2" strokeWidth="1.5"/><circle cx="20" cy="20" r="6" strokeWidth="1.5"/><circle cx="20" cy="20" r="2.5" fill="currentColor"/><path d="M8 15 L8 25 M32 15 L32 25" strokeWidth="1" strokeLinecap="round"/><path d="M14 8 L20 12 M26 8 L20 12" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Transfer Switch':
+      return <svg {...props}><path d="M8 12 L8 20" strokeWidth="2" strokeLinecap="round"/><path d="M32 28 L32 20" strokeWidth="2" strokeLinecap="round"/><circle cx="8" cy="10" r="3" strokeWidth="1.5"/><circle cx="32" cy="30" r="3" strokeWidth="1.5"/><path d="M8 20 L32 20" strokeDasharray="3 2" strokeWidth="1.5"/><path d="M8 20 L20 10 M32 20 L20 30" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    case 'Junction Box':
+      return <svg {...props}><rect x="8" y="8" width="24" height="24" rx="2" strokeWidth="1.5"/><path d="M8 20 L4 20 M32 20 L36 20 M20 8 L20 4 M20 32 L20 36" strokeWidth="1.5" strokeLinecap="round"/><circle cx="20" cy="20" r="3" strokeWidth="1.5"/></svg>
+    case 'Light Switch':
+      return <svg {...props}><rect x="10" y="6" width="20" height="28" rx="3" strokeWidth="1.5"/><rect x="16" y="10" width="8" height="12" rx="2" strokeWidth="1.5"/><circle cx="20" cy="28" r="2" strokeWidth="1.5"/></svg>
+    case 'Dimmer':
+      return <svg {...props}><rect x="10" y="6" width="20" height="28" rx="3" strokeWidth="1.5"/><path d="M14 20 L26 20" strokeWidth="2" strokeLinecap="round"/><circle cx="20" cy="20" r="3" strokeWidth="1.5" fill="white"/><path d="M15 14 Q20 10 25 14" strokeLinecap="round" strokeWidth="1.5" fill="none"/><circle cx="20" cy="28" r="1.5" strokeWidth="1.5"/></svg>
+    case 'GFCI Outlet':
+      return <svg {...props}><rect x="10" y="6" width="20" height="28" rx="3" strokeWidth="1.5"/><path d="M17 14 L17 18 M23 14 L23 18" strokeWidth="2" strokeLinecap="round"/><rect x="15" y="20" width="4" height="2.5" rx="0.5" strokeWidth="1"/><rect x="21" y="20" width="4" height="2.5" rx="0.5" strokeWidth="1"/><path d="M15 26 Q20 29 25 26" strokeLinecap="round" strokeWidth="1.5" fill="none"/></svg>
+    case 'Circuit Breaker':
+      return <svg {...props}><rect x="12" y="4" width="16" height="32" rx="2" strokeWidth="1.5"/><path d="M16 18 L24 18" strokeWidth="1.5" strokeLinecap="round"/><path d="M20 10 L20 18 M20 22 L20 30" strokeWidth="2" strokeLinecap="round"/><circle cx="20" cy="20" r="2" fill="currentColor"/></svg>
+    case 'EV Charger':
+      return <svg {...props}><rect x="8" y="6" width="24" height="28" rx="3" strokeWidth="1.5"/><path d="M18 12 L16 20 L20 20 L20 28 L24 20 L20 20" fill="currentColor" strokeWidth="0.5"/><path d="M12 30 L12 36 M28 30 L28 36" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Disconnect':
+      return <svg {...props}><path d="M20 8 L20 16" strokeWidth="2.5" strokeLinecap="round"/><path d="M20 24 L20 32" strokeWidth="2.5" strokeLinecap="round"/><path d="M20 16 L28 20" strokeWidth="2" strokeLinecap="round"/><circle cx="20" cy="16" r="2.5" fill="currentColor"/><circle cx="20" cy="24" r="2.5" fill="currentColor"/></svg>
+    // ── DAS ────────────────────────────────────────────────────────────────────
+    case 'BDA':
+      return <svg {...props}><path d="M8 28 L18 20 L36 20" strokeWidth="0" fill="none"/><path d="M6 28 L18 14 L18 26 Z" strokeWidth="1.5" fill="none"/><rect x="18" y="16" width="16" height="8" rx="1" strokeWidth="1.5"/><path d="M34 20 L40 20" strokeWidth="1.5" strokeLinecap="round"/><path d="M6 20 L2 20" strokeWidth="1.5" strokeLinecap="round"/><path d="M38 17 L40 20 L38 23" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.2" fill="none"/></svg>
+    case 'Donor Antenna':
+      return <svg {...props}><path d="M20 36 L20 20" strokeWidth="2" strokeLinecap="round"/><path d="M12 28 Q20 20 28 28" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M8 22 Q20 10 32 22" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M4 16 Q20 0 36 16" strokeLinecap="round" strokeWidth="1.5" fill="none"/><circle cx="20" cy="36" r="2" fill="currentColor"/></svg>
+    case 'Omni Antenna':
+      return <svg {...props}><path d="M20 36 L20 10" strokeWidth="2" strokeLinecap="round"/><ellipse cx="20" cy="22" rx="8" ry="3" strokeWidth="1.5" fill="none"/><ellipse cx="20" cy="16" rx="5" ry="2" strokeWidth="1" fill="none"/><ellipse cx="20" cy="28" rx="5" ry="2" strokeWidth="1" fill="none"/><circle cx="20" cy="36" r="2" fill="currentColor"/></svg>
+    case 'Directional Antenna':
+      return <svg {...props}><path d="M10 20 L30 20" strokeWidth="2.5" strokeLinecap="round"/><path d="M10 14 L26 20 L10 26 Z" strokeWidth="1.5" fill="none"/><path d="M30 16 L36 16 M30 20 L38 20 M30 24 L36 24" strokeWidth="1.5" strokeLinecap="round"/><path d="M10 20 L6 20" strokeWidth="2" strokeLinecap="round"/></svg>
+    case 'Splitter':
+      return <svg {...props}><path d="M6 20 L20 20" strokeWidth="2" strokeLinecap="round"/><path d="M20 20 L34 12" strokeWidth="1.5" strokeLinecap="round"/><path d="M20 20 L34 28" strokeWidth="1.5" strokeLinecap="round"/><circle cx="6" cy="20" r="3" strokeWidth="1.5"/><circle cx="34" cy="12" r="2.5" strokeWidth="1.5"/><circle cx="34" cy="28" r="2.5" strokeWidth="1.5"/></svg>
+    case 'Coupler':
+      return <svg {...props}><rect x="12" y="12" width="16" height="16" rx="2" strokeWidth="1.5"/><path d="M4 16 L12 16 M4 24 L12 24 M28 16 L36 16 M28 24 L36 24" strokeWidth="1.5" strokeLinecap="round"/><path d="M16 16 L24 24" strokeWidth="1" strokeDasharray="2 2"/></svg>
+    case 'Fiber Node':
+      return <svg {...props}><circle cx="20" cy="20" r="7" strokeWidth="1.5"/><path d="M20 13 L20 6 M26.9 16.5 L33 12 M26.9 23.5 L33 28 M20 27 L20 34 M13.1 23.5 L7 28 M13.1 16.5 L7 12" strokeWidth="1.5" strokeLinecap="round"/><circle cx="20" cy="20" r="2.5" fill="currentColor"/></svg>
+    case 'Remote Unit':
+      return <svg {...props}><rect x="6" y="12" width="22" height="16" rx="2" strokeWidth="1.5"/><path d="M28 20 L36 16 M28 20 L36 24" strokeWidth="1.5" strokeLinecap="round"/><path d="M30 12 Q36 12 36 16" strokeLinecap="round" strokeWidth="1.2" fill="none"/><path d="M30 28 Q36 28 36 24" strokeLinecap="round" strokeWidth="1.2" fill="none"/><circle cx="14" cy="20" r="2" fill="currentColor"/><path d="M6 16 L6 24" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Head End':
+      return <svg {...props}><rect x="6" y="6" width="28" height="28" rx="2" strokeWidth="1.5"/><rect x="10" y="10" width="20" height="4" rx="1" strokeWidth="1"/><rect x="10" y="17" width="20" height="4" rx="1" strokeWidth="1"/><rect x="10" y="24" width="20" height="4" rx="1" strokeWidth="1"/><path d="M30 12 L34 12 M30 19 L34 19 M30 26 L34 26" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Small Cell':
+      return <svg {...props}><path d="M20 36 L20 20" strokeWidth="2" strokeLinecap="round"/><rect x="14" y="20" width="12" height="10" rx="2" strokeWidth="1.5"/><path d="M14 28 Q20 32 26 28" strokeLinecap="round" strokeWidth="1" fill="none"/><path d="M14 24 L10 22 M26 24 L30 22" strokeLinecap="round" strokeWidth="1.2"/><circle cx="20" cy="36" r="2" fill="currentColor"/></svg>
+    case 'Attenuator':
+      return <svg {...props}><path d="M4 20 L12 20" strokeWidth="2" strokeLinecap="round"/><rect x="12" y="14" width="16" height="12" rx="2" strokeWidth="1.5"/><path d="M28 20 L36 20" strokeWidth="2" strokeLinecap="round"/><path d="M16 24 L24 16" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Terminator':
+      return <svg {...props}><path d="M4 20 L20 20" strokeWidth="2" strokeLinecap="round"/><circle cx="26" cy="20" r="6" strokeWidth="1.5"/><path d="M22 24 L30 16 M22 16 L30 24" strokeWidth="1.5" strokeLinecap="round"/></svg>
     default:
       return <svg {...props}><rect x="10" y="10" width="20" height="20" rx="4" strokeWidth="1.5"/><circle cx="20" cy="20" r="4" strokeWidth="1.5"/></svg>
   }
