@@ -96,22 +96,27 @@ export default function DesignerTab() {
 
   const saveLaborDefaults = async () => {
     setSavingLabor(true)
-    await supabase.from('designer_labor_defaults').delete().eq('org_id', profile.org_id)
-    if (laborDefaults.length > 0) {
-      await supabase.from('designer_labor_defaults').insert(
-        laborDefaults
-          .filter(d => d.category && d.labor_role)
-          .map(d => ({
-            org_id:         profile.org_id,
-            category:       d.category,
-            labor_role:     d.labor_role,
-            hours_per_unit: parseFloat(d.hours_per_unit) || 1.0,
-          }))
-      )
+    try {
+      const rows = laborDefaults
+        .filter(d => d.category && d.labor_role)
+        .map(d => ({
+          org_id:         profile.org_id,
+          category:       d.category,
+          labor_role:     d.labor_role,
+          hours_per_unit: parseFloat(d.hours_per_unit) || 1.0,
+        }))
+      const { error: delErr } = await supabase.from('designer_labor_defaults').delete().eq('org_id', profile.org_id)
+      if (delErr) throw delErr
+      if (rows.length > 0) {
+        const { error: insErr } = await supabase.from('designer_labor_defaults').insert(rows)
+        if (insErr) throw insErr
+      }
+      setLaborSaved(true)
+      setTimeout(() => setLaborSaved(false), 2000)
+    } catch (err) {
+      alert('Error saving labor defaults: ' + err.message)
     }
     setSavingLabor(false)
-    setLaborSaved(true)
-    setTimeout(() => setLaborSaved(false), 2000)
   }
 
   const downloadTemplate = () => {
@@ -177,17 +182,19 @@ export default function DesignerTab() {
         if (imported.length === 0) { alert('No valid rows found. Make sure columns are: Category, Labor Role, Hours Per Device'); return }
 
         setLaborDefaults(imported)
-        // Auto-save
         setSavingLabor(true)
-        await supabase.from('designer_labor_defaults').delete().eq('org_id', profile.org_id)
-        await supabase.from('designer_labor_defaults').insert(
+        const { error: delErr } = await supabase.from('designer_labor_defaults').delete().eq('org_id', profile.org_id)
+        if (delErr) throw delErr
+        const { error: insErr } = await supabase.from('designer_labor_defaults').insert(
           imported.map(d => ({ org_id: profile.org_id, ...d }))
         )
+        if (insErr) throw insErr
         setSavingLabor(false)
         setLaborSaved(true)
         setTimeout(() => setLaborSaved(false), 2000)
       } catch (err) {
-        alert('Failed to parse file: ' + err.message)
+        setSavingLabor(false)
+        alert('Failed to save labor defaults: ' + err.message)
       }
     }
     reader.readAsBinaryString(file)
