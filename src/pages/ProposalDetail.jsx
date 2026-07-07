@@ -1817,6 +1817,7 @@ export default function ProposalDetail({ isAdmin }) {
             your_cost_unit: parseFloat(l.your_cost_unit) || null, markup_percent: parseFloat(l.markup_percent) || null,
             customer_price_unit: parseFloat(l.customer_price_unit) || null,
             customer_price_total: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0),
+            msrp_unit: parseFloat(l.msrp_unit) || null,
             pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing', recurring: l.recurring || false,
             section_id: resolvedSectionId,
           }
