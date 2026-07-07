@@ -47,7 +47,7 @@ export default function ApiTab({ featureApi }) {
       loadKeys()
       supabase
         .from('proposals')
-        .select('id, project_name')
+        .select('id, proposal_name')
         .eq('org_id', profile.org_id)
         .order('created_at', { ascending: false })
         .limit(50)
@@ -529,7 +529,7 @@ Content-Type: application/json
                   >
                     <option value="">New blank project</option>
                     {proposals.map(p => (
-                      <option key={p.id} value={p.id}>{p.project_name || 'Untitled'}</option>
+                      <option key={p.id} value={p.id}>{p.proposal_name || 'Untitled'}</option>
                     ))}
                   </select>
                 </div>
