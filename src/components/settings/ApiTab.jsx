@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { useProfile } from '../../context/ProfileContext'
 
-const EMBED_SESSION_URL = 'https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/embed-session'
-
 const SCOPES = [
   { value: 'read:proposals',  label: 'Proposals',         desc: 'Read proposals, BOM line items, labor' },
   { value: 'read:clients',    label: 'Clients',            desc: 'Read clients and contacts' },
@@ -34,27 +32,9 @@ export default function ApiTab({ featureApi }) {
   const [copied, setCopied] = useState(false)
   const [revoking, setRevoking] = useState(null)
 
-  // Test embed panel state
-  const [proposals, setProposals] = useState([])
-  const [testKey, setTestKey] = useState('')
-  const [testProposal, setTestProposal] = useState('')
-  const [testToken, setTestToken] = useState('')
-  const [testLoading, setTestLoading] = useState(false)
-  const [testError, setTestError] = useState('')
-
   useEffect(() => {
-    if (profile?.org_id && featureApi) {
-      loadKeys()
-      supabase
-        .from('proposals')
-        .select('id, proposal_name')
-        .eq('org_id', profile.org_id)
-        .order('created_at', { ascending: false })
-        .limit(50)
-        .then(({ data }) => setProposals(data || []))
-    } else {
-      setLoading(false)
-    }
+    if (profile?.org_id && featureApi) loadKeys()
+    else setLoading(false)
   }, [profile?.org_id, featureApi])
 
   const loadKeys = async () => {
@@ -121,35 +101,6 @@ export default function ApiTab({ featureApi }) {
       scopes: p.scopes.includes(scope) ? p.scopes.filter(s => s !== scope) : [...p.scopes, scope],
     }))
   }
-
-  const handleTestEmbed = async () => {
-    if (!testKey.trim()) return
-    setTestLoading(true)
-    setTestError('')
-    setTestToken('')
-    try {
-      const res = await fetch(EMBED_SESSION_URL, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${testKey.trim()}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(testProposal ? { proposal_id: testProposal } : {}),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setTestError(data.error || `Error ${res.status}`)
-      } else {
-        setTestToken(data.access_token)
-      }
-    } catch (e) {
-      setTestError('Network error: ' + e.message)
-    }
-    setTestLoading(false)
-  }
-
-  const hasEmbedKey = keys.some(k => k.scopes?.includes('embed:designer'))
-
-  const iframeSrc = testToken
-    ? `${window.location.origin}/embed?session=${testToken}${testProposal ? `&proposal=${testProposal}` : ''}`
-    : ''
 
   if (!featureApi) {
     return (
@@ -501,74 +452,6 @@ Content-Type: application/json
             <p className="text-[#4a5d75] text-xs mt-3">Full schema: /v1/openapi.json</p>
           </div>
 
-          {/* Test Embed Panel */}
-          {hasEmbedKey && (
-            <div className="bg-[#1a2d45] rounded-xl p-5 border border-[#2a3d55] space-y-4">
-              <div>
-                <p className="text-white font-semibold text-sm">Test Embedded Designer</p>
-                <p className="text-[#8A9AB0] text-xs mt-0.5">Preview the embed live before your customer demo. Paste your raw API key (saved when generated), pick a proposal, and launch a preview.</p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">API Key</label>
-                  <input
-                    type="password"
-                    value={testKey}
-                    onChange={e => { setTestKey(e.target.value); setTestToken(''); setTestError('') }}
-                    placeholder="fpk_..."
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#C8622A]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Proposal <span className="text-[#4a5d75] font-normal">(optional)</span></label>
-                  <select
-                    value={testProposal}
-                    onChange={e => { setTestProposal(e.target.value); setTestToken(''); setTestError('') }}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-                  >
-                    <option value="">New blank project</option>
-                    {proposals.map(p => (
-                      <option key={p.id} value={p.id}>{p.proposal_name || 'Untitled'}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {testError && (
-                <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{testError}</p>
-              )}
-
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={handleTestEmbed}
-                  disabled={testLoading || !testKey.trim()}
-                  className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
-                >
-                  {testLoading ? 'Connecting...' : testToken ? 'Reload Preview' : 'Launch Preview'}
-                </button>
-                {testToken && (
-                  <button onClick={() => { setTestToken(''); setTestKey(''); setTestProposal(''); setTestError('') }}
-                    className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
-                    Clear
-                  </button>
-                )}
-              </div>
-
-              {testToken && (
-                <div className="rounded-xl overflow-hidden border border-[#2a3d55]">
-                  <iframe
-                    key={testToken}
-                    src={iframeSrc}
-                    className="w-full"
-                    style={{ height: 680 }}
-                    allow="clipboard-write"
-                    title="Embedded Designer Preview"
-                  />
-                </div>
-              )}
-            </div>
-          )}
         </div>
       )}
     </div>
