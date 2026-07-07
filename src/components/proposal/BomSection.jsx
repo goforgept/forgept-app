@@ -54,6 +54,8 @@ export default function BomSection({
   fmt,
   featureMsrp = false,
   canEdit = true,
+  laborRates = [],
+  defaultMarkup = 35,
 }) {
   return (
     <div className="bg-[#1a2d45] rounded-xl p-6">
@@ -688,7 +690,7 @@ export default function BomSection({
                             <tbody>
                               {(section.labor_items || []).map((item, idx) => (
                                 <tr key={idx} className="border-b border-[#2a3d55]/30">
-                                  <td className="pr-2 py-1"><input type="text" placeholder="Role" value={item.role || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'role', e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                                  <td className="pr-2 py-1"><input type="text" placeholder="Role" list="labor-roles-list" value={item.role || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'role', e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
                                   <td className="pr-2 py-1"><input type="number" placeholder="0" value={item.quantity || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'quantity', e.target.value)} className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
                                   <td className="pr-2 py-1">
                                     <select value={item.unit || 'hr'} onChange={e => onUpdateSectionLabor(section.id, idx, 'unit', e.target.value)} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
@@ -747,7 +749,9 @@ export default function BomSection({
               <tbody>
                 {laborItems.map((item, index) => (
                   <tr key={index} className="border-b border-[#2a3d55]/30">
-                    <td className="pr-2 py-1"><input type="text" placeholder="e.g. Electrician" value={item.role} onChange={e => onUpdateLabor(index, 'role', e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                    <td className="pr-2 py-1">
+                      <input type="text" placeholder="e.g. Electrician" list="labor-roles-list" value={item.role} onChange={e => onUpdateLabor(index, 'role', e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                    </td>
                     <td className="pr-2 py-1"><input type="number" placeholder="0" value={item.quantity || ''} onChange={e => onUpdateLabor(index, 'quantity', e.target.value)} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
                     <td className="pr-2 py-1">
                       <select value={item.unit || 'hr'} onChange={e => onUpdateLabor(index, 'unit', e.target.value)} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
@@ -792,7 +796,10 @@ export default function BomSection({
                 </tr>
               </tfoot>
             </table>
-            <button onClick={() => setLaborItems(prev => [...prev, { role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: 0 }])} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">+ Add Labor</button>
+            <datalist id="labor-roles-list">
+              {laborRates.map(r => <option key={r.role} value={r.role} />)}
+            </datalist>
+            <button onClick={() => setLaborItems(prev => [...prev, { role: '', quantity: '', unit: 'hr', your_cost: '', markup: defaultMarkup, customer_price: 0 }])} className="mt-4 text-[#C8622A] hover:text-white text-sm transition-colors">+ Add Labor</button>
           </div>
 
           {/* Live running total */}

@@ -49,6 +49,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [laborItems, setLaborItems] = useState([
     { role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: 0 }
   ])
+  const [orgLaborRates, setOrgLaborRates] = useState([])
   const [resolvedLogoUrl, setResolvedLogoUrl] = useState(null)
   const [loading, setLoading] = useState(true)
   const [editingBOM, setEditingBOM] = useState(false)
@@ -240,9 +241,11 @@ export default function ProposalDetail({ isAdmin }) {
 
     // Load org SLA settings and auto-attach if applicable
     if (data?.org_id) {
-      const { data: orgSLA } = await supabase.from('organizations')
-        .select('feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates')
-        .eq('id', data.org_id).single()
+      const [{ data: orgSLA }, { data: ratesData }] = await Promise.all([
+        supabase.from('organizations').select('feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates').eq('id', data.org_id).single(),
+        supabase.from('labor_rates').select('role, cost_per_hour, bill_rate_per_hour, unit').eq('org_id', data.org_id).order('sort_order'),
+      ])
+      setOrgLaborRates(ratesData || [])
       setOrgSLASettings(orgSLA)
       const notifications = []
       const updates = {}
@@ -1700,6 +1703,25 @@ export default function ProposalDetail({ isAdmin }) {
       if (s.id !== sectionId) return s
       const updated = [...(s.labor_items || [])]
       updated[index] = { ...updated[index], [field]: value }
+
+      if (field === 'role') {
+        const matched = orgLaborRates.find(r => r.role === value)
+        if (matched) {
+          updated[index].your_cost = String(matched.cost_per_hour || '')
+          updated[index].unit      = matched.unit || 'hr'
+          const cost = parseFloat(matched.cost_per_hour) || 0
+          const bill = parseFloat(matched.bill_rate_per_hour) || 0
+          if (cost > 0 && bill > 0) {
+            updated[index].markup = (((bill - cost) / cost) * 100).toFixed(1)
+          }
+          const qty = parseFloat(updated[index].quantity) || 0
+          if (cost > 0 && qty > 0) {
+            const mkp = parseFloat(updated[index].markup) || 0
+            updated[index].customer_price = (cost * (1 + mkp / 100) * qty).toFixed(2)
+          }
+        }
+      }
+
       const qty = parseFloat(updated[index].quantity) || 0
       const cost = parseFloat(updated[index].your_cost) || 0
       const markup = parseFloat(updated[index].markup) || 0
@@ -1711,8 +1733,9 @@ export default function ProposalDetail({ isAdmin }) {
   }
 
   const addSectionLaborLine = (sectionId) => {
+    const defaultMarkup = parseFloat(profile?.default_markup_percent) || 35
     setEditSections(prev => prev.map(s => s.id === sectionId
-      ? { ...s, labor_items: [...(s.labor_items || []), { role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: 0 }] }
+      ? { ...s, labor_items: [...(s.labor_items || []), { role: '', quantity: '', unit: 'hr', your_cost: '', markup: defaultMarkup, customer_price: 0 }] }
       : s
     ))
   }
@@ -1744,6 +1767,26 @@ export default function ProposalDetail({ isAdmin }) {
     setLaborItems(prev => {
       const updated = [...prev]
       updated[index] = { ...updated[index], [field]: value }
+
+      // Auto-fill from rate card when a matching role is selected
+      if (field === 'role') {
+        const matched = orgLaborRates.find(r => r.role === value)
+        if (matched) {
+          updated[index].your_cost = String(matched.cost_per_hour || '')
+          updated[index].unit      = matched.unit || 'hr'
+          const cost = parseFloat(matched.cost_per_hour) || 0
+          const bill = parseFloat(matched.bill_rate_per_hour) || 0
+          if (cost > 0 && bill > 0) {
+            updated[index].markup = (((bill - cost) / cost) * 100).toFixed(1)
+          }
+          const qty = parseFloat(updated[index].quantity) || 0
+          if (cost > 0 && qty > 0) {
+            const mkp = parseFloat(updated[index].markup) || 0
+            updated[index].customer_price = (cost * (1 + mkp / 100) * qty).toFixed(2)
+          }
+        }
+      }
+
       const qty = parseFloat(updated[index].quantity) || 0
       const cost = parseFloat(updated[index].your_cost) || 0
       const markup = parseFloat(updated[index].markup) || 0
@@ -2838,6 +2881,8 @@ const analyzeDrawing = async () => {
           onUpdateLabor={updateLabor}
           onUpdateSectionLabor={updateSectionLabor}
           onAddSectionLaborLine={addSectionLaborLine}
+          laborRates={orgLaborRates}
+          defaultMarkup={parseFloat(profile?.default_markup_percent) || 35}
           onRemoveSectionLaborLine={removeSectionLaborLine}
           onExcelUpload={handleExcelUpload}
           onOpenCatalogSearch={() => setShowCatalogSearch(true)}
