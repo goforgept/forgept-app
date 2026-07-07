@@ -35,7 +35,7 @@ async function sha256(str: string): Promise<string> {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
-async function buildJWT(userId: string, userEmail: string, orgId: string): Promise<string> {
+async function buildJWT(userId: string, userEmail: string, orgId: string, sessionId: string): Promise<string> {
   const secret = Deno.env.get('EMBED_JWT_SECRET') || Deno.env.get('SUPABASE_JWT_SECRET') || ''
   if (!secret) throw new Error('EMBED_JWT_SECRET is not set')
   const key = await crypto.subtle.importKey(
@@ -58,7 +58,7 @@ async function buildJWT(userId: string, userEmail: string, orgId: string): Promi
     user_metadata: { embed_org_id: orgId },
     role: 'authenticated',
     aal: 'aal1',
-    session_id: crypto.randomUUID(),
+    session_id: sessionId,
   }
 
   const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
@@ -202,7 +202,15 @@ Deno.serve(async (req) => {
     ext_name:    extName,
   })
 
-  const access_token = await buildJWT(embedUserId, embedEmail, keyRow.org_id)
+  // Register session in auth.sessions so GoTrue accepts the JWT
+  const sessionId = crypto.randomUUID()
+  await supabase.rpc('create_embed_session', {
+    p_session_id: sessionId,
+    p_user_id:    embedUserId,
+    p_not_after:  new Date(Date.now() + 7200 * 1000).toISOString(),
+  })
+
+  const access_token = await buildJWT(embedUserId, embedEmail, keyRow.org_id, sessionId)
   const expires_at   = new Date(Date.now() + 7200 * 1000).toISOString()
 
   return j({
