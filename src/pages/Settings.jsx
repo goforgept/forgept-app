@@ -286,7 +286,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       ship_to_address: form.ship_to_address, ship_to_city: form.ship_to_city,
       ship_to_state: form.ship_to_state, ship_to_zip: form.ship_to_zip,
     }).eq('id', user.id)
-    if (orgId) await supabase.from('organizations').update({ default_tax_rate: parseFloat(orgTaxRate) || null, timezone: orgTimezone }).eq('id', orgId)
+    if (orgId) await supabase.from('organizations').update({ timezone: orgTimezone }).eq('id', orgId)
     setSuccess('Settings saved successfully'); setSaving(false)
   }
 
@@ -383,7 +383,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       await supabase.from('organizations').update({
         trip_fee_default: parseFloat(orgServiceSettings.trip_fee_default) || 0,
         drive_time_rate_default: parseFloat(orgServiceSettings.drive_time_rate_default) || 0,
-        service_billing_mode: orgServiceSettings.service_billing_mode
+        service_billing_mode: orgServiceSettings.service_billing_mode,
+        default_tax_rate: parseFloat(orgTaxRate) || null,
       }).eq('id', profile.org_id)
       setSuccess('Rate card saved.')
     } catch (err) { alert('Error saving rate card: ' + err.message) }
@@ -463,7 +464,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
 
           {activeTab === 'general' && (
             <GeneralTab form={form} setForm={setForm} inputClass={inputClass} logoUrl={logoUrl} uploadingLogo={uploadingLogo} handleLogoUpload={handleLogoUpload}
-              orgTaxRate={orgTaxRate} setOrgTaxRate={setOrgTaxRate} orgTimezone={orgTimezone} setOrgTimezone={setOrgTimezone}
+              orgTimezone={orgTimezone} setOrgTimezone={setOrgTimezone}
               passwordForm={passwordForm} setPasswordForm={setPasswordForm} passwordError={passwordError} passwordSuccess={passwordSuccess}
               savingPassword={savingPassword} handleChangePassword={handleChangePassword}
               supportPin={supportPin} pinInput={pinInput} setPinInput={setPinInput} savingPin={savingPin} pinSaved={pinSaved} savePin={savePin} regeneratePin={regeneratePin}
@@ -517,6 +518,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           {activeTab === 'ratecard' && isAdmin && (
             <RateCardTab laborRates={laborRates} setLaborRates={setLaborRates} form={form} setForm={setForm}
               orgServiceSettings={orgServiceSettings} setOrgServiceSettings={setOrgServiceSettings}
+              orgTaxRate={orgTaxRate} setOrgTaxRate={setOrgTaxRate}
               savingRates={savingRates}
               onSave={async () => {
                 await supabase.from('profiles').update({ default_markup_percent: parseFloat(form.default_markup_percent) || 35 }).eq('id', profile.id)

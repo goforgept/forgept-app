@@ -1,4 +1,4 @@
-export default function RateCardTab({ laborRates, setLaborRates, form, setForm, orgServiceSettings, setOrgServiceSettings, savingRates, onSave }) {
+export default function RateCardTab({ laborRates, setLaborRates, form, setForm, orgServiceSettings, setOrgServiceSettings, orgTaxRate, setOrgTaxRate, savingRates, onSave }) {
   return (
     <div className="space-y-6">
       {/* Labor Rates */}
@@ -82,16 +82,25 @@ export default function RateCardTab({ laborRates, setLaborRates, form, setForm, 
         )}
       </div>
 
-      {/* Material Markup */}
+      {/* Pricing Defaults */}
       <div className="bg-[#1a2d45] rounded-xl p-6">
-        <h3 className="text-white font-bold text-lg mb-2">Material Markup</h3>
-        <p className="text-[#8A9AB0] text-sm mb-5">Default markup applied to all materials. Can be overridden per line item.</p>
-        <div className="flex items-center gap-3">
-          <label className="text-[#8A9AB0] text-sm">Default Markup %</label>
-          <input type="number" min="0" max="200" value={form.default_markup_percent}
-            onChange={e => setForm(prev => ({ ...prev, default_markup_percent: e.target.value }))}
-            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] w-24" />
-          <span className="text-[#8A9AB0] text-sm">%</span>
+        <h3 className="text-white font-bold text-lg mb-2">Pricing Defaults</h3>
+        <p className="text-[#8A9AB0] text-sm mb-5">Applied as defaults to all new proposals. Both can be overridden per proposal.</p>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <label className="text-[#8A9AB0] text-sm w-36">Default Markup</label>
+            <input type="number" min="0" max="200" value={form.default_markup_percent}
+              onChange={e => setForm(prev => ({ ...prev, default_markup_percent: e.target.value }))}
+              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] w-24" />
+            <span className="text-[#8A9AB0] text-sm">%</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-[#8A9AB0] text-sm w-36">Default Tax Rate</label>
+            <input type="number" min="0" max="100" step="0.01" placeholder="e.g. 8.5" value={orgTaxRate}
+              onChange={e => setOrgTaxRate(e.target.value)}
+              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] w-24" />
+            <span className="text-[#8A9AB0] text-sm">%</span>
+          </div>
         </div>
       </div>
 

@@ -37,22 +37,58 @@ export default function EmbedDesigner() {
   const [exported,          setExported]          = useState(false)
   const [bomRefreshKey,          setBomRefreshKey]          = useState(0)
   const [placementsRefreshKey,   setPlacementsRefreshKey]   = useState(0)
-  const stageRefs = useRef({})
+  const stageRefs       = useRef({})
+  const refreshTimerRef = useRef(null)
 
   const activeSheet = sheets.find(s => s.id === activeSheetId) || null
 
   useEffect(() => { init() }, [])
+
+  // Listen for fresh tokens posted by the parent page to keep the session alive
+  useEffect(() => {
+    const handleMessage = async (event) => {
+      if (event.data?.type !== 'forgept:refresh_session') return
+      const newToken = event.data.access_token
+      if (!newToken || typeof newToken !== 'string') return
+      if (!newToken.match(/^[\w-]+\.[\w-]+\.[\w-]+$/)) return
+
+      const { error } = await supabase.auth.setSession({
+        access_token:  newToken,
+        refresh_token: 'embed_session',
+      })
+      if (error) return
+
+      try {
+        const newPayload  = JSON.parse(atob(newToken.split('.')[1]))
+        const expiresAtMs = (newPayload.exp || 0) * 1000
+        const warnDelay   = expiresAtMs - Date.now() - 5 * 60 * 1000
+        if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+        if (expiresAtMs > 0 && warnDelay > 0) {
+          refreshTimerRef.current = setTimeout(() => {
+            window.parent.postMessage({ type: 'forgept:session_expiring', expires_at: new Date(expiresAtMs).toISOString() }, '*')
+          }, warnDelay)
+        }
+      } catch {}
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => {
+      window.removeEventListener('message', handleMessage)
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+    }
+  }, [])
 
   const init = async () => {
     if (!sessionToken) { setStatus('error'); return }
 
     // Decode JWT locally — avoids a GoTrue /auth/v1/user call which rejects
     // manually-crafted tokens that aren't registered in auth.sessions
-    let userId, resolvedOrgId
+    let userId, resolvedOrgId, expClaim = 0
     try {
       const payload = JSON.parse(atob(sessionToken.split('.')[1]))
       userId        = payload.sub
       resolvedOrgId = payload.user_metadata?.embed_org_id
+      expClaim      = payload.exp || 0
       if (!userId || !resolvedOrgId) { setStatus('error'); return }
     } catch { setStatus('error'); return }
 
@@ -103,6 +139,17 @@ export default function EmbedDesigner() {
       if (sheetData?.length > 0) setActiveSheetId(sheetData[0].id)
 
       setStatus('ready')
+
+      // Warn the parent 5 minutes before token expiry so it can push a fresh token
+      if (expClaim > 0) {
+        const expiresAtMs = expClaim * 1000
+        const warnDelay   = expiresAtMs - Date.now() - 5 * 60 * 1000
+        if (warnDelay > 0) {
+          refreshTimerRef.current = setTimeout(() => {
+            window.parent.postMessage({ type: 'forgept:session_expiring', expires_at: new Date(expiresAtMs).toISOString() }, '*')
+          }, warnDelay)
+        }
+      }
     } catch (e) {
       console.error(e)
       setStatus('error')

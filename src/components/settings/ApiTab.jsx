@@ -327,7 +327,7 @@ Content-Type: application/json
   "org_id":       "uuid",
   "user_id":      "uuid"
 }`}</pre>
-              <p className="text-[#4a5d75] text-xs mt-1">Token is valid for 2 hours; cache and reuse server-side. Passing <code className="text-[#C8622A]">user</code> creates a persistent per-user session. Omit for anonymous shared sessions.</p>
+              <p className="text-[#4a5d75] text-xs mt-1">Token is valid for 2 hours. <strong className="text-yellow-400">If multiple users will be working simultaneously, you must pass <code className="text-[#C8622A]">user.id</code></strong> — without it all users share one account and will overwrite each other. See Step 4 below to keep sessions alive past 2 hours.</p>
             </div>
 
             {/* Step 2 */}
@@ -356,7 +356,29 @@ Content-Type: application/json
 
             {/* Step 3 */}
             <div>
-              <p className="text-white text-xs font-semibold mb-1">Step 3 — Listen for the BOM export</p>
+              <p className="text-white text-xs font-semibold mb-1">Step 3 — Keep the session alive (token refresh)</p>
+              <p className="text-[#8A9AB0] text-xs mb-2">The designer will post <code className="text-[#C8622A]">forgept:session_expiring</code> to your page 5 minutes before the token expires. Respond with a fresh token and the user's session continues uninterrupted — no page reload, no data loss:</p>
+              <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`const iframeEl = document.getElementById('forgept-designer')
+
+window.addEventListener('message', async (event) => {
+  if (event.data?.type !== 'forgept:session_expiring') return
+
+  // Call your server (same as Step 1) to get a new token
+  const res = await fetch('/api/embed-token', { method: 'POST' })
+  const { access_token } = await res.json()
+
+  // Push the new token back into the running iframe — no reload needed
+  iframeEl.contentWindow.postMessage(
+    { type: 'forgept:refresh_session', access_token },
+    'https://app.goforgept.com'
+  )
+})`}</pre>
+              <p className="text-[#4a5d75] text-xs mt-1">The iframe automatically resets the 2-hour clock and the timer on receipt. Repeat indefinitely to keep long-running sessions alive.</p>
+            </div>
+
+            {/* Step 4 */}
+            <div>
+              <p className="text-white text-xs font-semibold mb-1">Step 4 — Listen for the BOM export</p>
               <p className="text-[#8A9AB0] text-xs mb-2">When the user clicks <strong>Export BOM</strong> inside the designer, the iframe fires a <code className="text-[#C8622A]">postMessage</code> to your page:</p>
               <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`window.addEventListener('message', (event) => {
   if (event.data?.type !== 'forgept:export') return
@@ -422,7 +444,7 @@ Content-Type: application/json
                   </div>
                 ))}
               </div>
-              <p className="text-[#4a5d75] text-xs mt-2">If the session token expires mid-session, the iframe shows an expiry message. Regenerate a token server-side and reload the iframe src.</p>
+              <p className="text-[#4a5d75] text-xs mt-2">Implement Step 3 to prevent mid-session expiry. If the session does expire without a refresh handler, the iframe will show an expiry message — generate a new token and set the iframe <code className="text-[#C8622A]">src</code> with the new <code className="text-[#C8622A]">?session=</code> value.</p>
             </div>
           </div>
 

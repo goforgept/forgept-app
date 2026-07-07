@@ -1,6 +1,6 @@
 export default function GeneralTab({
   form, setForm, inputClass, logoUrl, uploadingLogo, handleLogoUpload,
-  orgTaxRate, setOrgTaxRate, orgTimezone, setOrgTimezone,
+  orgTimezone, setOrgTimezone,
   passwordForm, setPasswordForm, passwordError, passwordSuccess, savingPassword, handleChangePassword,
   supportPin, pinInput, setPinInput, savingPin, pinSaved, savePin, regeneratePin,
   sameAsShipTo, handleSameAsShipTo, profile, saving, handleSave,
@@ -125,17 +125,8 @@ export default function GeneralTab({
       {isAdmin && (
         <div className="bg-[#1a2d45] rounded-xl p-6">
           <h3 className="text-white font-bold mb-1">Proposal Defaults</h3>
-          <p className="text-[#8A9AB0] text-sm mb-4">Default values and features applied to all proposals.</p>
+          <p className="text-[#8A9AB0] text-sm mb-4">Default features applied to all proposals. Markup % and tax rate are set in the Rate Card tab.</p>
           <div className="space-y-4">
-            <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Default Markup %</label>
-              <input type="number" value={form.default_markup_percent} onChange={e => setForm(prev => ({ ...prev, default_markup_percent: e.target.value }))} className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-            </div>
-            <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Default Tax Rate %</label>
-              <input type="number" step="0.01" placeholder="e.g. 8.5" value={orgTaxRate} onChange={e => setOrgTaxRate(e.target.value)} className="w-40 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-              <p className="text-[#8A9AB0] text-xs mt-1">Applied as default to new proposals.</p>
-            </div>
             <div className="flex items-center justify-between bg-[#0F1C2E] rounded-xl px-4 py-3">
               <div>
                 <p className="text-white text-sm font-semibold">Enable MSRP</p>
