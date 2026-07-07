@@ -46,22 +46,30 @@ export default function EmbedDesigner() {
   const init = async () => {
     if (!sessionToken) { setStatus('error'); return }
 
-    const { data, error: sessionErr } = await supabase.auth.setSession({
+    // Decode JWT locally — avoids a GoTrue /auth/v1/user call which rejects
+    // manually-crafted tokens that aren't registered in auth.sessions
+    let userId, resolvedOrgId
+    try {
+      const payload = JSON.parse(atob(sessionToken.split('.')[1]))
+      userId        = payload.sub
+      resolvedOrgId = payload.user_metadata?.embed_org_id
+      if (!userId || !resolvedOrgId) { setStatus('error'); return }
+    } catch { setStatus('error'); return }
+
+    // Set the session so all supabase.from() calls use this JWT
+    const { error: sessionErr } = await supabase.auth.setSession({
       access_token:  sessionToken,
       refresh_token: 'embed_session',
     })
-    if (sessionErr || !data?.session) { setStatus('error'); return }
+    if (sessionErr) { setStatus('error'); return }
 
     setStatus('loading')
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile }  = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-      if (!profile) { setStatus('error'); return }
-      setOrgId(profile.org_id)
+      setOrgId(resolvedOrgId)
 
       const [{ data: org }, { data: defaults }] = await Promise.all([
-        supabase.from('organizations').select('designer_labor_enabled').eq('id', profile.org_id).single(),
-        supabase.from('designer_labor_defaults').select('category, labor_role, hours_per_unit').eq('org_id', profile.org_id),
+        supabase.from('organizations').select('designer_labor_enabled').eq('id', resolvedOrgId).single(),
+        supabase.from('designer_labor_defaults').select('category, labor_role, hours_per_unit').eq('org_id', resolvedOrgId),
       ])
       setLaborEnabled(org?.designer_labor_enabled ?? false)
       setLaborDefaults(defaults || [])
@@ -71,8 +79,8 @@ export default function EmbedDesigner() {
         // Auto-create a proposal for this embed session
         const { data: newProp } = await supabase.from('proposals').insert({
           proposal_name: 'Embedded Design',
-          org_id:        profile.org_id,
-          user_id:       user.id,
+          org_id:        resolvedOrgId,
+          user_id:       userId,
           status:        'Draft',
           industry:      'Security',
         }).select('id, proposal_name, company, client_name, status, industry').single()
