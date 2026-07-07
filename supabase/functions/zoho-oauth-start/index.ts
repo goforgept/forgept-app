@@ -11,21 +11,28 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders })
   }
 
-  const { scope } = await req.json()
+  const body = await req.json()
+  const scope = body.scope === 'books' ? 'books' : 'crm'
 
   const CLIENT_ID    = Deno.env.get('ZOHO_CLIENT_ID')!
   const REDIRECT_URI = Deno.env.get('ZOHO_REDIRECT_URI')!
+  const STATE_SECRET = Deno.env.get('OAUTH_STATE_SECRET')!
 
-  // Scope determines which Zoho product to connect
   const scopes = scope === 'books'
     ? 'ZohoBooks.invoices.ALL,ZohoBooks.estimates.ALL,ZohoBooks.contacts.ALL,ZohoBooks.settings.read'
     : 'ZohoCRM.modules.contacts.ALL,ZohoCRM.modules.accounts.ALL,ZohoCRM.modules.deals.ALL,ZohoCRM.users.read'
 
-  const state = JSON.stringify({ 
-    org_id: profile.org_id, 
-    scope,
-    ts: Date.now() 
-  })
+  const payload = JSON.stringify({ org_id: profile.org_id, scope, ts: Date.now() })
+
+  // Sign the state with HMAC-SHA256 so the callback can verify it wasn't tampered with
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(STATE_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  )
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload))
+  const sigHex = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('')
+
+  const state = btoa(JSON.stringify({ payload, sig: sigHex }))
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -33,7 +40,7 @@ Deno.serve(async (req) => {
     scope:         scopes,
     redirect_uri:  REDIRECT_URI,
     access_type:   'offline',
-    state:         btoa(state),
+    state,
   })
 
   const authUrl = `https://accounts.zoho.com/oauth/v2/auth?${params.toString()}`

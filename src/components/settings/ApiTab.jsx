@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { useProfile } from '../../context/ProfileContext'
 
+const EMBED_SESSION_URL = 'https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/embed-session'
+
 const SCOPES = [
-  { value: 'read:proposals',  label: 'Proposals', desc: 'Read proposals, BOM line items, labor' },
-  { value: 'read:clients',    label: 'Clients',   desc: 'Read clients and contacts' },
-  { value: 'read:jobs',       label: 'Jobs',       desc: 'Read jobs and job details' },
-  { value: 'read:drawings',   label: 'Designer (read)', desc: 'Read floor plans and device placements via API' },
-  { value: 'embed:designer',  label: 'Designer (embed)', desc: 'Embed the interactive designer in your own platform' },
+  { value: 'read:proposals',  label: 'Proposals',         desc: 'Read proposals, BOM line items, labor' },
+  { value: 'read:clients',    label: 'Clients',            desc: 'Read clients and contacts' },
+  { value: 'read:jobs',       label: 'Jobs',               desc: 'Read jobs and job details' },
+  { value: 'read:drawings',   label: 'Designer (read)',    desc: 'Read floor plans and device placements via API' },
+  { value: 'embed:designer',  label: 'Designer (embed)',   desc: 'Embed the interactive designer in your own platform' },
 ]
 
 async function sha256hex(str) {
@@ -26,20 +28,42 @@ export default function ApiTab({ featureApi }) {
   const [keys, setKeys] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', scopes: ['read:proposals'] })
+  const [form, setForm] = useState({ name: '', scopes: ['read:proposals'], allowedOrigins: '' })
   const [generating, setGenerating] = useState(false)
   const [newKey, setNewKey] = useState(null)
   const [copied, setCopied] = useState(false)
   const [revoking, setRevoking] = useState(null)
 
+  // Test embed panel state
+  const [proposals, setProposals] = useState([])
+  const [testKey, setTestKey] = useState('')
+  const [testProposal, setTestProposal] = useState('')
+  const [testToken, setTestToken] = useState('')
+  const [testLoading, setTestLoading] = useState(false)
+  const [testError, setTestError] = useState('')
+
   useEffect(() => {
-    if (profile?.org_id && featureApi) loadKeys()
-    else setLoading(false)
+    if (profile?.org_id && featureApi) {
+      loadKeys()
+      supabase
+        .from('proposals')
+        .select('id, project_name')
+        .eq('org_id', profile.org_id)
+        .order('created_at', { ascending: false })
+        .limit(50)
+        .then(({ data }) => setProposals(data || []))
+    } else {
+      setLoading(false)
+    }
   }, [profile?.org_id, featureApi])
 
   const loadKeys = async () => {
     setLoading(true)
-    const { data } = await supabase.from('api_keys').select('*').eq('org_id', profile.org_id).order('created_at', { ascending: false })
+    const { data } = await supabase
+      .from('api_keys')
+      .select('*')
+      .eq('org_id', profile.org_id)
+      .order('created_at', { ascending: false })
     setKeys(data || [])
     setLoading(false)
   }
@@ -50,17 +74,22 @@ export default function ApiTab({ featureApi }) {
     const raw = generateRawKey()
     const hash = await sha256hex(raw)
     const prefix = raw.slice(0, 12)
+    const allowedOrigins = form.allowedOrigins
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
     const { error } = await supabase.from('api_keys').insert({
-      org_id: profile.org_id,
-      name: form.name.trim(),
-      key_prefix: prefix,
-      key_hash: hash,
-      scopes: form.scopes,
-      is_active: true,
+      org_id:          profile.org_id,
+      name:            form.name.trim(),
+      key_prefix:      prefix,
+      key_hash:        hash,
+      scopes:          form.scopes,
+      is_active:       true,
+      allowed_origins: allowedOrigins,
     })
     if (!error) {
       setNewKey(raw)
-      setForm({ name: '', scopes: ['read:proposals'] })
+      setForm({ name: '', scopes: ['read:proposals'], allowedOrigins: '' })
       setShowForm(false)
       await loadKeys()
     }
@@ -89,9 +118,38 @@ export default function ApiTab({ featureApi }) {
   const toggleScope = (scope) => {
     setForm(p => ({
       ...p,
-      scopes: p.scopes.includes(scope) ? p.scopes.filter(s => s !== scope) : [...p.scopes, scope]
+      scopes: p.scopes.includes(scope) ? p.scopes.filter(s => s !== scope) : [...p.scopes, scope],
     }))
   }
+
+  const handleTestEmbed = async () => {
+    if (!testKey.trim()) return
+    setTestLoading(true)
+    setTestError('')
+    setTestToken('')
+    try {
+      const res = await fetch(EMBED_SESSION_URL, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${testKey.trim()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(testProposal ? { proposal_id: testProposal } : {}),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setTestError(data.error || `Error ${res.status}`)
+      } else {
+        setTestToken(data.access_token)
+      }
+    } catch (e) {
+      setTestError('Network error: ' + e.message)
+    }
+    setTestLoading(false)
+  }
+
+  const hasEmbedKey = keys.some(k => k.scopes?.includes('embed:designer'))
+
+  const iframeSrc = testToken
+    ? `${window.location.origin}/embed?session=${testToken}${testProposal ? `&proposal=${testProposal}` : ''}`
+    : ''
 
   if (!featureApi) {
     return (
@@ -212,8 +270,17 @@ export default function ApiTab({ featureApi }) {
               ))}
             </div>
           </div>
+          {form.scopes.includes('embed:designer') && (
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Allowed Origins <span className="text-[#4a5d75] font-normal">(optional)</span></label>
+              <input type="text" value={form.allowedOrigins} onChange={e => setForm(p => ({ ...p, allowedOrigins: e.target.value }))}
+                placeholder="https://yoursite.com, https://portal.example.com"
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              <p className="text-[#4a5d75] text-xs mt-1">Comma-separated domains allowed to call embed-session from a browser. Leave blank to allow any origin (server-to-server calls are always allowed).</p>
+            </div>
+          )}
           <div className="flex gap-3 pt-1">
-            <button onClick={() => { setShowForm(false); setForm({ name: '', scopes: ['read:proposals'] }) }}
+            <button onClick={() => { setShowForm(false); setForm({ name: '', scopes: ['read:proposals'], allowedOrigins: '' }) }}
               className="flex-1 py-2 border border-[#2a3d55] text-[#8A9AB0] rounded-lg text-sm hover:text-white transition-colors">Cancel</button>
             <button onClick={handleGenerate} disabled={generating || !form.name.trim() || form.scopes.length === 0}
               className="flex-1 py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
@@ -249,6 +316,9 @@ export default function ApiTab({ featureApi }) {
                       </span>
                     ))}
                   </div>
+                  {k.allowed_origins?.length > 0 && (
+                    <p className="text-[#4a5d75] text-xs mt-1">Origins: {k.allowed_origins.join(', ')}</p>
+                  )}
                 </div>
                 <div className="shrink-0 text-right space-y-1">
                   <p className="text-[#4a5d75] text-xs">Created {new Date(k.created_at).toLocaleDateString()}</p>
@@ -306,7 +376,7 @@ Content-Type: application/json
   "org_id":       "uuid",
   "user_id":      "uuid"
 }`}</pre>
-              <p className="text-[#4a5d75] text-xs mt-1">Passing <code className="text-[#C8622A]">user</code> creates a persistent per-user session — designs are saved to that user and you can track usage per integrator. Omit it for anonymous shared sessions. Token is valid for 24 hours; cache and reuse server-side.</p>
+              <p className="text-[#4a5d75] text-xs mt-1">Token is valid for 2 hours; cache and reuse server-side. Passing <code className="text-[#C8622A]">user</code> creates a persistent per-user session. Omit for anonymous shared sessions.</p>
             </div>
 
             {/* Step 2 */}
@@ -321,7 +391,7 @@ Content-Type: application/json
 />`}</pre>
               <div className="mt-2 space-y-1">
                 {[
-                  { param: 'session', req: true,  desc: 'The access_token from Step 1.' },
+                  { param: 'session',  req: true,  desc: 'The access_token from Step 1.' },
                   { param: 'proposal', req: false, desc: 'UUID of an existing proposal/design to load. Omit to auto-create a new blank project.' },
                 ].map(p => (
                   <div key={p.param} className="flex items-start gap-2">
@@ -391,7 +461,8 @@ Content-Type: application/json
               <div className="space-y-1">
                 {[
                   { status: '401', msg: 'Missing API key / Invalid or revoked API key' },
-                  { status: '403', msg: 'Key lacks embed:designer scope / API not enabled for org' },
+                  { status: '403', msg: 'Key lacks embed:designer scope / API not enabled / Origin not allowed' },
+                  { status: '400', msg: 'Key requires proposal_id but none was provided' },
                   { status: '500', msg: 'Failed to create embed session user (contact support)' },
                 ].map(e => (
                   <div key={e.status} className="flex items-start gap-2">
@@ -408,16 +479,16 @@ Content-Type: application/json
             <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Available Endpoints</p>
             <div className="space-y-2">
               {[
-                { method: 'GET', path: '/proposals', desc: 'List all proposals (filter with ?status=Won)', scope: 'proposals' },
-                { method: 'GET', path: '/proposals/:id', desc: 'Get proposal with full BOM and labor', scope: 'proposals' },
-                { method: 'GET', path: '/clients', desc: 'List clients', scope: 'clients' },
-                { method: 'GET', path: '/clients/:id', desc: 'Get client details', scope: 'clients' },
-                { method: 'GET', path: '/jobs', desc: 'List jobs', scope: 'jobs' },
-                { method: 'GET', path: '/jobs/:id', desc: 'Get job details', scope: 'jobs' },
-                { method: 'GET', path: '/drawings', desc: 'List proposals with drawing projects', scope: 'drawings' },
-                { method: 'GET', path: '/drawings/:proposalId', desc: 'Get drawing project and sheet list', scope: 'drawings' },
-                { method: 'GET', path: '/drawings/:proposalId/placements', desc: 'All device placements with position, label, FOV, notes', scope: 'drawings' },
-                { method: 'GET', path: '/drawings/:proposalId/bom', desc: 'Aggregate BOM by part number across all sheets', scope: 'drawings' },
+                { method: 'GET', path: '/proposals',                         desc: 'List all proposals (filter with ?status=Won)',                scope: 'proposals' },
+                { method: 'GET', path: '/proposals/:id',                     desc: 'Get proposal with full BOM and labor',                        scope: 'proposals' },
+                { method: 'GET', path: '/clients',                           desc: 'List clients',                                                scope: 'clients' },
+                { method: 'GET', path: '/clients/:id',                       desc: 'Get client details',                                          scope: 'clients' },
+                { method: 'GET', path: '/jobs',                              desc: 'List jobs',                                                   scope: 'jobs' },
+                { method: 'GET', path: '/jobs/:id',                          desc: 'Get job details',                                             scope: 'jobs' },
+                { method: 'GET', path: '/drawings',                          desc: 'List proposals with drawing projects',                         scope: 'drawings' },
+                { method: 'GET', path: '/drawings/:proposalId',              desc: 'Get drawing project and sheet list',                           scope: 'drawings' },
+                { method: 'GET', path: '/drawings/:proposalId/placements',   desc: 'All device placements with position, label, FOV, notes',       scope: 'drawings' },
+                { method: 'GET', path: '/drawings/:proposalId/bom',          desc: 'Aggregate BOM by part number across all sheets',               scope: 'drawings' },
               ].map(e => (
                 <div key={e.path} className="flex items-start gap-3">
                   <span className="shrink-0 text-xs font-mono font-bold text-green-400 w-10">{e.method}</span>
@@ -429,6 +500,75 @@ Content-Type: application/json
             </div>
             <p className="text-[#4a5d75] text-xs mt-3">Full schema: /v1/openapi.json</p>
           </div>
+
+          {/* Test Embed Panel */}
+          {hasEmbedKey && (
+            <div className="bg-[#1a2d45] rounded-xl p-5 border border-[#2a3d55] space-y-4">
+              <div>
+                <p className="text-white font-semibold text-sm">Test Embedded Designer</p>
+                <p className="text-[#8A9AB0] text-xs mt-0.5">Preview the embed live before your customer demo. Paste your raw API key (saved when generated), pick a proposal, and launch a preview.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">API Key</label>
+                  <input
+                    type="password"
+                    value={testKey}
+                    onChange={e => { setTestKey(e.target.value); setTestToken(''); setTestError('') }}
+                    placeholder="fpk_..."
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#C8622A]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Proposal <span className="text-[#4a5d75] font-normal">(optional)</span></label>
+                  <select
+                    value={testProposal}
+                    onChange={e => { setTestProposal(e.target.value); setTestToken(''); setTestError('') }}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                  >
+                    <option value="">New blank project</option>
+                    {proposals.map(p => (
+                      <option key={p.id} value={p.id}>{p.project_name || 'Untitled'}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {testError && (
+                <p className="text-red-400 text-xs bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{testError}</p>
+              )}
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleTestEmbed}
+                  disabled={testLoading || !testKey.trim()}
+                  className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+                >
+                  {testLoading ? 'Connecting...' : testToken ? 'Reload Preview' : 'Launch Preview'}
+                </button>
+                {testToken && (
+                  <button onClick={() => { setTestToken(''); setTestKey(''); setTestProposal(''); setTestError('') }}
+                    className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {testToken && (
+                <div className="rounded-xl overflow-hidden border border-[#2a3d55]">
+                  <iframe
+                    key={testToken}
+                    src={iframeSrc}
+                    className="w-full"
+                    style={{ height: 680 }}
+                    allow="clipboard-write"
+                    title="Embedded Designer Preview"
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

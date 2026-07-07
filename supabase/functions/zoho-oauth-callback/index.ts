@@ -1,6 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
+const STATE_MAX_AGE_MS = 10 * 60 * 1000 // 10 minutes
+
 Deno.serve(async (req) => {
   const url    = new URL(req.url)
   const code   = url.searchParams.get('code')
@@ -12,8 +14,39 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const stateData = JSON.parse(atob(state))
+    const STATE_SECRET = Deno.env.get('OAUTH_STATE_SECRET')!
+
+    // Decode and verify HMAC signature
+    let stateData: { org_id: string; scope: string; ts: number }
+    try {
+      const { payload, sig } = JSON.parse(atob(state))
+
+      const key = await crypto.subtle.importKey(
+        'raw', new TextEncoder().encode(STATE_SECRET),
+        { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+      )
+      const sigBytes = Uint8Array.from(sig.match(/.{2}/g).map((h: string) => parseInt(h, 16)))
+      const valid = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(payload))
+
+      if (!valid) {
+        console.error('Zoho OAuth: invalid state signature')
+        return Response.redirect(`${appUrl}/settings?zoho=error&reason=invalid_state`)
+      }
+
+      stateData = JSON.parse(payload)
+    } catch {
+      return Response.redirect(`${appUrl}/settings?zoho=error&reason=bad_state`)
+    }
+
+    // Reject stale states
+    if (Date.now() - stateData.ts > STATE_MAX_AGE_MS) {
+      return Response.redirect(`${appUrl}/settings?zoho=error&reason=state_expired`)
+    }
+
     const { org_id, scope } = stateData
+    if (!org_id || (scope !== 'crm' && scope !== 'books')) {
+      return Response.redirect(`${appUrl}/settings?zoho=error&reason=bad_state`)
+    }
 
     const CLIENT_ID     = Deno.env.get('ZOHO_CLIENT_ID')!
     const CLIENT_SECRET = Deno.env.get('ZOHO_CLIENT_SECRET')!
@@ -34,7 +67,7 @@ Deno.serve(async (req) => {
 
     const tokens = await tokenRes.json()
     if (!tokens.access_token) {
-      console.error('Token exchange failed:', tokens)
+      console.error('Zoho token exchange failed:', tokens)
       return Response.redirect(`${appUrl}/settings?zoho=error&reason=token_failed`)
     }
 
@@ -45,8 +78,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    // Store tokens on organization
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       zoho_access_token:  tokens.access_token,
       zoho_refresh_token: tokens.refresh_token,
       zoho_token_expires: expiresAt.toISOString(),
@@ -55,15 +87,13 @@ Deno.serve(async (req) => {
 
     if (scope === 'crm') {
       updateData.zoho_crm_connected = true
-      // Get Zoho CRM org info
       const userRes = await fetch('https://www.zohoapis.com/crm/v2/users?type=CurrentUser', {
         headers: { 'Authorization': `Zoho-oauthtoken ${tokens.access_token}` }
       })
       const userData = await userRes.json()
       updateData.zoho_crm_org_id = userData?.users?.[0]?.id || null
-    } else if (scope === 'books') {
+    } else {
       updateData.zoho_books_connected = true
-      // Get Zoho Books org info
       const orgsRes = await fetch('https://www.zohoapis.com/books/v3/organizations', {
         headers: { 'Authorization': `Zoho-oauthtoken ${tokens.access_token}` }
       })
@@ -71,10 +101,7 @@ Deno.serve(async (req) => {
       updateData.zoho_books_org_id = orgsData?.organizations?.[0]?.organization_id || null
     }
 
-    await supabase
-      .from('organizations')
-      .update(updateData)
-      .eq('id', org_id)
+    await supabase.from('organizations').update(updateData).eq('id', org_id)
 
     return Response.redirect(`${appUrl}/settings?zoho=connected&scope=${scope}`)
 
