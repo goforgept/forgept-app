@@ -437,7 +437,7 @@ export default function EmbedDesigner() {
 
         {activeTab === 'bom' && (
           <div className="flex-1 overflow-y-auto p-4">
-            <DrawingBOMPreview proposalId={proposalId} refreshKey={bomRefreshKey} />
+            <DrawingBOMPreview proposalId={proposalId} orgId={orgId} sheets={sheets} refreshKey={bomRefreshKey} />
           </div>
         )}
       </div>
