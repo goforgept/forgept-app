@@ -36,7 +36,8 @@ async function sha256(str: string): Promise<string> {
 }
 
 async function buildJWT(userId: string, userEmail: string, orgId: string): Promise<string> {
-  const secret = Deno.env.get('SUPABASE_JWT_SECRET')!
+  const secret = Deno.env.get('EMBED_JWT_SECRET') || Deno.env.get('SUPABASE_JWT_SECRET') || ''
+  if (!secret) throw new Error('EMBED_JWT_SECRET is not set')
   const key = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
