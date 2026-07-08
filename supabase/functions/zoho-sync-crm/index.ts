@@ -30,8 +30,12 @@ async function fetchAll(token: string, module: string) {
       `https://www.zohoapis.com/crm/v2/${module}?page=${page}&per_page=200`,
       { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
     )
-    if (res.status === 204) break
+    if (res.status === 204) break // no records
     const body = await res.json()
+    // Surface Zoho API errors instead of silently returning 0 records
+    if (body.status === 'error' || body.code) {
+      throw new Error(`Zoho ${module} API error: ${body.message || body.code || JSON.stringify(body)}`)
+    }
     if (!body.data?.length) break
     records.push(...body.data)
     if (!body.info?.more_records) break

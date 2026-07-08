@@ -141,8 +141,14 @@ export default function IntegrationsTab({
       const data = await res.json()
       if (data.success) {
         const { accounts, contacts } = data
+        const total = accounts.added + accounts.updated + contacts.added + contacts.updated
         setZohoLastSync(new Date().toISOString())
-        setZohoMessage({ type: 'success', text: `Synced: ${accounts.added} new clients, ${accounts.updated} updated · ${contacts.added} new contacts, ${contacts.updated} updated` })
+        setZohoMessage({
+          type: total > 0 ? 'success' : 'error',
+          text: total > 0
+            ? `Synced: ${accounts.added} new clients, ${accounts.updated} updated · ${contacts.added} new contacts, ${contacts.updated} updated`
+            : 'Zoho returned 0 records. Check that your Zoho account has Accounts and Contacts data and the token is still valid — try disconnecting and reconnecting.'
+        })
       } else {
         setZohoMessage({ type: 'error', text: data.error || 'Sync failed' })
       }
