@@ -113,17 +113,42 @@ export default function IntegrationsTab({
   const [zohoConnecting, setZohoConnecting] = useState(null)
   const [zohoMessage, setZohoMessage] = useState(null)
   const [zohoStatus, setZohoStatus] = useState({ crm: false, books: false })
+  const [zohoSyncing, setZohoSyncing] = useState(false)
+  const [zohoLastSync, setZohoLastSync] = useState(null)
 
   useState(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       const { data: p } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
       if (!p?.org_id) return
-      const { data: org } = await supabase.from('organizations').select('zoho_crm_connected, zoho_books_connected').eq('id', p.org_id).single()
-      if (org) setZohoStatus({ crm: org.zoho_crm_connected || false, books: org.zoho_books_connected || false })
+      const { data: org } = await supabase.from('organizations').select('zoho_crm_connected, zoho_books_connected, zoho_last_sync_at').eq('id', p.org_id).single()
+      if (org) {
+        setZohoStatus({ crm: org.zoho_crm_connected || false, books: org.zoho_books_connected || false })
+        setZohoLastSync(org.zoho_last_sync_at || null)
+      }
     }
     load()
   }, [])
+
+  const syncZohoCRM = async () => {
+    setZohoSyncing(true); setZohoMessage(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-sync-crm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      })
+      const data = await res.json()
+      if (data.success) {
+        const { accounts, contacts } = data
+        setZohoLastSync(new Date().toISOString())
+        setZohoMessage({ type: 'success', text: `Synced: ${accounts.added} new clients, ${accounts.updated} updated · ${contacts.added} new contacts, ${contacts.updated} updated` })
+      } else {
+        setZohoMessage({ type: 'error', text: data.error || 'Sync failed' })
+      }
+    } catch (err) { setZohoMessage({ type: 'error', text: err.message }) }
+    setZohoSyncing(false)
+  }
 
   const connectZoho = async (scope) => {
     setZohoConnecting(scope); setZohoMessage(null)
@@ -549,7 +574,19 @@ export default function IntegrationsTab({
               ))}
             </div>
             {zohoStatus.crm ? (
-              <button onClick={() => disconnectZoho('crm')} className="text-red-400 hover:text-red-300 text-xs transition-colors">Disconnect Zoho CRM</button>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <button onClick={syncZohoCRM} disabled={zohoSyncing}
+                    className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                    {zohoSyncing ? 'Syncing...' : '↻ Sync Now'}
+                  </button>
+                  {zohoLastSync && (
+                    <span className="text-[#8A9AB0] text-xs">Last sync: {new Date(zohoLastSync).toLocaleString()}</span>
+                  )}
+                </div>
+                <p className="text-[#8A9AB0] text-xs">Two-way sync is active. Changes in Zoho update ForgePt automatically. Client and contact saves push back to Zoho.</p>
+                <button onClick={() => disconnectZoho('crm')} className="text-red-400 hover:text-red-300 text-xs transition-colors">Disconnect Zoho CRM</button>
+              </div>
             ) : (
               <button onClick={() => connectZoho('crm')} disabled={zohoConnecting === 'crm'}
                 className="w-full bg-red-600/80 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">

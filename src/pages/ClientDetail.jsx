@@ -203,14 +203,27 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const saveContact = async () => {
     if (!contactForm.full_name.trim()) return
     setSavingContact(true)
+    let savedContactId = editingContact?.id
     if (editingContact) {
       await supabase.from('client_contacts').update(contactForm).eq('id', editingContact.id)
     } else {
-      await supabase.from('client_contacts').insert({ ...contactForm, client_id: id, org_id: profile.org_id })
+      const { data: newContact } = await supabase.from('client_contacts')
+        .insert({ ...contactForm, client_id: id, org_id: profile.org_id })
+        .select('id').single()
+      savedContactId = newContact?.id
     }
     await fetchContacts()
     setShowContactModal(false)
     setSavingContact(false)
+    // Push to Zoho if connected
+    if (savedContactId) {
+      const { data: { session } } = await supabase.auth.getSession()
+      fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ contactId: savedContactId }),
+      }).catch(() => {})
+    }
   }
 
   const deleteContact = async (contactId) => {
@@ -270,6 +283,13 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     await fetchClient()
     setEditingClient(false)
     setSavingClient(false)
+    // Push to Zoho if connected (fire-and-forget)
+    const { data: { session } } = await supabase.auth.getSession()
+    fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ clientId: id }),
+    }).catch(() => {})
   }
 
 const deleteMeeting = async (meetingId) => {

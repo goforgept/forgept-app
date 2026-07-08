@@ -92,6 +92,31 @@ Deno.serve(async (req) => {
       })
       const userData = await userRes.json()
       updateData.zoho_crm_org_id = userData?.users?.[0]?.id || null
+
+      // Generate a webhook token and register Zoho notifications for Accounts + Contacts
+      const webhookToken = crypto.randomUUID()
+      updateData.zoho_webhook_token = webhookToken
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+      const webhookUrl = `${supabaseUrl}/functions/v1/zoho-webhook?org_id=${org_id}&token=${webhookToken}`
+      const expiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().replace('T', 'T').split('.')[0] + '+00:00'
+      try {
+        await fetch('https://www.zohoapis.com/crm/v2/actions/watch', {
+          method: 'POST',
+          headers: {
+            Authorization: `Zoho-oauthtoken ${tokens.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            watch: [{
+              channel_id: org_id.replace(/-/g, '').slice(0, 18),
+              events: ['Accounts.create', 'Accounts.edit', 'Contacts.create', 'Contacts.edit'],
+              token: webhookToken,
+              notify_url: webhookUrl,
+              channel_expiry: expiry,
+            }],
+          }),
+        })
+      } catch { /* non-fatal — webhook can be set up manually */ }
     } else {
       updateData.zoho_books_connected = true
       const orgsRes = await fetch('https://www.zohoapis.com/books/v3/organizations', {
