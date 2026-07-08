@@ -34,10 +34,12 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   const [form, setForm] = useState({
     title: '', description: '', client_id: '', job_id: '',
     assigned_tech_id: '', priority: 'Normal', status: 'Open',
-    scheduled_date: '', scheduled_time: '', duration_hours: '2', location_id: ''
+    scheduled_date: '', scheduled_time: '', duration_hours: '2', location_id: '',
+    contact_id: ''
   })
   const [clientJobs, setClientJobs] = useState([])
   const [clientLocations, setClientLocations] = useState([])
+  const [clientContacts, setClientContacts] = useState([])
 
   useEffect(() => { if (profile?.org_id) fetchAll() }, [profile?.org_id])
 
@@ -63,19 +65,19 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   }
 
   const handleClientChange = async (clientId) => {
-    setForm(p => ({ ...p, client_id: clientId, job_id: '', location_id: '' }))
+    setForm(p => ({ ...p, client_id: clientId, job_id: '', location_id: '', contact_id: '' }))
     setClientJobs([])
     setClientLocations([])
+    setClientContacts([])
     if (!clientId) return
-    const { data } = await supabase
-      .from('jobs').select('id, name, job_number')
-      .eq('client_id', clientId).in('status', ['Active', 'On Hold'])
-      .order('created_at', { ascending: false })
-    setClientJobs(data || [])
-    const { data: locData } = await supabase
-      .from('client_locations').select('*')
-      .eq('client_id', clientId).order('site_name', { ascending: true })
+    const [{ data: jobData }, { data: locData }, { data: contactData }] = await Promise.all([
+      supabase.from('jobs').select('id, name, job_number').eq('client_id', clientId).in('status', ['Active', 'On Hold']).order('created_at', { ascending: false }),
+      supabase.from('client_locations').select('*').eq('client_id', clientId).order('site_name', { ascending: true }),
+      supabase.from('client_contacts').select('id, full_name, title, email, phone').eq('client_id', clientId).order('is_primary', { ascending: false }).order('full_name', { ascending: true }),
+    ])
+    setClientJobs(jobData || [])
     setClientLocations(locData || [])
+    setClientContacts(contactData || [])
   }
 
   const saveTicket = async () => {
@@ -99,6 +101,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
         scheduled_time: form.scheduled_time || null,
         duration_hours: parseFloat(form.duration_hours) || 2,
         location_id: form.location_id || null,
+        contact_id: form.contact_id || null,
       })
 
       if (error) {
@@ -108,9 +111,10 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
 
       setShowModal(false)
       setSaveError('')
-      setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '', duration_hours: '2', location_id: '' })
+      setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '', duration_hours: '2', location_id: '', contact_id: '' })
       setClientJobs([])
       setClientLocations([])
+      setClientContacts([])
       fetchAll()
     } catch (err) {
       setSaveError(err.message || 'Unexpected error')
@@ -268,6 +272,19 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
                     {clientLocations.map(loc => (
                       <option key={loc.id} value={loc.id}>
                         {loc.site_name}{loc.address ? ` — ${loc.address}, ${loc.city || ''}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {clientContacts.length > 0 && (
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Requested By (optional)</label>
+                  <select value={form.contact_id} onChange={e => setForm(p => ({ ...p, contact_id: e.target.value }))} className={inputClass}>
+                    <option value="">— Select contact —</option>
+                    {clientContacts.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.full_name}{c.title ? ` — ${c.title}` : ''}
                       </option>
                     ))}
                   </select>

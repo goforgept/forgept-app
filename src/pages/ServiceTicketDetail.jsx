@@ -39,6 +39,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago')
   const [photos, setPhotos] = useState([])
   const [clientLocations, setClientLocations] = useState([])
+  const [clientContacts, setClientContacts] = useState([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoCategory, setPhotoCategory] = useState('Other')
 
@@ -50,7 +51,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
 
     const { data: ticketData } = await supabase
       .from('service_tickets')
-      .select('*, clients(id, company, client_name, email), profiles!service_tickets_assigned_tech_id_fkey(full_name, email), jobs(id, name, job_number)')
+      .select('*, clients(id, company, client_name, email), profiles!service_tickets_assigned_tech_id_fkey(full_name, email), jobs(id, name, job_number), client_contacts(id, full_name, title)')
       .eq('id', id)
       .single()
     setTicket(ticketData)
@@ -62,14 +63,14 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
       .eq('org_id', profile.org_id).order('full_name')
     setTechs(techData || [])
 
-    // Fetch client locations if client is set
+    // Fetch client locations and contacts if client is set
     if (ticketData?.clients?.id) {
-      const { data: locData } = await supabase
-        .from('client_locations')
-        .select('*')
-        .eq('client_id', ticketData.clients.id)
-        .order('site_name', { ascending: true })
+      const [{ data: locData }, { data: contactData }] = await Promise.all([
+        supabase.from('client_locations').select('*').eq('client_id', ticketData.clients.id).order('site_name', { ascending: true }),
+        supabase.from('client_contacts').select('id, full_name, title, email, phone').eq('client_id', ticketData.clients.id).order('is_primary', { ascending: false }).order('full_name', { ascending: true }),
+      ])
       setClientLocations(locData || [])
+      setClientContacts(contactData || [])
     }
 
     setLoading(false)
@@ -277,12 +278,23 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     doc.rect(0, 0, pageWidth, 40, 'F')
 
     if (profile?.logo_url) {
-      const img = new Image()
-      img.src = profile.logo_url
-      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
-      const maxW = 50, maxH = 26
-      const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
-      doc.addImage(img, 'PNG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+      try {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.src = profile.logo_url
+        await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+        if (img.naturalWidth > 0) {
+          const maxW = 50, maxH = 26
+          const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+          doc.addImage(img, 'PNG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+        } else {
+          doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+          doc.text(profile?.company_name || 'ForgePt.', 14, 24)
+        }
+      } catch (e) {
+        doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+        doc.text(profile?.company_name || 'ForgePt.', 14, 24)
+      }
     } else {
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(20)
@@ -309,6 +321,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     doc.setTextColor(100, 100, 100)
     if (ticket.ticket_number) { doc.text(`Ticket #: ${ticket.ticket_number}`, 14, y); y += 5 }
     if (ticket.clients?.company) { doc.text(`Client: ${ticket.clients.company}`, 14, y); y += 5 }
+    if (ticket.contact_id) { const rc = clientContacts.find(x => x.id === ticket.contact_id); if (rc) { doc.text(`Requested By: ${rc.full_name}${rc.title ? ` (${rc.title})` : ''}`, 14, y); y += 5 } }
     if (ticket.profiles?.full_name) { doc.text(`Technician: ${ticket.profiles.full_name}`, 14, y); y += 5 }
     if (ticket.scheduled_date) { doc.text(`Service Date: ${new Date(ticket.scheduled_date).toLocaleDateString()}`, 14, y); y += 5 }
     if (ticket.location_id) {
@@ -471,7 +484,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
         try {
           const response = await fetch(categoryPhotos[i].url)
           const blob = await response.blob()
-          const base64 = await new Promise(resolve => {
+          const base64 = await new Promise((resolve, reject) => {
             const img2 = new Image()
             img2.onload = () => {
               const canvas = document.createElement('canvas')
@@ -481,6 +494,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
               ctx.drawImage(img2, 0, 0)
               resolve(canvas.toDataURL('image/jpeg', 0.85))
             }
+            img2.onerror = () => reject(new Error('Image decode failed'))
             img2.src = URL.createObjectURL(blob)
           })
           if (y + photoHeight + 10 > pageHeight - 20) { doc.addPage(); y = 20; photoX = 14 }
@@ -593,12 +607,12 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
             </div>
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <button onClick={() => generateServiceReport(false)}
+                <button onClick={() => generateServiceReport(false).catch(e => { console.error(e); alert('Error generating report: ' + e.message) })}
                   className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
                   📄 Download Report
                 </button>
                 {ticket.clients?.email && (
-                  <button onClick={() => generateServiceReport(true)}
+                  <button onClick={() => generateServiceReport(true).catch(e => { console.error(e); alert('Error sending report: ' + e.message) })}
                     className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                     ✉️ Send to Client
                   </button>
@@ -657,6 +671,19 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                   {clientLocations.map(loc => (
                     <option key={loc.id} value={loc.id}>
                       {loc.site_name}{loc.address ? ` — ${loc.address}` : ''}{loc.city ? `, ${loc.city}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {clientContacts.length > 0 && (
+              <div>
+                <p className="text-[#8A9AB0] text-xs mb-1">Requested By</p>
+                <select value={ticket.contact_id || ''} onChange={e => updateTicket('contact_id', e.target.value || null)} className={`w-full ${inputClass}`}>
+                  <option value="">— Select contact —</option>
+                  {clientContacts.map(c => (
+                    <option key={c.id} value={c.id}>
+                      {c.full_name}{c.title ? ` — ${c.title}` : ''}
                     </option>
                   ))}
                 </select>
@@ -737,6 +764,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                 <div><p className="text-[#8A9AB0] text-xs mb-0.5">Created</p><p className="text-white">{new Date(ticket.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</p></div>
                 {ticket.profiles?.full_name && <div><p className="text-[#8A9AB0] text-xs mb-0.5">Assigned To</p><p className="text-white">{ticket.profiles.full_name}</p></div>}
                 {ticket.clients?.company && <div><p className="text-[#8A9AB0] text-xs mb-0.5">Client</p><p className="text-white">{ticket.clients.company}</p></div>}
+                {ticket.contact_id && (() => { const c = clientContacts.find(x => x.id === ticket.contact_id); return c ? <div><p className="text-[#8A9AB0] text-xs mb-0.5">Requested By</p><p className="text-white">{c.full_name}{c.title ? <span className="text-[#8A9AB0] text-xs ml-1">· {c.title}</span> : ''}</p></div> : null })()}
                 {ticket.jobs?.name && <div><p className="text-[#8A9AB0] text-xs mb-0.5">Job</p><p className="text-white">{ticket.jobs.name}</p></div>}
                 {ticket.location_id && (() => {
                   const loc = clientLocations.find(l => l.id === ticket.location_id)

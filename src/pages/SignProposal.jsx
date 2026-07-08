@@ -720,6 +720,17 @@ export default function SignProposal() {
               <p className="text-[#8A9AB0] text-sm">Signed by <span className="text-white font-semibold">{signerName}</span></p>
               <p className="text-[#8A9AB0] text-xs mt-1">{signedAt ? new Date(signedAt).toLocaleString() : ''}</p>
               <p className="text-[#8A9AB0] text-xs mt-4">Your contractor has been notified. Thank you for your business.</p>
+              <button
+                onClick={async () => {
+                  try {
+                    const doc = await generateSignedPDF(signerName, signedAt || new Date().toISOString(), lineItems, proposal, orgProfile, sections)
+                    doc.save(`Signed-Proposal-${proposal?.proposal_name || 'document'}.pdf`)
+                  } catch (e) { alert('Error generating PDF. Please try again.') }
+                }}
+                className="mt-5 inline-flex items-center gap-2 bg-[#2a3d55] hover:bg-[#3a4d65] text-white px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                Download Signed Copy
+              </button>
             </div>
           ) : (
             <div>
