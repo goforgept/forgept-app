@@ -124,18 +124,21 @@ function CatalogsTab() {
       const XLSX = await import('xlsx')
       const data = await file.arrayBuffer()
       const wb = XLSX.read(data)
-      const ws = wb.Sheets[wb.SheetNames[0]]
+      const sheetName = wb.SheetNames.find(n => n.trim() === 'HVA Pricelist') || wb.SheetNames[0]
+      const ws = wb.Sheets[sheetName]
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
 
       const items = rows.map(r => {
-        const partNumber = String(r['Part Number'] || r['Part #'] || r['part_number'] || r['SKU'] || r['sku'] || '').trim()
-        const modelName = String(r['Model Name'] || r['Model'] || r['Description'] || r['Item Name'] || r['item_name'] || r['Name'] || '').trim()
+        // "Item #" / "Item Type" = Hanwha pricebook column names
+        const partNumber = String(r['Item #'] || r['Part Number'] || r['Part #'] || r['part_number'] || r['SKU'] || r['sku'] || '').trim()
+        const modelName = String(r['Item Type'] || r['Model Name'] || r['Model'] || r['Item Name'] || r['item_name'] || r['Name'] || '').trim()
+        const description = String(r['Description'] || r['Sales Description'] || r['description'] || '').trim() || null
         const msrpRaw = r['MSRP'] || r['List Price'] || r['msrp'] || r['Price'] || ''
         const msrp = parseFloat(String(msrpRaw).replace(/[$,]/g, '')) || null
         const category = String(r['Category'] || r['category'] || '').trim()
         const manufacturer = String(r['Manufacturer'] || r['manufacturer'] || r['Brand'] || importForm.label || '').trim()
         const unit = String(r['Unit'] || r['unit'] || 'ea').trim() || 'ea'
-        return { catalog_slug: importForm.slug.trim(), catalog_label: importForm.label.trim(), manufacturer, part_number: partNumber, model_name: modelName, msrp, category, unit, active: true }
+        return { catalog_slug: importForm.slug.trim(), catalog_label: importForm.label.trim(), manufacturer, part_number: partNumber, model_name: modelName, description, msrp, category, unit, active: true }
       }).filter(r => r.part_number || r.model_name)
 
       if (items.length === 0) { setImportError('No valid rows found. Make sure Part Number or Model Name column exists.'); setImporting(false); return }
