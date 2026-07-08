@@ -32,16 +32,21 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [uploadResult, setUploadResult] = useState(null) // { added, updated, vendors }
   const [error, setError] = useState(null)
   const [expandedId, setExpandedId] = useState(null)
+  const [activeTab, setActiveTab] = useState('library') // 'library' | catalog slug
   // Add product form
   const [showAddForm, setShowAddForm] = useState(false)
   const [addForm, setAddForm] = useState({ item_name: '', manufacturer: '', part_number: '', category: '', unit: 'ea', description: '', msrp: '' })
   const [saving, setSaving] = useState(false)
   // Add vendor price inline
-  const [addingPriceFor, setAddingPriceFor] = useState(null) // product_id
+  const [addingPriceFor, setAddingPriceFor] = useState(null) // product_id or `cat_${catalog_product_id}`
   const [priceForm, setPriceForm] = useState({ vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] })
   const [savingPrice, setSavingPrice] = useState(false)
   const [editingProductId, setEditingProductId] = useState(null)
   const [editForm, setEditForm] = useState({})
+  // Catalogs
+  const [enabledCatalogs, setEnabledCatalogs] = useState([]) // [{ slug, label }]
+  const [catalogItems, setCatalogItems] = useState([])        // catalog_products rows for active slugs
+  const [catalogCopied, setCatalogCopied] = useState({})      // { catalog_product_id: product_library_id }
 
   useEffect(() => { if (profile?.org_id) fetchAll() }, [profile?.org_id])
 
@@ -71,7 +76,76 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
 
     setProducts(prods || [])
     setPricing(priceMap)
+
+    // Track which catalog items have already been copied to this org's library
+    const copiedMap = {}
+    ;(prods || []).forEach(p => { if (p.catalog_product_id) copiedMap[p.catalog_product_id] = p.id })
+    setCatalogCopied(copiedMap)
+
+    // Fetch enabled catalogs for this org
+    const { data: orgRow } = await supabase
+      .from('organizations')
+      .select('enabled_catalogs')
+      .eq('id', profile.org_id)
+      .single()
+
+    const slugs = orgRow?.enabled_catalogs || []
+    if (slugs.length > 0) {
+      const { data: catProds } = await supabase
+        .from('catalog_products')
+        .select('*')
+        .in('catalog_slug', slugs)
+        .eq('active', true)
+        .order('model_name', { ascending: true })
+
+      const uniqueCatalogs = []
+      const seen = new Set()
+      ;(catProds || []).forEach(r => {
+        if (!seen.has(r.catalog_slug)) {
+          seen.add(r.catalog_slug)
+          uniqueCatalogs.push({ slug: r.catalog_slug, label: r.catalog_label || r.catalog_slug })
+        }
+      })
+      setEnabledCatalogs(uniqueCatalogs)
+      setCatalogItems(catProds || [])
+    } else {
+      setEnabledCatalogs([])
+      setCatalogItems([])
+    }
+
     setLoading(false)
+  }
+
+  // Copy a catalog item to this org's product_library, then open the pricing form
+  const copyAndAddPricing = async (catItem) => {
+    // If already copied, just open pricing form for existing product_library row
+    if (catalogCopied[catItem.id]) {
+      setExpandedId(catalogCopied[catItem.id])
+      setAddingPriceFor(catalogCopied[catItem.id])
+      setPriceForm({ vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] })
+      setActiveTab('library')
+      return
+    }
+    // Copy to product_library
+    const { data: newProd } = await supabase.from('product_library').insert({
+      org_id: profile.org_id,
+      item_name: catItem.model_name || catItem.part_number,
+      manufacturer: catItem.manufacturer || null,
+      part_number: catItem.part_number || null,
+      category: catItem.category || null,
+      unit: catItem.unit || 'ea',
+      description: catItem.description || null,
+      msrp: catItem.msrp || null,
+      catalog_product_id: catItem.id,
+      active: true,
+    }).select('id').single()
+    if (newProd?.id) {
+      await fetchAll()
+      setExpandedId(newProd.id)
+      setAddingPriceFor(newProd.id)
+      setPriceForm({ vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] })
+      setActiveTab('library')
+    }
   }
 
   // ─── Excel import ─────────────────────────────────────────────────────────
@@ -320,6 +394,18 @@ if (!finalCost) continue
     return matchSearch && matchCategory && matchVendor
   })
 
+  const filteredCatalog = activeTab !== 'library'
+    ? catalogItems.filter(c => {
+        if (c.catalog_slug !== activeTab) return false
+        const q = search.toLowerCase()
+        return !q ||
+          (c.model_name || '').toLowerCase().includes(q) ||
+          (c.part_number || '').toLowerCase().includes(q) ||
+          (c.manufacturer || '').toLowerCase().includes(q) ||
+          (c.category || '').toLowerCase().includes(q)
+      })
+    : []
+
   const fmt = (n) => n != null ? `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
   const inputCls = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
 
@@ -394,32 +480,102 @@ if (!finalCost) continue
           </div>
         )}
 
+        {/* Tabs: My Library + enabled catalogs */}
+        {enabledCatalogs.length > 0 && (
+          <div className="flex gap-1 bg-[#1a2d45] rounded-xl p-1 w-fit">
+            <button onClick={() => setActiveTab('library')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'library' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+              My Library
+            </button>
+            {enabledCatalogs.map(cat => (
+              <button key={cat.slug} onClick={() => setActiveTab(cat.slug)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === cat.slug ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Search + filters */}
         <div className="flex gap-3">
           <input type="text" placeholder="Search by name, part #, manufacturer..." value={search} onChange={e => setSearch(e.target.value)}
             className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
-          <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-            className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-            <option value="">All Categories</option>
-            {categories.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select value={filterVendor} onChange={e => setFilterVendor(e.target.value)}
-            className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-            <option value="">All Vendors</option>
-            {allVendors.map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
+          {activeTab === 'library' && <>
+            <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
+              className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+              <option value="">All Categories</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <select value={filterVendor} onChange={e => setFilterVendor(e.target.value)}
+              className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+              <option value="">All Vendors</option>
+              {allVendors.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </>}
         </div>
 
-        {/* Pricing freshness legend */}
-        <div className="flex items-center gap-4 text-xs text-[#8A9AB0]">
-          <span className="font-semibold">Pricing age:</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> &lt; 30 days — Current</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> 30–120 days — Aging</span>
-          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> 120+ days — Stale (RFQ when added to BOM)</span>
-        </div>
+        {/* Pricing freshness legend (library tab only) */}
+        {activeTab === 'library' && (
+          <div className="flex items-center gap-4 text-xs text-[#8A9AB0]">
+            <span className="font-semibold">Pricing age:</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> &lt; 30 days — Current</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> 30–120 days — Aging</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> 120+ days — Stale (RFQ when added to BOM)</span>
+          </div>
+        )}
 
-        {/* Product list */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        {/* Catalog product list */}
+        {activeTab !== 'library' && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-bold">
+                {enabledCatalogs.find(c => c.slug === activeTab)?.label || activeTab}
+                <span className="text-[#8A9AB0] font-normal text-sm ml-2">({filteredCatalog.length.toLocaleString()} products)</span>
+              </h3>
+              <p className="text-[#8A9AB0] text-xs">MSRP pricing only. Click "Add Pricing" to copy to your library and enter your distributor cost.</p>
+            </div>
+            {filteredCatalog.length === 0 ? (
+              <p className="text-[#8A9AB0] text-sm py-8 text-center">{search ? 'No matching products.' : 'No products in this catalog.'}</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-[#2a3d55]">
+                      {['Part #', 'Model / Description', 'Category', 'MSRP', ''].map(h => (
+                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs whitespace-nowrap">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCatalog.map(item => {
+                      const inLibrary = !!catalogCopied[item.id]
+                      return (
+                        <tr key={item.id} className="border-b border-[#2a3d55]/30 hover:bg-[#0F1C2E]/50">
+                          <td className="py-2 pr-4 font-mono text-[#8A9AB0] text-xs whitespace-nowrap">{item.part_number || '—'}</td>
+                          <td className="py-2 pr-4">
+                            <p className="text-white text-sm font-medium">{item.model_name || item.part_number}</p>
+                            {item.description && <p className="text-[#8A9AB0] text-xs mt-0.5 truncate max-w-xs">{item.description}</p>}
+                          </td>
+                          <td className="py-2 pr-4 text-[#8A9AB0] text-xs whitespace-nowrap">{item.category || '—'}</td>
+                          <td className="py-2 pr-4 text-white font-semibold whitespace-nowrap">{fmt(item.msrp)}</td>
+                          <td className="py-2">
+                            <button onClick={() => copyAndAddPricing(item)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${inLibrary ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-[#C8622A]/10 text-[#C8622A] hover:bg-[#C8622A]/20'}`}>
+                              {inLibrary ? '✓ In Library' : '+ Add Pricing'}
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Product list (library tab) */}
+        {activeTab === 'library' && <div className="bg-[#1a2d45] rounded-xl p-6">
           <h3 className="text-white font-bold mb-4">All Products ({filtered.length})</h3>
 
           {loading ? (
@@ -611,7 +767,7 @@ if (!finalCost) continue
               })}
             </div>
           )}
-        </div>
+        </div>}
       </div>
     </div>
   )

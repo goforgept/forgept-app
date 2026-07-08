@@ -47,6 +47,198 @@ function DesignerMfrPicker({ selected, onChange }) {
   )
 }
 
+// Catalog access picker — shown in org edit settings
+function CatalogAccessPicker({ selected, onChange }) {
+  const [catalogs, setCatalogs] = useState([]) // [{ slug, label, count }]
+  useEffect(() => {
+    supabase.from('catalog_products')
+      .select('catalog_slug, catalog_label')
+      .eq('active', true)
+      .then(({ data }) => {
+        const map = {}
+        ;(data || []).forEach(r => {
+          if (!map[r.catalog_slug]) map[r.catalog_slug] = { slug: r.catalog_slug, label: r.catalog_label || r.catalog_slug, count: 0 }
+          map[r.catalog_slug].count++
+        })
+        setCatalogs(Object.values(map).sort((a, b) => a.label.localeCompare(b.label)))
+      })
+  }, [])
+  const toggle = (slug) => {
+    if (selected.includes(slug)) onChange(selected.filter(s => s !== slug))
+    else onChange([...selected, slug])
+  }
+  if (!catalogs.length) return null
+  return (
+    <div>
+      <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">Product Catalogs</p>
+      <p className="text-[#8A9AB0] text-xs mb-2">Enable manufacturer price sheet catalogs this org can search. Disabled catalogs are completely hidden.</p>
+      <div className="border border-[#2a3d55] rounded-lg divide-y divide-[#2a3d55] overflow-hidden">
+        {catalogs.map(cat => (
+          <label key={cat.slug} className="flex items-center justify-between px-3 py-2.5 bg-[#0F1C2E] cursor-pointer hover:bg-[#1a2d45] transition-colors">
+            <div>
+              <span className="text-white text-sm">{cat.label}</span>
+              <span className="text-[#8A9AB0] text-xs ml-2">({cat.count.toLocaleString()} products)</span>
+            </div>
+            <button onClick={() => toggle(cat.slug)}
+              className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors ${selected.includes(cat.slug) ? 'bg-[#C8622A]' : 'bg-[#4B5563]'}`}>
+              <span className={`inline-block w-4 h-4 rounded-full bg-white shadow transition-transform ${selected.includes(cat.slug) ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Catalogs tab — import and manage global manufacturer price sheet catalogs
+function CatalogsTab() {
+  const [catalogs, setCatalogs] = useState([]) // [{ slug, label, count, updated }]
+  const [loading, setLoading] = useState(true)
+  const [importing, setImporting] = useState(false)
+  const [importForm, setImportForm] = useState({ slug: '', label: '' })
+  const [importResult, setImportResult] = useState(null)
+  const [importError, setImportError] = useState(null)
+  const [showImportForm, setShowImportForm] = useState(false)
+  const [deleting, setDeleting] = useState(null)
+
+  useEffect(() => { fetchCatalogs() }, [])
+
+  const fetchCatalogs = async () => {
+    setLoading(true)
+    const { data } = await supabase.from('catalog_products').select('catalog_slug, catalog_label, created_at').eq('active', true)
+    const map = {}
+    ;(data || []).forEach(r => {
+      if (!map[r.catalog_slug]) map[r.catalog_slug] = { slug: r.catalog_slug, label: r.catalog_label || r.catalog_slug, count: 0, updated: r.created_at }
+      map[r.catalog_slug].count++
+      if (r.created_at > map[r.catalog_slug].updated) map[r.catalog_slug].updated = r.created_at
+    })
+    setCatalogs(Object.values(map).sort((a, b) => a.label.localeCompare(b.label)))
+    setLoading(false)
+  }
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0]; if (!file) return
+    if (!importForm.slug.trim() || !importForm.label.trim()) { setImportError('Enter a catalog slug and label first.'); return }
+    setImporting(true); setImportError(null); setImportResult(null)
+    try {
+      const XLSX = await import('xlsx')
+      const data = await file.arrayBuffer()
+      const wb = XLSX.read(data)
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
+
+      const items = rows.map(r => {
+        const partNumber = String(r['Part Number'] || r['Part #'] || r['part_number'] || r['SKU'] || r['sku'] || '').trim()
+        const modelName = String(r['Model Name'] || r['Model'] || r['Description'] || r['Item Name'] || r['item_name'] || r['Name'] || '').trim()
+        const msrpRaw = r['MSRP'] || r['List Price'] || r['msrp'] || r['Price'] || ''
+        const msrp = parseFloat(String(msrpRaw).replace(/[$,]/g, '')) || null
+        const category = String(r['Category'] || r['category'] || '').trim()
+        const manufacturer = String(r['Manufacturer'] || r['manufacturer'] || r['Brand'] || importForm.label || '').trim()
+        const unit = String(r['Unit'] || r['unit'] || 'ea').trim() || 'ea'
+        return { catalog_slug: importForm.slug.trim(), catalog_label: importForm.label.trim(), manufacturer, part_number: partNumber, model_name: modelName, msrp, category, unit, active: true }
+      }).filter(r => r.part_number || r.model_name)
+
+      if (items.length === 0) { setImportError('No valid rows found. Make sure Part Number or Model Name column exists.'); setImporting(false); return }
+
+      // Delete old items for this slug first, then insert fresh
+      await supabase.from('catalog_products').delete().eq('catalog_slug', importForm.slug.trim())
+      const BATCH = 500
+      for (let i = 0; i < items.length; i += BATCH) {
+        await supabase.from('catalog_products').insert(items.slice(i, i + BATCH))
+      }
+      setImportResult({ count: items.length, slug: importForm.slug.trim() })
+      setImportForm({ slug: '', label: '' })
+      setShowImportForm(false)
+      fetchCatalogs()
+    } catch (err) { setImportError(err.message) }
+    setImporting(false)
+  }
+
+  const deleteCatalog = async (slug) => {
+    if (!window.confirm(`Delete all products in catalog "${slug}"? This cannot be undone.`)) return
+    setDeleting(slug)
+    await supabase.from('catalog_products').delete().eq('catalog_slug', slug)
+    setDeleting(null)
+    fetchCatalogs()
+  }
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-white font-bold text-lg">Manufacturer Catalogs</h3>
+          <p className="text-[#8A9AB0] text-sm mt-0.5">Global price sheet catalogs — enabled per org, MSRP only, dealers add their own distrib pricing</p>
+        </div>
+        <button onClick={() => setShowImportForm(v => !v)}
+          className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+          {showImportForm ? 'Cancel' : '+ Import Catalog'}
+        </button>
+      </div>
+
+      {importResult && <p className="text-green-400 text-sm">Imported {importResult.count.toLocaleString()} products into "{importResult.slug}"</p>}
+      {importError && <p className="text-red-400 text-sm">{importError}</p>}
+
+      {showImportForm && (
+        <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4 border border-[#2a3d55]">
+          <p className="text-white font-semibold text-sm">Import Price Sheet</p>
+          <p className="text-[#8A9AB0] text-xs">Upload a CSV or Excel file. Expected columns: Part Number, Model Name / Description, MSRP / List Price, Category, Manufacturer (optional). Importing replaces the entire catalog for that slug.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Catalog Slug <span className="text-[#C8622A]">*</span></label>
+              <input type="text" placeholder="e.g. hanwha_step" value={importForm.slug}
+                onChange={e => setImportForm(p => ({ ...p, slug: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') }))}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              <p className="text-[#8A9AB0] text-xs mt-1">Lowercase letters, numbers, underscores only</p>
+            </div>
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Display Name <span className="text-[#C8622A]">*</span></label>
+              <input type="text" placeholder="e.g. Hanwha Step Partner" value={importForm.label}
+                onChange={e => setImportForm(p => ({ ...p, label: e.target.value }))}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+            </div>
+          </div>
+          <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors ${importing ? 'bg-[#2a3d55] text-[#8A9AB0] opacity-50 pointer-events-none' : 'bg-[#2a3d55] text-white hover:bg-[#3a4d65]'}`}>
+            {importing ? 'Importing…' : '📂 Choose File (CSV / Excel)'}
+            <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFile} className="hidden" disabled={importing} />
+          </label>
+        </div>
+      )}
+
+      {loading ? <p className="text-[#8A9AB0]">Loading…</p> : catalogs.length === 0 ? (
+        <div className="bg-[#1a2d45] rounded-xl p-10 text-center border border-[#2a3d55]">
+          <p className="text-[#8A9AB0]">No catalogs yet. Import a price sheet to get started.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {catalogs.map(cat => (
+            <div key={cat.slug} className="bg-[#1a2d45] rounded-xl p-4 border border-[#2a3d55] flex items-center justify-between">
+              <div>
+                <p className="text-white font-semibold">{cat.label}</p>
+                <p className="text-[#8A9AB0] text-xs mt-0.5">
+                  Slug: <span className="font-mono text-[#C8622A]">{cat.slug}</span> · {cat.count.toLocaleString()} products · Updated {new Date(cat.updated).toLocaleDateString()}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <label className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${importing ? 'opacity-50 pointer-events-none' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+                  Re-import
+                  <input type="file" accept=".csv,.xlsx,.xls" onChange={async (e) => {
+                    setImportForm({ slug: cat.slug, label: cat.label })
+                    await handleFile(e)
+                  }} className="hidden" disabled={importing} />
+                </label>
+                <button onClick={() => deleteCatalog(cat.slug)} disabled={deleting === cat.slug}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50">
+                  {deleting === cat.slug ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SuperAdmin() {
   const [orgs, setOrgs] = useState([])
   const [profiles, setProfiles] = useState([])
@@ -321,6 +513,7 @@ export default function SuperAdmin() {
       feature_embed:          org.feature_embed          || false,
       feature_regions:        org.feature_regions        || false,
       designer_allowed_manufacturers: org.designer_allowed_manufacturers || null,
+      enabled_catalogs: org.enabled_catalogs || [],
     })
   }
 
@@ -343,6 +536,7 @@ export default function SuperAdmin() {
       feature_embed:          orgForm.feature_embed,
       feature_regions:        orgForm.feature_regions,
       designer_allowed_manufacturers: orgForm.designer_allowed_manufacturers?.length ? orgForm.designer_allowed_manufacturers : null,
+      enabled_catalogs: orgForm.enabled_catalogs?.length ? orgForm.enabled_catalogs : [],
     }).eq('id', orgId)
     setEditingOrg(null)
     fetchData()
@@ -568,6 +762,7 @@ export default function SuperAdmin() {
             { key: 'billing',  label: 'Billing & Plans' },
             { key: 'metrics',  label: 'Metrics' },
             { key: 'products', label: 'Global Products' },
+            { key: 'catalogs', label: 'Catalogs' },
             { key: 'api',      label: 'API Keys' },
             { key: 'sa_users', label: 'Admin Users' },
             { key: 'roadmap',  label: 'Roadmap' },
@@ -786,6 +981,12 @@ export default function SuperAdmin() {
                                 />
                               </div>
                             )}
+
+                            {/* Product Catalogs */}
+                            <CatalogAccessPicker
+                              selected={orgForm.enabled_catalogs || []}
+                              onChange={v => setOrgForm(p => ({ ...p, enabled_catalogs: v }))}
+                            />
                           </div>
 
                           <div className="flex justify-end">
@@ -1077,6 +1278,8 @@ export default function SuperAdmin() {
           </div>
         )}
       </div>
+
+      {activeTab === 'catalogs' && <CatalogsTab />}
 
       {/* Global Products tab */}
         {activeTab === 'products' && (
