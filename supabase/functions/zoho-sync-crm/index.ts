@@ -13,7 +13,7 @@ async function refreshToken(supabase: any, org: any) {
     }),
   })
   const tokens = await res.json()
-  if (!tokens.access_token) throw new Error('Zoho token refresh failed')
+  if (!tokens.access_token) throw new Error(`Zoho token refresh failed: ${tokens.error || tokens.message || JSON.stringify(tokens)}`)
   const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString()
   await supabase.from('organizations').update({
     zoho_access_token: tokens.access_token,
@@ -66,9 +66,16 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Zoho CRM not connected' }), { status: 400, headers: corsHeaders })
     }
 
-    let token = org.zoho_access_token
-    if (!org.zoho_token_expires || new Date(org.zoho_token_expires) <= new Date(Date.now() + 60000)) {
+    if (!org.zoho_refresh_token) {
+      return new Response(JSON.stringify({ error: 'No Zoho refresh token — please disconnect and reconnect Zoho CRM.' }), { status: 400, headers: corsHeaders })
+    }
+
+    // Always refresh — Zoho tokens expire in 1 hour, safer to always get a fresh one
+    let token: string
+    try {
       token = await refreshToken(supabase, org)
+    } catch (err: any) {
+      return new Response(JSON.stringify({ error: `Token refresh failed: ${err.message} — try disconnecting and reconnecting Zoho CRM.` }), { status: 401, headers: corsHeaders })
     }
 
     // ── Accounts → clients ───────────────────────────────────────────────

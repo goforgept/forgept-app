@@ -130,6 +130,11 @@ export default function ProposalDetail({ isAdmin }) {
   const [allClients, setAllClients] = useState([])
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deletingProposal, setDeletingProposal] = useState(false)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+  const [templatePickerSearch, setTemplatePickerSearch] = useState('')
+  const [templatePickerList, setTemplatePickerList] = useState([])
+  const [templatePickerLoading, setTemplatePickerLoading] = useState(false)
+  const [templatePickerSelected, setTemplatePickerSelected] = useState(null)
   const [qboConnected, setQboConnected] = useState(false)
   const [sendingToQBO, setSendingToQBO] = useState(false)
   const [qboInvoiceId, setQboInvoiceId] = useState(null)
@@ -1770,6 +1775,72 @@ export default function ProposalDetail({ isAdmin }) {
     setEditingBOM(true)
   }
 
+  const openTemplatePicker = async () => {
+    if (!editingBOM) startEditing()
+    setShowTemplatePicker(true)
+    setTemplatePickerSearch('')
+    setTemplatePickerSelected(null)
+    setTemplatePickerLoading(true)
+    const { data } = await supabase.from('templates')
+      .select('id, name, description, industry, labor_items')
+      .eq('org_id', profile.org_id)
+      .order('name')
+    setTemplatePickerList(data || [])
+    setTemplatePickerLoading(false)
+  }
+
+  const applyTemplate = async (template, mode) => {
+    const [{ data: tmplLines }, { data: tmplSects }] = await Promise.all([
+      supabase.from('template_line_items').select('*').eq('template_id', template.id).order('id'),
+      supabase.from('template_sections').select('*').eq('template_id', template.id).order('sort_order'),
+    ])
+
+    const sectionIdMap = {}
+    const baseOrder = mode === 'replace' ? 0 : editSections.length
+    const newSections = (tmplSects || []).map((s, si) => {
+      const tempId = `new_${Date.now()}_${si}`
+      sectionIdMap[s.id] = tempId
+      return {
+        id: tempId,
+        proposal_id: id,
+        org_id: profile?.org_id,
+        name: s.name,
+        sort_order: baseOrder + (s.sort_order ?? si),
+        include_labor: s.include_labor,
+        labor_items: s.labor_items || [],
+        isNew: true,
+      }
+    })
+
+    const newLines = (tmplLines || []).map(l => ({
+      item_name: l.item_name,
+      part_number_sku: l.part_number_sku || '',
+      quantity: String(l.quantity || 1),
+      unit: l.unit || 'ea',
+      category: l.category || '',
+      vendor: l.vendor || '',
+      your_cost_unit: l.your_cost_unit != null ? String(l.your_cost_unit) : '',
+      markup_percent: l.markup_percent != null ? String(l.markup_percent) : String(parseFloat(profile?.default_markup_percent) || 35),
+      customer_price_unit: l.customer_price_unit != null ? String(l.customer_price_unit) : '',
+      section_id: l.section_id ? (sectionIdMap[l.section_id] || null) : null,
+    }))
+
+    const newLabor = template.labor_items || []
+
+    if (mode === 'replace') {
+      setEditSections(newSections)
+      setEditLines(newLines)
+      setLaborItems(newLabor.length ? newLabor : [])
+    } else {
+      setEditSections(prev => [...prev, ...newSections])
+      setEditLines(prev => [...prev, ...newLines])
+      if (newLabor.length) setLaborItems(prev => [...prev, ...newLabor])
+    }
+
+    setShowTemplatePicker(false)
+    setTemplatePickerSelected(null)
+  }
+
   const addSection = () => {
     const newSection = {
       id: `new_${Date.now()}`,
@@ -2999,6 +3070,7 @@ const analyzeDrawing = async () => {
           onOpenDrawingModal={() => { setShowDrawingModal(true); setDrawingInstructions(proposal?.industry === 'Security' ? 'Focus on cameras, access control readers, door contacts, and NVR/DVR equipment.' : proposal?.industry === 'Audio/Visual' ? 'Focus on displays, speakers, amplifiers, source equipment, and cable runs.' : '') }}
           onOpenSpecModal={() => { setShowSpecModal(true); setSpecSummary(proposal?.spec_summary || null) }}
           onOpenSaveTemplateModal={() => { setTemplateName(proposal?.proposal_name || ''); setShowSaveTemplateModal(true) }}
+          onLoadTemplate={openTemplatePicker}
           onMoveLineToSection={(i) => { setMoveLineIndex(i); setMoveType('move'); setShowMoveModal(true) }}
           fmt={fmt}
           featureMsrp={features.msrp}
@@ -3118,6 +3190,67 @@ const analyzeDrawing = async () => {
       {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onClose={() => setShowPricingModal(false)} />}
 
       {showMoveModal && moveLineIndex !== null && <MoveLineModal editLines={editLines} moveLineIndex={moveLineIndex} editSections={editSections} onMove={moveLineToSection} onClose={() => { setShowMoveModal(false); setMoveLineIndex(null) }} />}
+
+      {showTemplatePicker && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-white font-bold text-lg">Load Template</h3>
+              <button onClick={() => { setShowTemplatePicker(false); setTemplatePickerSelected(null) }} className="text-[#8A9AB0] hover:text-white text-xl leading-none">✕</button>
+            </div>
+            <input
+              autoFocus
+              type="text"
+              placeholder="Search templates…"
+              value={templatePickerSearch}
+              onChange={e => setTemplatePickerSearch(e.target.value)}
+              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+            />
+            {templatePickerLoading ? (
+              <p className="text-[#8A9AB0] text-sm">Loading templates…</p>
+            ) : templatePickerList.length === 0 ? (
+              <p className="text-[#8A9AB0] text-sm">No templates found. Create one in the Templates section.</p>
+            ) : (
+              <div className="space-y-1 max-h-72 overflow-y-auto">
+                {templatePickerList
+                  .filter(t => {
+                    const q = templatePickerSearch.toLowerCase()
+                    return !q || t.name.toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q) || (t.industry || '').toLowerCase().includes(q)
+                  })
+                  .map(t => (
+                    <button
+                      key={t.id}
+                      onClick={() => setTemplatePickerSelected(t)}
+                      className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${templatePickerSelected?.id === t.id ? 'bg-[#C8622A]/20 border border-[#C8622A]' : 'bg-[#0F1C2E] hover:bg-[#2a3d55] border border-transparent'}`}
+                    >
+                      <p className="text-white text-sm font-semibold">{t.name}</p>
+                      {(t.industry || t.description) && (
+                        <p className="text-[#8A9AB0] text-xs mt-0.5">{[t.industry, t.description].filter(Boolean).join(' · ')}</p>
+                      )}
+                    </button>
+                  ))}
+              </div>
+            )}
+            {templatePickerSelected && (
+              <div className="border-t border-[#2a3d55] pt-4">
+                <p className="text-[#8A9AB0] text-xs mb-3">How should <span className="text-white font-semibold">{templatePickerSelected.name}</span> be loaded?</p>
+                <div className="flex gap-3">
+                  {(editLines.length > 0 || editSections.length > 0) && (
+                    <button onClick={() => applyTemplate(templatePickerSelected, 'replace')}
+                      className="flex-1 px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 rounded-lg text-sm font-semibold hover:bg-red-600/30 transition-colors">
+                      Replace BOM
+                    </button>
+                  )}
+                  <button onClick={() => applyTemplate(templatePickerSelected, 'append')}
+                    className="flex-1 px-4 py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                    {editLines.length > 0 || editSections.length > 0 ? 'Append to BOM' : 'Load Template'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showSentPrompt && <SentPromptModal onConfirm={markAsSent} onClose={() => setShowSentPrompt(false)} />}
 

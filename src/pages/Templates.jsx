@@ -23,6 +23,128 @@ const industries = ['Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visua
 const matCategories = ['Electrical', 'Mechanical', 'Audio/Visual', 'Security', 'Networking', 'Material', 'Other']
 const unitOptions = ['ea', 'ft', 'lot', 'hr', 'box', 'roll']
 
+const fmt = (n) => n != null && !isNaN(n) ? `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'
+
+const LABOR_DATALIST_ID = 'labor-roles-datalist'
+
+const LaborTableHeader = () => (
+  <tr className="border-b border-[#2a3d55]">
+    {['Role', 'Qty', 'Unit', 'Your Cost/hr', 'Markup %', 'Total Labor', ''].map(h => (
+      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+    ))}
+  </tr>
+)
+
+const LaborRow = ({ item, onUpdate, onRemove, laborRates, defaultMarkup }) => (
+  <tr className="border-b border-[#2a3d55]/30">
+    <td className="pr-2 py-1">
+      <input type="text" list={LABOR_DATALIST_ID} placeholder="e.g. Lead Tech" value={item.role}
+        onChange={e => onUpdate('role', e.target.value)}
+        className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+      <datalist id={LABOR_DATALIST_ID}>
+        {laborRates.map(r => <option key={r.role} value={r.role} />)}
+      </datalist>
+    </td>
+    <td className="pr-2 py-1">
+      <input type="number" placeholder="0" value={item.quantity} onChange={e => onUpdate('quantity', e.target.value)}
+        className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+    </td>
+    <td className="pr-2 py-1">
+      <select value={item.unit || 'hr'} onChange={e => onUpdate('unit', e.target.value)}
+        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+        {['hr', 'day', 'lot'].map(u => <option key={u}>{u}</option>)}
+      </select>
+    </td>
+    <td className="pr-2 py-1">
+      <input type="number" placeholder="0.00" value={item.your_cost} onChange={e => onUpdate('your_cost', e.target.value)}
+        className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+    </td>
+    <td className="pr-2 py-1">
+      <input type="number" placeholder={String(defaultMarkup)} value={item.markup} onChange={e => onUpdate('markup', e.target.value)}
+        className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+    </td>
+    <td className="pr-2 py-1">
+      <input type="number" placeholder="0.00" value={item.customer_price || ''} onChange={e => onUpdate('customer_price', e.target.value)}
+        className="w-24 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold" />
+    </td>
+    <td className="py-1"><button onClick={onRemove} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button></td>
+  </tr>
+)
+
+const LineTableHeader = ({ hasSections }) => (
+  <tr className="border-b border-[#2a3d55]">
+    {['Item Name', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ...(hasSections ? ['Section'] : []), ''].map(h => (
+      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+    ))}
+  </tr>
+)
+
+const LineRow = ({ line, sects, onUpdate, onRemove, defaultMarkup }) => (
+  <tr className="border-b border-[#2a3d55]/30 group">
+    <td className="pr-2 py-1">
+      <input type="text" placeholder="Item name" value={line.item_name}
+        onChange={e => onUpdate(line._key, 'item_name', e.target.value)}
+        className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+    </td>
+    <td className="pr-2 py-1">
+      <input type="text" placeholder="Part #" value={line.part_number_sku}
+        onChange={e => onUpdate(line._key, 'part_number_sku', e.target.value)}
+        className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+    </td>
+    <td className="pr-2 py-1">
+      <input type="number" placeholder="1" value={line.quantity}
+        onChange={e => onUpdate(line._key, 'quantity', e.target.value)}
+        className="w-14 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+    </td>
+    <td className="pr-2 py-1">
+      <select value={line.unit} onChange={e => onUpdate(line._key, 'unit', e.target.value)}
+        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+        {unitOptions.map(u => <option key={u}>{u}</option>)}
+      </select>
+    </td>
+    <td className="pr-2 py-1">
+      <select value={line.category} onChange={e => onUpdate(line._key, 'category', e.target.value)}
+        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+        <option value="">Category</option>
+        {matCategories.map(c => <option key={c}>{c}</option>)}
+      </select>
+    </td>
+    <td className="pr-2 py-1">
+      <input type="text" placeholder="Vendor" value={line.vendor}
+        onChange={e => onUpdate(line._key, 'vendor', e.target.value)}
+        className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+    </td>
+    <td className="pr-2 py-1">
+      <input type="number" placeholder="0.00" value={line.your_cost_unit}
+        onChange={e => onUpdate(line._key, 'your_cost_unit', e.target.value)}
+        className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+    </td>
+    <td className="pr-2 py-1">
+      <input type="number" placeholder={String(defaultMarkup)} value={line.markup_percent}
+        onChange={e => onUpdate(line._key, 'markup_percent', e.target.value)}
+        className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+    </td>
+    <td className="pr-2 py-1">
+      <input type="number" placeholder="0.00" value={line.customer_price_unit}
+        onChange={e => onUpdate(line._key, 'customer_price_unit', e.target.value)}
+        className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold" />
+    </td>
+    {sects.length > 0 && (
+      <td className="pr-2 py-1">
+        <select value={line.section_id || ''}
+          onChange={e => onUpdate(line._key, 'section_id', e.target.value || null)}
+          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+          <option value="">General</option>
+          {sects.map(s => <option key={s._id} value={s._id}>{s.name || 'Untitled Section'}</option>)}
+        </select>
+      </td>
+    )}
+    <td className="py-1">
+      <button onClick={() => onRemove(line._key)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
+    </td>
+  </tr>
+)
+
 export default function Templates({ isAdmin }) {
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
@@ -330,11 +452,9 @@ export default function Templates({ isAdmin }) {
     return !q || t.name.toLowerCase().includes(q) || (t.description || '').toLowerCase().includes(q) || (t.industry || '').toLowerCase().includes(q)
   })
 
-  const fmt = (n) => n != null && !isNaN(n) ? `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'
+  // ── Render helpers (called as functions, not JSX components, to avoid remounting) ──
 
-  // ── Shared render pieces ──────────────────────────────────────────────────
-
-  const LibraryPanel = ({ setter, activeSects }) => (
+  const renderLibraryPanel = (setter, activeSects) => (
     <div className="bg-[#0a1628] rounded-xl p-4 space-y-3 border border-[#C8622A]/40 mb-4">
       <div className="flex items-center gap-3">
         <input autoFocus type="text" placeholder="Search product library…" value={libQuery}
@@ -380,129 +500,7 @@ export default function Templates({ isAdmin }) {
     </div>
   )
 
-  const roleDatalistId = `labor-roles-${Math.random().toString(36).slice(2)}`
-
-  const LaborRow = ({ item, onUpdate, onRemove }) => (
-    <tr className="border-b border-[#2a3d55]/30">
-      <td className="pr-2 py-1">
-        <input type="text" list={roleDatalistId} placeholder="e.g. Lead Tech" value={item.role}
-          onChange={e => onUpdate('role', e.target.value)}
-          className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-        <datalist id={roleDatalistId}>
-          {laborRates.map(r => <option key={r.role} value={r.role} />)}
-        </datalist>
-      </td>
-      <td className="pr-2 py-1">
-        <input type="number" placeholder="0" value={item.quantity} onChange={e => onUpdate('quantity', e.target.value)}
-          className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-      </td>
-      <td className="pr-2 py-1">
-        <select value={item.unit || 'hr'} onChange={e => onUpdate('unit', e.target.value)}
-          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-          {['hr', 'day', 'lot'].map(u => <option key={u}>{u}</option>)}
-        </select>
-      </td>
-      <td className="pr-2 py-1">
-        <input type="number" placeholder="0.00" value={item.your_cost} onChange={e => onUpdate('your_cost', e.target.value)}
-          className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-      </td>
-      <td className="pr-2 py-1">
-        <input type="number" placeholder={String(defaultMarkup)} value={item.markup} onChange={e => onUpdate('markup', e.target.value)}
-          className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-      </td>
-      <td className="pr-2 py-1">
-        <input type="number" placeholder="0.00" value={item.customer_price || ''} onChange={e => onUpdate('customer_price', e.target.value)}
-          className="w-24 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold" />
-      </td>
-      <td className="py-1"><button onClick={onRemove} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button></td>
-    </tr>
-  )
-
-  const LaborTableHeader = () => (
-    <tr className="border-b border-[#2a3d55]">
-      {['Role', 'Qty', 'Unit', 'Your Cost/hr', 'Markup %', 'Total Labor', ''].map(h => (
-        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
-      ))}
-    </tr>
-  )
-
-  // BOM line item row — shared between general and section groups
-  const LineRow = ({ line, sects, onUpdate, onRemove }) => (
-    <tr className="border-b border-[#2a3d55]/30 group">
-      <td className="pr-2 py-1">
-        <input type="text" placeholder="Item name" value={line.item_name}
-          onChange={e => onUpdate(line._key, 'item_name', e.target.value)}
-          className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-      </td>
-      <td className="pr-2 py-1">
-        <input type="text" placeholder="Part #" value={line.part_number_sku}
-          onChange={e => onUpdate(line._key, 'part_number_sku', e.target.value)}
-          className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-      </td>
-      <td className="pr-2 py-1">
-        <input type="number" placeholder="1" value={line.quantity}
-          onChange={e => onUpdate(line._key, 'quantity', e.target.value)}
-          className="w-14 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-      </td>
-      <td className="pr-2 py-1">
-        <select value={line.unit} onChange={e => onUpdate(line._key, 'unit', e.target.value)}
-          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-          {unitOptions.map(u => <option key={u}>{u}</option>)}
-        </select>
-      </td>
-      <td className="pr-2 py-1">
-        <select value={line.category} onChange={e => onUpdate(line._key, 'category', e.target.value)}
-          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-          <option value="">Category</option>
-          {matCategories.map(c => <option key={c}>{c}</option>)}
-        </select>
-      </td>
-      <td className="pr-2 py-1">
-        <input type="text" placeholder="Vendor" value={line.vendor}
-          onChange={e => onUpdate(line._key, 'vendor', e.target.value)}
-          className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-      </td>
-      <td className="pr-2 py-1">
-        <input type="number" placeholder="0.00" value={line.your_cost_unit}
-          onChange={e => onUpdate(line._key, 'your_cost_unit', e.target.value)}
-          className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-      </td>
-      <td className="pr-2 py-1">
-        <input type="number" placeholder={String(defaultMarkup)} value={line.markup_percent}
-          onChange={e => onUpdate(line._key, 'markup_percent', e.target.value)}
-          className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
-      </td>
-      <td className="pr-2 py-1">
-        <input type="number" placeholder="0.00" value={line.customer_price_unit}
-          onChange={e => onUpdate(line._key, 'customer_price_unit', e.target.value)}
-          className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold" />
-      </td>
-      {sects.length > 0 && (
-        <td className="pr-2 py-1">
-          <select value={line.section_id || ''}
-            onChange={e => onUpdate(line._key, 'section_id', e.target.value || null)}
-            className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
-            <option value="">General</option>
-            {sects.map(s => <option key={s._id} value={s._id}>{s.name || 'Untitled Section'}</option>)}
-          </select>
-        </td>
-      )}
-      <td className="py-1">
-        <button onClick={() => onRemove(line._key)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
-      </td>
-    </tr>
-  )
-
-  const LineTableHeader = ({ hasSections }) => (
-    <tr className="border-b border-[#2a3d55]">
-      {['Item Name', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ...(hasSections ? ['Section'] : []), ''].map(h => (
-        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
-      ))}
-    </tr>
-  )
-
-  // Render the full BOM editor (used in both create and edit)
-  const BomEditor = ({ lns, setLns, labor, setLabor, sects, setSect, isLibTarget }) => {
+  const renderBomEditor = (lns, setLns, labor, setLabor, sects, setSect, isLibTarget) => {
     const updateLine = (key, field, value) => updateLineByKey(setLns, key, field, value)
     const removeLine = (key) => setLns(prev => prev.filter(l => l._key !== key))
     const hasSections = sects.length > 0
@@ -525,7 +523,7 @@ export default function Templates({ isAdmin }) {
           </div>
         </div>
 
-        {libTarget === isLibTarget && <LibraryPanel setter={setLns} activeSects={sects} />}
+        {libTarget === isLibTarget && renderLibraryPanel(setLns, sects)}
 
         {/* Flat BOM table with section column when sections exist */}
         <div className="overflow-x-auto">
@@ -536,7 +534,7 @@ export default function Templates({ isAdmin }) {
                 ? <tr><td colSpan={hasSections ? 11 : 10} className="text-[#8A9AB0] text-xs py-3">No items yet. Add manually or browse the library.</td></tr>
                 : lns.map(line => (
                   <LineRow key={line._key} line={line} sects={sects}
-                    onUpdate={updateLine} onRemove={removeLine} />
+                    onUpdate={updateLine} onRemove={removeLine} defaultMarkup={defaultMarkup} />
                 ))}
             </tbody>
           </table>
@@ -594,7 +592,9 @@ export default function Templates({ isAdmin }) {
                             {(s.labor_items || []).map((item, i) => (
                               <LaborRow key={i} item={item}
                                 onUpdate={(field, value) => updateSectionLabor(setSect, s._id, i, field, value)}
-                                onRemove={() => removeSectionLaborLine(setSect, s._id, i)} />
+                                onRemove={() => removeSectionLaborLine(setSect, s._id, i)}
+                                laborRates={laborRates}
+                                defaultMarkup={defaultMarkup} />
                             ))}
                           </tbody>
                         </table>
@@ -621,7 +621,9 @@ export default function Templates({ isAdmin }) {
                   : labor.map((item, i) => (
                     <LaborRow key={i} item={item}
                       onUpdate={(field, value) => updateLaborRow(setLabor, i, field, value)}
-                      onRemove={() => setLabor(prev => prev.filter((_, idx) => idx !== i))} />
+                      onRemove={() => setLabor(prev => prev.filter((_, idx) => idx !== i))}
+                      laborRates={laborRates}
+                      defaultMarkup={defaultMarkup} />
                   ))}
               </tbody>
             </table>
@@ -682,8 +684,7 @@ export default function Templates({ isAdmin }) {
               </div>
             </div>
 
-            <BomEditor lns={lines} setLns={setLines} labor={laborItems} setLabor={setLaborItems}
-              sects={sections} setSect={setSections} isLibTarget="create" />
+            {renderBomEditor(lines, setLines, laborItems, setLaborItems, sections, setSections, 'create')}
 
             <div className="flex justify-end gap-3 pt-2 border-t border-[#2a3d55]">
               <button onClick={() => setShowForm(false)} className="px-6 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
@@ -725,8 +726,7 @@ export default function Templates({ isAdmin }) {
                 </div>
               </div>
 
-              <BomEditor lns={editLines} setLns={setEditLines} labor={editLaborItems} setLabor={setEditLaborItems}
-                sects={editSections} setSect={setEditSections} isLibTarget="edit" />
+              {renderBomEditor(editLines, setEditLines, editLaborItems, setEditLaborItems, editSections, setEditSections, 'edit')}
 
               <div className="flex justify-end gap-3 pt-4 border-t border-[#2a3d55]">
                 <button onClick={() => setEditingTemplate(null)} className="px-6 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>

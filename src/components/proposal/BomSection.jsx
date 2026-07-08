@@ -49,6 +49,7 @@ export default function BomSection({
   onOpenDrawingModal,
   onOpenSpecModal,
   onOpenSaveTemplateModal,
+  onLoadTemplate,
   onMoveLineToSection,
   onDeleteRFQ,
   fmt,
@@ -171,6 +172,7 @@ export default function BomSection({
             {orgType !== 'manufacturer' && (
               <button onClick={onOpenRFQModal} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Send RFQs</button>
             )}
+            <button onClick={onLoadTemplate} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Load Template</button>
             <button onClick={onOpenSaveTemplateModal} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Save as Template</button>
             {features.aiBom && (
               <button onClick={onOpenAIBOMModal} className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✨ AI Build BOM</button>
