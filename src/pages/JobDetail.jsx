@@ -790,7 +790,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       })
       await supabase.from('activities').insert({
         proposal_id: job.proposal_id, org_id: job.org_id, user_id: profile?.id,
-        type: 'email', title: `Customer notified about job update`
+        type: 'email', source: 'system', title: `Customer notified about job update`
       })
     } catch (e) { console.error(e) }
     setShowNotifyModal(false)

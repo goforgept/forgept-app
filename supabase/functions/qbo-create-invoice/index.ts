@@ -211,6 +211,7 @@ Deno.serve(async (req) => {
       org_id: profile.org_id,
       user_id: profile.id,
       type: 'note',
+      source: 'system',
       title: `Invoice created in QuickBooks${invoice.DocNumber ? ` — #${invoice.DocNumber}` : ''}`
     })
 

@@ -362,7 +362,8 @@ export default function ProposalDetail({ isAdmin }) {
       org_id: proposal?.org_id,
       user_id: user.id,
       type,
-      title: event
+      title: event,
+      source: 'system',
     })
     setActivityRefreshKey(k => k + 1)
   }

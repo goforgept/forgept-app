@@ -397,7 +397,7 @@ export default function SignProposal() {
       if (updateError) throw updateError
 
       await supabase.from('activities').insert({
-        proposal_id: proposal.id, org_id: proposal.org_id, type: 'note',
+        proposal_id: proposal.id, org_id: proposal.org_id, type: 'note', source: 'system',
         title: `Proposal signed by ${signerName.trim()} · IP: ${clientIp}${signedPdfUrl ? ' · Signed PDF stored' : ''}`
       })
 
