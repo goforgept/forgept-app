@@ -7,7 +7,7 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ title: '', due_date: '', priority: 'normal', assigned_to: userId || '' })
+  const [form, setForm] = useState({ title: '', due_date: '', priority: 'normal', assigned_to: userId || '', recurrence: '' })
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -45,20 +45,50 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
       created_by: userId,
       client_id: clientId || null,
       proposal_id: proposalId || null,
-      completed: false
+      completed: false,
+      recurrence: form.recurrence || null,
     })
 
-    setForm({ title: '', due_date: '', priority: 'normal', assigned_to: userId || '' })
+    setForm({ title: '', due_date: '', priority: 'normal', assigned_to: userId || '', recurrence: '' })
     setShowForm(false)
     fetchTasks()
     setSaving(false)
   }
 
+  const nextRecurrenceDate = (fromDate, recurrence) => {
+    const d = new Date(fromDate + 'T12:00:00')
+    if (recurrence === 'weekly')     d.setDate(d.getDate() + 7)
+    else if (recurrence === 'biweekly')  d.setDate(d.getDate() + 14)
+    else if (recurrence === 'monthly')   d.setMonth(d.getMonth() + 1)
+    else if (recurrence === 'quarterly') d.setMonth(d.getMonth() + 3)
+    else if (recurrence === 'annual')    d.setFullYear(d.getFullYear() + 1)
+    return d.toISOString().split('T')[0]
+  }
+
   const toggleComplete = async (task) => {
+    const completing = !task.completed
     await supabase.from('tasks').update({
-      completed: !task.completed,
-      completed_at: !task.completed ? new Date().toISOString() : null
+      completed: completing,
+      completed_at: completing ? new Date().toISOString() : null
     }).eq('id', task.id)
+
+    if (completing && task.recurrence && task.due_date) {
+      const nextDate = nextRecurrenceDate(task.due_date, task.recurrence)
+      await supabase.from('tasks').insert({
+        org_id: orgId,
+        title: task.title,
+        due_date: nextDate,
+        priority: task.priority,
+        assigned_to: task.assigned_to,
+        created_by: task.created_by || task.assigned_to,
+        client_id: task.client_id || null,
+        proposal_id: task.proposal_id || null,
+        completed: false,
+        recurrence: task.recurrence,
+        parent_task_id: task.parent_task_id || task.id,
+      })
+    }
+
     fetchTasks()
   }
 
@@ -109,7 +139,7 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
             onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
             className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
           />
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div>
               <label className="text-[#8A9AB0] text-xs mb-1 block">Due Date</label>
               <input
@@ -129,6 +159,21 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
                 <option value="low">Low</option>
                 <option value="normal">Normal</option>
                 <option value="high">High</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Repeat</label>
+              <select
+                value={form.recurrence}
+                onChange={e => setForm(prev => ({ ...prev, recurrence: e.target.value }))}
+                className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
+              >
+                <option value="">Does not repeat</option>
+                <option value="weekly">Weekly</option>
+                <option value="biweekly">Every 2 Weeks</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="annual">Annually</option>
               </select>
             </div>
             {profiles.length > 0 && (
@@ -191,6 +236,9 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
                   <p className="text-[#8A9AB0] text-xs mt-0.5">{task.profiles.full_name}</p>
                 )}
               </div>
+              {task.recurrence && (
+                <span className="text-xs text-purple-400 font-semibold">↻</span>
+              )}
               <span className={`text-xs font-semibold capitalize ${priorityColor(task.priority)}`}>
                 {task.priority}
               </span>

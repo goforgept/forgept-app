@@ -22,7 +22,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
     assigned_to: '', client_id: '', notes: '',
     meeting_type: '', meeting_link: '', start_time: '', duration_minutes: 60, is_virtual: false,
     customer_notified: false, attendee_ids: [], attendee_emails: [],
-    meeting_notes: ''
+    meeting_notes: '', recurrence: ''
   })
   const [showMeeting, setShowMeeting] = useState(false)
   const [newAttendeeEmail, setNewAttendeeEmail] = useState('')
@@ -140,6 +140,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
       attendee_emails: isMeeting && form.attendee_emails.length > 0 ? form.attendee_emails : null,
       meeting_notes: isMeeting ? form.meeting_notes || null : null,
       start_time: isMeeting ? form.start_time || null : null,
+      recurrence: form.recurrence || null,
     }).select('*, clients(company, client_name, email)').single()
 
     if (newTask && isMeeting && form.due_date) {
@@ -153,18 +154,51 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
       }
     }
 
-    setForm({ title: '', due_date: '', priority: 'normal', assigned_to: profile.id, client_id: '', notes: '', meeting_type: '', meeting_link: '', start_time: '', duration_minutes: 60, is_virtual: false, customer_notified: false, attendee_ids: [], attendee_emails: [], meeting_notes: '' })
+    setForm({ title: '', due_date: '', priority: 'normal', assigned_to: profile.id, client_id: '', notes: '', meeting_type: '', meeting_link: '', start_time: '', duration_minutes: 60, is_virtual: false, customer_notified: false, attendee_ids: [], attendee_emails: [], meeting_notes: '', recurrence: '' })
     setShowMeeting(false)
     setShowForm(false)
     fetchData()
     setSaving(false)
   }
 
+  const nextRecurrenceDate = (fromDate, recurrence) => {
+    const d = new Date(fromDate + 'T12:00:00')
+    if (recurrence === 'weekly')     d.setDate(d.getDate() + 7)
+    else if (recurrence === 'biweekly')  d.setDate(d.getDate() + 14)
+    else if (recurrence === 'monthly')   d.setMonth(d.getMonth() + 1)
+    else if (recurrence === 'quarterly') d.setMonth(d.getMonth() + 3)
+    else if (recurrence === 'annual')    d.setFullYear(d.getFullYear() + 1)
+    return d.toISOString().split('T')[0]
+  }
+
   const toggleComplete = async (task) => {
+    const completing = !task.completed
     await supabase.from('tasks').update({
-      completed: !task.completed,
-      completed_at: !task.completed ? new Date().toISOString() : null
+      completed: completing,
+      completed_at: completing ? new Date().toISOString() : null
     }).eq('id', task.id)
+
+    // Auto-spawn next occurrence when completing a recurring task that has a due date
+    if (completing && task.recurrence && task.due_date) {
+      const nextDate = nextRecurrenceDate(task.due_date, task.recurrence)
+      await supabase.from('tasks').insert({
+        org_id: task.org_id,
+        title: task.title,
+        due_date: nextDate,
+        priority: task.priority,
+        assigned_to: task.assigned_to,
+        created_by: task.created_by || task.assigned_to,
+        client_id: task.client_id || null,
+        notes: task.notes || null,
+        completed: false,
+        recurrence: task.recurrence,
+        parent_task_id: task.parent_task_id || task.id,
+        meeting_type: task.meeting_type || null,
+        start_time: task.start_time || null,
+        duration_minutes: task.duration_minutes || null,
+      })
+    }
+
     fetchData()
   }
 
@@ -271,6 +305,17 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                   <option value="low">Low</option>
                   <option value="normal">Normal</option>
                   <option value="high">High</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Repeat</label>
+                <select value={form.recurrence} onChange={e => setForm(prev => ({ ...prev, recurrence: e.target.value }))} className={inputClass}>
+                  <option value="">Does not repeat</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="biweekly">Every 2 Weeks</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="annual">Annually</option>
                 </select>
               </div>
               <div>
@@ -508,6 +553,9 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                               {task.profiles?.full_name && (
                                 <p className="text-[#8A9AB0] text-xs mt-0.5">{task.profiles.full_name}</p>
                               )}
+                              {task.recurrence && (
+                                <p className="text-purple-400 text-xs mt-0.5">↻ {task.recurrence === 'biweekly' ? 'every 2 weeks' : task.recurrence}</p>
+                              )}
                             </div>
                             <span className={`text-xs font-semibold capitalize shrink-0 ${priorityColor(task.priority)}`}>
                               {task.priority}
@@ -581,6 +629,11 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                           )}
                         </div>
                       </div>
+                      {task.recurrence && (
+                        <span className="text-xs px-2 py-0.5 rounded bg-purple-500/15 text-purple-400 font-semibold flex items-center gap-1">
+                          ↻ {task.recurrence === 'biweekly' ? '2-week' : task.recurrence}
+                        </span>
+                      )}
                       {task.meeting_type && (
                         <span className="text-xs px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 font-semibold">
                           📅 {task.meeting_type}
