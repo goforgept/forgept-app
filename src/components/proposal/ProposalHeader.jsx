@@ -1,7 +1,7 @@
 export default function ProposalHeader({
   proposal, profile, features, isAdmin,
   editingProposalName, proposalNameDraft, setProposalNameDraft, setEditingProposalName, saveProposalName,
-  openEditClientModal, locationName, collaborators, orgProfiles,
+  openEditClientModal, clientAddress, locationName, collaborators, orgProfiles,
   updateStatus, onUpdateRep,
   editingQuoteNumber, quoteNumberDraft, setQuoteNumberDraft, quoteNumberError, setQuoteNumberError,
   saveQuoteNumber, setEditingQuoteNumber,
@@ -45,6 +45,7 @@ export default function ProposalHeader({
             )}
           </div>
           <p className="text-[#8A9AB0] text-sm">{proposal?.client_email}</p>
+          {clientAddress && <p className="text-[#8A9AB0] text-sm">{clientAddress}</p>}
           {locationName && <span className="inline-flex items-center gap-1 bg-[#2a3d55] text-[#8A9AB0] text-xs px-2 py-0.5 rounded-full mt-1">📍 {locationName}</span>}
           {proposal?.signature_name && (
             <div className="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full mt-1">

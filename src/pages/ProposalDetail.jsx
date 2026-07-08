@@ -204,7 +204,7 @@ export default function ProposalDetail({ isAdmin }) {
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,show_msrp,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,show_msrp,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
       .eq('id', id)
       .single()
 
@@ -3006,7 +3006,7 @@ const analyzeDrawing = async () => {
           editingProposalName={editingProposalName} proposalNameDraft={proposalNameDraft}
           setProposalNameDraft={setProposalNameDraft} setEditingProposalName={setEditingProposalName}
           saveProposalName={saveProposalName}
-          openEditClientModal={openEditClientModal} locationName={locationName}
+          openEditClientModal={openEditClientModal} clientAddress={clientAddress} locationName={locationName}
           collaborators={collaborators} orgProfiles={orgProfiles}
           updateStatus={updateStatus} onUpdateRep={updateRep}
           editingQuoteNumber={editingQuoteNumber} quoteNumberDraft={quoteNumberDraft}
