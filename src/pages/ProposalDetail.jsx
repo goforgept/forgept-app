@@ -457,8 +457,10 @@ export default function ProposalDetail({ isAdmin }) {
       user_id:   repProfile.id,
       rep_name:  repProfile.full_name,
       rep_email: repProfile.email,
+      rep_phone: repProfile.phone || null,
+      rep_title: repProfile.job_title || null,
     }).eq('id', id)
-    setProposal(prev => ({ ...prev, user_id: repProfile.id, rep_name: repProfile.full_name, rep_email: repProfile.email }))
+    setProposal(prev => ({ ...prev, user_id: repProfile.id, rep_name: repProfile.full_name, rep_email: repProfile.email, rep_phone: repProfile.phone || null, rep_title: repProfile.job_title || null }))
     logActivity(`Rep changed to ${repProfile.full_name}`)
   }
 

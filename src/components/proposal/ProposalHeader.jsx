@@ -119,6 +119,9 @@ export default function ProposalHeader({
           ) : (
             <p className="text-white text-sm font-medium">{proposal?.rep_name}</p>
           )}
+          {proposal?.rep_title && <p className="text-[#8A9AB0] text-xs mt-0.5">{proposal.rep_title}</p>}
+          {proposal?.rep_email && <p className="text-[#8A9AB0] text-xs">{proposal.rep_email}</p>}
+          {proposal?.rep_phone && <p className="text-[#8A9AB0] text-xs">{proposal.rep_phone}</p>}
         </div>
         <div>
           <p className="text-[#8A9AB0] text-xs mb-1">Quote #</p>

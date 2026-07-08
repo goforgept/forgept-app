@@ -172,6 +172,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     }
     setForm({
       full_name: data?.full_name || '', email: data?.email || '', company_name: data?.company_name || '',
+      phone: data?.phone || '', job_title: data?.job_title || '',
       default_markup_percent: data?.default_markup_percent || '35', followup_days: data?.followup_days || '30,14,7,0',
       terms_and_conditions: data?.terms_and_conditions || '', primary_color: data?.primary_color || '#0F1C2E',
       bill_to_address: data?.bill_to_address || '', bill_to_city: data?.bill_to_city || '',
@@ -278,6 +279,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     const { data: { user } } = await supabase.auth.getUser()
     await supabase.from('profiles').update({
       full_name: form.full_name, company_name: form.company_name,
+      phone: form.phone || null, job_title: form.job_title || null,
       default_markup_percent: parseFloat(form.default_markup_percent) || 35,
       followup_days: form.followup_days, terms_and_conditions: form.terms_and_conditions,
       primary_color: form.primary_color,

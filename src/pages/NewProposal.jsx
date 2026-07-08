@@ -36,6 +36,8 @@ export default function NewProposal() {
       industry: '',
       rep_name: '',
       rep_email: '',
+      rep_phone: '',
+      rep_title: '',
     }
   })
 
@@ -47,6 +49,8 @@ export default function NewProposal() {
         ...prev,
         rep_name: profile.full_name || '',
         rep_email: profile.email || '',
+        rep_phone: profile.phone || '',
+        rep_title: profile.job_title || '',
       }))
       setTaxRate(profile.organizations?.default_tax_rate ?? '')
 
@@ -166,6 +170,8 @@ export default function NewProposal() {
       location_id: selectedLocationId || null,
       rep_name: form.rep_name,
       rep_email: form.rep_email,
+      rep_phone: form.rep_phone || null,
+      rep_title: form.rep_title || null,
       client_name: form.client_name,
       company: form.company,
       client_email: form.client_email,

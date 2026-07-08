@@ -23,6 +23,14 @@ export default function GeneralTab({
             <input type="text" value={form.email} disabled className="w-full bg-[#0F1C2E] text-[#8A9AB0] border border-[#2a3d55] rounded-lg px-3 py-2 text-sm cursor-not-allowed" />
           </div>
           <div>
+            <label className="text-[#8A9AB0] text-xs mb-1 block">Job Title</label>
+            <input type="text" value={form.job_title || ''} onChange={e => setForm(prev => ({ ...prev, job_title: e.target.value }))} placeholder="e.g. Solutions Consultant" className={inputClass} />
+          </div>
+          <div>
+            <label className="text-[#8A9AB0] text-xs mb-1 block">Phone</label>
+            <input type="tel" value={form.phone || ''} onChange={e => setForm(prev => ({ ...prev, phone: e.target.value }))} placeholder="e.g. (555) 123-4567" className={inputClass} />
+          </div>
+          <div>
             <label className="text-[#8A9AB0] text-xs mb-1 block">Role</label>
             <input type="text" value={profile?.role || ''} disabled className="w-full bg-[#0F1C2E] text-[#8A9AB0] border border-[#2a3d55] rounded-lg px-3 py-2 text-sm cursor-not-allowed" />
           </div>
