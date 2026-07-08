@@ -1517,19 +1517,32 @@ export default function SuperAdmin() {
 
       {/* ── ROADMAP TAB ── */}
       {activeTab === 'roadmap' && (
-        <SAoadmapPanel
-          items={roadmapItems}
-          orgs={orgs}
-          onStatusChange={async (id, status) => {
-            await supabase.from('roadmap_items').update({ status }).eq('id', id)
-            setRoadmapItems(prev => prev.map(i => i.id === id ? { ...i, status } : i))
-          }}
-          onDelete={async (id) => {
-            if (!window.confirm('Delete this roadmap item?')) return
-            await supabase.from('roadmap_items').delete().eq('id', id)
-            setRoadmapItems(prev => prev.filter(i => i.id !== id))
-          }}
-        />
+        <>
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={async () => {
+                const result = await supabase.functions.invoke('superadmin-get-data', { body: { sa_password: getSaPassword() } })
+                setRoadmapItems(result?.data?.roadmap_items || [])
+              }}
+              className="bg-[#2a3d55] text-[#8A9AB0] hover:text-white px-3 py-1.5 rounded-lg text-xs transition-colors"
+            >
+              ↻ Refresh
+            </button>
+          </div>
+          <SAoadmapPanel
+            items={roadmapItems}
+            orgs={orgs}
+            onStatusChange={async (id, status) => {
+              await supabase.from('roadmap_items').update({ status }).eq('id', id)
+              setRoadmapItems(prev => prev.map(i => i.id === id ? { ...i, status } : i))
+            }}
+            onDelete={async (id) => {
+              if (!window.confirm('Delete this roadmap item?')) return
+              await supabase.from('roadmap_items').delete().eq('id', id)
+              setRoadmapItems(prev => prev.filter(i => i.id !== id))
+            }}
+          />
+        </>
       )}
 
     </div>

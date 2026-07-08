@@ -173,11 +173,13 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
   const [reqForm, setReqForm] = useState({ title: '', description: '', category: 'feature' })
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
 
   const submitRequest = async () => {
     if (!reqForm.title.trim() || !profile?.org_id) return
     setSubmitting(true)
-    await supabase.from('roadmap_items').insert({
+    setSubmitError(null)
+    const { error } = await supabase.from('roadmap_items').insert({
       org_id:       profile.org_id,
       title:        reqForm.title.trim(),
       description:  reqForm.description.trim() || null,
@@ -186,6 +188,7 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
       requested_by: profile.id,
     })
     setSubmitting(false)
+    if (error) { setSubmitError(error.message); return }
     setSubmitted(true)
     setReqForm({ title: '', description: '', category: 'feature' })
   }
@@ -274,6 +277,7 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
                   {submitting ? 'Submitting...' : 'Submit Request'}
                 </button>
               </div>
+              {submitError && <p className="text-red-400 text-xs">{submitError}</p>}
             </div>
           )}
         </div>
