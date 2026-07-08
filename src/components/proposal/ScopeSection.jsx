@@ -8,7 +8,7 @@ export default function ScopeSection({
   requestingSignature, requestSignature,
   uploadingSignedPDF, uploadSignedPDF,
   qboConnected, qboInvoiceId, sendingToQBO, sendToQBO,
-  setShowPricingModal, downloadPDF, downloadDOCX,
+  setShowPricingModal, downloadPDF, downloadDOCX, downloadSignedCopy,
   setShowPhotosModal,
   canEdit = true,
 }) {
@@ -53,8 +53,8 @@ export default function ScopeSection({
                   : await getR2Url(proposal.signed_pdf_url, 3600, BUCKETS.DOCUMENTS)
                 if (url) { window.open(url, '_blank'); return }
               }
-              // No stored PDF — download the unsigned proposal PDF as fallback
-              downloadPDF()
+              // No stored R2 PDF — generate a fresh signed copy with the signature page
+              if (downloadSignedCopy) downloadSignedCopy()
             }} className="bg-green-600/20 text-green-400 border border-green-600/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-600/30 transition-colors flex items-center gap-1">
               ⬇ Signed Copy
             </button>

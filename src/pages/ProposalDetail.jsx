@@ -1087,6 +1087,45 @@ export default function ProposalDetail({ isAdmin }) {
     doc.save(`${proposal?.proposal_name || 'Proposal'}.pdf`)
   }
 
+  const downloadSignedCopy = async () => {
+    const doc = await generatePDFDoc()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
+    const name = proposal?.signature_name || ''
+    const timestamp = proposal?.signature_at || new Date().toISOString()
+
+    doc.addPage()
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.rect(0, 0, pageWidth, 8, 'F')
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text('Electronic Signature Confirmation', 14, 28)
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+    doc.text(`Proposal: ${proposal?.proposal_name || ''}`, 14, 42)
+    doc.text(`Client: ${proposal?.client_name || ''} — ${proposal?.company || ''}`, 14, 50)
+    doc.text(`Email: ${proposal?.client_email || ''}`, 14, 58)
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text('Signature Details', 14, 74)
+    doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.line(14, 76, pageWidth - 14, 76)
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+    doc.text(`Signed by: ${name}`, 14, 86)
+    doc.text(`Date & Time: ${new Date(timestamp).toLocaleString()}`, 14, 94)
+    doc.setFillColor(248, 249, 250); doc.rect(14, 114, pageWidth - 28, 36, 'F')
+    doc.setDrawColor(220, 220, 220); doc.rect(14, 114, pageWidth - 28, 36, 'S')
+    doc.setFontSize(22); doc.setFont('helvetica', 'italic'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text(name, 24, 137)
+    doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(150, 150, 150)
+    doc.text(`Electronic signature recorded ${new Date(timestamp).toLocaleString()}`, 14, 158)
+    doc.text('This electronic signature is legally binding and equivalent to a handwritten signature.', 14, 165)
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.rect(0, pageHeight - 12, pageWidth, 12, 'F')
+    doc.setFontSize(8); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'normal')
+    doc.text(`${profile?.company_name || 'ForgePt.'} · Signed Proposal · Confidential`, pageWidth / 2, pageHeight - 4, { align: 'center' })
+
+    doc.save(`Signed-${proposal?.proposal_name || 'Proposal'}.pdf`)
+  }
+
   const downloadDOCX = async () => {
     if (proposal?.status === 'Draft') setShowSentPrompt(true)
 
@@ -2821,7 +2860,7 @@ const analyzeDrawing = async () => {
           requestingSignature={requestingSignature} requestSignature={requestSignature}
           uploadingSignedPDF={uploadingSignedPDF} uploadSignedPDF={uploadSignedPDF}
           qboConnected={qboConnected} qboInvoiceId={qboInvoiceId} sendingToQBO={sendingToQBO} sendToQBO={sendToQBO}
-          setShowPricingModal={setShowPricingModal} downloadPDF={downloadPDF} downloadDOCX={downloadDOCX}
+          setShowPricingModal={setShowPricingModal} downloadPDF={downloadPDF} downloadDOCX={downloadDOCX} downloadSignedCopy={downloadSignedCopy}
           setShowPhotosModal={setShowPhotosModal}
           canEdit={canEdit}
         />
