@@ -44,13 +44,17 @@ export default function ScopeSection({
               {requestingSignature ? 'Sending...' : '✍️ Request Signature'}
             </button>
           )}
-          {proposal?.signed_pdf_url && (
+          {proposal?.signature_name && (
             <button onClick={async () => {
-              const { getR2Url, BUCKETS } = await import('../../r2')
-              const url = proposal.signed_pdf_url.startsWith('http')
-                ? proposal.signed_pdf_url
-                : await getR2Url(proposal.signed_pdf_url, 3600, BUCKETS.DOCUMENTS)
-              if (url) window.open(url, '_blank')
+              if (proposal.signed_pdf_url) {
+                const { getR2Url, BUCKETS } = await import('../../r2')
+                const url = proposal.signed_pdf_url.startsWith('http')
+                  ? proposal.signed_pdf_url
+                  : await getR2Url(proposal.signed_pdf_url, 3600, BUCKETS.DOCUMENTS)
+                if (url) { window.open(url, '_blank'); return }
+              }
+              // No stored PDF — download the unsigned proposal PDF as fallback
+              downloadPDF()
             }} className="bg-green-600/20 text-green-400 border border-green-600/30 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-600/30 transition-colors flex items-center gap-1">
               ⬇ Signed Copy
             </button>
