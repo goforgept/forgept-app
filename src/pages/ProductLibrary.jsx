@@ -375,7 +375,7 @@ if (!finalCost) continue
   const handleDeleteProduct = async (productId) => {
     if (!window.confirm('Remove this product from the library?')) return
     await supabase.from('product_library').update({ active: false }).eq('id', productId)
-    setProducts(prev => prev.filter(p => p.id !== productId))
+    fetchAll()
   }
 
   // ─── Filters ──────────────────────────────────────────────────────────────

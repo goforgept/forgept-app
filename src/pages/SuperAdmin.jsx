@@ -141,8 +141,10 @@ function CatalogsTab() {
         const partNumber = String(r['Item #'] || r['Part Number'] || r['Part #'] || r['part_number'] || r['SKU'] || r['sku'] || '').trim()
         const modelName = String(r['Item Type'] || r['Model Name'] || r['Model'] || r['Item Name'] || r['item_name'] || r['Name'] || '').trim()
         const description = String(r['Description'] || r['Sales Description'] || r['description'] || '').trim() || null
-        const msrpRaw = r['MSRP'] || r['List Price'] || r['msrp'] || r['Price'] || ''
-        const msrp = parseFloat(String(msrpRaw).replace(/[$,]/g, '')) || null
+        // Fuzzy MSRP lookup — catches "MSRP", "MSRP ", "MSRP (USD)", etc.
+        const msrpKey = Object.keys(r).find(k => k.trim().toUpperCase().startsWith('MSRP') || k.trim() === 'List Price' || k.trim() === 'Price')
+        const msrpRaw = msrpKey ? r[msrpKey] : ''
+        const msrp = parseFloat(String(msrpRaw).replace(/[$,\s]/g, '')) || null
         const category = String(r['Category'] || r['category'] || '').trim()
         const manufacturer = String(r['Manufacturer'] || r['manufacturer'] || r['Brand'] || importForm.label || '').trim()
         const unit = String(r['Unit'] || r['unit'] || 'ea').trim() || 'ea'
@@ -151,13 +153,28 @@ function CatalogsTab() {
 
       if (items.length === 0) { setImportError('No valid rows found. Make sure Part Number or Model Name column exists.'); setImporting(false); return }
 
-      // Delete old items for this slug first, then insert fresh
-      await supabase.from('catalog_products').delete().eq('catalog_slug', importForm.slug.trim())
+      // Fetch existing items for this slug so we can UPDATE in place (preserves IDs → dealer pricing links stay intact)
+      const { data: existing } = await supabase.from('catalog_products').select('id, part_number').eq('catalog_slug', importForm.slug.trim())
+      const existingMap = {}
+      ;(existing || []).forEach(e => { if (e.part_number) existingMap[e.part_number] = e.id })
+
+      const toInsert = [], toUpdate = []
+      items.forEach(item => {
+        const existingId = item.part_number ? existingMap[item.part_number] : null
+        if (existingId) toUpdate.push({ id: existingId, ...item })
+        else toInsert.push(item)
+      })
+
       const BATCH = 500
-      for (let i = 0; i < items.length; i += BATCH) {
-        await supabase.from('catalog_products').insert(items.slice(i, i + BATCH))
+      for (let i = 0; i < toInsert.length; i += BATCH) {
+        await supabase.from('catalog_products').insert(toInsert.slice(i, i + BATCH))
       }
-      setImportResult({ count: items.length, slug: importForm.slug.trim() })
+      for (let i = 0; i < toUpdate.length; i += BATCH) {
+        await Promise.all(toUpdate.slice(i, i + BATCH).map(({ id, ...fields }) =>
+          supabase.from('catalog_products').update(fields).eq('id', id)
+        ))
+      }
+      setImportResult({ added: toInsert.length, updated: toUpdate.length, slug: importForm.slug.trim() })
       setImportForm({ slug: '', label: '' })
       setShowImportForm(false)
       fetchCatalogs()
@@ -186,7 +203,7 @@ function CatalogsTab() {
         </button>
       </div>
 
-      {importResult && <p className="text-green-400 text-sm">Imported {importResult.count.toLocaleString()} products into "{importResult.slug}"</p>}
+      {importResult && <p className="text-green-400 text-sm">{importResult.added} added · {importResult.updated} updated in "{importResult.slug}"</p>}
       {importError && <p className="text-red-400 text-sm">{importError}</p>}
 
       {showImportForm && (

@@ -97,11 +97,17 @@ export default function BomSection({
                                 {prod.manufacturer && <span className="text-[#8A9AB0] text-xs">{prod.manufacturer}</span>}
                                 {prod.part_number && <span className="text-[#8A9AB0] text-xs font-mono bg-[#0F1C2E] px-1.5 py-0.5 rounded">{prod.part_number}</span>}
                                 {prod.category && <span className="text-[#8A9AB0] text-xs">{prod.category}</span>}
+                                {prod._fromCatalog && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400">{prod._catalogLabel}</span>}
                               </div>
                             </div>
                           </div>
                           <div className="shrink-0 text-right" onClick={e => e.stopPropagation()}>
-                            {prices.length === 0 ? (
+                            {prod._fromCatalog ? (
+                              <div>
+                                {prod.msrp && <p className="text-[#8A9AB0] text-xs">MSRP ${Number(prod.msrp).toFixed(2)}</p>}
+                                <span className="text-xs text-yellow-400">Add pricing in library</span>
+                              </div>
+                            ) : prices.length === 0 ? (
                               <span className="text-[#2a3d55] text-xs">No pricing</span>
                             ) : prices.length === 1 ? (
                               <div>

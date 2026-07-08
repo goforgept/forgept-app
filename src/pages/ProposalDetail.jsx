@@ -97,6 +97,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [libraryLoading, setLibraryLoading] = useState(false)
   const [librarySelectedVendor, setLibrarySelectedVendor] = useState({})
   const [librarySelectedItems, setLibrarySelectedItems] = useState(new Set())
+  const [enabledCatalogSlugs, setEnabledCatalogSlugs] = useState([])
   const [rfqVendorData, setRfqVendorData] = useState({})
   const [rfqItems, setRfqItems] = useState([])
   const [sendingRFQs, setSendingRFQs] = useState(false)
@@ -242,11 +243,12 @@ export default function ProposalDetail({ isAdmin }) {
     // Load org SLA settings and auto-attach if applicable
     if (data?.org_id) {
       const [{ data: orgSLA }, { data: ratesData }] = await Promise.all([
-        supabase.from('organizations').select('feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates').eq('id', data.org_id).single(),
+        supabase.from('organizations').select('feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, enabled_catalogs').eq('id', data.org_id).single(),
         supabase.from('labor_rates').select('role, cost_per_hour, bill_rate_per_hour, unit').eq('org_id', data.org_id).order('sort_order'),
       ])
       setOrgLaborRates(ratesData || [])
       setOrgSLASettings(orgSLA)
+      setEnabledCatalogSlugs(orgSLA?.enabled_catalogs || [])
       const notifications = []
       const updates = {}
       if (orgSLA?.feature_sla && orgSLA?.sla_auto_attach && slaArr.length === 0) {
@@ -791,22 +793,87 @@ export default function ProposalDetail({ isAdmin }) {
     setLibrarySearch(q)
     if (!q.trim()) { setLibraryResults([]); return }
     setLibraryLoading(true)
-    const { data: prods } = await supabase
-      .from('product_library')
-      .select('*, product_library_pricing(*)')
-      .eq('org_id', proposal?.org_id)
-      .eq('active', true)
-      .or(`item_name.ilike.%${q}%,part_number.ilike.%${q}%,manufacturer.ilike.%${q}%,category.ilike.%${q}%`)
-      .limit(30)
-    setLibraryResults(prods || [])
+
+    const [{ data: prods }, catalogRes] = await Promise.all([
+      supabase
+        .from('product_library')
+        .select('*, product_library_pricing(*)')
+        .eq('org_id', proposal?.org_id)
+        .eq('active', true)
+        .or(`item_name.ilike.%${q}%,part_number.ilike.%${q}%,manufacturer.ilike.%${q}%,category.ilike.%${q}%`)
+        .limit(30),
+      enabledCatalogSlugs.length > 0
+        ? supabase
+            .from('catalog_products')
+            .select('*')
+            .in('catalog_slug', enabledCatalogSlugs)
+            .eq('active', true)
+            .or(`model_name.ilike.%${q}%,part_number.ilike.%${q}%,manufacturer.ilike.%${q}%,category.ilike.%${q}%`)
+            .limit(30)
+        : Promise.resolve({ data: [] }),
+    ])
+
+    // Catalog items already copied to this org's library — don't show them twice
+    const copiedPartNumbers = new Set((prods || []).map(p => p.part_number).filter(Boolean))
+    const catalogItems = (catalogRes.data || [])
+      .filter(c => !copiedPartNumbers.has(c.part_number))
+      .map(c => ({
+        id: `cat_${c.id}`,
+        _catalogProductId: c.id,
+        _fromCatalog: true,
+        _catalogLabel: c.catalog_label,
+        item_name: c.model_name || c.part_number,
+        manufacturer: c.manufacturer,
+        part_number: c.part_number,
+        category: c.category,
+        unit: c.unit,
+        msrp: c.msrp,
+        product_library_pricing: [],
+      }))
+
+    setLibraryResults([...(prods || []), ...catalogItems])
     setLibraryLoading(false)
   }
 
-  const addLibraryItemsToBOM = () => {
+  const addLibraryItemsToBOM = async () => {
     const STALE_DAYS = 120
     const newLines = []
-    libraryResults.forEach(prod => {
-      if (!librarySelectedItems.has(prod.id)) return
+
+    for (const prod of libraryResults) {
+      if (!librarySelectedItems.has(prod.id)) continue
+
+      // Catalog item not yet in library — copy it now
+      if (prod._fromCatalog) {
+        await supabase.from('product_library').insert({
+          org_id: proposal?.org_id,
+          item_name: prod.item_name,
+          manufacturer: prod.manufacturer || null,
+          part_number: prod.part_number || null,
+          category: prod.category || null,
+          unit: prod.unit || 'ea',
+          msrp: prod.msrp || null,
+          catalog_product_id: prod._catalogProductId,
+          active: true,
+        })
+        newLines.push({
+          proposal_id: id,
+          item_name: prod.item_name,
+          manufacturer: prod.manufacturer || '',
+          part_number_sku: prod.part_number || '',
+          quantity: '1',
+          unit: prod.unit || 'ea',
+          category: prod.category || '',
+          vendor: '',
+          your_cost_unit: '',
+          markup_percent: '35',
+          customer_price_unit: '',
+          customer_price_total: '',
+          pricing_status: 'Needs Pricing',
+          msrp_unit: prod.msrp ? String(prod.msrp) : '',
+        })
+        continue
+      }
+
       const selectedPricing = librarySelectedVendor[prod.id] || prod.product_library_pricing?.[0]
       const days = selectedPricing?.pricing_date
         ? Math.floor((new Date() - new Date(selectedPricing.pricing_date)) / (1000 * 60 * 60 * 24))
@@ -829,7 +896,7 @@ export default function ProposalDetail({ isAdmin }) {
         pricing_status: isStale ? 'Needs Pricing' : 'Confirmed',
         msrp_unit: prod.msrp ? String(prod.msrp) : '',
       })
-    })
+    }
     if (!editingBOM) {
       setEditLines([...lineItems.map(l => ({ ...l })), ...newLines])
       setEditingBOM(true)
