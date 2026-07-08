@@ -676,7 +676,7 @@ if (!finalCost) continue
         <div className="flex gap-2">
           <button onClick={() => setEditingProductId(null)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Cancel</button>
           <button onClick={async () => {
-            await supabase.from('product_library').update({
+            const { error: updErr } = await supabase.from('product_library').update({
               item_name: editForm.item_name,
               manufacturer: editForm.manufacturer || null,
               part_number: editForm.part_number || null,
@@ -685,6 +685,7 @@ if (!finalCost) continue
               description: editForm.description || null,
               msrp: editForm.msrp ? parseFloat(editForm.msrp) : null,
             }).eq('id', p.id)
+            if (updErr) { setError(updErr.message); return }
             setEditingProductId(null)
             fetchAll()
           }} className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors">
@@ -696,7 +697,7 @@ if (!finalCost) continue
       <div className="flex items-center justify-between mb-2">
         {p.description && <p className="text-[#8A9AB0] text-xs italic">{p.description}</p>}
         {!p.description && <span />}
-        <button onClick={() => { setEditingProductId(p.id); setEditForm({ item_name: p.item_name, manufacturer: p.manufacturer, part_number: p.part_number, category: p.category, unit: p.unit, description: p.description }) }}
+        <button onClick={() => { setEditingProductId(p.id); setEditForm({ item_name: p.item_name, manufacturer: p.manufacturer, part_number: p.part_number, category: p.category, unit: p.unit, description: p.description, msrp: p.msrp ?? '' }) }}
           className="text-[#8A9AB0] hover:text-white text-xs transition-colors">✎ Edit</button>
       </div>
     )}
