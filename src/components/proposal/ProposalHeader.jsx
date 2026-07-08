@@ -101,6 +101,19 @@ export default function ProposalHeader({
         </div>
       </div>
 
+      {(profile?.bill_to_address || profile?.license_number) && (
+        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-[#2a3d55]/50 flex-wrap">
+          {profile?.bill_to_address && (
+            <span className="text-[#8A9AB0] text-xs">
+              {profile.bill_to_address}{profile.bill_to_city ? `, ${profile.bill_to_city}` : ''}{profile.bill_to_state ? `, ${profile.bill_to_state}` : ''}{profile.bill_to_zip ? ` ${profile.bill_to_zip}` : ''}
+            </span>
+          )}
+          {profile?.license_number && (
+            <span className="text-[#8A9AB0] text-xs">License #: {profile.license_number}</span>
+          )}
+        </div>
+      )}
+
       <div className="grid grid-cols-6 gap-4 mt-6">
         <div>
           <p className="text-[#8A9AB0] text-xs mb-1">Rep</p>

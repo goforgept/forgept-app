@@ -2585,12 +2585,39 @@ const analyzeDrawing = async () => {
       doc.text('Scope it. Send it. Close it.', 14, 30)
     }
 
+    // Company address + license on right side of banner
+    {
+      const bannerLines = []
+      if (profile?.bill_to_address) bannerLines.push(profile.bill_to_address)
+      const csl = [profile?.bill_to_city, profile?.bill_to_state, profile?.bill_to_zip].filter(Boolean).join(', ')
+      if (csl) bannerLines.push(csl)
+      if (profile?.license_number) bannerLines.push(`Lic #: ${profile.license_number}`)
+      if (bannerLines.length > 0) {
+        doc.setFontSize(8); doc.setFont(pdfFont, 'normal'); doc.setTextColor(255, 255, 255)
+        const bStartY = 22 - (bannerLines.length - 1) * 2.5
+        bannerLines.forEach((ln, i) => doc.text(ln, pageWidth - 14, bStartY + i * 5, { align: 'right' }))
+      }
+    }
+
     doc.setTextColor(0, 0, 0); doc.setFontSize(18); doc.setFont(pdfFont, 'bold')
     doc.text(proposal?.proposal_name || 'Proposal', 14, 55)
     doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100)
     doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
     if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, 72)
     doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, clientAddress ? 79 : 72)
+
+    // Rep contact info, right-aligned in the same area
+    {
+      const repLines = []
+      if (proposal?.rep_name) repLines.push(`Rep: ${proposal.rep_name}`)
+      if (proposal?.rep_title) repLines.push(proposal.rep_title)
+      if (proposal?.rep_email) repLines.push(proposal.rep_email)
+      if (proposal?.rep_phone) repLines.push(proposal.rep_phone)
+      if (repLines.length > 0) {
+        doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100)
+        repLines.forEach((ln, i) => doc.text(ln, pageWidth - 14, 65 + i * 7, { align: 'right' }))
+      }
+    }
 
     let yPos = 92
 
@@ -2750,33 +2777,38 @@ const analyzeDrawing = async () => {
     doc.setTextColor(200, 98, 42)
     doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos + 4, { align: 'right' })
 
+    const renderSignatureBlock = (doc, startY) => {
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Accepted and Agreed', 14, startY)
+      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
+      const s1 = startY + 18
+      doc.text('Client Signature:', 14, s1); doc.line(50, s1, 140, s1)
+      doc.text('Date:', 150, s1); doc.line(163, s1, pageWidth - 14, s1)
+      const s2 = s1 + 20; doc.text('Printed Name:', 14, s2); doc.line(50, s2, pageWidth - 14, s2)
+      const s3 = s2 + 20; doc.text('Title:', 14, s3); doc.line(30, s3, pageWidth - 14, s3)
+    }
+
     if (profile?.terms_and_conditions) {
       doc.addPage()
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Terms and Conditions', 14, 20)
       doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
       const termsLines = doc.splitTextToSize(profile.terms_and_conditions, pageWidth - 28)
-      doc.text(termsLines, 14, 32)
-      const tLen = termsLines.length
-      const afterTermsY = 32 + tLen * 4.5 + 16
-      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Accepted and Agreed', 14, afterTermsY)
-      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
-      const s1 = afterTermsY + 18
-      doc.text('Client Signature:', 14, s1); doc.line(50, s1, 140, s1)
-      doc.text('Date:', 150, s1); doc.line(163, s1, pageWidth - 14, s1)
-      const s2 = s1 + 20; doc.text('Printed Name:', 14, s2); doc.line(50, s2, pageWidth - 14, s2)
-      const s3 = s2 + 20; doc.text('Title:', 14, s3); doc.line(30, s3, pageWidth - 14, s3)
+      const lineH = 4.5
+      const pageH = doc.internal.pageSize.getHeight()
+      let ty = 32
+      for (const line of termsLines) {
+        if (ty + lineH > pageH - 20) { doc.addPage(); ty = 20 }
+        doc.text(line, 14, ty)
+        ty += lineH
+      }
+      ty += 16
+      if (ty + 70 > pageH) { doc.addPage(); ty = 20 }
+      renderSignatureBlock(doc, ty)
     } else {
-      const afterY = yPos + 20
-      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Accepted and Agreed', 14, afterY)
-      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
-      const s1 = afterY + 18
-      doc.text('Client Signature:', 14, s1); doc.line(50, s1, 140, s1)
-      doc.text('Date:', 150, s1); doc.line(163, s1, pageWidth - 14, s1)
-      const s2 = s1 + 20; doc.text('Printed Name:', 14, s2); doc.line(50, s2, pageWidth - 14, s2)
-      const s3 = s2 + 20; doc.text('Title:', 14, s3); doc.line(30, s3, pageWidth - 14, s3)
+      let afterY = yPos + 20
+      if (afterY + 70 > pageHeight) { doc.addPage(); afterY = 20 }
+      renderSignatureBlock(doc, afterY)
     }
 
     for (const slaC of slaContracts) {

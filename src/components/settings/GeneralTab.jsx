@@ -99,6 +99,11 @@ export default function GeneralTab({
             <input type="text" value={form.company_name} onChange={e => setForm(prev => ({ ...prev, company_name: e.target.value }))} placeholder="Your company name" className={inputClass} />
           </div>
           <div>
+            <label className="text-[#8A9AB0] text-xs mb-1 block">License Number</label>
+            <input type="text" value={form.license_number || ''} onChange={e => setForm(prev => ({ ...prev, license_number: e.target.value }))} placeholder="e.g. LIC-123456" className={inputClass} />
+            <p className="text-[#8A9AB0] text-xs mt-1">If entered, printed on all PDF proposals. Required by some states.</p>
+          </div>
+          <div>
             <label className="text-[#8A9AB0] text-xs mb-1 block">Company Logo</label>
             {logoUrl && <div className="mb-3"><img src={logoUrl} alt="Company logo" className="h-16 object-contain bg-white rounded-lg p-2" /></div>}
             <label className="cursor-pointer">
