@@ -8,12 +8,12 @@ const ACTIVITY_TYPES = [
   { value: 'note', label: 'Note', icon: '📝' },
 ]
 
-export default function ActivityTimeline({ clientId, proposalId, orgId, userId }) {
+export default function ActivityTimeline({ clientId, proposalId, orgId, userId, contacts = [] }) {
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ type: 'note', title: '', body: '' })
+  const [form, setForm] = useState({ type: 'note', title: '', body: '', contact_id: '' })
 
   useEffect(() => {
     fetchActivities()
@@ -37,7 +37,7 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId }
       // Direct client activities
       const { data: clientActs } = await supabase
         .from('activities')
-        .select('*, profiles(full_name), proposals(proposal_name)')
+        .select('*, profiles(full_name), proposals(proposal_name), client_contacts(full_name)')
         .eq('client_id', clientId)
         .order('created_at', { ascending: false })
       allActivities = [...(clientActs || [])]
@@ -46,7 +46,7 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId }
       if (proposalIds.length > 0) {
         const { data: proposalActs } = await supabase
           .from('activities')
-          .select('*, profiles(full_name), proposals(proposal_name)')
+          .select('*, profiles(full_name), proposals(proposal_name), client_contacts(full_name)')
           .in('proposal_id', proposalIds)
           .is('client_id', null)
           .order('created_at', { ascending: false })
@@ -59,7 +59,7 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId }
     } else if (proposalId) {
       const { data } = await supabase
         .from('activities')
-        .select('*, profiles(full_name), proposals(proposal_name)')
+        .select('*, profiles(full_name), proposals(proposal_name), client_contacts(full_name)')
         .eq('proposal_id', proposalId)
         .order('created_at', { ascending: false })
       setActivities(data || [])
@@ -78,9 +78,10 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId }
       user_id: userId,
       type: form.type,
       title: form.title,
-      body: form.body
+      body: form.body,
+      contact_id: form.contact_id || null,
     })
-    setForm({ type: 'note', title: '', body: '' })
+    setForm({ type: 'note', title: '', body: '', contact_id: '' })
     setShowForm(false)
     fetchActivities()
     setSaving(false)
@@ -126,9 +127,21 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId }
               </button>
             ))}
           </div>
+          {contacts.length > 0 && (
+            <select
+              value={form.contact_id}
+              onChange={e => setForm(prev => ({ ...prev, contact_id: e.target.value }))}
+              className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+            >
+              <option value="">Contact (optional)</option>
+              {contacts.map(c => (
+                <option key={c.id} value={c.id}>{c.full_name}{c.title ? ` — ${c.title}` : ''}</option>
+              ))}
+            </select>
+          )}
           <input
             type="text"
-            placeholder="Title — e.g. Called John about pricing"
+            placeholder="Title — e.g. Meeting with John about Q3 project"
             value={form.title}
             onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
             className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
@@ -172,8 +185,11 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId }
                 {activity.body && (
                   <p className="text-[#8A9AB0] text-xs mt-1 leading-relaxed">{activity.body}</p>
                 )}
-                <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   <p className="text-[#2a3d55] text-xs">{activity.profiles?.full_name}</p>
+                  {activity.client_contacts?.full_name && (
+                    <span className="text-[#8A9AB0] text-xs">· with {activity.client_contacts.full_name}</span>
+                  )}
                   {activity.proposals?.proposal_name && (
                     <span className="text-[#2a3d55] text-xs">· {activity.proposals.proposal_name}</span>
                   )}
