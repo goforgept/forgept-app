@@ -126,7 +126,15 @@ function CatalogsTab() {
       const wb = XLSX.read(data)
       const sheetName = wb.SheetNames.find(n => n.trim() === 'HVA Pricelist') || wb.SheetNames[0]
       const ws = wb.Sheets[sheetName]
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
+
+      // Find the actual header row — scan raw rows until we hit one containing known column names
+      const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+      const headerRowIdx = raw.findIndex(row =>
+        row.some(cell => ['Item #', 'Category', 'Part Number', 'Part #', 'Model Name', 'Item Type'].includes(String(cell).trim()))
+      )
+      const rows = headerRowIdx >= 0
+        ? XLSX.utils.sheet_to_json(ws, { defval: '', range: headerRowIdx })
+        : XLSX.utils.sheet_to_json(ws, { defval: '' })
 
       const items = rows.map(r => {
         // "Item #" / "Item Type" = Hanwha pricebook column names
