@@ -1,5 +1,39 @@
 @import "tailwindcss";
 
+/* ── Theme tokens ─────────────────────────────────────────────────── */
+:root {
+  --fp-bg:        #0F1C2E;
+  --fp-card:      #1a2d45;
+  --fp-inset:     #0a1628;
+  --fp-hover:     #1f3550;
+  --fp-border:    #2a3d55;
+  --fp-text:      #ffffff;
+  --fp-muted:     #8A9AB0;
+  --fp-brand:     #C8622A;
+}
+
+[data-theme="light"] {
+  --fp-bg:        #EEF2F7;
+  --fp-card:      #FFFFFF;
+  --fp-inset:     #F1F5F9;
+  --fp-hover:     #E8EDF3;
+  --fp-border:    #CBD5E1;
+  --fp-text:      #0F172A;
+  --fp-muted:     #64748B;
+  --fp-brand:     #C8622A;
+}
+
+@theme {
+  --color-fp-bg:     var(--fp-bg);
+  --color-fp-card:   var(--fp-card);
+  --color-fp-inset:  var(--fp-inset);
+  --color-fp-hover:  var(--fp-hover);
+  --color-fp-border: var(--fp-border);
+  --color-fp-text:   var(--fp-text);
+  --color-fp-muted:  var(--fp-muted);
+  --color-fp-brand:  var(--fp-brand);
+}
+
 .scrollbar-none {
   scrollbar-width: none;
 }

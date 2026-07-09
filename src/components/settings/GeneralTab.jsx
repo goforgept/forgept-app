@@ -7,9 +7,32 @@ export default function GeneralTab({
   isAdmin, msrpEnabled, onToggleMsrp,
   docFont = 'helvetica', onChangeDocFont,
   pdfTableStyle = 'striped', onChangePdfTableStyle,
+  currentTheme = 'dark', applyTheme,
 }) {
   return (
     <div className="space-y-6">
+      {/* Appearance */}
+      <div className="bg-[#1a2d45] rounded-xl p-6">
+        <h3 className="text-white font-bold mb-1">Appearance</h3>
+        <p className="text-[#8A9AB0] text-sm mb-5">Choose how ForgePt looks for you. Light mode is rolling out gradually across the app.</p>
+        <div className="flex gap-3">
+          {[
+            { value: 'dark',  label: 'Dark',  icon: '🌙', desc: 'Default dark theme' },
+            { value: 'light', label: 'Light', icon: '☀️', desc: 'Light theme (beta)' },
+          ].map(opt => (
+            <button key={opt.value} onClick={() => applyTheme?.(opt.value)}
+              className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                currentTheme === opt.value
+                  ? 'border-[#C8622A] bg-[#C8622A]/10'
+                  : 'border-[#2a3d55] hover:border-[#C8622A]/50'
+              }`}>
+              <span className="text-2xl">{opt.icon}</span>
+              <span className="text-white text-sm font-semibold">{opt.label}</span>
+              <span className="text-[#8A9AB0] text-xs">{opt.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
       {/* Profile */}
       <div className="bg-[#1a2d45] rounded-xl p-6">
         <h3 className="text-white font-bold mb-4">Profile</h3>

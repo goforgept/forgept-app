@@ -404,6 +404,14 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setSuccess('SLA & Monitoring settings saved'); setSavingSLA(false)
   }
 
+  const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('fp-theme') || 'dark')
+
+  const applyTheme = (t) => {
+    setCurrentTheme(t)
+    localStorage.setItem('fp-theme', t)
+    document.documentElement.setAttribute('data-theme', t)
+  }
+
   const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
 
   const navGroups = [
@@ -471,6 +479,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
               savingPassword={savingPassword} handleChangePassword={handleChangePassword}
               supportPin={supportPin} pinInput={pinInput} setPinInput={setPinInput} savingPin={savingPin} pinSaved={pinSaved} savePin={savePin} regeneratePin={regeneratePin}
               sameAsShipTo={sameAsShipTo} handleSameAsShipTo={handleSameAsShipTo} profile={profile} saving={saving} handleSave={handleSave}
+              currentTheme={currentTheme} applyTheme={applyTheme}
               isAdmin={isAdmin} msrpEnabled={msrpEnabled}
               onToggleMsrp={async () => {
                 const next = !msrpEnabled
