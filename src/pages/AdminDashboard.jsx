@@ -7,11 +7,12 @@ import { useProfile } from '../context/ProfileContext'
 
 const ADMIN_WIDGET_DEFS = [
   { id: 'pipeline-chart',   label: 'Pipeline by Stage',  desc: 'Bar chart of deal count/value per status' },
-  { id: 'team-leaderboard', label: 'Team Leaderboard',   desc: 'Rep-by-rep revenue ranking and targets' },
+  { id: 'top-clients',      label: 'Top Clients',        desc: 'Top 20 clients by total proposal value' },
+  { id: 'team-leaderboard', label: 'Rep Leaderboard',    desc: 'Rep-by-rep pipeline, won revenue and margin' },
   { id: 'ar-summary',       label: 'AR & PO Summary',    desc: 'Outstanding invoices and purchase orders' },
   { id: 'needs-attention',  label: 'Needs Attention',    desc: 'Drafts not sent in 3+ days' },
 ]
-const DEFAULT_ADMIN_WIDGETS = ['pipeline-chart', 'team-leaderboard', 'ar-summary', 'needs-attention']
+const DEFAULT_ADMIN_WIDGETS = ['pipeline-chart', 'top-clients', 'team-leaderboard', 'ar-summary', 'needs-attention']
 const PIPE_STATUS_COLOR = { Draft: '#6B7280', Sent: '#3B82F6', Won: '#22C55E', Lost: '#EF4444' }
 const fmtAd = (n) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
@@ -354,7 +355,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         </div>
 
         {/* ── Customizable Analytics Widgets ── */}
-        {!loading && (on('pipeline-chart') || on('team-leaderboard')) && (
+        {!loading && (on('pipeline-chart') || on('top-clients')) && (
           <div className="grid grid-cols-2 gap-4 mb-6">
             {on('pipeline-chart') && (() => {
               const stages = ['Draft','Sent','Won','Lost']
@@ -381,34 +382,27 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               )
             })()}
 
-            {on('team-leaderboard') && (() => {
-              const sorted = [...repStats].sort((a,b) => b.won - a.won).slice(0, 10)
-              const maxWon = Math.max(...sorted.map(r => r.won), 1)
-              return (
-                <div className="bg-fp-card rounded-xl p-5 border border-fp-border/40 col-span-2">
-                  <p className="text-fp-text font-bold mb-4">Team Leaderboard — Won Revenue{periodShort[period]}</p>
-                  {sorted.length === 0 ? <p className="text-fp-muted text-sm">No data yet.</p> : (
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-                      {sorted.map((rep, i) => (
-                        <div key={rep.name}>
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-xs font-bold w-5 ${i===0?'text-yellow-400':i===1?'text-gray-300':i===2?'text-amber-600':'text-fp-muted'}`}>#{i+1}</span>
-                              <span className="text-fp-text text-sm font-medium">{rep.name}</span>
-                              {rep.avgMargin && <span className="text-fp-muted text-xs">· {rep.avgMargin}%</span>}
-                            </div>
-                            <span className="text-green-400 text-sm font-semibold">{fmtAd(rep.won)}</span>
-                          </div>
-                          <div className="w-full bg-fp-inset rounded-full h-1.5">
-                            <div className="h-1.5 rounded-full bg-green-500" style={{ width: `${(rep.won/maxWon)*100}%` }} />
-                          </div>
+            {on('top-clients') && (
+              <div className="bg-fp-card rounded-xl p-5 border border-fp-border/40">
+                <p className="text-fp-text font-bold mb-3">Top Clients{periodShort[period]}</p>
+                {loading ? <p className="text-fp-muted text-sm">Loading...</p> : topClients.length === 0 ? <p className="text-fp-muted text-sm">No client data yet.</p> : (
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {topClients.map((client, i) => (
+                      <div key={client.id} onClick={() => navigate(`/client/${client.id}`)}
+                        className="flex items-center cursor-pointer hover:bg-fp-hover rounded-lg px-2 py-2 transition-colors">
+                        <span className={`text-xs font-bold w-6 flex-shrink-0 ${i===0?'text-yellow-400':i===1?'text-gray-300':i===2?'text-amber-600':'text-fp-muted'}`}>#{i+1}</span>
+                        <span className="text-fp-text text-sm flex-1 truncate">{client.name}</span>
+                        <span className="text-fp-muted text-xs mr-3">{client.count} deals</span>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-fp-text text-xs font-semibold">{fmtAd(client.pipeline)}</p>
+                          <p className="text-green-400 text-xs">{fmtAd(client.won)} won</p>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })()}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -778,34 +772,36 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-6 mb-6">
-          {/* Rep Leaderboard */}
-          <div className="bg-fp-card rounded-xl p-6">
-            <h3 className="text-fp-text font-bold text-lg mb-4">Rep Leaderboard{periodShort[period]}</h3>
-            {loading ? <p className="text-fp-muted">Loading...</p> : repStats.length === 0 ? <p className="text-fp-muted">No data yet.</p> : (
-              <div className="space-y-4">
-                {repStats.map((rep, i) => (
-                  <div key={rep.name} onClick={() => navigate(`/proposals?rep=${encodeURIComponent(rep.name)}`)}
-                    className="flex justify-between items-center cursor-pointer hover:bg-fp-bg rounded-lg p-2 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <span className={`text-sm font-bold w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-fp-muted' : i === 2 ? 'text-orange-400' : 'text-fp-border'}`}>#{i + 1}</span>
-                      <div>
-                        <p className="text-fp-text text-sm font-medium">{rep.name}</p>
-                        <p className="text-fp-muted text-xs">{rep.count} proposals</p>
+        <div className={`grid ${on('team-leaderboard') ? 'grid-cols-2' : 'grid-cols-1'} gap-6 mb-6`}>
+          {/* Rep Leaderboard — toggle controlled */}
+          {on('team-leaderboard') && (
+            <div className="bg-fp-card rounded-xl p-6">
+              <h3 className="text-fp-text font-bold text-lg mb-4">Rep Leaderboard{periodShort[period]}</h3>
+              {loading ? <p className="text-fp-muted">Loading...</p> : repStats.length === 0 ? <p className="text-fp-muted">No data yet.</p> : (
+                <div className="space-y-4">
+                  {repStats.map((rep, i) => (
+                    <div key={rep.name} onClick={() => navigate(`/proposals?rep=${encodeURIComponent(rep.name)}`)}
+                      className="flex justify-between items-center cursor-pointer hover:bg-fp-bg rounded-lg p-2 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm font-bold w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-fp-muted' : i === 2 ? 'text-orange-400' : 'text-fp-border'}`}>#{i + 1}</span>
+                        <div>
+                          <p className="text-fp-text text-sm font-medium">{rep.name}</p>
+                          <p className="text-fp-muted text-xs">{rep.count} proposals</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-fp-text text-sm font-bold">${rep.pipeline.toLocaleString()}</p>
+                        <div className="flex gap-2 justify-end">
+                          <p className="text-green-400 text-xs">${rep.won.toLocaleString()} won</p>
+                          {rep.avgMargin && <p className="text-fp-brand text-xs">{rep.avgMargin}% margin</p>}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-fp-text text-sm font-bold">${rep.pipeline.toLocaleString()}</p>
-                      <div className="flex gap-2 justify-end">
-                        <p className="text-green-400 text-xs">${rep.won.toLocaleString()} won</p>
-                        {rep.avgMargin && <p className="text-fp-brand text-xs">{rep.avgMargin}% margin</p>}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Closing Soon */}
           <div className="bg-fp-card rounded-xl p-6">
@@ -929,22 +925,6 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         </div>
 
         <div className="grid grid-cols-2 gap-6 mb-6">
-          <div className="bg-fp-card rounded-xl p-6">
-            <h3 className="text-fp-text font-bold text-lg mb-4">Top Clients{periodShort[period]}</h3>
-            {loading ? <p className="text-fp-muted">Loading...</p> : topClients.length === 0 ? <p className="text-fp-muted">No client data yet.</p> : (
-              <div className="space-y-4">
-                {topClients.map((client, i) => (
-                  <div key={client.id} onClick={() => navigate(`/client/${client.id}`)} className="flex justify-between items-center cursor-pointer hover:bg-fp-bg rounded-lg p-2 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <span className={`text-sm font-bold w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-fp-muted' : i === 2 ? 'text-orange-400' : 'text-fp-border'}`}>#{i + 1}</span>
-                      <div><p className="text-fp-text text-sm font-medium">{client.name}</p><p className="text-fp-muted text-xs">{client.count} proposals</p></div>
-                    </div>
-                    <div className="text-right"><p className="text-fp-text text-sm font-bold">${client.pipeline.toLocaleString()}</p><p className="text-green-400 text-xs">${client.won.toLocaleString()} won</p></div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
           <div className="bg-fp-card rounded-xl p-6">
             <h3 className="text-fp-text font-bold text-lg mb-4">Top Vendors{periodShort[period]}</h3>
             {loading ? <p className="text-fp-muted">Loading...</p> : topVendors.length === 0 ? <p className="text-fp-muted">No vendor data yet.</p> : (
