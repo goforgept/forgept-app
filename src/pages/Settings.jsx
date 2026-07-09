@@ -412,7 +412,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     document.documentElement.setAttribute('data-theme', t)
   }
 
-  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+  const inputClass = "w-full bg-fp-bg text-white border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   const navGroups = [
     { items: [{ key: 'general', label: 'General' }] },
@@ -440,25 +440,25 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   ]
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-bg">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureSla={featureSla} featureMonitoring={featureMonitoring} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
       <div className="flex flex-1 min-w-0">
         {/* Settings nav */}
-        <div className="w-52 border-r border-[#2a3d55] p-4 shrink-0">
+        <div className="w-52 border-r border-fp-border p-4 shrink-0">
           <p className="text-white font-bold text-lg mb-5 px-3">Settings</p>
           <nav className="space-y-0.5">
             {navGroups.map((group, gi) => (
               <div key={gi} className={gi > 0 ? 'pt-4' : ''}>
                 {group.label && (
-                  <p className="text-[#4a5d75] text-xs font-semibold uppercase tracking-wider mb-1 px-3">{group.label}</p>
+                  <p className="text-fp-muted/60 text-xs font-semibold uppercase tracking-wider mb-1 px-3">{group.label}</p>
                 )}
                 {group.items.map(item => (
                   <button key={item.key}
                     onClick={() => { setActiveTab(item.key); setSuccess(null) }}
                     className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                       activeTab === item.key
-                        ? 'bg-[#1a2d45] text-white font-medium border-l-2 border-[#C8622A] pl-[10px]'
-                        : 'text-[#8A9AB0] hover:text-white hover:bg-[#1a2d45]/50'
+                        ? 'bg-fp-card text-white font-medium border-l-2 border-fp-brand pl-[10px]'
+                        : 'text-fp-muted hover:text-white hover:bg-fp-card/50'
                     }`}>
                     {item.label}
                   </button>
@@ -545,7 +545,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           {activeTab === 'catalog' && isDevTeam && !isAdmin && (
             <div className="p-6">
               <h2 className="text-white text-lg font-bold mb-1">Product Catalog</h2>
-              <p className="text-[#8A9AB0] text-sm mb-6">Upload or manage your global product library used in embedded sessions.</p>
+              <p className="text-fp-muted text-sm mb-6">Upload or manage your global product library used in embedded sessions.</p>
               <GlobalProductsImport />
             </div>
           )}
@@ -600,40 +600,40 @@ function FeedbackTab({ profile }) {
     setForm({ title: '', description: '', category: 'feature' })
   }
 
-  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
+  const inputClass = "w-full bg-fp-bg text-white border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]"
 
   return (
     <div className="space-y-6 max-w-xl">
       <div>
         <h2 className="text-white font-bold text-xl mb-1">Request a Feature</h2>
-        <p className="text-[#8A9AB0] text-sm">Have an idea or something you wish ForgePt could do? Let us know — we read every submission and use this to shape the product roadmap.</p>
+        <p className="text-fp-muted text-sm">Have an idea or something you wish ForgePt could do? Let us know — we read every submission and use this to shape the product roadmap.</p>
       </div>
 
       {submitted ? (
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl px-5 py-4 flex items-center justify-between gap-3">
           <div>
             <p className="text-green-400 font-semibold text-sm">Request submitted — thank you!</p>
-            <p className="text-[#8A9AB0] text-xs mt-0.5">We'll review it and update the roadmap accordingly.</p>
+            <p className="text-fp-muted text-xs mt-0.5">We'll review it and update the roadmap accordingly.</p>
           </div>
-          <button onClick={() => setSubmitted(false)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors flex-shrink-0">Submit another</button>
+          <button onClick={() => setSubmitted(false)} className="text-fp-muted hover:text-white text-xs transition-colors flex-shrink-0">Submit another</button>
         </div>
       ) : (
-        <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5 space-y-4">
+        <div className="bg-fp-card border border-fp-border rounded-xl p-5 space-y-4">
           <div>
-            <label className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide block mb-1">What do you need? *</label>
+            <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide block mb-1">What do you need? *</label>
             <input type="text" placeholder="Short title for your request" value={form.title}
               onChange={e => setForm(p => ({ ...p, title: e.target.value }))} className={inputClass} />
           </div>
           <div>
-            <label className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide block mb-1">More Detail</label>
+            <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide block mb-1">More Detail</label>
             <textarea rows={4} placeholder="Why would this help you or your customers?"
               value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
               className={`${inputClass} resize-none`} />
           </div>
           <div>
-            <label className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide block mb-1">Type</label>
+            <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide block mb-1">Type</label>
             <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+              className="bg-fp-bg text-white border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
               <option value="feature">New Feature</option>
               <option value="improvement">Improvement to existing</option>
               <option value="bug_fix">Bug Fix</option>
@@ -641,7 +641,7 @@ function FeedbackTab({ profile }) {
             </select>
           </div>
           <button onClick={handleSubmit} disabled={submitting || !form.title.trim()}
-            className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+            className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-50">
             {submitting ? 'Submitting...' : 'Submit Request'}
           </button>
         </div>

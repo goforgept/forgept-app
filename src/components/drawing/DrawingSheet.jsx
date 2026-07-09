@@ -214,7 +214,12 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     const canvas   = document.createElement('canvas')
     canvas.width   = scaled.width
     canvas.height  = scaled.height
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport: scaled }).promise
+    const ctx = canvas.getContext('2d')
+    // Fill white background before rendering PDF
+    // (prevents dark stage background bleeding through transparent PDF)
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    await page.render({ canvasContext: ctx, viewport: scaled }).promise
     await loadImageFromUrl(canvas.toDataURL('image/png'))
     return pdf.numPages
   }
@@ -1107,7 +1112,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         )}
 
         {!loading && !error && stageSize.w > 0 && (
-          <Stage ref={stageRef} width={stageSize.w} height={stageSize.h}
+          <Stage ref={stageRef} width={stageSize.w} height={stageSize.h} style={{ background: '#ffffff' }}
             onWheel={handleWheel} onMouseDown={(e) => { if (e.evt.button === 2) return; handleMouseDown(e) }} onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
             onClick={(e) => {

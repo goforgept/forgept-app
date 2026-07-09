@@ -23,7 +23,7 @@
   --fp-brand:     #C8622A;
 }
 
-@theme {
+@theme inline {
   --color-fp-bg:     var(--fp-bg);
   --color-fp-card:   var(--fp-card);
   --color-fp-inset:  var(--fp-inset);

@@ -294,25 +294,25 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const periodLabels = { all: 'All Time', ytd: 'Year to Date', qtd: 'Quarter to Date', mtd: 'Month to Date' }
   const periodShort = { all: '', ytd: ' — YTD', qtd: ' — QTD', mtd: ' — MTD' }
 
-  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+  const inputClass = "w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-bg">
       <Sidebar isAdmin={true} featureProposals={featureProposals} featureCRM={featureCRM} />
       <div className="flex-1 p-6 overflow-y-auto h-screen">
 
-        <div className="sticky top-0 z-10 bg-[#0F1C2E] pt-2 pb-4 mb-2 border-b border-[#2a3d55]">
+        <div className="sticky top-0 z-10 bg-fp-bg pt-2 pb-4 mb-2 border-b border-fp-border">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-white text-2xl font-bold">Team Dashboard</h2>
+              <h2 className="text-fp-text text-2xl font-bold">Team Dashboard</h2>
               {featureRegions && profile?.is_regional_vp && profile?.region_id && (
-                <p className="text-[#8A9AB0] text-xs mt-0.5">Showing your region only</p>
+                <p className="text-fp-muted text-xs mt-0.5">Showing your region only</p>
               )}
             </div>
             <div className="flex gap-2">
               {Object.entries(periodLabels).map(([key, label]) => (
                 <button key={key} onClick={() => setPeriod(key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${period === key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>{label}</button>
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${period === key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>{label}</button>
               ))}
             </div>
           </div>
@@ -320,32 +320,32 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
         {/* Stats */}
         <div className="grid grid-cols-6 gap-4 mb-6">
-          <div onClick={() => navigate('/proposals')} className="bg-[#1a2d45] rounded-xl p-5 cursor-pointer hover:bg-[#1f3550] transition-colors"><p className="text-[#8A9AB0] text-xs mb-1">Active Pipeline</p><p className="text-white text-xl font-bold">${activePipeline.toLocaleString()}</p></div>
-          <div onClick={() => navigate('/proposals')} className="bg-[#1a2d45] rounded-xl p-5 cursor-pointer hover:bg-[#1f3550] transition-colors"><p className="text-[#8A9AB0] text-xs mb-1">Won Revenue</p><p className="text-green-400 text-xl font-bold">${wonPipeline.toLocaleString()}</p></div>
-          <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-xs mb-1">Avg Margin</p><p className="text-[#C8622A] text-xl font-bold">{avgMargin ? `${avgMargin}%` : '—'}</p></div>
-          <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-xs mb-1">Close Rate</p><p className="text-[#C8622A] text-xl font-bold">{closeRate ? `${closeRate}%` : '—'}</p></div>
-          <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-xs mb-1">Closing in 30d</p><p className="text-[#C8622A] text-xl font-bold">{closingSoon}</p></div>
-          <div onClick={() => navigate('/proposals')} className="bg-[#1a2d45] rounded-xl p-5 cursor-pointer hover:bg-[#1f3550] transition-colors"><p className="text-[#8A9AB0] text-xs mb-1">Total Proposals</p><p className="text-white text-xl font-bold">{filteredProposals.length}</p></div>
+          <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Active Pipeline</p><p className="text-fp-text text-xl font-bold">${activePipeline.toLocaleString()}</p></div>
+          <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Won Revenue</p><p className="text-green-400 text-xl font-bold">${wonPipeline.toLocaleString()}</p></div>
+          <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Avg Margin</p><p className="text-fp-brand text-xl font-bold">{avgMargin ? `${avgMargin}%` : '—'}</p></div>
+          <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Close Rate</p><p className="text-fp-brand text-xl font-bold">{closeRate ? `${closeRate}%` : '—'}</p></div>
+          <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Closing in 30d</p><p className="text-fp-brand text-xl font-bold">{closingSoon}</p></div>
+          <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Total Proposals</p><p className="text-fp-text text-xl font-bold">{filteredProposals.length}</p></div>
         </div>
 
         {/* AR + PO Summary */}
         <div className={`grid ${orgType === 'manufacturer' ? 'grid-cols-1' : 'grid-cols-2'} gap-4 mb-6`}>
-          <div className="bg-[#1a2d45] rounded-xl p-5 cursor-pointer hover:bg-[#1f3550] transition-colors" onClick={() => navigate('/invoices')}>
-            <p className="text-white font-bold mb-3">Invoicing & AR</p>
+          <div className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors" onClick={() => navigate('/invoices')}>
+            <p className="text-fp-text font-bold mb-3">Invoicing & AR</p>
             <div className="grid grid-cols-4 gap-3">
-              <div><p className="text-[#8A9AB0] text-xs mb-1">Total Invoiced</p><p className="text-white text-lg font-bold">${totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
-              <div><p className="text-[#8A9AB0] text-xs mb-1">Outstanding</p><p className="text-white text-lg font-bold">${outstandingAR.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
-              <div><p className="text-[#8A9AB0] text-xs mb-1">Overdue</p><p className={`text-lg font-bold ${overdueAR > 0 ? 'text-red-400' : 'text-white'}`}>${overdueAR.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
-              <div><p className="text-[#8A9AB0] text-xs mb-1">Needs Invoice</p><p className={`text-lg font-bold ${needsInvoice > 0 ? 'text-yellow-400' : 'text-white'}`}>{needsInvoice}</p></div>
+              <div><p className="text-fp-muted text-xs mb-1">Total Invoiced</p><p className="text-fp-text text-lg font-bold">${totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
+              <div><p className="text-fp-muted text-xs mb-1">Outstanding</p><p className="text-fp-text text-lg font-bold">${outstandingAR.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
+              <div><p className="text-fp-muted text-xs mb-1">Overdue</p><p className={`text-lg font-bold ${overdueAR > 0 ? 'text-red-400' : 'text-fp-text'}`}>${overdueAR.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
+              <div><p className="text-fp-muted text-xs mb-1">Needs Invoice</p><p className={`text-lg font-bold ${needsInvoice > 0 ? 'text-yellow-400' : 'text-fp-text'}`}>{needsInvoice}</p></div>
             </div>
           </div>
           {orgType !== 'manufacturer' && (
-            <div className="bg-[#1a2d45] rounded-xl p-5 cursor-pointer hover:bg-[#1f3550] transition-colors" onClick={() => navigate('/purchase-orders')}>
-              <p className="text-white font-bold mb-3">Purchase Orders</p>
+            <div className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors" onClick={() => navigate('/purchase-orders')}>
+              <p className="text-fp-text font-bold mb-3">Purchase Orders</p>
               <div className="grid grid-cols-3 gap-3">
-                <div><p className="text-[#8A9AB0] text-xs mb-1">Total Value</p><p className="text-white text-lg font-bold">${totalPOValue.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
-                <div><p className="text-[#8A9AB0] text-xs mb-1">Partial</p><p className={`text-lg font-bold ${partialPOs > 0 ? 'text-yellow-400' : 'text-white'}`}>{partialPOs}</p></div>
-                <div><p className="text-[#8A9AB0] text-xs mb-1">Pending</p><p className={`text-lg font-bold ${pendingPOs > 0 ? 'text-blue-400' : 'text-white'}`}>{pendingPOs}</p></div>
+                <div><p className="text-fp-muted text-xs mb-1">Total Value</p><p className="text-fp-text text-lg font-bold">${totalPOValue.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
+                <div><p className="text-fp-muted text-xs mb-1">Partial</p><p className={`text-lg font-bold ${partialPOs > 0 ? 'text-yellow-400' : 'text-fp-text'}`}>{partialPOs}</p></div>
+                <div><p className="text-fp-muted text-xs mb-1">Pending</p><p className={`text-lg font-bold ${pendingPOs > 0 ? 'text-blue-400' : 'text-fp-text'}`}>{pendingPOs}</p></div>
               </div>
             </div>
           )}
@@ -355,23 +355,23 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         {orgType !== 'manufacturer' && (
           <div className="flex justify-end mb-2">
             {!isPM && (
-              <div className="flex bg-[#0F1C2E] rounded-lg p-1 gap-1">
+              <div className="flex bg-fp-bg rounded-lg p-1 gap-1">
                 <button
                   onClick={() => { setDashboardMode('sales'); localStorage.setItem('dashboardMode', 'sales') }}
-                  className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'sales' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                  className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'sales' ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
                   📊 Sales
                 </button>
                 {(isAdmin || isPM) && (
                   <button
                     onClick={() => { setDashboardMode('pm'); localStorage.setItem('dashboardMode', 'pm') }}
-                    className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'pm' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                    className={`px-4 py-1.5 rounded text-sm font-semibold transition-colors ${dashboardMode === 'pm' ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
                     🔨 PM
                   </button>
                 )}
               </div>
             )}
             {isPM && (
-              <span className="text-[#8A9AB0] text-sm font-semibold">🔨 PM Dashboard</span>
+              <span className="text-fp-muted text-sm font-semibold">🔨 PM Dashboard</span>
             )}
           </div>
         )}
@@ -396,12 +396,12 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                 { label: 'Active Jobs', value: activeJobs.length, color: 'text-green-400', click: () => navigate('/jobs') },
                 { label: 'On Hold', value: jobs.filter(j => j.status === 'On Hold').length, color: 'text-yellow-400', click: () => navigate('/jobs') },
                 { label: 'Completed', value: jobs.filter(j => j.status === 'Completed').length, color: 'text-blue-400', click: () => navigate('/jobs') },
-                { label: 'Hours This Week', value: hoursThisWeek.toFixed(1), color: 'text-[#C8622A]', click: () => navigate('/tech-log') },
-                { label: 'Overdue Jobs', value: overdueJobs.length, color: overdueJobs.length > 0 ? 'text-red-400' : 'text-white', click: () => navigate('/jobs') },
-                { label: 'POs Outstanding', value: pendingPOsCount, color: pendingPOsCount > 0 ? 'text-yellow-400' : 'text-white', click: () => navigate('/purchase-orders') },
+                { label: 'Hours This Week', value: hoursThisWeek.toFixed(1), color: 'text-fp-brand', click: () => navigate('/tech-log') },
+                { label: 'Overdue Jobs', value: overdueJobs.length, color: overdueJobs.length > 0 ? 'text-red-400' : 'text-fp-text', click: () => navigate('/jobs') },
+                { label: 'POs Outstanding', value: pendingPOsCount, color: pendingPOsCount > 0 ? 'text-yellow-400' : 'text-fp-text', click: () => navigate('/purchase-orders') },
               ].map(stat => (
-                <div key={stat.label} onClick={stat.click} className="bg-[#1a2d45] rounded-xl p-4 cursor-pointer hover:bg-[#1f3550] transition-colors">
-                  <p className="text-[#8A9AB0] text-xs mb-1">{stat.label}</p>
+                <div key={stat.label} onClick={stat.click} className="bg-fp-card rounded-xl p-4 cursor-pointer hover:bg-fp-hover transition-colors">
+                  <p className="text-fp-muted text-xs mb-1">{stat.label}</p>
                   <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
                 </div>
               ))}
@@ -413,11 +413,11 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                 <div className="flex items-center gap-2">
                   <span className="text-yellow-400 text-lg">⚠</span>
                   <div>
-                    <p className="text-white font-semibold text-sm">{pendingCOs.length} Change Order{pendingCOs.length !== 1 ? 's' : ''} Pending Approval</p>
+                    <p className="text-fp-text font-semibold text-sm">{pendingCOs.length} Change Order{pendingCOs.length !== 1 ? 's' : ''} Pending Approval</p>
                     <p className="text-yellow-400 text-xs">{pendingCOs.map(co => co.jobs?.name || 'Unknown Job').join(', ')}</p>
                   </div>
                 </div>
-                <button onClick={() => navigate('/jobs')} className="text-yellow-400 hover:text-white text-xs transition-colors">Review →</button>
+                <button onClick={() => navigate('/jobs')} className="text-yellow-400 hover:text-fp-text text-xs transition-colors">Review →</button>
               </div>
             )}
 
@@ -426,12 +426,12 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <span className="text-red-400">⚠</span>
-                  <p className="text-white font-semibold text-sm">{overdueJobs.length} Job{overdueJobs.length !== 1 ? 's' : ''} Past End Date</p>
+                  <p className="text-fp-text font-semibold text-sm">{overdueJobs.length} Job{overdueJobs.length !== 1 ? 's' : ''} Past End Date</p>
                 </div>
                 <div className="space-y-1">
                   {overdueJobs.map(job => (
                     <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)} className="flex justify-between items-center cursor-pointer hover:bg-red-500/5 rounded px-2 py-1 transition-colors">
-                      <span className="text-white text-sm">{job.name}</span>
+                      <span className="text-fp-text text-sm">{job.name}</span>
                       <span className="text-red-400 text-xs">{Math.ceil((new Date() - new Date(job.end_date)) / (1000 * 60 * 60 * 24))}d overdue</span>
                     </div>
                   ))}
@@ -441,13 +441,13 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
             <div className="grid grid-cols-2 gap-5">
               {/* Active Jobs with progress */}
-              <div className="bg-[#1a2d45] rounded-xl p-5">
+              <div className="bg-fp-card rounded-xl p-5">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-white font-bold">Active Jobs</h3>
-                  <button onClick={() => navigate('/jobs')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">View all →</button>
+                  <h3 className="text-fp-text font-bold">Active Jobs</h3>
+                  <button onClick={() => navigate('/jobs')} className="text-fp-muted hover:text-fp-text text-xs transition-colors">View all →</button>
                 </div>
                 {activeJobs.length === 0 ? (
-                  <p className="text-[#8A9AB0] text-sm">No active jobs. Created when proposals are marked Won.</p>
+                  <p className="text-fp-muted text-sm">No active jobs. Created when proposals are marked Won.</p>
                 ) : (
                   <div className="space-y-3">
                     {activeJobs.map(job => {
@@ -458,27 +458,27 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                       const isOverdue = job.end_date && new Date(job.end_date) < new Date()
                       return (
                         <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)}
-                          className="bg-[#0F1C2E] rounded-lg p-4 cursor-pointer hover:bg-[#0a1628] transition-colors group">
+                          className="bg-fp-bg rounded-lg p-4 cursor-pointer hover:bg-fp-inset transition-colors group">
                           <div className="flex justify-between items-start mb-2">
                             <div>
                               <div className="flex items-center gap-2">
-                                <p className="text-white text-sm font-semibold group-hover:text-[#C8622A] transition-colors">{job.name}</p>
+                                <p className="text-fp-text text-sm font-semibold group-hover:text-fp-brand transition-colors">{job.name}</p>
                                 {isOverdue && <span className="text-red-400 text-xs font-semibold">OVERDUE</span>}
                               </div>
-                              {job.clients?.company && <p className="text-[#8A9AB0] text-xs">{job.clients.company}</p>}
+                              {job.clients?.company && <p className="text-fp-muted text-xs">{job.clients.company}</p>}
                               <div className="flex gap-3 mt-0.5">
-                                {job.start_date && <p className="text-[#8A9AB0] text-xs">Start: {new Date(job.start_date + 'T12:00:00').toLocaleDateString()}</p>}
-                                {job.end_date && <p className={`text-xs ${isOverdue ? 'text-red-400' : 'text-[#8A9AB0]'}`}>End: {new Date(job.end_date + 'T12:00:00').toLocaleDateString()}</p>}
+                                {job.start_date && <p className="text-fp-muted text-xs">Start: {new Date(job.start_date + 'T12:00:00').toLocaleDateString()}</p>}
+                                {job.end_date && <p className={`text-xs ${isOverdue ? 'text-red-400' : 'text-fp-muted'}`}>End: {new Date(job.end_date + 'T12:00:00').toLocaleDateString()}</p>}
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-[#C8622A] text-sm font-bold">{progress}%</p>
-                              <p className="text-[#8A9AB0] text-xs">{done}/{items.length} tasks</p>
-                              {prop?.proposal_value && <p className="text-white text-xs font-semibold mt-0.5">${(prop.proposal_value).toLocaleString()}</p>}
+                              <p className="text-fp-brand text-sm font-bold">{progress}%</p>
+                              <p className="text-fp-muted text-xs">{done}/{items.length} tasks</p>
+                              {prop?.proposal_value && <p className="text-fp-text text-xs font-semibold mt-0.5">${(prop.proposal_value).toLocaleString()}</p>}
                             </div>
                           </div>
-                          <div className="w-full bg-[#1a2d45] rounded-full h-1.5">
-                            <div className={`h-1.5 rounded-full transition-all ${progress === 100 ? 'bg-green-400' : isOverdue ? 'bg-red-500' : 'bg-[#C8622A]'}`} style={{ width: `${progress}%` }} />
+                          <div className="w-full bg-fp-card rounded-full h-1.5">
+                            <div className={`h-1.5 rounded-full transition-all ${progress === 100 ? 'bg-green-400' : isOverdue ? 'bg-red-500' : 'bg-fp-brand'}`} style={{ width: `${progress}%` }} />
                           </div>
                         </div>
                       )
@@ -488,13 +488,13 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               </div>
 
               {/* Cost vs Budget */}
-              <div className="bg-[#1a2d45] rounded-xl p-5">
+              <div className="bg-fp-card rounded-xl p-5">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-white font-bold">Cost vs Budget</h3>
-                  <p className="text-[#8A9AB0] text-xs">Active jobs</p>
+                  <h3 className="text-fp-text font-bold">Cost vs Budget</h3>
+                  <p className="text-fp-muted text-xs">Active jobs</p>
                 </div>
                 {activeJobs.length === 0 ? (
-                  <p className="text-[#8A9AB0] text-sm">No active jobs.</p>
+                  <p className="text-fp-muted text-sm">No active jobs.</p>
                 ) : (
                   <div className="space-y-3">
                     {activeJobs.map(job => {
@@ -506,23 +506,23 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                       if (budget === 0) return null
                       return (
                         <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)}
-                          className="bg-[#0F1C2E] rounded-lg p-3 cursor-pointer hover:bg-[#0a1628] transition-colors">
+                          className="bg-fp-bg rounded-lg p-3 cursor-pointer hover:bg-fp-inset transition-colors">
                           <div className="flex justify-between items-start mb-1">
-                            <p className="text-white text-sm font-medium">{job.name}</p>
-                            <p className={`text-xs font-bold ${margin >= 30 ? 'text-green-400' : margin >= 15 ? 'text-[#C8622A]' : 'text-red-400'}`}>{margin.toFixed(1)}% margin</p>
+                            <p className="text-fp-text text-sm font-medium">{job.name}</p>
+                            <p className={`text-xs font-bold ${margin >= 30 ? 'text-green-400' : margin >= 15 ? 'text-fp-brand' : 'text-red-400'}`}>{margin.toFixed(1)}% margin</p>
                           </div>
-                          <div className="flex justify-between text-xs text-[#8A9AB0] mb-1.5">
-                            <span>Revenue: <span className="text-white font-semibold">${budget.toLocaleString()}</span></span>
-                            <span>Cost: <span className="text-white font-semibold">${cost.toLocaleString()}</span></span>
+                          <div className="flex justify-between text-xs text-fp-muted mb-1.5">
+                            <span>Revenue: <span className="text-fp-text font-semibold">${budget.toLocaleString()}</span></span>
+                            <span>Cost: <span className="text-fp-text font-semibold">${cost.toLocaleString()}</span></span>
                           </div>
-                          <div className="w-full bg-[#1a2d45] rounded-full h-1.5">
-                            <div className="h-1.5 rounded-full bg-[#C8622A]" style={{ width: `${Math.min(100, (cost / budget) * 100)}%` }} />
+                          <div className="w-full bg-fp-card rounded-full h-1.5">
+                            <div className="h-1.5 rounded-full bg-fp-brand" style={{ width: `${Math.min(100, (cost / budget) * 100)}%` }} />
                           </div>
                         </div>
                       )
                     }).filter(Boolean)}
                     {activeJobs.every(j => !proposals.find(p => p.id === j.proposal_id)?.proposal_value) && (
-                      <p className="text-[#8A9AB0] text-sm">No budget data on linked proposals.</p>
+                      <p className="text-fp-muted text-sm">No budget data on linked proposals.</p>
                     )}
                   </div>
                 )}
@@ -531,16 +531,16 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
             <div className="grid grid-cols-2 gap-5">
               {/* Hours Logged This Week */}
-              <div className="bg-[#1a2d45] rounded-xl p-5">
+              <div className="bg-fp-card rounded-xl p-5">
                 <div className="flex justify-between items-center mb-4">
                   <div>
-                    <h3 className="text-white font-bold">Hours Logged — This Week</h3>
-                    <p className="text-[#8A9AB0] text-xs mt-0.5">{hoursThisWeek.toFixed(1)} total hours across all jobs</p>
+                    <h3 className="text-fp-text font-bold">Hours Logged — This Week</h3>
+                    <p className="text-fp-muted text-xs mt-0.5">{hoursThisWeek.toFixed(1)} total hours across all jobs</p>
                   </div>
-                  <button onClick={() => navigate('/tech-log')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Full log →</button>
+                  <button onClick={() => navigate('/tech-log')} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Full log →</button>
                 </div>
                 {techLogs.length === 0 ? (
-                  <p className="text-[#8A9AB0] text-sm">No hours logged this week.</p>
+                  <p className="text-fp-muted text-sm">No hours logged this week.</p>
                 ) : (() => {
                   // Group by job
                   const byJob = {}
@@ -554,12 +554,12 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                   return (
                     <div className="space-y-2">
                       {Object.values(byJob).sort((a, b) => b.hours - a.hours).map((item, i) => (
-                        <div key={i} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-3 py-2">
+                        <div key={i} className="flex justify-between items-center bg-fp-bg rounded-lg px-3 py-2">
                           <div>
-                            <p className="text-white text-sm">{item.name}</p>
-                            <p className="text-[#8A9AB0] text-xs">{item.entries} log{item.entries !== 1 ? 's' : ''}</p>
+                            <p className="text-fp-text text-sm">{item.name}</p>
+                            <p className="text-fp-muted text-xs">{item.entries} log{item.entries !== 1 ? 's' : ''}</p>
                           </div>
-                          <p className="text-[#C8622A] font-bold">{item.hours.toFixed(1)} hrs</p>
+                          <p className="text-fp-brand font-bold">{item.hours.toFixed(1)} hrs</p>
                         </div>
                       ))}
                     </div>
@@ -568,10 +568,10 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               </div>
 
               {/* Materials — POs Outstanding */}
-              <div className="bg-[#1a2d45] rounded-xl p-5">
+              <div className="bg-fp-card rounded-xl p-5">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-white font-bold">Materials Status</h3>
-                  <button onClick={() => navigate('/purchase-orders')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">All POs →</button>
+                  <h3 className="text-fp-text font-bold">Materials Status</h3>
+                  <button onClick={() => navigate('/purchase-orders')} className="text-fp-muted hover:text-fp-text text-xs transition-colors">All POs →</button>
                 </div>
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   {[
@@ -579,24 +579,24 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                     { label: 'Partial', value: purchaseOrders.filter(p => p.status === 'Partial').length, color: 'text-yellow-400' },
                     { label: 'Received', value: purchaseOrders.filter(p => p.status === 'Received').length, color: 'text-green-400' },
                   ].map(s => (
-                    <div key={s.label} className="bg-[#0F1C2E] rounded-lg p-3 text-center">
-                      <p className="text-[#8A9AB0] text-xs mb-1">{s.label}</p>
+                    <div key={s.label} className="bg-fp-bg rounded-lg p-3 text-center">
+                      <p className="text-fp-muted text-xs mb-1">{s.label}</p>
                       <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
                     </div>
                   ))}
                 </div>
                 {purchaseOrders.filter(p => p.status === 'Sent' || p.status === 'Partial').length === 0 ? (
-                  <p className="text-[#8A9AB0] text-sm">No outstanding POs.</p>
+                  <p className="text-fp-muted text-sm">No outstanding POs.</p>
                 ) : (
                   <div className="space-y-2">
                     {purchaseOrders.filter(p => p.status === 'Sent' || p.status === 'Partial').slice(0, 5).map(po => (
-                      <div key={po.id} onClick={() => navigate('/purchase-orders')} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-3 py-2 cursor-pointer hover:bg-[#0a1628] transition-colors">
+                      <div key={po.id} onClick={() => navigate('/purchase-orders')} className="flex justify-between items-center bg-fp-bg rounded-lg px-3 py-2 cursor-pointer hover:bg-fp-inset transition-colors">
                         <div>
-                          <p className="text-white text-sm font-mono">{po.po_number}</p>
-                          <p className="text-[#8A9AB0] text-xs">{po.vendor_name}</p>
+                          <p className="text-fp-text text-sm font-mono">{po.po_number}</p>
+                          <p className="text-fp-muted text-xs">{po.vendor_name}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-white text-sm font-semibold">${(po.total_amount || 0).toLocaleString()}</p>
+                          <p className="text-fp-text text-sm font-semibold">${(po.total_amount || 0).toLocaleString()}</p>
                           <span className={`text-xs font-semibold ${po.status === 'Partial' ? 'text-yellow-400' : 'text-blue-400'}`}>{po.status}</span>
                         </div>
                       </div>
@@ -607,14 +607,14 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
             </div>
 
             {/* Upcoming deadlines */}
-            <div className="bg-[#1a2d45] rounded-xl p-5">
-              <h3 className="text-white font-bold mb-4">Upcoming Deadlines</h3>
+            <div className="bg-fp-card rounded-xl p-5">
+              <h3 className="text-fp-text font-bold mb-4">Upcoming Deadlines</h3>
               {(() => {
                 const upcoming = jobs
                   .filter(j => (j.status === 'Active' || j.status === 'On Hold') && j.end_date)
                   .sort((a, b) => new Date(a.end_date) - new Date(b.end_date))
                   .slice(0, 6)
-                if (upcoming.length === 0) return <p className="text-[#8A9AB0] text-sm">No jobs with end dates set.</p>
+                if (upcoming.length === 0) return <p className="text-fp-muted text-sm">No jobs with end dates set.</p>
                 return (
                   <div className="grid grid-cols-3 gap-3">
                     {upcoming.map(job => {
@@ -625,17 +625,17 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                       const isOverdue = daysLeft < 0
                       return (
                         <div key={job.id} onClick={() => navigate(`/jobs/${job.id}`)}
-                          className={`rounded-xl p-4 cursor-pointer transition-colors hover:opacity-90 ${isOverdue ? 'bg-red-500/10 border border-red-500/20' : daysLeft <= 7 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-[#0F1C2E] border border-[#2a3d55]'}`}>
-                          <p className="text-white text-sm font-semibold mb-0.5">{job.name}</p>
-                          {job.clients?.company && <p className="text-[#8A9AB0] text-xs mb-2">{job.clients.company}</p>}
+                          className={`rounded-xl p-4 cursor-pointer transition-colors hover:opacity-90 ${isOverdue ? 'bg-red-500/10 border border-red-500/20' : daysLeft <= 7 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-fp-bg border border-fp-border'}`}>
+                          <p className="text-fp-text text-sm font-semibold mb-0.5">{job.name}</p>
+                          {job.clients?.company && <p className="text-fp-muted text-xs mb-2">{job.clients.company}</p>}
                           <div className="flex justify-between items-center mb-2">
-                            <span className={`text-xs font-bold ${isOverdue ? 'text-red-400' : daysLeft <= 7 ? 'text-yellow-400' : 'text-[#8A9AB0]'}`}>
+                            <span className={`text-xs font-bold ${isOverdue ? 'text-red-400' : daysLeft <= 7 ? 'text-yellow-400' : 'text-fp-muted'}`}>
                               {isOverdue ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? 'Due today' : `${daysLeft}d left`}
                             </span>
-                            <span className="text-[#C8622A] text-xs font-semibold">{progress}%</span>
+                            <span className="text-fp-brand text-xs font-semibold">{progress}%</span>
                           </div>
-                          <div className="w-full bg-[#1a2d45] rounded-full h-1">
-                            <div className={`h-1 rounded-full ${isOverdue ? 'bg-red-500' : 'bg-[#C8622A]'}`} style={{ width: `${progress}%` }} />
+                          <div className="w-full bg-fp-card rounded-full h-1">
+                            <div className={`h-1 rounded-full ${isOverdue ? 'bg-red-500' : 'bg-fp-brand'}`} style={{ width: `${progress}%` }} />
                           </div>
                         </div>
                       )
@@ -660,7 +660,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               <div className="flex items-center gap-2">
                 <span className="text-red-400">⚠</span>
                 <div>
-                  <p className="text-white font-semibold text-sm">Pricing Expired</p>
+                  <p className="text-fp-text font-semibold text-sm">Pricing Expired</p>
                   <p className="text-red-400 text-xs">{expiredPricingCount} proposal{expiredPricingCount !== 1 ? 's' : ''} have expired RFQ pricing — re-quote vendors</p>
                 </div>
               </div>
@@ -668,7 +668,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           </div>
         )}
         {!loading && needsAttention.length > 0 && (
-          <div className="bg-[#1a2d45] border border-yellow-500/30 rounded-xl p-5 mb-6">
+          <div className="bg-fp-card border border-yellow-500/30 rounded-xl p-5 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
               <h3 className="text-yellow-400 font-bold text-sm">Needs Attention — {needsAttention.length} draft{needsAttention.length > 1 ? 's' : ''} not yet sent</h3>
@@ -677,14 +677,14 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               {needsAttention.map(p => {
                 const daysSince = Math.floor((new Date() - new Date(p.created_at)) / (1000 * 60 * 60 * 24))
                 return (
-                  <div key={p.id} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-4 py-3">
+                  <div key={p.id} className="flex justify-between items-center bg-fp-bg rounded-lg px-4 py-3">
                     <div className="flex-1 cursor-pointer" onClick={() => navigate(`/proposal/${p.id}`)}>
-                      <p className="text-white text-sm font-medium">{p.proposal_name}</p>
-                      <p className="text-[#8A9AB0] text-xs">{p.rep_name} · {p.company} · Created {daysSince} day{daysSince !== 1 ? 's' : ''} ago</p>
+                      <p className="text-fp-text text-sm font-medium">{p.proposal_name}</p>
+                      <p className="text-fp-muted text-xs">{p.rep_name} · {p.company} · Created {daysSince} day{daysSince !== 1 ? 's' : ''} ago</p>
                     </div>
                     <div className="flex items-center gap-3 ml-4">
-                      <p className="text-white text-sm font-semibold">${(p.proposal_value || 0).toLocaleString()}</p>
-                      <button onClick={() => markAsSent(p.id)} className="bg-[#C8622A] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors whitespace-nowrap">Mark as Sent</button>
+                      <p className="text-fp-text text-sm font-semibold">${(p.proposal_value || 0).toLocaleString()}</p>
+                      <button onClick={() => markAsSent(p.id)} className="bg-fp-brand text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:opacity-90 transition-colors whitespace-nowrap">Mark as Sent</button>
                     </div>
                   </div>
                 )
@@ -695,25 +695,25 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
         <div className="grid grid-cols-2 gap-6 mb-6">
           {/* Rep Leaderboard */}
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">Rep Leaderboard{periodShort[period]}</h3>
-            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : repStats.length === 0 ? <p className="text-[#8A9AB0]">No data yet.</p> : (
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold text-lg mb-4">Rep Leaderboard{periodShort[period]}</h3>
+            {loading ? <p className="text-fp-muted">Loading...</p> : repStats.length === 0 ? <p className="text-fp-muted">No data yet.</p> : (
               <div className="space-y-4">
                 {repStats.map((rep, i) => (
                   <div key={rep.name} onClick={() => navigate(`/proposals?rep=${encodeURIComponent(rep.name)}`)}
-                    className="flex justify-between items-center cursor-pointer hover:bg-[#0F1C2E] rounded-lg p-2 transition-colors">
+                    className="flex justify-between items-center cursor-pointer hover:bg-fp-bg rounded-lg p-2 transition-colors">
                     <div className="flex items-center gap-3">
-                      <span className={`text-sm font-bold w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-[#8A9AB0]' : i === 2 ? 'text-orange-400' : 'text-[#2a3d55]'}`}>#{i + 1}</span>
+                      <span className={`text-sm font-bold w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-fp-muted' : i === 2 ? 'text-orange-400' : 'text-fp-border'}`}>#{i + 1}</span>
                       <div>
-                        <p className="text-white text-sm font-medium">{rep.name}</p>
-                        <p className="text-[#8A9AB0] text-xs">{rep.count} proposals</p>
+                        <p className="text-fp-text text-sm font-medium">{rep.name}</p>
+                        <p className="text-fp-muted text-xs">{rep.count} proposals</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-white text-sm font-bold">${rep.pipeline.toLocaleString()}</p>
+                      <p className="text-fp-text text-sm font-bold">${rep.pipeline.toLocaleString()}</p>
                       <div className="flex gap-2 justify-end">
                         <p className="text-green-400 text-xs">${rep.won.toLocaleString()} won</p>
-                        {rep.avgMargin && <p className="text-[#C8622A] text-xs">{rep.avgMargin}% margin</p>}
+                        {rep.avgMargin && <p className="text-fp-brand text-xs">{rep.avgMargin}% margin</p>}
                       </div>
                     </div>
                   </div>
@@ -723,18 +723,18 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           </div>
 
           {/* Closing Soon */}
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">Closing Soon</h3>
-            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : closingSoonList.length === 0 ? <p className="text-[#8A9AB0]">Nothing closing in the next 30 days.</p> : (
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold text-lg mb-4">Closing Soon</h3>
+            {loading ? <p className="text-fp-muted">Loading...</p> : closingSoonList.length === 0 ? <p className="text-fp-muted">Nothing closing in the next 30 days.</p> : (
               <div className="space-y-3">
                 {closingSoonList.map(p => {
                   const days = Math.ceil((new Date(p.close_date) - new Date()) / (1000 * 60 * 60 * 24))
                   return (
-                    <div key={p.id} onClick={() => navigate(`/proposal/${p.id}`)} className="flex justify-between items-center cursor-pointer hover:bg-[#0F1C2E] rounded-lg p-2 transition-colors">
-                      <div><p className="text-white text-sm font-medium">{p.proposal_name}</p><p className="text-[#8A9AB0] text-xs">{p.rep_name} · {p.company}</p></div>
+                    <div key={p.id} onClick={() => navigate(`/proposal/${p.id}`)} className="flex justify-between items-center cursor-pointer hover:bg-fp-bg rounded-lg p-2 transition-colors">
+                      <div><p className="text-fp-text text-sm font-medium">{p.proposal_name}</p><p className="text-fp-muted text-xs">{p.rep_name} · {p.company}</p></div>
                       <div className="text-right">
-                        <p className="text-white text-sm font-bold">${(p.proposal_value || 0).toLocaleString()}</p>
-                        <p className={`text-xs font-semibold ${days <= 7 ? 'text-red-400' : 'text-[#C8622A]'}`}>{days === 0 ? 'Today' : `${days}d left`}</p>
+                        <p className="text-fp-text text-sm font-bold">${(p.proposal_value || 0).toLocaleString()}</p>
+                        <p className={`text-xs font-semibold ${days <= 7 ? 'text-red-400' : 'text-fp-brand'}`}>{days === 0 ? 'Today' : `${days}d left`}</p>
                       </div>
                     </div>
                   )
@@ -746,53 +746,53 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
         {/* Recurring Revenue */}
         {recurringItems.length > 0 && (
-          <div className="bg-[#1a2d45] rounded-xl p-6 mb-6 border border-[#C8622A]/20">
+          <div className="bg-fp-card rounded-xl p-6 mb-6 border border-fp-brand/20">
             <div className="flex justify-between items-center mb-4">
               <div className="flex items-center gap-2">
-                <span className="text-[#C8622A] text-lg">🔄</span>
-                <h3 className="text-white font-bold text-lg">Recurring Revenue{periodShort[period]}</h3>
+                <span className="text-fp-brand text-lg">🔄</span>
+                <h3 className="text-fp-text font-bold text-lg">Recurring Revenue{periodShort[period]}</h3>
               </div>
             </div>
 
             {/* Summary stats — clickable */}
             <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="bg-[#0F1C2E] rounded-xl p-4 cursor-pointer hover:bg-[#0a1628] transition-colors border border-transparent hover:border-[#C8622A]/30"
+              <div className="bg-fp-bg rounded-xl p-4 cursor-pointer hover:bg-fp-inset transition-colors border border-transparent hover:border-fp-brand/30"
                 onClick={() => setRecurringModal('revenue')}>
-                <p className="text-[#8A9AB0] text-xs mb-1">Recurring Revenue{periodShort[period]}</p>
-                <p className="text-[#C8622A] text-xl font-bold">${recurringStats.recurringRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                <p className="text-[#8A9AB0] text-xs mt-1">{recurringStats.inPeriodCount} item{recurringStats.inPeriodCount !== 1 ? 's' : ''} renewing · click to drill down</p>
+                <p className="text-fp-muted text-xs mb-1">Recurring Revenue{periodShort[period]}</p>
+                <p className="text-fp-brand text-xl font-bold">${recurringStats.recurringRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                <p className="text-fp-muted text-xs mt-1">{recurringStats.inPeriodCount} item{recurringStats.inPeriodCount !== 1 ? 's' : ''} renewing · click to drill down</p>
               </div>
-              <div className="bg-[#0F1C2E] rounded-xl p-4 cursor-pointer hover:bg-[#0a1628] transition-colors border border-transparent hover:border-yellow-500/30"
+              <div className="bg-fp-bg rounded-xl p-4 cursor-pointer hover:bg-fp-inset transition-colors border border-transparent hover:border-yellow-500/30"
                 onClick={() => setRecurringModal('quoting')}>
-                <p className="text-[#8A9AB0] text-xs mb-1">Need Quoting — 90 Days</p>
-                <p className={`text-xl font-bold ${recurringStats.needsQuotingCount > 0 ? 'text-yellow-400' : 'text-white'}`}>{recurringStats.needsQuotingCount}</p>
-                <p className="text-[#8A9AB0] text-xs mt-1">across {recurringStats.needsQuotingClients} client{recurringStats.needsQuotingClients !== 1 ? 's' : ''} · click to drill down</p>
+                <p className="text-fp-muted text-xs mb-1">Need Quoting — 90 Days</p>
+                <p className={`text-xl font-bold ${recurringStats.needsQuotingCount > 0 ? 'text-yellow-400' : 'text-fp-text'}`}>{recurringStats.needsQuotingCount}</p>
+                <p className="text-fp-muted text-xs mt-1">across {recurringStats.needsQuotingClients} client{recurringStats.needsQuotingClients !== 1 ? 's' : ''} · click to drill down</p>
               </div>
-              <div className="bg-[#0F1C2E] rounded-xl p-4 cursor-pointer hover:bg-[#0a1628] transition-colors border border-transparent hover:border-[#2a3d55]"
+              <div className="bg-fp-bg rounded-xl p-4 cursor-pointer hover:bg-fp-inset transition-colors border border-transparent hover:border-fp-border"
                 onClick={() => setRecurringModal('all')}>
-                <p className="text-[#8A9AB0] text-xs mb-1">Total Recurring Items</p>
-                <p className="text-white text-xl font-bold">{recurringItems.length}</p>
-                <p className="text-[#8A9AB0] text-xs mt-1">across all won deals · click to drill down</p>
+                <p className="text-fp-muted text-xs mb-1">Total Recurring Items</p>
+                <p className="text-fp-text text-xl font-bold">{recurringItems.length}</p>
+                <p className="text-fp-muted text-xs mt-1">across all won deals · click to drill down</p>
               </div>
             </div>
 
             {/* Upcoming list */}
             {recurringStats.upcomingGroups.length > 0 && (
               <div className="space-y-2">
-                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Due in next 90 days</p>
+                <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Due in next 90 days</p>
                 {recurringStats.upcomingGroups.map((group, i) => {
                   const totalValue = group.items.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
                   const daysUntil = Math.ceil((new Date(group.earliestDate) - new Date()) / (1000 * 60 * 60 * 24))
                   return (
-                    <div key={i} className="flex justify-between items-center bg-[#0F1C2E] rounded-lg px-4 py-3 cursor-pointer hover:bg-[#0a1628] transition-colors"
+                    <div key={i} className="flex justify-between items-center bg-fp-bg rounded-lg px-4 py-3 cursor-pointer hover:bg-fp-inset transition-colors"
                       onClick={() => group.clientId && navigate(`/client/${group.clientId}`)}>
                       <div>
-                        <p className="text-white text-sm font-medium">{group.company}</p>
-                        <p className="text-[#8A9AB0] text-xs">{group.repName} · {group.items.map(i => i.item_name).join(', ')}</p>
+                        <p className="text-fp-text text-sm font-medium">{group.company}</p>
+                        <p className="text-fp-muted text-xs">{group.repName} · {group.items.map(i => i.item_name).join(', ')}</p>
                       </div>
                       <div className="text-right ml-4">
-                        <p className="text-white text-sm font-bold">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                        <p className={`text-xs font-semibold ${daysUntil <= 30 ? 'text-red-400' : daysUntil <= 60 ? 'text-yellow-400' : 'text-[#C8622A]'}`}>
+                        <p className="text-fp-text text-sm font-bold">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                        <p className={`text-xs font-semibold ${daysUntil <= 30 ? 'text-red-400' : daysUntil <= 60 ? 'text-yellow-400' : 'text-fp-brand'}`}>
                           {daysUntil === 0 ? 'Today' : `${daysUntil}d`} — {new Date(group.earliestDate).toLocaleDateString()}
                         </p>
                       </div>
@@ -805,37 +805,37 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         )}
 
         {/* Rep Targets */}
-        <div className="bg-[#1a2d45] rounded-xl p-6 mb-6">
+        <div className="bg-fp-card rounded-xl p-6 mb-6">
           <div className="flex justify-between items-center mb-4">
             <div>
-              <h3 className="text-white font-bold text-lg">Rep Targets — {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
-              <p className="text-[#8A9AB0] text-xs mt-0.5">Monthly revenue goals vs actuals</p>
+              <h3 className="text-fp-text font-bold text-lg">Rep Targets — {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}</h3>
+              <p className="text-fp-muted text-xs mt-0.5">Monthly revenue goals vs actuals</p>
             </div>
-            <button onClick={() => setShowSetTargetModal(true)} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Set Target</button>
+            <button onClick={() => setShowSetTargetModal(true)} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors">Set Target</button>
           </div>
           {repTargets.length === 0 ? (
-            <p className="text-[#8A9AB0] text-sm">No targets set yet. Click "Set Target" to assign monthly goals to your reps.</p>
+            <p className="text-fp-muted text-sm">No targets set yet. Click "Set Target" to assign monthly goals to your reps.</p>
           ) : (
             <div className="space-y-4">
               {repTargets.map(rep => (
-                <div key={rep.id} className="bg-[#0F1C2E] rounded-xl p-4">
+                <div key={rep.id} className="bg-fp-bg rounded-xl p-4">
                   <div className="flex justify-between items-center mb-2">
                     <div>
-                      <p className="text-white font-semibold text-sm">{rep.full_name}</p>
-                      <p className="text-[#8A9AB0] text-xs">${rep.wonRevenue.toLocaleString()} won{rep.target ? ` of $${rep.target.revenue_target.toLocaleString()} goal` : ''}</p>
+                      <p className="text-fp-text font-semibold text-sm">{rep.full_name}</p>
+                      <p className="text-fp-muted text-xs">${rep.wonRevenue.toLocaleString()} won{rep.target ? ` of $${rep.target.revenue_target.toLocaleString()} goal` : ''}</p>
                     </div>
-                    <p className={`text-xl font-bold ${rep.progress >= 100 ? 'text-green-400' : rep.progress >= 70 ? 'text-[#C8622A]' : 'text-white'}`}>
+                    <p className={`text-xl font-bold ${rep.progress >= 100 ? 'text-green-400' : rep.progress >= 70 ? 'text-fp-brand' : 'text-fp-text'}`}>
                       {rep.progress !== null ? `${rep.progress}%` : '—'}
                     </p>
                   </div>
                   {rep.target && (
-                    <div className="w-full bg-[#1a2d45] rounded-full h-2.5">
-                      <div className={`h-2.5 rounded-full transition-all ${rep.progress >= 100 ? 'bg-green-500' : rep.progress >= 70 ? 'bg-[#C8622A]' : 'bg-blue-500'}`}
+                    <div className="w-full bg-fp-card rounded-full h-2.5">
+                      <div className={`h-2.5 rounded-full transition-all ${rep.progress >= 100 ? 'bg-green-500' : rep.progress >= 70 ? 'bg-fp-brand' : 'bg-blue-500'}`}
                         style={{ width: `${Math.min(100, rep.progress || 0)}%` }} />
                     </div>
                   )}
                   {rep.target?.deals_target > 0 && (
-                    <p className="text-[#8A9AB0] text-xs mt-1.5">{rep.wonDeals} of {rep.target.deals_target} deals closed</p>
+                    <p className="text-fp-muted text-xs mt-1.5">{rep.wonDeals} of {rep.target.deals_target} deals closed</p>
                   )}
                 </div>
               ))}
@@ -844,33 +844,33 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         </div>
 
         <div className="grid grid-cols-2 gap-6 mb-6">
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">Top Clients{periodShort[period]}</h3>
-            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : topClients.length === 0 ? <p className="text-[#8A9AB0]">No client data yet.</p> : (
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold text-lg mb-4">Top Clients{periodShort[period]}</h3>
+            {loading ? <p className="text-fp-muted">Loading...</p> : topClients.length === 0 ? <p className="text-fp-muted">No client data yet.</p> : (
               <div className="space-y-4">
                 {topClients.map((client, i) => (
-                  <div key={client.id} onClick={() => navigate(`/client/${client.id}`)} className="flex justify-between items-center cursor-pointer hover:bg-[#0F1C2E] rounded-lg p-2 transition-colors">
+                  <div key={client.id} onClick={() => navigate(`/client/${client.id}`)} className="flex justify-between items-center cursor-pointer hover:bg-fp-bg rounded-lg p-2 transition-colors">
                     <div className="flex items-center gap-3">
-                      <span className={`text-sm font-bold w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-[#8A9AB0]' : i === 2 ? 'text-orange-400' : 'text-[#2a3d55]'}`}>#{i + 1}</span>
-                      <div><p className="text-white text-sm font-medium">{client.name}</p><p className="text-[#8A9AB0] text-xs">{client.count} proposals</p></div>
+                      <span className={`text-sm font-bold w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-fp-muted' : i === 2 ? 'text-orange-400' : 'text-fp-border'}`}>#{i + 1}</span>
+                      <div><p className="text-fp-text text-sm font-medium">{client.name}</p><p className="text-fp-muted text-xs">{client.count} proposals</p></div>
                     </div>
-                    <div className="text-right"><p className="text-white text-sm font-bold">${client.pipeline.toLocaleString()}</p><p className="text-green-400 text-xs">${client.won.toLocaleString()} won</p></div>
+                    <div className="text-right"><p className="text-fp-text text-sm font-bold">${client.pipeline.toLocaleString()}</p><p className="text-green-400 text-xs">${client.won.toLocaleString()} won</p></div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">Top Vendors{periodShort[period]}</h3>
-            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : topVendors.length === 0 ? <p className="text-[#8A9AB0]">No vendor data yet.</p> : (
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold text-lg mb-4">Top Vendors{periodShort[period]}</h3>
+            {loading ? <p className="text-fp-muted">Loading...</p> : topVendors.length === 0 ? <p className="text-fp-muted">No vendor data yet.</p> : (
               <div className="space-y-4">
                 {topVendors.map((vendor, i) => (
-                  <div key={vendor.name} onClick={() => navigate('/vendors')} className="flex justify-between items-center cursor-pointer hover:bg-[#0F1C2E] rounded-lg p-2 transition-colors">
+                  <div key={vendor.name} onClick={() => navigate('/vendors')} className="flex justify-between items-center cursor-pointer hover:bg-fp-bg rounded-lg p-2 transition-colors">
                     <div className="flex items-center gap-3">
-                      <span className={`text-sm font-bold w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-[#8A9AB0]' : i === 2 ? 'text-orange-400' : 'text-[#2a3d55]'}`}>#{i + 1}</span>
-                      <div><p className="text-white text-sm font-medium">{vendor.name}</p><p className="text-[#8A9AB0] text-xs">{vendor.count} line items</p></div>
+                      <span className={`text-sm font-bold w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-fp-muted' : i === 2 ? 'text-orange-400' : 'text-fp-border'}`}>#{i + 1}</span>
+                      <div><p className="text-fp-text text-sm font-medium">{vendor.name}</p><p className="text-fp-muted text-xs">{vendor.count} line items</p></div>
                     </div>
-                    <p className="text-white text-sm font-bold">${vendor.total.toLocaleString()}</p>
+                    <p className="text-fp-text text-sm font-bold">${vendor.total.toLocaleString()}</p>
                   </div>
                 ))}
               </div>
@@ -880,19 +880,19 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
         {/* Labor Forecast */}
         {orgType !== 'manufacturer' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-5">
-              <div><h3 className="text-white font-bold text-lg">Labor Forecast{periodShort[period]}</h3><p className="text-[#8A9AB0] text-xs mt-0.5">Use this to plan crew scheduling and backlog</p></div>
-              {laborStats.dealsWithLabor > 0 && <span className="text-[#8A9AB0] text-xs">{laborStats.dealsWithLabor} deal{laborStats.dealsWithLabor !== 1 ? 's' : ''} with labor</span>}
+              <div><h3 className="text-fp-text font-bold text-lg">Labor Forecast{periodShort[period]}</h3><p className="text-fp-muted text-xs mt-0.5">Use this to plan crew scheduling and backlog</p></div>
+              {laborStats.dealsWithLabor > 0 && <span className="text-fp-muted text-xs">{laborStats.dealsWithLabor} deal{laborStats.dealsWithLabor !== 1 ? 's' : ''} with labor</span>}
             </div>
-            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : laborStats.laborQuoted === 0 && laborStats.laborWon === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No labor data yet.</p>
+            {loading ? <p className="text-fp-muted">Loading...</p> : laborStats.laborQuoted === 0 && laborStats.laborWon === 0 ? (
+              <p className="text-fp-muted text-sm">No labor data yet.</p>
             ) : (
               <div className="grid grid-cols-4 gap-4">
-                <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Total Labor Quoted</p><p className="text-white text-xl font-bold">${laborStats.laborQuoted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="text-[#C8622A] text-xs font-semibold mt-1">{laborStats.hoursQuoted.toLocaleString()} hrs</p><p className="text-[#8A9AB0] text-xs">Active pipeline</p></div>
-                <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Total Labor Won</p><p className="text-green-400 text-xl font-bold">${laborStats.laborWon.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="text-[#C8622A] text-xs font-semibold mt-1">{laborStats.hoursWon.toLocaleString()} hrs</p><p className="text-[#8A9AB0] text-xs">Confirmed backlog</p></div>
-                <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Closing in 30 Days</p><p className="text-[#C8622A] text-xl font-bold">${laborStats.laborClosingSoon.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="text-[#C8622A] text-xs font-semibold mt-1">{laborStats.hoursClosingSoon.toLocaleString()} hrs</p><p className="text-[#8A9AB0] text-xs">Plan ahead</p></div>
-                <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Avg Labor per Deal</p><p className="text-white text-xl font-bold">${laborStats.avgLaborPerDeal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="text-[#8A9AB0] text-xs mt-1">Across active deals</p></div>
+                <div className="bg-fp-bg rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Total Labor Quoted</p><p className="text-fp-text text-xl font-bold">${laborStats.laborQuoted.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="text-fp-brand text-xs font-semibold mt-1">{laborStats.hoursQuoted.toLocaleString()} hrs</p><p className="text-fp-muted text-xs">Active pipeline</p></div>
+                <div className="bg-fp-bg rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Total Labor Won</p><p className="text-green-400 text-xl font-bold">${laborStats.laborWon.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="text-fp-brand text-xs font-semibold mt-1">{laborStats.hoursWon.toLocaleString()} hrs</p><p className="text-fp-muted text-xs">Confirmed backlog</p></div>
+                <div className="bg-fp-bg rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Closing in 30 Days</p><p className="text-fp-brand text-xl font-bold">${laborStats.laborClosingSoon.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="text-fp-brand text-xs font-semibold mt-1">{laborStats.hoursClosingSoon.toLocaleString()} hrs</p><p className="text-fp-muted text-xs">Plan ahead</p></div>
+                <div className="bg-fp-bg rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Avg Labor per Deal</p><p className="text-fp-text text-xl font-bold">${laborStats.avgLaborPerDeal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p><p className="text-fp-muted text-xs mt-1">Across active deals</p></div>
               </div>
             )}
           </div>
@@ -903,56 +903,56 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       {/* Recurring Revenue Drill-Down Modal */}
       {recurringModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5">
               <div>
-                <h3 className="text-white font-bold text-lg">
+                <h3 className="text-fp-text font-bold text-lg">
                   {recurringModal === 'revenue' ? `Recurring Revenue${periodShort[period]}` :
                    recurringModal === 'quoting' ? 'Need Quoting — Next 90 Days' :
                    'All Recurring Items'}
                 </h3>
-                <p className="text-[#8A9AB0] text-xs mt-0.5">
+                <p className="text-fp-muted text-xs mt-0.5">
                   {recurringModal === 'revenue' ? `${recurringStats.inPeriodCount} items · $${recurringStats.recurringRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })} total` :
                    recurringModal === 'quoting' ? `${recurringStats.needsQuotingCount} items across ${recurringStats.needsQuotingClients} clients` :
                    `${recurringItems.length} total recurring items`}
                 </p>
               </div>
-              <button onClick={() => setRecurringModal(null)} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">✕ Close</button>
+              <button onClick={() => setRecurringModal(null)} className="text-fp-muted hover:text-fp-text text-sm transition-colors">✕ Close</button>
             </div>
 
             {(() => {
               const groups = recurringModal === 'revenue' ? recurringStats.periodClientGroups :
                              recurringModal === 'quoting' ? recurringStats.upcomingGroups :
                              recurringStats.allClientGroups
-              if (groups.length === 0) return <p className="text-[#8A9AB0] text-sm">No items found.</p>
+              if (groups.length === 0) return <p className="text-fp-muted text-sm">No items found.</p>
               return (
                 <div className="space-y-3">
                   {groups.map((group, i) => {
                     const totalValue = group.totalValue || group.items?.reduce((s, i) => s + (i.customer_price_total || 0), 0) || 0
                     return (
-                      <div key={i} className="bg-[#0F1C2E] rounded-xl p-4 cursor-pointer hover:bg-[#0a1628] transition-colors"
+                      <div key={i} className="bg-fp-bg rounded-xl p-4 cursor-pointer hover:bg-fp-inset transition-colors"
                         onClick={() => { setRecurringModal(null); group.clientId && navigate(`/client/${group.clientId}`) }}>
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="text-white font-semibold">{group.company}</p>
-                            <p className="text-[#8A9AB0] text-xs">{group.repName} · {group.proposalName}</p>
+                            <p className="text-fp-text font-semibold">{group.company}</p>
+                            <p className="text-fp-muted text-xs">{group.repName} · {group.proposalName}</p>
                           </div>
-                          <p className="text-[#C8622A] font-bold">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                          <p className="text-fp-brand font-bold">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                         </div>
                         <div className="space-y-1">
                           {group.items.map(item => (
                             <div key={item.id} className="flex justify-between items-center">
                               <div className="flex items-center gap-2">
-                                <span className="text-[#C8622A] text-xs">🔄</span>
-                                <span className="text-[#D6E4F0] text-xs">{item.item_name}</span>
+                                <span className="text-fp-brand text-xs">🔄</span>
+                                <span className="text-fp-text/70 text-xs">{item.item_name}</span>
                               </div>
                               <div className="flex items-center gap-4">
-                                <span className="text-[#8A9AB0] text-xs">${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                <span className="text-fp-muted text-xs">${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                                 {item.renewal_date && (
                                   <span className={`text-xs font-semibold ${
                                     Math.ceil((new Date(item.renewal_date) - new Date()) / (1000 * 60 * 60 * 24)) <= 30 ? 'text-red-400' :
                                     Math.ceil((new Date(item.renewal_date) - new Date()) / (1000 * 60 * 60 * 24)) <= 60 ? 'text-yellow-400' :
-                                    'text-[#8A9AB0]'
+                                    'text-fp-muted'
                                   }`}>
                                     {new Date(item.renewal_date).toLocaleDateString()}
                                   </span>
@@ -977,44 +977,44 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       {/* Set Target Modal */}
       {showSetTargetModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-1">Set Target</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Assign a revenue goal to a rep.</p>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-fp-text font-bold text-lg mb-1">Set Target</h3>
+            <p className="text-fp-muted text-sm mb-5">Assign a revenue goal to a rep.</p>
             <div className="space-y-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Period</label>
+                <label className="text-fp-muted text-xs mb-1 block">Period</label>
                 <div className="flex gap-2">
                   {['monthly', 'quarterly', 'annual'].map(p => (
                     <button key={p} onClick={() => setTargetPeriod(p)}
-                      className={`flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-colors ${targetPeriod === p ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold capitalize transition-colors ${targetPeriod === p ? 'bg-fp-brand text-white' : 'bg-fp-bg text-fp-muted hover:text-fp-text'}`}>
                       {p}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Rep</label>
+                <label className="text-fp-muted text-xs mb-1 block">Rep</label>
                 <select value={targetForm.profile_id} onChange={e => setTargetForm(p => ({ ...p, profile_id: e.target.value }))} className={inputClass}>
                   <option value="">— Select rep —</option>
                   {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">{targetPeriod === 'monthly' ? 'Month' : targetPeriod === 'quarterly' ? 'Quarter Start' : 'Year Start'}</label>
+                <label className="text-fp-muted text-xs mb-1 block">{targetPeriod === 'monthly' ? 'Month' : targetPeriod === 'quarterly' ? 'Quarter Start' : 'Year Start'}</label>
                 <input type="month" value={targetForm.period_start?.slice(0, 7)} onChange={e => setTargetForm(p => ({ ...p, period_start: e.target.value + '-01' }))} className={inputClass} />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Revenue Target ($)</label>
+                <label className="text-fp-muted text-xs mb-1 block">Revenue Target ($)</label>
                 <input type="number" value={targetForm.revenue_target} onChange={e => setTargetForm(p => ({ ...p, revenue_target: e.target.value }))} placeholder="e.g. 50000" className={inputClass} />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Deals Target (optional)</label>
+                <label className="text-fp-muted text-xs mb-1 block">Deals Target (optional)</label>
                 <input type="number" value={targetForm.deals_target} onChange={e => setTargetForm(p => ({ ...p, deals_target: e.target.value }))} placeholder="e.g. 5" className={inputClass} />
               </div>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowSetTargetModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={() => setShowSetTargetModal(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={saveTarget} disabled={savingTarget || !targetForm.profile_id || !targetForm.revenue_target}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-50">
                   {savingTarget ? 'Saving...' : 'Save Target'}
                 </button>
               </div>
