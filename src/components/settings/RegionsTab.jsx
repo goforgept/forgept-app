@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../supabase'
 import { useProfile } from '../../context/ProfileContext'
 
-const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
 export default function RegionsTab({ regionsEnabled, setRegionsEnabled }) {
   const { profile } = useProfile()
@@ -69,24 +69,24 @@ export default function RegionsTab({ regionsEnabled, setRegionsEnabled }) {
     load()
   }
 
-  if (loading) return <div className="text-[#8A9AB0] text-sm p-6">Loading…</div>
+  if (loading) return <div className="text-fp-muted text-sm p-6">Loading…</div>
 
   return (
     <div className="space-y-6">
 
       {/* Feature toggle */}
-      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-6">
+      <div className="bg-fp-card border border-fp-border rounded-xl p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-white font-bold text-base">Regions</h3>
-            <p className="text-[#8A9AB0] text-xs mt-0.5">
+            <h3 className="text-fp-text font-bold text-base">Regions</h3>
+            <p className="text-fp-muted text-xs mt-0.5">
               Organize your team into regions with a dedicated manager per region.
               Regional managers can edit all quotes for their team.
               All other users are read-only on deals unless added as a collaborator.
             </p>
           </div>
           <button onClick={toggleRegions}
-            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ml-4 ${regionsEnabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ml-4 ${regionsEnabled ? 'bg-fp-brand' : 'bg-fp-inset'}`}>
             <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${regionsEnabled ? 'translate-x-5' : ''}`} />
           </button>
         </div>
@@ -95,29 +95,29 @@ export default function RegionsTab({ regionsEnabled, setRegionsEnabled }) {
       {regionsEnabled && (
         <>
           {/* Region list */}
-          <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[#2a3d55]">
+          <div className="bg-fp-card border border-fp-border rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-fp-border">
               <div>
-                <h3 className="text-white font-bold text-base">Regions</h3>
-                <p className="text-[#8A9AB0] text-xs mt-0.5">{regions.length} region{regions.length !== 1 ? 's' : ''}</p>
+                <h3 className="text-fp-text font-bold text-base">Regions</h3>
+                <p className="text-fp-muted text-xs mt-0.5">{regions.length} region{regions.length !== 1 ? 's' : ''}</p>
               </div>
               <button onClick={() => setShowForm(s => !s)}
-                className="px-3 py-1.5 bg-[#C8622A] text-white text-xs font-semibold rounded-lg hover:bg-[#b5571f] transition-colors">
+                className="px-3 py-1.5 bg-fp-brand text-white text-xs font-semibold rounded-lg hover:bg-[#b5571f] transition-colors">
                 + Add Region
               </button>
             </div>
 
             {showForm && (
-              <div className="px-5 py-4 border-b border-[#2a3d55] bg-[#0F1C2E]/40">
+              <div className="px-5 py-4 border-b border-fp-border bg-fp-inset/40">
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div>
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Region Name</label>
+                    <label className="text-fp-muted text-xs mb-1 block">Region Name</label>
                     <input type="text" placeholder="e.g. Northeast, West Coast"
                       value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                       className={inputClass} />
                   </div>
                   <div>
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Regional Manager</label>
+                    <label className="text-fp-muted text-xs mb-1 block">Regional Manager</label>
                     <select value={form.manager_id} onChange={e => setForm(p => ({ ...p, manager_id: e.target.value }))}
                       className={inputClass}>
                       <option value="">— Assign later —</option>
@@ -127,9 +127,9 @@ export default function RegionsTab({ regionsEnabled, setRegionsEnabled }) {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => { setShowForm(false); setForm({ name: '', manager_id: '' }) }}
-                    className="px-3 py-1.5 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                    className="px-3 py-1.5 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                   <button onClick={handleAdd} disabled={saving || !form.name.trim()}
-                    className="px-4 py-1.5 bg-[#C8622A] text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors">
+                    className="px-4 py-1.5 bg-fp-brand text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors">
                     {saving ? 'Adding…' : 'Add Region'}
                   </button>
                 </div>
@@ -137,38 +137,38 @@ export default function RegionsTab({ regionsEnabled, setRegionsEnabled }) {
             )}
 
             {regions.length === 0 ? (
-              <div className="px-5 py-8 text-center text-[#8A9AB0] text-sm">
+              <div className="px-5 py-8 text-center text-fp-muted text-sm">
                 No regions yet. Add one to get started.
               </div>
             ) : (
-              <div className="divide-y divide-[#2a3d55]">
+              <div className="divide-y divide-fp-border">
                 {regions.map(region => {
                   const regionMembers = members.filter(m => m.region_id === region.id)
                   return (
                     <div key={region.id} className="px-5 py-4">
                       <div className="flex items-start justify-between gap-4 mb-3">
                         <div>
-                          <p className="text-white font-semibold">{region.name}</p>
-                          <p className="text-[#8A9AB0] text-xs mt-0.5">{regionMembers.length} member{regionMembers.length !== 1 ? 's' : ''}</p>
+                          <p className="text-fp-text font-semibold">{region.name}</p>
+                          <p className="text-fp-muted text-xs mt-0.5">{regionMembers.length} member{regionMembers.length !== 1 ? 's' : ''}</p>
                         </div>
                         <button onClick={() => handleDelete(region.id)}
-                          className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors flex-shrink-0">
+                          className="text-fp-muted hover:text-red-400 text-xs transition-colors flex-shrink-0">
                           Delete
                         </button>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[#8A9AB0] text-xs mb-1 block">Regional Manager</label>
+                          <label className="text-fp-muted text-xs mb-1 block">Regional Manager</label>
                           <select
                             value={region.manager_id || ''}
                             onChange={e => handleSetManager(region.id, e.target.value)}
-                            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                            className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-fp-brand">
                             <option value="">— None —</option>
                             {members.map(m => <option key={m.id} value={m.id}>{m.full_name}</option>)}
                           </select>
                           {region.manager_id && (
-                            <p className="text-[#4a5a6a] text-xs mt-1">Can edit all quotes in this region</p>
+                            <p className="text-fp-muted text-xs mt-1">Can edit all quotes in this region</p>
                           )}
                         </div>
                       </div>
@@ -177,17 +177,17 @@ export default function RegionsTab({ regionsEnabled, setRegionsEnabled }) {
                       {regionMembers.length > 0 && (
                         <div className="mt-3 space-y-1">
                           {regionMembers.map(m => (
-                            <div key={m.id} className="flex items-center justify-between bg-[#0F1C2E] rounded px-3 py-1.5">
+                            <div key={m.id} className="flex items-center justify-between bg-fp-inset rounded px-3 py-1.5">
                               <div>
-                                <span className="text-white text-xs font-medium">{m.full_name}</span>
-                                <span className="text-[#4a5a6a] text-xs ml-2">{m.org_role}</span>
+                                <span className="text-fp-text text-xs font-medium">{m.full_name}</span>
+                                <span className="text-fp-muted text-xs ml-2">{m.org_role}</span>
                                 {m.id === region.manager_id && (
-                                  <span className="ml-2 text-xs bg-[#C8622A]/20 text-[#C8622A] px-1.5 py-0.5 rounded-full">Manager</span>
+                                  <span className="ml-2 text-xs bg-fp-brand/20 text-fp-brand px-1.5 py-0.5 rounded-full">Manager</span>
                                 )}
                               </div>
                               <button
                                 onClick={() => handleAssignMember(m.id, null)}
-                                className="text-[#4a5a6a] hover:text-red-400 text-xs transition-colors">
+                                className="text-fp-muted hover:text-red-400 text-xs transition-colors">
                                 Remove
                               </button>
                             </div>
@@ -203,22 +203,22 @@ export default function RegionsTab({ regionsEnabled, setRegionsEnabled }) {
 
           {/* Unassigned members */}
           {members.filter(m => !m.region_id).length > 0 && (
-            <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-[#2a3d55]">
-                <h3 className="text-white font-semibold text-sm">Unassigned Members</h3>
-                <p className="text-[#8A9AB0] text-xs mt-0.5">Assign these team members to a region</p>
+            <div className="bg-fp-card border border-fp-border rounded-xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-fp-border">
+                <h3 className="text-fp-text font-semibold text-sm">Unassigned Members</h3>
+                <p className="text-fp-muted text-xs mt-0.5">Assign these team members to a region</p>
               </div>
-              <div className="divide-y divide-[#2a3d55]">
+              <div className="divide-y divide-fp-border">
                 {members.filter(m => !m.region_id).map(m => (
                   <div key={m.id} className="flex items-center justify-between px-5 py-3">
                     <div>
-                      <p className="text-white text-sm font-medium">{m.full_name}</p>
-                      <p className="text-[#8A9AB0] text-xs">{m.email} · {m.org_role}</p>
+                      <p className="text-fp-text text-sm font-medium">{m.full_name}</p>
+                      <p className="text-fp-muted text-xs">{m.email} · {m.org_role}</p>
                     </div>
                     <select
                       value=""
                       onChange={e => handleAssignMember(m.id, e.target.value || null)}
-                      className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                      className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand">
                       <option value="">Assign to region…</option>
                       {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>

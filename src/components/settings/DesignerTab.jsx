@@ -36,7 +36,7 @@ const CATEGORY_MAP = {
   'Other':           ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','AV Receiver','Bullet Camera','Ceiling Speaker','Clock','Control Processor','Controller','Diffuser','Digital Signage','Display','Document Camera','Dome Camera','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','HDMI Extender','Interior Siren','Lighting','Media Player','Microphone','Motion Sensor','Network','NVR','Outlet','Panel','Panic Button','PIR Detector','PTZ Camera','Projection Screen','Projector','Shock Sensor','Speaker','Streaming Encoder','Subwoofer','Thermostat','Touch Panel','Video Conference','Wall Plate','Wireless Mic'],
 }
 
-const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
 const EMPTY_FORM = { name: '', part_number: '', model_number: '', manufacturer: '', industry: 'Security', category: 'Dome Camera' }
 
@@ -229,18 +229,18 @@ export default function DesignerTab() {
   return (
     <div className="space-y-8">
       {/* Title Block */}
-      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-6">
-        <h3 className="text-white font-bold text-base mb-4">Title Block</h3>
-        <p className="text-[#8A9AB0] text-xs mb-4">Used on all shop drawing and as-built exports.</p>
+      <div className="bg-fp-card border border-fp-border rounded-xl p-6">
+        <h3 className="text-fp-text font-bold text-base mb-4">Title Block</h3>
+        <p className="text-fp-muted text-xs mb-4">Used on all shop drawing and as-built exports.</p>
         <div className="grid grid-cols-2 gap-4">
           {[['Designer / Engineer Name', 'title_block_engineer'], ['License Number', 'title_block_license'], ['Default Scale', 'title_block_scale']].map(([label, field]) => (
             <div key={field}>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">{label}</label>
+              <label className="text-fp-muted text-xs mb-1 block">{label}</label>
               <input type="text" placeholder={label} className={inputClass} />
             </div>
           ))}
           <div>
-            <label className="text-[#8A9AB0] text-xs mb-1 block">Default Sheet Size</label>
+            <label className="text-fp-muted text-xs mb-1 block">Default Sheet Size</label>
             <select className={inputClass}>
               <option value="letter">Letter (8.5 × 11)</option>
               <option value="tabloid">Tabloid (11 × 17)</option>
@@ -251,14 +251,14 @@ export default function DesignerTab() {
       </div>
 
       {/* Labor Estimation */}
-      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-6">
+      <div className="bg-fp-card border border-fp-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-1">
           <div>
-            <h3 className="text-white font-bold text-base">Labor Estimation</h3>
-            <p className="text-[#8A9AB0] text-xs mt-0.5">Automatically calculate labor hours per device in the designer. Hours push to the proposal labor table when drawings are approved — rates come from your rate card.</p>
+            <h3 className="text-fp-text font-bold text-base">Labor Estimation</h3>
+            <p className="text-fp-muted text-xs mt-0.5">Automatically calculate labor hours per device in the designer. Hours push to the proposal labor table when drawings are approved — rates come from your rate card.</p>
           </div>
           <button onClick={toggleLabor}
-            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${laborEnabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+            className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${laborEnabled ? 'bg-fp-brand' : 'bg-fp-inset'}`}>
             <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${laborEnabled ? 'translate-x-5' : ''}`} />
           </button>
         </div>
@@ -266,38 +266,38 @@ export default function DesignerTab() {
         {laborEnabled && (
           <div className="mt-5">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Default Hours per Device Category</p>
-              <button onClick={addLaborDefault} className="text-xs text-[#C8622A] hover:text-white transition-colors">+ Add Category</button>
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Default Hours per Device Category</p>
+              <button onClick={addLaborDefault} className="text-xs text-fp-brand hover:text-fp-text transition-colors">+ Add Category</button>
             </div>
 
             {laborDefaults.length === 0 ? (
-              <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] p-6 text-center">
-                <p className="text-[#8A9AB0] text-sm">No labor defaults yet</p>
-                <p className="text-[#8A9AB0] text-xs mt-1">Add a category to set default hours per device</p>
+              <div className="bg-fp-inset rounded-lg border border-fp-border p-6 text-center">
+                <p className="text-fp-muted text-sm">No labor defaults yet</p>
+                <p className="text-fp-muted text-xs mt-1">Add a category to set default hours per device</p>
               </div>
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-12 gap-2 px-2 pb-1">
-                  <p className="col-span-4 text-[#8A9AB0] text-xs">Category</p>
-                  <p className="col-span-4 text-[#8A9AB0] text-xs">Labor Role</p>
-                  <p className="col-span-3 text-[#8A9AB0] text-xs">Hrs / Device</p>
+                  <p className="col-span-4 text-fp-muted text-xs">Category</p>
+                  <p className="col-span-4 text-fp-muted text-xs">Labor Role</p>
+                  <p className="col-span-3 text-fp-muted text-xs">Hrs / Device</p>
                 </div>
                 {laborDefaults.map((def, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-[#0F1C2E] rounded-lg px-2 py-2 border border-[#2a3d55]">
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-fp-inset rounded-lg px-2 py-2 border border-fp-border">
                     <select value={def.category} onChange={e => updateLaborDefault(idx, 'category', e.target.value)}
-                      className="col-span-4 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                      className="col-span-4 bg-fp-card text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand">
                       {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                     <select value={def.labor_role} onChange={e => updateLaborDefault(idx, 'labor_role', e.target.value)}
-                      className="col-span-4 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                      className="col-span-4 bg-fp-card text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand">
                       <option value="">— Select role —</option>
                       {laborRates.map(r => <option key={r.role} value={r.role}>{r.role}</option>)}
                     </select>
                     <input type="number" min="0.25" step="0.25" value={def.hours_per_unit}
                       onChange={e => updateLaborDefault(idx, 'hours_per_unit', e.target.value)}
-                      className="col-span-3 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:border-[#C8622A]" />
+                      className="col-span-3 bg-fp-card text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:border-fp-brand" />
                     <button onClick={() => removeLaborDefault(idx)}
-                      className="col-span-1 text-[#8A9AB0] hover:text-red-400 transition-colors text-center">✕</button>
+                      className="col-span-1 text-fp-muted hover:text-red-400 transition-colors text-center">✕</button>
                   </div>
                 ))}
               </div>
@@ -305,17 +305,17 @@ export default function DesignerTab() {
 
             <div className="flex items-center gap-3 mt-3 flex-wrap">
               <button onClick={saveLaborDefaults} disabled={savingLabor}
-                className="px-4 py-2 bg-[#C8622A] text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] disabled:opacity-50 transition-colors">
+                className="px-4 py-2 bg-fp-brand text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] disabled:opacity-50 transition-colors">
                 {savingLabor ? 'Saving…' : 'Save Defaults'}
               </button>
               <button onClick={downloadTemplate}
-                className="flex items-center gap-1.5 px-3 py-2 bg-[#0F1C2E] text-[#8A9AB0] hover:text-white text-sm rounded-lg border border-[#2a3d55] hover:border-[#C8622A] transition-colors">
+                className="flex items-center gap-1.5 px-3 py-2 bg-fp-inset text-fp-muted hover:text-fp-text text-sm rounded-lg border border-fp-border hover:border-fp-brand transition-colors">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                 </svg>
                 Download Template
               </button>
-              <label className="flex items-center gap-1.5 px-3 py-2 bg-[#0F1C2E] text-[#8A9AB0] hover:text-white text-sm rounded-lg border border-[#2a3d55] hover:border-[#C8622A] transition-colors cursor-pointer">
+              <label className="flex items-center gap-1.5 px-3 py-2 bg-fp-inset text-fp-muted hover:text-fp-text text-sm rounded-lg border border-fp-border hover:border-fp-brand transition-colors cursor-pointer">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12"/>
                 </svg>
@@ -327,7 +327,7 @@ export default function DesignerTab() {
                 <p className="text-yellow-400 text-xs">Add roles to your Rate Card first to assign them here.</p>
               )}
             </div>
-            <p className="text-[#4a5a6a] text-xs mt-2">
+            <p className="text-fp-muted text-xs mt-2">
               Tip: Download the template, fill in the Labor Role and hours for each device type, then upload it back. Instructions are included in the first tab of the file.
             </p>
           </div>
@@ -335,40 +335,40 @@ export default function DesignerTab() {
       </div>
 
       {/* Symbol Library */}
-      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-6">
+      <div className="bg-fp-card border border-fp-border rounded-xl p-6">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="text-white font-bold text-base">Symbol Library</h3>
+          <h3 className="text-fp-text font-bold text-base">Symbol Library</h3>
           <button onClick={() => setShowModal(true)}
-            className="px-3 py-1.5 bg-[#C8622A] text-white text-xs font-semibold rounded-lg hover:bg-[#b5571f] transition-colors">
+            className="px-3 py-1.5 bg-fp-brand text-white text-xs font-semibold rounded-lg hover:bg-[#b5571f] transition-colors">
             + Add Custom Symbol
           </button>
         </div>
-        <p className="text-[#8A9AB0] text-xs mb-4">Global symbols are managed by ForgePt. Add your own devices here — they'll appear in the Designer symbol picker under your manufacturer name.</p>
+        <p className="text-fp-muted text-xs mb-4">Global symbols are managed by ForgePt. Add your own devices here — they'll appear in the Designer symbol picker under your manufacturer name.</p>
 
         {loading ? (
-          <p className="text-[#8A9AB0] text-sm">Loading...</p>
+          <p className="text-fp-muted text-sm">Loading...</p>
         ) : products.length === 0 ? (
-          <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] p-8 text-center">
-            <p className="text-[#8A9AB0] text-sm">No custom symbols yet</p>
-            <p className="text-[#8A9AB0] text-xs mt-1">Add devices not in the global library — they show up in your Designer symbol picker</p>
+          <div className="bg-fp-inset rounded-lg border border-fp-border p-8 text-center">
+            <p className="text-fp-muted text-sm">No custom symbols yet</p>
+            <p className="text-fp-muted text-xs mt-1">Add devices not in the global library — they show up in your Designer symbol picker</p>
           </div>
         ) : (
           <div className="space-y-2">
             {products.map(p => (
-              <div key={p.id} className="flex items-center justify-between bg-[#0F1C2E] rounded-lg px-4 py-3 border border-[#2a3d55]">
+              <div key={p.id} className="flex items-center justify-between bg-fp-inset rounded-lg px-4 py-3 border border-fp-border">
                 <div className="flex items-center gap-4">
                   <div>
-                    <p className="text-white text-sm font-medium">{p.name}</p>
-                    <p className="text-[#8A9AB0] text-xs font-mono">{p.part_number}{p.model_number ? ` · ${p.model_number}` : ''}</p>
+                    <p className="text-fp-text text-sm font-medium">{p.name}</p>
+                    <p className="text-fp-muted text-xs font-mono">{p.part_number}{p.model_number ? ` · ${p.model_number}` : ''}</p>
                   </div>
                   <div className="flex gap-2">
-                    <span className="text-xs px-2 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0]">{p.category}</span>
-                    <span className="text-xs px-2 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0]">{p.industry}</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-fp-inset text-fp-muted">{p.category}</span>
+                    <span className="text-xs px-2 py-0.5 rounded bg-fp-inset text-fp-muted">{p.industry}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button onClick={() => setEditingAccessories(p)} className="text-xs text-[#C8622A] hover:text-white transition-colors">Accessories</button>
-                  <button onClick={() => handleDelete(p.id)} className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors">✕</button>
+                  <button onClick={() => setEditingAccessories(p)} className="text-xs text-fp-brand hover:text-fp-text transition-colors">Accessories</button>
+                  <button onClick={() => handleDelete(p.id)} className="text-fp-muted hover:text-red-400 text-sm transition-colors">✕</button>
                 </div>
               </div>
             ))}
@@ -377,19 +377,19 @@ export default function DesignerTab() {
       </div>
 
       {/* Storage Preferences */}
-      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-6">
-        <h3 className="text-white font-bold text-base mb-1">Storage & Cleanup</h3>
-        <p className="text-[#8A9AB0] text-xs mb-4">Control when inactive projects are flagged for cleanup.</p>
+      <div className="bg-fp-card border border-fp-border rounded-xl p-6">
+        <h3 className="text-fp-text font-bold text-base mb-1">Storage & Cleanup</h3>
+        <p className="text-fp-muted text-xs mb-4">Control when inactive projects are flagged for cleanup.</p>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="text-[#8A9AB0] text-xs mb-1 block">Flag inactive drafts after</label>
+            <label className="text-fp-muted text-xs mb-1 block">Flag inactive drafts after</label>
             <select className={inputClass}>
               <option value="30">30 days</option><option value="60">60 days</option>
               <option value="90">90 days</option><option value="180">180 days</option><option value="never">Never</option>
             </select>
           </div>
           <div>
-            <label className="text-[#8A9AB0] text-xs mb-1 block">Flag lost opportunities after</label>
+            <label className="text-fp-muted text-xs mb-1 block">Flag lost opportunities after</label>
             <select className={inputClass}>
               <option value="30">30 days</option><option value="60">60 days</option>
               <option value="90">90 days</option><option value="never">Never</option>
@@ -414,32 +414,32 @@ export default function DesignerTab() {
       {/* Add Symbol Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-5">Add Custom Symbol</h3>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-fp-text font-bold text-lg mb-5">Add Custom Symbol</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Device Name <span className="text-[#C8622A]">*</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Device Name <span className="text-fp-brand">*</span></label>
                   <input type="text" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                     placeholder="e.g. Hikvision DS-2CD2143G2-I" className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Part Number <span className="text-[#C8622A]">*</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Part Number <span className="text-fp-brand">*</span></label>
                   <input type="text" value={form.part_number} onChange={e => setForm(p => ({ ...p, part_number: e.target.value }))}
                     placeholder="e.g. DS-2CD2143G2-I" className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Model Number</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Model Number</label>
                   <input type="text" value={form.model_number} onChange={e => setForm(p => ({ ...p, model_number: e.target.value }))}
                     placeholder="Optional" className={inputClass} />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Manufacturer <span className="text-[#C8622A]">*</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Manufacturer <span className="text-fp-brand">*</span></label>
                   <input type="text" value={form.manufacturer} onChange={e => setForm(p => ({ ...p, manufacturer: e.target.value }))}
                     placeholder="e.g. Hikvision" className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Industry</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Industry</label>
                   <select value={form.industry} onChange={e => {
                     const ind = e.target.value
                     setForm(p => ({ ...p, industry: ind, category: CATEGORY_MAP[ind][0] }))
@@ -448,7 +448,7 @@ export default function DesignerTab() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Category (Icon)</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Category (Icon)</label>
                   <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className={inputClass}>
                     {CATEGORY_MAP[form.industry].map(c => <option key={c}>{c}</option>)}
                   </select>
@@ -456,9 +456,9 @@ export default function DesignerTab() {
               </div>
               <div className="flex gap-3 pt-1">
                 <button onClick={() => { setShowModal(false); setForm(EMPTY_FORM) }}
-                  className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                  className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={handleAdd} disabled={saving || !form.name.trim() || !form.part_number.trim() || !form.manufacturer.trim()}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {saving ? 'Adding...' : 'Add Symbol'}
                 </button>
               </div>

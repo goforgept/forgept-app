@@ -57,7 +57,7 @@ const INTEGRATIONS = [
     description: 'Automatically create service tickets from emails forwarded to tickets@goforgept.com.',
     icon: '📨',
     iconBg: 'bg-orange-500/10',
-    accentColor: 'bg-[#C8622A]',
+    accentColor: 'bg-fp-brand',
     what: ['Emails from your domain create tickets automatically', 'Sender matched to existing client records', 'Auto-reply sent to acknowledge receipt', 'Ticket created with email body as description'],
     steps: [
       'Toggle on Inbound Email and enter your company domain.',
@@ -351,8 +351,8 @@ export default function IntegrationsTab({
     return (
       <div>
         <div className="mb-5">
-          <h2 className="text-white text-xl font-bold">Integrations</h2>
-          <p className="text-[#8A9AB0] text-sm mt-0.5">{INTEGRATIONS.length} available · {INTEGRATIONS.filter(i => isConnected(i.id)).length} connected</p>
+          <h2 className="text-fp-text text-xl font-bold">Integrations</h2>
+          <p className="text-fp-muted text-sm mt-0.5">{INTEGRATIONS.length} available · {INTEGRATIONS.filter(i => isConnected(i.id)).length} connected</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {INTEGRATIONS.map(intg => {
@@ -361,26 +361,26 @@ export default function IntegrationsTab({
             return (
               <div key={intg.id}
                 onClick={() => setSelected(intg.id)}
-                className="bg-[#1a2d45] rounded-xl p-5 cursor-pointer hover:bg-[#1f3552] hover:border-[#C8622A]/40 border border-[#2a3d55] transition-all group">
+                className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover hover:border-fp-brand/40 border border-fp-border transition-all group">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className={`w-11 h-11 rounded-xl ${intg.iconBg} flex items-center justify-center text-xl flex-shrink-0`}>
                       {intg.icon}
                     </div>
                     <div>
-                      <p className="text-white font-semibold group-hover:text-[#C8622A] transition-colors leading-tight">{intg.name}</p>
-                      <p className="text-[#4a5d75] text-xs mt-0.5">{intg.category}</p>
+                      <p className="text-fp-text font-semibold group-hover:text-fp-brand transition-colors leading-tight">{intg.name}</p>
+                      <p className="text-fp-muted text-xs mt-0.5">{intg.category}</p>
                     </div>
                   </div>
                   {connected
                     ? <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0">Connected</span>
-                    : <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs px-2.5 py-1 rounded-full flex-shrink-0">Not connected</span>
+                    : <span className="bg-fp-inset text-fp-muted text-xs px-2.5 py-1 rounded-full flex-shrink-0">Not connected</span>
                   }
                 </div>
-                <p className="text-[#8A9AB0] text-sm leading-relaxed mb-3">{intg.description}</p>
+                <p className="text-fp-muted text-sm leading-relaxed mb-3">{intg.description}</p>
                 {label && <p className="text-green-400 text-xs">✓ {label}</p>}
-                <div className="flex items-center justify-end mt-3 pt-3 border-t border-[#2a3d55]">
-                  <span className="text-[#8A9AB0] group-hover:text-[#C8622A] text-xs transition-colors flex items-center gap-1">
+                <div className="flex items-center justify-end mt-3 pt-3 border-t border-fp-border">
+                  <span className="text-fp-muted group-hover:text-fp-brand text-xs transition-colors flex items-center gap-1">
                     {connected ? 'Manage' : 'Set up'} <span className="text-base leading-none">→</span>
                   </span>
                 </div>
@@ -410,14 +410,14 @@ export default function IntegrationsTab({
   return (
     <div>
       {/* Back nav */}
-      <button onClick={() => setSelected(null)} className="flex items-center gap-1.5 text-[#8A9AB0] hover:text-white text-sm transition-colors mb-5">
+      <button onClick={() => setSelected(null)} className="flex items-center gap-1.5 text-fp-muted hover:text-fp-text text-sm transition-colors mb-5">
         <span className="text-base">←</span> Integrations
       </button>
 
       {msgBanner(getMsg())}
 
       {/* Hero */}
-      <div className="bg-[#1a2d45] rounded-xl p-6 mb-4">
+      <div className="bg-fp-card rounded-xl p-6 mb-4">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
             <div className={`w-14 h-14 rounded-xl ${intg.iconBg} flex items-center justify-center text-3xl flex-shrink-0`}>
@@ -425,11 +425,11 @@ export default function IntegrationsTab({
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-white text-xl font-bold">{intg.name}</h2>
-                <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs px-2 py-0.5 rounded-full">{intg.category}</span>
+                <h2 className="text-fp-text text-xl font-bold">{intg.name}</h2>
+                <span className="bg-fp-inset text-fp-muted text-xs px-2 py-0.5 rounded-full">{intg.category}</span>
                 {connected && <span className="bg-green-500/20 text-green-400 text-xs font-semibold px-2.5 py-0.5 rounded-full">✓ Connected</span>}
               </div>
-              <p className="text-[#8A9AB0] text-sm mt-1">{intg.description}</p>
+              <p className="text-fp-muted text-sm mt-1">{intg.description}</p>
               {label && <p className="text-green-400 text-xs mt-1">✓ {label}</p>}
             </div>
           </div>
@@ -437,11 +437,11 @@ export default function IntegrationsTab({
       </div>
 
       {/* What syncs */}
-      <div className="bg-[#1a2d45] rounded-xl p-6 mb-4">
-        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">What syncs</p>
+      <div className="bg-fp-card rounded-xl p-6 mb-4">
+        <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">What syncs</p>
         <div className="grid grid-cols-2 gap-2">
           {intg.what.map(t => (
-            <div key={t} className="flex items-center gap-2 text-sm text-[#8A9AB0]">
+            <div key={t} className="flex items-center gap-2 text-sm text-fp-muted">
               <span className="text-green-400 flex-shrink-0">✓</span> {t}
             </div>
           ))}
@@ -449,13 +449,13 @@ export default function IntegrationsTab({
       </div>
 
       {/* Setup steps */}
-      <div className="bg-[#1a2d45] rounded-xl p-6 mb-4">
-        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Setup</p>
+      <div className="bg-fp-card rounded-xl p-6 mb-4">
+        <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Setup</p>
         <div className="space-y-3">
           {intg.steps.map((step, i) => (
             <div key={i} className="flex gap-3 text-sm">
-              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${intg.accentColor} text-white`}>{i + 1}</span>
-              <span className="text-[#8A9AB0]">{step}</span>
+              <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${intg.accentColor} text-fp-text`}>{i + 1}</span>
+              <span className="text-fp-muted">{step}</span>
             </div>
           ))}
         </div>
@@ -463,18 +463,18 @@ export default function IntegrationsTab({
 
       {/* Action area */}
       {selected === 'quickbooks' && (
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="bg-fp-card rounded-xl p-6">
           {qboConnected ? (
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white font-semibold">QuickBooks Online</p>
-                {qboCompanyName && <p className="text-[#8A9AB0] text-sm mt-0.5">Connected to <span className="text-white">{qboCompanyName}</span></p>}
+                <p className="text-fp-text font-semibold">QuickBooks Online</p>
+                {qboCompanyName && <p className="text-fp-muted text-sm mt-0.5">Connected to <span className="text-fp-text">{qboCompanyName}</span></p>}
               </div>
-              <button onClick={disconnectQBO} className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors">Disconnect</button>
+              <button onClick={disconnectQBO} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
             </div>
           ) : (
             <button onClick={connectQBO} disabled={connectingQBO}
-              className="w-full bg-[#2CA01C] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#259018] transition-colors disabled:opacity-50">
+              className="w-full bg-[#2CA01C] text-fp-text py-2.5 rounded-lg text-sm font-semibold hover:bg-[#259018] transition-colors disabled:opacity-50">
               {connectingQBO ? 'Connecting...' : 'Connect QuickBooks'}
             </button>
           )}
@@ -482,18 +482,18 @@ export default function IntegrationsTab({
       )}
 
       {selected === 'google' && (
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="bg-fp-card rounded-xl p-6">
           {googleConnected ? (
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white font-semibold">Google Calendar & Meet</p>
-                {googleEmail && <p className="text-[#8A9AB0] text-sm mt-0.5">Connected as <span className="text-white">{googleEmail}</span></p>}
+                <p className="text-fp-text font-semibold">Google Calendar & Meet</p>
+                {googleEmail && <p className="text-fp-muted text-sm mt-0.5">Connected as <span className="text-fp-text">{googleEmail}</span></p>}
               </div>
-              <button onClick={disconnectGoogle} className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors">Disconnect</button>
+              <button onClick={disconnectGoogle} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
             </div>
           ) : (
             <button onClick={connectGoogle} disabled={connectingGoogle}
-              className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
+              className="w-full bg-blue-600 text-fp-text py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
               {connectingGoogle ? 'Connecting...' : 'Connect Google'}
             </button>
           )}
@@ -501,18 +501,18 @@ export default function IntegrationsTab({
       )}
 
       {selected === 'microsoft' && (
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="bg-fp-card rounded-xl p-6">
           {microsoftConnected ? (
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white font-semibold">Microsoft Outlook & Teams</p>
-                {microsoftEmail && <p className="text-[#8A9AB0] text-sm mt-0.5">Connected as <span className="text-white">{microsoftEmail}</span></p>}
+                <p className="text-fp-text font-semibold">Microsoft Outlook & Teams</p>
+                {microsoftEmail && <p className="text-fp-muted text-sm mt-0.5">Connected as <span className="text-fp-text">{microsoftEmail}</span></p>}
               </div>
-              <button onClick={disconnectMicrosoft} className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors">Disconnect</button>
+              <button onClick={disconnectMicrosoft} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
             </div>
           ) : (
             <button onClick={connectMicrosoft} disabled={connectingMicrosoft}
-              className="w-full bg-blue-700 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50">
+              className="w-full bg-blue-700 text-fp-text py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 transition-colors disabled:opacity-50">
               {connectingMicrosoft ? 'Connecting...' : 'Connect Microsoft'}
             </button>
           )}
@@ -520,44 +520,44 @@ export default function IntegrationsTab({
       )}
 
       {selected === 'inbound' && (
-        <div className="bg-[#1a2d45] rounded-xl p-6 space-y-4">
+        <div className="bg-fp-card rounded-xl p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-white font-semibold">Inbound Email Routing</p>
+              <p className="text-fp-text font-semibold">Inbound Email Routing</p>
               {inboundVerified && inboundDomain && <p className="text-green-400 text-xs mt-0.5">✓ Verified · routing @{inboundDomain}</p>}
               {inboundDomain && !inboundVerified && <p className="text-yellow-400 text-xs mt-0.5">⏳ Pending verification for @{inboundDomain}</p>}
             </div>
             <button onClick={() => setInboundEnabled(p => !p)}
-              className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${inboundEnabled ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+              className={`relative w-12 h-6 rounded-full transition-colors shrink-0 ${inboundEnabled ? 'bg-fp-brand' : 'bg-fp-inset'}`}>
               <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${inboundEnabled ? 'left-7' : 'left-1'}`} />
             </button>
           </div>
           {inboundEnabled && (
             <>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Your Company Domain</label>
+                <label className="text-fp-muted text-xs mb-1 block">Your Company Domain</label>
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8A9AB0] text-sm">@</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fp-muted text-sm">@</span>
                     <input type="text" value={inboundDomain} onChange={e => { setInboundDomain(e.target.value); setInboundVerified(false) }}
                       placeholder="acmeav.com"
-                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                      className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                   </div>
                   <button onClick={sendVerificationEmail} disabled={verifyingInbound || !inboundDomain.trim() || inboundVerified}
-                    className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors disabled:opacity-50 whitespace-nowrap">
+                    className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50 whitespace-nowrap">
                     {verifyingInbound ? 'Sending...' : inboundVerified ? '✓ Verified' : 'Send Verification'}
                   </button>
                 </div>
-                <p className="text-[#8A9AB0] text-xs mt-1">Emails forwarded to <span className="text-white font-mono">tickets@goforgept.com</span> from this domain will create tickets.</p>
+                <p className="text-fp-muted text-xs mt-1">Emails forwarded to <span className="text-fp-text font-mono">tickets@goforgept.com</span> from this domain will create tickets.</p>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Auto-Reply Message <span className="font-normal">(optional)</span></label>
+                <label className="text-fp-muted text-xs mb-1 block">Auto-Reply Message <span className="font-normal">(optional)</span></label>
                 <textarea value={inboundAutoReply} onChange={e => setInboundAutoReply(e.target.value)} rows={4}
                   placeholder={`Hi there,\n\nThank you for reaching out. We've received your request and will be in touch shortly.`}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
               </div>
               <button onClick={saveInboundSettings} disabled={savingInbound}
-                className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                 {savingInbound ? 'Saving...' : 'Save Settings'}
               </button>
             </>
@@ -566,15 +566,15 @@ export default function IntegrationsTab({
       )}
 
       {selected === 'zoho' && (
-        <div className="bg-[#1a2d45] rounded-xl p-6 space-y-4">
+        <div className="bg-fp-card rounded-xl p-6 space-y-4">
           {/* CRM */}
-          <div className="bg-[#0F1C2E] rounded-xl p-4">
+          <div className="bg-fp-inset rounded-xl p-4">
             <div className="flex items-center gap-2 mb-1">
-              <h4 className="text-white font-semibold text-sm">Zoho CRM</h4>
+              <h4 className="text-fp-text font-semibold text-sm">Zoho CRM</h4>
               {zohoStatus.crm && <span className="bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-full">✓ Connected</span>}
             </div>
-            <p className="text-[#8A9AB0] text-xs mb-3">Sync clients and contacts. New proposals automatically create deals with the correct stage.</p>
-            <div className="space-y-1 text-xs text-[#8A9AB0] mb-3">
+            <p className="text-fp-muted text-xs mb-3">Sync clients and contacts. New proposals automatically create deals with the correct stage.</p>
+            <div className="space-y-1 text-xs text-fp-muted mb-3">
               {['Import existing Zoho Accounts → ForgePt Clients','New clients sync both ways automatically','Proposal status → Zoho Deal stage','Rep attribution by email match'].map(t => (
                 <div key={t} className="flex items-center gap-1.5"><span className="text-green-400">✓</span>{t}</div>
               ))}
@@ -583,34 +583,34 @@ export default function IntegrationsTab({
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <button onClick={syncZohoCRM} disabled={zohoSyncing}
-                    className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                    className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                     {zohoSyncing ? 'Syncing...' : '↻ Sync Now'}
                   </button>
                   {zohoLastSync && (
-                    <span className="text-[#8A9AB0] text-xs">Last sync: {new Date(zohoLastSync).toLocaleString()}</span>
+                    <span className="text-fp-muted text-xs">Last sync: {new Date(zohoLastSync).toLocaleString()}</span>
                   )}
                 </div>
-                <p className="text-[#8A9AB0] text-xs">Two-way sync is active. Changes in Zoho update ForgePt automatically. Client and contact saves push back to Zoho.</p>
+                <p className="text-fp-muted text-xs">Two-way sync is active. Changes in Zoho update ForgePt automatically. Client and contact saves push back to Zoho.</p>
                 <button onClick={() => disconnectZoho('crm')} className="text-red-400 hover:text-red-300 text-xs transition-colors">Disconnect Zoho CRM</button>
               </div>
             ) : (
               <button onClick={() => connectZoho('crm')} disabled={zohoConnecting === 'crm'}
-                className="w-full bg-red-600/80 text-white py-2 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">
+                className="w-full bg-red-600/80 text-fp-text py-2 rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors disabled:opacity-50">
                 {zohoConnecting === 'crm' ? 'Connecting...' : 'Connect Zoho CRM'}
               </button>
             )}
           </div>
           {/* Books */}
-          <div className="bg-[#0F1C2E] rounded-xl p-4">
+          <div className="bg-fp-inset rounded-xl p-4">
             <div className="flex items-center gap-2 mb-1">
-              <h4 className="text-white font-semibold text-sm">Zoho Books</h4>
+              <h4 className="text-fp-text font-semibold text-sm">Zoho Books</h4>
               {zohoStatus.books && <span className="bg-green-500/20 text-green-400 text-xs px-2 py-0.5 rounded-full">✓ Connected</span>}
-              <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs px-2 py-0.5 rounded-full">Coming Soon</span>
+              <span className="bg-fp-inset text-fp-muted text-xs px-2 py-0.5 rounded-full">Coming Soon</span>
             </div>
-            <p className="text-[#8A9AB0] text-xs mb-3">Sync invoices and estimates between ForgePt and Zoho Books for seamless accounting.</p>
-            <div className="space-y-1 text-xs text-[#8A9AB0]">
+            <p className="text-fp-muted text-xs mb-3">Sync invoices and estimates between ForgePt and Zoho Books for seamless accounting.</p>
+            <div className="space-y-1 text-xs text-fp-muted">
               {['Won proposals → Zoho Books estimates','Invoices sync both ways','Payment status updates automatically','Tax rates synced from Zoho Books'].map(t => (
-                <div key={t} className="flex items-center gap-1.5"><span className="text-[#4a5a6a]">○</span>{t}</div>
+                <div key={t} className="flex items-center gap-1.5"><span className="text-fp-muted">○</span>{t}</div>
               ))}
             </div>
           </div>
@@ -618,18 +618,18 @@ export default function IntegrationsTab({
       )}
 
       {selected === 'square' && (
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="bg-fp-card rounded-xl p-6">
           {squareConnected ? (
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-white font-semibold">Square Payments</p>
-                {squareMerchantId && <p className="text-[#8A9AB0] text-sm mt-0.5">Merchant <span className="text-white font-mono">{squareMerchantId}</span></p>}
+                <p className="text-fp-text font-semibold">Square Payments</p>
+                {squareMerchantId && <p className="text-fp-muted text-sm mt-0.5">Merchant <span className="text-fp-text font-mono">{squareMerchantId}</span></p>}
               </div>
-              <button onClick={disconnectSquare} className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors">Disconnect</button>
+              <button onClick={disconnectSquare} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
             </div>
           ) : (
             <button onClick={connectSquare} disabled={connectingSquare}
-              className="w-full bg-[#3E4348] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#4E5358] transition-colors disabled:opacity-50">
+              className="w-full bg-[#3E4348] text-fp-text py-2.5 rounded-lg text-sm font-semibold hover:bg-[#4E5358] transition-colors disabled:opacity-50">
               {connectingSquare ? 'Connecting...' : 'Connect Square'}
             </button>
           )}

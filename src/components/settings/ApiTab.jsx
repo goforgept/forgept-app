@@ -105,14 +105,14 @@ export default function ApiTab({ featureApi }) {
   if (!featureApi) {
     return (
       <div className="space-y-6">
-        <div className="bg-[#1a2d45] rounded-xl p-8 text-center border border-[#2a3d55]">
-          <div className="w-16 h-16 bg-[#C8622A]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-[#C8622A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="bg-fp-card rounded-xl p-8 text-center border border-fp-border">
+          <div className="w-16 h-16 bg-fp-brand/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-fp-brand" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
             </svg>
           </div>
-          <h3 className="text-white font-bold text-lg mb-2">API Access</h3>
-          <p className="text-[#8A9AB0] text-sm max-w-md mx-auto mb-6">Connect ForgePt to your CRM, export BOMs programmatically, and build custom integrations. API access is available on upgraded plans.</p>
+          <h3 className="text-fp-text font-bold text-lg mb-2">API Access</h3>
+          <p className="text-fp-muted text-sm max-w-md mx-auto mb-6">Connect ForgePt to your CRM, export BOMs programmatically, and build custom integrations. API access is available on upgraded plans.</p>
           <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto mb-6 text-left">
             {[
               { icon: '🔗', title: 'CRM Sync', desc: 'Push proposals to Salesforce, HubSpot, or any CRM' },
@@ -120,14 +120,14 @@ export default function ApiTab({ featureApi }) {
               { icon: '🤖', title: 'AI Integrations', desc: 'Let AI agents read and act on your ForgePt data' },
               { icon: '🔄', title: 'Webhooks', desc: 'Get notified when proposals are won or jobs created' },
             ].map(f => (
-              <div key={f.title} className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+              <div key={f.title} className="bg-fp-inset rounded-lg p-3 border border-fp-border">
                 <p className="text-lg mb-1">{f.icon}</p>
-                <p className="text-white text-sm font-medium">{f.title}</p>
-                <p className="text-[#8A9AB0] text-xs mt-0.5">{f.desc}</p>
+                <p className="text-fp-text text-sm font-medium">{f.title}</p>
+                <p className="text-fp-muted text-xs mt-0.5">{f.desc}</p>
               </div>
             ))}
           </div>
-          <p className="text-[#4a5d75] text-xs">Contact us to enable API access for your account.</p>
+          <p className="text-fp-muted text-xs">Contact us to enable API access for your account.</p>
         </div>
       </div>
     )
@@ -139,25 +139,25 @@ export default function ApiTab({ featureApi }) {
       {newKey && (
         <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-5">
           <p className="text-green-400 font-semibold text-sm mb-1">API key generated — copy it now</p>
-          <p className="text-[#8A9AB0] text-xs mb-3">This key will not be shown again. Store it somewhere safe.</p>
+          <p className="text-fp-muted text-xs mb-3">This key will not be shown again. Store it somewhere safe.</p>
           <div className="flex items-center gap-3">
-            <code className="flex-1 bg-[#0F1C2E] text-green-400 font-mono text-sm px-4 py-3 rounded-lg border border-green-500/20 break-all">{newKey}</code>
-            <button onClick={copyKey} className="bg-green-600 text-white px-4 py-3 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors shrink-0">
+            <code className="flex-1 bg-fp-inset text-green-400 font-mono text-sm px-4 py-3 rounded-lg border border-green-500/20 break-all">{newKey}</code>
+            <button onClick={copyKey} className="bg-green-600 text-fp-text px-4 py-3 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors shrink-0">
               {copied ? '✓ Copied' : 'Copy'}
             </button>
           </div>
-          <button onClick={() => setNewKey(null)} className="mt-3 text-[#8A9AB0] hover:text-white text-xs transition-colors">I've saved it — dismiss</button>
+          <button onClick={() => setNewKey(null)} className="mt-3 text-fp-muted hover:text-fp-text text-xs transition-colors">I've saved it — dismiss</button>
         </div>
       )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-white font-bold text-lg">API Keys</h3>
-          <p className="text-[#8A9AB0] text-sm mt-0.5">Keys authenticate your API requests. Treat them like passwords — never share or commit them.</p>
+          <h3 className="text-fp-text font-bold text-lg">API Keys</h3>
+          <p className="text-fp-muted text-sm mt-0.5">Keys authenticate your API requests. Treat them like passwords — never share or commit them.</p>
         </div>
         {!showForm && (
-          <button onClick={() => setShowForm(true)} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+          <button onClick={() => setShowForm(true)} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
             + Generate Key
           </button>
         )}
@@ -180,14 +180,14 @@ export default function ApiTab({ featureApi }) {
               examples: ['Embed on a manufacturer or distributor portal', 'Let customers configure their own system', 'Receive device & cable list for quoting or ordering'],
             },
           ].map(card => (
-            <div key={card.title} className="bg-[#0F1C2E] border border-[#2a3d55] rounded-xl p-4">
-              <p className="text-white font-semibold text-sm mb-1">{card.title}</p>
-              <p className="text-[#C8622A] font-mono text-xs mb-2">{card.scopes}</p>
-              <p className="text-[#8A9AB0] text-xs mb-3">{card.desc}</p>
+            <div key={card.title} className="bg-fp-inset border border-fp-border rounded-xl p-4">
+              <p className="text-fp-text font-semibold text-sm mb-1">{card.title}</p>
+              <p className="text-fp-brand font-mono text-xs mb-2">{card.scopes}</p>
+              <p className="text-fp-muted text-xs mb-3">{card.desc}</p>
               <ul className="space-y-1">
                 {card.examples.map(ex => (
-                  <li key={ex} className="text-[#4a5d75] text-xs flex gap-1.5">
-                    <span className="text-[#C8622A] shrink-0">›</span>{ex}
+                  <li key={ex} className="text-fp-muted text-xs flex gap-1.5">
+                    <span className="text-fp-brand shrink-0">›</span>{ex}
                   </li>
                 ))}
               </ul>
@@ -198,24 +198,24 @@ export default function ApiTab({ featureApi }) {
 
       {/* Generate form */}
       {showForm && (
-        <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5 space-y-4">
-          <h4 className="text-white font-semibold">New API Key</h4>
+        <div className="bg-fp-card border border-fp-border rounded-xl p-5 space-y-4">
+          <h4 className="text-fp-text font-semibold">New API Key</h4>
           <div>
-            <label className="text-[#8A9AB0] text-xs mb-1 block">Key Name <span className="text-[#C8622A]">*</span></label>
+            <label className="text-fp-muted text-xs mb-1 block">Key Name <span className="text-fp-brand">*</span></label>
             <input type="text" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
               placeholder="e.g. Salesforce Integration, n8n Automation"
-              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
           </div>
           <div>
-            <label className="text-[#8A9AB0] text-xs mb-2 block">Scopes <span className="text-[#C8622A]">*</span></label>
+            <label className="text-fp-muted text-xs mb-2 block">Scopes <span className="text-fp-brand">*</span></label>
             <div className="space-y-2">
               {SCOPES.map(s => (
                 <label key={s.value} className="flex items-start gap-3 cursor-pointer group">
                   <input type="checkbox" checked={form.scopes.includes(s.value)} onChange={() => toggleScope(s.value)}
-                    className="mt-0.5 accent-[#C8622A]" />
+                    className="mt-0.5 accent-fp-brand" />
                   <div>
-                    <p className="text-white text-sm font-medium group-hover:text-[#C8622A] transition-colors">{s.label}</p>
-                    <p className="text-[#8A9AB0] text-xs">{s.desc}</p>
+                    <p className="text-fp-text text-sm font-medium group-hover:text-fp-brand transition-colors">{s.label}</p>
+                    <p className="text-fp-muted text-xs">{s.desc}</p>
                   </div>
                 </label>
               ))}
@@ -223,18 +223,18 @@ export default function ApiTab({ featureApi }) {
           </div>
           {form.scopes.includes('embed:designer') && (
             <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Allowed Origins <span className="text-[#4a5d75] font-normal">(optional)</span></label>
+              <label className="text-fp-muted text-xs mb-1 block">Allowed Origins <span className="text-fp-muted font-normal">(optional)</span></label>
               <input type="text" value={form.allowedOrigins} onChange={e => setForm(p => ({ ...p, allowedOrigins: e.target.value }))}
                 placeholder="https://yoursite.com, https://portal.example.com"
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-              <p className="text-[#4a5d75] text-xs mt-1">Comma-separated domains allowed to call embed-session from a browser. Leave blank to allow any origin (server-to-server calls are always allowed).</p>
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+              <p className="text-fp-muted text-xs mt-1">Comma-separated domains allowed to call embed-session from a browser. Leave blank to allow any origin (server-to-server calls are always allowed).</p>
             </div>
           )}
           <div className="flex gap-3 pt-1">
             <button onClick={() => { setShowForm(false); setForm({ name: '', scopes: ['read:proposals'], allowedOrigins: '' }) }}
-              className="flex-1 py-2 border border-[#2a3d55] text-[#8A9AB0] rounded-lg text-sm hover:text-white transition-colors">Cancel</button>
+              className="flex-1 py-2 border border-fp-border text-fp-muted rounded-lg text-sm hover:text-fp-text transition-colors">Cancel</button>
             <button onClick={handleGenerate} disabled={generating || !form.name.trim() || form.scopes.length === 0}
-              className="flex-1 py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+              className="flex-1 py-2 bg-fp-brand text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
               {generating ? 'Generating...' : 'Generate Key'}
             </button>
           </div>
@@ -243,37 +243,37 @@ export default function ApiTab({ featureApi }) {
 
       {/* Keys list */}
       {loading ? (
-        <p className="text-[#8A9AB0] text-sm">Loading...</p>
+        <p className="text-fp-muted text-sm">Loading...</p>
       ) : keys.length === 0 && !showForm ? (
-        <div className="bg-[#1a2d45] border border-dashed border-[#2a3d55] rounded-xl p-6 text-center">
-          <p className="text-white font-medium mb-1">No API keys yet</p>
-          <p className="text-[#8A9AB0] text-xs mb-4">Choose a key type above and click Generate Key to get started.</p>
-          <button onClick={() => setShowForm(true)} className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+        <div className="bg-fp-card border border-dashed border-fp-border rounded-xl p-6 text-center">
+          <p className="text-fp-text font-medium mb-1">No API keys yet</p>
+          <p className="text-fp-muted text-xs mb-4">Choose a key type above and click Generate Key to get started.</p>
+          <button onClick={() => setShowForm(true)} className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
             + Generate Your First Key
           </button>
         </div>
       ) : keys.length > 0 ? (
         <div className="space-y-2">
           {keys.map(k => (
-            <div key={k.id} className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl px-4 py-3">
+            <div key={k.id} className="bg-fp-card border border-fp-border rounded-xl px-4 py-3">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
-                  <p className="text-white font-medium text-sm truncate">{k.name}</p>
-                  <p className="font-mono text-[#8A9AB0] text-xs mt-0.5 truncate">{k.key_prefix}••••••••••••••</p>
+                  <p className="text-fp-text font-medium text-sm truncate">{k.name}</p>
+                  <p className="font-mono text-fp-muted text-xs mt-0.5 truncate">{k.key_prefix}••••••••••••••</p>
                   <div className="flex flex-wrap gap-1 mt-2">
                     {k.scopes.map(s => (
-                      <span key={s} className="text-xs bg-[#C8622A]/15 text-[#C8622A] px-2 py-0.5 rounded font-medium">
+                      <span key={s} className="text-xs bg-fp-brand/15 text-fp-brand px-2 py-0.5 rounded font-medium">
                         {s.replace('read:', '').replace('embed:', '')}
                       </span>
                     ))}
                   </div>
                   {k.allowed_origins?.length > 0 && (
-                    <p className="text-[#4a5d75] text-xs mt-1">Origins: {k.allowed_origins.join(', ')}</p>
+                    <p className="text-fp-muted text-xs mt-1">Origins: {k.allowed_origins.join(', ')}</p>
                   )}
                 </div>
                 <div className="shrink-0 text-right space-y-1">
-                  <p className="text-[#4a5d75] text-xs">Created {new Date(k.created_at).toLocaleDateString()}</p>
-                  <p className="text-[#4a5d75] text-xs">Last used: {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'}</p>
+                  <p className="text-fp-muted text-xs">Created {new Date(k.created_at).toLocaleDateString()}</p>
+                  <p className="text-fp-muted text-xs">Last used: {k.last_used_at ? new Date(k.last_used_at).toLocaleDateString() : 'Never'}</p>
                   <button onClick={() => handleRevoke(k.id)} disabled={revoking === k.id}
                     className="text-red-400 hover:text-red-300 text-xs transition-colors disabled:opacity-50 block ml-auto">
                     {revoking === k.id ? 'Deleting...' : 'Delete'}
@@ -288,26 +288,26 @@ export default function ApiTab({ featureApi }) {
       {/* Docs */}
       {keys.length > 0 && (
         <div className="space-y-4">
-          <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
-            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Authentication</p>
-            <p className="text-[#8A9AB0] text-xs mb-2">Include your key in the Authorization header on every request:</p>
-            <code className="block bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-2 rounded-lg">
+          <div className="bg-fp-inset rounded-xl p-4 border border-fp-border">
+            <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Authentication</p>
+            <p className="text-fp-muted text-xs mb-2">Include your key in the Authorization header on every request:</p>
+            <code className="block bg-fp-card text-fp-brand font-mono text-xs px-3 py-2 rounded-lg">
               Authorization: Bearer fpk_your_key_here
             </code>
-            <p className="text-[#4a5d75] text-xs mt-2">Base URL: https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/api/v1</p>
+            <p className="text-fp-muted text-xs mt-2">Base URL: https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/api/v1</p>
           </div>
 
-          <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55] space-y-5">
+          <div className="bg-fp-inset rounded-xl p-4 border border-fp-border space-y-5">
             <div>
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">Embedded Designer API</p>
-              <p className="text-[#8A9AB0] text-xs">Drop the ForgePt designer canvas into your own platform. Your server generates a short-lived session token; the iframe never sees your API key.</p>
-              <p className="text-[#4a5d75] text-xs mt-1">Required scope: <span className="text-[#C8622A] font-mono">embed:designer</span></p>
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1">Embedded Designer API</p>
+              <p className="text-fp-muted text-xs">Drop the ForgePt designer canvas into your own platform. Your server generates a short-lived session token; the iframe never sees your API key.</p>
+              <p className="text-fp-muted text-xs mt-1">Required scope: <span className="text-fp-brand font-mono">embed:designer</span></p>
             </div>
 
             {/* Step 1 */}
             <div>
-              <p className="text-white text-xs font-semibold mb-1">Step 1 — Exchange API key for session token <span className="text-[#4a5d75] font-normal">(server-side only)</span></p>
-              <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`POST https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/embed-session
+              <p className="text-fp-text text-xs font-semibold mb-1">Step 1 — Exchange API key for session token <span className="text-fp-muted font-normal">(server-side only)</span></p>
+              <pre className="bg-fp-card text-fp-brand font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`POST https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/embed-session
 Authorization: Bearer fpk_your_key_here
 Content-Type: application/json
 
@@ -327,13 +327,13 @@ Content-Type: application/json
   "org_id":       "uuid",
   "user_id":      "uuid"
 }`}</pre>
-              <p className="text-[#4a5d75] text-xs mt-1">Token is valid for 2 hours. <strong className="text-yellow-400">If multiple users will be working simultaneously, you must pass <code className="text-[#C8622A]">user.id</code></strong> — without it all users share one account and will overwrite each other. See Step 4 below to keep sessions alive past 2 hours.</p>
+              <p className="text-fp-muted text-xs mt-1">Token is valid for 2 hours. <strong className="text-yellow-400">If multiple users will be working simultaneously, you must pass <code className="text-fp-brand">user.id</code></strong> — without it all users share one account and will overwrite each other. See Step 4 below to keep sessions alive past 2 hours.</p>
             </div>
 
             {/* Step 2 */}
             <div>
-              <p className="text-white text-xs font-semibold mb-1">Step 2 — Render the iframe</p>
-              <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`<iframe
+              <p className="text-fp-text text-xs font-semibold mb-1">Step 2 — Render the iframe</p>
+              <pre className="bg-fp-card text-fp-brand font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`<iframe
   src="https://app.goforgept.com/embed?session=ACCESS_TOKEN&proposal=PROPOSAL_UUID"
   width="100%"
   height="700"
@@ -346,9 +346,9 @@ Content-Type: application/json
                   { param: 'proposal', req: false, desc: 'UUID of an existing proposal/design to load. Omit to auto-create a new blank project.' },
                 ].map(p => (
                   <div key={p.param} className="flex items-start gap-2">
-                    <code className="shrink-0 text-[#C8622A] font-mono text-xs w-20">{p.param}</code>
-                    <span className={`shrink-0 text-xs w-16 ${p.req ? 'text-yellow-400' : 'text-[#4a5d75]'}`}>{p.req ? 'required' : 'optional'}</span>
-                    <span className="text-[#8A9AB0] text-xs">{p.desc}</span>
+                    <code className="shrink-0 text-fp-brand font-mono text-xs w-20">{p.param}</code>
+                    <span className={`shrink-0 text-xs w-16 ${p.req ? 'text-yellow-400' : 'text-fp-muted'}`}>{p.req ? 'required' : 'optional'}</span>
+                    <span className="text-fp-muted text-xs">{p.desc}</span>
                   </div>
                 ))}
               </div>
@@ -356,9 +356,9 @@ Content-Type: application/json
 
             {/* Step 3 */}
             <div>
-              <p className="text-white text-xs font-semibold mb-1">Step 3 — Keep the session alive (token refresh)</p>
-              <p className="text-[#8A9AB0] text-xs mb-2">The designer will post <code className="text-[#C8622A]">forgept:session_expiring</code> to your page 5 minutes before the token expires. Respond with a fresh token and the user's session continues uninterrupted — no page reload, no data loss:</p>
-              <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`const iframeEl = document.getElementById('forgept-designer')
+              <p className="text-fp-text text-xs font-semibold mb-1">Step 3 — Keep the session alive (token refresh)</p>
+              <p className="text-fp-muted text-xs mb-2">The designer will post <code className="text-fp-brand">forgept:session_expiring</code> to your page 5 minutes before the token expires. Respond with a fresh token and the user's session continues uninterrupted — no page reload, no data loss:</p>
+              <pre className="bg-fp-card text-fp-brand font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`const iframeEl = document.getElementById('forgept-designer')
 
 window.addEventListener('message', async (event) => {
   if (event.data?.type !== 'forgept:session_expiring') return
@@ -373,14 +373,14 @@ window.addEventListener('message', async (event) => {
     'https://app.goforgept.com'
   )
 })`}</pre>
-              <p className="text-[#4a5d75] text-xs mt-1">The iframe automatically resets the 2-hour clock and the timer on receipt. Repeat indefinitely to keep long-running sessions alive.</p>
+              <p className="text-fp-muted text-xs mt-1">The iframe automatically resets the 2-hour clock and the timer on receipt. Repeat indefinitely to keep long-running sessions alive.</p>
             </div>
 
             {/* Step 4 */}
             <div>
-              <p className="text-white text-xs font-semibold mb-1">Step 4 — Listen for the BOM export</p>
-              <p className="text-[#8A9AB0] text-xs mb-2">When the user clicks <strong>Export BOM</strong> inside the designer, the iframe fires a <code className="text-[#C8622A]">postMessage</code> to your page:</p>
-              <pre className="bg-[#1a2d45] text-[#C8622A] font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`window.addEventListener('message', (event) => {
+              <p className="text-fp-text text-xs font-semibold mb-1">Step 4 — Listen for the BOM export</p>
+              <p className="text-fp-muted text-xs mb-2">When the user clicks <strong>Export BOM</strong> inside the designer, the iframe fires a <code className="text-fp-brand">postMessage</code> to your page:</p>
+              <pre className="bg-fp-card text-fp-brand font-mono text-xs px-3 py-3 rounded-lg overflow-x-auto whitespace-pre">{`window.addEventListener('message', (event) => {
   if (event.data?.type !== 'forgept:export') return
 
   const { proposal_id, devices, cables } = event.data
@@ -390,10 +390,10 @@ window.addEventListener('message', async (event) => {
 
             {/* Payload schema */}
             <div>
-              <p className="text-white text-xs font-semibold mb-2">Export payload schema</p>
+              <p className="text-fp-text text-xs font-semibold mb-2">Export payload schema</p>
               <div className="space-y-3">
                 <div>
-                  <p className="text-[#8A9AB0] text-xs font-semibold mb-1">devices — array</p>
+                  <p className="text-fp-muted text-xs font-semibold mb-1">devices — array</p>
                   <div className="space-y-1 pl-2">
                     {[
                       { field: 'part_number',  type: 'string | null', desc: 'Manufacturer part number' },
@@ -403,24 +403,24 @@ window.addEventListener('message', async (event) => {
                       { field: 'quantity',     type: 'number',        desc: 'Total count across all sheets' },
                     ].map(f => (
                       <div key={f.field} className="flex items-start gap-2">
-                        <code className="shrink-0 text-[#C8622A] font-mono text-xs w-28">{f.field}</code>
-                        <span className="shrink-0 text-[#4a5d75] text-xs w-24">{f.type}</span>
-                        <span className="text-[#8A9AB0] text-xs">{f.desc}</span>
+                        <code className="shrink-0 text-fp-brand font-mono text-xs w-28">{f.field}</code>
+                        <span className="shrink-0 text-fp-muted text-xs w-24">{f.type}</span>
+                        <span className="text-fp-muted text-xs">{f.desc}</span>
                       </div>
                     ))}
                   </div>
                 </div>
                 <div>
-                  <p className="text-[#8A9AB0] text-xs font-semibold mb-1">cables — array</p>
+                  <p className="text-fp-muted text-xs font-semibold mb-1">cables — array</p>
                   <div className="space-y-1 pl-2">
                     {[
                       { field: 'cable_type', type: 'string', desc: 'Cable type label (e.g. CAT6, Fiber, Coax)' },
                       { field: 'footage',    type: 'number', desc: 'Total footage across all runs on all sheets' },
                     ].map(f => (
                       <div key={f.field} className="flex items-start gap-2">
-                        <code className="shrink-0 text-[#C8622A] font-mono text-xs w-28">{f.field}</code>
-                        <span className="shrink-0 text-[#4a5d75] text-xs w-24">{f.type}</span>
-                        <span className="text-[#8A9AB0] text-xs">{f.desc}</span>
+                        <code className="shrink-0 text-fp-brand font-mono text-xs w-28">{f.field}</code>
+                        <span className="shrink-0 text-fp-muted text-xs w-24">{f.type}</span>
+                        <span className="text-fp-muted text-xs">{f.desc}</span>
                       </div>
                     ))}
                   </div>
@@ -430,7 +430,7 @@ window.addEventListener('message', async (event) => {
 
             {/* Errors */}
             <div>
-              <p className="text-white text-xs font-semibold mb-2">Error responses (embed-session)</p>
+              <p className="text-fp-text text-xs font-semibold mb-2">Error responses (embed-session)</p>
               <div className="space-y-1">
                 {[
                   { status: '401', msg: 'Missing API key / Invalid or revoked API key' },
@@ -440,16 +440,16 @@ window.addEventListener('message', async (event) => {
                 ].map(e => (
                   <div key={e.status} className="flex items-start gap-2">
                     <span className="shrink-0 text-red-400 font-mono text-xs w-8">{e.status}</span>
-                    <span className="text-[#8A9AB0] text-xs">{e.msg}</span>
+                    <span className="text-fp-muted text-xs">{e.msg}</span>
                   </div>
                 ))}
               </div>
-              <p className="text-[#4a5d75] text-xs mt-2">Implement Step 3 to prevent mid-session expiry. If the session does expire without a refresh handler, the iframe will show an expiry message — generate a new token and set the iframe <code className="text-[#C8622A]">src</code> with the new <code className="text-[#C8622A]">?session=</code> value.</p>
+              <p className="text-fp-muted text-xs mt-2">Implement Step 3 to prevent mid-session expiry. If the session does expire without a refresh handler, the iframe will show an expiry message — generate a new token and set the iframe <code className="text-fp-brand">src</code> with the new <code className="text-fp-brand">?session=</code> value.</p>
             </div>
           </div>
 
-          <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
-            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Available Endpoints</p>
+          <div className="bg-fp-inset rounded-xl p-4 border border-fp-border">
+            <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Available Endpoints</p>
             <div className="space-y-2">
               {[
                 { method: 'GET', path: '/proposals',                         desc: 'List all proposals (filter with ?status=Won)',                scope: 'proposals' },
@@ -465,13 +465,13 @@ window.addEventListener('message', async (event) => {
               ].map(e => (
                 <div key={e.path} className="flex items-start gap-3">
                   <span className="shrink-0 text-xs font-mono font-bold text-green-400 w-10">{e.method}</span>
-                  <span className="shrink-0 text-xs font-mono text-[#C8622A] w-64">{e.path}</span>
-                  <span className="text-xs text-[#8A9AB0]">{e.desc}</span>
-                  <span className="shrink-0 text-xs text-[#4a5d75] italic">{e.scope}</span>
+                  <span className="shrink-0 text-xs font-mono text-fp-brand w-64">{e.path}</span>
+                  <span className="text-xs text-fp-muted">{e.desc}</span>
+                  <span className="shrink-0 text-xs text-fp-muted italic">{e.scope}</span>
                 </div>
               ))}
             </div>
-            <p className="text-[#4a5d75] text-xs mt-3">Full schema: /v1/openapi.json</p>
+            <p className="text-fp-muted text-xs mt-3">Full schema: /v1/openapi.json</p>
           </div>
 
         </div>

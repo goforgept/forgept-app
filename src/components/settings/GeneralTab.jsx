@@ -225,7 +225,7 @@ export default function GeneralTab({
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-fp-text text-sm font-semibold">Bill To</h4>
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={sameAsShipTo} onChange={e => handleSameAsShipTo(e.target.checked)} className="accent-[#C8622A]" />
+                <input type="checkbox" checked={sameAsShipTo} onChange={e => handleSameAsShipTo(e.target.checked)} className="accent-fp-brand" />
                 <span className="text-fp-muted text-xs">Same as Ship To</span>
               </label>
             </div>
