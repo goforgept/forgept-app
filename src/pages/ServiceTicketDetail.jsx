@@ -12,7 +12,7 @@ const STATUS_COLORS = {
 }
 
 const PRIORITY_COLORS = {
-  'Low': 'bg-[#2a3d55] text-[#8A9AB0]',
+  'Low': 'bg-fp-inset text-fp-muted',
   'Normal': 'bg-blue-500/20 text-blue-400',
   'High': 'bg-orange-500/20 text-orange-400',
   'Urgent': 'bg-red-500/20 text-red-400',
@@ -542,28 +542,28 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
   }
 
-  const inputClass = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-  const cellInput = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+  const inputClass = "bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+  const cellInput = "bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand"
 
   const matTotal = lineItems.reduce((sum, l) => sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
   const labTotal = laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
 
-  if (loading) return <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center"><p className="text-white">Loading...</p></div>
-  if (!ticket) return <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center"><p className="text-white">Ticket not found.</p></div>
+  if (loading) return <div className="min-h-screen bg-fp-inset flex items-center justify-center"><p className="text-fp-text">Loading...</p></div>
+  if (!ticket) return <div className="min-h-screen bg-fp-inset flex items-center justify-center"><p className="text-fp-text">Ticket not found.</p></div>
 
   const noteLines = ticket.notes ? ticket.notes.split('\n\n').filter(Boolean).reverse() : []
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} role={role} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-6 max-w-5xl">
 
         {/* Header */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="bg-fp-card rounded-xl p-6">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <button onClick={() => navigate('/service-tickets')} className="text-[#8A9AB0] hover:text-white text-xs mb-2 transition-colors">← Service Tickets</button>
+              <button onClick={() => navigate('/service-tickets')} className="text-fp-muted hover:text-fp-text text-xs mb-2 transition-colors">← Service Tickets</button>
               <div className="flex items-center gap-3 mb-1">
                 {editingTicketNumber ? (
                   <input
@@ -582,50 +582,50 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                       if (e.key === 'Enter') e.target.blur()
                       if (e.key === 'Escape') { cancelTicketNumberEdit.current = true; e.target.blur() }
                     }}
-                    className="text-xs font-mono bg-[#0F1C2E] text-white border border-[#C8622A] rounded px-2 py-0.5 w-32 focus:outline-none"
+                    className="text-xs font-mono bg-fp-inset text-fp-text border border-[#C8622A] rounded px-2 py-0.5 w-32 focus:outline-none"
                   />
                 ) : (
                   <button
                     onClick={() => { setTicketNumberDraft(ticket.ticket_number || ''); setEditingTicketNumber(true) }}
-                    className="text-[#8A9AB0] text-xs font-mono bg-[#0F1C2E] px-2 py-0.5 rounded hover:border-[#C8622A] border border-transparent transition-colors"
+                    className="text-fp-muted text-xs font-mono bg-fp-inset px-2 py-0.5 rounded hover:border-fp-brand border border-transparent transition-colors"
                     title="Click to edit ticket number">
                     {ticket.ticket_number || 'No #'}
                   </button>
                 )}
               </div>
-              <h2 className="text-white text-2xl font-bold">{ticket.title}</h2>
+              <h2 className="text-fp-text text-2xl font-bold">{ticket.title}</h2>
               <div className="flex items-center gap-3 mt-2 flex-wrap">
                 <span className={`text-xs px-2 py-1 rounded font-semibold ${PRIORITY_COLORS[ticket.priority] || PRIORITY_COLORS.Normal}`}>{ticket.priority}</span>
                 <span className={`text-xs px-2 py-1 rounded font-semibold ${STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>{ticket.status}</span>
                 {ticket.clients?.company && (
-                  <button onClick={() => navigate(`/client/${ticket.clients.id}`)} className="text-[#8A9AB0] text-sm hover:text-[#C8622A] transition-colors">🏢 {ticket.clients.company}</button>
+                  <button onClick={() => navigate(`/client/${ticket.clients.id}`)} className="text-fp-muted text-sm hover:text-[#C8622A] transition-colors">🏢 {ticket.clients.company}</button>
                 )}
                 {ticket.jobs?.name && (
-                  <button onClick={() => navigate(`/jobs/${ticket.jobs.id}`)} className="text-[#8A9AB0] text-sm hover:text-[#C8622A] transition-colors">🔨 {ticket.jobs.job_number ? `${ticket.jobs.job_number} — ` : ''}{ticket.jobs.name}</button>
+                  <button onClick={() => navigate(`/jobs/${ticket.jobs.id}`)} className="text-fp-muted text-sm hover:text-[#C8622A] transition-colors">🔨 {ticket.jobs.job_number ? `${ticket.jobs.job_number} — ` : ''}{ticket.jobs.name}</button>
                 )}
               </div>
             </div>
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <button onClick={() => generateServiceReport(false).catch(e => { console.error(e); alert('Error generating report: ' + e.message) })}
-                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                  className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
                   📄 Download Report
                 </button>
                 {ticket.clients?.email && (
                   <button onClick={() => generateServiceReport(true).catch(e => { console.error(e); alert('Error sending report: ' + e.message) })}
-                    className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                    className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                     ✉️ Send to Client
                   </button>
                 )}
               </div>
             {confirmDelete ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-[#8A9AB0] text-xs">Delete ticket?</span>
+                  <span className="text-fp-muted text-xs">Delete ticket?</span>
                   <button onClick={deleteTicket} className="bg-red-500/20 text-red-400 hover:bg-red-500/30 text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors">Yes, delete</button>
-                  <button onClick={() => setConfirmDelete(false)} className="text-[#8A9AB0] hover:text-white text-xs px-3 py-1.5 transition-colors">Cancel</button>
+                  <button onClick={() => setConfirmDelete(false)} className="text-fp-muted hover:text-fp-text text-xs px-3 py-1.5 transition-colors">Cancel</button>
                 </div>
               ) : (
-                <button onClick={() => setConfirmDelete(true)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Delete</button>
+                <button onClick={() => setConfirmDelete(true)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Delete</button>
               )}
             </div>
           </div>
@@ -633,30 +633,30 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
           {/* Quick controls */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
             <div>
-              <p className="text-[#8A9AB0] text-xs mb-1">Status</p>
+              <p className="text-fp-muted text-xs mb-1">Status</p>
               <select value={ticket.status} onChange={e => updateTicket('status', e.target.value)} disabled={saving} className={`w-full ${inputClass}`}>
                 {['Open', 'In Progress', 'Resolved', 'Cancelled'].map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div>
-              <p className="text-[#8A9AB0] text-xs mb-1">Priority</p>
+              <p className="text-fp-muted text-xs mb-1">Priority</p>
               <select value={ticket.priority} onChange={e => updateTicket('priority', e.target.value)} disabled={saving} className={`w-full ${inputClass}`}>
                 {['Low', 'Normal', 'High', 'Urgent'].map(p => <option key={p}>{p}</option>)}
               </select>
             </div>
             <div>
-              <p className="text-[#8A9AB0] text-xs mb-1">Technician</p>
+              <p className="text-fp-muted text-xs mb-1">Technician</p>
               <select value={ticket.assigned_tech_id || ''} onChange={e => updateTicket('assigned_tech_id', e.target.value)} disabled={saving} className={`w-full ${inputClass}`}>
                 <option value="">Unassigned</option>
                 {techs.map(t => <option key={t.id} value={t.id}>{t.full_name}{t.dispatch_zone ? ` · ${t.dispatch_zone}` : ''}</option>)}
               </select>
             </div>
             <div>
-              <p className="text-[#8A9AB0] text-xs mb-1">Scheduled</p>
+              <p className="text-fp-muted text-xs mb-1">Scheduled</p>
               <input type="date" value={ticket.scheduled_date || ''} onChange={e => updateTicket('scheduled_date', e.target.value)} className={`w-full ${inputClass}`} />
             </div>
             <div>
-              <p className="text-[#8A9AB0] text-xs mb-1">Duration</p>
+              <p className="text-fp-muted text-xs mb-1">Duration</p>
               <select value={ticket.duration_hours || '2'} onChange={e => updateTicket('duration_hours', parseFloat(e.target.value))} className={`w-full ${inputClass}`}>
                 {['0.5','1','1.5','2','2.5','3','3.5','4','5','6','7','8'].map(h => (
                   <option key={h} value={h}>{h} {parseFloat(h) === 1 ? 'hr' : 'hrs'}</option>
@@ -665,7 +665,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
             </div>
             {clientLocations.length > 0 && (
               <div>
-                <p className="text-[#8A9AB0] text-xs mb-1">Site Location</p>
+                <p className="text-fp-muted text-xs mb-1">Site Location</p>
                 <select value={ticket.location_id || ''} onChange={e => updateTicket('location_id', e.target.value || null)} className={`w-full ${inputClass}`}>
                   <option value="">— Select location —</option>
                   {clientLocations.map(loc => (
@@ -678,7 +678,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
             )}
             {clientContacts.length > 0 && (
               <div>
-                <p className="text-[#8A9AB0] text-xs mb-1">Requested By</p>
+                <p className="text-fp-muted text-xs mb-1">Requested By</p>
                 <select value={ticket.contact_id || ''} onChange={e => updateTicket('contact_id', e.target.value || null)} className={`w-full ${inputClass}`}>
                   <option value="">— Select contact —</option>
                   {clientContacts.map(c => (
@@ -693,7 +693,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
 
           {ticket.scheduled_time && (
             <div className="mt-3">
-              <p className="text-[#8A9AB0] text-xs mb-1">Scheduled Time</p>
+              <p className="text-fp-muted text-xs mb-1">Scheduled Time</p>
               <input type="time" value={ticket.scheduled_time || ''} onChange={e => updateTicket('scheduled_time', e.target.value)} className={`w-40 ${inputClass}`} />
             </div>
           )}
@@ -711,7 +711,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
             { key: 'photos', label: `📷 Photos (${photos.length})` },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
               {t.label}
             </button>
           ))}
@@ -721,26 +721,26 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
         {activeTab === 'overview' && (
           <>
             {ticket.description && (
-              <div className="bg-[#1a2d45] rounded-xl p-6">
-                <h3 className="text-white font-bold mb-3">Description</h3>
-                <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{ticket.description}</p>
+              <div className="bg-fp-card rounded-xl p-6">
+                <h3 className="text-fp-text font-bold mb-3">Description</h3>
+                <p className="text-fp-text text-sm leading-relaxed whitespace-pre-wrap">{ticket.description}</p>
               </div>
             )}
 
-            <div className="bg-[#1a2d45] rounded-xl p-6">
-              <h3 className="text-white font-bold mb-4">Notes & Activity</h3>
+            <div className="bg-fp-card rounded-xl p-6">
+              <h3 className="text-fp-text font-bold mb-4">Notes & Activity</h3>
               <div className="flex gap-3 mb-5">
                 <input type="text" value={newNote} onChange={e => setNewNote(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addNote()}
                   placeholder="Add a note or update..."
-                  className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
+                  className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
                 <button onClick={addNote} disabled={savingNote || !newNote.trim()}
-                  className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {savingNote ? '...' : 'Add'}
                 </button>
               </div>
               {noteLines.length === 0 ? (
-                <p className="text-[#8A9AB0] text-sm italic">No notes yet.</p>
+                <p className="text-fp-muted text-sm italic">No notes yet.</p>
               ) : (
                 <div className="space-y-3">
                   {noteLines.map((note, i) => {
@@ -748,9 +748,9 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                     const meta = match ? match[1] : null
                     const body = match ? match[2] : note
                     return (
-                      <div key={i} className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55]">
-                        {meta && <p className="text-[#8A9AB0] text-xs mb-1.5">{meta}</p>}
-                        <p className="text-[#D6E4F0] text-sm whitespace-pre-wrap">{body}</p>
+                      <div key={i} className="bg-fp-inset rounded-lg p-4 border border-fp-border">
+                        {meta && <p className="text-fp-muted text-xs mb-1.5">{meta}</p>}
+                        <p className="text-fp-text text-sm whitespace-pre-wrap">{body}</p>
                       </div>
                     )
                   })}
@@ -758,20 +758,20 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
               )}
             </div>
 
-            <div className="bg-[#1a2d45] rounded-xl p-6">
-              <h3 className="text-white font-bold mb-3">Details</h3>
+            <div className="bg-fp-card rounded-xl p-6">
+              <h3 className="text-fp-text font-bold mb-3">Details</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><p className="text-[#8A9AB0] text-xs mb-0.5">Created</p><p className="text-white">{new Date(ticket.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</p></div>
-                {ticket.profiles?.full_name && <div><p className="text-[#8A9AB0] text-xs mb-0.5">Assigned To</p><p className="text-white">{ticket.profiles.full_name}</p></div>}
-                {ticket.clients?.company && <div><p className="text-[#8A9AB0] text-xs mb-0.5">Client</p><p className="text-white">{ticket.clients.company}</p></div>}
-                {ticket.contact_id && (() => { const c = clientContacts.find(x => x.id === ticket.contact_id); return c ? <div><p className="text-[#8A9AB0] text-xs mb-0.5">Requested By</p><p className="text-white">{c.full_name}{c.title ? <span className="text-[#8A9AB0] text-xs ml-1">· {c.title}</span> : ''}</p></div> : null })()}
-                {ticket.jobs?.name && <div><p className="text-[#8A9AB0] text-xs mb-0.5">Job</p><p className="text-white">{ticket.jobs.name}</p></div>}
+                <div><p className="text-fp-muted text-xs mb-0.5">Created</p><p className="text-fp-text">{new Date(ticket.created_at).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</p></div>
+                {ticket.profiles?.full_name && <div><p className="text-fp-muted text-xs mb-0.5">Assigned To</p><p className="text-fp-text">{ticket.profiles.full_name}</p></div>}
+                {ticket.clients?.company && <div><p className="text-fp-muted text-xs mb-0.5">Client</p><p className="text-fp-text">{ticket.clients.company}</p></div>}
+                {ticket.contact_id && (() => { const c = clientContacts.find(x => x.id === ticket.contact_id); return c ? <div><p className="text-fp-muted text-xs mb-0.5">Requested By</p><p className="text-fp-text">{c.full_name}{c.title ? <span className="text-fp-muted text-xs ml-1">· {c.title}</span> : ''}</p></div> : null })()}
+                {ticket.jobs?.name && <div><p className="text-fp-muted text-xs mb-0.5">Job</p><p className="text-fp-text">{ticket.jobs.name}</p></div>}
                 {ticket.location_id && (() => {
                   const loc = clientLocations.find(l => l.id === ticket.location_id)
                   return loc ? (
                     <div className="col-span-2">
-                      <p className="text-[#8A9AB0] text-xs mb-0.5">Site Location</p>
-                      <p className="text-white">{loc.site_name}{loc.store_id ? <span className="text-[#C8622A] font-mono text-xs ml-2">{loc.store_id}</span> : ''}{loc.address ? ` — ${loc.address}, ${loc.city || ''} ${loc.state || ''}`.trim() : ''}</p>
+                      <p className="text-fp-muted text-xs mb-0.5">Site Location</p>
+                      <p className="text-fp-text">{loc.site_name}{loc.store_id ? <span className="text-[#C8622A] font-mono text-xs ml-2">{loc.store_id}</span> : ''}{loc.address ? ` — ${loc.address}, ${loc.city || ''} ${loc.state || ''}`.trim() : ''}</p>
                     </div>
                   ) : null
                 })()}
@@ -785,26 +785,26 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
           <div className="space-y-6">
 
             {/* Materials */}
-            <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="bg-fp-card rounded-xl p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-white font-bold">Materials</h3>
-                <button onClick={addMaterial} className="text-[#C8622A] text-sm hover:text-white transition-colors">+ Add Material</button>
+                <h3 className="text-fp-text font-bold">Materials</h3>
+                <button onClick={addMaterial} className="text-[#C8622A] text-sm hover:text-fp-text transition-colors">+ Add Material</button>
               </div>
               {lineItems.length === 0 ? (
-                <p className="text-[#8A9AB0] text-sm italic">No materials logged yet.</p>
+                <p className="text-fp-muted text-sm italic">No materials logged yet.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-[#2a3d55]">
-                        <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Item Name</th>
-                        <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Qty</th>
-                        <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Unit</th>
+                      <tr className="border-b border-fp-border">
+                        <th className="text-fp-muted text-left py-2 pr-3 font-normal">Item Name</th>
+                        <th className="text-fp-muted text-left py-2 pr-3 font-normal">Qty</th>
+                        <th className="text-fp-muted text-left py-2 pr-3 font-normal">Unit</th>
                         {!isTechnician && <>
-                          <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Your Cost</th>
-                          <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Markup %</th>
-                          <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Unit Price</th>
-                          <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Total</th>
+                          <th className="text-fp-muted text-left py-2 pr-3 font-normal">Your Cost</th>
+                          <th className="text-fp-muted text-left py-2 pr-3 font-normal">Markup %</th>
+                          <th className="text-fp-muted text-left py-2 pr-3 font-normal">Unit Price</th>
+                          <th className="text-fp-muted text-left py-2 pr-3 font-normal">Total</th>
                         </>}
                         <th></th>
                       </tr>
@@ -813,7 +813,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                       {lineItems.map((line, i) => {
                         const lineTotal = (parseFloat(line.customer_price_unit) || 0) * (parseFloat(line.quantity) || 0)
                         return (
-                          <tr key={line.id} className="border-b border-[#2a3d55]/30">
+                          <tr key={line.id} className="border-b border-fp-border/30">
                             <td className="pr-3 py-1.5">
                               <input value={line.item_name} onChange={e => updateMaterial(i, 'item_name', e.target.value)} placeholder="Item name" className={`w-40 ${cellInput}`} />
                             </td>
@@ -835,10 +835,10 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                               <td className="pr-3 py-1.5">
                                 <input type="number" min="0" step="0.01" placeholder="0.00" value={line.customer_price_unit} onChange={e => updateMaterial(i, 'customer_price_unit', e.target.value)} className={`w-20 ${cellInput}`} />
                               </td>
-                              <td className="pr-3 py-1.5 text-white font-medium">${lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                              <td className="pr-3 py-1.5 text-fp-text font-medium">${lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                             </>}
                             <td className="py-1.5">
-                              <button onClick={() => removeMaterial(i)} className="text-[#8A9AB0] hover:text-red-400 transition-colors">✕</button>
+                              <button onClick={() => removeMaterial(i)} className="text-fp-muted hover:text-red-400 transition-colors">✕</button>
                             </td>
                           </tr>
                         )
@@ -847,7 +847,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                     {!isTechnician && lineItems.length > 0 && (
                       <tfoot>
                         <tr>
-                          <td colSpan="6" className="text-[#8A9AB0] text-right pt-3 pr-3 font-semibold">Materials Total</td>
+                          <td colSpan="6" className="text-fp-muted text-right pt-3 pr-3 font-semibold">Materials Total</td>
                           <td className="text-[#C8622A] font-bold pt-3">${matTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                           <td></td>
                         </tr>
@@ -859,32 +859,32 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
             </div>
 
             {/* Labor */}
-            <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="bg-fp-card rounded-xl p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-white font-bold">Labor</h3>
-                <button onClick={addLabor} className="text-[#C8622A] text-sm hover:text-white transition-colors">+ Add Labor</button>
+                <h3 className="text-fp-text font-bold">Labor</h3>
+                <button onClick={addLabor} className="text-[#C8622A] text-sm hover:text-fp-text transition-colors">+ Add Labor</button>
               </div>
               {laborItems.length === 0 ? (
-                <p className="text-[#8A9AB0] text-sm italic">No labor logged yet.</p>
+                <p className="text-fp-muted text-sm italic">No labor logged yet.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-[#2a3d55]">
-                        <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Role / Description</th>
-                        <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Qty</th>
-                        <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Unit</th>
+                      <tr className="border-b border-fp-border">
+                        <th className="text-fp-muted text-left py-2 pr-3 font-normal">Role / Description</th>
+                        <th className="text-fp-muted text-left py-2 pr-3 font-normal">Qty</th>
+                        <th className="text-fp-muted text-left py-2 pr-3 font-normal">Unit</th>
                         {!isTechnician && <>
-                          <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Your Cost</th>
-                          <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Markup %</th>
-                          <th className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">Total</th>
+                          <th className="text-fp-muted text-left py-2 pr-3 font-normal">Your Cost</th>
+                          <th className="text-fp-muted text-left py-2 pr-3 font-normal">Markup %</th>
+                          <th className="text-fp-muted text-left py-2 pr-3 font-normal">Total</th>
                         </>}
                         <th></th>
                       </tr>
                     </thead>
                     <tbody>
                       {laborItems.map((labor, i) => (
-                        <tr key={labor.id} className="border-b border-[#2a3d55]/30">
+                        <tr key={labor.id} className="border-b border-fp-border/30">
                           <td className="pr-3 py-1.5">
                             <input value={labor.role} onChange={e => updateLabor(i, 'role', e.target.value)} placeholder="e.g. Low Voltage Tech" className={`w-44 ${cellInput}`} />
                           </td>
@@ -903,10 +903,10 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                             <td className="pr-3 py-1.5">
                               <input type="number" min="0" placeholder="35" value={labor.markup} onChange={e => updateLabor(i, 'markup', e.target.value)} className={`w-16 ${cellInput}`} />
                             </td>
-                            <td className="pr-3 py-1.5 text-white font-medium">${(parseFloat(labor.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            <td className="pr-3 py-1.5 text-fp-text font-medium">${(parseFloat(labor.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                           </>}
                           <td className="py-1.5">
-                            <button onClick={() => removeLabor(i)} className="text-[#8A9AB0] hover:text-red-400 transition-colors">✕</button>
+                            <button onClick={() => removeLabor(i)} className="text-fp-muted hover:text-red-400 transition-colors">✕</button>
                           </td>
                         </tr>
                       ))}
@@ -914,7 +914,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                     {!isTechnician && laborItems.length > 0 && (
                       <tfoot>
                         <tr>
-                          <td colSpan="5" className="text-[#8A9AB0] text-right pt-3 pr-3 font-semibold">Labor Total</td>
+                          <td colSpan="5" className="text-fp-muted text-right pt-3 pr-3 font-semibold">Labor Total</td>
                           <td className="text-[#C8622A] font-bold pt-3">${labTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                           <td></td>
                         </tr>
@@ -927,13 +927,13 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
 
             {/* Grand total — managers only */}
             {!isTechnician && (lineItems.length > 0 || laborItems.length > 0) && (
-              <div className="bg-[#1a2d45] rounded-xl p-4 flex justify-between items-center">
-                <div className="text-sm text-[#8A9AB0] space-y-0.5">
-                  {lineItems.length > 0 && <p>Materials: <span className="text-white">${matTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>}
-                  {laborItems.length > 0 && <p>Labor: <span className="text-white">${labTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>}
+              <div className="bg-fp-card rounded-xl p-4 flex justify-between items-center">
+                <div className="text-sm text-fp-muted space-y-0.5">
+                  {lineItems.length > 0 && <p>Materials: <span className="text-fp-text">${matTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>}
+                  {laborItems.length > 0 && <p>Labor: <span className="text-fp-text">${labTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></p>}
                 </div>
                 <div className="text-right">
-                  <p className="text-[#8A9AB0] text-xs mb-0.5">Ticket Total</p>
+                  <p className="text-fp-muted text-xs mb-0.5">Ticket Total</p>
                   <p className="text-[#C8622A] font-bold text-xl">${(matTotal + labTotal).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                 </div>
               </div>
@@ -941,7 +941,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
 
             <div className="flex justify-end">
               <button onClick={saveItems} disabled={savingItems}
-                className="bg-[#C8622A] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                className="bg-fp-brand text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                 {savingItems ? 'Saving...' : 'Save'}
               </button>
             </div>
@@ -950,20 +950,20 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
 
       {/* PHOTOS TAB */}
         {activeTab === 'photos' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-5">
               <div>
-                <h3 className="text-white font-bold text-lg">Site Photos</h3>
-                <p className="text-[#8A9AB0] text-sm mt-0.5">{photos.length} photo{photos.length !== 1 ? 's' : ''}</p>
+                <h3 className="text-fp-text font-bold text-lg">Site Photos</h3>
+                <p className="text-fp-muted text-sm mt-0.5">{photos.length} photo{photos.length !== 1 ? 's' : ''}</p>
               </div>
               <div className="flex items-center gap-3">
                 <select value={photoCategory} onChange={e => setPhotoCategory(e.target.value)}
-                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                   {['Before', 'During', 'After', 'Issue/Defect', 'Equipment', 'Panel/Rack', 'Cable Run', 'Other'].map(c => (
                     <option key={c} value={c}>{c}</option>
                   ))}
                 </select>
-                <label className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors cursor-pointer">
+                <label className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors cursor-pointer">
                   {uploadingPhoto ? 'Uploading...' : '+ Upload Photo'}
                   <input type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadTicketPhoto} className="hidden" disabled={uploadingPhoto} />
                 </label>
@@ -971,10 +971,10 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
             </div>
 
             {photos.length === 0 ? (
-              <div className="text-center py-12 border-2 border-dashed border-[#2a3d55] rounded-xl">
+              <div className="text-center py-12 border-2 border-dashed border-fp-border rounded-xl">
                 <p className="text-4xl mb-3">📷</p>
-                <p className="text-[#8A9AB0]">No photos yet.</p>
-                <p className="text-[#8A9AB0] text-sm mt-1">Upload photos to document this service ticket.</p>
+                <p className="text-fp-muted">No photos yet.</p>
+                <p className="text-fp-muted text-sm mt-1">Upload photos to document this service ticket.</p>
               </div>
             ) : (
               <div>
@@ -983,10 +983,10 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                   if (categoryPhotos.length === 0) return null
                   return (
                     <div key={category} className="mb-6">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">{category} ({categoryPhotos.length})</p>
+                      <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">{category} ({categoryPhotos.length})</p>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {categoryPhotos.map(photo => (
-                          <div key={photo.id} className="bg-[#0F1C2E] rounded-xl overflow-hidden border border-[#2a3d55]">
+                          <div key={photo.id} className="bg-fp-inset rounded-xl overflow-hidden border border-fp-border">
                             <img src={photo.url} alt={photo.caption || category}
                               className="w-full h-48 object-cover cursor-pointer"
                               onClick={() => window.open(photo.url, '_blank')} />
@@ -994,11 +994,11 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                               <input type="text" value={photo.caption || ''} placeholder="Add caption..."
                                 onChange={e => updateTicketPhotoCaption(photo.id, e.target.value)}
                                 onBlur={e => updateTicketPhotoCaption(photo.id, e.target.value)}
-                                className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                                className="w-full bg-fp-card text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
                               <div className="flex justify-between items-center">
-                                <span className="text-[#8A9AB0] text-xs">{new Date(photo.created_at).toLocaleDateString()}</span>
+                                <span className="text-fp-muted text-xs">{new Date(photo.created_at).toLocaleDateString()}</span>
                                 <button onClick={() => deleteTicketPhoto(photo.id, photo.storage_path)}
-                                  className="text-[#2a3d55] hover:text-red-400 text-xs transition-colors">Delete</button>
+                                  className="text-fp-muted hover:text-red-400 text-xs transition-colors">Delete</button>
                               </div>
                             </div>
                           </div>

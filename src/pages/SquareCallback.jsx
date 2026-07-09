@@ -21,10 +21,10 @@ export default function SquareCallback() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
+    <div className="min-h-screen bg-fp-inset flex items-center justify-center">
       <div className="text-center">
-        <h1 className="text-white text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
-        <p className="text-[#8A9AB0] text-sm">Connecting Square...</p>
+        <h1 className="text-fp-text text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
+        <p className="text-fp-muted text-sm">Connecting Square...</p>
         <div className="mt-4 w-6 h-6 border-2 border-[#C8622A] border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     </div>

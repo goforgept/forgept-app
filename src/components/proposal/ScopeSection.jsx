@@ -18,9 +18,9 @@ export default function ScopeSection({
     .replace(/\{\{repName\}\}/g, proposal?.rep_name || '')
     .replace(/\{\{companyName\}\}/g, proposal?.company || '')
   return (
-    <div className="bg-[#1a2d45] rounded-xl p-6">
+    <div className="bg-fp-card rounded-xl p-6">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-white font-bold text-lg">Scope of Work</h3>
+        <h3 className="text-fp-text font-bold text-lg">Scope of Work</h3>
         <div className="flex gap-2 flex-wrap">
           {canEdit && features.sendProposal && (
             <button onClick={() => {
@@ -34,13 +34,13 @@ export default function ScopeSection({
               })
               setShowSendModal(true)
             }}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
+              className="bg-green-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
               ✉ Send Proposal
             </button>
           )}
           {canEdit && proposal?.client_email && proposal?.status === 'Sent' && !proposal?.signature_name && (
             <button onClick={requestSignature} disabled={requestingSignature}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
+              className="bg-blue-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
               {requestingSignature ? 'Sending...' : '✍️ Request Signature'}
             </button>
           )}
@@ -60,7 +60,7 @@ export default function ScopeSection({
             </button>
           )}
           {canEdit && (
-            <label className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1 ${uploadingSignedPDF ? 'bg-[#2a3d55] text-[#8A9AB0] opacity-50 cursor-not-allowed' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}
+            <label className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors cursor-pointer flex items-center gap-1 ${uploadingSignedPDF ? 'bg-fp-inset text-fp-muted opacity-50 cursor-not-allowed' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}
               title="Upload a physically signed or externally signed agreement PDF">
               {uploadingSignedPDF ? 'Uploading...' : '📎 Upload Signed'}
               <input type="file" accept=".pdf" onChange={uploadSignedPDF} className="hidden" disabled={uploadingSignedPDF} />
@@ -68,24 +68,24 @@ export default function ScopeSection({
           )}
           {qboConnected && proposal?.status === 'Won' && (
             <button onClick={sendToQBO} disabled={sendingToQBO}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${qboInvoiceId ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-[#2CA01C] text-white hover:bg-[#259018]'}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${qboInvoiceId ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-[#2CA01C] text-fp-text hover:bg-[#259018]'}`}>
               {sendingToQBO ? 'Sending...' : qboInvoiceId ? '✓ In QuickBooks' : '🟢 Send to QuickBooks'}
             </button>
           )}
           <button onClick={() => setShowPricingModal(true)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${(proposal?.hide_material_prices || proposal?.hide_labor_breakdown) ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${(proposal?.hide_material_prices || proposal?.hide_labor_breakdown) ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
             ⚙ Pricing
           </button>
-          <button onClick={downloadPDF} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">↓ PDF</button>
-          <button onClick={downloadDOCX} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">↓ DOCX</button>
+          <button onClick={downloadPDF} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors">↓ PDF</button>
+          <button onClick={downloadDOCX} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors">↓ DOCX</button>
           {features.sitePhotos && (
-            <button onClick={() => setShowPhotosModal(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors flex items-center gap-2">
+            <button onClick={() => setShowPhotosModal(true)} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors flex items-center gap-2">
               📷 Photos{photos.length > 0 ? ` (${photos.length})` : ''}
             </button>
           )}
           {canEdit && (
             <button onClick={generateSOW} disabled={generatingSOW}
-              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
               {generatingSOW ? 'Generating...' : proposal?.scope_of_work ? 'Regenerate SOW' : 'Generate SOW'}
             </button>
           )}
@@ -94,39 +94,39 @@ export default function ScopeSection({
 
       {canEdit && (
         <div className="mb-4">
-          <label className="text-white text-sm font-semibold block mb-1">AI Notes (Optional)</label>
-          <p className="text-[#8A9AB0] text-xs mb-2">Describe what you want the Scope of Work to include, how it should sound, or anything important.</p>
+          <label className="text-fp-text text-sm font-semibold block mb-1">AI Notes (Optional)</label>
+          <p className="text-fp-muted text-xs mb-2">Describe what you want the Scope of Work to include, how it should sound, or anything important.</p>
           <textarea value={aiNotes} onChange={e => setAiNotes(e.target.value)}
             placeholder="Example: This is for a commercial install. Keep it professional, emphasize safety, and make it easy for a non-technical client to understand."
-            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] min-h-[100px]" />
+            className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand min-h-[100px]" />
         </div>
       )}
 
       {canEdit && editingSOW ? (
         <div className="space-y-3">
           <textarea value={sowDraft} onChange={e => setSowDraft(e.target.value)} rows={14}
-            className="w-full bg-[#0F1C2E] text-white border border-[#C8622A]/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-y leading-relaxed" />
+            className="w-full bg-fp-inset text-fp-text border border-[#C8622A]/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y leading-relaxed" />
           <div className="flex gap-2 justify-end">
-            <button onClick={() => setEditingSOW(false)} className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-            <button onClick={saveSOW} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save SOW</button>
+            <button onClick={() => setEditingSOW(false)} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+            <button onClick={saveSOW} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save SOW</button>
           </div>
         </div>
       ) : proposal?.scope_of_work ? (
         <div className="relative group">
-          <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
+          <p className="text-fp-text text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
           {canEdit && (
             <button onClick={() => { setSowDraft(proposal.scope_of_work); setEditingSOW(true) }}
-              className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[#2a3d55] text-[#8A9AB0] hover:text-white px-2 py-1 rounded text-xs">
+              className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-fp-inset text-fp-muted hover:text-fp-text px-2 py-1 rounded text-xs">
               ✏️ Edit
             </button>
           )}
         </div>
       ) : (
         <div className="flex items-center gap-3">
-          <p className="text-[#8A9AB0] text-sm">No Scope of Work yet.</p>
+          <p className="text-fp-muted text-sm">No Scope of Work yet.</p>
           {canEdit && (
             <button onClick={() => { setSowDraft(''); setEditingSOW(true) }}
-              className="text-[#C8622A] hover:text-white text-sm font-medium transition-colors">
+              className="text-[#C8622A] hover:text-fp-text text-sm font-medium transition-colors">
               ✏️ Write my SOW
             </button>
           )}

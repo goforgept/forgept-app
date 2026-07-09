@@ -502,27 +502,27 @@ const deleteMeeting = async (meetingId) => {
   const avgDeal = proposals.length > 0 ? proposals.reduce((sum, p) => sum + (p.proposal_value || 0), 0) / proposals.length : 0
   const fmt = (num) => num?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'
   const fullAddress = [client?.address, client?.city, client?.state, client?.zip].filter(Boolean).join(', ')
-  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+  const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
-  if (loading) return <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center"><p className="text-white">Loading...</p></div>
+  if (loading) return <div className="min-h-screen bg-fp-inset flex items-center justify-center"><p className="text-fp-text">Loading...</p></div>
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
       <div className="flex-1 p-6 space-y-6">
 
         {/* Header */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="bg-fp-card rounded-xl p-6">
           <div className="flex justify-between items-start">
             <div className="flex items-start gap-4">
               <div className="w-14 h-14 rounded-xl bg-[#C8622A]/20 flex items-center justify-center flex-shrink-0">
                 <span className="text-[#C8622A] text-xl font-bold">{(client?.company || client?.client_name || '?')[0].toUpperCase()}</span>
               </div>
               <div>
-                <button onClick={() => navigate('/clients')} className="text-[#8A9AB0] hover:text-white text-xs transition-colors mb-1">← Clients</button>
-                <h2 className="text-white text-2xl font-bold">{client?.company}</h2>
-                <p className="text-[#8A9AB0] mt-0.5">{client?.client_name}</p>
-                {fullAddress && <p className="text-[#8A9AB0] text-sm mt-0.5">{fullAddress}</p>}
+                <button onClick={() => navigate('/clients')} className="text-fp-muted hover:text-fp-text text-xs transition-colors mb-1">← Clients</button>
+                <h2 className="text-fp-text text-2xl font-bold">{client?.company}</h2>
+                <p className="text-fp-muted mt-0.5">{client?.client_name}</p>
+                {fullAddress && <p className="text-fp-muted text-sm mt-0.5">{fullAddress}</p>}
               </div>
             </div>
             <div className="flex gap-2">
@@ -531,29 +531,29 @@ const deleteMeeting = async (meetingId) => {
                   if (!client?.email) { alert('Add an email address to this client first.'); return }
                   setShowEmailModal(true); setDraftedEmail(''); setEmailForm({ subject: '', context: '' })
                 }}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✍️ Draft Email</button>
+                  className="bg-purple-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✍️ Draft Email</button>
               )}
-              <button onClick={() => setEditingClient(true)} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">Edit Client</button>
-              <button onClick={handleNewProposal} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ New Proposal</button>
+              <button onClick={() => setEditingClient(true)} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">Edit Client</button>
+              <button onClick={handleNewProposal} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ New Proposal</button>
             </div>
           </div>
           <div className="grid grid-cols-5 gap-4 mt-6">
-            <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Proposals</p><p className="text-white text-xl font-bold">{proposals.length}</p></div>
-            <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Pipeline</p><p className="text-white text-xl font-bold">${fmt(totalPipeline)}</p></div>
-            <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Won Revenue</p><p className="text-green-400 text-xl font-bold">${fmt(wonPipeline)}</p></div>
-            <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Win Rate</p><p className="text-white text-xl font-bold">{winRate}%</p></div>
-            <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Locations</p><p className="text-white text-xl font-bold">{locations.length}</p></div>
+            <div className="bg-fp-inset rounded-lg p-3"><p className="text-fp-muted text-xs mb-1">Proposals</p><p className="text-fp-text text-xl font-bold">{proposals.length}</p></div>
+            <div className="bg-fp-inset rounded-lg p-3"><p className="text-fp-muted text-xs mb-1">Pipeline</p><p className="text-fp-text text-xl font-bold">${fmt(totalPipeline)}</p></div>
+            <div className="bg-fp-inset rounded-lg p-3"><p className="text-fp-muted text-xs mb-1">Won Revenue</p><p className="text-green-400 text-xl font-bold">${fmt(wonPipeline)}</p></div>
+            <div className="bg-fp-inset rounded-lg p-3"><p className="text-fp-muted text-xs mb-1">Win Rate</p><p className="text-fp-text text-xl font-bold">{winRate}%</p></div>
+            <div className="bg-fp-inset rounded-lg p-3"><p className="text-fp-muted text-xs mb-1">Locations</p><p className="text-fp-text text-xl font-bold">{locations.length}</p></div>
           </div>
         </div>
 
         {/* Contact strip */}
-        <div className="bg-[#1a2d45] rounded-xl px-6 py-4 flex gap-8 flex-wrap">
-          {client?.email && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Email</span><a href={`mailto:${encodeURIComponent(client.email)}`} className="text-[#C8622A] text-sm hover:underline">{client.email}</a></div>}
-          {client?.phone && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Phone</span><a href={`tel:${client.phone}`} className="text-white text-sm hover:text-[#C8622A] transition-colors">{client.phone}</a></div>}
-          {client?.industry && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Industry</span><span className="text-white text-sm">{client.industry}</span></div>}
-          {fullAddress && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Address</span><a href={`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`} target="_blank" rel="noreferrer" className="text-white text-sm hover:text-[#C8622A] transition-colors">{fullAddress}</a></div>}
-          {client?.store_id && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Store ID</span><span className="text-white text-sm font-mono">{client.store_id}</span></div>}
-          {client?.net_terms && <div className="flex items-center gap-2"><span className="text-[#8A9AB0] text-xs uppercase tracking-wide">Terms</span><span className="text-white text-sm font-semibold">{client.net_terms}</span></div>}
+        <div className="bg-fp-card rounded-xl px-6 py-4 flex gap-8 flex-wrap">
+          {client?.email && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Email</span><a href={`mailto:${encodeURIComponent(client.email)}`} className="text-[#C8622A] text-sm hover:underline">{client.email}</a></div>}
+          {client?.phone && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Phone</span><a href={`tel:${client.phone}`} className="text-fp-text text-sm hover:text-[#C8622A] transition-colors">{client.phone}</a></div>}
+          {client?.industry && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Industry</span><span className="text-fp-text text-sm">{client.industry}</span></div>}
+          {fullAddress && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Address</span><a href={`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`} target="_blank" rel="noreferrer" className="text-fp-text text-sm hover:text-[#C8622A] transition-colors">{fullAddress}</a></div>}
+          {client?.store_id && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Store ID</span><span className="text-fp-text text-sm font-mono">{client.store_id}</span></div>}
+          {client?.net_terms && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Terms</span><span className="text-fp-text text-sm font-semibold">{client.net_terms}</span></div>}
         </div>
 
         {/* Tabs */}
@@ -570,7 +570,7 @@ const deleteMeeting = async (meetingId) => {
             { key: 'notes', label: 'Notes' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
               {t.label}
             </button>
           ))}
@@ -578,28 +578,28 @@ const deleteMeeting = async (meetingId) => {
 
         {/* Proposals tab */}
         {activeTab === 'proposals' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="bg-fp-card rounded-xl p-6">
             {proposals.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-[#8A9AB0] mb-4">No proposals yet for this client.</p>
-                <button onClick={handleNewProposal} className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Create First Proposal</button>
+                <p className="text-fp-muted mb-4">No proposals yet for this client.</p>
+                <button onClick={handleNewProposal} className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Create First Proposal</button>
               </div>
             ) : (
               <div className="space-y-3">
                 {proposals.map(proposal => (
                   <div key={proposal.id} onClick={() => navigate(`/proposal/${proposal.id}`)}
-                    className="flex justify-between items-center bg-[#0F1C2E] rounded-lg p-4 cursor-pointer hover:bg-[#0a1628] transition-colors group">
+                    className="flex justify-between items-center bg-fp-inset rounded-lg p-4 cursor-pointer hover:bg-fp-inset transition-colors group">
                     <div>
-                      <p className="text-white font-semibold group-hover:text-[#C8622A] transition-colors">{proposal.proposal_name}</p>
-                      <p className="text-[#8A9AB0] text-sm mt-0.5">{proposal.rep_name} · {proposal.industry}{proposal.close_date && ` · Close: ${proposal.close_date}`}</p>
+                      <p className="text-fp-text font-semibold group-hover:text-[#C8622A] transition-colors">{proposal.proposal_name}</p>
+                      <p className="text-fp-muted text-sm mt-0.5">{proposal.rep_name} · {proposal.industry}{proposal.close_date && ` · Close: ${proposal.close_date}`}</p>
                     </div>
                     <div className="flex items-center gap-4">
                       {proposal.total_gross_margin_percent != null && (
-                        <div className="text-right"><p className="text-[#8A9AB0] text-xs">Margin</p><p className="text-[#C8622A] text-sm font-semibold">{proposal.total_gross_margin_percent.toFixed(1)}%</p></div>
+                        <div className="text-right"><p className="text-fp-muted text-xs">Margin</p><p className="text-[#C8622A] text-sm font-semibold">{proposal.total_gross_margin_percent.toFixed(1)}%</p></div>
                       )}
-                      <div className="text-right"><p className="text-[#8A9AB0] text-xs">Value</p><p className="text-white text-sm font-bold">${(proposal.proposal_value || 0).toLocaleString()}</p></div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${proposal.status === 'Won' ? 'bg-green-500/20 text-green-400' : proposal.status === 'Sent' ? 'bg-blue-500/20 text-blue-400' : proposal.status === 'Lost' ? 'bg-red-500/20 text-red-400' : 'bg-[#8A9AB0]/20 text-[#8A9AB0]'}`}>{proposal.status}</span>
-                      <span className="text-[#8A9AB0] group-hover:text-white transition-colors">→</span>
+                      <div className="text-right"><p className="text-fp-muted text-xs">Value</p><p className="text-fp-text text-sm font-bold">${(proposal.proposal_value || 0).toLocaleString()}</p></div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${proposal.status === 'Won' ? 'bg-green-500/20 text-green-400' : proposal.status === 'Sent' ? 'bg-blue-500/20 text-blue-400' : proposal.status === 'Lost' ? 'bg-red-500/20 text-red-400' : 'bg-fp-muted/20 text-fp-muted'}`}>{proposal.status}</span>
+                      <span className="text-fp-muted group-hover:text-fp-text transition-colors">→</span>
                     </div>
                   </div>
                 ))}
@@ -610,52 +610,52 @@ const deleteMeeting = async (meetingId) => {
 
         {/* Contacts tab */}
         {activeTab === 'contacts' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-bold text-lg">Contacts</h3>
-              <button onClick={openAddContact} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Contact</button>
+              <h3 className="text-fp-text font-bold text-lg">Contacts</h3>
+              <button onClick={openAddContact} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Contact</button>
             </div>
             {contacts.length === 0 ? (
-              <div className="text-center py-8 border-2 border-dashed border-[#2a3d55] rounded-xl">
-                <p className="text-[#8A9AB0] mb-3">No contacts yet.</p>
-                <p className="text-[#8A9AB0] text-sm">Add contacts like owners, project managers, or billing contacts for this client.</p>
+              <div className="text-center py-8 border-2 border-dashed border-fp-border rounded-xl">
+                <p className="text-fp-muted mb-3">No contacts yet.</p>
+                <p className="text-fp-muted text-sm">Add contacts like owners, project managers, or billing contacts for this client.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {contacts.map(contact => (
-                  <div key={contact.id} className={`bg-[#0F1C2E] rounded-xl p-4 border ${contact.is_primary ? 'border-[#C8622A]/40' : 'border-[#2a3d55]'}`}>
+                  <div key={contact.id} className={`bg-fp-inset rounded-xl p-4 border ${contact.is_primary ? 'border-[#C8622A]/40' : 'border-fp-border'}`}>
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-[#2a3d55] flex items-center justify-center flex-shrink-0">
-                          <span className="text-white text-sm font-bold">{(contact.full_name || '?')[0].toUpperCase()}</span>
+                        <div className="w-9 h-9 rounded-full bg-fp-inset flex items-center justify-center flex-shrink-0">
+                          <span className="text-fp-text text-sm font-bold">{(contact.full_name || '?')[0].toUpperCase()}</span>
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="text-white font-semibold text-sm truncate">{contact.full_name}</p>
+                            <p className="text-fp-text font-semibold text-sm truncate">{contact.full_name}</p>
                             {contact.is_primary && <span className="text-[#C8622A] text-xs font-semibold flex-shrink-0">Primary</span>}
                           </div>
-                          {contact.title && <p className="text-[#8A9AB0] text-xs">{contact.title}</p>}
+                          {contact.title && <p className="text-fp-muted text-xs">{contact.title}</p>}
                         </div>
                       </div>
                       <div className="flex gap-2 flex-shrink-0 ml-2">
-                        <button onClick={() => openEditContact(contact)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Edit</button>
+                        <button onClick={() => openEditContact(contact)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>
                         <button onClick={() => deleteContact(contact.id)} className="text-red-400 hover:text-red-300 text-xs transition-colors">Delete</button>
                       </div>
                     </div>
                     <div className="mt-3 space-y-1">
                       {contact.email && (
                         <div className="flex items-center gap-2">
-                          <span className="text-[#8A9AB0] text-xs w-10">Email</span>
+                          <span className="text-fp-muted text-xs w-10">Email</span>
                           <a href={`mailto:${encodeURIComponent(contact.email)}`} className="text-[#C8622A] text-xs hover:underline truncate">{contact.email}</a>
                         </div>
                       )}
                       {contact.phone && (
                         <div className="flex items-center gap-2">
-                          <span className="text-[#8A9AB0] text-xs w-10">Phone</span>
-                          <a href={`tel:${contact.phone}`} className="text-white text-xs hover:text-[#C8622A] transition-colors">{contact.phone}</a>
+                          <span className="text-fp-muted text-xs w-10">Phone</span>
+                          <a href={`tel:${contact.phone}`} className="text-fp-text text-xs hover:text-[#C8622A] transition-colors">{contact.phone}</a>
                         </div>
                       )}
-                      {contact.notes && <p className="text-[#8A9AB0] text-xs mt-1 italic">{contact.notes}</p>}
+                      {contact.notes && <p className="text-fp-muted text-xs mt-1 italic">{contact.notes}</p>}
                     </div>
                   </div>
                 ))}
@@ -666,15 +666,15 @@ const deleteMeeting = async (meetingId) => {
 
         {/* Locations tab */}
         {activeTab === 'locations' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-bold text-lg">Locations</h3>
-              <button onClick={openAddLocation} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Location</button>
+              <h3 className="text-fp-text font-bold text-lg">Locations</h3>
+              <button onClick={openAddLocation} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Location</button>
             </div>
             {locations.length === 0 ? (
-              <div className="text-center py-8 border-2 border-dashed border-[#2a3d55] rounded-xl">
-                <p className="text-[#8A9AB0] mb-3">No locations yet.</p>
-                <p className="text-[#8A9AB0] text-sm">Add job site locations, offices, or facilities for this client.</p>
+              <div className="text-center py-8 border-2 border-dashed border-fp-border rounded-xl">
+                <p className="text-fp-muted mb-3">No locations yet.</p>
+                <p className="text-fp-muted text-sm">Add job site locations, offices, or facilities for this client.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -682,39 +682,39 @@ const deleteMeeting = async (meetingId) => {
                   const addr = [loc.address, loc.floor_suite, loc.city, loc.state, loc.zip].filter(Boolean).join(', ')
                   const addrMapQuery = [loc.address, loc.city, loc.state, loc.zip].filter(Boolean).join(', ')
                   return (
-                    <div key={loc.id} className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
+                    <div key={loc.id} className="bg-fp-inset rounded-xl p-4 border border-fp-border">
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <div className="flex items-center gap-2 mb-0.5">
-                            <p className="text-white font-semibold">{loc.site_name}</p>
-                            {loc.store_id && <span className="text-xs px-1.5 py-0.5 rounded bg-[#0F1C2E] text-[#C8622A] font-mono">{loc.store_id}</span>}
-                            {loc.location_type && <span className="text-xs px-1.5 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0]">{loc.location_type}</span>}
+                            <p className="text-fp-text font-semibold">{loc.site_name}</p>
+                            {loc.store_id && <span className="text-xs px-1.5 py-0.5 rounded bg-fp-inset text-[#C8622A] font-mono">{loc.store_id}</span>}
+                            {loc.location_type && <span className="text-xs px-1.5 py-0.5 rounded bg-fp-inset text-fp-muted">{loc.location_type}</span>}
                           </div>
-                          {addr && <a href={`https://maps.google.com/?q=${encodeURIComponent(addrMapQuery)}`} target="_blank" rel="noreferrer" className="text-[#8A9AB0] text-xs hover:text-[#C8622A] transition-colors mt-0.5 block">{addr}</a>}
+                          {addr && <a href={`https://maps.google.com/?q=${encodeURIComponent(addrMapQuery)}`} target="_blank" rel="noreferrer" className="text-fp-muted text-xs hover:text-[#C8622A] transition-colors mt-0.5 block">{addr}</a>}
                         </div>
                         <div className="flex gap-2 flex-shrink-0 ml-2">
-                          <button onClick={() => openEditLocation(loc)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Edit</button>
+                          <button onClick={() => openEditLocation(loc)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>
                           <button onClick={() => deleteLocation(loc.id)} className="text-red-400 hover:text-red-300 text-xs transition-colors">Delete</button>
                         </div>
                       </div>
                       {loc.access_notes && (
-                        <div className="bg-[#1a2d45] rounded-lg px-3 py-2 mb-2">
-                          <p className="text-[#8A9AB0] text-xs font-semibold mb-0.5">Access</p>
-                          <p className="text-white text-xs">{loc.access_notes}</p>
+                        <div className="bg-fp-card rounded-lg px-3 py-2 mb-2">
+                          <p className="text-fp-muted text-xs font-semibold mb-0.5">Access</p>
+                          <p className="text-fp-text text-xs">{loc.access_notes}</p>
                         </div>
                       )}
                       {(loc.site_contact_name || loc.site_contact_email || loc.site_contact_phone) && (
-                        <div className="border-t border-[#2a3d55] pt-2 mt-2 space-y-1">
-                          <p className="text-[#8A9AB0] text-xs font-semibold">Site Contact</p>
-                          {loc.site_contact_name && <p className="text-white text-xs font-medium">{loc.site_contact_name}</p>}
+                        <div className="border-t border-fp-border pt-2 mt-2 space-y-1">
+                          <p className="text-fp-muted text-xs font-semibold">Site Contact</p>
+                          {loc.site_contact_name && <p className="text-fp-text text-xs font-medium">{loc.site_contact_name}</p>}
                           {loc.site_contact_email && <a href={`mailto:${encodeURIComponent(loc.site_contact_email)}`} className="text-[#C8622A] text-xs hover:underline block">{loc.site_contact_email}</a>}
-                          {loc.site_contact_phone && <a href={`tel:${loc.site_contact_phone}`} className="text-[#8A9AB0] text-xs hover:text-white transition-colors block">{loc.site_contact_phone}</a>}
+                          {loc.site_contact_phone && <a href={`tel:${loc.site_contact_phone}`} className="text-fp-muted text-xs hover:text-fp-text transition-colors block">{loc.site_contact_phone}</a>}
                         </div>
                       )}
-                      {loc.notes && <p className="text-[#8A9AB0] text-xs mt-2 italic">{loc.notes}</p>}
-                      <div className="mt-3 pt-2 border-t border-[#2a3d55]">
+                      {loc.notes && <p className="text-fp-muted text-xs mt-2 italic">{loc.notes}</p>}
+                      <div className="mt-3 pt-2 border-t border-fp-border">
                         <button onClick={() => navigate(`/new?clientId=${id}&locationId=${loc.id}`)}
-                          className="text-[#C8622A] text-xs hover:text-white transition-colors">+ Proposal for this location →</button>
+                          className="text-[#C8622A] text-xs hover:text-fp-text transition-colors">+ Proposal for this location →</button>
                       </div>
                     </div>
                   )
@@ -725,32 +725,32 @@ const deleteMeeting = async (meetingId) => {
         )}
 
         {activeTab === 'tickets' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-bold text-lg">Service Tickets</h3>
-              <button onClick={() => navigate('/service-tickets')} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">+ New Ticket</button>
+              <h3 className="text-fp-text font-bold text-lg">Service Tickets</h3>
+              <button onClick={() => navigate('/service-tickets')} className="text-fp-muted hover:text-fp-text text-sm transition-colors">+ New Ticket</button>
             </div>
             {clientTickets.length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No service tickets for this client yet.</p>
+              <p className="text-fp-muted text-sm">No service tickets for this client yet.</p>
             ) : (
               <div className="space-y-3">
                 {clientTickets.map(ticket => (
                   <div key={ticket.id} onClick={() => navigate(`/service-tickets/${ticket.id}`)}
-                    className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] cursor-pointer hover:border-[#C8622A]/40 transition-colors">
+                    className="bg-fp-inset rounded-lg p-4 border border-fp-border cursor-pointer hover:border-fp-brand/40 transition-colors">
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          {ticket.ticket_number && <span className="text-[#8A9AB0] text-xs font-mono bg-[#1a2d45] px-2 py-0.5 rounded">{ticket.ticket_number}</span>}
-                          <p className="text-white font-semibold text-sm">{ticket.title}</p>
+                          {ticket.ticket_number && <span className="text-fp-muted text-xs font-mono bg-fp-card px-2 py-0.5 rounded">{ticket.ticket_number}</span>}
+                          <p className="text-fp-text font-semibold text-sm">{ticket.title}</p>
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-[#8A9AB0] flex-wrap">
-                          <span className={`px-2 py-0.5 rounded font-semibold ${ticket.priority === 'Urgent' ? 'bg-red-500/20 text-red-400' : ticket.priority === 'High' ? 'bg-orange-500/20 text-orange-400' : ticket.priority === 'Normal' ? 'bg-blue-500/20 text-blue-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>{ticket.priority}</span>
+                        <div className="flex items-center gap-3 text-xs text-fp-muted flex-wrap">
+                          <span className={`px-2 py-0.5 rounded font-semibold ${ticket.priority === 'Urgent' ? 'bg-red-500/20 text-red-400' : ticket.priority === 'High' ? 'bg-orange-500/20 text-orange-400' : ticket.priority === 'Normal' ? 'bg-blue-500/20 text-blue-400' : 'bg-fp-inset text-fp-muted'}`}>{ticket.priority}</span>
                           <span className={`px-2 py-0.5 rounded font-semibold ${ticket.status === 'Open' ? 'bg-blue-500/20 text-blue-400' : ticket.status === 'In Progress' ? 'bg-yellow-500/20 text-yellow-400' : ticket.status === 'Resolved' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{ticket.status}</span>
                           {ticket.profiles?.full_name && <span>🔧 {ticket.profiles.full_name}</span>}
                           {ticket.scheduled_date && <span>📅 {new Date(ticket.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
                         </div>
                       </div>
-                      <span className="text-[#8A9AB0] text-xs ml-4">{new Date(ticket.created_at).toLocaleDateString()}</span>
+                      <span className="text-fp-muted text-xs ml-4">{new Date(ticket.created_at).toLocaleDateString()}</span>
                     </div>
                   </div>
                 ))}
@@ -759,37 +759,37 @@ const deleteMeeting = async (meetingId) => {
           </div>
         )}
 {activeTab === 'meetings' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-bold text-lg">Meetings</h3>
+              <h3 className="text-fp-text font-bold text-lg">Meetings</h3>
               <button onClick={() => { setEditingMeeting(null); setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false }); setShowMeetingModal(true) }}
-                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                 + Schedule Meeting
               </button>
             </div>
             {clientMeetings.length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No meetings scheduled yet.</p>
+              <p className="text-fp-muted text-sm">No meetings scheduled yet.</p>
             ) : (
               <div className="space-y-3">
                 {clientMeetings.map(meeting => {
                   const isPast = meeting.due_date < new Date().toISOString().split('T')[0]
                   return (
-                    <div key={meeting.id} className={`bg-[#0F1C2E] rounded-xl p-4 border ${isPast ? 'border-[#2a3d55]/30 opacity-70' : 'border-[#2a3d55]'}`}>
+                    <div key={meeting.id} className={`bg-fp-inset rounded-xl p-4 border ${isPast ? 'border-fp-border/30 opacity-70' : 'border-fp-border'}`}>
                       <div className="flex justify-between items-start">
                         <div>
                           <div className="flex items-center gap-2 mb-1">
                             <span className="text-xs px-2 py-0.5 rounded bg-blue-500/15 text-blue-400 font-semibold">📅 {meeting.meeting_type}</span>
                             {meeting.is_virtual && <span className="text-xs px-2 py-0.5 rounded bg-purple-500/15 text-purple-400 font-semibold">🎥 Virtual</span>}
-                            {isPast && <span className="text-xs px-2 py-0.5 rounded bg-[#2a3d55] text-[#8A9AB0]">Past</span>}
+                            {isPast && <span className="text-xs px-2 py-0.5 rounded bg-fp-inset text-fp-muted">Past</span>}
                             {meeting.completed && <span className="text-xs px-2 py-0.5 rounded bg-green-500/15 text-green-400">✓ Done</span>}
                           </div>
-                          <p className="text-white font-semibold text-sm">{meeting.title}</p>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-[#8A9AB0]">
+                          <p className="text-fp-text font-semibold text-sm">{meeting.title}</p>
+                          <div className="flex items-center gap-3 mt-1 text-xs text-fp-muted">
                             <span>📆 {meeting.due_date}{meeting.start_time ? ` at ${meeting.start_time}` : ''}</span>
                             {meeting.duration_minutes && <span>⏱ {meeting.duration_minutes} min</span>}
                             {meeting.profiles?.full_name && <span>👤 {meeting.profiles.full_name}</span>}
                           </div>
-                          {meeting.meeting_notes && <p className="text-[#8A9AB0] text-xs mt-1 italic">{meeting.meeting_notes}</p>}
+                          {meeting.meeting_notes && <p className="text-fp-muted text-xs mt-1 italic">{meeting.meeting_notes}</p>}
                           {meeting.meeting_link && (
                             <a href={meeting.meeting_link} target="_blank" rel="noopener noreferrer"
                               className="text-[#C8622A] text-xs hover:underline mt-1 block">🔗 Join Meeting</a>
@@ -797,8 +797,8 @@ const deleteMeeting = async (meetingId) => {
                         </div>
                         <div className="flex items-center gap-2">
                           {meeting.customer_notified && <span className="text-xs text-green-400">✉ Notified</span>}
-                          <button onClick={() => openEditMeeting(meeting)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Edit</button>
-                          <button onClick={() => deleteMeeting(meeting.id)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Delete</button>
+                          <button onClick={() => openEditMeeting(meeting)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>
+                          <button onClick={() => deleteMeeting(meeting.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Delete</button>
                         </div>
                       </div>
                     </div>
@@ -813,29 +813,29 @@ const deleteMeeting = async (meetingId) => {
         {activeTab === 'tasks' && <TaskList clientId={id} orgId={client?.org_id} userId={profile?.id} profiles={teamProfiles} />}
 
         {activeTab === 'emails' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-bold text-lg">Email History</h3>
+              <h3 className="text-fp-text font-bold text-lg">Email History</h3>
               {featureAiEmail && (
                 <button onClick={() => {
                   if (!client?.email) { alert('Add an email address to this client first.'); return }
                   setShowEmailModal(true); setDraftedEmail(''); setEmailForm({ subject: '', context: '' })
                 }}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✍️ Draft Email</button>
+                  className="bg-purple-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✍️ Draft Email</button>
               )}
             </div>
             {clientEmails.length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No emails sent yet.</p>
+              <p className="text-fp-muted text-sm">No emails sent yet.</p>
             ) : (
               <div className="space-y-3">
                 {clientEmails.map(email => (
-                  <div key={email.id} className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55]">
+                  <div key={email.id} className="bg-fp-inset rounded-lg p-4 border border-fp-border">
                     <div className="flex justify-between items-start mb-2">
-                      <p className="text-white font-semibold text-sm">{email.subject}</p>
-                      {email.opened_at ? <span className="text-green-400 text-xs font-semibold">✓ Opened {new Date(email.opened_at).toLocaleDateString()}</span> : <span className="text-[#8A9AB0] text-xs">Not opened yet</span>}
+                      <p className="text-fp-text font-semibold text-sm">{email.subject}</p>
+                      {email.opened_at ? <span className="text-green-400 text-xs font-semibold">✓ Opened {new Date(email.opened_at).toLocaleDateString()}</span> : <span className="text-fp-muted text-xs">Not opened yet</span>}
                     </div>
-                    <p className="text-[#8A9AB0] text-xs mb-2">To: {email.to_email} · {new Date(email.sent_at).toLocaleDateString()}</p>
-                    <p className="text-[#D6E4F0] text-xs leading-relaxed whitespace-pre-wrap line-clamp-3">{email.body}</p>
+                    <p className="text-fp-muted text-xs mb-2">To: {email.to_email} · {new Date(email.sent_at).toLocaleDateString()}</p>
+                    <p className="text-fp-text text-xs leading-relaxed whitespace-pre-wrap line-clamp-3">{email.body}</p>
                   </div>
                 ))}
               </div>
@@ -844,29 +844,29 @@ const deleteMeeting = async (meetingId) => {
         )}
 
         {activeTab === 'notes' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-white font-bold text-lg">Notes</h3>
-              {!editingClient && <button onClick={() => setEditingClient(true)} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">Edit</button>}
+              <h3 className="text-fp-text font-bold text-lg">Notes</h3>
+              {!editingClient && <button onClick={() => setEditingClient(true)} className="text-fp-muted hover:text-fp-text text-sm transition-colors">Edit</button>}
             </div>
-            {client?.notes ? <p className="text-[#8A9AB0] text-sm leading-relaxed whitespace-pre-wrap">{client.notes}</p> : <p className="text-[#8A9AB0] text-sm italic">No notes yet.</p>}
+            {client?.notes ? <p className="text-fp-muted text-sm leading-relaxed whitespace-pre-wrap">{client.notes}</p> : <p className="text-fp-muted text-sm italic">No notes yet.</p>}
           </div>
         )}
       </div>
 {/* Schedule Meeting Modal */}
       {showMeetingModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-5">📅 {editingMeeting ? 'Edit Meeting' : 'Schedule Meeting'}</h3>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-fp-text font-bold text-lg mb-5">📅 {editingMeeting ? 'Edit Meeting' : 'Schedule Meeting'}</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Meeting Title <span className="text-[#C8622A]">*</span></label>
+                <label className="text-fp-muted text-xs mb-1 block">Meeting Title <span className="text-[#C8622A]">*</span></label>
                 <input type="text" value={meetingForm.title} onChange={e => setMeetingForm(p => ({ ...p, title: e.target.value }))}
                   placeholder="e.g. Security System Proposal Review" className={inputClass} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Meeting Type <span className="text-[#C8622A]">*</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Meeting Type <span className="text-[#C8622A]">*</span></label>
                   <select value={meetingForm.meeting_type} onChange={e => setMeetingForm(p => ({ ...p, meeting_type: e.target.value }))} className={inputClass}>
                     {['Site Visit', 'Sales Call', 'Follow-up Call', 'Proposal Review', 'Kickoff Meeting'].map(t => (
                       <option key={t} value={t}>{t}</option>
@@ -874,53 +874,53 @@ const deleteMeeting = async (meetingId) => {
                   </select>
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Assigned To</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Assigned To</label>
                   <select value={meetingForm.assigned_to} onChange={e => setMeetingForm(p => ({ ...p, assigned_to: e.target.value }))} className={inputClass}>
                     {teamProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Date <span className="text-[#C8622A]">*</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Date <span className="text-[#C8622A]">*</span></label>
                   <input type="date" value={meetingForm.due_date} onChange={e => setMeetingForm(p => ({ ...p, due_date: e.target.value }))} className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start Time</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Start Time</label>
                   <input type="time" value={meetingForm.start_time} onChange={e => setMeetingForm(p => ({ ...p, start_time: e.target.value }))} className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Duration</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Duration</label>
                   <select value={meetingForm.duration_minutes} onChange={e => setMeetingForm(p => ({ ...p, duration_minutes: parseInt(e.target.value) }))} className={inputClass}>
                     {[15, 30, 45, 60, 90, 120].map(m => <option key={m} value={m}>{m} min</option>)}
                   </select>
                 </div>
                 <div className="flex items-end pb-2">
                   <button type="button" onClick={() => setMeetingForm(p => ({ ...p, is_virtual: !p.is_virtual }))}
-                    className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${meetingForm.is_virtual ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+                    className={`w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${meetingForm.is_virtual ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
                     🎥 {meetingForm.is_virtual ? 'Virtual — link auto-generated' : 'Make Virtual'}
                   </button>
                 </div>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Notes (optional)</label>
+                <label className="text-fp-muted text-xs mb-1 block">Notes (optional)</label>
                 <textarea value={meetingForm.meeting_notes} onChange={e => setMeetingForm(p => ({ ...p, meeting_notes: e.target.value }))}
                   rows={2} placeholder="Agenda, location details, prep notes..."
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
               </div>
               {client?.email && (
                 <button onClick={() => setMeetingForm(p => ({ ...p, customer_notified: !p.customer_notified }))}
                   className="flex items-center gap-2 text-sm transition-colors">
-                  <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${meetingForm.customer_notified ? 'bg-[#C8622A] border-[#C8622A]' : 'border-[#2a3d55]'}`}>
-                    {meetingForm.customer_notified && <span className="text-white text-xs">✓</span>}
+                  <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${meetingForm.customer_notified ? 'bg-[#C8622A] border-[#C8622A]' : 'border-fp-border'}`}>
+                    {meetingForm.customer_notified && <span className="text-fp-text text-xs">✓</span>}
                   </span>
-                  <span className={meetingForm.customer_notified ? 'text-white' : 'text-[#8A9AB0]'}>
+                  <span className={meetingForm.customer_notified ? 'text-fp-text' : 'text-fp-muted'}>
                     Send confirmation email to {client?.client_name || client?.company} + 24hr reminder
                   </span>
                 </button>
               )}
               <div className="flex gap-3 pt-2">
-                <button onClick={() => { setShowMeetingModal(false); setEditingMeeting(null) }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={() => { setShowMeetingModal(false); setEditingMeeting(null) }} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={saveMeeting} disabled={savingMeeting || !meetingForm.title || !meetingForm.due_date}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {savingMeeting ? 'Saving...' : editingMeeting ? 'Save Changes' : 'Schedule Meeting'}
                 </button>
               </div>
@@ -932,20 +932,20 @@ const deleteMeeting = async (meetingId) => {
       {/* Location Modal */}
       {showLocationModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-5">{editingLocation ? 'Edit Location' : 'Add Location'}</h3>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-fp-text font-bold text-lg mb-5">{editingLocation ? 'Edit Location' : 'Add Location'}</h3>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Site Name <span className="text-[#C8622A]">*</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Site Name <span className="text-[#C8622A]">*</span></label>
                   <input type="text" value={locationForm.site_name} onChange={e => setLocationForm(p => ({ ...p, site_name: e.target.value }))} placeholder="e.g. HQ, Warehouse, Nashville Office" className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Store ID</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Store ID</label>
                   <input type="text" value={locationForm.store_id || ''} onChange={e => setLocationForm(p => ({ ...p, store_id: e.target.value }))} placeholder="e.g. STR-001" className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Location Type</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Location Type</label>
                   <select value={locationForm.location_type} onChange={e => setLocationForm(p => ({ ...p, location_type: e.target.value }))} className={inputClass}>
                     <option value="">— Select type —</option>
                     {LOCATION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -953,32 +953,32 @@ const deleteMeeting = async (meetingId) => {
                 </div>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Street Address</label>
+                <label className="text-fp-muted text-xs mb-1 block">Street Address</label>
                 <input type="text" value={locationForm.address} onChange={e => setLocationForm(p => ({ ...p, address: e.target.value }))} placeholder="123 Main St" className={inputClass} />
               </div>
               <div className="grid grid-cols-4 gap-3">
-                <div className="col-span-2"><label className="text-[#8A9AB0] text-xs mb-1 block">City</label><input type="text" value={locationForm.city} onChange={e => setLocationForm(p => ({ ...p, city: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">State</label><input type="text" value={locationForm.state} onChange={e => setLocationForm(p => ({ ...p, state: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">ZIP</label><input type="text" value={locationForm.zip} onChange={e => setLocationForm(p => ({ ...p, zip: e.target.value }))} className={inputClass} /></div>
+                <div className="col-span-2"><label className="text-fp-muted text-xs mb-1 block">City</label><input type="text" value={locationForm.city} onChange={e => setLocationForm(p => ({ ...p, city: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">State</label><input type="text" value={locationForm.state} onChange={e => setLocationForm(p => ({ ...p, state: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">ZIP</label><input type="text" value={locationForm.zip} onChange={e => setLocationForm(p => ({ ...p, zip: e.target.value }))} className={inputClass} /></div>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Floor / Suite / Unit</label>
+                <label className="text-fp-muted text-xs mb-1 block">Floor / Suite / Unit</label>
                 <input type="text" value={locationForm.floor_suite} onChange={e => setLocationForm(p => ({ ...p, floor_suite: e.target.value }))} placeholder="e.g. Suite 200, Floor 3, Unit B" className={inputClass} />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Access Notes</label>
+                <label className="text-fp-muted text-xs mb-1 block">Access Notes</label>
                 <input type="text" value={locationForm.access_notes} onChange={e => setLocationForm(p => ({ ...p, access_notes: e.target.value }))} placeholder="Gate code, parking, building entry..." className={inputClass} />
               </div>
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide pt-2">Site Contact (optional)</p>
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide pt-2">Site Contact (optional)</p>
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">Contact Name</label><input type="text" value={locationForm.site_contact_name} onChange={e => setLocationForm(p => ({ ...p, site_contact_name: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">Contact Email</label><input type="email" value={locationForm.site_contact_email} onChange={e => setLocationForm(p => ({ ...p, site_contact_email: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">Contact Phone</label><input type="text" value={locationForm.site_contact_phone} onChange={e => setLocationForm(p => ({ ...p, site_contact_phone: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Contact Name</label><input type="text" value={locationForm.site_contact_name} onChange={e => setLocationForm(p => ({ ...p, site_contact_name: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Contact Email</label><input type="email" value={locationForm.site_contact_email} onChange={e => setLocationForm(p => ({ ...p, site_contact_email: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Contact Phone</label><input type="text" value={locationForm.site_contact_phone} onChange={e => setLocationForm(p => ({ ...p, site_contact_phone: e.target.value }))} className={inputClass} /></div>
               </div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">General Notes</label><textarea value={locationForm.notes} onChange={e => setLocationForm(p => ({ ...p, notes: e.target.value }))} placeholder="Additional notes about this location..." rows={2} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" /></div>
+              <div><label className="text-fp-muted text-xs mb-1 block">General Notes</label><textarea value={locationForm.notes} onChange={e => setLocationForm(p => ({ ...p, notes: e.target.value }))} placeholder="Additional notes about this location..." rows={2} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" /></div>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowLocationModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={saveLocation} disabled={savingLocation || !locationForm.site_name.trim()} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingLocation ? 'Saving...' : 'Save Location'}</button>
+                <button onClick={() => setShowLocationModal(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+                <button onClick={saveLocation} disabled={savingLocation || !locationForm.site_name.trim()} className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingLocation ? 'Saving...' : 'Save Location'}</button>
               </div>
             </div>
           </div>
@@ -988,41 +988,41 @@ const deleteMeeting = async (meetingId) => {
       {/* Contact Modal */}
       {showContactModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-5">{editingContact ? 'Edit Contact' : 'Add Contact'}</h3>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-fp-text font-bold text-lg mb-5">{editingContact ? 'Edit Contact' : 'Add Contact'}</h3>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Full Name <span className="text-[#C8622A]">*</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Full Name <span className="text-[#C8622A]">*</span></label>
                   <input type="text" value={contactForm.full_name} onChange={e => setContactForm(p => ({ ...p, full_name: e.target.value }))} placeholder="Jane Smith" className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Title / Role</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Title / Role</label>
                   <input type="text" value={contactForm.title} onChange={e => setContactForm(p => ({ ...p, title: e.target.value }))} placeholder="Owner, PM, Accounting..." className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Email</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Email</label>
                   <input type="email" value={contactForm.email} onChange={e => setContactForm(p => ({ ...p, email: e.target.value }))} className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Phone</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Phone</label>
                   <input type="text" value={contactForm.phone} onChange={e => setContactForm(p => ({ ...p, phone: e.target.value }))} className={inputClass} />
                 </div>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Notes</label>
+                <label className="text-fp-muted text-xs mb-1 block">Notes</label>
                 <input type="text" value={contactForm.notes} onChange={e => setContactForm(p => ({ ...p, notes: e.target.value }))} placeholder="Best time to call, preferences..." className={inputClass} />
               </div>
               <button type="button" onClick={() => setContactForm(p => ({ ...p, is_primary: !p.is_primary }))}
                 className="flex items-center gap-2 text-sm transition-colors">
-                <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${contactForm.is_primary ? 'bg-[#C8622A] border-[#C8622A]' : 'border-[#2a3d55]'}`}>
-                  {contactForm.is_primary && <span className="text-white text-xs">✓</span>}
+                <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${contactForm.is_primary ? 'bg-[#C8622A] border-[#C8622A]' : 'border-fp-border'}`}>
+                  {contactForm.is_primary && <span className="text-fp-text text-xs">✓</span>}
                 </span>
-                <span className={contactForm.is_primary ? 'text-white' : 'text-[#8A9AB0]'}>Primary contact</span>
+                <span className={contactForm.is_primary ? 'text-fp-text' : 'text-fp-muted'}>Primary contact</span>
               </button>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowContactModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={saveContact} disabled={savingContact || !contactForm.full_name.trim()} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingContact ? 'Saving...' : 'Save Contact'}</button>
+                <button onClick={() => setShowContactModal(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+                <button onClick={saveContact} disabled={savingContact || !contactForm.full_name.trim()} className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingContact ? 'Saving...' : 'Save Contact'}</button>
               </div>
             </div>
           </div>
@@ -1032,22 +1032,22 @@ const deleteMeeting = async (meetingId) => {
       {/* AI Email Modal */}
       {showEmailModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-1">✍️ Draft Email with AI</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Sending to <span className="text-white font-medium">{client?.company}</span>{client?.client_name ? ` · ${client.client_name}` : ''} · {client?.email}</p>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-fp-text font-bold text-lg mb-1">✍️ Draft Email with AI</h3>
+            <p className="text-fp-muted text-sm mb-5">Sending to <span className="text-fp-text font-medium">{client?.company}</span>{client?.client_name ? ` · ${client.client_name}` : ''} · {client?.email}</p>
             <div className="space-y-4">
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Subject Line</label><input type="text" value={emailForm.subject} onChange={e => setEmailForm(p => ({ ...p, subject: e.target.value }))} placeholder="e.g. Security System Upgrade" className={inputClass} /></div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">What do you want to accomplish?</label><textarea value={emailForm.context} onChange={e => setEmailForm(p => ({ ...p, context: e.target.value }))} rows={3} placeholder="e.g. Cold outreach about camera system for their next project." className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" /></div>
-              <button onClick={draftEmail} disabled={generatingEmail || !emailForm.context} className="bg-purple-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">{generatingEmail ? '✨ Drafting...' : '✨ Generate Draft'}</button>
+              <div><label className="text-fp-muted text-xs mb-1 block">Subject Line</label><input type="text" value={emailForm.subject} onChange={e => setEmailForm(p => ({ ...p, subject: e.target.value }))} placeholder="e.g. Security System Upgrade" className={inputClass} /></div>
+              <div><label className="text-fp-muted text-xs mb-1 block">What do you want to accomplish?</label><textarea value={emailForm.context} onChange={e => setEmailForm(p => ({ ...p, context: e.target.value }))} rows={3} placeholder="e.g. Cold outreach about camera system for their next project." className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" /></div>
+              <button onClick={draftEmail} disabled={generatingEmail || !emailForm.context} className="bg-purple-600 text-fp-text px-5 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">{generatingEmail ? '✨ Drafting...' : '✨ Generate Draft'}</button>
               {draftedEmail && (
                 <div>
-                  <div className="flex justify-between items-center mb-2"><label className="text-[#8A9AB0] text-xs">Email Draft</label><button onClick={() => setEmailEditMode(!emailEditMode)} className="text-[#C8622A] text-xs hover:text-white transition-colors">{emailEditMode ? 'Preview' : 'Edit'}</button></div>
-                  {emailEditMode ? <textarea value={draftedEmail} onChange={e => setDraftedEmail(e.target.value)} rows={12} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" /> : <div className="bg-[#0F1C2E] border border-[#2a3d55] rounded-lg p-4"><p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{draftedEmail}</p></div>}
+                  <div className="flex justify-between items-center mb-2"><label className="text-fp-muted text-xs">Email Draft</label><button onClick={() => setEmailEditMode(!emailEditMode)} className="text-[#C8622A] text-xs hover:text-fp-text transition-colors">{emailEditMode ? 'Preview' : 'Edit'}</button></div>
+                  {emailEditMode ? <textarea value={draftedEmail} onChange={e => setDraftedEmail(e.target.value)} rows={12} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" /> : <div className="bg-fp-inset border border-fp-border rounded-lg p-4"><p className="text-fp-text text-sm leading-relaxed whitespace-pre-wrap">{draftedEmail}</p></div>}
                 </div>
               )}
               <div className="flex gap-3 pt-2">
-                <button onClick={() => { setShowEmailModal(false); setDraftedEmail(''); setEmailEditMode(false) }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={sendEmail} disabled={sendingEmail || !draftedEmail || !emailForm.subject} className="flex-1 bg-purple-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">{sendingEmail ? 'Sending...' : 'Send Email →'}</button>
+                <button onClick={() => { setShowEmailModal(false); setDraftedEmail(''); setEmailEditMode(false) }} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+                <button onClick={sendEmail} disabled={sendingEmail || !draftedEmail || !emailForm.subject} className="flex-1 bg-purple-600 text-fp-text py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">{sendingEmail ? 'Sending...' : 'Send Email →'}</button>
               </div>
             </div>
           </div>
@@ -1057,28 +1057,28 @@ const deleteMeeting = async (meetingId) => {
       {/* Edit Client Modal */}
       {editingClient && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-5">Edit Client</h3>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-fp-text font-bold text-lg mb-5">Edit Client</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">Company</label><input type="text" value={editForm.company || ''} onChange={e => setEditForm(p => ({ ...p, company: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">Contact Name</label><input type="text" value={editForm.client_name || ''} onChange={e => setEditForm(p => ({ ...p, client_name: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">Email</label><input type="email" value={editForm.email || ''} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">Phone</label><input type="text" value={editForm.phone || ''} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">Industry</label><select value={editForm.industry || ''} onChange={e => setEditForm(p => ({ ...p, industry: e.target.value }))} className={inputClass}><option value="">Select industry</option>{INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}</select></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">Store ID</label><input type="text" value={editForm.store_id || ''} onChange={e => setEditForm(p => ({ ...p, store_id: e.target.value }))} placeholder="e.g. STR-001" className={inputClass} /></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">Payment Terms</label><select value={editForm.net_terms || 'NET 30'} onChange={e => setEditForm(p => ({ ...p, net_terms: e.target.value }))} className={inputClass}>{['Due on Receipt', 'NET 15', 'NET 30', 'NET 45', 'NET 60', 'NET 90'].map(t => <option key={t}>{t}</option>)}</select></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Company</label><input type="text" value={editForm.company || ''} onChange={e => setEditForm(p => ({ ...p, company: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Contact Name</label><input type="text" value={editForm.client_name || ''} onChange={e => setEditForm(p => ({ ...p, client_name: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Email</label><input type="email" value={editForm.email || ''} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Phone</label><input type="text" value={editForm.phone || ''} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Industry</label><select value={editForm.industry || ''} onChange={e => setEditForm(p => ({ ...p, industry: e.target.value }))} className={inputClass}><option value="">Select industry</option>{INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}</select></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Store ID</label><input type="text" value={editForm.store_id || ''} onChange={e => setEditForm(p => ({ ...p, store_id: e.target.value }))} placeholder="e.g. STR-001" className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Payment Terms</label><select value={editForm.net_terms || 'NET 30'} onChange={e => setEditForm(p => ({ ...p, net_terms: e.target.value }))} className={inputClass}>{['Due on Receipt', 'NET 15', 'NET 30', 'NET 45', 'NET 60', 'NET 90'].map(t => <option key={t}>{t}</option>)}</select></div>
               </div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Street Address</label><input type="text" value={editForm.address || ''} onChange={e => setEditForm(p => ({ ...p, address: e.target.value }))} className={inputClass} /></div>
+              <div><label className="text-fp-muted text-xs mb-1 block">Street Address</label><input type="text" value={editForm.address || ''} onChange={e => setEditForm(p => ({ ...p, address: e.target.value }))} className={inputClass} /></div>
               <div className="grid grid-cols-3 gap-3">
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">City</label><input type="text" value={editForm.city || ''} onChange={e => setEditForm(p => ({ ...p, city: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">State</label><input type="text" value={editForm.state || ''} onChange={e => setEditForm(p => ({ ...p, state: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-[#8A9AB0] text-xs mb-1 block">ZIP</label><input type="text" value={editForm.zip || ''} onChange={e => setEditForm(p => ({ ...p, zip: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">City</label><input type="text" value={editForm.city || ''} onChange={e => setEditForm(p => ({ ...p, city: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">State</label><input type="text" value={editForm.state || ''} onChange={e => setEditForm(p => ({ ...p, state: e.target.value }))} className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">ZIP</label><input type="text" value={editForm.zip || ''} onChange={e => setEditForm(p => ({ ...p, zip: e.target.value }))} className={inputClass} /></div>
               </div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Notes</label><textarea value={editForm.notes || ''} onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))} rows={4} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" /></div>
+              <div><label className="text-fp-muted text-xs mb-1 block">Notes</label><textarea value={editForm.notes || ''} onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))} rows={4} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" /></div>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setEditingClient(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={saveClient} disabled={savingClient} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingClient ? 'Saving...' : 'Save Changes'}</button>
+                <button onClick={() => setEditingClient(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+                <button onClick={saveClient} disabled={savingClient} className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingClient ? 'Saving...' : 'Save Changes'}</button>
               </div>
             </div>
           </div>

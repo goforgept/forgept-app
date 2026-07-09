@@ -257,11 +257,11 @@ const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featu
     location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'))
 
   return (
-    <div className="w-56 min-h-screen bg-[#1a2d45] border-r border-[#2a3d55] flex flex-col">
-      <div className="px-6 py-5 border-b border-[#2a3d55]">
+    <div className="w-56 min-h-screen bg-fp-card border-r border-fp-border flex flex-col">
+      <div className="px-6 py-5 border-b border-fp-border">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-white text-xl font-bold">
+            <h1 className="text-fp-text text-xl font-bold">
               ForgePt<span className="text-[#C8622A]">.</span>
             </h1>
             {(isAdmin || isSalesManager || isPM || isProductManager || isTechnician || isDevTeam) && (
@@ -283,11 +283,11 @@ const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featu
               <button
                 onClick={() => toggleGroup(group.key)}
                 className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors ${
-                  hasActive && !isOpen ? 'text-[#C8622A]' : 'text-[#8A9AB0] hover:text-white'
+                  hasActive && !isOpen ? 'text-[#C8622A]' : 'text-fp-muted hover:text-fp-text'
                 }`}
               >
                 <span>{group.label}</span>
-                <span className="text-[#2a3d55] text-xs">{isOpen ? '▾' : '▸'}</span>
+                <span className="text-fp-muted text-xs">{isOpen ? '▾' : '▸'}</span>
               </button>
               {isOpen && (
                 <div className="mt-0.5 space-y-0.5">
@@ -298,7 +298,7 @@ const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featu
                       className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-3 transition-all duration-150 ${
                         isActive(path)
                           ? 'bg-[#C8622A]/20 text-[#C8622A]'
-                          : 'text-[#8A9AB0] hover:text-white hover:bg-[#0F1C2E]'
+                          : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
                       }`}
                     >
                       <span className="text-base">{icon}</span>
@@ -312,10 +312,10 @@ const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featu
         })}
       </nav>
 
-      <div className="px-3 py-4 border-t border-[#2a3d55]">
+      <div className="px-3 py-4 border-t border-fp-border">
         <button
           onClick={handleSignOut}
-          className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-[#8A9AB0] hover:text-white hover:bg-[#0F1C2E] transition-all duration-200 flex items-center gap-3"
+          className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-fp-muted hover:text-fp-text hover:bg-fp-inset transition-all duration-200 flex items-center gap-3"
         >
           <span>🚪</span>
           Sign Out

@@ -52,10 +52,10 @@ function App() {
   const location = useLocation()
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
+    <div className="min-h-screen bg-fp-inset flex items-center justify-center">
       <div className="text-center">
-        <h1 className="text-white text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
-        <p className="text-[#8A9AB0] text-sm">Loading...</p>
+        <h1 className="text-fp-text text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
+        <p className="text-fp-muted text-sm">Loading...</p>
       </div>
     </div>
   )
@@ -69,17 +69,17 @@ function App() {
   sessionStorage.setItem('featureDrawingTool', features.drawingTool)
 
   if (session && isPending) return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-fp-inset flex items-center justify-center px-4">
       <div className="text-center max-w-md">
-        <h1 className="text-white text-4xl font-bold mb-2">
+        <h1 className="text-fp-text text-4xl font-bold mb-2">
           ForgePt<span className="text-[#C8622A]">.</span>
         </h1>
-        <div className="bg-[#1a2d45] rounded-2xl p-8 mt-6">
+        <div className="bg-fp-card rounded-2xl p-8 mt-6">
           <p className="text-yellow-400 text-lg font-semibold mb-3">⏳ Account Pending Approval</p>
-          <p className="text-[#8A9AB0] text-sm">Your account is being reviewed. You will receive an email once approved.</p>
+          <p className="text-fp-muted text-sm">Your account is being reviewed. You will receive an email once approved.</p>
           <button
             onClick={() => supabase.auth.signOut()}
-            className="mt-6 text-[#8A9AB0] hover:text-white text-sm transition-colors"
+            className="mt-6 text-fp-muted hover:text-fp-text text-sm transition-colors"
           >
             Sign Out
           </button>
@@ -120,7 +120,7 @@ function App() {
   return (
     <>
       {impersonation && (
-        <div className="fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-white text-xs flex items-center justify-between px-4 py-1.5">
+        <div className="fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-fp-text text-xs flex items-center justify-between px-4 py-1.5">
           <span>Superadmin viewing as <strong>{impersonation.orgName}</strong> · {impersonation.userName}</span>
           <button onClick={() => { localStorage.removeItem('sa_impersonate'); window.location.reload() }} className="underline hover:no-underline ml-4">Exit</button>
         </div>
@@ -202,7 +202,7 @@ function TempPasswordBanner() {
   const [hidden, setHidden] = useState(false)
   if (hidden) return null
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9998] bg-[#C8622A] text-white text-xs flex items-center justify-between px-4 py-2 shadow-lg">
+    <div className="fixed top-0 left-0 right-0 z-[9998] bg-fp-brand text-white text-xs flex items-center justify-between px-4 py-2 shadow-lg">
       <span className="font-medium">
         You're using a temporary password — please change it to secure your account.
       </span>
@@ -212,7 +212,7 @@ function TempPasswordBanner() {
           className="bg-white text-[#C8622A] font-semibold px-3 py-1 rounded text-xs hover:bg-orange-50 transition-colors">
           Change Password
         </button>
-        <button onClick={() => setHidden(true)} className="text-white/70 hover:text-white transition-colors text-sm leading-none">✕</button>
+        <button onClick={() => setHidden(true)} className="text-fp-text/70 hover:text-fp-text transition-colors text-sm leading-none">✕</button>
       </div>
     </div>
   )

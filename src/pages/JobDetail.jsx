@@ -1082,23 +1082,23 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const progress = checklist.length > 0 ? Math.round((completedCount / checklist.length) * 100) : 0
   const totalCOAmount = changeOrders.filter(c => c.status === 'Approved').reduce((sum, c) => sum + (c.amount || 0), 0)
   const categories = ['Electrical', 'Mechanical', 'Audio/Visual', 'Security', 'Networking', 'Material', 'Roofing Materials', 'Insulation', 'Windows & Doors', 'Flooring', 'Painting & Finishing', 'Plumbing', 'HVAC', 'Solar', 'Hardware', 'Other']
-  const inputClass = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+  const inputClass = "bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
-  if (loading) return <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center"><p className="text-white">Loading...</p></div>
+  if (loading) return <div className="min-h-screen bg-fp-inset flex items-center justify-center"><p className="text-fp-text">Loading...</p></div>
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} role={role} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-6">
 
         {/* Header */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="bg-fp-card rounded-xl p-6">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <button onClick={() => navigate('/jobs')} className="text-[#8A9AB0] hover:text-white text-xs mb-2 transition-colors">← Jobs</button>
+              <button onClick={() => navigate('/jobs')} className="text-fp-muted hover:text-fp-text text-xs mb-2 transition-colors">← Jobs</button>
               <div className="flex items-center gap-3">
-                {job?.job_number && <span className="text-[#8A9AB0] text-sm font-mono bg-[#0F1C2E] px-2 py-0.5 rounded">{job.job_number}</span>}
+                {job?.job_number && <span className="text-fp-muted text-sm font-mono bg-fp-inset px-2 py-0.5 rounded">{job.job_number}</span>}
                 {editingJobName ? (
                   <div className="flex items-center gap-2">
                     <input
@@ -1107,44 +1107,44 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                       value={jobNameDraft}
                       onChange={e => setJobNameDraft(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') saveJobName(); if (e.key === 'Escape') setEditingJobName(false) }}
-                      className="bg-[#0F1C2E] text-white text-2xl font-bold border-b-2 border-[#C8622A] focus:outline-none px-1"
+                      className="bg-fp-inset text-fp-text text-2xl font-bold border-b-2 border-[#C8622A] focus:outline-none px-1"
                     />
-                    <button onClick={saveJobName} className="text-[#C8622A] text-sm font-semibold hover:text-white transition-colors">Save</button>
-                    <button onClick={() => setEditingJobName(false)} className="text-[#8A9AB0] text-sm hover:text-white transition-colors">Cancel</button>
+                    <button onClick={saveJobName} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors">Save</button>
+                    <button onClick={() => setEditingJobName(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">Cancel</button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 group">
-                    <h2 className="text-white text-2xl font-bold">{job?.name}</h2>
+                    <h2 className="text-fp-text text-2xl font-bold">{job?.name}</h2>
                     <button onClick={() => { setJobNameDraft(job?.name || ''); setEditingJobName(true) }}
-                      className="opacity-0 group-hover:opacity-100 text-[#8A9AB0] hover:text-white text-xs transition-all">✏️</button>
+                      className="opacity-0 group-hover:opacity-100 text-fp-muted hover:text-fp-text text-xs transition-all">✏️</button>
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-4 mt-1 text-sm text-[#8A9AB0]">
+              <div className="flex items-center gap-4 mt-1 text-sm text-fp-muted">
                 {job?.clients?.company && <span>🏢 {job.clients.company}</span>}
                 {proposal?.quote_number && <span className="font-mono">#{proposal.quote_number}</span>}
               </div>
               <div className="flex items-center gap-3 mt-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[#8A9AB0] text-xs">👤 PM:</span>
+                  <span className="text-fp-muted text-xs">👤 PM:</span>
                   <select value={job?.user_id || job?.profiles?.id || ''} onChange={e => assignPM(e.target.value)}
-                    className="bg-[#0F1C2E] text-white text-xs border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]">
+                    className="bg-fp-inset text-fp-text text-xs border border-fp-border rounded px-2 py-1 focus:outline-none focus:border-fp-brand">
                     <option value="">Unassigned</option>
                     {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                   </select>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[#8A9AB0] text-xs">🔧 Tech:</span>
+                  <span className="text-fp-muted text-xs">🔧 Tech:</span>
                   <select value={job?.tech_id || ''} onChange={e => assignTech(e.target.value)}
-                    className="bg-[#0F1C2E] text-white text-xs border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]">
+                    className="bg-fp-inset text-fp-text text-xs border border-fp-border rounded px-2 py-1 focus:outline-none focus:border-fp-brand">
                     <option value="">Unassigned</option>
                     {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                   </select>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[#8A9AB0] text-xs">💰 Billing:</span>
+                  <span className="text-fp-muted text-xs">💰 Billing:</span>
                   <select value={job?.billing_type || 'Lump Sum'} onChange={e => updateBillingType(e.target.value)}
-                    className="bg-[#0F1C2E] text-white text-xs border border-[#2a3d55] rounded px-2 py-1 focus:outline-none focus:border-[#C8622A]">
+                    className="bg-fp-inset text-fp-text text-xs border border-fp-border rounded px-2 py-1 focus:outline-none focus:border-fp-brand">
                     {['Lump Sum', 'T&M', 'AIA', 'Unit Price'].map(b => <option key={b}>{b}</option>)}
                   </select>
                 </div>
@@ -1153,67 +1153,67 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             <div className="flex items-center gap-3">
               {(isAdmin || isPM) && (
                 <button onClick={() => setShowScheduleModal(true)}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
+                  className="bg-blue-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
                   📅 Schedule Tech
                 </button>
               )}
               {job?.clients?.email && (
                 <button onClick={() => setShowNotifyModal(true)}
-                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                  className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
                   ✉️ Notify Customer
                 </button>
               )}
               <button onClick={generateFinalJobPacket}
-                className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+                className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
                 📄 Final Packet
               </button>
               <select value={job?.status || 'Active'} onChange={e => updateJobStatus(e.target.value)} disabled={savingStatus}
-                className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                 {['Active', 'On Hold', 'Completed', 'Cancelled'].map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
           </div>
 
           <div className="grid grid-cols-5 gap-4">
-            <div className="bg-[#0F1C2E] rounded-lg p-3">
-              <p className="text-[#8A9AB0] text-xs mb-1">Contract Value</p>
-              <p className="text-white font-bold">${fmt(proposal?.proposal_value)}</p>
+            <div className="bg-fp-inset rounded-lg p-3">
+              <p className="text-fp-muted text-xs mb-1">Contract Value</p>
+              <p className="text-fp-text font-bold">${fmt(proposal?.proposal_value)}</p>
             </div>
             {totalCOAmount > 0 && (
-              <div className="bg-[#0F1C2E] rounded-lg p-3">
-                <p className="text-[#8A9AB0] text-xs mb-1">Change Orders</p>
+              <div className="bg-fp-inset rounded-lg p-3">
+                <p className="text-fp-muted text-xs mb-1">Change Orders</p>
                 <p className="text-[#C8622A] font-bold">+${fmt(totalCOAmount)}</p>
               </div>
             )}
-            <div className="bg-[#0F1C2E] rounded-lg p-3">
-              <p className="text-[#8A9AB0] text-xs mb-1">Margin</p>
+            <div className="bg-fp-inset rounded-lg p-3">
+              <p className="text-fp-muted text-xs mb-1">Margin</p>
               <p className="text-[#C8622A] font-bold">{proposal?.total_gross_margin_percent?.toFixed(1) || '—'}%</p>
             </div>
-            <div className="bg-[#0F1C2E] rounded-lg p-3">
-              <p className="text-[#8A9AB0] text-xs mb-1">Start Date</p>
+            <div className="bg-fp-inset rounded-lg p-3">
+              <p className="text-fp-muted text-xs mb-1">Start Date</p>
               <input type="date" value={job?.start_date || ''} onChange={e => updateJobDates('start_date', e.target.value)}
-                className="bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer w-full" />
+                className="bg-transparent text-fp-text text-sm font-medium focus:outline-none cursor-pointer w-full" />
             </div>
-            <div className="bg-[#0F1C2E] rounded-lg p-3">
-              <p className="text-[#8A9AB0] text-xs mb-1">End Date</p>
+            <div className="bg-fp-inset rounded-lg p-3">
+              <p className="text-fp-muted text-xs mb-1">End Date</p>
               <input type="date" value={job?.end_date || ''} onChange={e => updateJobDates('end_date', e.target.value)}
-                className="bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer w-full" />
+                className="bg-transparent text-fp-text text-sm font-medium focus:outline-none cursor-pointer w-full" />
             </div>
           </div>
 
           <div className="mt-4">
             <div className="flex justify-between items-center mb-1">
-              <span className="text-[#8A9AB0] text-xs">Overall progress — {completedCount} of {checklist.length} complete</span>
-              <span className="text-[#8A9AB0] text-xs">{progress}%</span>
+              <span className="text-fp-muted text-xs">Overall progress — {completedCount} of {checklist.length} complete</span>
+              <span className="text-fp-muted text-xs">{progress}%</span>
             </div>
-            <div className="w-full bg-[#0F1C2E] rounded-full h-2">
+            <div className="w-full bg-fp-inset rounded-full h-2">
               <div className={`h-2 rounded-full transition-all ${progress === 100 ? 'bg-green-400' : 'bg-[#C8622A]'}`} style={{ width: `${progress}%` }} />
             </div>
           </div>
         {/* Upcoming tech schedules */}
           {jobSchedules.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-[#2a3d55]">
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Upcoming Tech Schedule</p>
+            <div className="mt-4 pt-4 border-t border-fp-border">
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Upcoming Tech Schedule</p>
               <div className="flex flex-wrap gap-2">
                 {jobSchedules.map(s => (
                   <div key={s.id} className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-1.5 group">
@@ -1222,7 +1222,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                     <span className="text-blue-400/70 text-xs">{new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                     <span className="text-blue-400/70 text-xs">· {s.hours_allocated}h</span>
                     {(isAdmin || isPM) && (
-                      <button onClick={() => removeSchedule(s.id)} className="opacity-0 group-hover:opacity-100 text-[#8A9AB0] hover:text-red-400 text-xs transition-all ml-1">✕</button>
+                      <button onClick={() => removeSchedule(s.id)} className="opacity-0 group-hover:opacity-100 text-fp-muted hover:text-red-400 text-xs transition-all ml-1">✕</button>
                     )}
                   </div>
                 ))}
@@ -1244,7 +1244,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             ...(job?.billing_type === 'AIA' ? [{ key: 'aia', label: 'AIA Applications' }] : []),
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
               {t.label}
             </button>
           ))}

@@ -121,15 +121,15 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
   ]
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-white text-2xl font-bold">Vendors</h2>
+          <h2 className="text-fp-text text-2xl font-bold">Vendors</h2>
           <button
             onClick={() => { setShowForm(!showForm); setError(null) }}
-            className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+            className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
           >
             {showForm ? 'Cancel' : '+ Add Vendor'}
           </button>
@@ -138,18 +138,18 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
         {success && <p className="text-green-400 text-sm">{success}</p>}
 
         {showForm && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold mb-4">New Vendor</h3>
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold mb-4">New Vendor</h3>
             {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
             <div className="grid grid-cols-3 gap-4 mb-4">
               {fields.map(([field, label]) => (
                 <div key={field}>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">{label}</label>
+                  <label className="text-fp-muted text-xs mb-1 block">{label}</label>
                   <input
                     type="text"
                     value={form[field]}
                     onChange={e => setForm(prev => ({ ...prev, [field]: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                   />
                 </div>
               ))}
@@ -157,34 +157,34 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
             <button
               onClick={handleAdd}
               disabled={adding || !form.vendor_name}
-              className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+              className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
             >
               {adding ? 'Saving...' : 'Save Vendor'}
             </button>
           </div>
         )}
 
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold mb-4">All Vendors ({vendors.length})</h3>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold mb-4">All Vendors ({vendors.length})</h3>
           {loading ? (
-            <p className="text-[#8A9AB0]">Loading...</p>
+            <p className="text-fp-muted">Loading...</p>
           ) : vendors.length === 0 ? (
-            <p className="text-[#8A9AB0]">No vendors yet. Add your first vendor above.</p>
+            <p className="text-fp-muted">No vendors yet. Add your first vendor above.</p>
           ) : (
             <div className="space-y-3">
               {vendors.map(v => (
-                <div key={v.id} className="border border-[#2a3d55] rounded-xl p-4">
+                <div key={v.id} className="border border-fp-border rounded-xl p-4">
                   {editingId === v.id ? (
                     <div>
                       <div className="grid grid-cols-3 gap-4 mb-4">
                         {fields.map(([field, label]) => (
                           <div key={field}>
-                            <label className="text-[#8A9AB0] text-xs mb-1 block">{label}</label>
+                            <label className="text-fp-muted text-xs mb-1 block">{label}</label>
                             <input
                               type="text"
                               value={editForm[field]}
                               onChange={e => setEditForm(prev => ({ ...prev, [field]: e.target.value }))}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                              className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                             />
                           </div>
                         ))}
@@ -192,13 +192,13 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleEdit(v.id)}
-                          className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+                          className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
                         >
                           Save Changes
                         </button>
                         <button
                           onClick={() => setEditingId(null)}
-                          className="text-[#8A9AB0] hover:text-white px-4 py-2 text-sm transition-colors"
+                          className="text-fp-muted hover:text-fp-text px-4 py-2 text-sm transition-colors"
                         >
                           Cancel
                         </button>
@@ -208,47 +208,47 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
                     <div className="flex justify-between items-start">
                       <div className="grid grid-cols-4 gap-x-8 gap-y-2 flex-1">
                         <div>
-                          <p className="text-[#8A9AB0] text-xs">Vendor</p>
-                          <p className="text-white font-medium">{v.vendor_name}</p>
+                          <p className="text-fp-muted text-xs">Vendor</p>
+                          <p className="text-fp-text font-medium">{v.vendor_name}</p>
                         </div>
                         <div>
-                          <p className="text-[#8A9AB0] text-xs">Contact</p>
-                          <p className="text-white text-sm">{v.contact_name || '—'}</p>
+                          <p className="text-fp-muted text-xs">Contact</p>
+                          <p className="text-fp-text text-sm">{v.contact_name || '—'}</p>
                         </div>
                         <div>
-                          <p className="text-[#8A9AB0] text-xs">Email</p>
-                          <p className="text-white text-sm">{v.contact_email || '—'}</p>
+                          <p className="text-fp-muted text-xs">Email</p>
+                          <p className="text-fp-text text-sm">{v.contact_email || '—'}</p>
                         </div>
                         <div>
-                          <p className="text-[#8A9AB0] text-xs">Phone</p>
-                          <p className="text-white text-sm">{v.contact_phone_number || '—'}</p>
+                          <p className="text-fp-muted text-xs">Phone</p>
+                          <p className="text-fp-text text-sm">{v.contact_phone_number || '—'}</p>
                         </div>
                         <div>
-                          <p className="text-[#8A9AB0] text-xs">Account #</p>
-                          <p className="text-white text-sm">{v.account_number || '—'}</p>
+                          <p className="text-fp-muted text-xs">Account #</p>
+                          <p className="text-fp-text text-sm">{v.account_number || '—'}</p>
                         </div>
                         <div>
-                          <p className="text-[#8A9AB0] text-xs">Default Markup</p>
+                          <p className="text-fp-muted text-xs">Default Markup</p>
                           <p className="text-[#C8622A] text-sm">{v.default_markup_percent ? `${v.default_markup_percent}%` : '—'}</p>
                         </div>
                         <div>
-                          <p className="text-[#8A9AB0] text-xs">Payment Terms</p>
-                          <p className="text-white text-sm">{v.payment_terms || '—'}</p>
+                          <p className="text-fp-muted text-xs">Payment Terms</p>
+                          <p className="text-fp-text text-sm">{v.payment_terms || '—'}</p>
                         </div>
                         <div>
-                          <p className="text-[#8A9AB0] text-xs">Pricing Valid</p>
-                          <p className="text-white text-sm">{v.pricing_valid_days || 30} days</p>
+                          <p className="text-fp-muted text-xs">Pricing Valid</p>
+                          <p className="text-fp-text text-sm">{v.pricing_valid_days || 30} days</p>
                         </div>
                         {v.notes && (
                           <div>
-                            <p className="text-[#8A9AB0] text-xs">Notes</p>
-                            <p className="text-white text-sm">{v.notes}</p>
+                            <p className="text-fp-muted text-xs">Notes</p>
+                            <p className="text-fp-text text-sm">{v.notes}</p>
                           </div>
                         )}
                       </div>
                       <button
                         onClick={() => startEditing(v)}
-                        className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs hover:bg-[#3a4d65] transition-colors ml-4 shrink-0"
+                        className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs hover:bg-fp-hover transition-colors ml-4 shrink-0"
                       >
                         Edit
                       </button>

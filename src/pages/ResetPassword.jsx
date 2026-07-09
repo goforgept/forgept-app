@@ -46,12 +46,12 @@ export default function ResetPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
-      <div className="bg-[#1a2d45] p-8 rounded-xl w-full max-w-md">
-        <h1 className="text-white text-3xl font-bold mb-1">
+    <div className="min-h-screen bg-fp-inset flex items-center justify-center px-4">
+      <div className="bg-fp-card p-8 rounded-xl w-full max-w-md">
+        <h1 className="text-fp-text text-3xl font-bold mb-1">
           ForgePt<span className="text-[#C8622A]">.</span>
         </h1>
-        <p className="text-[#8A9AB0] text-sm mb-8">Set your new password</p>
+        <p className="text-fp-muted text-sm mb-8">Set your new password</p>
 
         {success ? (
           <div className="text-center space-y-3">
@@ -61,8 +61,8 @@ export default function ResetPassword() {
               </svg>
             </div>
             <p className="text-green-400 font-semibold">Password updated!</p>
-            <p className="text-[#8A9AB0] text-sm">Sign in with your new password to continue.</p>
-            <a href="/" className="inline-block mt-2 text-[#C8622A] hover:text-white text-sm font-semibold transition-colors">
+            <p className="text-fp-muted text-sm">Sign in with your new password to continue.</p>
+            <a href="/" className="inline-block mt-2 text-[#C8622A] hover:text-fp-text text-sm font-semibold transition-colors">
               Go to sign in →
             </a>
           </div>
@@ -75,8 +75,8 @@ export default function ResetPassword() {
               </svg>
             </div>
             <p className="text-red-400 font-semibold">Link expired or invalid</p>
-            <p className="text-[#8A9AB0] text-sm">Password reset links expire after 1 hour. Request a new one from the sign-in page.</p>
-            <a href="/" className="inline-block mt-2 text-[#C8622A] hover:text-white text-sm font-semibold transition-colors">
+            <p className="text-fp-muted text-sm">Password reset links expire after 1 hour. Request a new one from the sign-in page.</p>
+            <a href="/" className="inline-block mt-2 text-[#C8622A] hover:text-fp-text text-sm font-semibold transition-colors">
               Back to sign in →
             </a>
           </div>
@@ -87,7 +87,7 @@ export default function ResetPassword() {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
             </svg>
-            <p className="text-[#8A9AB0] text-sm">Verifying your reset link…</p>
+            <p className="text-fp-muted text-sm">Verifying your reset link…</p>
           </div>
 
         ) : (
@@ -95,24 +95,24 @@ export default function ResetPassword() {
             {error && <p className="text-red-400 mb-4 text-sm">{error}</p>}
             <form onSubmit={handleReset} className="space-y-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">New Password</label>
+                <label className="text-fp-muted text-xs mb-1 block">New Password</label>
                 <input
                   type="password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#C8622A]"
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-fp-brand"
                   placeholder="At least 6 characters"
                   minLength={6}
                   required
                 />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Confirm Password</label>
+                <label className="text-fp-muted text-xs mb-1 block">Confirm Password</label>
                 <input
                   type="password"
                   value={confirm}
                   onChange={e => setConfirm(e.target.value)}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#C8622A]"
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-fp-brand"
                   placeholder="••••••••"
                   minLength={6}
                   required
@@ -121,7 +121,7 @@ export default function ResetPassword() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#C8622A] text-white py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+                className="w-full bg-fp-brand text-white py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
               >
                 {loading ? 'Updating…' : 'Update Password'}
               </button>

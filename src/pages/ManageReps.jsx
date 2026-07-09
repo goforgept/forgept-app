@@ -46,7 +46,7 @@ const PERMISSION_FLAGS = [
   },
 ]
 
-const getRoleStyle = (role) => ROLES.find(r => r.value === role)?.color || 'bg-[#8A9AB0]/20 text-[#8A9AB0]'
+const getRoleStyle = (role) => ROLES.find(r => r.value === role)?.color || 'bg-fp-muted/20 text-fp-muted'
 const getRoleLabel = (role) => ROLES.find(r => r.value === role)?.label || role || 'Rep'
 
 const effectivePerm = (flag, rep) => {
@@ -139,31 +139,31 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
 
   const hasCustomPerms = (rep) => Object.keys(rep.permissions || {}).length > 0
 
-  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+  const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-white text-2xl font-bold">Team</h2>
+          <h2 className="text-fp-text text-2xl font-bold">Team</h2>
           {isAdmin && (
             <button onClick={() => { setShowForm(!showForm); setError(null); setSuccess(null) }}
-              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
               {showForm ? 'Cancel' : '+ Add Team Member'}
             </button>
           )}
         </div>
 
         {/* Role legend */}
-        <div className="bg-[#1a2d45] rounded-xl p-5">
-          <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Roles</p>
+        <div className="bg-fp-card rounded-xl p-5">
+          <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Roles</p>
           <div className="grid grid-cols-2 gap-3">
             {ROLES.map(role => (
               <div key={role.value} className="flex items-start gap-3">
                 <span className={`text-xs font-semibold px-2 py-1 rounded whitespace-nowrap ${role.color}`}>{role.label}</span>
-                <p className="text-[#8A9AB0] text-xs leading-relaxed">{role.desc}</p>
+                <p className="text-fp-muted text-xs leading-relaxed">{role.desc}</p>
               </div>
             ))}
           </div>
@@ -171,43 +171,43 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
 
         {/* Invite form */}
         {showForm && isAdmin && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold mb-4">Invite Team Member</h3>
-            <p className="text-[#8A9AB0] text-sm mb-4">They'll receive an email with a link to set up their password.</p>
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold mb-4">Invite Team Member</h3>
+            <p className="text-fp-muted text-sm mb-4">They'll receive an email with a link to set up their password.</p>
             {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
             {success && <p className="text-green-400 text-sm mb-4">{success}</p>}
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Full Name</label>
+                <label className="text-fp-muted text-xs mb-1 block">Full Name</label>
                 <input type="text" value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))}
                   className={inputClass} placeholder="John Smith" />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Email</label>
+                <label className="text-fp-muted text-xs mb-1 block">Email</label>
                 <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
                   className={inputClass} placeholder="rep@company.com" />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Role</label>
+                <label className="text-fp-muted text-xs mb-1 block">Role</label>
                 <select value={form.org_role} onChange={e => setForm(p => ({ ...p, org_role: e.target.value }))} className={inputClass}>
                   {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
             </div>
             <button onClick={handleAddRep} disabled={adding}
-              className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+              className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
               {adding ? 'Sending...' : 'Send Invite'}
             </button>
           </div>
         )}
 
         {/* Team list */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold mb-4">Team Members ({reps.length})</h3>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold mb-4">Team Members ({reps.length})</h3>
           {loading ? (
-            <p className="text-[#8A9AB0]">Loading...</p>
+            <p className="text-fp-muted">Loading...</p>
           ) : reps.length === 0 ? (
-            <p className="text-[#8A9AB0]">No team members yet. Add your first above.</p>
+            <p className="text-fp-muted">No team members yet. Add your first above.</p>
           ) : (
             <div className="space-y-2">
               {reps.map(rep => {
@@ -216,35 +216,35 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
                 const isOpen        = !!expanded[rep.id]
 
                 return (
-                  <div key={rep.id} className="border border-[#2a3d55] rounded-xl overflow-hidden">
+                  <div key={rep.id} className="border border-fp-border rounded-xl overflow-hidden">
                     {/* Row */}
                     <div className="flex justify-between items-center px-4 py-3">
                       <div className="flex items-center gap-3">
                         {/* Expand toggle (admin only, not self) */}
                         {isAdmin && !isCurrentUser && currentRole !== 'admin' && (
                           <button onClick={() => setExpanded(p => ({ ...p, [rep.id]: !p[rep.id] }))}
-                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#0F1C2E] border border-[#2a3d55] hover:border-[#C8622A]/40 text-[#8A9AB0] hover:text-white transition-colors text-xs font-medium">
+                            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-fp-inset border border-fp-border hover:border-fp-brand/40 text-fp-muted hover:text-fp-text transition-colors text-xs font-medium">
                             <span>{isOpen ? '▾' : '▸'}</span>
                             <span>Permissions</span>
                           </button>
                         )}
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="text-white font-medium">{rep.full_name || '—'}</p>
-                            {isCurrentUser && <span className="text-[#8A9AB0] text-xs">(you)</span>}
+                            <p className="text-fp-text font-medium">{rep.full_name || '—'}</p>
+                            {isCurrentUser && <span className="text-fp-muted text-xs">(you)</span>}
                             {hasCustomPerms(rep) && (
                               <span className="text-xs px-1.5 py-0.5 rounded bg-[#C8622A]/10 text-[#C8622A] font-medium">custom</span>
                             )}
                           </div>
-                          <p className="text-[#8A9AB0] text-sm">{rep.email}</p>
+                          <p className="text-fp-muted text-sm">{rep.email}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        {updatingRole[rep.id] && <span className="text-[#8A9AB0] text-xs">Saving...</span>}
+                        {updatingRole[rep.id] && <span className="text-fp-muted text-xs">Saving...</span>}
                         {isAdmin && !isCurrentUser && currentRole !== 'admin' ? (
                           <>
                             <select value={currentRole} onChange={e => updateRole(rep.id, e.target.value)}
-                              className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                              className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
                               {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                             </select>
                             <button onClick={() => handleRemoveMember(rep)} disabled={deletingId === rep.id}
@@ -262,19 +262,19 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
 
                     {/* Expanded permissions panel */}
                     {isOpen && isAdmin && (
-                      <div className="border-t border-[#2a3d55] bg-[#0F1C2E] px-6 py-4">
+                      <div className="border-t border-fp-border bg-fp-inset px-6 py-4">
                         <div className="flex items-center justify-between mb-3">
-                          <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">
+                          <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">
                             Permission Overrides
                           </p>
                           {hasCustomPerms(rep) && (
                             <button onClick={() => resetPerms(rep)}
-                              className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">
+                              className="text-fp-muted hover:text-red-400 text-xs transition-colors">
                               Reset to role defaults
                             </button>
                           )}
                         </div>
-                        <p className="text-[#8A9AB0] text-xs mb-4 leading-relaxed">
+                        <p className="text-fp-muted text-xs mb-4 leading-relaxed">
                           Overrides apply on top of the <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${getRoleStyle(currentRole)}`}>{getRoleLabel(currentRole)}</span> role defaults.
                           A grey toggle means the role's default applies — flip it to override.
                         </p>
@@ -286,20 +286,20 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
                             const stateKey     = `${rep.id}:${flag.key}`
 
                             return (
-                              <div key={flag.key} className={`flex items-center justify-between rounded-lg px-4 py-3 border transition-colors ${isOverridden ? 'border-[#C8622A]/30 bg-[#C8622A]/5' : 'border-[#2a3d55]'}`}>
+                              <div key={flag.key} className={`flex items-center justify-between rounded-lg px-4 py-3 border transition-colors ${isOverridden ? 'border-[#C8622A]/30 bg-[#C8622A]/5' : 'border-fp-border'}`}>
                                 <div className="flex-1 min-w-0 mr-4">
                                   <div className="flex items-center gap-2">
-                                    <p className="text-white text-sm font-medium">{flag.label}</p>
+                                    <p className="text-fp-text text-sm font-medium">{flag.label}</p>
                                     {isOverridden ? (
                                       <span className="text-xs px-1.5 py-0.5 rounded bg-[#C8622A]/20 text-[#C8622A]">overridden</span>
                                     ) : (
-                                      <span className="text-xs text-[#8A9AB0]">role default: {roleDefault ? 'on' : 'off'}</span>
+                                      <span className="text-xs text-fp-muted">role default: {roleDefault ? 'on' : 'off'}</span>
                                     )}
                                   </div>
-                                  <p className="text-[#8A9AB0] text-xs mt-0.5">{flag.desc}</p>
+                                  <p className="text-fp-muted text-xs mt-0.5">{flag.desc}</p>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                  {savingPerm[stateKey] && <span className="text-[#8A9AB0] text-xs">Saving...</span>}
+                                  {savingPerm[stateKey] && <span className="text-fp-muted text-xs">Saving...</span>}
                                   <button
                                     onClick={() => togglePerm(rep, flag.key, !currentVal)}
                                     disabled={!!savingPerm[stateKey]}
@@ -312,7 +312,7 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
                                       delete p[flag.key]
                                       supabase.from('profiles').update({ permissions: p }).eq('id', rep.id)
                                       setReps(prev => prev.map(r => r.id === rep.id ? { ...r, permissions: p } : r))
-                                    }} className="text-[#8A9AB0] hover:text-white text-xs transition-colors" title="Remove override">✕</button>
+                                    }} className="text-fp-muted hover:text-fp-text text-xs transition-colors" title="Remove override">✕</button>
                                   )}
                                 </div>
                               </div>

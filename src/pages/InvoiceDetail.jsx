@@ -354,13 +354,13 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setEditingNotes(false)
   }
 
-  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+  const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
-  if (loading) return <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center"><p className="text-white">Loading...</p></div>
-  if (!invoice) return <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center"><p className="text-white">Invoice not found.</p></div>
+  if (loading) return <div className="min-h-screen bg-fp-inset flex items-center justify-center"><p className="text-fp-text">Loading...</p></div>
+  if (!invoice) return <div className="min-h-screen bg-fp-inset flex items-center justify-center"><p className="text-fp-text">Invoice not found.</p></div>
 
   const STATUS_COLORS = {
-    'Draft': 'bg-[#2a3d55] text-[#8A9AB0]',
+    'Draft': 'bg-fp-inset text-fp-muted',
     'Sent': 'bg-blue-500/20 text-blue-400',
     'Partially Paid': 'bg-yellow-500/20 text-yellow-400',
     'Paid': 'bg-green-500/20 text-green-400',
@@ -368,47 +368,47 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6 max-w-4xl">
         {/* Header */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="bg-fp-card rounded-xl p-6">
           <div className="flex justify-between items-start">
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <h2 className="text-white text-2xl font-bold">{invoice.invoice_number}</h2>
+                <h2 className="text-fp-text text-2xl font-bold">{invoice.invoice_number}</h2>
                 <select
                   value={invoice.status || 'Draft'}
                   onChange={e => updateStatus(e.target.value)}
-                  className={`text-xs font-semibold px-2 py-1 rounded border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#C8622A] ${STATUS_COLORS[invoice.status] || 'bg-[#2a3d55] text-[#8A9AB0]'}`}
+                  className={`text-xs font-semibold px-2 py-1 rounded border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-fp-brand ${STATUS_COLORS[invoice.status] || 'bg-fp-inset text-fp-muted'}`}
                   style={{ background: 'transparent' }}
                 >
                   {['Draft', 'Sent', 'Partially Paid', 'Paid', 'Overdue'].map(s => (
-                    <option key={s} value={s} className="bg-[#1a2d45] text-white">{s}</option>
+                    <option key={s} value={s} className="bg-fp-card text-fp-text">{s}</option>
                   ))}
                 </select>
               </div>
-              <p className="text-[#8A9AB0]">{invoice.proposals?.company} · {invoice.proposals?.client_name}</p>
-              <p className="text-[#8A9AB0] text-xs mt-0.5">{invoice.proposals?.proposal_name}</p>
+              <p className="text-fp-muted">{invoice.proposals?.company} · {invoice.proposals?.client_name}</p>
+              <p className="text-fp-muted text-xs mt-0.5">{invoice.proposals?.proposal_name}</p>
             </div>
             <div className="flex gap-2">
               {squareConnected && !invoice?.square_invoice_id && (
                 <button onClick={sendToSquare} disabled={sendingToSquare}
-                  className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors disabled:opacity-50">
+                  className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
                   {sendingToSquare ? 'Creating...' : '💳 Send to Square'}
                 </button>
               )}
               <button onClick={() => {
                 setSendForm({ subject: `Invoice ${invoice.invoice_number}`, message: `Hi ${invoice.proposals?.client_name || 'there'},\n\nPlease find your invoice attached. Payment instructions are included on the invoice.\n\nThank you for your business.\n\n${invoice.proposals?.rep_name || profile?.full_name || ''}` })
                 setShowSendModal(true)
-              }} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
+              }} className="bg-green-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
                 ✉ Send Invoice
               </button>
-              <button onClick={downloadPDF} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#3a4d65] transition-colors">
+              <button onClick={downloadPDF} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors">
                 ↓ Download PDF
               </button>
-              <button onClick={() => setShowPaymentModal(true)} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+              <button onClick={() => setShowPaymentModal(true)} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                 + Record Payment
               </button>
             </div>
@@ -417,100 +417,100 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
           {squareError && (
             <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 flex items-center justify-between">
               <p className="text-red-400 text-sm">Square error: {squareError}</p>
-              <button onClick={() => setSquareError(null)} className="text-[#8A9AB0] hover:text-white text-lg leading-none">×</button>
+              <button onClick={() => setSquareError(null)} className="text-fp-muted hover:text-fp-text text-lg leading-none">×</button>
             </div>
           )}
           {invoice?.square_payment_url && (
-            <div className="mt-4 bg-[#1a2d45] border border-[#2a3d55] rounded-xl px-5 py-4">
+            <div className="mt-4 bg-fp-card border border-fp-border rounded-xl px-5 py-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-white text-sm font-semibold">💳 Square Payment Link</p>
-                  <p className="text-[#8A9AB0] text-xs mt-0.5">Share this with your client so they can pay by card or ACH online.</p>
+                  <p className="text-fp-text text-sm font-semibold">💳 Square Payment Link</p>
+                  <p className="text-fp-muted text-xs mt-0.5">Share this with your client so they can pay by card or ACH online.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <a href={invoice.square_payment_url} target="_blank" rel="noopener noreferrer"
-                    className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors">
+                    className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors">
                     Open ↗
                   </a>
                   <button onClick={copyPaymentLink}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${copiedLink ? 'bg-green-600/20 text-green-400' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${copiedLink ? 'bg-green-600/20 text-green-400' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
                     {copiedLink ? '✓ Copied!' : 'Copy Link'}
                   </button>
                 </div>
               </div>
-              <p className="text-[#8A9AB0] text-xs mt-2 font-mono truncate">{invoice.square_payment_url}</p>
+              <p className="text-fp-muted text-xs mt-2 font-mono truncate">{invoice.square_payment_url}</p>
             </div>
           )}
 
           <div className="grid grid-cols-4 gap-4 mt-6">
-            <div><p className="text-[#8A9AB0] text-xs">Invoice Date</p><p className="text-white text-sm font-medium">{invoice.issued_date ? new Date(invoice.issued_date).toLocaleDateString() : '—'}</p></div>
+            <div><p className="text-fp-muted text-xs">Invoice Date</p><p className="text-fp-text text-sm font-medium">{invoice.issued_date ? new Date(invoice.issued_date).toLocaleDateString() : '—'}</p></div>
             <div>
-              <p className="text-[#8A9AB0] text-xs">Due Date</p>
+              <p className="text-fp-muted text-xs">Due Date</p>
               {editingDueDate ? (
                 <div className="flex items-center gap-1 mt-0.5">
                   <input type="date" value={dueDateValue} onChange={e => setDueDateValue(e.target.value)}
-                    className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-0.5 text-xs focus:outline-none focus:border-[#C8622A]" />
-                  <button onClick={saveDueDate} className="text-[#C8622A] text-xs font-semibold hover:text-white transition-colors">Save</button>
-                  <button onClick={() => { setDueDateValue(invoice.due_date || ''); setEditingDueDate(false) }} className="text-[#8A9AB0] text-xs hover:text-white transition-colors">✕</button>
+                    className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-0.5 text-xs focus:outline-none focus:border-fp-brand" />
+                  <button onClick={saveDueDate} className="text-[#C8622A] text-xs font-semibold hover:text-fp-text transition-colors">Save</button>
+                  <button onClick={() => { setDueDateValue(invoice.due_date || ''); setEditingDueDate(false) }} className="text-fp-muted text-xs hover:text-fp-text transition-colors">✕</button>
                 </div>
               ) : (
-                <button onClick={() => setEditingDueDate(true)} className="text-white text-sm font-medium hover:text-[#C8622A] transition-colors text-left">
-                  {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : <span className="text-[#8A9AB0]">Set date</span>}
+                <button onClick={() => setEditingDueDate(true)} className="text-fp-text text-sm font-medium hover:text-[#C8622A] transition-colors text-left">
+                  {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : <span className="text-fp-muted">Set date</span>}
                 </button>
               )}
             </div>
-            <div><p className="text-[#8A9AB0] text-xs">Total</p><p className="text-white text-sm font-bold">${(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
-            <div><p className="text-[#8A9AB0] text-xs">Balance Due</p><p className={`text-sm font-bold ${invoice.balance_due > 0 ? 'text-[#C8622A]' : 'text-green-400'}`}>${(invoice.balance_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
+            <div><p className="text-fp-muted text-xs">Total</p><p className="text-fp-text text-sm font-bold">${(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
+            <div><p className="text-fp-muted text-xs">Balance Due</p><p className={`text-sm font-bold ${invoice.balance_due > 0 ? 'text-[#C8622A]' : 'text-green-400'}`}>${(invoice.balance_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
           </div>
         </div>
 
         {/* Description of Work */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="bg-fp-card rounded-xl p-6">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-white font-bold">Description of Work</h3>
+            <h3 className="text-fp-text font-bold">Description of Work</h3>
             {!editingDescription
-              ? <button onClick={() => setEditingDescription(true)} className="text-[#C8622A] text-sm hover:text-white transition-colors">Edit</button>
+              ? <button onClick={() => setEditingDescription(true)} className="text-[#C8622A] text-sm hover:text-fp-text transition-colors">Edit</button>
               : <div className="flex gap-2">
-                  <button onClick={() => setEditingDescription(false)} className="text-[#8A9AB0] text-sm hover:text-white transition-colors">Cancel</button>
-                  <button onClick={saveDescription} className="text-[#C8622A] text-sm font-semibold hover:text-white transition-colors">Save</button>
+                  <button onClick={() => setEditingDescription(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">Cancel</button>
+                  <button onClick={saveDescription} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors">Save</button>
                 </div>
             }
           </div>
           {editingDescription
             ? <textarea value={descriptionValue} onChange={e => setDescriptionValue(e.target.value)} rows={4}
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
-            : <p className="text-[#D6E4F0] text-sm whitespace-pre-wrap">{invoice.description || <span className="text-[#8A9AB0]">No description. Click Edit to add one.</span>}</p>
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
+            : <p className="text-fp-text text-sm whitespace-pre-wrap">{invoice.description || <span className="text-fp-muted">No description. Click Edit to add one.</span>}</p>
           }
         </div>
 
         {/* Line Items */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold text-lg mb-4">Line Items</h3>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold text-lg mb-4">Line Items</h3>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#2a3d55]">
-                <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">Description</th>
-                <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Qty</th>
-                <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Unit Price</th>
-                <th className="text-[#8A9AB0] text-right py-2 font-normal">Total</th>
+              <tr className="border-b border-fp-border">
+                <th className="text-fp-muted text-left py-2 pr-4 font-normal">Description</th>
+                <th className="text-fp-muted text-right py-2 pr-4 font-normal">Qty</th>
+                <th className="text-fp-muted text-right py-2 pr-4 font-normal">Unit Price</th>
+                <th className="text-fp-muted text-right py-2 font-normal">Total</th>
               </tr>
             </thead>
             <tbody>
               {lineItems.map(item => (
-                <tr key={item.id} className="border-b border-[#2a3d55]/50">
-                  <td className="text-white py-3 pr-4">{item.description}</td>
-                  <td className="text-[#8A9AB0] py-3 pr-4 text-right">{item.quantity}</td>
-                  <td className="text-[#8A9AB0] py-3 pr-4 text-right">${(item.unit_price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="text-white py-3 text-right">${(item.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                <tr key={item.id} className="border-b border-fp-border/50">
+                  <td className="text-fp-text py-3 pr-4">{item.description}</td>
+                  <td className="text-fp-muted py-3 pr-4 text-right">{item.quantity}</td>
+                  <td className="text-fp-muted py-3 pr-4 text-right">${(item.unit_price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                  <td className="text-fp-text py-3 text-right">${(item.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot>
-              <tr><td colSpan="3" className="text-[#8A9AB0] pt-3 text-right font-semibold pr-4">Subtotal</td><td className="text-white pt-3 text-right">${(invoice.subtotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
-              {invoice.tax_percent > 0 && <tr><td colSpan="3" className="text-[#8A9AB0] pt-1 text-right font-semibold pr-4">Tax ({invoice.tax_percent}%)</td><td className="text-white pt-1 text-right">${(invoice.tax_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>}
-              <tr className="border-t border-[#2a3d55]"><td colSpan="3" className="text-white pt-3 text-right font-bold pr-4">Total</td><td className="text-white pt-3 text-right font-bold">${(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
+              <tr><td colSpan="3" className="text-fp-muted pt-3 text-right font-semibold pr-4">Subtotal</td><td className="text-fp-text pt-3 text-right">${(invoice.subtotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
+              {invoice.tax_percent > 0 && <tr><td colSpan="3" className="text-fp-muted pt-1 text-right font-semibold pr-4">Tax ({invoice.tax_percent}%)</td><td className="text-fp-text pt-1 text-right">${(invoice.tax_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>}
+              <tr className="border-t border-fp-border"><td colSpan="3" className="text-fp-text pt-3 text-right font-bold pr-4">Total</td><td className="text-fp-text pt-3 text-right font-bold">${(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
               {invoice.amount_paid > 0 && <>
-                <tr><td colSpan="3" className="text-[#8A9AB0] pt-1 text-right pr-4">Amount Paid</td><td className="text-green-400 pt-1 text-right">${(invoice.amount_paid || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
+                <tr><td colSpan="3" className="text-fp-muted pt-1 text-right pr-4">Amount Paid</td><td className="text-green-400 pt-1 text-right">${(invoice.amount_paid || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
                 <tr><td colSpan="3" className="text-[#C8622A] pt-1 text-right font-bold pr-4">Balance Due</td><td className="text-[#C8622A] pt-1 text-right font-bold">${(invoice.balance_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
               </>}
             </tfoot>
@@ -519,23 +519,23 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
         {/* Payment History */}
         {payments.length > 0 && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">Payment History</h3>
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold text-lg mb-4">Payment History</h3>
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#2a3d55]">
+                <tr className="border-b border-fp-border">
                   {['Date', 'Amount', 'Method', 'Notes'].map(h => (
-                    <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
+                    <th key={h} className="text-fp-muted text-left py-2 pr-4 font-normal text-xs">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {payments.map(p => (
-                  <tr key={p.id} className="border-b border-[#2a3d55]/30">
-                    <td className="text-white py-3 pr-4">{new Date(p.payment_date).toLocaleDateString()}</td>
+                  <tr key={p.id} className="border-b border-fp-border/30">
+                    <td className="text-fp-text py-3 pr-4">{new Date(p.payment_date).toLocaleDateString()}</td>
                     <td className="text-green-400 py-3 pr-4 font-semibold">${(p.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    <td className="text-[#8A9AB0] py-3 pr-4">{p.method}</td>
-                    <td className="text-[#8A9AB0] py-3">{p.notes || '—'}</td>
+                    <td className="text-fp-muted py-3 pr-4">{p.method}</td>
+                    <td className="text-fp-muted py-3">{p.notes || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -544,21 +544,21 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
         )}
 
         {/* Notes */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="bg-fp-card rounded-xl p-6">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-white font-bold">Notes</h3>
+            <h3 className="text-fp-text font-bold">Notes</h3>
             {!editingNotes
-              ? <button onClick={() => setEditingNotes(true)} className="text-[#C8622A] text-sm hover:text-white transition-colors">Edit</button>
+              ? <button onClick={() => setEditingNotes(true)} className="text-[#C8622A] text-sm hover:text-fp-text transition-colors">Edit</button>
               : <div className="flex gap-2">
-                  <button onClick={() => setEditingNotes(false)} className="text-[#8A9AB0] text-sm hover:text-white transition-colors">Cancel</button>
-                  <button onClick={saveNotes} className="text-[#C8622A] text-sm font-semibold hover:text-white transition-colors">Save</button>
+                  <button onClick={() => setEditingNotes(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">Cancel</button>
+                  <button onClick={saveNotes} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors">Save</button>
                 </div>
             }
           </div>
           {editingNotes
             ? <textarea value={notesValue} onChange={e => setNotesValue(e.target.value)} rows={4}
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
-            : <p className="text-[#8A9AB0] text-sm whitespace-pre-wrap">{invoice.notes || 'No notes.'}</p>
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
+            : <p className="text-fp-muted text-sm whitespace-pre-wrap">{invoice.notes || 'No notes.'}</p>
           }
         </div>
       </div>
@@ -566,35 +566,35 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
       {/* Record Payment Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-4">Record Payment</h3>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-fp-text font-bold text-lg mb-4">Record Payment</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Amount</label>
+                <label className="text-fp-muted text-xs mb-1 block">Amount</label>
                 <input type="number" value={paymentForm.amount} onChange={e => setPaymentForm(p => ({ ...p, amount: e.target.value }))}
                   placeholder="0.00" className={inputClass} />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Payment Date</label>
+                <label className="text-fp-muted text-xs mb-1 block">Payment Date</label>
                 <input type="date" value={paymentForm.payment_date} onChange={e => setPaymentForm(p => ({ ...p, payment_date: e.target.value }))}
                   className={inputClass} />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Method</label>
+                <label className="text-fp-muted text-xs mb-1 block">Method</label>
                 <select value={paymentForm.method} onChange={e => setPaymentForm(p => ({ ...p, method: e.target.value }))}
                   className={inputClass}>
                   {['Check', 'ACH', 'Wire', 'Zelle', 'Venmo', 'Cash', 'Credit Card', 'Square', 'Other'].map(m => <option key={m}>{m}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Notes (optional)</label>
+                <label className="text-fp-muted text-xs mb-1 block">Notes (optional)</label>
                 <input type="text" value={paymentForm.notes} onChange={e => setPaymentForm(p => ({ ...p, notes: e.target.value }))}
                   placeholder="Check #1234..." className={inputClass} />
               </div>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowPaymentModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={() => setShowPaymentModal(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={recordPayment} disabled={savingPayment || !paymentForm.amount}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {savingPayment ? 'Saving...' : 'Record Payment'}
                 </button>
               </div>
@@ -606,29 +606,29 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
       {/* Send Invoice Modal */}
       {showSendModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg">
-            <h3 className="text-white font-bold text-lg mb-1">Send Invoice</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">
-              Sending to <span className="text-white font-medium">{invoice.proposals?.client_email}</span> · PDF will be attached
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-lg">
+            <h3 className="text-fp-text font-bold text-lg mb-1">Send Invoice</h3>
+            <p className="text-fp-muted text-sm mb-5">
+              Sending to <span className="text-fp-text font-medium">{invoice.proposals?.client_email}</span> · PDF will be attached
             </p>
             <div className="space-y-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Subject</label>
+                <label className="text-fp-muted text-xs mb-1 block">Subject</label>
                 <input type="text" value={sendForm.subject} onChange={e => setSendForm(p => ({ ...p, subject: e.target.value }))} className={inputClass} />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Message</label>
+                <label className="text-fp-muted text-xs mb-1 block">Message</label>
                 <textarea value={sendForm.message} onChange={e => setSendForm(p => ({ ...p, message: e.target.value }))} rows={5}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
               </div>
-              <div className="bg-[#0F1C2E] rounded-lg px-4 py-3 text-xs text-[#8A9AB0]">
+              <div className="bg-fp-inset rounded-lg px-4 py-3 text-xs text-fp-muted">
                 <p>✓ Invoice PDF with payment instructions will be attached</p>
                 <p>✓ Invoice will be marked as Sent</p>
               </div>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowSendModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={() => setShowSendModal(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={sendInvoice} disabled={sendingInvoice || !sendForm.subject || !sendForm.message}
-                  className="flex-1 bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50">
+                  className="flex-1 bg-green-600 text-fp-text py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50">
                   {sendingInvoice ? 'Sending...' : 'Send Invoice →'}
                 </button>
               </div>

@@ -13,7 +13,7 @@ const CATEGORY_COLORS = {
 }
 
 const STATUS_META = {
-  backlog:     { label: 'Backlog',     color: 'text-[#8A9AB0]',  dot: 'bg-[#8A9AB0]',  badge: 'bg-[#8A9AB0]/20 text-[#8A9AB0]' },
+  backlog:     { label: 'Backlog',     color: 'text-fp-muted',  dot: 'bg-fp-muted',  badge: 'bg-fp-muted/20 text-fp-muted' },
   planned:     { label: 'Planned',     color: 'text-yellow-400', dot: 'bg-yellow-400',  badge: 'bg-yellow-500/20 text-yellow-400' },
   in_progress: { label: 'In Progress', color: 'text-blue-400',   dot: 'bg-blue-400',    badge: 'bg-blue-500/20 text-blue-400' },
   released:    { label: 'Released',    color: 'text-green-400',  dot: 'bg-green-400',   badge: 'bg-green-500/20 text-green-400' },
@@ -423,14 +423,14 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
   const sidebarProps = { isAdmin, isDevTeam, isProductManager, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices }
 
   if (loading) return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar {...sidebarProps} />
-      <div className="flex-1 flex items-center justify-center"><p className="text-[#8A9AB0]">Loading...</p></div>
+      <div className="flex-1 flex items-center justify-center"><p className="text-fp-muted">Loading...</p></div>
     </div>
   )
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar {...sidebarProps} />
 
       <div className="flex-1 p-6 min-w-0 print:p-0 print:bg-white">
@@ -438,36 +438,36 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
         {/* Header */}
         <div className="flex justify-between items-center mb-6 print:hidden">
           <div>
-            <h2 className="text-white text-2xl font-bold">Roadmap</h2>
-            <p className="text-[#8A9AB0] text-sm mt-0.5">
+            <h2 className="text-fp-text text-2xl font-bold">Roadmap</h2>
+            <p className="text-fp-muted text-sm mt-0.5">
               {userIsAdmin ? "Manage your team's feature pipeline." : "See what's planned and submit a request."}
             </p>
           </div>
           <div className="flex items-center gap-3">
             {/* View toggle */}
             {userIsAdmin && (
-              <div className="flex bg-[#1a2d45] border border-[#2a3d55] rounded-lg p-1 gap-1">
+              <div className="flex bg-fp-card border border-fp-border rounded-lg p-1 gap-1">
                 <button onClick={() => setView('board')}
-                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'board' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'board' ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
                   Board
                 </button>
                 <button onClick={() => setView('table')}
-                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'table' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'table' ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
                   Table
                 </button>
                 <button onClick={() => setView('gantt')}
-                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'gantt' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                  className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'gantt' ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
                   Gantt
                 </button>
                 {isDevTeam && (
                   <button onClick={() => setView('mywork')}
-                    className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'mywork' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                    className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'mywork' ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
                     My Work {myItems.length > 0 && <span className="ml-1 bg-white/20 rounded-full px-1.5">{myItems.length}</span>}
                   </button>
                 )}
                 {(isAdmin || isProductManager) && (
                   <button onClick={() => setView('report')}
-                    className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'report' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                    className={`px-3 py-1.5 rounded text-xs font-semibold transition-colors ${view === 'report' ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
                     Report
                   </button>
                 )}
@@ -477,37 +477,37 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
             {userIsAdmin && (
               <button
                 onClick={() => { setShowArchived(p => !p); setDrawer(null) }}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors border ${showArchived ? 'bg-[#2a3d55] border-[#2a3d55] text-white' : 'bg-[#1a2d45] border-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors border ${showArchived ? 'bg-fp-inset border-fp-border text-fp-text' : 'bg-fp-card border-fp-border text-fp-muted hover:text-fp-text'}`}>
                 {showArchived ? '← Active Board' : `Archive${archivedItems.length > 0 ? ` (${archivedItems.length})` : ''}`}
               </button>
             )}
             {!showArchived && (
               <button onClick={() => setShowRequest(true)}
-                className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
+                className="bg-fp-card text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-fp-border">
                 + Submit Request
               </button>
             )}
             {userIsAdmin && (view === 'board' || view === 'table') && !showArchived && (
               <button onClick={openCreate}
-                className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                 + Add Item
               </button>
             )}
             {view === 'report' && (
               <button onClick={() => window.print()}
-                className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
+                className="bg-fp-card text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-fp-border">
                 Print / Export
               </button>
             )}
             {view === 'gantt' && !showArchived && (
               <button onClick={() => exportGanttPDF(activeItems, getAssignees)}
-                className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
+                className="bg-fp-card text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-fp-border">
                 Export PDF
               </button>
             )}
             {view === 'table' && !showArchived && (
               <button onClick={() => exportTableCSV(activeItems, getAssignees)}
-                className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-[#2a3d55]">
+                className="bg-fp-card text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-fp-border">
                 Export CSV
               </button>
             )}
@@ -519,8 +519,8 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
           <div className="max-w-4xl">
             {archivedItems.length === 0 ? (
               <div className="text-center py-16">
-                <p className="text-white font-semibold mb-2">No archived items.</p>
-                <p className="text-[#8A9AB0] text-sm">Archive items from the board to clean up old releases.</p>
+                <p className="text-fp-text font-semibold mb-2">No archived items.</p>
+                <p className="text-fp-muted text-sm">Archive items from the board to clean up old releases.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -533,7 +533,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
                       <div className="flex items-center gap-2 mb-3">
                         <div className={`w-2 h-2 rounded-full ${meta.dot}`} />
                         <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>{meta.label}</span>
-                        <span className="text-[#8A9AB0] text-xs">({group.length})</span>
+                        <span className="text-fp-muted text-xs">({group.length})</span>
                       </div>
                       <div className="space-y-2">
                         {group.map(item => {
@@ -541,11 +541,11 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
                           const release   = item.target_quarter || fmtDate(item.target_date)
                           return (
                             <button key={item.id} onClick={() => setDrawer(item.id)}
-                              className="w-full text-left bg-[#1a2d45] border border-[#2a3d55] hover:border-[#C8622A]/40 rounded-xl px-5 py-4 flex items-start gap-4 transition-colors opacity-70 hover:opacity-100">
+                              className="w-full text-left bg-fp-card border border-fp-border hover:border-fp-brand/40 rounded-xl px-5 py-4 flex items-start gap-4 transition-colors opacity-70 hover:opacity-100">
                               <div className="flex-1 min-w-0">
-                                <p className="text-white font-semibold text-sm">{item.title}</p>
-                                {item.description && <p className="text-[#8A9AB0] text-xs mt-1 line-clamp-1">{item.description}</p>}
-                                <p className="text-[#8A9AB0] text-xs mt-1">
+                                <p className="text-fp-text font-semibold text-sm">{item.title}</p>
+                                {item.description && <p className="text-fp-muted text-xs mt-1 line-clamp-1">{item.description}</p>}
+                                <p className="text-fp-muted text-xs mt-1">
                                   Archived {new Date(item.archived_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                 </p>
                               </div>
@@ -554,7 +554,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
                                   {CATEGORY_LABELS[item.category]}
                                 </span>
                                 {assignees.length > 0 && (
-                                  <span className="text-[#8A9AB0] text-xs">{assignees.map(a => a.full_name).join(', ')}</span>
+                                  <span className="text-fp-muted text-xs">{assignees.map(a => a.full_name).join(', ')}</span>
                                 )}
                                 {release && <span className="text-[#C8622A] text-xs font-semibold">{release}</span>}
                               </div>
@@ -581,11 +581,11 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
                   <div className="flex items-center gap-2 mb-1">
                     <div className={`w-2 h-2 rounded-full ${meta.dot}`} />
                     <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>{meta.label}</span>
-                    <span className="text-[#8A9AB0] text-xs ml-auto">{col.length}</span>
+                    <span className="text-fp-muted text-xs ml-auto">{col.length}</span>
                   </div>
                   {col.length === 0 && (
-                    <div className="border border-dashed border-[#2a3d55] rounded-xl p-4 text-center">
-                      <p className="text-[#8A9AB0] text-xs">Empty</p>
+                    <div className="border border-dashed border-fp-border rounded-xl p-4 text-center">
+                      <p className="text-fp-muted text-xs">Empty</p>
                     </div>
                   )}
                   {col.map(item => (
@@ -618,8 +618,8 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
           <div className="space-y-8 max-w-4xl">
             {myItems.length === 0 ? (
               <div className="text-center py-16">
-                <p className="text-white font-semibold mb-2">Nothing assigned to you yet.</p>
-                <p className="text-[#8A9AB0] text-sm">Ask your product manager to assign items to you.</p>
+                <p className="text-fp-text font-semibold mb-2">Nothing assigned to you yet.</p>
+                <p className="text-fp-muted text-sm">Ask your product manager to assign items to you.</p>
               </div>
             ) : (
               <>
@@ -632,17 +632,17 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
                       <div className="flex items-center gap-2 mb-4">
                         <div className={`w-2 h-2 rounded-full ${meta.dot}`} />
                         <h3 className={`font-semibold text-sm uppercase tracking-wide ${meta.color}`}>{meta.label}</h3>
-                        <span className="text-[#8A9AB0] text-xs">({mine.length})</span>
+                        <span className="text-fp-muted text-xs">({mine.length})</span>
                       </div>
                       <div className="space-y-2">
                         {mine.map(item => {
                           const release = item.target_quarter || fmtDate(item.target_date)
                           return (
                             <button key={item.id} onClick={() => setDrawer(item.id)}
-                              className="w-full text-left bg-[#1a2d45] border border-[#2a3d55] hover:border-[#C8622A]/40 rounded-xl px-5 py-4 flex items-start gap-4 transition-colors">
+                              className="w-full text-left bg-fp-card border border-fp-border hover:border-fp-brand/40 rounded-xl px-5 py-4 flex items-start gap-4 transition-colors">
                               <div className="flex-1 min-w-0">
-                                <p className="text-white font-semibold text-sm">{item.title}</p>
-                                {item.description && <p className="text-[#8A9AB0] text-xs mt-1 line-clamp-2">{item.description}</p>}
+                                <p className="text-fp-text font-semibold text-sm">{item.title}</p>
+                                {item.description && <p className="text-fp-muted text-xs mt-1 line-clamp-2">{item.description}</p>}
                               </div>
                               <div className="flex items-center gap-2 flex-shrink-0">
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[item.category]}`}>
@@ -673,11 +673,11 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <div className="w-2 h-2 rounded-full bg-blue-400" />
-                <h3 className="text-white font-semibold">Coming Up</h3>
-                <span className="text-[#8A9AB0] text-xs">{byStatus('planned').length + byStatus('in_progress').length} items</span>
+                <h3 className="text-fp-text font-semibold">Coming Up</h3>
+                <span className="text-fp-muted text-xs">{byStatus('planned').length + byStatus('in_progress').length} items</span>
               </div>
               {byStatus('planned').length === 0 && byStatus('in_progress').length === 0 ? (
-                <p className="text-[#8A9AB0] text-sm">Nothing planned yet — check back soon.</p>
+                <p className="text-fp-muted text-sm">Nothing planned yet — check back soon.</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {[...byStatus('in_progress'), ...byStatus('planned')].map(item => (
@@ -690,8 +690,8 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-2 h-2 rounded-full bg-green-400" />
-                  <h3 className="text-white font-semibold">Released</h3>
-                  <span className="text-[#8A9AB0] text-xs">{byStatus('released').length} items</span>
+                  <h3 className="text-fp-text font-semibold">Released</h3>
+                  <span className="text-fp-muted text-xs">{byStatus('released').length} items</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {byStatus('released').map(item => (
@@ -704,7 +704,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
               <div>
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-2 h-2 rounded-full bg-[#C8622A]" />
-                  <h3 className="text-white font-semibold">My Requests</h3>
+                  <h3 className="text-fp-text font-semibold">My Requests</h3>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                   {items.filter(i => i.requested_by === profileId).map(item => (
@@ -740,48 +740,48 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
       {/* Add/edit modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-5">{editItem ? 'Edit Item' : 'Add Roadmap Item'}</h3>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-fp-text font-bold text-lg mb-5">{editItem ? 'Edit Item' : 'Add Roadmap Item'}</h3>
             {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
             <div className="space-y-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Title <span className="text-[#C8622A]">*</span></label>
+                <label className="text-fp-muted text-xs mb-1 block">Title <span className="text-[#C8622A]">*</span></label>
                 <input type="text" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
                   placeholder="e.g. Dark mode support"
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Description</label>
+                <label className="text-fp-muted text-xs mb-1 block">Description</label>
                 <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                   rows={3} placeholder="What is this and why does it matter?"
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Category</label>
+                <label className="text-fp-muted text-xs mb-1 block">Category</label>
                 <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                   {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                 </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Target Quarter</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Target Quarter</label>
                   <select value={form.target_quarter} onChange={e => setForm(p => ({ ...p, target_quarter: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                     <option value="">— None —</option>
                     {QUARTER_OPTIONS.map(q => <option key={q} value={q}>{q}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Specific Date</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Specific Date</label>
                   <input type="date" value={form.target_date} onChange={e => setForm(p => ({ ...p, target_date: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowModal(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={() => setShowModal(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={saveItem} disabled={saving}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {saving ? 'Saving...' : editItem ? 'Save Changes' : 'Add Item'}
                 </button>
               </div>
@@ -793,33 +793,33 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
       {/* Request modal */}
       {showRequest && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-1">Submit a Feature Request</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">Your request will go into the backlog for review.</p>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-fp-text font-bold text-lg mb-1">Submit a Feature Request</h3>
+            <p className="text-fp-muted text-sm mb-5">Your request will go into the backlog for review.</p>
             <div className="space-y-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">What do you need? <span className="text-[#C8622A]">*</span></label>
+                <label className="text-fp-muted text-xs mb-1 block">What do you need? <span className="text-[#C8622A]">*</span></label>
                 <input type="text" value={reqForm.title} onChange={e => setReqForm(p => ({ ...p, title: e.target.value }))}
                   placeholder="e.g. Batch pricing update for catalog"
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">More detail</label>
+                <label className="text-fp-muted text-xs mb-1 block">More detail</label>
                 <textarea value={reqForm.description} onChange={e => setReqForm(p => ({ ...p, description: e.target.value }))}
                   rows={3} placeholder="Why would this help you or your customers?"
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Category</label>
+                <label className="text-fp-muted text-xs mb-1 block">Category</label>
                 <select value={reqForm.category} onChange={e => setReqForm(p => ({ ...p, category: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                   {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowRequest(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={() => setShowRequest(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={submitRequest} disabled={submitting || !reqForm.title.trim()}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {submitting ? 'Submitting...' : 'Submit Request'}
                 </button>
               </div>
@@ -838,23 +838,23 @@ function ReportView({ items, getAssignees }) {
     { status: 'in_progress', label: 'In Progress',  border: 'border-blue-500/30',   dot: 'bg-blue-400' },
     { status: 'planned',     label: 'Planned',       border: 'border-yellow-500/30', dot: 'bg-yellow-400' },
     { status: 'released',    label: 'Released',      border: 'border-green-500/30',  dot: 'bg-green-400' },
-    { status: 'backlog',     label: 'Backlog',       border: 'border-[#2a3d55]',     dot: 'bg-[#8A9AB0]' },
+    { status: 'backlog',     label: 'Backlog',       border: 'border-fp-border',     dot: 'bg-fp-muted' },
     { status: 'declined',    label: 'Declined',      border: 'border-red-500/30',    dot: 'bg-red-400' },
   ]
   const byStatus = (s) => items.filter(i => i.status === s)
 
   return (
     <div className="max-w-4xl mx-auto print:max-w-none">
-      <div className="mb-8 pb-6 border-b border-[#2a3d55] print:border-gray-300">
-        <h1 className="text-white text-3xl font-bold mb-1 print:text-black">Product Roadmap</h1>
-        <p className="text-[#8A9AB0] text-sm print:text-gray-500">Generated {today}</p>
+      <div className="mb-8 pb-6 border-b border-fp-border print:border-gray-300">
+        <h1 className="text-fp-text text-3xl font-bold mb-1 print:text-black">Product Roadmap</h1>
+        <p className="text-fp-muted text-sm print:text-gray-500">Generated {today}</p>
       </div>
       <div className="grid grid-cols-5 gap-3 mb-8">
         {SECTIONS.map(s => (
-          <div key={s.status} className={`bg-[#1a2d45] border ${s.border} rounded-xl p-4 text-center print:bg-white print:border-gray-200`}>
+          <div key={s.status} className={`bg-fp-card border ${s.border} rounded-xl p-4 text-center print:bg-white print:border-gray-200`}>
             <div className={`w-2 h-2 rounded-full ${s.dot} mx-auto mb-2`} />
-            <p className="text-white text-2xl font-bold print:text-black">{byStatus(s.status).length}</p>
-            <p className="text-[#8A9AB0] text-xs mt-0.5 print:text-gray-500">{s.label}</p>
+            <p className="text-fp-text text-2xl font-bold print:text-black">{byStatus(s.status).length}</p>
+            <p className="text-fp-muted text-xs mt-0.5 print:text-gray-500">{s.label}</p>
           </div>
         ))}
       </div>
@@ -862,25 +862,25 @@ function ReportView({ items, getAssignees }) {
         <div key={s.status} className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <div className={`w-2.5 h-2.5 rounded-full ${s.dot}`} />
-            <h2 className="text-white font-bold text-lg print:text-black">{s.label}</h2>
-            <span className="text-[#8A9AB0] text-sm">({byStatus(s.status).length})</span>
+            <h2 className="text-fp-text font-bold text-lg print:text-black">{s.label}</h2>
+            <span className="text-fp-muted text-sm">({byStatus(s.status).length})</span>
           </div>
           <div className="space-y-2">
             {byStatus(s.status).map(item => {
               const assignees = getAssignees(item.id)
               const release   = item.target_quarter || fmtDate(item.target_date)
               return (
-                <div key={item.id} className={`bg-[#1a2d45] border ${s.border} rounded-xl px-5 py-4 flex items-start gap-4 print:bg-white print:border-gray-200`}>
+                <div key={item.id} className={`bg-fp-card border ${s.border} rounded-xl px-5 py-4 flex items-start gap-4 print:bg-white print:border-gray-200`}>
                   <div className="flex-1 min-w-0">
-                    <p className="text-white font-semibold text-sm print:text-black">{item.title}</p>
-                    {item.description && <p className="text-[#8A9AB0] text-xs mt-1 leading-relaxed print:text-gray-500">{item.description}</p>}
+                    <p className="text-fp-text font-semibold text-sm print:text-black">{item.title}</p>
+                    {item.description && <p className="text-fp-muted text-xs mt-1 leading-relaxed print:text-gray-500">{item.description}</p>}
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[item.category]}`}>
                       {CATEGORY_LABELS[item.category]}
                     </span>
                     {assignees.length > 0 && (
-                      <span className="text-[#8A9AB0] text-xs">{assignees.map(a => a.full_name).join(', ')}</span>
+                      <span className="text-fp-muted text-xs">{assignees.map(a => a.full_name).join(', ')}</span>
                     )}
                     {release && <span className="text-[#C8622A] text-xs font-semibold">{release}</span>}
                   </div>
@@ -955,10 +955,10 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees,
   return (
     <>
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
-      <div className="fixed right-0 top-0 bottom-0 w-[440px] bg-[#1a2d45] border-l border-[#2a3d55] z-50 flex flex-col shadow-2xl">
+      <div className="fixed right-0 top-0 bottom-0 w-[440px] bg-fp-card border-l border-fp-border z-50 flex flex-col shadow-2xl">
 
         {/* Header */}
-        <div className="flex items-start justify-between px-6 py-4 border-b border-[#2a3d55] flex-shrink-0">
+        <div className="flex items-start justify-between px-6 py-4 border-b border-fp-border flex-shrink-0">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${meta.badge}`}>{meta.label}</span>
@@ -966,12 +966,12 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees,
                 {CATEGORY_LABELS[item.category]}
               </span>
             </div>
-            <h3 className="text-white font-bold text-base leading-snug">{item.title}</h3>
+            <h3 className="text-fp-text font-bold text-base leading-snug">{item.title}</h3>
             {item.profiles?.full_name && (
-              <p className="text-[#8A9AB0] text-xs mt-1">Requested by {item.profiles.full_name}</p>
+              <p className="text-fp-muted text-xs mt-1">Requested by {item.profiles.full_name}</p>
             )}
           </div>
-          <button onClick={onClose} className="text-[#8A9AB0] hover:text-white transition-colors ml-3 flex-shrink-0">
+          <button onClick={onClose} className="text-fp-muted hover:text-fp-text transition-colors ml-3 flex-shrink-0">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
             </svg>
@@ -983,24 +983,24 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees,
 
           {item.description && (
             <div>
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">Description</p>
-              <p className="text-white text-sm leading-relaxed">{item.description}</p>
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1">Description</p>
+              <p className="text-fp-text text-sm leading-relaxed">{item.description}</p>
             </div>
           )}
 
           {/* Assignees */}
           {userIsAdmin && (
             <div>
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Assigned To</p>
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Assigned To</p>
               {/* Current assignees as chips */}
               {assignees.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
                   {assignees.map(a => (
-                    <div key={a.profile_id} className="flex items-center gap-1.5 bg-[#0F1C2E] border border-[#2a3d55] rounded-full pl-3 pr-2 py-1">
-                      <span className="text-white text-xs font-medium">{a.full_name}</span>
-                      <span className="text-[#8A9AB0] text-xs">· {roleLabel(a.org_role)}</span>
+                    <div key={a.profile_id} className="flex items-center gap-1.5 bg-fp-inset border border-fp-border rounded-full pl-3 pr-2 py-1">
+                      <span className="text-fp-text text-xs font-medium">{a.full_name}</span>
+                      <span className="text-fp-muted text-xs">· {roleLabel(a.org_role)}</span>
                       <button onClick={() => onRemoveAssignee(a.profile_id)}
-                        className="text-[#8A9AB0] hover:text-red-400 transition-colors ml-1 text-xs leading-none">✕</button>
+                        className="text-fp-muted hover:text-red-400 transition-colors ml-1 text-xs leading-none">✕</button>
                     </div>
                   ))}
                 </div>
@@ -1010,7 +1010,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees,
                 <select
                   value=""
                   onChange={e => { if (e.target.value) onAddAssignee(e.target.value) }}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                   <option value="">+ Add person…</option>
                   {unassigned.map(m => (
                     <option key={m.id} value={m.id}>{m.full_name} ({roleLabel(m.org_role)})</option>
@@ -1018,10 +1018,10 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees,
                 </select>
               )}
               {unassigned.length === 0 && assignees.length > 0 && (
-                <p className="text-[#8A9AB0] text-xs">All team members assigned.</p>
+                <p className="text-fp-muted text-xs">All team members assigned.</p>
               )}
               {teamMembers.length === 0 && (
-                <p className="text-[#8A9AB0] text-xs">No dev or product manager profiles in this org yet.</p>
+                <p className="text-fp-muted text-xs">No dev or product manager profiles in this org yet.</p>
               )}
             </div>
           )}
@@ -1029,58 +1029,58 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees,
           {/* Expected Release */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Expected Release</p>
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Expected Release</p>
               {userIsAdmin && !editingRelease && (
                 <button onClick={() => { setReleaseForm({ target_quarter: item.target_quarter || '', target_date: item.target_date || '' }); setEditingRelease(true) }}
-                  className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors">Edit</button>
+                  className="text-fp-muted hover:text-[#C8622A] text-xs transition-colors">Edit</button>
               )}
             </div>
             {editingRelease ? (
-              <div className="space-y-3 bg-[#0F1C2E] rounded-xl p-3 border border-[#2a3d55]">
+              <div className="space-y-3 bg-fp-inset rounded-xl p-3 border border-fp-border">
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Quarter</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Quarter</label>
                   <select value={releaseForm.target_quarter} onChange={e => setReleaseForm(p => ({ ...p, target_quarter: e.target.value }))}
-                    className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                    className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                     <option value="">— None —</option>
                     {QUARTER_OPTIONS.map(q => <option key={q} value={q}>{q}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Specific Date</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Specific Date</label>
                   <input type="date" value={releaseForm.target_date} onChange={e => setReleaseForm(p => ({ ...p, target_date: e.target.value }))}
-                    className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                    className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setEditingRelease(false)} className="flex-1 py-1.5 text-[#8A9AB0] hover:text-white text-xs transition-colors">Cancel</button>
+                  <button onClick={() => setEditingRelease(false)} className="flex-1 py-1.5 text-fp-muted hover:text-fp-text text-xs transition-colors">Cancel</button>
                   <button onClick={saveRelease} disabled={savingRelease}
-                    className="flex-1 bg-[#C8622A] text-white py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                    className="flex-1 bg-fp-brand text-white py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                     {savingRelease ? 'Saving...' : 'Save'}
                   </button>
                 </div>
               </div>
             ) : displayRelease ? (
-              <div className="flex items-center gap-2 bg-[#0F1C2E] rounded-xl px-4 py-3 border border-[#2a3d55]">
+              <div className="flex items-center gap-2 bg-fp-inset rounded-xl px-4 py-3 border border-fp-border">
                 <svg className="w-4 h-4 text-[#C8622A] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                 </svg>
-                <span className="text-white text-sm font-semibold">{displayRelease}</span>
+                <span className="text-fp-text text-sm font-semibold">{displayRelease}</span>
                 {item.target_quarter && item.target_date && (
-                  <span className="text-[#8A9AB0] text-xs">· {fmtDateLong(item.target_date)}</span>
+                  <span className="text-fp-muted text-xs">· {fmtDateLong(item.target_date)}</span>
                 )}
               </div>
             ) : (
-              <p className="text-[#8A9AB0] text-sm">{userIsAdmin ? 'Not set — click Edit to add a target.' : 'Not yet scheduled.'}</p>
+              <p className="text-fp-muted text-sm">{userIsAdmin ? 'Not set — click Edit to add a target.' : 'Not yet scheduled.'}</p>
             )}
           </div>
 
           {/* Status moves */}
           {userIsAdmin && moves.length > 0 && (
             <div>
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Move To</p>
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Move To</p>
               <div className="flex flex-wrap gap-2">
                 {moves.map(m => (
                   <button key={m.value} onClick={() => onStatusChange(m.value)}
-                    className="px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white hover:bg-[#2a3d55] text-xs font-medium transition-colors border border-[#2a3d55]">
+                    className="px-3 py-1.5 rounded-lg bg-fp-inset text-fp-muted hover:text-fp-text hover:bg-fp-inset text-xs font-medium transition-colors border border-fp-border">
                     {m.label}
                   </button>
                 ))}
@@ -1091,7 +1091,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees,
           {userIsAdmin && (
             <div className="flex gap-2">
               <button onClick={onEdit}
-                className="flex-1 px-3 py-2 bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] hover:text-white rounded-lg text-xs font-medium transition-colors text-left">
+                className="flex-1 px-3 py-2 bg-fp-inset border border-fp-border text-fp-muted hover:text-fp-text rounded-lg text-xs font-medium transition-colors text-left">
                 Edit Title & Description
               </button>
               {item.archived_at ? (
@@ -1101,7 +1101,7 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees,
                 </button>
               ) : (
                 <button onClick={onArchive}
-                  className="px-3 py-2 bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] hover:text-yellow-400 hover:border-yellow-500/30 rounded-lg text-xs font-medium transition-colors">
+                  className="px-3 py-2 bg-fp-inset border border-fp-border text-fp-muted hover:text-yellow-400 hover:border-yellow-500/30 rounded-lg text-xs font-medium transition-colors">
                   Archive
                 </button>
               )}
@@ -1111,31 +1111,31 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees,
           {/* Team notes */}
           {userIsAdmin && (
             <div>
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">
                 Team Notes {notes.length > 0 && `(${notes.length})`}
               </p>
               {loadingNotes ? (
-                <p className="text-[#8A9AB0] text-xs">Loading...</p>
+                <p className="text-fp-muted text-xs">Loading...</p>
               ) : notes.length === 0 ? (
-                <p className="text-[#8A9AB0] text-sm">No notes yet.</p>
+                <p className="text-fp-muted text-sm">No notes yet.</p>
               ) : (
                 <div className="space-y-3">
                   {notes.map(note => (
-                    <div key={note.id} className={`rounded-xl p-3 border group ${note.is_internal ? 'bg-[#0F1C2E] border-[#2a3d55]' : 'bg-blue-900/10 border-blue-500/20'}`}>
+                    <div key={note.id} className={`rounded-xl p-3 border group ${note.is_internal ? 'bg-fp-inset border-fp-border' : 'bg-blue-900/10 border-blue-500/20'}`}>
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
                           <span className="text-[#C8622A] text-xs font-semibold">{note.profiles?.full_name || 'Team'}</span>
-                          <span className={`text-xs px-1.5 py-0.5 rounded ${note.is_internal ? 'bg-[#2a3d55] text-[#8A9AB0]' : 'bg-blue-500/20 text-blue-400'}`}>
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${note.is_internal ? 'bg-fp-inset text-fp-muted' : 'bg-blue-500/20 text-blue-400'}`}>
                             {note.is_internal ? 'Internal' : 'Public'}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[#8A9AB0] text-xs">{new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                          <span className="text-fp-muted text-xs">{new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                           <button onClick={() => deleteNote(note.id)}
-                            className="text-[#8A9AB0] hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
+                            className="text-fp-muted hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
                         </div>
                       </div>
-                      <p className="text-white text-sm leading-relaxed whitespace-pre-wrap">{note.body}</p>
+                      <p className="text-fp-text text-sm leading-relaxed whitespace-pre-wrap">{note.body}</p>
                     </div>
                   ))}
                 </div>
@@ -1146,23 +1146,23 @@ function ItemDrawer({ item, orgId, profile, userIsAdmin, teamMembers, assignees,
 
         {/* Note input */}
         {userIsAdmin && (
-          <div className="px-6 py-4 border-t border-[#2a3d55] flex-shrink-0">
+          <div className="px-6 py-4 border-t border-fp-border flex-shrink-0">
             <textarea ref={textareaRef} value={noteBody}
               onChange={e => setNoteBody(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) postNote() }}
               placeholder="Add a team note… (⌘↵ to post)"
               rows={3}
-              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none placeholder-[#8A9AB0] mb-2"
+              className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none placeholder-[#8A9AB0] mb-2"
             />
             <div className="flex items-center gap-3 mb-2">
               <button onClick={() => setNoteInternal(!noteInternal)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${noteInternal ? 'bg-[#2a3d55] border-[#2a3d55] text-[#8A9AB0]' : 'bg-blue-500/10 border-blue-500/30 text-blue-400'}`}>
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${noteInternal ? 'bg-fp-inset border-fp-border text-fp-muted' : 'bg-blue-500/10 border-blue-500/30 text-blue-400'}`}>
                 {noteInternal ? '🔒 Internal only' : '👁 Visible to reps'}
               </button>
-              <span className="text-[#8A9AB0] text-xs">{noteInternal ? 'Only team sees this' : 'Rep who submitted can see this'}</span>
+              <span className="text-fp-muted text-xs">{noteInternal ? 'Only team sees this' : 'Rep who submitted can see this'}</span>
             </div>
             <button onClick={postNote} disabled={posting || !noteBody.trim()}
-              className="w-full bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+              className="w-full bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
               {posting ? 'Posting...' : 'Post Note'}
             </button>
           </div>
@@ -1178,18 +1178,18 @@ function AdminCard({ item, currentStatus, assignees, onOpen, onEdit, onDelete, o
   const displayRelease = item.target_quarter || fmtDate(item.target_date)
 
   return (
-    <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-4 group hover:border-[#C8622A]/30 transition-colors">
+    <div className="bg-fp-card border border-fp-border rounded-xl p-4 group hover:border-fp-brand/30 transition-colors">
       <div className="flex items-start justify-between gap-2 mb-2">
-        <button onClick={onOpen} className="text-white text-sm font-semibold leading-tight text-left hover:text-[#C8622A] transition-colors">
+        <button onClick={onOpen} className="text-fp-text text-sm font-semibold leading-tight text-left hover:text-[#C8622A] transition-colors">
           {item.title}
         </button>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          <button onClick={onEdit} className="text-[#8A9AB0] hover:text-white text-xs p-0.5">✏️</button>
-          <button onClick={onDelete} className="text-[#8A9AB0] hover:text-red-400 text-xs p-0.5">✕</button>
+          <button onClick={onEdit} className="text-fp-muted hover:text-fp-text text-xs p-0.5">✏️</button>
+          <button onClick={onDelete} className="text-fp-muted hover:text-red-400 text-xs p-0.5">✕</button>
         </div>
       </div>
       {item.description && (
-        <p className="text-[#8A9AB0] text-xs mb-2 leading-relaxed line-clamp-2">{item.description}</p>
+        <p className="text-fp-muted text-xs mb-2 leading-relaxed line-clamp-2">{item.description}</p>
       )}
       <div className="flex flex-wrap gap-1.5 mb-2">
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[item.category]}`}>
@@ -1204,7 +1204,7 @@ function AdminCard({ item, currentStatus, assignees, onOpen, onEdit, onDelete, o
       {/* Requestor + assignees */}
       <div className="mb-2 space-y-0.5">
         {item.profiles?.full_name && (
-          <p className="text-[#8A9AB0] text-xs">↑ {item.profiles.full_name}</p>
+          <p className="text-fp-muted text-xs">↑ {item.profiles.full_name}</p>
         )}
         {assignees.length > 0 && (
           <p className="text-blue-400 text-xs">
@@ -1213,12 +1213,12 @@ function AdminCard({ item, currentStatus, assignees, onOpen, onEdit, onDelete, o
         )}
       </div>
       <div className="flex flex-col gap-1">
-        <button onClick={onOpen} className="w-full text-left text-xs px-2 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white hover:bg-[#2a3d55] transition-colors">
+        <button onClick={onOpen} className="w-full text-left text-xs px-2 py-1.5 rounded-lg bg-fp-inset text-fp-muted hover:text-fp-text hover:bg-fp-inset transition-colors">
           View details & notes →
         </button>
         {moves.map(m => (
           <button key={m.value} onClick={() => onStatusChange(m.value)}
-            className="w-full text-left text-xs px-2 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white hover:bg-[#2a3d55] transition-colors">
+            className="w-full text-left text-xs px-2 py-1.5 rounded-lg bg-fp-inset text-fp-muted hover:text-fp-text hover:bg-fp-inset transition-colors">
             {m.label}
           </button>
         ))}
@@ -1257,33 +1257,33 @@ function TableView({ items, getAssignees, onOpen }) {
     })
 
   const SortIcon = ({ col }) => {
-    if (sort.col !== col) return <span className="text-[#2a3d55] ml-1">↕</span>
+    if (sort.col !== col) return <span className="text-fp-muted ml-1">↕</span>
     return <span className="text-[#C8622A] ml-1">{sort.dir === 'asc' ? '↑' : '↓'}</span>
   }
 
-  const thClass = 'px-4 py-3 text-left text-xs font-semibold text-[#8A9AB0] uppercase tracking-wide cursor-pointer hover:text-white transition-colors select-none'
+  const thClass = 'px-4 py-3 text-left text-xs font-semibold text-fp-muted uppercase tracking-wide cursor-pointer hover:text-fp-text transition-colors select-none'
 
   return (
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex items-center gap-3">
         <select value={filter.status} onChange={e => setFilter(p => ({ ...p, status: e.target.value }))}
-          className="bg-[#1a2d45] border border-[#2a3d55] text-[#8A9AB0] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]">
+          className="bg-fp-card border border-fp-border text-fp-muted text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand">
           <option value="">All Statuses</option>
           {ADMIN_COLUMNS.map(s => <option key={s} value={s}>{STATUS_META[s].label}</option>)}
         </select>
         <select value={filter.category} onChange={e => setFilter(p => ({ ...p, category: e.target.value }))}
-          className="bg-[#1a2d45] border border-[#2a3d55] text-[#8A9AB0] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]">
+          className="bg-fp-card border border-fp-border text-fp-muted text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand">
           <option value="">All Categories</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
         </select>
-        <span className="text-[#8A9AB0] text-xs ml-auto">{sorted.length} item{sorted.length !== 1 ? 's' : ''}</span>
+        <span className="text-fp-muted text-xs ml-auto">{sorted.length} item{sorted.length !== 1 ? 's' : ''}</span>
       </div>
 
       {/* Table */}
-      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
+      <div className="bg-fp-card border border-fp-border rounded-xl overflow-hidden">
         <table className="w-full border-collapse">
-          <thead className="border-b border-[#2a3d55] bg-[#0F1C2E]">
+          <thead className="border-b border-fp-border bg-fp-inset">
             <tr>
               <th className={thClass} onClick={() => toggleSort('title')}>Title <SortIcon col="title" /></th>
               <th className={thClass} onClick={() => toggleSort('status')}>Status <SortIcon col="status" /></th>
@@ -1295,7 +1295,7 @@ function TableView({ items, getAssignees, onOpen }) {
           </thead>
           <tbody>
             {sorted.length === 0 && (
-              <tr><td colSpan={6} className="text-center py-12 text-[#8A9AB0] text-sm">No items match the current filters.</td></tr>
+              <tr><td colSpan={6} className="text-center py-12 text-fp-muted text-sm">No items match the current filters.</td></tr>
             )}
             {sorted.map((item, idx) => {
               const meta      = STATUS_META[item.status]
@@ -1304,10 +1304,10 @@ function TableView({ items, getAssignees, onOpen }) {
               return (
                 <tr key={item.id}
                   onClick={() => onOpen(item.id)}
-                  className={`border-b border-[#2a3d55] hover:bg-[#0F1C2E]/60 cursor-pointer transition-colors ${idx % 2 === 0 ? '' : 'bg-[#0F1C2E]/20'}`}>
+                  className={`border-b border-fp-border hover:bg-fp-inset/60 cursor-pointer transition-colors ${idx % 2 === 0 ? '' : 'bg-fp-inset/20'}`}>
                   <td className="px-4 py-3">
-                    <p className="text-white text-sm font-semibold">{item.title}</p>
-                    {item.description && <p className="text-[#8A9AB0] text-xs mt-0.5 line-clamp-1">{item.description}</p>}
+                    <p className="text-fp-text text-sm font-semibold">{item.title}</p>
+                    {item.description && <p className="text-fp-muted text-xs mt-0.5 line-clamp-1">{item.description}</p>}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full ${meta.badge}`}>
@@ -1322,16 +1322,16 @@ function TableView({ items, getAssignees, onOpen }) {
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     {assignees.length > 0
-                      ? <span className="text-[#8A9AB0] text-xs">{assignees.map(a => a.full_name).join(', ')}</span>
-                      : <span className="text-[#2a3d55] text-xs">—</span>}
+                      ? <span className="text-fp-muted text-xs">{assignees.map(a => a.full_name).join(', ')}</span>
+                      : <span className="text-fp-muted text-xs">—</span>}
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     {target
                       ? <span className="text-[#C8622A] text-xs font-semibold">{target}</span>
-                      : <span className="text-[#2a3d55] text-xs">—</span>}
+                      : <span className="text-fp-muted text-xs">—</span>}
                   </td>
                   <td className="px-4 py-3 hidden xl:table-cell">
-                    <span className="text-[#8A9AB0] text-xs">{item.profiles?.full_name || '—'}</span>
+                    <span className="text-fp-muted text-xs">{item.profiles?.full_name || '—'}</span>
                   </td>
                 </tr>
               )
@@ -1394,16 +1394,16 @@ function GanttView({ items, getAssignees, onOpen }) {
   const scheduled   = items.filter(i => getItemQuarter(i))
   const unscheduled = items.filter(i => !getItemQuarter(i))
 
-  const ganttRowClass = 'flex items-stretch border-b border-[#2a3d55] last:border-b-0 hover:bg-[#0F1C2E]/30 cursor-pointer group'
+  const ganttRowClass = 'flex items-stretch border-b border-fp-border last:border-b-0 hover:bg-fp-inset/30 cursor-pointer group'
 
   return (
     <div className="space-y-6">
-      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-x-auto">
+      <div className="bg-fp-card border border-fp-border rounded-xl overflow-x-auto">
         {/* Quarter headers */}
-        <div className="flex border-b border-[#2a3d55] bg-[#0F1C2E] sticky top-0 z-10" style={{ minWidth: `${240 + quarters.length * 120}px` }}>
-          <div className="w-60 flex-shrink-0 px-4 py-3 text-xs font-semibold text-[#8A9AB0] uppercase tracking-wide">Item</div>
+        <div className="flex border-b border-fp-border bg-fp-inset sticky top-0 z-10" style={{ minWidth: `${240 + quarters.length * 120}px` }}>
+          <div className="w-60 flex-shrink-0 px-4 py-3 text-xs font-semibold text-fp-muted uppercase tracking-wide">Item</div>
           {quarters.map(q => (
-            <div key={q} className={`flex-1 min-w-[120px] px-2 py-3 text-center text-xs font-semibold tracking-wide border-l border-[#2a3d55] ${q === currentQ ? 'text-[#C8622A] bg-[#C8622A]/5' : 'text-[#8A9AB0]'}`}>
+            <div key={q} className={`flex-1 min-w-[120px] px-2 py-3 text-center text-xs font-semibold tracking-wide border-l border-fp-border ${q === currentQ ? 'text-[#C8622A] bg-[#C8622A]/5' : 'text-fp-muted'}`}>
               {q}
               {q === currentQ && <div className="w-1.5 h-1.5 rounded-full bg-[#C8622A] mx-auto mt-1" />}
             </div>
@@ -1412,7 +1412,7 @@ function GanttView({ items, getAssignees, onOpen }) {
 
         {/* Rows */}
         {scheduled.length === 0 && (
-          <div className="py-12 text-center text-[#8A9AB0] text-sm">No items have a target quarter set yet.</div>
+          <div className="py-12 text-center text-fp-muted text-sm">No items have a target quarter set yet.</div>
         )}
         {scheduled.map(item => {
           const meta   = STATUS_META[item.status]
@@ -1425,7 +1425,7 @@ function GanttView({ items, getAssignees, onOpen }) {
               className={ganttRowClass} style={{ minWidth: `${240 + quarters.length * 120}px` }}>
               {/* Label */}
               <div className="w-60 flex-shrink-0 px-4 py-3 flex flex-col justify-center min-w-0">
-                <p className="text-white text-xs font-semibold truncate group-hover:text-[#C8622A] transition-colors">{item.title}</p>
+                <p className="text-fp-text text-xs font-semibold truncate group-hover:text-[#C8622A] transition-colors">{item.title}</p>
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className={`inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded-full ${meta.badge}`}>
                     <span className={`w-1 h-1 rounded-full ${meta.dot}`} />
@@ -1436,7 +1436,7 @@ function GanttView({ items, getAssignees, onOpen }) {
                   </span>
                 </div>
                 {assignees.length > 0 && (
-                  <p className="text-[#8A9AB0] text-xs mt-1 truncate">{assignees.map(a => a.full_name?.split(' ')[0]).join(', ')}</p>
+                  <p className="text-fp-muted text-xs mt-1 truncate">{assignees.map(a => a.full_name?.split(' ')[0]).join(', ')}</p>
                 )}
               </div>
 
@@ -1445,7 +1445,7 @@ function GanttView({ items, getAssignees, onOpen }) {
                 const isCurrent  = q === currentQ
                 const isTarget   = i === qIdx
                 return (
-                  <div key={q} className={`flex-1 min-w-[120px] border-l border-[#2a3d55] flex items-center justify-center px-2 py-3 ${isCurrent ? 'bg-[#C8622A]/5' : ''}`}>
+                  <div key={q} className={`flex-1 min-w-[120px] border-l border-fp-border flex items-center justify-center px-2 py-3 ${isCurrent ? 'bg-[#C8622A]/5' : ''}`}>
                     {isTarget && (
                       <div className={`w-full rounded-lg px-2 py-1.5 text-center ${meta.badge} border border-current/30`}>
                         <span className="text-xs font-bold">●</span>
@@ -1462,14 +1462,14 @@ function GanttView({ items, getAssignees, onOpen }) {
       {/* Unscheduled */}
       {unscheduled.length > 0 && (
         <div>
-          <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Unscheduled ({unscheduled.length})</p>
+          <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Unscheduled ({unscheduled.length})</p>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
             {unscheduled.map(item => {
               const meta = STATUS_META[item.status]
               return (
                 <button key={item.id} onClick={() => onOpen(item.id)}
-                  className="text-left bg-[#1a2d45] border border-[#2a3d55] hover:border-[#C8622A]/40 rounded-lg px-3 py-2.5 transition-colors">
-                  <p className="text-white text-xs font-semibold truncate">{item.title}</p>
+                  className="text-left bg-fp-card border border-fp-border hover:border-fp-brand/40 rounded-lg px-3 py-2.5 transition-colors">
+                  <p className="text-fp-text text-xs font-semibold truncate">{item.title}</p>
                   <div className="flex items-center gap-1 mt-1">
                     <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${meta.badge}`}>{meta.label}</span>
                   </div>
@@ -1486,16 +1486,16 @@ function GanttView({ items, getAssignees, onOpen }) {
 // ── Rep card ──────────────────────────────────────────────────────────────────
 function RepCard({ item, released = false, showStatus = false, onOpen }) {
   const statusBadge = {
-    backlog: 'bg-[#8A9AB0]/20 text-[#8A9AB0]', planned: 'bg-yellow-500/20 text-yellow-400',
+    backlog: 'bg-fp-muted/20 text-fp-muted', planned: 'bg-yellow-500/20 text-yellow-400',
     in_progress: 'bg-blue-500/20 text-blue-400', released: 'bg-green-500/20 text-green-400', declined: 'bg-red-500/20 text-red-400',
   }
   const statusLabel = { backlog: 'Pending', planned: 'Planned', in_progress: 'In Progress', released: 'Released', declined: 'Declined' }
   const displayRelease = item.target_quarter || fmtDateLong(item.target_date)
 
   return (
-    <button onClick={onOpen} className={`w-full text-left bg-[#1a2d45] border rounded-xl p-4 hover:border-[#C8622A]/40 transition-colors ${released ? 'border-green-500/20' : 'border-[#2a3d55]'}`}>
+    <button onClick={onOpen} className={`w-full text-left bg-fp-card border rounded-xl p-4 hover:border-fp-brand/40 transition-colors ${released ? 'border-green-500/20' : 'border-fp-border'}`}>
       <div className="flex items-start justify-between gap-2 mb-2">
-        <p className="text-white text-sm font-semibold leading-tight">{item.title}</p>
+        <p className="text-fp-text text-sm font-semibold leading-tight">{item.title}</p>
         {showStatus && (
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${statusBadge[item.status]}`}>
             {statusLabel[item.status]}
@@ -1505,7 +1505,7 @@ function RepCard({ item, released = false, showStatus = false, onOpen }) {
           <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 flex-shrink-0">In Progress</span>
         )}
       </div>
-      {item.description && <p className="text-[#8A9AB0] text-xs mb-3 leading-relaxed line-clamp-2">{item.description}</p>}
+      {item.description && <p className="text-fp-muted text-xs mb-3 leading-relaxed line-clamp-2">{item.description}</p>}
       <div className="flex flex-wrap gap-1.5">
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${CATEGORY_COLORS[item.category]}`}>
           {CATEGORY_LABELS[item.category]}

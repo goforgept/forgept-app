@@ -202,41 +202,41 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
   })).filter(cat => cat.items.length > 0)
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6 max-w-3xl">
         <div>
-          <h2 className="text-white text-2xl font-bold">FAQ & Help</h2>
-          <p className="text-[#8A9AB0] mt-1">Everything you need to know about using ForgePt.</p>
+          <h2 className="text-fp-text text-2xl font-bold">FAQ & Help</h2>
+          <p className="text-fp-muted mt-1">Everything you need to know about using ForgePt.</p>
         </div>
 
         <input type="text" placeholder="Search for help..." value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
+          className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
 
         {filtered.length === 0 ? (
-          <div className="bg-[#1a2d45] rounded-xl p-6 text-center">
-            <p className="text-[#8A9AB0]">No results found for "{search}"</p>
-            <p className="text-[#8A9AB0] text-sm mt-2">Try a different search term or browse all categories below.</p>
+          <div className="bg-fp-card rounded-xl p-6 text-center">
+            <p className="text-fp-muted">No results found for "{search}"</p>
+            <p className="text-fp-muted text-sm mt-2">Try a different search term or browse all categories below.</p>
           </div>
         ) : (
           filtered.map(category => (
-            <div key={category.category} className="bg-[#1a2d45] rounded-xl p-6">
-              <h3 className="text-white font-bold text-lg mb-4">{category.category}</h3>
+            <div key={category.category} className="bg-fp-card rounded-xl p-6">
+              <h3 className="text-fp-text font-bold text-lg mb-4">{category.category}</h3>
               <div className="space-y-2">
                 {category.items.map((item, i) => {
                   const key = `${category.category}-${i}`
                   const isOpen = openItem === key
                   return (
-                    <div key={key} className="border border-[#2a3d55] rounded-lg overflow-hidden">
+                    <div key={key} className="border border-fp-border rounded-lg overflow-hidden">
                       <button onClick={() => setOpenItem(isOpen ? null : key)}
-                        className="w-full text-left px-4 py-3 flex justify-between items-center hover:bg-[#0F1C2E] transition-colors">
-                        <span className="text-white text-sm font-medium">{item.q}</span>
+                        className="w-full text-left px-4 py-3 flex justify-between items-center hover:bg-fp-inset transition-colors">
+                        <span className="text-fp-text text-sm font-medium">{item.q}</span>
                         <span className="text-[#C8622A] text-lg ml-4">{isOpen ? '−' : '+'}</span>
                       </button>
                       {isOpen && (
                         <div className="px-4 pb-4 pt-1">
-                          <p className="text-[#8A9AB0] text-sm leading-relaxed">{item.a}</p>
+                          <p className="text-fp-muted text-sm leading-relaxed">{item.a}</p>
                         </div>
                       )}
                     </div>
@@ -248,32 +248,32 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
         )}
 
         {/* Feature request */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold text-lg mb-1">Request a Feature</h3>
-          <p className="text-[#8A9AB0] text-sm mb-4">Have an idea or something you wish ForgePt could do? Let us know — we read every submission.</p>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold text-lg mb-1">Request a Feature</h3>
+          <p className="text-fp-muted text-sm mb-4">Have an idea or something you wish ForgePt could do? Let us know — we read every submission.</p>
           {submitted ? (
             <div className="bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-3 flex items-center gap-3">
               <span className="text-green-400 text-sm font-semibold">Thanks! Your request has been submitted.</span>
-              <button onClick={() => setSubmitted(false)} className="text-[#8A9AB0] hover:text-white text-xs ml-auto transition-colors">Submit another</button>
+              <button onClick={() => setSubmitted(false)} className="text-fp-muted hover:text-fp-text text-xs ml-auto transition-colors">Submit another</button>
             </div>
           ) : (
             <div className="space-y-3">
               <input type="text" placeholder="What do you need? (required)"
                 value={reqForm.title} onChange={e => setReqForm(p => ({ ...p, title: e.target.value }))}
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
               <textarea rows={3} placeholder="More detail — why would this help you or your customers?"
                 value={reqForm.description} onChange={e => setReqForm(p => ({ ...p, description: e.target.value }))}
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0] resize-none" />
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0] resize-none" />
               <div className="flex items-center gap-3">
                 <select value={reqForm.category} onChange={e => setReqForm(p => ({ ...p, category: e.target.value }))}
-                  className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                   <option value="feature">Feature</option>
                   <option value="improvement">Improvement</option>
                   <option value="bug_fix">Bug Fix</option>
                   <option value="product">Product</option>
                 </select>
                 <button onClick={submitRequest} disabled={submitting || !reqForm.title.trim()}
-                  className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {submitting ? 'Submitting...' : 'Submit Request'}
                 </button>
               </div>
@@ -282,10 +282,10 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
           )}
         </div>
 
-        <div className="bg-[#1a2d45] rounded-xl p-6 text-center">
-          <p className="text-white font-semibold mb-2">Still have questions?</p>
-          <p className="text-[#8A9AB0] text-sm mb-4">Reach out to us and we will get back to you within 1 business day.</p>
-          <a href="mailto:hello@goforgept.com" className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors inline-block">
+        <div className="bg-fp-card rounded-xl p-6 text-center">
+          <p className="text-fp-text font-semibold mb-2">Still have questions?</p>
+          <p className="text-fp-muted text-sm mb-4">Reach out to us and we will get back to you within 1 business day.</p>
+          <a href="mailto:hello@goforgept.com" className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors inline-block">
             Contact Support
           </a>
         </div>

@@ -239,54 +239,54 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     return logDate >= weekAgo
   }).length
 
-  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
+  const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]"
 
   // Estimated hours for selected job
   const estimatedHours = jobLabor.reduce((sum, l) => sum + (parseFloat(l.quantity) || 0), 0)
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} role={role} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-white text-2xl font-bold">Tech Daily Log</h2>
-            <p className="text-[#8A9AB0] text-sm mt-0.5">Track daily hours and work notes by job</p>
+            <h2 className="text-fp-text text-2xl font-bold">Tech Daily Log</h2>
+            <p className="text-fp-muted text-sm mt-0.5">Track daily hours and work notes by job</p>
           </div>
           <button onClick={() => openForm(filterJob)}
-            className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+            className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
             + Log Today's Work
           </button>
         </div>
 
         <div className="grid grid-cols-4 gap-4">
           {[
-            { label: 'Total Hours Logged', value: totalHours.toFixed(1), color: 'text-white' },
-            { label: 'Days Worked', value: uniqueDays, color: 'text-white' },
+            { label: 'Total Hours Logged', value: totalHours.toFixed(1), color: 'text-fp-text' },
+            { label: 'Days Worked', value: uniqueDays, color: 'text-fp-text' },
             { label: 'Logs This Week', value: logsThisWeek, color: 'text-[#C8622A]' },
-            { label: 'Total Entries', value: filteredLogs.length, color: 'text-white' },
+            { label: 'Total Entries', value: filteredLogs.length, color: 'text-fp-text' },
           ].map(stat => (
-            <div key={stat.label} className="bg-[#1a2d45] rounded-xl p-4">
-              <p className="text-[#8A9AB0] text-xs mb-1">{stat.label}</p>
+            <div key={stat.label} className="bg-fp-card rounded-xl p-4">
+              <p className="text-fp-muted text-xs mb-1">{stat.label}</p>
               <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
             </div>
           ))}
         </div>
 
         <div className="flex gap-3 items-center">
-          <span className="text-[#8A9AB0] text-sm">Filter by job:</span>
+          <span className="text-fp-muted text-sm">Filter by job:</span>
           <select value={filterJob} onChange={e => setFilterJob(e.target.value)}
-            className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+            className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
             <option value="all">All Jobs</option>
             {jobs.map(j => <option key={j.id} value={j.id}>{j.job_number ? `${j.job_number} — ` : ''}{j.name}</option>)}
           </select>
           {filterJob !== 'all' && jobLogTotals[filterJob] && (
-            <div className="flex items-center gap-4 ml-2 bg-[#1a2d45] rounded-lg px-4 py-2 text-sm">
-              <span className="text-[#8A9AB0]">Job totals:</span>
-              <span className="text-white font-semibold">{jobLogTotals[filterJob].hours.toFixed(1)} hrs logged</span>
+            <div className="flex items-center gap-4 ml-2 bg-fp-card rounded-lg px-4 py-2 text-sm">
+              <span className="text-fp-muted">Job totals:</span>
+              <span className="text-fp-text font-semibold">{jobLogTotals[filterJob].hours.toFixed(1)} hrs logged</span>
               {Object.keys(jobLogTotals[filterJob].materials).length > 0 && (
-                <span className="text-[#8A9AB0]">{Object.keys(jobLogTotals[filterJob].materials).length} material types used</span>
+                <span className="text-fp-muted">{Object.keys(jobLogTotals[filterJob].materials).length} material types used</span>
               )}
             </div>
           )}
@@ -294,8 +294,8 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
         {/* Per-job material running totals panel */}
         {filterJob !== 'all' && jobLogTotals[filterJob] && Object.keys(jobLogTotals[filterJob].materials).length > 0 && (
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-white font-semibold text-sm mb-4">📦 Material Usage — Running Totals for This Job</p>
+          <div className="bg-fp-card rounded-xl p-5">
+            <p className="text-fp-text font-semibold text-sm mb-4">📦 Material Usage — Running Totals for This Job</p>
             <div className="grid grid-cols-1 gap-2">
               {Object.values(jobLogTotals[filterJob].materials).map((mat, i) => {
                 const planned = parseFloat(mat.planned) || 0
@@ -305,12 +305,12 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                 const isOver = used > planned && planned > 0
                 const isLow = !isOver && planned > 0 && remaining / planned < 0.2
                 return (
-                  <div key={i} className="bg-[#0F1C2E] rounded-lg p-3">
+                  <div key={i} className="bg-fp-inset rounded-lg p-3">
                     <div className="flex justify-between items-center mb-1.5">
-                      <span className="text-white text-sm font-medium">{mat.name}</span>
+                      <span className="text-fp-text text-sm font-medium">{mat.name}</span>
                       <div className="flex items-center gap-3 text-xs">
-                        <span className="text-[#8A9AB0]">Planned: <span className="text-white">{planned > 0 ? `${planned} ${mat.unit}` : '—'}</span></span>
-                        <span className="text-[#8A9AB0]">Used: <span className={`font-semibold ${isOver ? 'text-red-400' : 'text-[#C8622A]'}`}>{used} {mat.unit}</span></span>
+                        <span className="text-fp-muted">Planned: <span className="text-fp-text">{planned > 0 ? `${planned} ${mat.unit}` : '—'}</span></span>
+                        <span className="text-fp-muted">Used: <span className={`font-semibold ${isOver ? 'text-red-400' : 'text-[#C8622A]'}`}>{used} {mat.unit}</span></span>
                         {planned > 0 && (
                           <span className={`font-semibold ${isOver ? 'text-red-400' : isLow ? 'text-yellow-400' : 'text-green-400'}`}>
                             {isOver ? `${Math.abs(remaining).toFixed(1)} over ⚠` : `${remaining.toFixed(1)} ${mat.unit} left`}
@@ -319,7 +319,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                       </div>
                     </div>
                     {planned > 0 && (
-                      <div className="w-full bg-[#1a2d45] rounded-full h-1.5">
+                      <div className="w-full bg-fp-card rounded-full h-1.5">
                         <div
                           className={`h-1.5 rounded-full transition-all ${isOver ? 'bg-red-500' : isLow ? 'bg-yellow-400' : 'bg-green-500'}`}
                           style={{ width: `${pct}%` }}
@@ -334,66 +334,66 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
         )}
 
         {loading ? (
-          <p className="text-[#8A9AB0]">Loading...</p>
+          <p className="text-fp-muted">Loading...</p>
         ) : filteredLogs.length === 0 ? (
-          <div className="text-center py-16 bg-[#1a2d45] rounded-xl border-2 border-dashed border-[#2a3d55]">
-            <p className="text-[#8A9AB0] text-lg mb-2">No log entries yet</p>
-            <p className="text-[#8A9AB0] text-sm mb-4">Start logging daily work to track hours and progress.</p>
-            <button onClick={() => openForm(filterJob)} className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Log Today's Work</button>
+          <div className="text-center py-16 bg-fp-card rounded-xl border-2 border-dashed border-fp-border">
+            <p className="text-fp-muted text-lg mb-2">No log entries yet</p>
+            <p className="text-fp-muted text-sm mb-4">Start logging daily work to track hours and progress.</p>
+            <button onClick={() => openForm(filterJob)} className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Log Today's Work</button>
           </div>
         ) : (
           <div className="space-y-3">
             {filteredLogs.map(log => {
               const parsedMaterials = parseMaterials(log.materials_used)
               return (
-                <div key={log.id} className="bg-[#1a2d45] rounded-xl p-5 border border-[#2a3d55] hover:border-[#C8622A]/30 transition-colors">
+                <div key={log.id} className="bg-fp-card rounded-xl p-5 border border-fp-border hover:border-fp-brand/30 transition-colors">
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <div className="flex items-center gap-3 mb-1">
-                        <span className="text-[#8A9AB0] text-xs bg-[#0F1C2E] px-2 py-0.5 rounded font-mono">
+                        <span className="text-fp-muted text-xs bg-fp-inset px-2 py-0.5 rounded font-mono">
                           {new Date(log.log_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                         </span>
-                        {log.jobs?.job_number && <span className="text-[#8A9AB0] text-xs font-mono bg-[#0F1C2E] px-2 py-0.5 rounded">{log.jobs.job_number}</span>}
-                        <span className="text-white font-semibold">{log.jobs?.name}</span>
+                        {log.jobs?.job_number && <span className="text-fp-muted text-xs font-mono bg-fp-inset px-2 py-0.5 rounded">{log.jobs.job_number}</span>}
+                        <span className="text-fp-text font-semibold">{log.jobs?.name}</span>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-[#8A9AB0]">
+                      <div className="flex items-center gap-4 text-xs text-fp-muted">
                         {log.jobs?.clients?.company && <span>🏢 {log.jobs.clients.company}</span>}
                         <span>👤 {log.profiles?.full_name || 'Unknown'}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <p className="text-[#8A9AB0] text-xs">Hours</p>
+                        <p className="text-fp-muted text-xs">Hours</p>
                         <p className="text-[#C8622A] font-bold text-lg">{log.hours_worked || 0}</p>
                       </div>
                       {(isAdmin || log.user_id === profile?.id) && (
-                        <button onClick={() => deleteLog(log.id)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors ml-2">✕</button>
+                        <button onClick={() => deleteLog(log.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors ml-2">✕</button>
                       )}
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <div className="bg-[#0F1C2E] rounded-lg p-3">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">Work Summary</p>
-                      <p className="text-[#D6E4F0] text-sm leading-relaxed">{log.work_summary}</p>
+                    <div className="bg-fp-inset rounded-lg p-3">
+                      <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1">Work Summary</p>
+                      <p className="text-fp-text text-sm leading-relaxed">{log.work_summary}</p>
                     </div>
 
                     {parsedMaterials && Array.isArray(parsedMaterials) && parsedMaterials.length > 0 && (
-                      <div className="bg-[#0F1C2E] rounded-lg p-3">
-                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">📦 Materials Used Today</p>
+                      <div className="bg-fp-inset rounded-lg p-3">
+                        <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">📦 Materials Used Today</p>
                         <div className="space-y-1">
                           {parsedMaterials.map((item, i) => {
                             const jobTotal = jobLogTotals[log.job_id]?.materials[item.id]
                             const isOver = item.planned && item.qty > item.planned
                             return (
                               <div key={i} className="flex items-center justify-between text-xs">
-                                <span className="text-[#D6E4F0]">{item.name}</span>
+                                <span className="text-fp-text">{item.name}</span>
                                 <div className="flex items-center gap-3">
                                   <span className={`font-semibold ${isOver ? 'text-yellow-400' : 'text-[#C8622A]'}`}>
                                     {item.qty} {item.unit} today
                                   </span>
                                   {jobTotal && (
-                                    <span className="text-[#8A9AB0]">
+                                    <span className="text-fp-muted">
                                       {jobTotal.used} {item.unit} total
                                       {item.planned && jobTotal.planned > 0 && (
                                         <span className={jobTotal.used > jobTotal.planned ? ' text-red-400' : ' text-green-400'}>
@@ -411,16 +411,16 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                     )}
 
                     {log.materials_used && !parsedMaterials && (
-                      <div className="bg-[#0F1C2E] rounded-lg p-3">
-                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">📦 Materials</p>
-                        <p className="text-[#D6E4F0] text-sm">{log.materials_used}</p>
+                      <div className="bg-fp-inset rounded-lg p-3">
+                        <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1">📦 Materials</p>
+                        <p className="text-fp-text text-sm">{log.materials_used}</p>
                       </div>
                     )}
 
                     {log.issues && (
                       <div className="bg-red-500/5 border border-red-500/20 rounded-lg p-3">
                         <p className="text-red-400 text-xs font-semibold uppercase tracking-wide mb-1">⚠ Issues / Notes</p>
-                        <p className="text-[#D6E4F0] text-sm">{log.issues}</p>
+                        <p className="text-fp-text text-sm">{log.issues}</p>
                       </div>
                     )}
                   </div>
@@ -434,12 +434,12 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
       {/* Log Entry Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-5">Log Work</h3>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-fp-text font-bold text-lg mb-5">Log Work</h3>
             <div className="space-y-4">
 
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Job <span className="text-[#C8622A]">*</span></label>
+                <label className="text-fp-muted text-xs mb-1 block">Job <span className="text-[#C8622A]">*</span></label>
                 <select value={form.job_id} onChange={e => handleJobSelect(e.target.value)} className={inputClass}>
                   <option value="">— Select job —</option>
                   {jobs.map(j => (
@@ -450,7 +450,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
               {form.job_id && jobChangeOrders.length > 0 && (
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Logging Against</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Logging Against</label>
                   <select value={selectedCOId} onChange={e => { setSelectedCOId(e.target.value); setCoBomUsage({}) }} className={inputClass}>
                     <option value="">Main Job BOM</option>
                     {jobChangeOrders.map(co => (
@@ -464,38 +464,38 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Date <span className="text-[#C8622A]">*</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Date <span className="text-[#C8622A]">*</span></label>
                   <input type="date" value={form.log_date} onChange={e => setForm(p => ({ ...p, log_date: e.target.value }))} className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Hours Worked</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Hours Worked</label>
                   <input type="number" step="0.5" min="0" value={form.hours_worked} onChange={e => setForm(p => ({ ...p, hours_worked: e.target.value }))} placeholder="e.g. 8" className={inputClass} />
                 </div>
               </div>
 
               {/* Hours context — show running total vs estimate */}
               {form.job_id && (estimatedHours > 0 || jobTotalHours > 0) && (
-                <div className="bg-[#0F1C2E] rounded-lg p-3">
-                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Labor Hours Status</p>
+                <div className="bg-fp-inset rounded-lg p-3">
+                  <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Labor Hours Status</p>
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-[#8A9AB0]">Logged so far</span>
-                    <span className="text-white font-semibold">{jobTotalHours.toFixed(1)} hrs</span>
+                    <span className="text-fp-muted">Logged so far</span>
+                    <span className="text-fp-text font-semibold">{jobTotalHours.toFixed(1)} hrs</span>
                   </div>
                   {estimatedHours > 0 && (
                     <>
                       <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-[#8A9AB0]">Estimated total</span>
-                        <span className="text-white">{estimatedHours.toFixed(1)} hrs</span>
+                        <span className="text-fp-muted">Estimated total</span>
+                        <span className="text-fp-text">{estimatedHours.toFixed(1)} hrs</span>
                       </div>
                       <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-[#8A9AB0]">Remaining</span>
+                        <span className="text-fp-muted">Remaining</span>
                         <span className={`font-semibold ${jobTotalHours > estimatedHours ? 'text-red-400' : 'text-green-400'}`}>
                           {jobTotalHours > estimatedHours
                             ? `${(jobTotalHours - estimatedHours).toFixed(1)} hrs over ⚠`
                             : `${(estimatedHours - jobTotalHours).toFixed(1)} hrs left`}
                         </span>
                       </div>
-                      <div className="w-full bg-[#1a2d45] rounded-full h-1.5">
+                      <div className="w-full bg-fp-card rounded-full h-1.5">
                         <div
                           className={`h-1.5 rounded-full ${jobTotalHours > estimatedHours ? 'bg-red-500' : 'bg-blue-500'}`}
                           style={{ width: `${Math.min((jobTotalHours / estimatedHours) * 100, 100)}%` }}
@@ -507,8 +507,8 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                     <div className="mt-2 space-y-1">
                       {jobLabor.map((labor, idx) => (
                         <div key={idx} className="flex items-center justify-between">
-                          <span className="text-[#8A9AB0] text-xs">{labor.role}</span>
-                          <span className="text-[#8A9AB0] text-xs">{labor.quantity} {labor.unit || 'hr'} planned</span>
+                          <span className="text-fp-muted text-xs">{labor.role}</span>
+                          <span className="text-fp-muted text-xs">{labor.quantity} {labor.unit || 'hr'} planned</span>
                         </div>
                       ))}
                     </div>
@@ -516,7 +516,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                 </div>
               )}
 
-              {fetchingBom && <p className="text-[#8A9AB0] text-xs">Loading job materials...</p>}
+              {fetchingBom && <p className="text-fp-muted text-xs">Loading job materials...</p>}
 
               {/* Change Order BOM */}
               {!fetchingBom && selectedCOId && (() => {
@@ -530,13 +530,13 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                     </div>
 
                     {co.labor_items?.length > 0 && (
-                      <div className="bg-[#0F1C2E] rounded-lg p-3">
-                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">CO Labor</p>
+                      <div className="bg-fp-inset rounded-lg p-3">
+                        <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">CO Labor</p>
                         <div className="space-y-1">
                           {co.labor_items.map((l, i) => (
                             <div key={i} className="flex justify-between text-xs">
-                              <span className="text-[#D6E4F0]">{l.role}</span>
-                              <span className="text-[#8A9AB0]">{l.quantity} {l.unit || 'hr'} planned</span>
+                              <span className="text-fp-text">{l.role}</span>
+                              <span className="text-fp-muted">{l.quantity} {l.unit || 'hr'} planned</span>
                             </div>
                           ))}
                         </div>
@@ -545,22 +545,22 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
                     {co.line_items?.length > 0 && (
                       <div>
-                        <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">
+                        <label className="text-fp-muted text-xs mb-2 block font-semibold uppercase tracking-wide">
                           CO Materials Used Today
-                          <span className="text-[#8A9AB0] font-normal normal-case ml-1">(enter qty used today)</span>
+                          <span className="text-fp-muted font-normal normal-case ml-1">(enter qty used today)</span>
                         </label>
                         <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
                           {co.line_items.map((item, idx) => {
                             const key = `co_${selectedCOId}_${idx}`
                             const planned = parseFloat(item.quantity) || 0
                             return (
-                              <div key={idx} className="bg-[#0F1C2E] border border-transparent rounded-lg px-3 py-2">
+                              <div key={idx} className="bg-fp-inset border border-transparent rounded-lg px-3 py-2">
                                 <div className="flex items-center gap-3">
                                   <div className="flex-1 min-w-0">
-                                    <span className="text-[#D6E4F0] text-sm block truncate">{item.item_name}</span>
+                                    <span className="text-fp-text text-sm block truncate">{item.item_name}</span>
                                     <div className="flex items-center gap-3 mt-0.5">
-                                      {item.category && <span className="text-[#8A9AB0] text-xs">{item.category}</span>}
-                                      <span className="text-[#8A9AB0] text-xs">Planned: {planned} {item.unit}</span>
+                                      {item.category && <span className="text-fp-muted text-xs">{item.category}</span>}
+                                      <span className="text-fp-muted text-xs">Planned: {planned} {item.unit}</span>
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-1 shrink-0">
@@ -568,9 +568,9 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                                       type="number" min="0" step="any" placeholder="0"
                                       value={coBomUsage[key] || ''}
                                       onChange={e => setCoBomUsage(p => ({ ...p, [key]: e.target.value }))}
-                                      className="w-20 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#C8622A] text-right"
+                                      className="w-20 bg-fp-card text-fp-text border border-fp-border rounded px-2 py-1 text-sm focus:outline-none focus:border-fp-brand text-right"
                                     />
-                                    <span className="text-[#8A9AB0] text-xs w-6 shrink-0">{item.unit}</span>
+                                    <span className="text-fp-muted text-xs w-6 shrink-0">{item.unit}</span>
                                   </div>
                                 </div>
                               </div>
@@ -585,9 +585,9 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
               {!fetchingBom && !selectedCOId && jobBom.length > 0 && (
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">
+                  <label className="text-fp-muted text-xs mb-2 block font-semibold uppercase tracking-wide">
                     Materials Used Today
-                    <span className="text-[#8A9AB0] font-normal normal-case ml-1">(enter qty used today)</span>
+                    <span className="text-fp-muted font-normal normal-case ml-1">(enter qty used today)</span>
                   </label>
                   <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
                     {jobBom.map(item => {
@@ -597,13 +597,13 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                       const isOver = alreadyUsed > planned && planned > 0
                       const isLow = !isOver && planned > 0 && remaining / planned < 0.2
                       return (
-                        <div key={item.id} className={`rounded-lg px-3 py-2 border ${isOver ? 'bg-red-500/5 border-red-500/20' : isLow ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-[#0F1C2E] border-transparent'}`}>
+                        <div key={item.id} className={`rounded-lg px-3 py-2 border ${isOver ? 'bg-red-500/5 border-red-500/20' : isLow ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-fp-inset border-transparent'}`}>
                           <div className="flex items-center gap-3">
                             <div className="flex-1 min-w-0">
-                              <span className="text-[#D6E4F0] text-sm block truncate">{item.item_name}</span>
+                              <span className="text-fp-text text-sm block truncate">{item.item_name}</span>
                               <div className="flex items-center gap-3 mt-0.5">
-                                {item.category && <span className="text-[#8A9AB0] text-xs">{item.category}</span>}
-                                <span className="text-[#8A9AB0] text-xs">Planned: {planned} {item.unit}</span>
+                                {item.category && <span className="text-fp-muted text-xs">{item.category}</span>}
+                                <span className="text-fp-muted text-xs">Planned: {planned} {item.unit}</span>
                                 {alreadyUsed > 0 && (
                                   <span className={`text-xs font-semibold ${isOver ? 'text-red-400' : isLow ? 'text-yellow-400' : 'text-green-400'}`}>
                                     {alreadyUsed} used · {isOver ? `${Math.abs(remaining).toFixed(1)} over ⚠` : `${remaining.toFixed(1)} left`}
@@ -619,9 +619,9 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                                 placeholder="0"
                                 value={bomUsage[item.id] || ''}
                                 onChange={e => setBomUsage(p => ({ ...p, [item.id]: e.target.value }))}
-                                className="w-20 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-1 text-sm focus:outline-none focus:border-[#C8622A] text-right"
+                                className="w-20 bg-fp-card text-fp-text border border-fp-border rounded px-2 py-1 text-sm focus:outline-none focus:border-fp-brand text-right"
                               />
-                              <span className="text-[#8A9AB0] text-xs w-6 shrink-0">{item.unit}</span>
+                              <span className="text-fp-muted text-xs w-6 shrink-0">{item.unit}</span>
                             </div>
                           </div>
                         </div>
@@ -633,31 +633,31 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
               {!fetchingBom && jobBom.length === 0 && !selectedCOId && (
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Materials Used <span className="text-[#8A9AB0]">(optional)</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Materials Used <span className="text-fp-muted">(optional)</span></label>
                   <textarea value={form.materials_used} onChange={e => setForm(p => ({ ...p, materials_used: e.target.value }))} rows={2}
                     placeholder="List any materials consumed or installed today..."
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none placeholder-[#8A9AB0]" />
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none placeholder-[#8A9AB0]" />
                 </div>
               )}
 
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Work Summary <span className="text-[#C8622A]">*</span></label>
+                <label className="text-fp-muted text-xs mb-1 block">Work Summary <span className="text-[#C8622A]">*</span></label>
                 <textarea value={form.work_summary} onChange={e => setForm(p => ({ ...p, work_summary: e.target.value }))} rows={4}
                   placeholder="What was completed today? What was installed, configured, or tested?"
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none placeholder-[#8A9AB0]" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none placeholder-[#8A9AB0]" />
               </div>
 
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Issues / Notes <span className="text-[#8A9AB0]">(optional)</span></label>
+                <label className="text-fp-muted text-xs mb-1 block">Issues / Notes <span className="text-fp-muted">(optional)</span></label>
                 <textarea value={form.issues} onChange={e => setForm(p => ({ ...p, issues: e.target.value }))} rows={2}
                   placeholder="Any problems encountered, open items, or notes for tomorrow..."
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none placeholder-[#8A9AB0]" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none placeholder-[#8A9AB0]" />
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowForm(false)} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={() => setShowForm(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={submitLog} disabled={saving || !form.job_id || !form.log_date || !form.work_summary.trim()}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {saving ? 'Saving...' : 'Save Log Entry'}
                 </button>
               </div>

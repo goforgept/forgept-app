@@ -73,7 +73,7 @@ export default function DrawingToolSummary({ proposalId, featureEnabled }) {
   }
 
   return (
-    <div className="mt-6 bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5">
+    <div className="mt-6 bg-fp-card border border-fp-border rounded-xl p-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {/* Icon */}
@@ -86,23 +86,23 @@ export default function DrawingToolSummary({ proposalId, featureEnabled }) {
 
           {/* Info */}
           <div>
-            <p className="text-white font-semibold text-sm">Floor Plan Designer</p>
+            <p className="text-fp-text font-semibold text-sm">Floor Plan Designer</p>
             {loading ? (
-              <p className="text-[#8A9AB0] text-xs mt-0.5">Loading...</p>
+              <p className="text-fp-muted text-xs mt-0.5">Loading...</p>
             ) : stats?.sheets === 0 ? (
-              <p className="text-[#8A9AB0] text-xs mt-0.5">No floor plans uploaded yet</p>
+              <p className="text-fp-muted text-xs mt-0.5">No floor plans uploaded yet</p>
             ) : (
               <div className="flex items-center gap-3 mt-0.5">
-                <span className="text-[#8A9AB0] text-xs">
+                <span className="text-fp-muted text-xs">
                   {stats.sheets} sheet{stats.sheets !== 1 ? 's' : ''}
                 </span>
-                <span className="text-[#2a3d55]">·</span>
-                <span className="text-[#8A9AB0] text-xs">
+                <span className="text-fp-muted">·</span>
+                <span className="text-fp-muted text-xs">
                   {stats.devices} device{stats.devices !== 1 ? 's' : ''} placed
                 </span>
                 {stats.status && (
                   <>
-                    <span className="text-[#2a3d55]">·</span>
+                    <span className="text-fp-muted">·</span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${statusBadge[stats.status]}`}>
                       {stats.status}
                     </span>
@@ -116,7 +116,7 @@ export default function DrawingToolSummary({ proposalId, featureEnabled }) {
         {/* Open button */}
         <button
           onClick={() => navigate(`/designer/${proposalId}`)}
-          className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-fp-brand text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] transition-colors"
         >
           {stats?.sheets === 0 ? 'Start Drawing' : 'Open in Designer'}
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

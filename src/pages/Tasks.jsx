@@ -222,7 +222,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
 
   const priorityColor = (p) => {
     if (p === 'high') return 'text-red-400'
-    if (p === 'low') return 'text-[#8A9AB0]'
+    if (p === 'low') return 'text-fp-muted'
     return 'text-[#C8622A]'
   }
 
@@ -250,29 +250,29 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
 
   const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+  const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-white text-2xl font-bold">Tasks</h2>
+          <h2 className="text-fp-text text-2xl font-bold">Tasks</h2>
           <div className="flex gap-2">
             {/* View toggle */}
-            <div className="flex bg-[#1a2d45] rounded-lg p-1 gap-1">
+            <div className="flex bg-fp-card rounded-lg p-1 gap-1">
               <button onClick={() => setView('list')}
-                className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${view === 'list' ? 'bg-[#0F1C2E] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${view === 'list' ? 'bg-fp-inset text-fp-text' : 'text-fp-muted hover:text-fp-text'}`}>
                 ☰ List
               </button>
               <button onClick={() => setView('calendar')}
-                className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${view === 'calendar' ? 'bg-[#0F1C2E] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                className={`px-3 py-1.5 rounded text-sm font-semibold transition-colors ${view === 'calendar' ? 'bg-fp-inset text-fp-text' : 'text-fp-muted hover:text-fp-text'}`}>
                 📅 Calendar
               </button>
             </div>
             <button onClick={() => setShowForm(!showForm)}
-              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
               {showForm ? 'Cancel' : '+ New Task'}
             </button>
           </div>
@@ -280,27 +280,27 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-[#1a2d45] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Pending</p><p className="text-white text-2xl font-bold">{pendingCount}</p></div>
-          <div className="bg-[#1a2d45] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Due Today</p><p className="text-[#C8622A] text-2xl font-bold">{todayCount}</p></div>
-          <div className="bg-[#1a2d45] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Overdue</p><p className="text-red-400 text-2xl font-bold">{overdueCount}</p></div>
+          <div className="bg-fp-card rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Pending</p><p className="text-fp-text text-2xl font-bold">{pendingCount}</p></div>
+          <div className="bg-fp-card rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Due Today</p><p className="text-[#C8622A] text-2xl font-bold">{todayCount}</p></div>
+          <div className="bg-fp-card rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Overdue</p><p className="text-red-400 text-2xl font-bold">{overdueCount}</p></div>
         </div>
 
         {/* New Task Form */}
         {showForm && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold mb-4">New Task</h3>
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold mb-4">New Task</h3>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="col-span-2">
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Task Title</label>
+                <label className="text-fp-muted text-xs mb-1 block">Task Title</label>
                 <input type="text" value={form.title} onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="e.g. Call John about panel upgrade quote" className={inputClass} />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Due Date</label>
+                <label className="text-fp-muted text-xs mb-1 block">Due Date</label>
                 <input type="date" value={form.due_date} onChange={e => setForm(prev => ({ ...prev, due_date: e.target.value }))} className={inputClass} />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Priority</label>
+                <label className="text-fp-muted text-xs mb-1 block">Priority</label>
                 <select value={form.priority} onChange={e => setForm(prev => ({ ...prev, priority: e.target.value }))} className={inputClass}>
                   <option value="low">Low</option>
                   <option value="normal">Normal</option>
@@ -308,7 +308,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 </select>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Repeat</label>
+                <label className="text-fp-muted text-xs mb-1 block">Repeat</label>
                 <select value={form.recurrence} onChange={e => setForm(prev => ({ ...prev, recurrence: e.target.value }))} className={inputClass}>
                   <option value="">Does not repeat</option>
                   <option value="weekly">Weekly</option>
@@ -319,13 +319,13 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 </select>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Assign To</label>
+                <label className="text-fp-muted text-xs mb-1 block">Assign To</label>
                 <select value={form.assigned_to} onChange={e => setForm(prev => ({ ...prev, assigned_to: e.target.value }))} className={inputClass}>
                   {profiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Link to Client (optional)</label>
+                <label className="text-fp-muted text-xs mb-1 block">Link to Client (optional)</label>
                 <select value={form.client_id} onChange={e => setForm(prev => ({ ...prev, client_id: e.target.value }))} className={inputClass}>
                   <option value="">— No client —</option>
                   {clients.map(c => <option key={c.id} value={c.id}>{c.company}</option>)}
@@ -333,11 +333,11 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
               </div>
             </div>
             {/* Meeting toggle */}
-            <div className="col-span-2 border-t border-[#2a3d55] pt-4">
+            <div className="col-span-2 border-t border-fp-border pt-4">
               <button onClick={() => setShowMeeting(p => !p)}
-                className="flex items-center gap-2 text-sm font-semibold text-[#8A9AB0] hover:text-white transition-colors">
-                <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${showMeeting ? 'bg-[#C8622A] border-[#C8622A]' : 'border-[#2a3d55]'}`}>
-                  {showMeeting && <span className="text-white text-xs">✓</span>}
+                className="flex items-center gap-2 text-sm font-semibold text-fp-muted hover:text-fp-text transition-colors">
+                <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${showMeeting ? 'bg-[#C8622A] border-[#C8622A]' : 'border-fp-border'}`}>
+                  {showMeeting && <span className="text-fp-text text-xs">✓</span>}
                 </span>
                 Schedule Internal Meeting
               </button>
@@ -346,7 +346,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
             {showMeeting && (
               <>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Meeting Type</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Meeting Type</label>
                   <select value={form.meeting_type} onChange={e => setForm(p => ({ ...p, meeting_type: e.target.value }))} className={inputClass}>
                     <option value="">— Select type —</option>
                     {['Site Visit', 'Sales Call', 'Follow-up Call', 'Proposal Review', 'Kickoff Meeting'].map(t => (
@@ -355,20 +355,20 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                   </select>
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Start Time</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Start Time</label>
                   <input type="time" value={form.start_time || ''} onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))} className={inputClass} />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Duration (minutes)</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Duration (minutes)</label>
                   <select value={form.duration_minutes} onChange={e => setForm(p => ({ ...p, duration_minutes: parseInt(e.target.value) }))} className={inputClass}>
                     {[15, 30, 45, 60, 90, 120].map(m => <option key={m} value={m}>{m} min</option>)}
                   </select>
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Meeting Link (optional)</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Meeting Link (optional)</label>
                   <div className="flex items-center gap-3 mt-2">
                     <button type="button" onClick={() => setForm(p => ({ ...p, is_virtual: !p.is_virtual }))}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${form.is_virtual ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${form.is_virtual ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
                       🎥 {form.is_virtual ? 'Virtual Meeting — link will be auto-generated' : 'Make Virtual'}
                     </button>
                   </div>
@@ -376,7 +376,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                     placeholder="https://meet.google.com/..." className={inputClass} />
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Invite Team Members & Guests</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Invite Team Members & Guests</label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {profiles.filter(p => p.id !== form.assigned_to).map(p => (
                       <button key={p.id} onClick={() => setForm(prev => ({
@@ -385,7 +385,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                           ? prev.attendee_ids.filter(id => id !== p.id)
                           : [...prev.attendee_ids, p.id]
                       }))}
-                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${form.attendee_ids.includes(p.id) ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white border border-[#2a3d55]'}`}>
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${form.attendee_ids.includes(p.id) ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text border border-fp-border'}`}>
                         {p.full_name}
                       </button>
                     ))}
@@ -399,12 +399,12 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                         }
                       }}
                       placeholder="Invite by email and press Enter"
-                      className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
+                      className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
                   </div>
                   {form.attendee_emails.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
                       {form.attendee_emails.map((email, i) => (
-                        <span key={i} className="flex items-center gap-1 bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] text-xs px-2 py-1 rounded">
+                        <span key={i} className="flex items-center gap-1 bg-fp-inset border border-fp-border text-fp-muted text-xs px-2 py-1 rounded">
                           {email}
                           <button onClick={() => setForm(p => ({ ...p, attendee_emails: p.attendee_emails.filter((_, idx) => idx !== i) }))}
                             className="hover:text-red-400 ml-1">✕</button>
@@ -414,19 +414,19 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                   )}
                 </div>
                 <div className="col-span-2">
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Meeting Notes (optional)</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Meeting Notes (optional)</label>
                   <textarea value={form.meeting_notes} onChange={e => setForm(p => ({ ...p, meeting_notes: e.target.value }))}
                     rows={2} placeholder="Agenda, prep notes, location details..."
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none placeholder-[#8A9AB0]" />
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none placeholder-[#8A9AB0]" />
                 </div>
                 {form.client_id && (
                   <div className="col-span-2">
                     <button onClick={() => setForm(p => ({ ...p, customer_notified: !p.customer_notified }))}
                       className="flex items-center gap-2 text-sm transition-colors">
-                      <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${form.customer_notified ? 'bg-[#C8622A] border-[#C8622A]' : 'border-[#2a3d55]'}`}>
-                        {form.customer_notified && <span className="text-white text-xs">✓</span>}
+                      <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${form.customer_notified ? 'bg-[#C8622A] border-[#C8622A]' : 'border-fp-border'}`}>
+                        {form.customer_notified && <span className="text-fp-text text-xs">✓</span>}
                       </span>
-                      <span className={form.customer_notified ? 'text-white' : 'text-[#8A9AB0]'}>
+                      <span className={form.customer_notified ? 'text-fp-text' : 'text-fp-muted'}>
                         Send confirmation email to customer + 24hr reminder
                       </span>
                     </button>
@@ -436,7 +436,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
             )}
             <div className="mt-4">
               <button onClick={handleAdd} disabled={saving || !form.title}
-                className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                 {saving ? 'Saving...' : 'Create Task'}
               </button>
             </div>
@@ -447,18 +447,18 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
         {view === 'calendar' && (
           <div className="grid grid-cols-3 gap-4">
             {/* Calendar grid */}
-            <div className="col-span-2 bg-[#1a2d45] rounded-xl p-5">
+            <div className="col-span-2 bg-fp-card rounded-xl p-5">
               {/* Month navigation */}
               <div className="flex justify-between items-center mb-5">
-                <button onClick={prevMonth} className="text-[#8A9AB0] hover:text-white text-lg transition-colors px-2">‹</button>
-                <h3 className="text-white font-bold text-lg">{monthName}</h3>
-                <button onClick={nextMonth} className="text-[#8A9AB0] hover:text-white text-lg transition-colors px-2">›</button>
+                <button onClick={prevMonth} className="text-fp-muted hover:text-fp-text text-lg transition-colors px-2">‹</button>
+                <h3 className="text-fp-text font-bold text-lg">{monthName}</h3>
+                <button onClick={nextMonth} className="text-fp-muted hover:text-fp-text text-lg transition-colors px-2">›</button>
               </div>
 
               {/* Day headers */}
               <div className="grid grid-cols-7 mb-2">
                 {DAYS.map(d => (
-                  <div key={d} className="text-center text-[#8A9AB0] text-xs font-semibold py-1">{d}</div>
+                  <div key={d} className="text-center text-fp-muted text-xs font-semibold py-1">{d}</div>
                 ))}
               </div>
 
@@ -486,13 +486,13 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                       className={`min-h-[64px] rounded-lg p-1.5 cursor-pointer transition-colors border ${
                         isSelected ? 'border-[#C8622A] bg-[#C8622A]/10' :
                         isToday ? 'border-[#C8622A]/40 bg-[#C8622A]/5' :
-                        'border-transparent hover:border-[#2a3d55] hover:bg-[#0F1C2E]/50'
+                        'border-transparent hover:border-fp-border hover:bg-fp-inset/50'
                       }`}
                     >
                       <p className={`text-xs font-semibold mb-1 ${
                         isToday ? 'text-[#C8622A]' :
-                        isSelected ? 'text-white' :
-                        'text-[#8A9AB0]'
+                        isSelected ? 'text-fp-text' :
+                        'text-fp-muted'
                       }`}>{day}</p>
                       <div className="space-y-0.5">
                         {dayTasks.slice(0, 3).map(task => (
@@ -506,7 +506,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                           </div>
                         ))}
                         {dayTasks.length > 3 && (
-                          <p className="text-xs text-[#8A9AB0] pl-1">+{dayTasks.length - 3} more</p>
+                          <p className="text-xs text-fp-muted pl-1">+{dayTasks.length - 3} more</p>
                         )}
                       </div>
                     </div>
@@ -516,32 +516,32 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
             </div>
 
             {/* Selected day detail */}
-            <div className="bg-[#1a2d45] rounded-xl p-5">
+            <div className="bg-fp-card rounded-xl p-5">
               {selectedDay ? (
                 <>
-                  <h3 className="text-white font-bold mb-1">
+                  <h3 className="text-fp-text font-bold mb-1">
                     {new Date(calYear, calMonth, selectedDay).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
                   </h3>
-                  <p className="text-[#8A9AB0] text-xs mb-4">{selectedDayTasks.length} task{selectedDayTasks.length !== 1 ? 's' : ''}</p>
+                  <p className="text-fp-muted text-xs mb-4">{selectedDayTasks.length} task{selectedDayTasks.length !== 1 ? 's' : ''}</p>
                   {selectedDayTasks.length === 0 ? (
-                    <p className="text-[#8A9AB0] text-sm">No tasks this day.</p>
+                    <p className="text-fp-muted text-sm">No tasks this day.</p>
                   ) : (
                     <div className="space-y-3">
                       {selectedDayTasks.map(task => (
                         <div key={task.id} className={`p-3 rounded-lg border ${
-                          task.completed ? 'border-[#2a3d55]/30 opacity-60' :
+                          task.completed ? 'border-fp-border/30 opacity-60' :
                           selectedDayStr < todayStr ? 'border-red-500/30 bg-red-500/5' :
-                          'border-[#2a3d55]'
+                          'border-fp-border'
                         }`}>
                           <div className="flex items-start gap-2">
                             <button onClick={() => toggleComplete(task)}
                               className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-                                task.completed ? 'bg-green-500 border-green-500' : 'border-[#2a3d55] hover:border-[#C8622A]'
+                                task.completed ? 'bg-green-500 border-green-500' : 'border-fp-border hover:border-fp-brand'
                               }`}>
-                              {task.completed && <span className="text-white text-xs">✓</span>}
+                              {task.completed && <span className="text-fp-text text-xs">✓</span>}
                             </button>
                             <div className="flex-1 min-w-0">
-                              <p className={`text-sm font-medium ${task.completed ? 'line-through text-[#8A9AB0]' : 'text-white'}`}>
+                              <p className={`text-sm font-medium ${task.completed ? 'line-through text-fp-muted' : 'text-fp-text'}`}>
                                 {task.title}
                               </p>
                               {task.clients?.company && (
@@ -551,7 +551,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                                 </button>
                               )}
                               {task.profiles?.full_name && (
-                                <p className="text-[#8A9AB0] text-xs mt-0.5">{task.profiles.full_name}</p>
+                                <p className="text-fp-muted text-xs mt-0.5">{task.profiles.full_name}</p>
                               )}
                               {task.recurrence && (
                                 <p className="text-purple-400 text-xs mt-0.5">↻ {task.recurrence === 'biweekly' ? 'every 2 weeks' : task.recurrence}</p>
@@ -568,8 +568,8 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center h-full text-center py-8">
-                  <p className="text-[#8A9AB0] text-sm">Click a day to see tasks</p>
-                  <p className="text-[#8A9AB0] text-xs mt-1">Days with tasks show colored chips</p>
+                  <p className="text-fp-muted text-sm">Click a day to see tasks</p>
+                  <p className="text-fp-muted text-xs mt-1">Days with tasks show colored chips</p>
                 </div>
               )}
             </div>
@@ -588,34 +588,34 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 { key: 'all', label: 'All' },
               ].map(f => (
                 <button key={f.key} onClick={() => setFilter(f.key)}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${filter === f.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${filter === f.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
                   {f.label}
                 </button>
               ))}
             </div>
 
-            <div className="bg-[#1a2d45] rounded-xl p-6">
+            <div className="bg-fp-card rounded-xl p-6">
               {loading ? (
-                <p className="text-[#8A9AB0]">Loading...</p>
+                <p className="text-fp-muted">Loading...</p>
               ) : filtered.length === 0 ? (
-                <p className="text-[#8A9AB0]">No tasks here. Click + New Task to get started.</p>
+                <p className="text-fp-muted">No tasks here. Click + New Task to get started.</p>
               ) : (
                 <div className="space-y-2">
                   {filtered.map(task => (
                     <div key={task.id} className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${
-                      task.completed ? 'border-[#2a3d55]/30 bg-[#0F1C2E]/30 opacity-60' :
+                      task.completed ? 'border-fp-border/30 bg-fp-inset/30 opacity-60' :
                       isOverdue(task) ? 'border-red-500/20 bg-red-500/5' :
                       isDueToday(task) ? 'border-[#C8622A]/20 bg-[#C8622A]/5' :
-                      'border-[#2a3d55]/50 bg-[#0F1C2E]/50'
+                      'border-fp-border/50 bg-fp-inset/50'
                     }`}>
                       <button onClick={() => toggleComplete(task)}
                         className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                          task.completed ? 'bg-green-500 border-green-500' : 'border-[#2a3d55] hover:border-[#C8622A]'
+                          task.completed ? 'bg-green-500 border-green-500' : 'border-fp-border hover:border-fp-brand'
                         }`}>
-                        {task.completed && <span className="text-white text-xs">✓</span>}
+                        {task.completed && <span className="text-fp-text text-xs">✓</span>}
                       </button>
                       <div className="flex-1">
-                        <p className={`text-sm font-medium ${task.completed ? 'line-through text-[#8A9AB0]' : 'text-white'}`}>
+                        <p className={`text-sm font-medium ${task.completed ? 'line-through text-fp-muted' : 'text-fp-text'}`}>
                           {task.title}
                         </p>
                         <div className="flex items-center gap-3 mt-0.5">
@@ -625,7 +625,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                             </button>
                           )}
                           {task.profiles?.full_name && (
-                            <span className="text-[#8A9AB0] text-xs">{task.profiles.full_name}</span>
+                            <span className="text-fp-muted text-xs">{task.profiles.full_name}</span>
                           )}
                         </div>
                       </div>
@@ -642,7 +642,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                       <span className={`text-xs font-semibold capitalize ${priorityColor(task.priority)}`}>{task.priority}</span>
                       {task.due_date && (
                         <span className={`text-xs font-semibold ${
-                          isOverdue(task) ? 'text-red-400' : isDueToday(task) ? 'text-[#C8622A]' : 'text-[#8A9AB0]'
+                          isOverdue(task) ? 'text-red-400' : isDueToday(task) ? 'text-[#C8622A]' : 'text-fp-muted'
                         }`}>
                           {isOverdue(task) ? 'Overdue' : isDueToday(task) ? 'Today' : task.due_date}
                         </span>

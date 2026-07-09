@@ -21,8 +21,8 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
   const nearBudget = !overBudget && totalRevenue > 0 && totalCost / totalRevenue > 0.8
 
   const rows = [
-    { label: 'Quoted Materials', quoted: quotedMaterials, cost: costMaterials, color: 'text-white' },
-    { label: 'Quoted Labor', quoted: quotedLabor, cost: costLabor, color: 'text-white' },
+    { label: 'Quoted Materials', quoted: quotedMaterials, cost: costMaterials, color: 'text-fp-text' },
+    { label: 'Quoted Labor', quoted: quotedLabor, cost: costLabor, color: 'text-fp-text' },
     ...(approvedCOs > 0 ? [{ label: 'Approved Change Orders', quoted: approvedCOs, cost: costCOs, color: 'text-[#C8622A]' }] : []),
     ...(freeformPOCost > 0 ? [{ label: 'Freeform POs (Job-linked)', quoted: 0, cost: freeformPOCost, color: 'text-blue-400' }] : []),
   ]
@@ -54,11 +54,11 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
   const costBurnPct = totalCost > 0 ? Math.min((actualCostTotal / totalCost) * 100, 100) : 0
 
   return (
-    <div className="bg-[#1a2d45] rounded-xl p-6">
+    <div className="bg-fp-card rounded-xl p-6">
       <div className="flex justify-between items-center mb-5">
-        <h3 className="text-white font-bold text-lg">Job Cost Report</h3>
+        <h3 className="text-fp-text font-bold text-lg">Job Cost Report</h3>
         <button onClick={onExportPDF}
-          className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+          className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
           ↓ Export PDF
         </button>
       </div>
@@ -74,7 +74,7 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
                   ? `Over budget by $${fmt(totalCost - totalRevenue)}`
                   : `Approaching budget limit — ${((totalCost / totalRevenue) * 100).toFixed(0)}% of contract value spent`}
               </p>
-              <p className="text-[#8A9AB0] text-xs mt-0.5">
+              <p className="text-fp-muted text-xs mt-0.5">
                 Contract value: ${fmt(totalRevenue)} · Total cost: ${fmt(totalCost)} · Remaining: ${overBudget ? '-' : ''}${fmt(Math.abs(totalRevenue - totalCost))}
               </p>
             </div>
@@ -88,8 +88,8 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
         )}
 
         {/* Job Progress */}
-        <div className="bg-[#0F1C2E] rounded-xl p-5 space-y-4">
-          <p className="text-white font-semibold text-sm">Job Progress</p>
+        <div className="bg-fp-inset rounded-xl p-5 space-y-4">
+          <p className="text-fp-text font-semibold text-sm">Job Progress</p>
           {[
             { label: 'Materials Used', pct: materialsPct, detail: totalPlannedUnits > 0 ? `${totalUsedUnits} of ${totalPlannedUnits} units${materialsOver ? ` (+${(totalUsedUnits - totalPlannedUnits).toFixed(1)} over)` : ''}` : 'No materials logged', over: materialsOver, color: materialsOver ? 'bg-red-500' : 'bg-[#C8622A]' },
             { label: 'Labor Hours', pct: laborPct, detail: estimatedHours > 0 ? `${hoursLogged.toFixed(1)} of ${estimatedHours.toFixed(1)} hrs est.${laborOver ? ` (+${(hoursLogged - estimatedHours).toFixed(1)} over)` : ''}` : `${hoursLogged.toFixed(1)} hrs logged (no estimate)`, over: laborOver, color: laborOver ? 'bg-red-500' : 'bg-blue-500' },
@@ -98,42 +98,42 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
           ].map(({ label, pct, detail, over, color }) => (
             <div key={label}>
               <div className="flex justify-between items-baseline mb-1">
-                <span className="text-[#8A9AB0] text-xs">{label}</span>
-                <span className={`text-xs font-semibold ${over ? 'text-red-400' : 'text-white'}`}>{pct.toFixed(0)}%{over ? ' ⚠' : ''}</span>
+                <span className="text-fp-muted text-xs">{label}</span>
+                <span className={`text-xs font-semibold ${over ? 'text-red-400' : 'text-fp-text'}`}>{pct.toFixed(0)}%{over ? ' ⚠' : ''}</span>
               </div>
-              <div className="w-full bg-[#1a2d45] rounded-full h-2 mb-1">
+              <div className="w-full bg-fp-card rounded-full h-2 mb-1">
                 <div className={`h-2 rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
               </div>
-              <p className={`text-xs ${over ? 'text-red-400' : 'text-[#8A9AB0]'}`}>{detail}</p>
+              <p className={`text-xs ${over ? 'text-red-400' : 'text-fp-muted'}`}>{detail}</p>
             </div>
           ))}
         </div>
 
         {/* Summary cards */}
         <div className="grid grid-cols-4 gap-4">
-          <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Total Revenue</p><p className="text-white font-bold text-xl">${fmt(totalRevenue)}</p></div>
-          <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Total Cost</p><p className="text-white font-bold text-xl">${fmt(totalCost)}</p>{freeformPOCost > 0 && <p className="text-blue-400 text-xs mt-1">incl. ${fmt(freeformPOCost)} freeform POs</p>}</div>
-          <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Gross Margin</p><p className={`font-bold text-xl ${parseFloat(grossMargin) >= 30 ? 'text-green-400' : parseFloat(grossMargin) >= 15 ? 'text-[#C8622A]' : 'text-red-400'}`}>{grossMargin}%</p></div>
-          <div className="bg-[#0F1C2E] rounded-xl p-4"><p className="text-[#8A9AB0] text-xs mb-1">Hours Logged</p><p className="text-white font-bold text-xl">{hoursLogged.toFixed(1)}</p></div>
+          <div className="bg-fp-inset rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Total Revenue</p><p className="text-fp-text font-bold text-xl">${fmt(totalRevenue)}</p></div>
+          <div className="bg-fp-inset rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Total Cost</p><p className="text-fp-text font-bold text-xl">${fmt(totalCost)}</p>{freeformPOCost > 0 && <p className="text-blue-400 text-xs mt-1">incl. ${fmt(freeformPOCost)} freeform POs</p>}</div>
+          <div className="bg-fp-inset rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Gross Margin</p><p className={`font-bold text-xl ${parseFloat(grossMargin) >= 30 ? 'text-green-400' : parseFloat(grossMargin) >= 15 ? 'text-[#C8622A]' : 'text-red-400'}`}>{grossMargin}%</p></div>
+          <div className="bg-fp-inset rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Hours Logged</p><p className="text-fp-text font-bold text-xl">{hoursLogged.toFixed(1)}</p></div>
         </div>
 
         {/* Breakdown table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#2a3d55]">
-                <th className="text-[#8A9AB0] text-left py-2 font-normal">Category</th>
-                <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Revenue (Customer)</th>
-                <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal">Your Cost</th>
-                <th className="text-[#8A9AB0] text-right py-2 font-normal">Margin $</th>
+              <tr className="border-b border-fp-border">
+                <th className="text-fp-muted text-left py-2 font-normal">Category</th>
+                <th className="text-fp-muted text-right py-2 pr-4 font-normal">Revenue (Customer)</th>
+                <th className="text-fp-muted text-right py-2 pr-4 font-normal">Your Cost</th>
+                <th className="text-fp-muted text-right py-2 font-normal">Margin $</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row, i) => (
-                <tr key={i} className="border-b border-[#2a3d55]/50">
+                <tr key={i} className="border-b border-fp-border/50">
                   <td className={`py-3 ${row.color}`}>{row.label}</td>
-                  <td className="text-white py-3 pr-4 text-right">{row.quoted > 0 ? `$${fmt(row.quoted)}` : '—'}</td>
-                  <td className="text-white py-3 pr-4 text-right">${fmt(row.cost)}</td>
+                  <td className="text-fp-text py-3 pr-4 text-right">{row.quoted > 0 ? `$${fmt(row.quoted)}` : '—'}</td>
+                  <td className="text-fp-text py-3 pr-4 text-right">${fmt(row.cost)}</td>
                   <td className={`py-3 text-right font-semibold ${row.quoted - row.cost >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     {row.quoted > 0 ? `$${fmt(row.quoted - row.cost)}` : '—'}
                   </td>
@@ -141,10 +141,10 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
               ))}
             </tbody>
             <tfoot>
-              <tr className="border-t border-[#2a3d55]">
-                <td className="text-white pt-3 font-bold">Total</td>
-                <td className="text-white pt-3 pr-4 text-right font-bold">${fmt(totalRevenue)}</td>
-                <td className="text-white pt-3 pr-4 text-right font-bold">${fmt(totalCost)}</td>
+              <tr className="border-t border-fp-border">
+                <td className="text-fp-text pt-3 font-bold">Total</td>
+                <td className="text-fp-text pt-3 pr-4 text-right font-bold">${fmt(totalRevenue)}</td>
+                <td className="text-fp-text pt-3 pr-4 text-right font-bold">${fmt(totalCost)}</td>
                 <td className="text-green-400 pt-3 text-right font-bold">${fmt(totalRevenue - totalCost)}</td>
               </tr>
             </tfoot>
@@ -154,13 +154,13 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
         {/* Materials breakdown */}
         {lineItems.length > 0 && (
           <div>
-            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Materials — Line Item Detail</p>
+            <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Materials — Line Item Detail</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a3d55]">
+                  <tr className="border-b border-fp-border">
                     {['Item', 'Vendor', 'Planned', 'Used', 'Remaining', 'Your Cost', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
-                      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
+                      <th key={h} className="text-fp-muted text-left py-2 pr-3 font-normal">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -176,19 +176,19 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
                     const isOver = used > 0 && remaining < 0
                     const isLow = !isOver && used > 0 && planned > 0 && remaining / planned < 0.2
                     return (
-                      <tr key={item.id} className="border-b border-[#2a3d55]/30">
-                        <td className="text-white py-2 pr-3 font-medium">{item.item_name}</td>
-                        <td className="text-[#8A9AB0] py-2 pr-3">{item.vendor || '—'}</td>
-                        <td className="text-white py-2 pr-3">{planned} {item.unit}</td>
-                        <td className="py-2 pr-3">{used > 0 ? <span className="text-[#C8622A] font-semibold">{used} {item.unit}</span> : <span className="text-[#2a3d55]">—</span>}</td>
+                      <tr key={item.id} className="border-b border-fp-border/30">
+                        <td className="text-fp-text py-2 pr-3 font-medium">{item.item_name}</td>
+                        <td className="text-fp-muted py-2 pr-3">{item.vendor || '—'}</td>
+                        <td className="text-fp-text py-2 pr-3">{planned} {item.unit}</td>
+                        <td className="py-2 pr-3">{used > 0 ? <span className="text-[#C8622A] font-semibold">{used} {item.unit}</span> : <span className="text-fp-muted">—</span>}</td>
                         <td className="py-2 pr-3">
-                          {used === 0 ? <span className="text-[#8A9AB0]">—</span>
+                          {used === 0 ? <span className="text-fp-muted">—</span>
                             : isOver ? <span className="text-red-400 font-semibold">{Math.abs(remaining).toFixed(1)} over ⚠</span>
                             : isLow ? <span className="text-yellow-400 font-semibold">{remaining.toFixed(1)} left ↓</span>
                             : <span className="text-green-400">{remaining.toFixed(1)} left</span>}
                         </td>
-                        <td className="text-white py-2 pr-3">${fmt(cost)}</td>
-                        <td className="text-white py-2 pr-3">${fmt(revenue)}</td>
+                        <td className="text-fp-text py-2 pr-3">${fmt(cost)}</td>
+                        <td className="text-fp-text py-2 pr-3">${fmt(revenue)}</td>
                         <td className={`py-2 pr-3 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(margin)}</td>
                         <td className={`py-2 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{marginPct}{marginPct !== '—' ? '%' : ''}</td>
                       </tr>
@@ -196,10 +196,10 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
                   })}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-[#2a3d55]">
-                    <td colSpan="5" className="text-[#8A9AB0] pt-2 font-semibold">Totals</td>
-                    <td className="text-white pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0))}</td>
-                    <td className="text-white pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + (i.customer_price_total || 0), 0))}</td>
+                  <tr className="border-t border-fp-border">
+                    <td colSpan="5" className="text-fp-muted pt-2 font-semibold">Totals</td>
+                    <td className="text-fp-text pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0))}</td>
+                    <td className="text-fp-text pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + (i.customer_price_total || 0), 0))}</td>
                     <td className="text-green-400 pt-2 font-semibold pr-3">${fmt(lineItems.reduce((s, i) => s + ((i.customer_price_total || 0) - ((i.your_cost_unit || 0) * (i.quantity || 0))), 0))}</td>
                     <td></td>
                   </tr>
@@ -212,13 +212,13 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
         {/* Labor detail */}
         {(proposal?.labor_items || []).length > 0 && (
           <div>
-            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Labor — Line Item Detail</p>
+            <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Labor — Line Item Detail</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a3d55]">
+                  <tr className="border-b border-fp-border">
                     {['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
-                      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
+                      <th key={h} className="text-fp-muted text-left py-2 pr-3 font-normal">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -229,12 +229,12 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
                     const margin = revenue - cost
                     const marginPct = revenue > 0 ? ((margin / revenue) * 100).toFixed(1) : '—'
                     return (
-                      <tr key={i} className="border-b border-[#2a3d55]/30">
-                        <td className="text-white py-2 pr-3 font-medium">{l.role || '—'}</td>
-                        <td className="text-white py-2 pr-3">{l.quantity || '—'}</td>
-                        <td className="text-[#8A9AB0] py-2 pr-3">{l.unit || 'hr'}</td>
-                        <td className="text-white py-2 pr-3">${fmt(cost)}</td>
-                        <td className="text-white py-2 pr-3">${fmt(revenue)}</td>
+                      <tr key={i} className="border-b border-fp-border/30">
+                        <td className="text-fp-text py-2 pr-3 font-medium">{l.role || '—'}</td>
+                        <td className="text-fp-text py-2 pr-3">{l.quantity || '—'}</td>
+                        <td className="text-fp-muted py-2 pr-3">{l.unit || 'hr'}</td>
+                        <td className="text-fp-text py-2 pr-3">${fmt(cost)}</td>
+                        <td className="text-fp-text py-2 pr-3">${fmt(revenue)}</td>
                         <td className={`py-2 pr-3 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(margin)}</td>
                         <td className={`py-2 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{marginPct}{marginPct !== '—' ? '%' : ''}</td>
                       </tr>
@@ -249,32 +249,32 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
         {/* Freeform PO line items */}
         {freeformPOItems.length > 0 && (
           <div>
-            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Freeform PO Line Items</p>
+            <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Freeform PO Line Items</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a3d55]">
+                  <tr className="border-b border-fp-border">
                     {['PO #', 'Vendor', 'Description', 'Item', 'Qty', 'Unit Cost', 'Total'].map(h => (
-                      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
+                      <th key={h} className="text-fp-muted text-left py-2 pr-3 font-normal">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {freeformPOItems.map((l, i) => (
-                    <tr key={i} className="border-b border-[#2a3d55]/30">
-                      <td className="text-white py-2 pr-3 font-mono">{l.purchase_orders?.po_number || '—'}</td>
-                      <td className="text-[#8A9AB0] py-2 pr-3">{l.purchase_orders?.vendor_name || '—'}</td>
-                      <td className="text-[#8A9AB0] py-2 pr-3">{l.purchase_orders?.description || '—'}</td>
-                      <td className="text-white py-2 pr-3 font-medium">{l.item_name}</td>
-                      <td className="text-white py-2 pr-3">{l.quantity} {l.unit || ''}</td>
-                      <td className="text-white py-2 pr-3">${fmt(l.unit_cost)}</td>
+                    <tr key={i} className="border-b border-fp-border/30">
+                      <td className="text-fp-text py-2 pr-3 font-mono">{l.purchase_orders?.po_number || '—'}</td>
+                      <td className="text-fp-muted py-2 pr-3">{l.purchase_orders?.vendor_name || '—'}</td>
+                      <td className="text-fp-muted py-2 pr-3">{l.purchase_orders?.description || '—'}</td>
+                      <td className="text-fp-text py-2 pr-3 font-medium">{l.item_name}</td>
+                      <td className="text-fp-text py-2 pr-3">{l.quantity} {l.unit || ''}</td>
+                      <td className="text-fp-text py-2 pr-3">${fmt(l.unit_cost)}</td>
                       <td className="text-blue-400 py-2 font-semibold">${fmt(l.total)}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-[#2a3d55]">
-                    <td colSpan="6" className="text-[#8A9AB0] pt-2 font-semibold">Freeform PO Total</td>
+                  <tr className="border-t border-fp-border">
+                    <td colSpan="6" className="text-fp-muted pt-2 font-semibold">Freeform PO Total</td>
                     <td className="text-blue-400 pt-2 font-bold">${fmt(freeformPOCost)}</td>
                   </tr>
                 </tfoot>
@@ -286,13 +286,13 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
         {/* Change orders detail */}
         {changeOrders.length > 0 && (
           <div className="space-y-4">
-            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Change Orders</p>
+            <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Change Orders</p>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#2a3d55]">
+                  <tr className="border-b border-fp-border">
                     {['Name', 'Status', 'Amount', 'Your Cost', 'Margin $'].map(h => (
-                      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal">{h}</th>
+                      <th key={h} className="text-fp-muted text-left py-2 pr-3 font-normal">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -301,15 +301,15 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
                     const coCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0) + (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
                     const coMargin = co.amount - coCost
                     return (
-                      <tr key={co.id} className="border-b border-[#2a3d55]/30">
-                        <td className="text-white py-2 pr-3">{co.name}</td>
+                      <tr key={co.id} className="border-b border-fp-border/30">
+                        <td className="text-fp-text py-2 pr-3">{co.name}</td>
                         <td className="py-2 pr-3">
                           <span className={`px-2 py-0.5 rounded text-xs font-semibold ${co.status === 'Approved' ? 'bg-green-500/20 text-green-400' : co.status === 'Rejected' ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                             {co.status}
                           </span>
                         </td>
                         <td className="text-[#C8622A] py-2 pr-3 font-semibold">${fmt(co.amount)}</td>
-                        <td className="text-white py-2 pr-3">{coCost > 0 ? `$${fmt(coCost)}` : '—'}</td>
+                        <td className="text-fp-text py-2 pr-3">{coCost > 0 ? `$${fmt(coCost)}` : '—'}</td>
                         <td className={`py-2 font-semibold ${coMargin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{coCost > 0 ? `$${fmt(coMargin)}` : '—'}</td>
                       </tr>
                     )

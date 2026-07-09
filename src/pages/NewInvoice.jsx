@@ -318,35 +318,35 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     navigate(`/invoices/${inv.id}`)
   }
 
-  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+  const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6 max-w-4xl">
         <div className="flex justify-between items-center">
-          <h2 className="text-white text-2xl font-bold">New Invoice</h2>
-          <button onClick={() => navigate('/invoices')} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+          <h2 className="text-fp-text text-2xl font-bold">New Invoice</h2>
+          <button onClick={() => navigate('/invoices')} className="text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
         </div>
 
         {/* Invoice Details */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold mb-4">Invoice Details</h3>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold mb-4">Invoice Details</h3>
           <div className="grid grid-cols-2 gap-4">
 
             {/* Source type toggle */}
             <div className="col-span-2">
-              <label className="text-[#8A9AB0] text-xs mb-2 block">Invoice Source</label>
+              <label className="text-fp-muted text-xs mb-2 block">Invoice Source</label>
               <div className="flex gap-2">
                 <button
                   onClick={() => { setSourceType('proposal'); setSelectedTicket(null); setForm(p => ({ ...p, service_ticket_id: '' })); setLineItems([]) }}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${sourceType === 'proposal' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white border border-[#2a3d55]'}`}>
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${sourceType === 'proposal' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text border border-fp-border'}`}>
                   Won Proposal / Job
                 </button>
                 <button
                   onClick={() => { setSourceType('ticket'); setSelectedProposal(null); setForm(p => ({ ...p, proposal_id: '' })); setLineItems([]) }}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${sourceType === 'ticket' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white border border-[#2a3d55]'}`}>
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${sourceType === 'ticket' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text border border-fp-border'}`}>
                   Service Ticket
                 </button>
               </div>
@@ -355,7 +355,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
             {/* Proposal selector */}
             {sourceType === 'proposal' && (
               <div className="col-span-2">
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Link to Won Proposal (optional)</label>
+                <label className="text-fp-muted text-xs mb-1 block">Link to Won Proposal (optional)</label>
                 <select value={form.proposal_id} onChange={e => handleProposalChange(e.target.value)} className={inputClass}>
                   <option value="">— Select a proposal or create manually —</option>
                   {proposals.map(p => (
@@ -383,7 +383,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
             {/* Service ticket selector */}
             {sourceType === 'ticket' && (
               <div className="col-span-2">
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Select Service Ticket</label>
+                <label className="text-fp-muted text-xs mb-1 block">Select Service Ticket</label>
                 <select value={form.service_ticket_id} onChange={e => handleTicketChange(e.target.value)} className={inputClass}>
                   <option value="">— Select a service ticket —</option>
                   {serviceTickets.map(t => (
@@ -402,79 +402,79 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
             )}
 
             <div className="col-span-2">
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Description of Work</label>
+              <label className="text-fp-muted text-xs mb-1 block">Description of Work</label>
               <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                 rows={3} placeholder="Brief description of the work being invoiced..."
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
             </div>
             <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Invoice Date</label>
+              <label className="text-fp-muted text-xs mb-1 block">Invoice Date</label>
               <input type="date" value={form.issued_date} onChange={e => setForm(p => ({ ...p, issued_date: e.target.value }))} className={inputClass} />
             </div>
             <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Due Date</label>
+              <label className="text-fp-muted text-xs mb-1 block">Due Date</label>
               <input type="date" value={form.due_date} onChange={e => setForm(p => ({ ...p, due_date: e.target.value }))} className={inputClass} />
             </div>
             <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Tax %</label>
-              <input type="number" value={form.tax_percent} onChange={e => setForm(p => ({ ...p, tax_percent: e.target.value }))} placeholder="0" className="w-32 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              <label className="text-fp-muted text-xs mb-1 block">Tax %</label>
+              <input type="number" value={form.tax_percent} onChange={e => setForm(p => ({ ...p, tax_percent: e.target.value }))} placeholder="0" className="w-32 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
             </div>
           </div>
         </div>
 
         {/* Line Items */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold mb-4">Line Items</h3>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold mb-4">Line Items</h3>
           <table className="w-full text-sm mb-4">
             <thead>
-              <tr className="border-b border-[#2a3d55]">
+              <tr className="border-b border-fp-border">
                 {['Description', 'Qty', 'Unit Price', 'Total', ''].map(h => (
-                  <th key={h} className="text-[#8A9AB0] text-left py-2 pr-3 font-normal text-xs">{h}</th>
+                  <th key={h} className="text-fp-muted text-left py-2 pr-3 font-normal text-xs">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {lineItems.map((item, i) => (
-                <tr key={i} className="border-b border-[#2a3d55]/30">
+                <tr key={i} className="border-b border-fp-border/30">
                   <td className="pr-3 py-1">
                     <input type="text" value={item.description} onChange={e => updateLine(i, 'description', e.target.value)}
-                      placeholder="Description" className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                      placeholder="Description" className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
                   </td>
                   <td className="pr-3 py-1">
                     <input type="number" value={item.quantity} onChange={e => updateLine(i, 'quantity', e.target.value)}
-                      className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                      className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
                   </td>
                   <td className="pr-3 py-1">
                     <input type="number" value={item.unit_price} onChange={e => updateLine(i, 'unit_price', e.target.value)}
-                      className="w-24 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                      className="w-24 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
                   </td>
-                  <td className="pr-3 py-1 text-white text-xs">${(parseFloat(item.total) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="py-1"><button onClick={() => removeLine(i)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button></td>
+                  <td className="pr-3 py-1 text-fp-text text-xs">${(parseFloat(item.total) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                  <td className="py-1"><button onClick={() => removeLine(i)} className="text-fp-muted hover:text-red-400 text-xs">✕</button></td>
                 </tr>
               ))}
               {lineItems.length === 0 && (
-                <tr><td colSpan="5" className="py-4 text-[#8A9AB0] text-xs italic">No line items yet. Select a source above or add manually.</td></tr>
+                <tr><td colSpan="5" className="py-4 text-fp-muted text-xs italic">No line items yet. Select a source above or add manually.</td></tr>
               )}
             </tbody>
           </table>
-          <button onClick={addLine} className="text-[#C8622A] hover:text-white text-sm transition-colors">+ Add Line</button>
+          <button onClick={addLine} className="text-[#C8622A] hover:text-fp-text text-sm transition-colors">+ Add Line</button>
 
           {/* Contract fees */}
           {contractFees.length > 0 && (
-            <div className="mt-5 border-t border-[#2a3d55] pt-4">
-              <p className="text-white text-sm font-semibold mb-2">Service Agreement & Monitoring Fees</p>
-              <p className="text-[#8A9AB0] text-xs mb-3">Select any fees to include on this invoice.</p>
+            <div className="mt-5 border-t border-fp-border pt-4">
+              <p className="text-fp-text text-sm font-semibold mb-2">Service Agreement & Monitoring Fees</p>
+              <p className="text-fp-muted text-xs mb-3">Select any fees to include on this invoice.</p>
               <div className="space-y-2">
                 {contractFees.map(f => (
-                  <label key={f.key} className="flex items-center justify-between bg-[#0F1C2E] rounded-lg px-4 py-2.5 cursor-pointer hover:bg-[#0a1828] transition-colors">
+                  <label key={f.key} className="flex items-center justify-between bg-fp-inset rounded-lg px-4 py-2.5 cursor-pointer hover:bg-fp-inset transition-colors">
                     <div className="flex items-center gap-3">
                       <input
                         type="checkbox"
                         checked={includedContractFees[f.key] || false}
                         onChange={e => setIncludedContractFees(prev => ({ ...prev, [f.key]: e.target.checked }))}
-                        className="accent-[#C8622A]"
+                        className="accent-fp-brand"
                       />
-                      <span className="text-white text-sm">{f.label}</span>
+                      <span className="text-fp-text text-sm">{f.label}</span>
                     </div>
                     <span className="text-[#C8622A] text-sm font-semibold">${parseFloat(f.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                   </label>
@@ -483,25 +483,25 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
             </div>
           )}
 
-          <div className="mt-6 border-t border-[#2a3d55] pt-4 space-y-2 max-w-xs ml-auto">
-            <div className="flex justify-between text-sm"><span className="text-[#8A9AB0]">Subtotal</span><span className="text-white">${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-            {parseFloat(form.tax_percent) > 0 && <div className="flex justify-between text-sm"><span className="text-[#8A9AB0]">Tax ({form.tax_percent}%)</span><span className="text-white">${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>}
-            <div className="flex justify-between text-base font-bold border-t border-[#2a3d55] pt-2"><span className="text-white">Total</span><span className="text-[#C8622A]">${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+          <div className="mt-6 border-t border-fp-border pt-4 space-y-2 max-w-xs ml-auto">
+            <div className="flex justify-between text-sm"><span className="text-fp-muted">Subtotal</span><span className="text-fp-text">${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+            {parseFloat(form.tax_percent) > 0 && <div className="flex justify-between text-sm"><span className="text-fp-muted">Tax ({form.tax_percent}%)</span><span className="text-fp-text">${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>}
+            <div className="flex justify-between text-base font-bold border-t border-fp-border pt-2"><span className="text-fp-text">Total</span><span className="text-[#C8622A]">${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
           </div>
         </div>
 
         {/* Notes */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold mb-3">Notes</h3>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold mb-3">Notes</h3>
           <textarea value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
             rows={3} placeholder="Payment terms, project notes, etc."
-            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+            className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
         </div>
 
         <div className="flex justify-end gap-4">
-          <button onClick={() => navigate('/invoices')} className="px-6 py-3 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+          <button onClick={() => navigate('/invoices')} className="px-6 py-3 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving || lineItems.length === 0}
-            className="px-6 py-3 bg-[#C8622A] text-white rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+            className="px-6 py-3 bg-fp-brand text-white rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
             {saving ? 'Creating...' : 'Create Invoice'}
           </button>
         </div>

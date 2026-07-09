@@ -144,7 +144,7 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar
         isAdmin={isAdmin}
         featureProposals={featureProposals}
@@ -166,16 +166,16 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-white text-2xl font-bold flex items-center gap-2">
+            <h1 className="text-fp-text text-2xl font-bold flex items-center gap-2">
               <span className="text-[#C8622A]">📐</span>
               ForgePt Designer
             </h1>
-            <p className="text-[#8A9AB0] text-sm mt-1">
+            <p className="text-fp-muted text-sm mt-1">
               Floor plan design and device takeoff tool
             </p>
           </div>
           <button onClick={handleNewProject}
-            className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] transition-colors">
+            className="flex items-center gap-2 px-4 py-2 bg-fp-brand text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] transition-colors">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
             </svg>
@@ -190,13 +190,13 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
             placeholder="Search projects..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
+            className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]"
           />
-          <div className="flex items-center gap-1 bg-[#1a2d45] border border-[#2a3d55] rounded-lg p-1">
+          <div className="flex items-center gap-1 bg-fp-card border border-fp-border rounded-lg p-1">
             {['all', 'draft', 'approved'].map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors capitalize ${
-                  filter === f ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'
+                  filter === f ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'
                 }`}>
                 {f}
               </button>
@@ -211,7 +211,7 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
               </svg>
-              <span className="text-[#8A9AB0] text-sm">Loading projects...</span>
+              <span className="text-fp-muted text-sm">Loading projects...</span>
             </div>
           </div>
         ) : (
@@ -219,7 +219,7 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
             {/* Active drawing projects */}
             {filtered.length > 0 && (
               <div className="mb-8">
-                <h2 className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">
+                <h2 className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">
                   Drawing Projects ({filtered.length})
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -227,16 +227,16 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
                     <div
                       key={project.proposalId}
                       onClick={() => navigate(`/designer/${project.proposalId}`)}
-                      className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-4 cursor-pointer hover:border-[#C8622A]/40 hover:bg-[#1a2d45]/80 transition-all group"
+                      className="bg-fp-card border border-fp-border rounded-xl p-4 cursor-pointer hover:border-fp-brand/40 hover:bg-fp-card/80 transition-all group"
                     >
                       {/* Project name */}
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1 min-w-0">
-                          <p className="text-white font-semibold text-sm truncate">
+                          <p className="text-fp-text font-semibold text-sm truncate">
                             {project.proposal?.proposal_name || project.proposal?.company || 'Standalone Project'}
                           </p>
                           {project.proposal?.company && project.proposal?.proposal_name && (
-                            <p className="text-[#8A9AB0] text-xs truncate mt-0.5">
+                            <p className="text-fp-muted text-xs truncate mt-0.5">
                               {project.proposal.company}
                             </p>
                           )}
@@ -247,7 +247,7 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
                       </div>
 
                       {/* Stats */}
-                      <div className="flex items-center gap-4 text-xs text-[#8A9AB0] mb-3">
+                      <div className="flex items-center gap-4 text-xs text-fp-muted mb-3">
                         <span className="flex items-center gap-1">
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
@@ -265,12 +265,12 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
                       {/* Sheet list */}
                       <div className="flex flex-wrap gap-1 mb-3">
                         {project.sheets.slice(0, 3).map(sheet => (
-                          <span key={sheet.id} className="text-xs bg-[#0F1C2E] text-[#8A9AB0] px-2 py-0.5 rounded border border-[#2a3d55]">
+                          <span key={sheet.id} className="text-xs bg-fp-inset text-fp-muted px-2 py-0.5 rounded border border-fp-border">
                             {sheet.name}
                           </span>
                         ))}
                         {project.sheets.length > 3 && (
-                          <span className="text-xs text-[#8A9AB0]">
+                          <span className="text-xs text-fp-muted">
                             +{project.sheets.length - 3} more
                           </span>
                         )}
@@ -278,7 +278,7 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
 
                       {/* Last activity */}
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-[#8A9AB0]">
+                        <span className="text-xs text-fp-muted">
                           {project.lastActivity
                             ? `Updated ${new Date(project.lastActivity).toLocaleDateString()}`
                             : 'No activity yet'}
@@ -299,37 +299,37 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
             {/* Proposals without drawings */}
             {proposalsWithoutDrawings.length > 0 && (
               <div>
-                <h2 className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">
+                <h2 className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">
                   Start a New Drawing
                 </h2>
-                <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
+                <div className="bg-fp-card border border-fp-border rounded-xl overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-[#2a3d55]">
-                        <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium text-xs">Proposal</th>
-                        <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium text-xs">Client</th>
-                        <th className="text-left px-4 py-3 text-[#8A9AB0] font-medium text-xs">Status</th>
+                      <tr className="border-b border-fp-border">
+                        <th className="text-left px-4 py-3 text-fp-muted font-medium text-xs">Proposal</th>
+                        <th className="text-left px-4 py-3 text-fp-muted font-medium text-xs">Client</th>
+                        <th className="text-left px-4 py-3 text-fp-muted font-medium text-xs">Status</th>
                         <th className="px-4 py-3"/>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#2a3d55]/50">
+                    <tbody className="divide-y divide-fp-border/50">
                       {proposalsWithoutDrawings.slice(0, 10).map(proposal => (
-                        <tr key={proposal.id} className="hover:bg-[#0F1C2E]/50 transition-colors">
-                          <td className="px-4 py-3 text-white font-medium">
+                        <tr key={proposal.id} className="hover:bg-fp-inset/50 transition-colors">
+                          <td className="px-4 py-3 text-fp-text font-medium">
                             {proposal.proposal_name || '—'}
                           </td>
-                          <td className="px-4 py-3 text-[#8A9AB0]">
+                          <td className="px-4 py-3 text-fp-muted">
                             {proposal.company || proposal.client_name || '—'}
                           </td>
                           <td className="px-4 py-3">
-                            <span className="text-xs bg-[#2a3d55] text-[#8A9AB0] px-2 py-0.5 rounded">
+                            <span className="text-xs bg-fp-inset text-fp-muted px-2 py-0.5 rounded">
                               {proposal.status}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-right">
                             <button
                               onClick={() => navigate(`/designer/${proposal.id}`)}
-                              className="text-xs text-[#C8622A] hover:text-white font-semibold transition-colors flex items-center gap-1 ml-auto"
+                              className="text-xs text-[#C8622A] hover:text-fp-text font-semibold transition-colors flex items-center gap-1 ml-auto"
                             >
                               Start Drawing
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -348,11 +348,11 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
             {/* Empty state */}
             {filtered.length === 0 && proposalsWithoutDrawings.length === 0 && !loading && (
               <div className="flex flex-col items-center justify-center py-24 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-[#1a2d45] flex items-center justify-center mb-4">
+                <div className="w-16 h-16 rounded-2xl bg-fp-card flex items-center justify-center mb-4">
                   <span className="text-3xl">📐</span>
                 </div>
-                <p className="text-white font-semibold text-lg">No drawings yet</p>
-                <p className="text-[#8A9AB0] text-sm mt-2 max-w-sm">
+                <p className="text-fp-text font-semibold text-lg">No drawings yet</p>
+                <p className="text-fp-muted text-sm mt-2 max-w-sm">
                   Open a proposal and click "Open in Designer" to start your first floor plan drawing.
                 </p>
               </div>

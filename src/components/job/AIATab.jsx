@@ -402,58 +402,58 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
     setExportingPDF(false)
   }
 
-  const inputClass = 'bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] w-full'
-  const labelClass = 'block text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1'
+  const inputClass = 'bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand w-full'
+  const labelClass = 'block text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1'
 
   // LIST VIEW
   if (view === 'list') {
     return (
-      <div className="bg-[#1a2d45] rounded-xl p-6">
+      <div className="bg-fp-card rounded-xl p-6">
         <div className="flex justify-between items-center mb-5">
           <div>
-            <h3 className="text-white font-bold text-lg">AIA Pay Applications</h3>
-            <p className="text-[#8A9AB0] text-xs mt-0.5">G702 Application & Certificate for Payment · G703 Continuation Sheet</p>
+            <h3 className="text-fp-text font-bold text-lg">AIA Pay Applications</h3>
+            <p className="text-fp-muted text-xs mt-0.5">G702 Application & Certificate for Payment · G703 Continuation Sheet</p>
           </div>
-          <button onClick={startNew} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+          <button onClick={startNew} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
             + New Application
           </button>
         </div>
 
         {loading ? (
-          <p className="text-[#8A9AB0] text-sm text-center py-8">Loading...</p>
+          <p className="text-fp-muted text-sm text-center py-8">Loading...</p>
         ) : applications.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed border-[#2a3d55] rounded-xl">
-            <p className="text-[#8A9AB0] text-sm mb-1">No AIA applications yet.</p>
-            <p className="text-[#8A9AB0] text-xs">Create your first application to generate G702/G703 payment forms.</p>
+          <div className="text-center py-12 border-2 border-dashed border-fp-border rounded-xl">
+            <p className="text-fp-muted text-sm mb-1">No AIA applications yet.</p>
+            <p className="text-fp-muted text-xs">Create your first application to generate G702/G703 payment forms.</p>
           </div>
         ) : (
           <div className="space-y-3">
             {applications.map(app => (
               <div key={app.id} onClick={() => openApp(app)}
-                className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55] hover:border-[#C8622A]/50 cursor-pointer transition-colors group">
+                className="bg-fp-inset rounded-xl p-4 border border-fp-border hover:border-fp-brand/50 cursor-pointer transition-colors group">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-white font-semibold">Application #{app.application_number}</p>
-                    <p className="text-[#8A9AB0] text-xs mt-0.5">
+                    <p className="text-fp-text font-semibold">Application #{app.application_number}</p>
+                    <p className="text-fp-muted text-xs mt-0.5">
                       {app.period_to ? `Period to: ${new Date(app.period_to + 'T12:00:00').toLocaleDateString()}` : 'No period date set'}
                       {app.architect ? ` · Architect: ${app.architect}` : ''}
                     </p>
                   </div>
                   <div className="flex items-center gap-6 text-right">
                     <div>
-                      <p className="text-[#8A9AB0] text-xs">Contract Sum</p>
-                      <p className="text-white font-semibold text-sm">${fmt((app.original_contract_sum || 0) + (app.net_change_by_co || 0))}</p>
+                      <p className="text-fp-muted text-xs">Contract Sum</p>
+                      <p className="text-fp-text font-semibold text-sm">${fmt((app.original_contract_sum || 0) + (app.net_change_by_co || 0))}</p>
                     </div>
                     <div>
-                      <p className="text-[#8A9AB0] text-xs">Retainage</p>
+                      <p className="text-fp-muted text-xs">Retainage</p>
                       <p className="text-[#C8622A] font-semibold text-sm">{app.retainage_percent || 10}%</p>
                     </div>
                     <span className={`text-xs px-2 py-1 rounded font-semibold ${
                       app.status === 'Approved' ? 'bg-green-500/20 text-green-400' :
                       app.status === 'Submitted' ? 'bg-blue-500/20 text-blue-400' :
-                      'bg-[#2a3d55] text-[#8A9AB0]'
+                      'bg-fp-inset text-fp-muted'
                     }`}>{app.status || 'Draft'}</span>
-                    <span className="text-[#8A9AB0] group-hover:text-white text-xs transition-colors">Open →</span>
+                    <span className="text-fp-muted group-hover:text-fp-text text-xs transition-colors">Open →</span>
                   </div>
                 </div>
               </div>
@@ -468,21 +468,21 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
   return (
     <div className="space-y-4">
       {/* Top bar */}
-      <div className="bg-[#1a2d45] rounded-xl p-4 flex justify-between items-center">
+      <div className="bg-fp-card rounded-xl p-4 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <button onClick={() => { setView('list'); setSelectedApp(null) }}
-            className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
+            className="text-fp-muted hover:text-fp-text text-xs transition-colors">
             ← Applications
           </button>
-          <span className="text-[#2a3d55]">|</span>
-          <span className="text-white font-semibold text-sm">
+          <span className="text-fp-muted">|</span>
+          <span className="text-fp-text font-semibold text-sm">
             {selectedApp ? `Application #${appForm.application_number}` : 'New Application'}
           </span>
           {selectedApp && (
             <span className={`text-xs px-2 py-1 rounded font-semibold ${
               selectedApp.status === 'Approved' ? 'bg-green-500/20 text-green-400' :
               selectedApp.status === 'Submitted' ? 'bg-blue-500/20 text-blue-400' :
-              'bg-[#2a3d55] text-[#8A9AB0]'
+              'bg-fp-inset text-fp-muted'
             }`}>{selectedApp.status || 'Draft'}</span>
           )}
         </div>
@@ -495,7 +495,7 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
           )}
           {selectedApp && selectedApp.status !== 'Approved' && !pendingApprove && (
             <button onClick={startApprove} disabled={saving}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50">
+              className="bg-green-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors disabled:opacity-50">
               {saving ? 'Processing...' : `✓ Approve & Invoice ($${fmt(currentPaymentDue)})`}
             </button>
           )}
@@ -506,14 +506,14 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
                 type="date"
                 value={approveDueDate}
                 onChange={e => setApproveDueDate(e.target.value)}
-                className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-green-500"
+                className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-green-500"
               />
               <button onClick={approveApplication} disabled={saving}
-                className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 whitespace-nowrap">
+                className="bg-green-600 text-fp-text px-3 py-1.5 rounded text-xs font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 whitespace-nowrap">
                 {saving ? 'Creating...' : 'Confirm'}
               </button>
               <button onClick={() => setPendingApprove(false)}
-                className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
+                className="text-fp-muted hover:text-fp-text text-xs transition-colors">
                 Cancel
               </button>
             </div>
@@ -525,19 +525,19 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
             </button>
           )}
           <button onClick={exportPDF} disabled={exportingPDF}
-            className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors disabled:opacity-50">
+            className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors disabled:opacity-50">
             {exportingPDF ? 'Exporting...' : '↓ Export PDF'}
           </button>
           <button onClick={saveApp} disabled={saving || selectedApp?.status === 'Approved'}
-            className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+            className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
             {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
 
       {/* G702 — Application fields */}
-      <div className="bg-[#1a2d45] rounded-xl p-6">
-        <h4 className="text-white font-bold mb-4">G702 — Application Details</h4>
+      <div className="bg-fp-card rounded-xl p-6">
+        <h4 className="text-fp-text font-bold mb-4">G702 — Application Details</h4>
         <div className="grid grid-cols-2 gap-6">
           {/* Left: project info */}
           <div className="space-y-4">
@@ -595,7 +595,7 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
             </div>
 
             {/* Live computed G702 summary */}
-            <div className="bg-[#0F1C2E] rounded-xl p-4 space-y-2">
+            <div className="bg-fp-inset rounded-xl p-4 space-y-2">
               {[
                 ['Contract Sum to Date', `$${fmt(contractSumToDate)}`],
                 ['Total Completed & Stored', `$${fmt(totalCompletedStored)}`],
@@ -604,17 +604,17 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
                 ['Less Previous Certificates', `- $${fmt(previousCertificates)}`],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between text-sm">
-                  <span className="text-[#8A9AB0]">{label}</span>
-                  <span className="text-white font-mono">{value}</span>
+                  <span className="text-fp-muted">{label}</span>
+                  <span className="text-fp-text font-mono">{value}</span>
                 </div>
               ))}
-              <div className="border-t border-[#2a3d55] pt-2 flex justify-between items-baseline">
-                <span className="text-white font-bold text-sm">Current Payment Due</span>
+              <div className="border-t border-fp-border pt-2 flex justify-between items-baseline">
+                <span className="text-fp-text font-bold text-sm">Current Payment Due</span>
                 <span className="text-[#C8622A] font-bold text-xl font-mono">${fmt(currentPaymentDue)}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-[#8A9AB0]">Balance to Finish (incl. Retainage)</span>
-                <span className="text-white font-mono">${fmt(balanceToFinish)}</span>
+                <span className="text-fp-muted">Balance to Finish (incl. Retainage)</span>
+                <span className="text-fp-text font-mono">${fmt(balanceToFinish)}</span>
               </div>
             </div>
           </div>
@@ -622,18 +622,18 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
       </div>
 
       {/* G703 — Continuation sheet / line items */}
-      <div className="bg-[#1a2d45] rounded-xl p-6">
+      <div className="bg-fp-card rounded-xl p-6">
         <div className="flex justify-between items-center mb-4">
-          <h4 className="text-white font-bold">G703 — Continuation Sheet</h4>
+          <h4 className="text-fp-text font-bold">G703 — Continuation Sheet</h4>
           <div className="flex gap-2">
             {(jobLineItems.length > 0 || (proposal?.labor_items || []).length > 0) && (
               <button onClick={reimportSchedule}
-                className="bg-[#0F1C2E] text-[#8A9AB0] px-3 py-1.5 rounded-lg text-xs hover:text-white transition-colors border border-[#2a3d55]">
+                className="bg-fp-inset text-fp-muted px-3 py-1.5 rounded-lg text-xs hover:text-fp-text transition-colors border border-fp-border">
                 ↺ Reimport from Job
               </button>
             )}
             <button onClick={addLineItem}
-              className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#3a4d65] transition-colors">
+              className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors">
               + Add Line
             </button>
           </div>
@@ -642,9 +642,9 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-[#2a3d55]">
+              <tr className="border-b border-fp-border">
                 {['#', 'Description of Work', 'Scheduled Value', 'Prev Completed', 'This Period', 'Stored Materials', 'Total Completed', '% Complete', 'Balance to Finish', ''].map(h => (
-                  <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  <th key={h} className="text-fp-muted text-left py-2 pr-2 font-semibold uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
@@ -658,60 +658,60 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
                 const pct = sched > 0 ? ((total / sched) * 100).toFixed(1) : '—'
                 const bal = sched - total
                 return (
-                  <tr key={i} className="border-b border-[#2a3d55]/40 hover:bg-[#0F1C2E]/30">
+                  <tr key={i} className="border-b border-fp-border/40 hover:bg-fp-inset/30">
                     <td className="py-1.5 pr-2">
                       <input value={line.item_no} onChange={e => updateLine(i, 'item_no', e.target.value)}
-                        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 w-10 text-center focus:outline-none focus:border-[#C8622A]" />
+                        className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 w-10 text-center focus:outline-none focus:border-fp-brand" />
                     </td>
                     <td className="py-1.5 pr-2">
                       <input value={line.description} onChange={e => updateLine(i, 'description', e.target.value)}
                         placeholder="Description of work…"
-                        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 w-full min-w-[200px] focus:outline-none focus:border-[#C8622A]" />
+                        className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 w-full min-w-[200px] focus:outline-none focus:border-fp-brand" />
                     </td>
                     <td className="py-1.5 pr-2">
                       <input type="number" step="0.01" value={line.scheduled_value} onChange={e => updateLine(i, 'scheduled_value', e.target.value)}
                         placeholder="0.00"
-                        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 w-28 text-right focus:outline-none focus:border-[#C8622A]" />
+                        className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 w-28 text-right focus:outline-none focus:border-fp-brand" />
                     </td>
                     <td className="py-1.5 pr-2">
                       <input type="number" step="0.01" value={line.work_prev_completed} onChange={e => updateLine(i, 'work_prev_completed', e.target.value)}
                         placeholder="0.00"
-                        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 w-28 text-right focus:outline-none focus:border-[#C8622A]" />
+                        className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 w-28 text-right focus:outline-none focus:border-fp-brand" />
                     </td>
                     <td className="py-1.5 pr-2">
                       <input type="number" step="0.01" value={line.work_this_period} onChange={e => updateLine(i, 'work_this_period', e.target.value)}
                         placeholder="0.00"
-                        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 w-28 text-right focus:outline-none focus:border-[#C8622A]" />
+                        className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 w-28 text-right focus:outline-none focus:border-fp-brand" />
                     </td>
                     <td className="py-1.5 pr-2">
                       <input type="number" step="0.01" value={line.stored_materials} onChange={e => updateLine(i, 'stored_materials', e.target.value)}
                         placeholder="0.00"
-                        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 w-24 text-right focus:outline-none focus:border-[#C8622A]" />
+                        className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 w-24 text-right focus:outline-none focus:border-fp-brand" />
                     </td>
-                    <td className="py-1.5 pr-2 text-white text-right font-semibold px-3 whitespace-nowrap">${fmt(total)}</td>
-                    <td className={`py-1.5 pr-2 text-right font-semibold px-3 ${pct !== '—' && parseFloat(pct) >= 100 ? 'text-green-400' : 'text-white'}`}>
+                    <td className="py-1.5 pr-2 text-fp-text text-right font-semibold px-3 whitespace-nowrap">${fmt(total)}</td>
+                    <td className={`py-1.5 pr-2 text-right font-semibold px-3 ${pct !== '—' && parseFloat(pct) >= 100 ? 'text-green-400' : 'text-fp-text'}`}>
                       {pct}{pct !== '—' ? '%' : ''}
                     </td>
-                    <td className="py-1.5 pr-2 text-[#8A9AB0] text-right px-3 whitespace-nowrap">${fmt(bal)}</td>
+                    <td className="py-1.5 pr-2 text-fp-muted text-right px-3 whitespace-nowrap">${fmt(bal)}</td>
                     <td className="py-1.5">
-                      <button onClick={() => removeLine(i)} className="text-[#2a3d55] hover:text-red-400 transition-colors text-lg leading-none">×</button>
+                      <button onClick={() => removeLine(i)} className="text-fp-muted hover:text-red-400 transition-colors text-lg leading-none">×</button>
                     </td>
                   </tr>
                 )
               })}
             </tbody>
             <tfoot>
-              <tr className="border-t border-[#2a3d55]">
-                <td colSpan="2" className="text-[#8A9AB0] pt-3 pb-1 font-bold text-xs uppercase tracking-wide">Totals</td>
-                <td className="text-white pt-3 pb-1 text-right font-bold pr-2 whitespace-nowrap">${fmt(totalScheduledValue)}</td>
-                <td className="text-white pt-3 pb-1 text-right font-bold pr-2 whitespace-nowrap">${fmt(totalPrevCompleted)}</td>
-                <td className="text-white pt-3 pb-1 text-right font-bold pr-2 whitespace-nowrap">${fmt(totalThisPeriod)}</td>
-                <td className="text-white pt-3 pb-1 text-right font-bold pr-2 whitespace-nowrap">${fmt(totalStoredMaterials)}</td>
+              <tr className="border-t border-fp-border">
+                <td colSpan="2" className="text-fp-muted pt-3 pb-1 font-bold text-xs uppercase tracking-wide">Totals</td>
+                <td className="text-fp-text pt-3 pb-1 text-right font-bold pr-2 whitespace-nowrap">${fmt(totalScheduledValue)}</td>
+                <td className="text-fp-text pt-3 pb-1 text-right font-bold pr-2 whitespace-nowrap">${fmt(totalPrevCompleted)}</td>
+                <td className="text-fp-text pt-3 pb-1 text-right font-bold pr-2 whitespace-nowrap">${fmt(totalThisPeriod)}</td>
+                <td className="text-fp-text pt-3 pb-1 text-right font-bold pr-2 whitespace-nowrap">${fmt(totalStoredMaterials)}</td>
                 <td className="text-[#C8622A] pt-3 pb-1 text-right font-bold px-3 whitespace-nowrap">${fmt(totalCompletedStored)}</td>
-                <td className="text-white pt-3 pb-1 text-right font-bold px-3">
+                <td className="text-fp-text pt-3 pb-1 text-right font-bold px-3">
                   {totalScheduledValue > 0 ? ((totalCompletedStored / totalScheduledValue) * 100).toFixed(1) + '%' : '—'}
                 </td>
-                <td className="text-[#8A9AB0] pt-3 pb-1 text-right px-3 whitespace-nowrap">${fmt(contractSumToDate - totalCompletedStored)}</td>
+                <td className="text-fp-muted pt-3 pb-1 text-right px-3 whitespace-nowrap">${fmt(contractSumToDate - totalCompletedStored)}</td>
                 <td></td>
               </tr>
             </tfoot>
@@ -719,8 +719,8 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
         </div>
 
         {lineItems.length === 0 && (
-          <div className="text-center py-8 border-t border-[#2a3d55] mt-4">
-            <p className="text-[#8A9AB0] text-xs">No line items yet. Click "+ Add Line" to begin the G703 continuation sheet.</p>
+          <div className="text-center py-8 border-t border-fp-border mt-4">
+            <p className="text-fp-muted text-xs">No line items yet. Click "+ Add Line" to begin the G703 continuation sheet.</p>
           </div>
         )}
       </div>

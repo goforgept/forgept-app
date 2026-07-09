@@ -100,58 +100,58 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
   const maxStageValue = Math.max(...stageBreakdown.map(s => s.value), 1)
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-white">Loading...</p>
+          <p className="text-fp-text">Loading...</p>
         </div>
       ) : (
       <div className="flex-1 p-6 space-y-6">
         <div>
-          <h2 className="text-white text-2xl font-bold">Forecast</h2>
-          <p className="text-[#8A9AB0] text-sm mt-0.5">Revenue pipeline and close projections</p>
+          <h2 className="text-fp-text text-2xl font-bold">Forecast</h2>
+          <p className="text-fp-muted text-sm mt-0.5">Revenue pipeline and close projections</p>
         </div>
 
         <div className="grid grid-cols-4 gap-4">
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-xs mb-1">Active Pipeline</p>
-            <p className="text-white text-2xl font-bold">${fmt(totalActivePipeline)}</p>
-            <p className="text-[#8A9AB0] text-xs mt-1">{proposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').length} open deals</p>
+          <div className="bg-fp-card rounded-xl p-5">
+            <p className="text-fp-muted text-xs mb-1">Active Pipeline</p>
+            <p className="text-fp-text text-2xl font-bold">${fmt(totalActivePipeline)}</p>
+            <p className="text-fp-muted text-xs mt-1">{proposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').length} open deals</p>
           </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-xs mb-1">Weighted Forecast</p>
+          <div className="bg-fp-card rounded-xl p-5">
+            <p className="text-fp-muted text-xs mb-1">Weighted Forecast</p>
             <p className="text-[#C8622A] text-2xl font-bold">${fmt(weightedPipeline)}</p>
-            <p className="text-[#8A9AB0] text-xs mt-1">probability-adjusted</p>
+            <p className="text-fp-muted text-xs mt-1">probability-adjusted</p>
           </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-xs mb-1">Won YTD</p>
+          <div className="bg-fp-card rounded-xl p-5">
+            <p className="text-fp-muted text-xs mb-1">Won YTD</p>
             <p className="text-green-400 text-2xl font-bold">${fmt(totalWon)}</p>
-            <p className="text-[#8A9AB0] text-xs mt-1">{proposals.filter(p => p.status === 'Won').length} deals closed</p>
+            <p className="text-fp-muted text-xs mt-1">{proposals.filter(p => p.status === 'Won').length} deals closed</p>
           </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-xs mb-1">Closing This Month</p>
+          <div className="bg-fp-card rounded-xl p-5">
+            <p className="text-fp-muted text-xs mb-1">Closing This Month</p>
             <p className="text-[#C8622A] text-2xl font-bold">{closingThisMonth.length}</p>
-            <p className="text-[#8A9AB0] text-xs mt-1">${fmt(closingThisMonth.reduce((s, p) => s + (p.proposal_value || 0), 0))} at stake</p>
+            <p className="text-fp-muted text-xs mt-1">${fmt(closingThisMonth.reduce((s, p) => s + (p.proposal_value || 0), 0))} at stake</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-6">
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-6">Monthly Pipeline — Last 6 Months</h3>
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold text-lg mb-6">Monthly Pipeline — Last 6 Months</h3>
             <div className="space-y-3">
               {monthlyWon.map(m => (
                 <div key={m.key}>
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-[#8A9AB0] text-xs">{m.label}</span>
+                    <span className="text-fp-muted text-xs">{m.label}</span>
                     <div className="flex gap-4">
                       <span className="text-green-400 text-xs font-semibold">${fmt(m.won)} won</span>
-                      <span className="text-[#8A9AB0] text-xs">${fmt(m.total)} total</span>
+                      <span className="text-fp-muted text-xs">${fmt(m.total)} total</span>
                     </div>
                   </div>
-                  <div className="h-6 bg-[#0F1C2E] rounded-lg overflow-hidden relative">
-                    <div className="absolute inset-y-0 left-0 bg-[#2a3d55] rounded-lg transition-all duration-500" style={{ width: `${(m.total / maxMonthlyValue) * 100}%` }} />
+                  <div className="h-6 bg-fp-inset rounded-lg overflow-hidden relative">
+                    <div className="absolute inset-y-0 left-0 bg-fp-inset rounded-lg transition-all duration-500" style={{ width: `${(m.total / maxMonthlyValue) * 100}%` }} />
                     <div className="absolute inset-y-0 left-0 bg-green-500/70 rounded-lg transition-all duration-500" style={{ width: `${(m.won / maxMonthlyValue) * 100}%` }} />
                   </div>
                 </div>
@@ -159,10 +159,10 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
             </div>
           </div>
 
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-6">Pipeline by Stage</h3>
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold text-lg mb-6">Pipeline by Stage</h3>
             {stageBreakdown.length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No pipeline data yet. Add deals to the Pipeline board.</p>
+              <p className="text-fp-muted text-sm">No pipeline data yet. Add deals to the Pipeline board.</p>
             ) : (
               <div className="space-y-3">
                 {stageBreakdown.map(stage => (
@@ -170,22 +170,22 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
                     <div className="flex justify-between items-center mb-1">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full" style={{ background: stage.color }} />
-                        <span className="text-white text-xs font-medium">{stage.name}</span>
-                        <span className="text-[#8A9AB0] text-xs">({stage.count})</span>
+                        <span className="text-fp-text text-xs font-medium">{stage.name}</span>
+                        <span className="text-fp-muted text-xs">({stage.count})</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-[#8A9AB0] text-xs">{stageProbability(stage.name)}% prob</span>
-                        <span className="text-white text-xs font-semibold">${fmt(stage.value)}</span>
+                        <span className="text-fp-muted text-xs">{stageProbability(stage.name)}% prob</span>
+                        <span className="text-fp-text text-xs font-semibold">${fmt(stage.value)}</span>
                       </div>
                     </div>
-                    <div className="h-5 bg-[#0F1C2E] rounded-lg overflow-hidden">
+                    <div className="h-5 bg-fp-inset rounded-lg overflow-hidden">
                       <div className="h-full rounded-lg transition-all duration-500" style={{ width: `${(stage.value / maxStageValue) * 100}%`, background: stage.color }} />
                     </div>
                   </div>
                 ))}
-                <div className="border-t border-[#2a3d55] pt-3 mt-3">
+                <div className="border-t border-fp-border pt-3 mt-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-[#8A9AB0] text-sm">Weighted Total</span>
+                    <span className="text-fp-muted text-sm">Weighted Total</span>
                     <span className="text-[#C8622A] text-sm font-bold">${fmt(weightedPipeline)}</span>
                   </div>
                 </div>
@@ -195,19 +195,19 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
         </div>
 
         <div className="grid grid-cols-2 gap-6">
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-6">Close Rate — Last 6 Months</h3>
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold text-lg mb-6">Close Rate — Last 6 Months</h3>
             <div className="space-y-3">
               {closeRateByMonth.map(m => (
                 <div key={m.key}>
                   <div className="flex justify-between items-center mb-1">
-                    <span className="text-[#8A9AB0] text-xs">{m.label}</span>
+                    <span className="text-fp-muted text-xs">{m.label}</span>
                     <div className="flex gap-4">
-                      <span className="text-[#8A9AB0] text-xs">{m.total} proposals</span>
+                      <span className="text-fp-muted text-xs">{m.total} proposals</span>
                       <span className="text-[#C8622A] text-xs font-semibold">{m.rate}%</span>
                     </div>
                   </div>
-                  <div className="h-5 bg-[#0F1C2E] rounded-lg overflow-hidden">
+                  <div className="h-5 bg-fp-inset rounded-lg overflow-hidden">
                     <div className="h-full bg-[#C8622A]/70 rounded-lg transition-all duration-500" style={{ width: `${m.rate}%` }} />
                   </div>
                 </div>
@@ -215,24 +215,24 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
             </div>
           </div>
 
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">Rep Forecast</h3>
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold text-lg mb-4">Rep Forecast</h3>
             {repForecast.length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm">No data yet.</p>
+              <p className="text-fp-muted text-sm">No data yet.</p>
             ) : (
               <div className="space-y-3">
                 {repForecast.map((rep, i) => (
                   <div key={rep.name} onClick={() => navigate(`/proposals?rep=${encodeURIComponent(rep.name)}`)}
-                    className="flex justify-between items-center bg-[#0F1C2E] rounded-lg p-3 cursor-pointer hover:bg-[#0a1628] transition-colors">
+                    className="flex justify-between items-center bg-fp-inset rounded-lg p-3 cursor-pointer hover:bg-fp-inset transition-colors">
                     <div className="flex items-center gap-3">
-                      <span className={`text-sm font-bold w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-[#8A9AB0]' : i === 2 ? 'text-orange-400' : 'text-[#2a3d55]'}`}>#{i + 1}</span>
+                      <span className={`text-sm font-bold w-5 ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-fp-muted' : i === 2 ? 'text-orange-400' : 'text-fp-muted'}`}>#{i + 1}</span>
                       <div>
-                        <p className="text-white text-sm font-medium">{rep.name}</p>
-                        <p className="text-[#8A9AB0] text-xs">{rep.count} active deals</p>
+                        <p className="text-fp-text text-sm font-medium">{rep.name}</p>
+                        <p className="text-fp-muted text-xs">{rep.count} active deals</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-white text-sm font-bold">${fmt(rep.pipeline)}</p>
+                      <p className="text-fp-text text-sm font-bold">${fmt(rep.pipeline)}</p>
                       <p className="text-green-400 text-xs">${fmt(rep.won)} won</p>
                     </div>
                   </div>
@@ -243,39 +243,39 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
         </div>
 
         {closingThisMonth.length > 0 && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold text-lg mb-4">
               Closing This Month
-              <span className="ml-2 text-sm font-normal text-[#8A9AB0]">— ${fmt(closingThisMonth.reduce((s, p) => s + (p.proposal_value || 0), 0))} at stake</span>
+              <span className="ml-2 text-sm font-normal text-fp-muted">— ${fmt(closingThisMonth.reduce((s, p) => s + (p.proposal_value || 0), 0))} at stake</span>
             </h3>
             <div className="space-y-2">
               {closingThisMonth.map(p => {
                 const days = Math.ceil((new Date(p.close_date) - new Date()) / (1000 * 60 * 60 * 24))
                 return (
                   <div key={p.id} onClick={() => navigate(`/proposal/${p.id}`)}
-                    className="flex justify-between items-center bg-[#0F1C2E] rounded-lg p-4 cursor-pointer hover:bg-[#0a1628] transition-colors group">
+                    className="flex justify-between items-center bg-fp-inset rounded-lg p-4 cursor-pointer hover:bg-fp-inset transition-colors group">
                     <div>
-                      <p className="text-white text-sm font-medium group-hover:text-[#C8622A] transition-colors">{p.proposal_name}</p>
-                      <p className="text-[#8A9AB0] text-xs mt-0.5">{p.rep_name} · {p.company}</p>
+                      <p className="text-fp-text text-sm font-medium group-hover:text-[#C8622A] transition-colors">{p.proposal_name}</p>
+                      <p className="text-fp-muted text-xs mt-0.5">{p.rep_name} · {p.company}</p>
                     </div>
                     <div className="flex items-center gap-6">
                       {p.total_gross_margin_percent && (
                         <div className="text-right">
-                          <p className="text-[#8A9AB0] text-xs">Margin</p>
+                          <p className="text-fp-muted text-xs">Margin</p>
                           <p className="text-[#C8622A] text-sm font-semibold">{p.total_gross_margin_percent.toFixed(1)}%</p>
                         </div>
                       )}
                       <div className="text-right">
-                        <p className="text-[#8A9AB0] text-xs">Value</p>
-                        <p className="text-white text-sm font-bold">${fmt(p.proposal_value || 0)}</p>
+                        <p className="text-fp-muted text-xs">Value</p>
+                        <p className="text-fp-text text-sm font-bold">${fmt(p.proposal_value || 0)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[#8A9AB0] text-xs">Closes</p>
+                        <p className="text-fp-muted text-xs">Closes</p>
                         <p className={`text-sm font-bold ${days <= 7 ? 'text-red-400' : 'text-[#C8622A]'}`}>
                           {days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days}d`}
                         </p>
                       </div>
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#8A9AB0]/20 text-[#8A9AB0]">{p.status}</span>
+                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-fp-muted/20 text-fp-muted">{p.status}</span>
                     </div>
                   </div>
                 )

@@ -11,8 +11,8 @@ const AUTO_CHECK_TYPES = [
 
 export default function ChecklistTab({ checklist, lineItems, newCheckItem, setNewCheckItem, savingCheck, onToggleItem, onAddItem, onDeleteItem }) {
   return (
-    <div className="bg-[#1a2d45] rounded-xl p-6">
-      <h3 className="text-white font-bold text-lg mb-5">Job Checklist</h3>
+    <div className="bg-fp-card rounded-xl p-6">
+      <h3 className="text-fp-text font-bold text-lg mb-5">Job Checklist</h3>
       <div className="space-y-2 mb-6">
         {checklist.map(item => {
           const autoType = AUTO_CHECK_TYPES.find(a => a.type === item.auto_check_type)
@@ -20,18 +20,18 @@ export default function ChecklistTab({ checklist, lineItems, newCheckItem, setNe
             lineItems.some(l => l.po_status === 'PO Sent' || l.po_status === 'Received') &&
             !lineItems.every(l => l.po_status === 'PO Sent' || l.po_status === 'Received')
           return (
-            <div key={item.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${item.completed ? 'bg-green-500/5 border-green-500/20' : isPartiallyOrdered ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-[#0F1C2E] border-[#2a3d55]'}`}>
+            <div key={item.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${item.completed ? 'bg-green-500/5 border-green-500/20' : isPartiallyOrdered ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-fp-inset border-fp-border'}`}>
               <button onClick={() => onToggleItem(item)} disabled={item.is_auto}
-                className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${item.completed ? 'bg-green-500 border-green-500' : isPartiallyOrdered ? 'border-yellow-500' : 'border-[#2a3d55] hover:border-[#C8622A]'} ${item.is_auto ? 'cursor-default' : 'cursor-pointer'}`}>
-                {item.completed && <span className="text-white text-xs">✓</span>}
+                className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${item.completed ? 'bg-green-500 border-green-500' : isPartiallyOrdered ? 'border-yellow-500' : 'border-fp-border hover:border-fp-brand'} ${item.is_auto ? 'cursor-default' : 'cursor-pointer'}`}>
+                {item.completed && <span className="text-fp-text text-xs">✓</span>}
                 {isPartiallyOrdered && <span className="text-yellow-400 text-xs">–</span>}
               </button>
               <div className="flex-1">
-                <p className={`text-sm font-medium ${item.completed ? 'text-green-400 line-through' : isPartiallyOrdered ? 'text-yellow-400' : 'text-white'}`}>
+                <p className={`text-sm font-medium ${item.completed ? 'text-green-400 line-through' : isPartiallyOrdered ? 'text-yellow-400' : 'text-fp-text'}`}>
                   {autoType ? `${autoType.icon} ` : ''}{item.label}
                 </p>
                 {item.completed && item.completed_at && (
-                  <p className="text-[#8A9AB0] text-xs mt-0.5">Completed {new Date(item.completed_at).toLocaleDateString()}</p>
+                  <p className="text-fp-muted text-xs mt-0.5">Completed {new Date(item.completed_at).toLocaleDateString()}</p>
                 )}
                 {isPartiallyOrdered && (
                   <p className="text-yellow-500/70 text-xs mt-0.5">
@@ -40,24 +40,24 @@ export default function ChecklistTab({ checklist, lineItems, newCheckItem, setNe
                 )}
               </div>
               {item.is_auto && (
-                <span className={`text-xs px-2 py-0.5 rounded-full ${isPartiallyOrdered ? 'text-yellow-400 bg-yellow-500/10' : 'text-[#8A9AB0] bg-[#2a3d55]'}`}>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${isPartiallyOrdered ? 'text-yellow-400 bg-yellow-500/10' : 'text-fp-muted bg-fp-inset'}`}>
                   {isPartiallyOrdered ? 'Partially Ordered' : 'Auto'}
                 </span>
               )}
               {!item.is_auto && (
-                <button onClick={() => onDeleteItem(item.id)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">✕</button>
+                <button onClick={() => onDeleteItem(item.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">✕</button>
               )}
             </div>
           )
         })}
       </div>
-      <div className="flex gap-2 border-t border-[#2a3d55] pt-4">
+      <div className="flex gap-2 border-t border-fp-border pt-4">
         <input type="text" value={newCheckItem} onChange={e => setNewCheckItem(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && onAddItem()}
           placeholder="Add a custom checklist item..."
-          className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
+          className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
         <button onClick={onAddItem} disabled={savingCheck || !newCheckItem.trim()}
-          className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">Add</button>
+          className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">Add</button>
       </div>
     </div>
   )

@@ -331,35 +331,35 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
   const totalReceived = pos.filter(p => p.status === 'Received').reduce((sum, p) => sum + (p.total_amount || 0), 0)
   const pendingCount = pos.filter(p => p.status === 'Sent' || p.status === 'Partial').length
   const poTotal = poLines.reduce((sum, l) => sum + ((parseFloat(l.unit_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
-  const inputClass = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
-  const lineInputClass = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+  const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+  const lineInputClass = "bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand"
   const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} role={role} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-white text-2xl font-bold">Purchase Orders</h2>
+          <h2 className="text-fp-text text-2xl font-bold">Purchase Orders</h2>
           <button onClick={() => setShowNewPO(true)}
-            className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+            className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
             + New PO
           </button>
         </div>
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">Total PO Value</p>
-            <p className="text-white text-2xl font-bold">${totalSent.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+          <div className="bg-fp-card rounded-xl p-5">
+            <p className="text-fp-muted text-sm mb-1">Total PO Value</p>
+            <p className="text-fp-text text-2xl font-bold">${totalSent.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
           </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">Received</p>
+          <div className="bg-fp-card rounded-xl p-5">
+            <p className="text-fp-muted text-sm mb-1">Received</p>
             <p className="text-green-400 text-2xl font-bold">${totalReceived.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
           </div>
-          <div className="bg-[#1a2d45] rounded-xl p-5">
-            <p className="text-[#8A9AB0] text-sm mb-1">Pending</p>
+          <div className="bg-fp-card rounded-xl p-5">
+            <p className="text-fp-muted text-sm mb-1">Pending</p>
             <p className="text-yellow-400 text-2xl font-bold">{pendingCount}</p>
           </div>
         </div>
@@ -368,16 +368,16 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
         <div className="flex gap-2">
           {['All', 'Sent', 'Partial', 'Received', 'Cancelled'].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${statusFilter === s ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${statusFilter === s ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
               {s}
             </button>
           ))}
         </div>
 
         {/* PO List */}
-        {loading ? <p className="text-[#8A9AB0]">Loading...</p> : filtered.length === 0 ? (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <p className="text-[#8A9AB0]">No purchase orders yet.</p>
+        {loading ? <p className="text-fp-muted">Loading...</p> : filtered.length === 0 ? (
+          <div className="bg-fp-card rounded-xl p-6">
+            <p className="text-fp-muted">No purchase orders yet.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -385,12 +385,12 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
               const isExpanded = expandedPO === po.id
               const progress = getReceivingProgress(po.id)
               return (
-                <div key={po.id} className="border border-[#2a3d55] rounded-xl overflow-hidden bg-[#1a2d45]">
-                  <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-[#1f3550] transition-colors" onClick={() => toggleExpand(po)}>
+                <div key={po.id} className="border border-fp-border rounded-xl overflow-hidden bg-fp-card">
+                  <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-fp-hover transition-colors" onClick={() => toggleExpand(po)}>
                     <div className="flex items-center gap-4">
                       <div>
-                        <p className="text-white font-semibold text-sm">{po.po_number}</p>
-                        <p className="text-[#8A9AB0] text-xs">
+                        <p className="text-fp-text font-semibold text-sm">{po.po_number}</p>
+                        <p className="text-fp-muted text-xs">
                           {po.vendor_name || '—'}
                           {po.proposals?.proposal_name && (
                             <span> · <span className="hover:text-[#C8622A] transition-colors cursor-pointer" onClick={e => { e.stopPropagation(); navigate(`/proposal/${po.proposal_id}`) }}>{po.proposals.proposal_name}</span></span>
@@ -401,34 +401,34 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                       <span className={`text-xs font-semibold px-2 py-1 rounded ${po.status === 'Received' ? 'bg-green-500/20 text-green-400' : po.status === 'Partial' ? 'bg-yellow-500/20 text-yellow-400' : po.status === 'Cancelled' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
                         {po.status}
                       </span>
-                      {progress && <span className="text-[#8A9AB0] text-xs">{progress.received} of {progress.total} received</span>}
+                      {progress && <span className="text-fp-muted text-xs">{progress.received} of {progress.total} received</span>}
                     </div>
                     <div className="flex items-center gap-4">
-                      <p className="text-white text-sm font-semibold">${(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                      <p className="text-fp-text text-sm font-semibold">${(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                       <select value={po.status} onChange={e => { e.stopPropagation(); updateStatus(po.id, e.target.value) }} onClick={e => e.stopPropagation()}
-                        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+                        className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
                         {['Sent', 'Partial', 'Received', 'Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
-                      <span className="text-[#8A9AB0] text-sm">{isExpanded ? '▲' : '▼'}</span>
+                      <span className="text-fp-muted text-sm">{isExpanded ? '▲' : '▼'}</span>
                     </div>
                   </div>
 
                   {isExpanded && (
-                    <div className="border-t border-[#2a3d55] p-4">
-                      {po.notes && <p className="text-[#8A9AB0] text-xs mb-3 italic">{po.notes}</p>}
+                    <div className="border-t border-fp-border p-4">
+                      {po.notes && <p className="text-fp-muted text-xs mb-3 italic">{po.notes}</p>}
                       {!lineItems[po.id] ? (
-                        <p className="text-[#8A9AB0] text-sm">Loading items...</p>
+                        <p className="text-fp-muted text-sm">Loading items...</p>
                       ) : lineItems[po.id].length === 0 ? (
-                        <p className="text-[#8A9AB0] text-sm">No BOM line items linked to this PO.</p>
+                        <p className="text-fp-muted text-sm">No BOM line items linked to this PO.</p>
                       ) : (
                         <table className="w-full text-sm">
                           <thead>
-                            <tr className="border-b border-[#2a3d55]">
-                              <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Item</th>
-                              <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Part #</th>
-                              <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal text-xs">Ordered</th>
-                              <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal text-xs">Received Qty</th>
-                              <th className="text-[#8A9AB0] text-left py-2 font-normal text-xs">Status</th>
+                            <tr className="border-b border-fp-border">
+                              <th className="text-fp-muted text-left py-2 pr-4 font-normal text-xs">Item</th>
+                              <th className="text-fp-muted text-left py-2 pr-4 font-normal text-xs">Part #</th>
+                              <th className="text-fp-muted text-right py-2 pr-4 font-normal text-xs">Ordered</th>
+                              <th className="text-fp-muted text-right py-2 pr-4 font-normal text-xs">Received Qty</th>
+                              <th className="text-fp-muted text-left py-2 font-normal text-xs">Status</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -437,20 +437,20 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                               const received = parseFloat(item.received_qty) || 0
                               const itemStatus = received === 0 ? 'Pending' : received >= ordered ? 'Received' : 'Partial'
                               return (
-                                <tr key={item.id} className="border-b border-[#2a3d55]/30">
-                                  <td className="text-white py-3 pr-4">{item.item_name}</td>
-                                  <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
-                                  <td className="text-white py-3 pr-4 text-right">{ordered} {item.unit || 'ea'}</td>
+                                <tr key={item.id} className="border-b border-fp-border/30">
+                                  <td className="text-fp-text py-3 pr-4">{item.item_name}</td>
+                                  <td className="text-fp-muted py-3 pr-4">{item.part_number_sku || '—'}</td>
+                                  <td className="text-fp-text py-3 pr-4 text-right">{ordered} {item.unit || 'ea'}</td>
                                   <td className="py-3 pr-4 text-right">
                                     <input type="number" min="0" max={ordered} value={received || ''} onChange={e => updateReceivedQty(po.id, item.id, e.target.value, ordered)} placeholder="0"
-                                      className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] text-right" />
-                                    {savingReceiving[item.id] && <span className="text-[#8A9AB0] text-xs ml-1">✓</span>}
+                                      className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand text-right" />
+                                    {savingReceiving[item.id] && <span className="text-fp-muted text-xs ml-1">✓</span>}
                                   </td>
                                   <td className="py-3">
-                                    <span className={`text-xs font-semibold px-2 py-1 rounded ${itemStatus === 'Received' ? 'bg-green-500/20 text-green-400' : itemStatus === 'Partial' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
+                                    <span className={`text-xs font-semibold px-2 py-1 rounded ${itemStatus === 'Received' ? 'bg-green-500/20 text-green-400' : itemStatus === 'Partial' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-fp-inset text-fp-muted'}`}>
                                       {itemStatus}
                                     </span>
-                                    {item.received_at && <span className="text-[#8A9AB0] text-xs ml-2">{new Date(item.received_at).toLocaleDateString()}</span>}
+                                    {item.received_at && <span className="text-fp-muted text-xs ml-2">{new Date(item.received_at).toLocaleDateString()}</span>}
                                   </td>
                                 </tr>
                               )
@@ -470,14 +470,14 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
       {/* New PO Modal */}
       {showNewPO && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-white font-bold text-lg mb-5">New Purchase Order</h3>
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-fp-text font-bold text-lg mb-5">New Purchase Order</h3>
             <div className="space-y-5">
 
               {/* Vendor + PO number */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor <span className="text-[#C8622A]">*</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Vendor <span className="text-[#C8622A]">*</span></label>
                   <select value={poForm.vendor_id} onChange={e => handleVendorChange(e.target.value)} className={inputClass}>
                     <option value="">— Select vendor —</option>
                     {vendors.map(v => <option key={v.id} value={v.id}>{v.vendor_name}</option>)}
@@ -489,7 +489,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                   )}
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Vendor Email <span className="text-[#8A9AB0] font-normal">(optional)</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Vendor Email <span className="text-fp-muted font-normal">(optional)</span></label>
                   <input type="email" value={poForm.vendor_email} onChange={e => setPOForm(p => ({ ...p, vendor_email: e.target.value }))}
                     placeholder="vendor@company.com" className={inputClass} />
                 </div>
@@ -497,14 +497,14 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
 
               {/* PO number */}
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-2 block">PO Number</label>
+                <label className="text-fp-muted text-xs mb-2 block">PO Number</label>
                 <div className="flex gap-2 mb-2">
                   <button onClick={() => setPOForm(p => ({ ...p, po_number_mode: 'auto' }))}
-                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poForm.po_number_mode === 'auto' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poForm.po_number_mode === 'auto' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
                     Auto-Generate
                   </button>
                   <button onClick={() => setPOForm(p => ({ ...p, po_number_mode: 'manual' }))}
-                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poForm.po_number_mode === 'manual' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poForm.po_number_mode === 'manual' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
                     Enter Manually
                   </button>
                 </div>
@@ -516,11 +516,11 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
 
               {/* Link to job or ticket */}
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-2 block">Link To <span className="text-[#8A9AB0] font-normal">(optional)</span></label>
+                <label className="text-fp-muted text-xs mb-2 block">Link To <span className="text-fp-muted font-normal">(optional)</span></label>
                 <div className="flex gap-2 mb-2">
                   {['none', 'job', 'ticket'].map(t => (
                     <button key={t} onClick={() => setPOForm(p => ({ ...p, link_type: t }))}
-                      className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${poForm.link_type === t ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+                      className={`px-4 py-2 rounded-lg text-xs font-semibold transition-colors ${poForm.link_type === t ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
                       {t === 'none' ? 'None' : t === 'job' ? '🔨 Job' : '🎫 Service Ticket'}
                     </button>
                   ))}
@@ -532,22 +532,22 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                       {jobs.map(j => <option key={j.id} value={j.id}>{j.job_number ? `${j.job_number} — ` : ''}{j.name}</option>)}
                     </select>
                     {jobBudget && poForm.job_id && (
-                      <div className={`mt-2 rounded-lg px-4 py-3 text-xs ${jobBudget.totalCost > 0 ? (poTotal + jobBudget.totalPOs > jobBudget.totalCost ? 'bg-red-500/10 border border-red-500/30' : jobBudget.remaining - poTotal < jobBudget.totalCost * 0.1 ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-green-500/10 border border-green-500/30') : 'bg-[#0F1C2E] border border-[#2a3d55]'}`}>
+                      <div className={`mt-2 rounded-lg px-4 py-3 text-xs ${jobBudget.totalCost > 0 ? (poTotal + jobBudget.totalPOs > jobBudget.totalCost ? 'bg-red-500/10 border border-red-500/30' : jobBudget.remaining - poTotal < jobBudget.totalCost * 0.1 ? 'bg-yellow-500/10 border border-yellow-500/30' : 'bg-green-500/10 border border-green-500/30') : 'bg-fp-inset border border-fp-border'}`}>
                         {jobBudget.totalCost > 0 ? (
                           <div className="space-y-0.5">
                             <div className="flex justify-between">
-                              <span className="text-[#8A9AB0]">Material budget (cost)</span>
-                              <span className="text-white">${jobBudget.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              <span className="text-fp-muted">Material budget (cost)</span>
+                              <span className="text-fp-text">${jobBudget.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-[#8A9AB0]">POs already issued</span>
-                              <span className="text-white">${jobBudget.totalPOs.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              <span className="text-fp-muted">POs already issued</span>
+                              <span className="text-fp-text">${jobBudget.totalPOs.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-[#8A9AB0]">This PO</span>
-                              <span className="text-white">${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                              <span className="text-fp-muted">This PO</span>
+                              <span className="text-fp-text">${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                             </div>
-                            <div className="flex justify-between border-t border-[#2a3d55] pt-1 mt-1">
+                            <div className="flex justify-between border-t border-fp-border pt-1 mt-1">
                               <span className="font-semibold">
                                 {poTotal + jobBudget.totalPOs > jobBudget.totalCost ? '⚠ Over budget by' : 'Remaining after this PO'}
                               </span>
@@ -557,7 +557,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                             </div>
                           </div>
                         ) : (
-                          <p className="text-[#8A9AB0]">No material cost budget found for this job.</p>
+                          <p className="text-fp-muted">No material cost budget found for this job.</p>
                         )}
                       </div>
                     )}
@@ -573,7 +573,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
 
               {/* Description */}
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Description <span className="text-[#8A9AB0] font-normal">(optional)</span></label>
+                <label className="text-fp-muted text-xs mb-1 block">Description <span className="text-fp-muted font-normal">(optional)</span></label>
                 <input type="text" value={poForm.description} onChange={e => setPOForm(p => ({ ...p, description: e.target.value }))}
                   placeholder="e.g. Camera system materials, Phase 1..."
                   className={inputClass} />
@@ -582,15 +582,15 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
               {/* Line items */}
               <div>
                 <div className="flex justify-between items-center mb-2">
-                  <label className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Line Items</label>
-                  <button onClick={addPOLine} className="text-[#C8622A] text-xs hover:text-white transition-colors">+ Add Line</button>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Line Items</label>
+                  <button onClick={addPOLine} className="text-[#C8622A] text-xs hover:text-fp-text transition-colors">+ Add Line</button>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="border-b border-[#2a3d55]">
+                      <tr className="border-b border-fp-border">
                         {['Item Name', 'Part #', 'Qty', 'Unit', 'Unit Cost', 'Total', ''].map(h => (
-                          <th key={h} className="text-[#8A9AB0] text-left py-1.5 pr-2 font-normal">{h}</th>
+                          <th key={h} className="text-fp-muted text-left py-1.5 pr-2 font-normal">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -598,7 +598,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                       {poLines.map(line => {
                         const lineTotal = (parseFloat(line.unit_cost) || 0) * (parseFloat(line.quantity) || 0)
                         return (
-                          <tr key={line.id} className="border-b border-[#2a3d55]/30">
+                          <tr key={line.id} className="border-b border-fp-border/30">
                             <td className="pr-2 py-1.5">
                               <input type="text" value={line.item_name} onChange={e => updatePOLine(line.id, 'item_name', e.target.value)}
                                 placeholder="Item name" className={`w-40 ${lineInputClass}`} />
@@ -620,12 +620,12 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                               <input type="number" min="0" step="0.01" placeholder="0.00" value={line.unit_cost} onChange={e => updatePOLine(line.id, 'unit_cost', e.target.value)}
                                 className={`w-24 ${lineInputClass}`} />
                             </td>
-                            <td className="pr-2 py-1.5 text-white font-medium">
+                            <td className="pr-2 py-1.5 text-fp-text font-medium">
                               ${lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </td>
                             <td className="py-1.5">
                               {poLines.length > 1 && (
-                                <button onClick={() => removePOLine(line.id)} className="text-[#8A9AB0] hover:text-red-400 transition-colors">✕</button>
+                                <button onClick={() => removePOLine(line.id)} className="text-fp-muted hover:text-red-400 transition-colors">✕</button>
                               )}
                             </td>
                           </tr>
@@ -634,7 +634,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan="5" className="text-[#8A9AB0] text-right pt-3 pr-2 font-semibold">Total</td>
+                        <td colSpan="5" className="text-fp-muted text-right pt-3 pr-2 font-semibold">Total</td>
                         <td className="text-[#C8622A] font-bold pt-3">${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                         <td></td>
                       </tr>
@@ -645,16 +645,16 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
 
               {/* Notes */}
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Notes <span className="text-[#8A9AB0] font-normal">(optional)</span></label>
+                <label className="text-fp-muted text-xs mb-1 block">Notes <span className="text-fp-muted font-normal">(optional)</span></label>
                 <textarea value={poForm.notes} onChange={e => setPOForm(p => ({ ...p, notes: e.target.value }))} rows={2}
                   placeholder="Delivery instructions, special requirements..."
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
               </div>
 
               <div className="flex gap-3 pt-1">
-                <button onClick={() => { setShowNewPO(false); setJobBudget(null) }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+                <button onClick={() => { setShowNewPO(false); setJobBudget(null) }} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={generateNewPO} disabled={generatingPO || (!poForm.vendor_name && !poForm.vendor_id) || poLines.filter(l => l.item_name.trim()).length === 0}
-                  className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {generatingPO ? 'Generating...' : `Generate PO — $${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                 </button>
               </div>

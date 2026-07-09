@@ -109,20 +109,20 @@ export default function DrawingTool({ proposalId, orgId, featureEnabled, onBOMAp
   const anyDraft    = sheets.some(s => s.status === 'draft')
 
   return (
-    <div className="mt-6 border border-[#2a3d55] rounded-xl overflow-hidden bg-[#0F1C2E]">
+    <div className="mt-6 border border-fp-border rounded-xl overflow-hidden bg-fp-inset">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[#2a3d55] bg-[#1a2d45]">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-fp-border bg-fp-card">
         <div className="flex items-center gap-2">
           <svg className="w-4 h-4 text-[#C8622A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 6.75V15m6-6v8.25m.503-10.498l4.875 2.437c.381.19.622.58.622 1.006v4.163a1.5 1.5 0 01-.621 1.22l-4.875 3.046a1.5 1.5 0 01-1.627.023L4.5 13.5m15-5.25l-4.875-2.437" />
           </svg>
-          <span className="text-white text-sm font-semibold">Floor Plan Drawing Tool</span>
+          <span className="text-fp-text text-sm font-semibold">Floor Plan Drawing Tool</span>
         </div>
-        <div className="flex items-center gap-1 bg-[#0F1C2E] rounded-lg p-1">
+        <div className="flex items-center gap-1 bg-fp-inset rounded-lg p-1">
           {['canvas', 'bom'].map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                activeTab === tab ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'
+                activeTab === tab ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'
               }`}>
               {tab === 'canvas' ? 'Drawing' : 'BOM Preview'}
             </button>
@@ -140,14 +140,14 @@ export default function DrawingTool({ proposalId, orgId, featureEnabled, onBOMAp
 
       {/* Sheet tabs */}
       {sheets.length > 0 && (
-        <div className="flex items-center gap-1 px-4 py-2 border-b border-[#2a3d55] overflow-x-auto">
+        <div className="flex items-center gap-1 px-4 py-2 border-b border-fp-border overflow-x-auto">
           {sheets.map(sheet => (
             <SheetTab key={sheet.id} sheet={sheet} isActive={sheet.id === activeSheetId}
               onSelect={() => setActiveSheetId(sheet.id)}
               onRename={(name) => handleRenameSheet(sheet.id, name)}
               onDelete={() => handleDeleteSheet(sheet.id)} />
           ))}
-          <label className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-dashed border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A] cursor-pointer transition-colors whitespace-nowrap ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+          <label className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-dashed border-fp-border text-fp-muted hover:border-fp-brand hover:text-[#C8622A] cursor-pointer transition-colors whitespace-nowrap ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
             {uploading
               ? <span className="flex items-center gap-1"><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>Uploading...</span>
               : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>Add Floor Plan</>
@@ -162,16 +162,16 @@ export default function DrawingTool({ proposalId, orgId, featureEnabled, onBOMAp
         <div className="flex" style={{ minHeight: 600 }}>
           {!loading && sheets.length === 0 && (
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-12 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-[#1a2d45] flex items-center justify-center">
-                <svg className="w-8 h-8 text-[#8A9AB0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 rounded-2xl bg-fp-card flex items-center justify-center">
+                <svg className="w-8 h-8 text-fp-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
                 </svg>
               </div>
               <div>
-                <p className="text-white text-sm font-medium">Upload a floor plan to get started</p>
-                <p className="text-[#8A9AB0] text-xs mt-1">PDF, PNG, or JPG — one sheet per floor or area</p>
+                <p className="text-fp-text text-sm font-medium">Upload a floor plan to get started</p>
+                <p className="text-fp-muted text-xs mt-1">PDF, PNG, or JPG — one sheet per floor or area</p>
               </div>
-              <label className="px-4 py-2 bg-[#C8622A] text-white text-sm font-medium rounded-lg hover:bg-[#b5571f] cursor-pointer transition-colors">
+              <label className="px-4 py-2 bg-fp-brand text-white text-sm font-medium rounded-lg hover:bg-[#b5571f] cursor-pointer transition-colors">
                 {uploading ? 'Uploading...' : 'Upload Floor Plan'}
                 <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleUpload} disabled={uploading} />
               </label>
@@ -179,7 +179,7 @@ export default function DrawingTool({ proposalId, orgId, featureEnabled, onBOMAp
           )}
           {!loading && activeSheet && (
             <>
-              <div className="w-64 border-r border-[#2a3d55] flex-shrink-0 overflow-y-auto">
+              <div className="w-64 border-r border-fp-border flex-shrink-0 overflow-y-auto">
                 <SymbolPicker selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} />
               </div>
               <div className="flex-1 overflow-hidden">
@@ -187,7 +187,7 @@ export default function DrawingTool({ proposalId, orgId, featureEnabled, onBOMAp
               </div>
             </>
           )}
-          {loading && <div className="flex-1 flex items-center justify-center"><span className="text-sm text-[#8A9AB0]">Loading...</span></div>}
+          {loading && <div className="flex-1 flex items-center justify-center"><span className="text-sm text-fp-muted">Loading...</span></div>}
         </div>
       )}
 
@@ -198,15 +198,15 @@ export default function DrawingTool({ proposalId, orgId, featureEnabled, onBOMAp
 
       {/* Footer */}
       {sheets.length > 0 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-[#2a3d55] bg-[#1a2d45]">
-          <div className="text-xs text-[#8A9AB0]">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-fp-border bg-fp-card">
+          <div className="text-xs text-fp-muted">
             {anyDraft ? `${sheets.filter(s => s.status === 'draft').length} sheet(s) pending approval` : 'All sheets approved'}
           </div>
           <button onClick={handleApprove} disabled={approving || sheets.length === 0}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               approving || sheets.length === 0
-                ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
-                : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
+                ? 'bg-fp-inset text-fp-muted cursor-not-allowed'
+                : 'bg-fp-brand text-white hover:bg-[#b5571f]'
             }`}>
             {approving ? 'Pushing to BOM...' : allApproved ? 'Re-approve & Sync BOM' : 'Approve & Push to BOM'}
           </button>
@@ -219,22 +219,22 @@ export default function DrawingTool({ proposalId, orgId, featureEnabled, onBOMAp
 function SheetTab({ sheet, isActive, onSelect, onRename, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [name, setName]       = useState(sheet.name)
-  const statusColor = { draft: 'bg-yellow-900/40 text-yellow-400', approved: 'bg-green-900/40 text-green-400', revised: 'bg-blue-900/40 text-blue-400' }[sheet.status] || 'bg-[#2a3d55] text-[#8A9AB0]'
+  const statusColor = { draft: 'bg-yellow-900/40 text-yellow-400', approved: 'bg-green-900/40 text-green-400', revised: 'bg-blue-900/40 text-blue-400' }[sheet.status] || 'bg-fp-inset text-fp-muted'
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') { onRename(name); setEditing(false) }
     if (e.key === 'Escape') { setName(sheet.name); setEditing(false) }
   }
   return (
-    <div onClick={onSelect} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors whitespace-nowrap group ${isActive ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/40' : 'text-[#8A9AB0] hover:bg-[#1a2d45] border border-transparent'}`}>
+    <div onClick={onSelect} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors whitespace-nowrap group ${isActive ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/40' : 'text-fp-muted hover:bg-fp-card border border-transparent'}`}>
       {editing
         ? <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={handleKeyDown}
             onBlur={() => { onRename(name); setEditing(false) }} onClick={e => e.stopPropagation()}
-            className="w-24 text-xs border-b border-[#C8622A] outline-none bg-transparent text-white" />
+            className="w-24 text-xs border-b border-[#C8622A] outline-none bg-transparent text-fp-text" />
         : <span onDoubleClick={(e) => { e.stopPropagation(); setEditing(true) }}>{sheet.name}</span>
       }
       <span className={`px-1.5 py-0.5 rounded text-xs ${statusColor}`}>{sheet.status}</span>
       <button onClick={(e) => { e.stopPropagation(); onDelete() }}
-        className="opacity-0 group-hover:opacity-100 transition-opacity text-[#8A9AB0] hover:text-red-400">
+        className="opacity-0 group-hover:opacity-100 transition-opacity text-fp-muted hover:text-red-400">
         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
         </svg>

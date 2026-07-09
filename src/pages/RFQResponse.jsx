@@ -156,38 +156,38 @@ export default function RFQResponse() {
   }, 0)
 
   if (loading) return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
+    <div className="min-h-screen bg-fp-inset flex items-center justify-center">
       <div className="text-center">
-        <h1 className="text-white text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
-        <p className="text-[#8A9AB0] text-sm">Loading RFQ...</p>
+        <h1 className="text-fp-text text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
+        <p className="text-fp-muted text-sm">Loading RFQ...</p>
       </div>
     </div>
   )
 
   if (error) return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-fp-inset flex items-center justify-center px-4">
       <div className="text-center max-w-md">
-        <h1 className="text-white text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
-        <div className="bg-[#1a2d45] rounded-2xl p-8 mt-6">
+        <h1 className="text-fp-text text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
+        <div className="bg-fp-card rounded-2xl p-8 mt-6">
           <p className="text-red-400 text-lg font-semibold mb-2">⚠ Link Error</p>
-          <p className="text-[#8A9AB0] text-sm">{error}</p>
+          <p className="text-fp-muted text-sm">{error}</p>
         </div>
       </div>
     </div>
   )
 
   if (submitted) return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-fp-inset flex items-center justify-center px-4">
       <div className="text-center max-w-md">
-        <h1 className="text-white text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
-        <div className="bg-[#1a2d45] rounded-2xl p-8 mt-6">
+        <h1 className="text-fp-text text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1>
+        <div className="bg-fp-card rounded-2xl p-8 mt-6">
           <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4">
             <span className="text-green-400 text-3xl">✓</span>
           </div>
-          <h3 className="text-white font-bold text-xl mb-2">Quote Submitted</h3>
-          <p className="text-[#8A9AB0] text-sm">Thank you for your response. The team has been notified.</p>
+          <h3 className="text-fp-text font-bold text-xl mb-2">Quote Submitted</h3>
+          <p className="text-fp-muted text-sm">Thank you for your response. The team has been notified.</p>
           {rfq?.vendor_quote_number && (
-            <p className="text-[#8A9AB0] text-xs mt-2">Quote # {rfq.vendor_quote_number}</p>
+            <p className="text-fp-muted text-xs mt-2">Quote # {rfq.vendor_quote_number}</p>
           )}
         </div>
       </div>
@@ -195,21 +195,21 @@ export default function RFQResponse() {
   )
 
   return (
-    <div className="min-h-screen bg-[#0F1C2E]">
-      <div className="bg-[#1a2d45] border-b border-[#2a3d55] px-6 py-4">
+    <div className="min-h-screen bg-fp-inset">
+      <div className="bg-fp-card border-b border-fp-border px-6 py-4">
         <div className="max-w-3xl mx-auto flex justify-between items-center">
-          <h1 className="text-white text-xl font-bold">ForgePt<span className="text-[#C8622A]">.</span></h1>
-          <span className="text-[#8A9AB0] text-sm">Vendor Quote Submission</span>
+          <h1 className="text-fp-text text-xl font-bold">ForgePt<span className="text-[#C8622A]">.</span></h1>
+          <span className="text-fp-muted text-sm">Vendor Quote Submission</span>
         </div>
       </div>
 
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
 
         {/* Header */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h2 className="text-white text-2xl font-bold mb-1">Request for Quotation</h2>
-          <p className="text-[#8A9AB0]">Project: {proposal?.proposal_name}</p>
-          <p className="text-[#8A9AB0] text-sm">From: {proposal?.company}</p>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h2 className="text-fp-text text-2xl font-bold mb-1">Request for Quotation</h2>
+          <p className="text-fp-muted">Project: {proposal?.proposal_name}</p>
+          <p className="text-fp-muted text-sm">From: {proposal?.company}</p>
           {rfq?.expires_at && (
             <p className={`text-sm mt-2 font-semibold ${new Date(rfq.expires_at) < new Date() ? 'text-red-400' : 'text-[#C8622A]'}`}>
               {new Date(rfq.expires_at) < new Date() ? '⚠ This RFQ has expired' : `Response requested by ${new Date(rfq.expires_at).toLocaleDateString()}`}
@@ -218,15 +218,15 @@ export default function RFQResponse() {
         </div>
 
         {/* Upload PDF Quote */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold text-lg mb-1">Upload Your Quote (Optional)</h3>
-          <p className="text-[#8A9AB0] text-sm mb-4">Upload a PDF quote and AI will automatically extract pricing for you.</p>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold text-lg mb-1">Upload Your Quote (Optional)</h3>
+          <p className="text-fp-muted text-sm mb-4">Upload a PDF quote and AI will automatically extract pricing for you.</p>
           <input type="file" accept=".pdf,image/jpeg,image/png"
             onChange={e => {
               const file = e.target.files[0]
               if (file) { setQuoteFile(file); parsePDFQuote(file) }
             }}
-            className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+            className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
           {parsingPDF && <p className="text-[#C8622A] text-xs mt-2 animate-pulse">🤖 Reading your quote and filling in prices...</p>}
           {parsedItems.length > 0 && (
             <p className="text-green-400 text-xs mt-2">✓ {parsedItems.length} prices extracted — review below</p>
@@ -234,55 +234,55 @@ export default function RFQResponse() {
         </div>
 
         {/* Quote Details */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold text-lg mb-4">Quote Details</h3>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold text-lg mb-4">Quote Details</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Your Quote Number</label>
+              <label className="text-fp-muted text-xs mb-1 block">Your Quote Number</label>
               <input type="text" value={quoteNumber} onChange={e => setQuoteNumber(e.target.value)}
                 placeholder="e.g. QT-2024-8812"
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
             </div>
             <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Quote Expiry Date</label>
+              <label className="text-fp-muted text-xs mb-1 block">Quote Expiry Date</label>
               <input type="date" value={quoteExpiry} onChange={e => setQuoteExpiry(e.target.value)}
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
             </div>
           </div>
           <div className="mt-4">
-            <label className="text-[#8A9AB0] text-xs mb-1 block">Notes (optional)</label>
+            <label className="text-fp-muted text-xs mb-1 block">Notes (optional)</label>
             <textarea value={vendorNotes} onChange={e => setVendorNotes(e.target.value)} rows={2}
               placeholder="Lead times, substitutions, special conditions..."
-              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none" />
+              className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
           </div>
         </div>
 
         {/* Line Items Pricing */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold text-lg mb-4">Enter Your Pricing</h3>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold text-lg mb-4">Enter Your Pricing</h3>
           <div className="space-y-3">
             {lineItems.map(item => (
-              <div key={item.id} className="bg-[#0F1C2E] rounded-xl p-4">
+              <div key={item.id} className="bg-fp-inset rounded-xl p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <p className="text-white text-sm font-semibold">{item.item_name}</p>
-                    {item.part_number_sku && <p className="text-[#8A9AB0] text-xs">{item.part_number_sku}</p>}
-                    {item.manufacturer && <p className="text-[#8A9AB0] text-xs">{item.manufacturer}</p>}
+                    <p className="text-fp-text text-sm font-semibold">{item.item_name}</p>
+                    {item.part_number_sku && <p className="text-fp-muted text-xs">{item.part_number_sku}</p>}
+                    {item.manufacturer && <p className="text-fp-muted text-xs">{item.manufacturer}</p>}
                   </div>
-                  <span className="text-[#8A9AB0] text-xs">Qty: {item.quantity} {item.unit || 'ea'}</span>
+                  <span className="text-fp-muted text-xs">Qty: {item.quantity} {item.unit || 'ea'}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex-1">
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Unit Price ($)</label>
+                    <label className="text-fp-muted text-xs mb-1 block">Unit Price ($)</label>
                     <input type="number" step="0.01" value={prices[item.id] || ''}
                       onChange={e => setPrices(prev => ({ ...prev, [item.id]: e.target.value }))}
                       placeholder="0.00"
-                      className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                      className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                   </div>
                   {prices[item.id] && (
                     <div className="text-right">
-                      <p className="text-[#8A9AB0] text-xs">Extended</p>
-                      <p className="text-white text-sm font-semibold">${fmt((parseFloat(prices[item.id]) || 0) * (parseFloat(item.quantity) || 1))}</p>
+                      <p className="text-fp-muted text-xs">Extended</p>
+                      <p className="text-fp-text text-sm font-semibold">${fmt((parseFloat(prices[item.id]) || 0) * (parseFloat(item.quantity) || 1))}</p>
                     </div>
                   )}
                 </div>
@@ -290,26 +290,26 @@ export default function RFQResponse() {
             ))}
           </div>
           {totalQuoted > 0 && (
-            <div className="mt-4 pt-4 border-t border-[#2a3d55] flex justify-between items-center">
-              <p className="text-[#8A9AB0] text-sm font-semibold">Total Quote Value</p>
+            <div className="mt-4 pt-4 border-t border-fp-border flex justify-between items-center">
+              <p className="text-fp-muted text-sm font-semibold">Total Quote Value</p>
               <p className="text-[#C8622A] text-xl font-bold">${fmt(totalQuoted)}</p>
             </div>
           )}
         </div>
 
         {/* Submit */}
-        <div className="bg-[#1a2d45] rounded-xl p-6">
+        <div className="bg-fp-card rounded-xl p-6">
           <button onClick={submitQuote}
             disabled={submitting || !Object.values(prices).some(p => p)}
-            className="w-full bg-[#C8622A] text-white py-4 rounded-xl text-base font-bold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+            className="w-full bg-fp-brand text-white py-4 rounded-xl text-base font-bold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
             {submitting ? 'Submitting Quote...' : 'Submit Quote →'}
           </button>
-          <p className="text-[#8A9AB0] text-xs text-center mt-3">
+          <p className="text-fp-muted text-xs text-center mt-3">
             Your pricing will be sent directly to the project team.
           </p>
         </div>
 
-        <p className="text-center text-[#2a3d55] text-xs pb-4">Powered by ForgePt. · Secure vendor portal</p>
+        <p className="text-center text-fp-muted text-xs pb-4">Powered by ForgePt. · Secure vendor portal</p>
       </div>
     </div>
   )

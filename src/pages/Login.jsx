@@ -75,21 +75,21 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4">
+    <div className="min-h-screen bg-fp-inset flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-white text-4xl font-bold">
+          <h1 className="text-fp-text text-4xl font-bold">
             ForgePt<span className="text-[#C8622A]">.</span>
           </h1>
-          <p className="text-[#8A9AB0] mt-2">Manage. Propose. Close.</p>
+          <p className="text-fp-muted mt-2">Manage. Propose. Close.</p>
         </div>
 
-        <div className="bg-[#1a2d45] rounded-2xl p-8">
+        <div className="bg-fp-card rounded-2xl p-8">
           <div className="flex gap-2 mb-6">
             <button
               onClick={() => { setTab('login'); setError(null); setSuccess(null) }}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                tab === 'login' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'
+                tab === 'login' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'
               }`}
             >
               Sign In
@@ -97,7 +97,7 @@ export default function Login() {
             <button
               onClick={() => { setTab('request'); setError(null); setSuccess(null) }}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                tab === 'request' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'
+                tab === 'request' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'
               }`}
             >
               Request Access
@@ -110,70 +110,70 @@ export default function Login() {
           {tab === 'login' ? (
             <div className="space-y-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Email</label>
+                <label className="text-fp-muted text-xs mb-1 block">Email</label>
                 <input
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                   placeholder="you@company.com"
                 />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Password</label>
+                <label className="text-fp-muted text-xs mb-1 block">Password</label>
                 <input
                   type="password"
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                   placeholder="••••••••"
                 />
               </div>
               <button
                 onClick={handleLogin}
                 disabled={loading}
-                className="w-full bg-[#C8622A] text-white py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+                className="w-full bg-fp-brand text-white py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
               >
                 {loading ? 'Signing in...' : 'Sign In'}
               </button>
               <button
                 onClick={handleForgotPassword}
-                className="w-full text-[#8A9AB0] hover:text-white text-sm transition-colors"
+                className="w-full text-fp-muted hover:text-fp-text text-sm transition-colors"
               >
                 Forgot password?
               </button>
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-[#8A9AB0] text-sm">Tell us about your business and we will get you set up.</p>
+              <p className="text-fp-muted text-sm">Tell us about your business and we will get you set up.</p>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Full Name</label>
+                <label className="text-fp-muted text-xs mb-1 block">Full Name</label>
                 <input
                   type="text"
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                   placeholder="John Smith"
                 />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Company Name</label>
+                <label className="text-fp-muted text-xs mb-1 block">Company Name</label>
                 <input
                   type="text"
                   value={companyName}
                   onChange={e => setCompanyName(e.target.value)}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                   placeholder="Acme Electrical"
                 />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Your Role</label>
+                <label className="text-fp-muted text-xs mb-1 block">Your Role</label>
                 <select
                   value={role}
                   onChange={e => setRole(e.target.value)}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                 >
                   <option value="">Select your role</option>
                   {['Business Owner', 'Estimator', 'Project Manager', 'Sales Rep', 'Office Manager', 'Manufacturer / Supplier', 'Distributor', 'Other'].map(r => (
@@ -182,33 +182,33 @@ export default function Login() {
                 </select>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Email</label>
+                <label className="text-fp-muted text-xs mb-1 block">Email</label>
                 <input
                   type="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                   placeholder="you@company.com"
                 />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Tell us about your business (optional)</label>
+                <label className="text-fp-muted text-xs mb-1 block">Tell us about your business (optional)</label>
                 <textarea
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
                   rows={3}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none"
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none"
                   placeholder="What trade do you work in? How many reps on your team?"
                 />
               </div>
               <button
                 onClick={handleRequestAccess}
                 disabled={loading}
-                className="w-full bg-[#C8622A] text-white py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+                className="w-full bg-fp-brand text-white py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
               >
                 {loading ? 'Submitting...' : 'Request Access'}
               </button>
-              <p className="text-[#8A9AB0] text-xs text-center">
+              <p className="text-fp-muted text-xs text-center">
                 We typically respond within 1 business day.
               </p>
             </div>

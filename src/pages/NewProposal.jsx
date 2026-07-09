@@ -195,23 +195,23 @@ export default function NewProposal() {
   }
 
   const inputClass = (field) =>
-    `w-full bg-[#0a1628] text-white border rounded-xl px-4 py-3 text-sm focus:outline-none transition-colors placeholder-[#3a4d65] ${
-      errors[field] ? 'border-red-500/60 focus:border-red-400' : 'border-[#1e3450] focus:border-[#C8622A]'
+    `w-full bg-fp-inset text-fp-text border rounded-xl px-4 py-3 text-sm focus:outline-none transition-colors placeholder-[#3a4d65] ${
+      errors[field] ? 'border-red-500/60 focus:border-red-400' : 'border-fp-border focus:border-fp-brand'
     }`
 
   const selectedClient = clients.find(c => c.id === selectedClientId)
 
   return (
-    <div className="min-h-screen bg-[#070f1a]">
+    <div className="min-h-screen bg-fp-bg">
 
       {/* Top bar */}
-      <div className="border-b border-[#1a2d45] px-6 py-4 flex justify-between items-center bg-[#0a1628]">
+      <div className="border-b border-[#1a2d45] px-6 py-4 flex justify-between items-center bg-fp-inset">
         <div className="flex items-center gap-3">
-          <span className="text-white font-bold text-lg">ForgePt<span className="text-[#C8622A]">.</span></span>
-          <span className="text-[#2a3d55] text-sm">›</span>
-          <span className="text-[#8A9AB0] text-sm">Create Deal</span>
+          <span className="text-fp-text font-bold text-lg">ForgePt<span className="text-[#C8622A]">.</span></span>
+          <span className="text-fp-muted text-sm">›</span>
+          <span className="text-fp-muted text-sm">Create Deal</span>
         </div>
-        <button onClick={() => navigate(-1)} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">
+        <button onClick={() => navigate(-1)} className="text-fp-muted hover:text-fp-text text-sm transition-colors">
           Cancel
         </button>
       </div>
@@ -220,18 +220,18 @@ export default function NewProposal() {
 
         {/* Header */}
         <div className="mb-10">
-          <h1 className="text-white text-3xl font-bold tracking-tight mb-2">Create Deal</h1>
-          <p className="text-[#8A9AB0] text-sm">Fill in the basics. You'll add your BOM, labor, and scope once the deal is created.</p>
+          <h1 className="text-fp-text text-3xl font-bold tracking-tight mb-2">Create Deal</h1>
+          <p className="text-fp-muted text-sm">Fill in the basics. You'll add your BOM, labor, and scope once the deal is created.</p>
         </div>
 
         <div className="space-y-6">
 
           {/* Deal Name */}
-          <div className="bg-[#0a1628] border border-[#1a2d45] rounded-2xl p-6">
-            <label className="text-white text-sm font-semibold block mb-1">
+          <div className="bg-fp-inset border border-[#1a2d45] rounded-2xl p-6">
+            <label className="text-fp-text text-sm font-semibold block mb-1">
               Deal Name <span className="text-[#C8622A]">*</span>
             </label>
-            <p className="text-[#8A9AB0] text-xs mb-3">What is this job? e.g. "Access Control Upgrade — Main Office"</p>
+            <p className="text-fp-muted text-xs mb-3">What is this job? e.g. "Access Control Upgrade — Main Office"</p>
             <input
               type="text"
               value={form.job_description}
@@ -244,13 +244,13 @@ export default function NewProposal() {
           </div>
 
           {/* Client */}
-          <div className="bg-[#0a1628] border border-[#1a2d45] rounded-2xl p-6 space-y-4">
+          <div className="bg-fp-inset border border-[#1a2d45] rounded-2xl p-6 space-y-4">
             <div>
-              <label className="text-white text-sm font-semibold block mb-3">Client</label>
+              <label className="text-fp-text text-sm font-semibold block mb-3">Client</label>
               <select
                 value={selectedClientId}
                 onChange={e => handleClientSelect(e.target.value)}
-                className="w-full bg-[#070f1a] text-white border border-[#1e3450] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#C8622A] transition-colors"
+                className="w-full bg-fp-bg text-fp-text border border-fp-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-fp-brand transition-colors"
               >
                 <option value="">— Select existing client or add new below —</option>
                 {clients.map(c => (
@@ -264,11 +264,11 @@ export default function NewProposal() {
             {/* Location picker — only shows if client has locations */}
             {locations.length > 0 && (
               <div>
-                <label className="text-[#8A9AB0] text-xs font-semibold block mb-1 uppercase tracking-wide">Job Site Location</label>
+                <label className="text-fp-muted text-xs font-semibold block mb-1 uppercase tracking-wide">Job Site Location</label>
                 <select
                   value={selectedLocationId}
                   onChange={e => setSelectedLocationId(e.target.value)}
-                  className="w-full bg-[#070f1a] text-white border border-[#1e3450] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#C8622A] transition-colors"
+                  className="w-full bg-fp-bg text-fp-text border border-fp-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-fp-brand transition-colors"
                 >
                   <option value="">— Main address (no specific location) —</option>
                   {locations.map(l => {
@@ -286,11 +286,11 @@ export default function NewProposal() {
             {/* Contact picker — only shows when a client is selected */}
             {selectedClientId && (
               <div>
-                <label className="text-[#8A9AB0] text-xs font-semibold block mb-1 uppercase tracking-wide">Deal Contact</label>
+                <label className="text-fp-muted text-xs font-semibold block mb-1 uppercase tracking-wide">Deal Contact</label>
                 <select
                   value={selectedContactId}
                   onChange={e => handleContactSelect(e.target.value)}
-                  className="w-full bg-[#070f1a] text-white border border-[#1e3450] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#C8622A] transition-colors"
+                  className="w-full bg-fp-bg text-fp-text border border-fp-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-fp-brand transition-colors"
                 >
                   {(() => {
                     const client = clients.find(c => c.id === selectedClientId)
@@ -309,8 +309,8 @@ export default function NewProposal() {
                 {selectedContactId && selectedContactId !== '__main__' && selectedContactId !== '__none__' && (() => {
                   const contact = clientContacts.find(c => c.id === selectedContactId)
                   return contact ? (
-                    <p className="text-[#8A9AB0] text-xs mt-1.5">
-                      Contact name and email on this deal will be set to <span className="text-white">{contact.full_name}</span>{contact.email ? <> · <span className="text-[#C8622A]">{contact.email}</span></> : null}
+                    <p className="text-fp-muted text-xs mt-1.5">
+                      Contact name and email on this deal will be set to <span className="text-fp-text">{contact.full_name}</span>{contact.email ? <> · <span className="text-[#C8622A]">{contact.email}</span></> : null}
                     </p>
                   ) : null
                 })()}
@@ -320,7 +320,7 @@ export default function NewProposal() {
             {/* Manual client fields */}
             <div className={`grid grid-cols-2 gap-3 ${selectedClientId ? 'opacity-60' : ''}`}>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">
+                <label className="text-fp-muted text-xs mb-1 block">
                   Company {!selectedClientId && <span className="text-[#C8622A]">*</span>}
                 </label>
                 <input
@@ -334,7 +334,7 @@ export default function NewProposal() {
                 {errors.company && <p className="text-red-400 text-xs mt-1">{errors.company}</p>}
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Contact Name</label>
+                <label className="text-fp-muted text-xs mb-1 block">Contact Name</label>
                 <input
                   type="text"
                   value={form.client_name}
@@ -345,7 +345,7 @@ export default function NewProposal() {
                 />
               </div>
               <div className="col-span-2">
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Client Email</label>
+                <label className="text-fp-muted text-xs mb-1 block">Client Email</label>
                 <input
                   type="email"
                   value={form.client_email}
@@ -360,7 +360,7 @@ export default function NewProposal() {
             {selectedClientId && (
               <button
                 onClick={() => handleClientSelect('')}
-                className="text-[#8A9AB0] hover:text-[#C8622A] text-xs transition-colors"
+                className="text-fp-muted hover:text-[#C8622A] text-xs transition-colors"
               >
                 ✕ Clear client — enter manually instead
               </button>
@@ -368,22 +368,22 @@ export default function NewProposal() {
           </div>
 
           {/* Deal Details */}
-          <div className="bg-[#0a1628] border border-[#1a2d45] rounded-2xl p-6">
-            <label className="text-white text-sm font-semibold block mb-4">Deal Details</label>
+          <div className="bg-fp-inset border border-[#1a2d45] rounded-2xl p-6">
+            <label className="text-fp-text text-sm font-semibold block mb-4">Deal Details</label>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Industry</label>
+                <label className="text-fp-muted text-xs mb-1 block">Industry</label>
                 <select
                   value={form.industry}
                   onChange={e => setForm(prev => ({ ...prev, industry: e.target.value }))}
-                  className="w-full bg-[#070f1a] text-white border border-[#1e3450] rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#C8622A] transition-colors"
+                  className="w-full bg-fp-bg text-fp-text border border-fp-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-fp-brand transition-colors"
                 >
                   <option value="">Select industry</option>
                   {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Close Date</label>
+                <label className="text-fp-muted text-xs mb-1 block">Close Date</label>
                 <input
                   type="date"
                   value={form.close_date}
@@ -392,7 +392,7 @@ export default function NewProposal() {
                 />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Tax Rate %</label>
+                <label className="text-fp-muted text-xs mb-1 block">Tax Rate %</label>
                 <input
                   type="number"
                   value={taxRate}
@@ -406,22 +406,22 @@ export default function NewProposal() {
                 <label className="flex items-center gap-2.5 cursor-pointer">
                   <div
                     onClick={() => setTaxExempt(p => !p)}
-                    className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${taxExempt ? 'bg-[#C8622A]' : 'bg-[#1e3450]'}`}
+                    className={`w-10 h-5 rounded-full transition-colors relative cursor-pointer ${taxExempt ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}
                   >
                     <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${taxExempt ? 'left-5' : 'left-0.5'}`} />
                   </div>
-                  <span className="text-[#8A9AB0] text-sm">Tax Exempt</span>
+                  <span className="text-fp-muted text-sm">Tax Exempt</span>
                 </label>
               </div>
             </div>
           </div>
 
           {/* Rep */}
-          <div className="bg-[#0a1628] border border-[#1a2d45] rounded-2xl p-6">
-            <label className="text-white text-sm font-semibold block mb-4">Rep Details</label>
+          <div className="bg-fp-inset border border-[#1a2d45] rounded-2xl p-6">
+            <label className="text-fp-text text-sm font-semibold block mb-4">Rep Details</label>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Rep Name</label>
+                <label className="text-fp-muted text-xs mb-1 block">Rep Name</label>
                 <input
                   type="text"
                   value={form.rep_name}
@@ -430,7 +430,7 @@ export default function NewProposal() {
                 />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Rep Email</label>
+                <label className="text-fp-muted text-xs mb-1 block">Rep Email</label>
                 <input
                   type="email"
                   value={form.rep_email}
@@ -453,7 +453,7 @@ export default function NewProposal() {
                 '📎 Upload Excel BOM',
                 '🔍 Search product library',
               ].map(item => (
-                <p key={item} className="text-[#8A9AB0] text-xs">{item}</p>
+                <p key={item} className="text-fp-muted text-xs">{item}</p>
               ))}
             </div>
           </div>
@@ -462,14 +462,14 @@ export default function NewProposal() {
           <div className="flex gap-3 pt-2">
             <button
               onClick={() => navigate(-1)}
-              className="px-6 py-3.5 text-[#8A9AB0] hover:text-white text-sm transition-colors rounded-xl border border-[#1a2d45] hover:border-[#2a3d55]"
+              className="px-6 py-3.5 text-fp-muted hover:text-fp-text text-sm transition-colors rounded-xl border border-[#1a2d45] hover:border-fp-border"
             >
               Cancel
             </button>
             <button
               onClick={handleSubmit}
               disabled={saving}
-              className="flex-1 py-3.5 bg-[#C8622A] text-white rounded-xl font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+              className="flex-1 py-3.5 bg-fp-brand text-white rounded-xl font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50 text-sm flex items-center justify-center gap-2"
             >
               {saving ? (
                 <>

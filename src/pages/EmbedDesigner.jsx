@@ -287,44 +287,44 @@ export default function EmbedDesigner() {
   }
 
   if (status === 'authenticating' || status === 'loading') return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
+    <div className="min-h-screen bg-fp-inset flex items-center justify-center">
       <div className="text-center">
         <div className="w-10 h-10 border-2 border-[#C8622A] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-        <p className="text-[#8A9AB0] text-sm">{status === 'authenticating' ? 'Authenticating…' : 'Loading designer…'}</p>
+        <p className="text-fp-muted text-sm">{status === 'authenticating' ? 'Authenticating…' : 'Loading designer…'}</p>
       </div>
     </div>
   )
 
   if (status === 'error') return (
-    <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
+    <div className="min-h-screen bg-fp-inset flex items-center justify-center">
       <div className="text-center max-w-sm px-6">
         <p className="text-red-400 font-semibold mb-2">Unable to load designer</p>
-        <p className="text-[#8A9AB0] text-sm">The embed session is missing or has expired. Generate a new session token from your server and reload the iframe.</p>
+        <p className="text-fp-muted text-sm">The embed session is missing or has expired. Generate a new session token from your server and reload the iframe.</p>
       </div>
     </div>
   )
 
   return (
-    <div className="flex flex-col h-screen bg-[#0F1C2E] overflow-hidden">
+    <div className="flex flex-col h-screen bg-fp-inset overflow-hidden">
 
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#2a3d55] bg-[#1a2d45] flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-fp-border bg-fp-card flex-shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="text-[#C8622A] text-sm">📐</span>
-          <span className="text-white font-semibold text-sm truncate">
+          <span className="text-fp-text font-semibold text-sm truncate">
             {proposal?.proposal_name || proposal?.company || 'Designer'}
           </span>
           {proposal?.client_name && (
-            <span className="text-[#8A9AB0] text-xs hidden md:block">{proposal.client_name}</span>
+            <span className="text-fp-muted text-xs hidden md:block">{proposal.client_name}</span>
           )}
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Tab switcher */}
-          <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5">
+          <div className="flex items-center gap-0.5 bg-fp-inset rounded-lg p-0.5">
             {[{ id: 'canvas', label: 'Drawing' }, { id: 'bom', label: 'BOM Preview' }].map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${activeTab === tab.id ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${activeTab === tab.id ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
                 {tab.label}
               </button>
             ))}
@@ -333,7 +333,7 @@ export default function EmbedDesigner() {
           {/* Symbol picker toggle */}
           {activeTab === 'canvas' && sheets.length > 0 && (
             <button onClick={() => setSidebarOpen(s => !s)}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${sidebarOpen ? 'border-[#C8622A]/40 bg-[#C8622A]/10 text-[#C8622A]' : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${sidebarOpen ? 'border-[#C8622A]/40 bg-[#C8622A]/10 text-[#C8622A]' : 'border-fp-border text-fp-muted hover:text-fp-text'}`}
               title="Toggle symbol picker">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7"/>
@@ -343,7 +343,7 @@ export default function EmbedDesigner() {
 
           {/* Export BOM */}
           <button onClick={handleExportBOM} disabled={exporting || sheets.length === 0}
-            className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 ${exported ? 'bg-green-600 text-white' : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'}`}>
+            className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 ${exported ? 'bg-green-600 text-fp-text' : 'bg-fp-brand text-white hover:bg-[#b5571f]'}`}>
             {exported ? '✓ Exported' : exporting ? 'Exporting…' : 'Export BOM'}
           </button>
         </div>
@@ -358,7 +358,7 @@ export default function EmbedDesigner() {
       )}
 
       {/* Sheet tabs */}
-      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[#2a3d55] bg-[#0F1C2E] overflow-x-auto flex-shrink-0">
+      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-fp-border bg-fp-inset overflow-x-auto flex-shrink-0">
         {sheets.map(sheet => (
           <SheetTab key={sheet.id} sheet={sheet}
             isActive={sheet.id === activeSheetId}
@@ -366,7 +366,7 @@ export default function EmbedDesigner() {
             onRename={(name) => handleRenameSheet(sheet.id, name)}
             onDelete={() => handleDeleteSheet(sheet.id)} />
         ))}
-        <label className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-dashed border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A] cursor-pointer transition-colors whitespace-nowrap ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+        <label className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-dashed border-fp-border text-fp-muted hover:border-fp-brand hover:text-[#C8622A] cursor-pointer transition-colors whitespace-nowrap ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
           {uploading
             ? <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>Uploading…</>
             : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>Upload Floor Plan</>
@@ -374,7 +374,7 @@ export default function EmbedDesigner() {
           <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleUpload} disabled={uploading} />
         </label>
         <button onClick={handleAddBlankSheet}
-          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-dashed border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A] transition-colors whitespace-nowrap">
+          className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-dashed border-fp-border text-fp-muted hover:border-fp-brand hover:text-[#C8622A] transition-colors whitespace-nowrap">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
           </svg>
@@ -389,20 +389,20 @@ export default function EmbedDesigner() {
           <>
             {sheets.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-6 p-12 text-center">
-                <div className="w-20 h-20 rounded-2xl bg-[#1a2d45] flex items-center justify-center">
+                <div className="w-20 h-20 rounded-2xl bg-fp-card flex items-center justify-center">
                   <span className="text-4xl">📐</span>
                 </div>
                 <div>
-                  <p className="text-white text-lg font-semibold">Start your floor plan</p>
-                  <p className="text-[#8A9AB0] text-sm mt-2 max-w-sm">Upload a PDF or image floor plan, or start with a blank canvas.</p>
+                  <p className="text-fp-text text-lg font-semibold">Start your floor plan</p>
+                  <p className="text-fp-muted text-sm mt-2 max-w-sm">Upload a PDF or image floor plan, or start with a blank canvas.</p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap justify-center">
-                  <label className="px-5 py-2.5 bg-[#C8622A] text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] cursor-pointer transition-colors">
+                  <label className="px-5 py-2.5 bg-fp-brand text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] cursor-pointer transition-colors">
                     📄 Upload Floor Plan
                     <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleUpload} />
                   </label>
                   <button onClick={handleAddBlankSheet}
-                    className="px-5 py-2.5 bg-[#1a2d45] text-white text-sm font-semibold rounded-lg border border-[#2a3d55] hover:border-[#C8622A] transition-colors">
+                    className="px-5 py-2.5 bg-fp-card text-fp-text text-sm font-semibold rounded-lg border border-fp-border hover:border-fp-brand transition-colors">
                     🗒 Blank Canvas
                   </button>
                 </div>
@@ -410,7 +410,7 @@ export default function EmbedDesigner() {
             ) : (
               <>
                 {sidebarOpen && (
-                  <div className="w-60 border-r border-[#2a3d55] flex-shrink-0 overflow-y-auto min-h-0 h-full">
+                  <div className="w-60 border-r border-fp-border flex-shrink-0 overflow-y-auto min-h-0 h-full">
                     <SymbolPicker selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} orgId={orgId} />
                   </div>
                 )}
@@ -445,7 +445,7 @@ export default function EmbedDesigner() {
 
                   {/* Right panel */}
                   {(selectedPlacement || selectedCable) && (
-                    <div className="w-72 border-l border-[#2a3d55] flex-shrink-0 overflow-y-auto min-h-0 h-full">
+                    <div className="w-72 border-l border-fp-border flex-shrink-0 overflow-y-auto min-h-0 h-full">
                       {selectedPlacement && (
                         <PlacementPanel
                           placement={selectedPlacement}

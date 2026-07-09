@@ -12,7 +12,7 @@ const pricingAge = (dateStr) => {
 }
 
 const AgeBadge = ({ days }) => {
-  if (days === null) return <span className="text-xs text-[#2a3d55]">No date</span>
+  if (days === null) return <span className="text-xs text-fp-muted">No date</span>
   if (days <= 30) return <span className="text-xs px-2 py-0.5 rounded bg-green-500/20 text-green-400">Current</span>
   if (days <= 120) return <span className="text-xs px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-400">{days}d old</span>
   return <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">Stale — RFQ</span>
@@ -407,10 +407,10 @@ if (!finalCost) continue
     : []
 
   const fmt = (n) => n != null ? `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
-  const inputCls = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+  const inputCls = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureSla={featureSla} featureMonitoring={featureMonitoring} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-6">
@@ -418,17 +418,17 @@ if (!finalCost) continue
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-white text-2xl font-bold">Product Library</h2>
-            <p className="text-[#8A9AB0] text-sm mt-0.5">{products.length} products · {Object.values(pricing).flat().length} vendor prices</p>
+            <h2 className="text-fp-text text-2xl font-bold">Product Library</h2>
+            <p className="text-fp-muted text-sm mt-0.5">{products.length} products · {Object.values(pricing).flat().length} vendor prices</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={downloadTemplate} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">↓ Template</button>
-            <label className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors cursor-pointer">
+            <button onClick={downloadTemplate} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">↓ Template</button>
+            <label className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors cursor-pointer">
               {uploading ? 'Importing...' : '↑ Import Excel'}
               <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" disabled={uploading} />
             </label>
             <button onClick={() => { setShowAddForm(p => !p); setError(null) }}
-              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
               {showAddForm ? 'Cancel' : '+ Add Product'}
             </button>
           </div>
@@ -444,7 +444,7 @@ if (!finalCost) continue
                 {uploadResult.vendors.length > 0 && ` · Vendors: ${uploadResult.vendors.join(', ')}`}
               </p>
             </div>
-            <button onClick={() => setUploadResult(null)} className="text-[#8A9AB0] hover:text-white text-lg leading-none">×</button>
+            <button onClick={() => setUploadResult(null)} className="text-fp-muted hover:text-fp-text text-lg leading-none">×</button>
           </div>
         )}
 
@@ -452,29 +452,29 @@ if (!finalCost) continue
 
         {/* Add product form */}
         {showAddForm && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold mb-4">New Product</h3>
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold mb-4">New Product</h3>
             <div className="grid grid-cols-3 gap-4 mb-4">
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Item Name <span className="text-[#C8622A]">*</span></label><input type="text" value={addForm.item_name} onChange={e => setAddForm(p => ({ ...p, item_name: e.target.value }))} className={inputCls} /></div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Manufacturer</label><input type="text" value={addForm.manufacturer} onChange={e => setAddForm(p => ({ ...p, manufacturer: e.target.value }))} className={inputCls} /></div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Part #</label><input type="text" value={addForm.part_number} onChange={e => setAddForm(p => ({ ...p, part_number: e.target.value }))} className={inputCls} /></div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Category</label>
+              <div><label className="text-fp-muted text-xs mb-1 block">Item Name <span className="text-[#C8622A]">*</span></label><input type="text" value={addForm.item_name} onChange={e => setAddForm(p => ({ ...p, item_name: e.target.value }))} className={inputCls} /></div>
+              <div><label className="text-fp-muted text-xs mb-1 block">Manufacturer</label><input type="text" value={addForm.manufacturer} onChange={e => setAddForm(p => ({ ...p, manufacturer: e.target.value }))} className={inputCls} /></div>
+              <div><label className="text-fp-muted text-xs mb-1 block">Part #</label><input type="text" value={addForm.part_number} onChange={e => setAddForm(p => ({ ...p, part_number: e.target.value }))} className={inputCls} /></div>
+              <div><label className="text-fp-muted text-xs mb-1 block">Category</label>
                 <select value={addForm.category} onChange={e => setAddForm(p => ({ ...p, category: e.target.value }))} className={inputCls}>
                   <option value="">— Select —</option>
                   {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Unit</label>
+              <div><label className="text-fp-muted text-xs mb-1 block">Unit</label>
                 <select value={addForm.unit} onChange={e => setAddForm(p => ({ ...p, unit: e.target.value }))} className={inputCls}>
                   {['ea', 'ft', 'lot', 'roll', 'box', 'hr'].map(u => <option key={u}>{u}</option>)}
                 </select>
               </div>
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Description</label><input type="text" value={addForm.description} onChange={e => setAddForm(p => ({ ...p, description: e.target.value }))} className={inputCls} /></div>
-              {featureMsrp && <div><label className="text-[#8A9AB0] text-xs mb-1 block">MSRP</label><input type="number" placeholder="0.00" value={addForm.msrp} onChange={e => setAddForm(p => ({ ...p, msrp: e.target.value }))} className={inputCls} /></div>}
+              <div><label className="text-fp-muted text-xs mb-1 block">Description</label><input type="text" value={addForm.description} onChange={e => setAddForm(p => ({ ...p, description: e.target.value }))} className={inputCls} /></div>
+              {featureMsrp && <div><label className="text-fp-muted text-xs mb-1 block">MSRP</label><input type="number" placeholder="0.00" value={addForm.msrp} onChange={e => setAddForm(p => ({ ...p, msrp: e.target.value }))} className={inputCls} /></div>}
             </div>
-            <p className="text-[#8A9AB0] text-xs mb-4">After saving, the vendor pricing form will open automatically so you can add costs right away.</p>
+            <p className="text-fp-muted text-xs mb-4">After saving, the vendor pricing form will open automatically so you can add costs right away.</p>
             <button onClick={handleAddProduct} disabled={saving || !addForm.item_name}
-              className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+              className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
               {saving ? 'Saving...' : 'Save Product'}
             </button>
           </div>
@@ -482,14 +482,14 @@ if (!finalCost) continue
 
         {/* Tabs: My Library + enabled catalogs */}
         {enabledCatalogs.length > 0 && (
-          <div className="flex gap-1 bg-[#1a2d45] rounded-xl p-1 w-fit">
+          <div className="flex gap-1 bg-fp-card rounded-xl p-1 w-fit">
             <button onClick={() => setActiveTab('library')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'library' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'library' ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
               My Library
             </button>
             {enabledCatalogs.map(cat => (
               <button key={cat.slug} onClick={() => setActiveTab(cat.slug)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === cat.slug ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === cat.slug ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
                 {cat.label}
               </button>
             ))}
@@ -499,15 +499,15 @@ if (!finalCost) continue
         {/* Search + filters */}
         <div className="flex gap-3">
           <input type="text" placeholder="Search by name, part #, manufacturer..." value={search} onChange={e => setSearch(e.target.value)}
-            className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
+            className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
           {activeTab === 'library' && <>
             <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-              className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
               <option value="">All Categories</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             <select value={filterVendor} onChange={e => setFilterVendor(e.target.value)}
-              className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
               <option value="">All Vendors</option>
               {allVendors.map(v => <option key={v} value={v}>{v}</option>)}
             </select>
@@ -516,7 +516,7 @@ if (!finalCost) continue
 
         {/* Pricing freshness legend (library tab only) */}
         {activeTab === 'library' && (
-          <div className="flex items-center gap-4 text-xs text-[#8A9AB0]">
+          <div className="flex items-center gap-4 text-xs text-fp-muted">
             <span className="font-semibold">Pricing age:</span>
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> &lt; 30 days — Current</span>
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-yellow-400 inline-block" /> 30–120 days — Aging</span>
@@ -526,23 +526,23 @@ if (!finalCost) continue
 
         {/* Catalog product list */}
         {activeTab !== 'library' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
+          <div className="bg-fp-card rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-bold">
+              <h3 className="text-fp-text font-bold">
                 {enabledCatalogs.find(c => c.slug === activeTab)?.label || activeTab}
-                <span className="text-[#8A9AB0] font-normal text-sm ml-2">({filteredCatalog.length.toLocaleString()} products)</span>
+                <span className="text-fp-muted font-normal text-sm ml-2">({filteredCatalog.length.toLocaleString()} products)</span>
               </h3>
-              <p className="text-[#8A9AB0] text-xs">MSRP pricing only. Click "Add Pricing" to copy to your library and enter your distributor cost.</p>
+              <p className="text-fp-muted text-xs">MSRP pricing only. Click "Add Pricing" to copy to your library and enter your distributor cost.</p>
             </div>
             {filteredCatalog.length === 0 ? (
-              <p className="text-[#8A9AB0] text-sm py-8 text-center">{search ? 'No matching products.' : 'No products in this catalog.'}</p>
+              <p className="text-fp-muted text-sm py-8 text-center">{search ? 'No matching products.' : 'No products in this catalog.'}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-[#2a3d55]">
+                    <tr className="border-b border-fp-border">
                       {['Part #', 'Model / Description', 'Category', 'MSRP', ''].map(h => (
-                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs whitespace-nowrap">{h}</th>
+                        <th key={h} className="text-fp-muted text-left py-2 pr-4 font-normal text-xs whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -550,14 +550,14 @@ if (!finalCost) continue
                     {filteredCatalog.map(item => {
                       const inLibrary = !!catalogCopied[item.id]
                       return (
-                        <tr key={item.id} className="border-b border-[#2a3d55]/30 hover:bg-[#0F1C2E]/50">
-                          <td className="py-2 pr-4 font-mono text-[#8A9AB0] text-xs whitespace-nowrap">{item.part_number || '—'}</td>
+                        <tr key={item.id} className="border-b border-fp-border/30 hover:bg-fp-inset/50">
+                          <td className="py-2 pr-4 font-mono text-fp-muted text-xs whitespace-nowrap">{item.part_number || '—'}</td>
                           <td className="py-2 pr-4">
-                            <p className="text-white text-sm font-medium">{item.model_name || item.part_number}</p>
-                            {item.description && <p className="text-[#8A9AB0] text-xs mt-0.5 truncate max-w-xs">{item.description}</p>}
+                            <p className="text-fp-text text-sm font-medium">{item.model_name || item.part_number}</p>
+                            {item.description && <p className="text-fp-muted text-xs mt-0.5 truncate max-w-xs">{item.description}</p>}
                           </td>
-                          <td className="py-2 pr-4 text-[#8A9AB0] text-xs whitespace-nowrap">{item.category || '—'}</td>
-                          <td className="py-2 pr-4 text-white font-semibold whitespace-nowrap">{fmt(item.msrp)}</td>
+                          <td className="py-2 pr-4 text-fp-muted text-xs whitespace-nowrap">{item.category || '—'}</td>
+                          <td className="py-2 pr-4 text-fp-text font-semibold whitespace-nowrap">{fmt(item.msrp)}</td>
                           <td className="py-2">
                             <button onClick={() => copyAndAddPricing(item)}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${inLibrary ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-[#C8622A]/10 text-[#C8622A] hover:bg-[#C8622A]/20'}`}>
@@ -575,24 +575,24 @@ if (!finalCost) continue
         )}
 
         {/* Product list (library tab) */}
-        {activeTab === 'library' && <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold mb-4">All Products ({filtered.length})</h3>
+        {activeTab === 'library' && <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold mb-4">All Products ({filtered.length})</h3>
 
           {loading ? (
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="flex gap-4 animate-pulse">
-                  <div className="h-4 bg-[#2a3d55] rounded w-1/3" />
-                  <div className="h-4 bg-[#2a3d55] rounded w-1/6" />
-                  <div className="h-4 bg-[#2a3d55] rounded w-1/6" />
-                  <div className="h-4 bg-[#2a3d55] rounded w-1/6" />
+                  <div className="h-4 bg-fp-inset rounded w-1/3" />
+                  <div className="h-4 bg-fp-inset rounded w-1/6" />
+                  <div className="h-4 bg-fp-inset rounded w-1/6" />
+                  <div className="h-4 bg-fp-inset rounded w-1/6" />
                 </div>
               ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-[#8A9AB0] mb-2">No products yet.</p>
-              <p className="text-[#8A9AB0] text-sm">Upload an Excel price sheet using the template, or add products manually.</p>
+              <p className="text-fp-muted mb-2">No products yet.</p>
+              <p className="text-fp-muted text-sm">Upload an Excel price sheet using the template, or add products manually.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -602,20 +602,20 @@ if (!finalCost) continue
                 const bestCost = vendorPrices.length > 0 ? Math.min(...vendorPrices.map(v => v.your_cost || Infinity)) : null
 
                 return (
-                  <div key={p.id} className="bg-[#0F1C2E] rounded-xl overflow-hidden border border-[#2a3d55]">
+                  <div key={p.id} className="bg-fp-inset rounded-xl overflow-hidden border border-fp-border">
                     {/* Product row */}
                     <div
-                      className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-[#0a1828] transition-colors"
+                      className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-fp-inset transition-colors"
                       onClick={() => setExpandedId(isOpen ? null : p.id)}
                     >
                       <div className="flex items-center gap-4 min-w-0">
                         <div className="min-w-0">
-                          <p className="text-white text-sm font-semibold truncate">{p.item_name}</p>
+                          <p className="text-fp-text text-sm font-semibold truncate">{p.item_name}</p>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            {p.manufacturer && <span className="text-[#8A9AB0] text-xs">{p.manufacturer}</span>}
-                            {p.part_number && <span className="text-[#8A9AB0] text-xs font-mono bg-[#1a2d45] px-1.5 py-0.5 rounded">{p.part_number}</span>}
-                            {p.category && <span className="text-[#8A9AB0] text-xs">{p.category}</span>}
-                            {p.unit !== 'ea' && <span className="text-[#8A9AB0] text-xs">/ {p.unit}</span>}
+                            {p.manufacturer && <span className="text-fp-muted text-xs">{p.manufacturer}</span>}
+                            {p.part_number && <span className="text-fp-muted text-xs font-mono bg-fp-card px-1.5 py-0.5 rounded">{p.part_number}</span>}
+                            {p.category && <span className="text-fp-muted text-xs">{p.category}</span>}
+                            {p.unit !== 'ea' && <span className="text-fp-muted text-xs">/ {p.unit}</span>}
                           </div>
                         </div>
                       </div>
@@ -623,58 +623,58 @@ if (!finalCost) continue
                         {vendorPrices.length > 0 ? (
                           <div className="text-right">
                             <p className="text-[#C8622A] text-sm font-semibold">{fmt(bestCost)}</p>
-                            <p className="text-[#8A9AB0] text-xs">best of {vendorPrices.length} vendor{vendorPrices.length !== 1 ? 's' : ''}</p>
+                            <p className="text-fp-muted text-xs">best of {vendorPrices.length} vendor{vendorPrices.length !== 1 ? 's' : ''}</p>
                           </div>
                         ) : (
-                          <span className="text-[#2a3d55] text-xs">No pricing</span>
+                          <span className="text-fp-muted text-xs">No pricing</span>
                         )}
                         <button
                           onClick={e => { e.stopPropagation(); handleDeleteProduct(p.id) }}
                           title="Delete product"
-                          className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors px-1"
+                          className="text-fp-muted hover:text-red-400 text-xs transition-colors px-1"
                         >✕</button>
-                        <span className="text-[#8A9AB0] text-xs">{isOpen ? '▲' : '▼'}</span>
+                        <span className="text-fp-muted text-xs">{isOpen ? '▲' : '▼'}</span>
                       </div>
                     </div>
 
                     {/* Expanded: vendor pricing rows */}
                     {isOpen && (
-  <div className="border-t border-[#2a3d55] px-4 py-4 space-y-3">
+  <div className="border-t border-fp-border px-4 py-4 space-y-3">
     {editingProductId === p.id ? (
-      <div className="bg-[#1a2d45] rounded-lg p-4 space-y-3 mb-3">
-        <p className="text-white text-xs font-semibold">Edit Product</p>
+      <div className="bg-fp-card rounded-lg p-4 space-y-3 mb-3">
+        <p className="text-fp-text text-xs font-semibold">Edit Product</p>
         <div className="grid grid-cols-3 gap-3">
-          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Item Name</label>
+          <div><label className="text-fp-muted text-xs mb-1 block">Item Name</label>
             <input type="text" value={editForm.item_name || ''} onChange={e => setEditForm(p => ({ ...p, item_name: e.target.value }))} className={inputCls} />
           </div>
-          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Manufacturer</label>
+          <div><label className="text-fp-muted text-xs mb-1 block">Manufacturer</label>
             <input type="text" value={editForm.manufacturer || ''} onChange={e => setEditForm(p => ({ ...p, manufacturer: e.target.value }))} className={inputCls} />
           </div>
-          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Part #</label>
+          <div><label className="text-fp-muted text-xs mb-1 block">Part #</label>
             <input type="text" value={editForm.part_number || ''} onChange={e => setEditForm(p => ({ ...p, part_number: e.target.value }))} className={inputCls} />
           </div>
-          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Category</label>
+          <div><label className="text-fp-muted text-xs mb-1 block">Category</label>
             <select value={editForm.category || ''} onChange={e => setEditForm(p => ({ ...p, category: e.target.value }))} className={inputCls}>
               <option value="">— Select —</option>
               {CATEGORIES.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
-          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Unit</label>
+          <div><label className="text-fp-muted text-xs mb-1 block">Unit</label>
             <select value={editForm.unit || 'ea'} onChange={e => setEditForm(p => ({ ...p, unit: e.target.value }))} className={inputCls}>
               {['ea', 'ft', 'lot', 'roll', 'box', 'hr'].map(u => <option key={u}>{u}</option>)}
             </select>
           </div>
-          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Description</label>
+          <div><label className="text-fp-muted text-xs mb-1 block">Description</label>
             <input type="text" value={editForm.description || ''} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} className={inputCls} />
           </div>
           {featureMsrp && (
-            <div><label className="text-[#8A9AB0] text-xs mb-1 block">MSRP</label>
+            <div><label className="text-fp-muted text-xs mb-1 block">MSRP</label>
               <input type="number" placeholder="0.00" value={editForm.msrp || ''} onChange={e => setEditForm(p => ({ ...p, msrp: e.target.value }))} className={inputCls} />
             </div>
           )}
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setEditingProductId(null)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Cancel</button>
+          <button onClick={() => setEditingProductId(null)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Cancel</button>
           <button onClick={async () => {
             const { error: updErr } = await supabase.from('product_library').update({
               item_name: editForm.item_name,
@@ -688,17 +688,17 @@ if (!finalCost) continue
             if (updErr) { setError(updErr.message); return }
             setEditingProductId(null)
             fetchAll()
-          }} className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors">
+          }} className="bg-fp-brand text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors">
             Save Changes
           </button>
         </div>
       </div>
     ) : (
       <div className="flex items-center justify-between mb-2">
-        {p.description && <p className="text-[#8A9AB0] text-xs italic">{p.description}</p>}
+        {p.description && <p className="text-fp-muted text-xs italic">{p.description}</p>}
         {!p.description && <span />}
         <button onClick={() => { setEditingProductId(p.id); setEditForm({ item_name: p.item_name, manufacturer: p.manufacturer, part_number: p.part_number, category: p.category, unit: p.unit, description: p.description, msrp: p.msrp ?? '' }) }}
-          className="text-[#8A9AB0] hover:text-white text-xs transition-colors">✎ Edit</button>
+          className="text-fp-muted hover:text-fp-text text-xs transition-colors">✎ Edit</button>
       </div>
     )}
 
@@ -706,9 +706,9 @@ if (!finalCost) continue
                         {vendorPrices.length > 0 && (
                           <table className="w-full text-sm mb-3">
                             <thead>
-                              <tr className="border-b border-[#2a3d55]">
+                              <tr className="border-b border-fp-border">
                                 {['Vendor', 'Your Cost', 'Pricing Date', 'Age', 'Source', ''].map(h => (
-                                  <th key={h} className="text-[#8A9AB0] text-left py-1.5 pr-4 font-normal text-xs">{h}</th>
+                                  <th key={h} className="text-fp-muted text-left py-1.5 pr-4 font-normal text-xs">{h}</th>
                                 ))}
                               </tr>
                             </thead>
@@ -717,21 +717,21 @@ if (!finalCost) continue
                                 const days = pricingAge(vp.pricing_date)
                                 const isBest = vp.your_cost === bestCost
                                 return (
-                                  <tr key={vp.id} className="border-b border-[#2a3d55]/30">
+                                  <tr key={vp.id} className="border-b border-fp-border/30">
                                     <td className="py-2 pr-4">
                                       <div className="flex items-center gap-2">
-                                        <span className="text-white text-sm">{vp.vendor}</span>
+                                        <span className="text-fp-text text-sm">{vp.vendor}</span>
                                         {isBest && vendorPrices.length > 1 && <span className="text-xs px-1.5 py-0.5 rounded bg-[#C8622A]/20 text-[#C8622A] font-semibold">Best</span>}
                                       </div>
                                     </td>
                                     <td className="py-2 pr-4 text-[#C8622A] font-semibold">{fmt(vp.your_cost)}</td>
-                                    <td className="py-2 pr-4 text-[#8A9AB0] text-xs">{vp.pricing_date ? new Date(vp.pricing_date).toLocaleDateString() : '—'}</td>
+                                    <td className="py-2 pr-4 text-fp-muted text-xs">{vp.pricing_date ? new Date(vp.pricing_date).toLocaleDateString() : '—'}</td>
                                     <td className="py-2 pr-4"><AgeBadge days={days} /></td>
                                     <td className="py-2 pr-4">
-                                      <span className="text-[#2a3d55] text-xs capitalize">{(vp.source || 'manual').replace('_', ' ')}</span>
+                                      <span className="text-fp-muted text-xs capitalize">{(vp.source || 'manual').replace('_', ' ')}</span>
                                     </td>
                                     <td className="py-2">
-                                      <button onClick={() => handleDeletePrice(vp.id)} className="text-[#2a3d55] hover:text-red-400 text-xs transition-colors">✕</button>
+                                      <button onClick={() => handleDeletePrice(vp.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">✕</button>
                                     </td>
                                   </tr>
                                 )
@@ -742,24 +742,24 @@ if (!finalCost) continue
 
                         {/* Add vendor price */}
                         {addingPriceFor === p.id ? (
-                          <div className="bg-[#1a2d45] rounded-lg p-4 space-y-3">
-                            <p className="text-white text-xs font-semibold">Add Vendor Price</p>
+                          <div className="bg-fp-card rounded-lg p-4 space-y-3">
+                            <p className="text-fp-text text-xs font-semibold">Add Vendor Price</p>
                             <div className="grid grid-cols-3 gap-3">
-                              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Vendor <span className="text-[#C8622A]">*</span></label><input type="text" value={priceForm.vendor} onChange={e => setPriceForm(p => ({ ...p, vendor: e.target.value }))} placeholder="e.g. Anixter" className={inputCls} /></div>
-                              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Your Cost <span className="text-[#C8622A]">*</span></label><input type="number" value={priceForm.your_cost} onChange={e => setPriceForm(p => ({ ...p, your_cost: e.target.value }))} placeholder="0.00" className={inputCls} /></div>
-                              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Pricing Date</label><input type="date" value={priceForm.pricing_date} onChange={e => setPriceForm(p => ({ ...p, pricing_date: e.target.value }))} className={inputCls} /></div>
+                              <div><label className="text-fp-muted text-xs mb-1 block">Vendor <span className="text-[#C8622A]">*</span></label><input type="text" value={priceForm.vendor} onChange={e => setPriceForm(p => ({ ...p, vendor: e.target.value }))} placeholder="e.g. Anixter" className={inputCls} /></div>
+                              <div><label className="text-fp-muted text-xs mb-1 block">Your Cost <span className="text-[#C8622A]">*</span></label><input type="number" value={priceForm.your_cost} onChange={e => setPriceForm(p => ({ ...p, your_cost: e.target.value }))} placeholder="0.00" className={inputCls} /></div>
+                              <div><label className="text-fp-muted text-xs mb-1 block">Pricing Date</label><input type="date" value={priceForm.pricing_date} onChange={e => setPriceForm(p => ({ ...p, pricing_date: e.target.value }))} className={inputCls} /></div>
                             </div>
                             <div className="flex gap-2">
-                              <button onClick={() => { setAddingPriceFor(null); setPriceForm({ vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] }) }} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Cancel</button>
+                              <button onClick={() => { setAddingPriceFor(null); setPriceForm({ vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] }) }} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Cancel</button>
                               <button onClick={() => handleAddPrice(p.id)} disabled={savingPrice || !priceForm.vendor || !priceForm.your_cost}
-                                className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                                className="bg-fp-brand text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                                 {savingPrice ? 'Saving...' : 'Add Price'}
                               </button>
                             </div>
                           </div>
                         ) : (
                           <button onClick={() => { setAddingPriceFor(p.id); setPriceForm({ vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] }) }}
-                            className="text-[#C8622A] hover:text-white text-xs transition-colors">+ Add vendor price</button>
+                            className="text-[#C8622A] hover:text-fp-text text-xs transition-colors">+ Add vendor price</button>
                         )}
                       </div>
                     )}

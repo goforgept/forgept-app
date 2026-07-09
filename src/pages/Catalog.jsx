@@ -169,24 +169,24 @@ export default function Catalog({ isAdmin, featureProposals = true, featureCRM =
   ]
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-white text-2xl font-bold">Product Catalog</h2>
-            <p className="text-[#8A9AB0] text-sm mt-0.5">{products.length} products</p>
+            <h2 className="text-fp-text text-2xl font-bold">Product Catalog</h2>
+            <p className="text-fp-muted text-sm mt-0.5">{products.length} products</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={downloadTemplate} className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors">
+            <button onClick={downloadTemplate} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
               ↓ Template
             </button>
-            <label className="bg-[#2a3d55] text-white px-4 py-2 rounded-lg text-sm hover:bg-[#3a4d65] transition-colors cursor-pointer">
+            <label className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors cursor-pointer">
               {uploading ? 'Uploading...' : '↑ Import CSV/Excel'}
               <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" />
             </label>
-            <button onClick={() => { setShowForm(!showForm); setError(null) }} className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+            <button onClick={() => { setShowForm(!showForm); setError(null) }} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
               {showForm ? 'Cancel' : '+ Add Product'}
             </button>
           </div>
@@ -196,19 +196,19 @@ export default function Catalog({ isAdmin, featureProposals = true, featureCRM =
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
         {showForm && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold mb-4">New Product</h3>
+          <div className="bg-fp-card rounded-xl p-6">
+            <h3 className="text-fp-text font-bold mb-4">New Product</h3>
             <div className="grid grid-cols-3 gap-4 mb-4">
               {fields.map(([field, label, required]) => (
                 <div key={field}>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">{label}{required && <span className="text-[#C8622A]"> *</span>}</label>
+                  <label className="text-fp-muted text-xs mb-1 block">{label}{required && <span className="text-[#C8622A]"> *</span>}</label>
                   <input type="text" value={form[field]} onChange={e => setForm(prev => ({ ...prev, [field]: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                 </div>
               ))}
             </div>
             <button onClick={handleAdd} disabled={saving || !form.name}
-              className="bg-[#C8622A] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+              className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
               {saving ? 'Saving...' : 'Save Product'}
             </button>
           </div>
@@ -216,76 +216,76 @@ export default function Catalog({ isAdmin, featureProposals = true, featureCRM =
 
         <div className="flex gap-3">
           <input type="text" placeholder="Search products, part numbers..." value={search} onChange={e => setSearch(e.target.value)}
-            className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
+            className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
           <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-            className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+            className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
             <option value="">All Categories</option>
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
 
-        <div className="bg-[#1a2d45] rounded-xl p-6">
-          <h3 className="text-white font-bold mb-4">All Products ({filtered.length})</h3>
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold mb-4">All Products ({filtered.length})</h3>
           {loading ? (
             // Skeleton rows — keeps layout stable while data loads, no full-page blank
             <div className="space-y-3">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="flex gap-4 animate-pulse">
-                  <div className="h-4 bg-[#2a3d55] rounded w-1/3" />
-                  <div className="h-4 bg-[#2a3d55] rounded w-1/6" />
-                  <div className="h-4 bg-[#2a3d55] rounded w-1/6" />
-                  <div className="h-4 bg-[#2a3d55] rounded w-1/6" />
-                  <div className="h-4 bg-[#2a3d55] rounded w-1/6" />
+                  <div className="h-4 bg-fp-inset rounded w-1/3" />
+                  <div className="h-4 bg-fp-inset rounded w-1/6" />
+                  <div className="h-4 bg-fp-inset rounded w-1/6" />
+                  <div className="h-4 bg-fp-inset rounded w-1/6" />
+                  <div className="h-4 bg-fp-inset rounded w-1/6" />
                 </div>
               ))}
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-[#8A9AB0] mb-2">No products yet.</p>
-              <p className="text-[#8A9AB0] text-sm">Import your pricebook using the Excel template or add products manually.</p>
+              <p className="text-fp-muted mb-2">No products yet.</p>
+              <p className="text-fp-muted text-sm">Import your pricebook using the Excel template or add products manually.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#2a3d55]">
+                  <tr className="border-b border-fp-border">
                     {['Name', 'Part #', 'Category', 'Unit', 'MSRP', 'Dealer', 'Your Cost', 'Markup %', ''].map(h => (
-                      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">{h}</th>
+                      <th key={h} className="text-fp-muted text-left py-2 pr-4 font-normal text-xs">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map(p => (
                     editingId === p.id ? (
-                      <tr key={p.id} className="border-b border-[#2a3d55]/30">
+                      <tr key={p.id} className="border-b border-fp-border/30">
                         {['name', 'part_number', 'category', 'unit', 'msrp', 'dealer_price', 'your_cost', 'default_markup_percent'].map(field => (
                           <td key={field} className="pr-2 py-1">
                             <input type="text" value={editForm[field]} onChange={e => setEditForm(prev => ({ ...prev, [field]: e.target.value }))}
-                              className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                              className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
                           </td>
                         ))}
                         <td className="py-1">
                           <div className="flex gap-2">
-                            <button onClick={() => handleEdit(p.id)} className="text-[#C8622A] hover:text-white text-xs transition-colors">Save</button>
-                            <button onClick={() => setEditingId(null)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Cancel</button>
+                            <button onClick={() => handleEdit(p.id)} className="text-[#C8622A] hover:text-fp-text text-xs transition-colors">Save</button>
+                            <button onClick={() => setEditingId(null)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Cancel</button>
                           </div>
                         </td>
                       </tr>
                     ) : (
-                      <tr key={p.id} className="border-b border-[#2a3d55]/30 hover:bg-[#0F1C2E]/30 transition-colors">
-                        <td className="text-white py-3 pr-4 font-medium">{p.name}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{p.part_number || '—'}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{p.category || '—'}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{p.unit || 'ea'}</td>
-                        <td className="text-white py-3 pr-4">{fmt(p.msrp)}</td>
-                        <td className="text-white py-3 pr-4">{fmt(p.dealer_price)}</td>
+                      <tr key={p.id} className="border-b border-fp-border/30 hover:bg-fp-inset/30 transition-colors">
+                        <td className="text-fp-text py-3 pr-4 font-medium">{p.name}</td>
+                        <td className="text-fp-muted py-3 pr-4">{p.part_number || '—'}</td>
+                        <td className="text-fp-muted py-3 pr-4">{p.category || '—'}</td>
+                        <td className="text-fp-muted py-3 pr-4">{p.unit || 'ea'}</td>
+                        <td className="text-fp-text py-3 pr-4">{fmt(p.msrp)}</td>
+                        <td className="text-fp-text py-3 pr-4">{fmt(p.dealer_price)}</td>
                         <td className="text-[#C8622A] py-3 pr-4 font-semibold">{fmt(p.your_cost)}</td>
-                        <td className="text-[#8A9AB0] py-3 pr-4">{p.default_markup_percent ? `${p.default_markup_percent}%` : '—'}</td>
+                        <td className="text-fp-muted py-3 pr-4">{p.default_markup_percent ? `${p.default_markup_percent}%` : '—'}</td>
                         <td className="py-3">
                           <div className="flex gap-3">
                             <button onClick={() => { setEditingId(p.id); setEditForm({ name: p.name, part_number: p.part_number || '', description: p.description || '', category: p.category || '', unit: p.unit || 'ea', msrp: p.msrp || '', dealer_price: p.dealer_price || '', distributor_price: p.distributor_price || '', your_cost: p.your_cost || '', default_markup_percent: p.default_markup_percent || '35' }) }}
-                              className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Edit</button>
-                            <button onClick={() => handleDelete(p.id)} className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">Delete</button>
+                              className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>
+                            <button onClick={() => handleDelete(p.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Delete</button>
                           </div>
                         </td>
                       </tr>

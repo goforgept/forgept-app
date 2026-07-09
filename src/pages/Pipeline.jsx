@@ -135,32 +135,32 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
     .reduce((sum, p) => sum + (p.proposal_value || 0), 0)
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 space-y-6 overflow-hidden">
       {loading ? (
         <div className="flex-1 flex items-center justify-center h-full">
-          <p className="text-white">Loading...</p>
+          <p className="text-fp-text">Loading...</p>
         </div>
       ) : (<>
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-white text-2xl font-bold">Pipeline</h2>
-            <p className="text-[#8A9AB0] text-sm mt-0.5">
+            <h2 className="text-fp-text text-2xl font-bold">Pipeline</h2>
+            <p className="text-fp-muted text-sm mt-0.5">
               ${totalPipeline.toLocaleString()} active · ${wonPipeline.toLocaleString()} won
             </p>
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => setShowAddStage(!showAddStage)}
-              className="bg-[#1a2d45] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm transition-colors"
+              className="bg-fp-card text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm transition-colors"
             >
               + Add Stage
             </button>
             <button
               onClick={() => navigate('/new')}
-              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
             >
               + New Deal
             </button>
@@ -174,11 +174,11 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
               value={newStageName}
               onChange={e => setNewStageName(e.target.value)}
               placeholder="Stage name..."
-              className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
             />
             <button
               onClick={addStage}
-              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
             >
               Add
             </button>
@@ -205,20 +205,20 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
                       className="w-2.5 h-2.5 rounded-full"
                       style={{ background: stage.color }}
                     />
-                    <span className="text-white text-sm font-semibold">{stage.name}</span>
-                    <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs px-1.5 py-0.5 rounded-full">
+                    <span className="text-fp-text text-sm font-semibold">{stage.name}</span>
+                    <span className="bg-fp-inset text-fp-muted text-xs px-1.5 py-0.5 rounded-full">
                       {stageProposals.length}
                     </span>
                   </div>
                   {stageTotal > 0 && (
-                    <span className="text-[#8A9AB0] text-xs">${stageTotal.toLocaleString()}</span>
+                    <span className="text-fp-muted text-xs">${stageTotal.toLocaleString()}</span>
                   )}
                 </div>
 
                 {/* Drop Zone */}
                 <div
                   className={`min-h-24 rounded-xl p-2 space-y-2 transition-colors ${
-                    dragging ? 'bg-[#1a2d45]/80 border border-dashed border-[#2a3d55]' : 'bg-[#1a2d45]/40'
+                    dragging ? 'bg-fp-card/80 border border-dashed border-fp-border' : 'bg-fp-card/40'
                   }`}
                 >
                   {stageProposals.map(proposal => (
@@ -227,14 +227,14 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
                       draggable
                       onDragStart={e => handleDragStart(e, proposal)}
                       onClick={() => navigate(`/proposal/${proposal.id}`)}
-                      className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-3 cursor-pointer hover:border-[#C8622A]/50 transition-colors group"
+                      className="bg-fp-card border border-fp-border rounded-xl p-3 cursor-pointer hover:border-fp-brand/50 transition-colors group"
                     >
-                      <p className="text-white text-sm font-medium group-hover:text-[#C8622A] transition-colors leading-tight">
+                      <p className="text-fp-text text-sm font-medium group-hover:text-[#C8622A] transition-colors leading-tight">
                         {proposal.proposal_name}
                       </p>
-                      <p className="text-[#8A9AB0] text-xs mt-1">{proposal.company}</p>
+                      <p className="text-fp-muted text-xs mt-1">{proposal.company}</p>
                       <div className="flex justify-between items-center mt-2">
-                        <span className="text-white text-sm font-bold">
+                        <span className="text-fp-text text-sm font-bold">
                           ${(proposal.proposal_value || 0).toLocaleString()}
                         </span>
                         {proposal.total_gross_margin_percent > 0 && (
@@ -244,19 +244,19 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
                         )}
                       </div>
                       {proposal.close_date && (
-                        <p className="text-[#8A9AB0] text-xs mt-1">
+                        <p className="text-fp-muted text-xs mt-1">
                           Close: {proposal.close_date}
                         </p>
                       )}
                       {proposal.rep_name && (
-                        <p className="text-[#2a3d55] text-xs mt-0.5">{proposal.rep_name}</p>
+                        <p className="text-fp-muted text-xs mt-0.5">{proposal.rep_name}</p>
                       )}
                     </div>
                   ))}
 
                   {stageProposals.length === 0 && (
                     <div className="flex items-center justify-center h-16">
-                      <p className="text-[#2a3d55] text-xs">Drop deals here</p>
+                      <p className="text-fp-muted text-xs">Drop deals here</p>
                     </div>
                   )}
                 </div>

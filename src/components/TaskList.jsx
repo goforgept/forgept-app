@@ -104,7 +104,7 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
 
   const priorityColor = (p) => {
     if (p === 'high') return 'text-red-400'
-    if (p === 'low') return 'text-[#8A9AB0]'
+    if (p === 'low') return 'text-fp-muted'
     return 'text-[#C8622A]'
   }
 
@@ -112,10 +112,10 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
   const completed = tasks.filter(t => t.completed)
 
   return (
-    <div className="bg-[#1a2d45] rounded-xl p-6">
+    <div className="bg-fp-card rounded-xl p-6">
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
-          <h3 className="text-white font-bold text-lg">Tasks</h3>
+          <h3 className="text-fp-text font-bold text-lg">Tasks</h3>
           {pending.length > 0 && (
             <span className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-semibold">
               {pending.length}
@@ -124,37 +124,37 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="bg-[#C8622A] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors"
+          className="bg-fp-brand text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors"
         >
           {showForm ? 'Cancel' : '+ Add Task'}
         </button>
       </div>
 
       {showForm && (
-        <div className="bg-[#0F1C2E] rounded-xl p-4 mb-4 space-y-3">
+        <div className="bg-fp-inset rounded-xl p-4 mb-4 space-y-3">
           <input
             type="text"
             placeholder="Task title — e.g. Follow up on pricing"
             value={form.title}
             onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
-            className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+            className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
           />
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Due Date</label>
+              <label className="text-fp-muted text-xs mb-1 block">Due Date</label>
               <input
                 type="date"
                 value={form.due_date}
                 onChange={e => setForm(prev => ({ ...prev, due_date: e.target.value }))}
-                className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
+                className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand"
               />
             </div>
             <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Priority</label>
+              <label className="text-fp-muted text-xs mb-1 block">Priority</label>
               <select
                 value={form.priority}
                 onChange={e => setForm(prev => ({ ...prev, priority: e.target.value }))}
-                className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
+                className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand"
               >
                 <option value="low">Low</option>
                 <option value="normal">Normal</option>
@@ -162,11 +162,11 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
               </select>
             </div>
             <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Repeat</label>
+              <label className="text-fp-muted text-xs mb-1 block">Repeat</label>
               <select
                 value={form.recurrence}
                 onChange={e => setForm(prev => ({ ...prev, recurrence: e.target.value }))}
-                className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
+                className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand"
               >
                 <option value="">Does not repeat</option>
                 <option value="weekly">Weekly</option>
@@ -178,11 +178,11 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
             </div>
             {profiles.length > 0 && (
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Assign To</label>
+                <label className="text-fp-muted text-xs mb-1 block">Assign To</label>
                 <select
                   value={form.assigned_to}
                   onChange={e => setForm(prev => ({ ...prev, assigned_to: e.target.value }))}
-                  className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]"
+                  className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand"
                 >
                   {profiles.map(p => (
                     <option key={p.id} value={p.id}>{p.full_name}</option>
@@ -194,7 +194,7 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
           <button
             onClick={handleAdd}
             disabled={saving || !form.title}
-            className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+            className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Create Task'}
           </button>
@@ -202,9 +202,9 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
       )}
 
       {loading ? (
-        <p className="text-[#8A9AB0] text-sm">Loading...</p>
+        <p className="text-fp-muted text-sm">Loading...</p>
       ) : tasks.length === 0 ? (
-        <p className="text-[#8A9AB0] text-sm">No tasks yet. Click + Add Task to create one.</p>
+        <p className="text-fp-muted text-sm">No tasks yet. Click + Add Task to create one.</p>
       ) : (
         <div className="space-y-2">
           {[...pending, ...completed].map(task => (
@@ -212,28 +212,28 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
               key={task.id}
               className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
                 task.completed
-                  ? 'border-[#2a3d55]/30 bg-[#0F1C2E]/30 opacity-50'
+                  ? 'border-fp-border/30 bg-fp-inset/30 opacity-50'
                   : isOverdue(task)
                   ? 'border-red-500/20 bg-red-500/5'
                   : isDueToday(task)
                   ? 'border-[#C8622A]/20 bg-[#C8622A]/5'
-                  : 'border-[#2a3d55]/50 bg-[#0F1C2E]/30'
+                  : 'border-fp-border/50 bg-fp-inset/30'
               }`}
             >
               <button
                 onClick={() => toggleComplete(task)}
                 className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                  task.completed ? 'bg-green-500 border-green-500' : 'border-[#2a3d55] hover:border-[#C8622A]'
+                  task.completed ? 'bg-green-500 border-green-500' : 'border-fp-border hover:border-fp-brand'
                 }`}
               >
-                {task.completed && <span className="text-white text-xs">✓</span>}
+                {task.completed && <span className="text-fp-text text-xs">✓</span>}
               </button>
               <div className="flex-1">
-                <p className={`text-sm font-medium ${task.completed ? 'line-through text-[#8A9AB0]' : 'text-white'}`}>
+                <p className={`text-sm font-medium ${task.completed ? 'line-through text-fp-muted' : 'text-fp-text'}`}>
                   {task.title}
                 </p>
                 {task.profiles?.full_name && (
-                  <p className="text-[#8A9AB0] text-xs mt-0.5">{task.profiles.full_name}</p>
+                  <p className="text-fp-muted text-xs mt-0.5">{task.profiles.full_name}</p>
                 )}
               </div>
               {task.recurrence && (
@@ -246,7 +246,7 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
                 <span className={`text-xs font-semibold ${
                   isOverdue(task) ? 'text-red-400' :
                   isDueToday(task) ? 'text-[#C8622A]' :
-                  'text-[#8A9AB0]'
+                  'text-fp-muted'
                 }`}>
                   {isOverdue(task) ? 'Overdue' : isDueToday(task) ? 'Today' : task.due_date}
                 </span>

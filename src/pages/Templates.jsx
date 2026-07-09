@@ -28,36 +28,36 @@ const fmt = (n) => n != null && !isNaN(n) ? `$${Number(n).toLocaleString('en-US'
 const LABOR_DATALIST_ID = 'labor-roles-datalist'
 
 const LaborTableHeader = () => (
-  <tr className="border-b border-[#2a3d55]">
+  <tr className="border-b border-fp-border">
     {['Role', 'Qty', 'Unit', 'Your Cost/hr', 'Margin %', 'Total Labor', ''].map(h => (
-      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+      <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
     ))}
   </tr>
 )
 
 const LaborRow = ({ item, onUpdate, onRemove, laborRates, defaultMarkup }) => (
-  <tr className="border-b border-[#2a3d55]/30">
+  <tr className="border-b border-fp-border/30">
     <td className="pr-2 py-1">
       <input type="text" list={LABOR_DATALIST_ID} placeholder="e.g. Lead Tech" value={item.role}
         onChange={e => onUpdate('role', e.target.value)}
-        className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
       <datalist id={LABOR_DATALIST_ID}>
         {laborRates.map(r => <option key={r.role} value={r.role} />)}
       </datalist>
     </td>
     <td className="pr-2 py-1">
       <input type="number" placeholder="0" value={item.quantity} onChange={e => onUpdate('quantity', e.target.value)}
-        className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+        className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
     </td>
     <td className="pr-2 py-1">
       <select value={item.unit || 'hr'} onChange={e => onUpdate('unit', e.target.value)}
-        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+        className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
         {['hr', 'day', 'lot'].map(u => <option key={u}>{u}</option>)}
       </select>
     </td>
     <td className="pr-2 py-1">
       <input type="number" placeholder="0.00" value={item.your_cost} onChange={e => onUpdate('your_cost', e.target.value)}
-        className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+        className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
     </td>
     <td className="pr-2 py-1">
       <input type="number" placeholder="0" min="0" max="99.9" step="0.1"
@@ -67,50 +67,50 @@ const LaborRow = ({ item, onUpdate, onRemove, laborRates, defaultMarkup }) => (
           const markup = (m >= 0 && m < 100) ? (m / (100 - m) * 100).toFixed(2) : '0'
           onUpdate('markup', markup)
         }}
-        className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+        className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
     </td>
     <td className="pr-2 py-1">
       <input type="number" placeholder="0.00" value={item.customer_price || ''} onChange={e => onUpdate('customer_price', e.target.value)}
-        className="w-24 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold" />
+        className="w-24 bg-fp-inset text-[#C8622A] border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand font-semibold" />
     </td>
-    <td className="py-1"><button onClick={onRemove} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button></td>
+    <td className="py-1"><button onClick={onRemove} className="text-fp-muted hover:text-red-400 text-xs">✕</button></td>
   </tr>
 )
 
 const LineTableHeader = ({ hasSections }) => (
-  <tr className="border-b border-[#2a3d55]">
+  <tr className="border-b border-fp-border">
     {['Item Name', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ...(hasSections ? ['Section'] : []), ''].map(h => (
-      <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
+      <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
     ))}
   </tr>
 )
 
 const LineRow = ({ line, sects, onUpdate, onRemove, defaultMarkup }) => (
-  <tr className="border-b border-[#2a3d55]/30 group">
+  <tr className="border-b border-fp-border/30 group">
     <td className="pr-2 py-1">
       <input type="text" placeholder="Item name" value={line.item_name}
         onChange={e => onUpdate(line._key, 'item_name', e.target.value)}
-        className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
     </td>
     <td className="pr-2 py-1">
       <input type="text" placeholder="Part #" value={line.part_number_sku}
         onChange={e => onUpdate(line._key, 'part_number_sku', e.target.value)}
-        className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
     </td>
     <td className="pr-2 py-1">
       <input type="number" placeholder="1" value={line.quantity}
         onChange={e => onUpdate(line._key, 'quantity', e.target.value)}
-        className="w-14 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+        className="w-14 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
     </td>
     <td className="pr-2 py-1">
       <select value={line.unit} onChange={e => onUpdate(line._key, 'unit', e.target.value)}
-        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+        className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
         {unitOptions.map(u => <option key={u}>{u}</option>)}
       </select>
     </td>
     <td className="pr-2 py-1">
       <select value={line.category} onChange={e => onUpdate(line._key, 'category', e.target.value)}
-        className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+        className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
         <option value="">Category</option>
         {matCategories.map(c => <option key={c}>{c}</option>)}
       </select>
@@ -118,35 +118,35 @@ const LineRow = ({ line, sects, onUpdate, onRemove, defaultMarkup }) => (
     <td className="pr-2 py-1">
       <input type="text" placeholder="Vendor" value={line.vendor}
         onChange={e => onUpdate(line._key, 'vendor', e.target.value)}
-        className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
     </td>
     <td className="pr-2 py-1">
       <input type="number" placeholder="0.00" value={line.your_cost_unit}
         onChange={e => onUpdate(line._key, 'your_cost_unit', e.target.value)}
-        className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+        className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
     </td>
     <td className="pr-2 py-1">
       <input type="number" placeholder={String(defaultMarkup)} value={line.markup_percent}
         onChange={e => onUpdate(line._key, 'markup_percent', e.target.value)}
-        className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+        className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
     </td>
     <td className="pr-2 py-1">
       <input type="number" placeholder="0.00" value={line.customer_price_unit}
         onChange={e => onUpdate(line._key, 'customer_price_unit', e.target.value)}
-        className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold" />
+        className="w-20 bg-fp-inset text-[#C8622A] border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand font-semibold" />
     </td>
     {sects.length > 0 && (
       <td className="pr-2 py-1">
         <select value={line.section_id || ''}
           onChange={e => onUpdate(line._key, 'section_id', e.target.value || null)}
-          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]">
+          className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
           <option value="">General</option>
           {sects.map(s => <option key={s._id} value={s._id}>{s.name || 'Untitled Section'}</option>)}
         </select>
       </td>
     )}
     <td className="py-1">
-      <button onClick={() => onRemove(line._key)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button>
+      <button onClick={() => onRemove(line._key)} className="text-fp-muted hover:text-red-400 text-xs">✕</button>
     </td>
   </tr>
 )
@@ -462,35 +462,35 @@ export default function Templates({ isAdmin }) {
   // ── Render helpers (called as functions, not JSX components, to avoid remounting) ──
 
   const renderLibraryPanel = (setter, activeSects) => (
-    <div className="bg-[#0a1628] rounded-xl p-4 space-y-3 border border-[#C8622A]/40 mb-4">
+    <div className="bg-fp-inset rounded-xl p-4 space-y-3 border border-[#C8622A]/40 mb-4">
       <div className="flex items-center gap-3">
         <input autoFocus type="text" placeholder="Search product library…" value={libQuery}
           onChange={e => searchLibrary(e.target.value)}
-          className="flex-1 bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+          className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
         {activeSects.length > 0 && (
           <select value={libSectionId || ''} onChange={e => setLibSectionId(e.target.value || null)}
-            className="bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+            className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
             <option value="">Add to: General</option>
             {activeSects.map(s => <option key={s._id} value={s._id}>{s.name || 'Untitled Section'}</option>)}
           </select>
         )}
-        <button onClick={closeLib} className="text-[#8A9AB0] hover:text-white text-sm px-2">✕</button>
+        <button onClick={closeLib} className="text-fp-muted hover:text-fp-text text-sm px-2">✕</button>
       </div>
-      {libLoading && <p className="text-[#8A9AB0] text-xs">Searching…</p>}
-      {!libLoading && libQuery && libResults.length === 0 && <p className="text-[#8A9AB0] text-xs">No products found.</p>}
+      {libLoading && <p className="text-fp-muted text-xs">Searching…</p>}
+      {!libLoading && libQuery && libResults.length === 0 && <p className="text-fp-muted text-xs">No products found.</p>}
       {libResults.length > 0 && (
         <div className="space-y-1 max-h-52 overflow-y-auto">
           {libResults.map(prod => {
             const pricing = prod.product_library_pricing?.[0]
             const cost = parseFloat(pricing?.your_cost) || 0
             return (
-              <label key={prod.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-[#1a2d45] cursor-pointer">
-                <input type="checkbox" checked={libSelected.has(prod.id)} onChange={() => toggleLibItem(prod.id)} className="accent-[#C8622A]" />
+              <label key={prod.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-fp-card cursor-pointer">
+                <input type="checkbox" checked={libSelected.has(prod.id)} onChange={() => toggleLibItem(prod.id)} className="accent-fp-brand" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-xs font-medium truncate">{prod.item_name}</p>
-                  <p className="text-[#8A9AB0] text-xs">{[prod.manufacturer, prod.part_number, prod.category].filter(Boolean).join(' · ')}</p>
+                  <p className="text-fp-text text-xs font-medium truncate">{prod.item_name}</p>
+                  <p className="text-fp-muted text-xs">{[prod.manufacturer, prod.part_number, prod.category].filter(Boolean).join(' · ')}</p>
                 </div>
-                <span className={`text-xs font-semibold shrink-0 ${cost > 0 ? 'text-[#C8622A]' : 'text-[#8A9AB0]'}`}>
+                <span className={`text-xs font-semibold shrink-0 ${cost > 0 ? 'text-[#C8622A]' : 'text-fp-muted'}`}>
                   {cost > 0 ? `${fmt(cost)} → ${fmt(cost * (1 + defaultMarkup / 100))}` : 'No pricing'}
                 </span>
               </label>
@@ -500,7 +500,7 @@ export default function Templates({ isAdmin }) {
       )}
       {libSelected.size > 0 && (
         <button onClick={() => addLibraryItems(setter)}
-          className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors">
+          className="bg-fp-brand text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors">
           Add {libSelected.size} item{libSelected.size !== 1 ? 's' : ''} to BOM
         </button>
       )}
@@ -516,15 +516,15 @@ export default function Templates({ isAdmin }) {
       <div className="space-y-5">
         {/* Top bar */}
         <div className="flex items-center justify-between">
-          <h4 className="text-white font-semibold text-sm">Materials</h4>
+          <h4 className="text-fp-text font-semibold text-sm">Materials</h4>
           <div className="flex gap-2">
             <button
               onClick={() => libTarget === isLibTarget ? closeLib() : (setLibTarget(isLibTarget), setLibSectionId(null))}
-              className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors ${libTarget === isLibTarget ? 'bg-[#C8622A] text-white' : 'bg-[#2a3d55] text-[#8A9AB0] hover:text-white'}`}>
+              className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors ${libTarget === isLibTarget ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
               📦 Browse Library
             </button>
             <button onClick={() => addSection(setSect, sects)}
-              className="text-xs px-3 py-1.5 rounded-lg font-semibold bg-[#2a3d55] text-[#8A9AB0] hover:text-white transition-colors">
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold bg-fp-inset text-fp-muted hover:text-fp-text transition-colors">
               + Add Section
             </button>
           </div>
@@ -538,7 +538,7 @@ export default function Templates({ isAdmin }) {
             <thead><LineTableHeader hasSections={hasSections} /></thead>
             <tbody>
               {lns.length === 0
-                ? <tr><td colSpan={hasSections ? 11 : 10} className="text-[#8A9AB0] text-xs py-3">No items yet. Add manually or browse the library.</td></tr>
+                ? <tr><td colSpan={hasSections ? 11 : 10} className="text-fp-muted text-xs py-3">No items yet. Add manually or browse the library.</td></tr>
                 : lns.map(line => (
                   <LineRow key={line._key} line={line} sects={sects}
                     onUpdate={updateLine} onRemove={removeLine} defaultMarkup={defaultMarkup} />
@@ -547,51 +547,51 @@ export default function Templates({ isAdmin }) {
           </table>
         </div>
         <button onClick={() => setLns(prev => [...prev, emptyLine(defaultMarkup)])}
-          className="text-[#C8622A] hover:text-white text-sm transition-colors">+ Add Line Item</button>
+          className="text-[#C8622A] hover:text-fp-text text-sm transition-colors">+ Add Line Item</button>
 
         {/* Section cards — labor sub-tables per section */}
         {sects.length > 0 && (
           <div className="space-y-4 pt-2">
-            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Sections</p>
+            <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Sections</p>
             {sects.map((s, si) => {
               const secLines = lns.filter(l => l.section_id === s._id)
               return (
-                <div key={s._id} className="border border-[#2a3d55] rounded-xl overflow-hidden">
+                <div key={s._id} className="border border-fp-border rounded-xl overflow-hidden">
                   {/* Section header */}
-                  <div className="flex items-center gap-3 px-4 py-3 bg-[#0F1C2E]">
+                  <div className="flex items-center gap-3 px-4 py-3 bg-fp-inset">
                     <div className="w-2 h-2 rounded-full bg-[#C8622A]" />
                     <input
                       type="text"
                       placeholder={`Section ${si + 1} name`}
                       value={s.name}
                       onChange={e => updateSection(setSect, s._id, 'name', e.target.value)}
-                      className="flex-1 bg-transparent text-white font-semibold text-sm focus:outline-none placeholder-[#2a3d55]"
+                      className="flex-1 bg-transparent text-fp-text font-semibold text-sm focus:outline-none placeholder-[#2a3d55]"
                     />
-                    <span className="text-[#8A9AB0] text-xs">{secLines.length} item{secLines.length !== 1 ? 's' : ''}</span>
-                    <label className="flex items-center gap-1.5 text-xs text-[#8A9AB0] cursor-pointer select-none">
+                    <span className="text-fp-muted text-xs">{secLines.length} item{secLines.length !== 1 ? 's' : ''}</span>
+                    <label className="flex items-center gap-1.5 text-xs text-fp-muted cursor-pointer select-none">
                       <input type="checkbox" checked={s.include_labor}
                         onChange={e => updateSection(setSect, s._id, 'include_labor', e.target.checked)}
-                        className="accent-[#C8622A]" />
+                        className="accent-fp-brand" />
                       Section Labor
                     </label>
                     <button onClick={() => deleteSection(setSect, setLns, s._id)}
-                      className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors">✕ Remove</button>
+                      className="text-fp-muted hover:text-red-400 text-xs transition-colors">✕ Remove</button>
                   </div>
                   {/* Section items summary */}
                   {secLines.length > 0 && (
-                    <div className="px-4 py-2 bg-[#1a2d45]/50">
+                    <div className="px-4 py-2 bg-fp-card/50">
                       {secLines.map(l => (
                         <div key={l._key} className="flex items-center justify-between py-0.5">
-                          <span className="text-white text-xs">{l.item_name || '(unnamed)'}</span>
-                          <span className="text-[#8A9AB0] text-xs">Qty {l.quantity} · {l.customer_price_unit ? fmt(l.customer_price_unit) : '—'}</span>
+                          <span className="text-fp-text text-xs">{l.item_name || '(unnamed)'}</span>
+                          <span className="text-fp-muted text-xs">Qty {l.quantity} · {l.customer_price_unit ? fmt(l.customer_price_unit) : '—'}</span>
                         </div>
                       ))}
                     </div>
                   )}
                   {/* Section labor */}
                   {s.include_labor && (
-                    <div className="px-4 py-3 border-t border-[#2a3d55] space-y-2">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Section Labor</p>
+                    <div className="px-4 py-3 border-t border-fp-border space-y-2">
+                      <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Section Labor</p>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead><LaborTableHeader /></thead>
@@ -607,7 +607,7 @@ export default function Templates({ isAdmin }) {
                         </table>
                       </div>
                       <button onClick={() => addSectionLaborLine(setSect, s._id)}
-                        className="text-[#C8622A] hover:text-white text-xs transition-colors">+ Add Labor</button>
+                        className="text-[#C8622A] hover:text-fp-text text-xs transition-colors">+ Add Labor</button>
                     </div>
                   )}
                 </div>
@@ -617,14 +617,14 @@ export default function Templates({ isAdmin }) {
         )}
 
         {/* Global labor */}
-        <div className="pt-2 border-t border-[#2a3d55]">
-          <h4 className="text-white font-semibold text-sm mb-3">Labor</h4>
+        <div className="pt-2 border-t border-fp-border">
+          <h4 className="text-fp-text font-semibold text-sm mb-3">Labor</h4>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><LaborTableHeader /></thead>
               <tbody>
                 {labor.length === 0
-                  ? <tr><td colSpan={7} className="text-[#8A9AB0] text-xs py-3">No labor rows yet.</td></tr>
+                  ? <tr><td colSpan={7} className="text-fp-muted text-xs py-3">No labor rows yet.</td></tr>
                   : labor.map((item, i) => (
                     <LaborRow key={i} item={item}
                       onUpdate={(field, value) => updateLaborRow(setLabor, i, field, value)}
@@ -636,7 +636,7 @@ export default function Templates({ isAdmin }) {
             </table>
           </div>
           <button onClick={() => setLabor(prev => [...prev, emptyLaborLine(defaultMarkup)])}
-            className="mt-2 text-[#C8622A] hover:text-white text-sm transition-colors">+ Add Labor</button>
+            className="mt-2 text-[#C8622A] hover:text-fp-text text-sm transition-colors">+ Add Labor</button>
         </div>
       </div>
     )
@@ -644,18 +644,18 @@ export default function Templates({ isAdmin }) {
 
   // ── Main render ───────────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={true} featureCRM={true} />
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-white text-2xl font-bold">Proposal Templates</h2>
-            <p className="text-[#8A9AB0] text-sm mt-0.5">{templates.length} templates · {isAdmin ? 'Admin — can create and edit' : 'View and load into proposals'}</p>
+            <h2 className="text-fp-text text-2xl font-bold">Proposal Templates</h2>
+            <p className="text-fp-muted text-sm mt-0.5">{templates.length} templates · {isAdmin ? 'Admin — can create and edit' : 'View and load into proposals'}</p>
           </div>
           {isAdmin && (
             <button onClick={() => showForm ? setShowForm(false) : (setShowForm(true), setForm(emptyTemplate), setLines([]), setLaborItems([]), setSections([]), setError(null))}
-              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
               {showForm ? 'Cancel' : '+ New Template'}
             </button>
           )}
@@ -666,45 +666,45 @@ export default function Templates({ isAdmin }) {
 
         {/* New Template Form */}
         {showForm && isAdmin && (
-          <div className="bg-[#1a2d45] rounded-xl p-6 space-y-6">
-            <h3 className="text-white font-bold text-lg">New Template</h3>
+          <div className="bg-fp-card rounded-xl p-6 space-y-6">
+            <h3 className="text-fp-text font-bold text-lg">New Template</h3>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Template Name <span className="text-[#C8622A]">*</span></label>
+                <label className="text-fp-muted text-xs mb-1 block">Template Name <span className="text-[#C8622A]">*</span></label>
                 <input type="text" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
                   placeholder="e.g. 8 Camera Install"
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Industry</label>
+                <label className="text-fp-muted text-xs mb-1 block">Industry</label>
                 <select value={form.industry} onChange={e => setForm(p => ({ ...p, industry: e.target.value }))}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                   <option value="">Select industry</option>
                   {industries.map(i => <option key={i} value={i}>{i}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Description</label>
+                <label className="text-fp-muted text-xs mb-1 block">Description</label>
                 <input type="text" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                   placeholder="Brief description"
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
               </div>
             </div>
 
             <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Scope of Work <span className="text-[#8A9AB0] font-normal">(optional — applied to proposals when this template is loaded)</span></label>
+              <label className="text-fp-muted text-xs mb-1 block">Scope of Work <span className="text-fp-muted font-normal">(optional — applied to proposals when this template is loaded)</span></label>
               <textarea value={form.scope_of_work} onChange={e => setForm(p => ({ ...p, scope_of_work: e.target.value }))}
                 placeholder="Describe the scope of work for this template..."
                 rows={5}
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-y leading-relaxed" />
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y leading-relaxed" />
             </div>
 
             {renderBomEditor(lines, setLines, laborItems, setLaborItems, sections, setSections, 'create')}
 
-            <div className="flex justify-end gap-3 pt-2 border-t border-[#2a3d55]">
-              <button onClick={() => setShowForm(false)} className="px-6 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+            <div className="flex justify-end gap-3 pt-2 border-t border-fp-border">
+              <button onClick={() => setShowForm(false)} className="px-6 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
               <button onClick={handleSave} disabled={saving || !form.name}
-                className="px-6 py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                className="px-6 py-2 bg-fp-brand text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save Template'}
               </button>
             </div>
@@ -713,48 +713,48 @@ export default function Templates({ isAdmin }) {
 
         {/* Search */}
         <input type="text" placeholder="Search templates…" value={search} onChange={e => setSearch(e.target.value)}
-          className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]" />
+          className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
 
         {/* Edit Modal */}
         {editingTemplate && isAdmin && (
           <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 px-4 py-6 overflow-y-auto">
-            <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-5xl space-y-6">
-              <h3 className="text-white font-bold text-lg">Edit Template</h3>
+            <div className="bg-fp-card rounded-2xl p-6 w-full max-w-5xl space-y-6">
+              <h3 className="text-fp-text font-bold text-lg">Edit Template</h3>
               <div className="grid grid-cols-3 gap-4">
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Template Name <span className="text-[#C8622A]">*</span></label>
+                  <label className="text-fp-muted text-xs mb-1 block">Template Name <span className="text-[#C8622A]">*</span></label>
                   <input type="text" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Industry</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Industry</label>
                   <select value={editForm.industry} onChange={e => setEditForm(p => ({ ...p, industry: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                     <option value="">Select industry</option>
                     {industries.map(i => <option key={i} value={i}>{i}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Description</label>
+                  <label className="text-fp-muted text-xs mb-1 block">Description</label>
                   <input type="text" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                 </div>
               </div>
 
               <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Scope of Work <span className="text-[#8A9AB0] font-normal">(optional — applied to proposals when this template is loaded)</span></label>
+                <label className="text-fp-muted text-xs mb-1 block">Scope of Work <span className="text-fp-muted font-normal">(optional — applied to proposals when this template is loaded)</span></label>
                 <textarea value={editForm.scope_of_work} onChange={e => setEditForm(p => ({ ...p, scope_of_work: e.target.value }))}
                   placeholder="Describe the scope of work for this template..."
                   rows={5}
-                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-y leading-relaxed" />
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y leading-relaxed" />
               </div>
 
               {renderBomEditor(editLines, setEditLines, editLaborItems, setEditLaborItems, editSections, setEditSections, 'edit')}
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-[#2a3d55]">
-                <button onClick={() => setEditingTemplate(null)} className="px-6 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
+              <div className="flex justify-end gap-3 pt-4 border-t border-fp-border">
+                <button onClick={() => setEditingTemplate(null)} className="px-6 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={() => saveEdit(editingTemplate)} disabled={editSaving || !editForm.name}
-                  className="px-6 py-2 bg-[#C8622A] text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  className="px-6 py-2 bg-fp-brand text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {editSaving ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
@@ -764,11 +764,11 @@ export default function Templates({ isAdmin }) {
 
         {/* Template List */}
         {loading ? (
-          <p className="text-[#8A9AB0]">Loading…</p>
+          <p className="text-fp-muted">Loading…</p>
         ) : filtered.length === 0 ? (
-          <div className="bg-[#1a2d45] rounded-xl p-12 text-center">
-            <p className="text-[#8A9AB0] text-lg mb-2">No templates yet</p>
-            {isAdmin && <p className="text-[#8A9AB0] text-sm">Click "+ New Template" to create your first one.</p>}
+          <div className="bg-fp-card rounded-xl p-12 text-center">
+            <p className="text-fp-muted text-lg mb-2">No templates yet</p>
+            {isAdmin && <p className="text-fp-muted text-sm">Click "+ New Template" to create your first one.</p>}
           </div>
         ) : (
           <div className="space-y-3">
@@ -781,15 +781,15 @@ export default function Templates({ isAdmin }) {
                 s + (sec.include_labor ? (sec.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
 
               return (
-                <div key={template.id} className="bg-[#1a2d45] rounded-xl overflow-hidden border border-[#2a3d55]">
+                <div key={template.id} className="bg-fp-card rounded-xl overflow-hidden border border-fp-border">
                   <div className="flex justify-between items-center p-5 cursor-pointer" onClick={() => toggleExpand(template.id)}>
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-lg bg-[#C8622A]/20 flex items-center justify-center flex-shrink-0">
                         <span className="text-[#C8622A] text-lg">📋</span>
                       </div>
                       <div>
-                        <p className="text-white font-semibold">{template.name}</p>
-                        <p className="text-[#8A9AB0] text-xs mt-0.5">
+                        <p className="text-fp-text font-semibold">{template.name}</p>
+                        <p className="text-fp-muted text-xs mt-0.5">
                           {template.industry && <span className="mr-2">{template.industry}</span>}
                           {template.description}
                         </p>
@@ -797,47 +797,47 @@ export default function Templates({ isAdmin }) {
                     </div>
                     <div className="flex items-center gap-4">
                       {(totalLabor + sectionLaborTotal) > 0 && (
-                        <span className="text-[#8A9AB0] text-xs">{fmt(totalLabor + sectionLaborTotal)} labor</span>
+                        <span className="text-fp-muted text-xs">{fmt(totalLabor + sectionLaborTotal)} labor</span>
                       )}
                       {isAdmin && (
                         <button onClick={e => { e.stopPropagation(); startEditing(template) }}
-                          className="text-[#8A9AB0] hover:text-white text-xs transition-colors px-2">Edit</button>
+                          className="text-fp-muted hover:text-fp-text text-xs transition-colors px-2">Edit</button>
                       )}
                       {isAdmin && (
                         <button onClick={e => { e.stopPropagation(); handleDelete(template.id) }}
-                          className="text-[#8A9AB0] hover:text-red-400 text-xs transition-colors px-2">Delete</button>
+                          className="text-fp-muted hover:text-red-400 text-xs transition-colors px-2">Delete</button>
                       )}
-                      <span className="text-[#8A9AB0] text-sm">{isExpanded ? '▲' : '▼'}</span>
+                      <span className="text-fp-muted text-sm">{isExpanded ? '▲' : '▼'}</span>
                     </div>
                   </div>
 
                   {isExpanded && (
-                    <div className="border-t border-[#2a3d55] p-5 space-y-5">
+                    <div className="border-t border-fp-border p-5 space-y-5">
                       {/* General items (no section) */}
                       {(() => {
                         const general = td.lines.filter(l => !l.section_id)
                         if (general.length === 0 && td.sections.length === 0) return null
                         return general.length > 0 && (
                           <div>
-                            {td.sections.length > 0 && <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">General</p>}
+                            {td.sections.length > 0 && <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">General</p>}
                             <table className="w-full text-xs">
                               <thead>
-                                <tr className="border-b border-[#2a3d55]">
+                                <tr className="border-b border-fp-border">
                                   {['Item', 'Part #', 'Qty', 'Unit', 'Category', 'Your Cost', 'Markup %', 'Customer Price'].map(h => (
-                                    <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">{h}</th>
+                                    <th key={h} className="text-fp-muted text-left py-2 pr-4 font-normal">{h}</th>
                                   ))}
                                 </tr>
                               </thead>
                               <tbody>
                                 {general.map(l => (
-                                  <tr key={l.id} className="border-b border-[#2a3d55]/30">
-                                    <td className="text-white py-2 pr-4">{l.item_name}</td>
-                                    <td className="text-[#8A9AB0] py-2 pr-4">{l.part_number_sku || '—'}</td>
-                                    <td className="text-[#8A9AB0] py-2 pr-4">{l.quantity}</td>
-                                    <td className="text-[#8A9AB0] py-2 pr-4">{l.unit}</td>
-                                    <td className="text-[#8A9AB0] py-2 pr-4">{l.category || '—'}</td>
-                                    <td className="text-[#8A9AB0] py-2 pr-4">{fmt(l.your_cost_unit)}</td>
-                                    <td className="text-[#8A9AB0] py-2 pr-4">{l.markup_percent}%</td>
+                                  <tr key={l.id} className="border-b border-fp-border/30">
+                                    <td className="text-fp-text py-2 pr-4">{l.item_name}</td>
+                                    <td className="text-fp-muted py-2 pr-4">{l.part_number_sku || '—'}</td>
+                                    <td className="text-fp-muted py-2 pr-4">{l.quantity}</td>
+                                    <td className="text-fp-muted py-2 pr-4">{l.unit}</td>
+                                    <td className="text-fp-muted py-2 pr-4">{l.category || '—'}</td>
+                                    <td className="text-fp-muted py-2 pr-4">{fmt(l.your_cost_unit)}</td>
+                                    <td className="text-fp-muted py-2 pr-4">{l.markup_percent}%</td>
                                     <td className="text-[#C8622A] py-2 pr-4 font-semibold">{fmt(l.customer_price_unit)}</td>
                                   </tr>
                                 ))}
@@ -854,33 +854,33 @@ export default function Templates({ isAdmin }) {
                         const secMatTotal = secLines.reduce((s, l) => s + (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 1), 0)
                         const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
                         return (
-                          <div key={section.id} className="border border-[#2a3d55] rounded-xl overflow-hidden">
-                            <div className="flex items-center justify-between px-4 py-2.5 bg-[#0F1C2E]">
+                          <div key={section.id} className="border border-fp-border rounded-xl overflow-hidden">
+                            <div className="flex items-center justify-between px-4 py-2.5 bg-fp-inset">
                               <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-[#C8622A]" />
-                                <span className="text-white font-semibold text-sm">{section.name || 'Untitled Section'}</span>
+                                <span className="text-fp-text font-semibold text-sm">{section.name || 'Untitled Section'}</span>
                               </div>
-                              <span className="text-[#8A9AB0] text-xs">Total: <span className="text-white font-bold">{fmt(secMatTotal + secLaborTotal)}</span></span>
+                              <span className="text-fp-muted text-xs">Total: <span className="text-fp-text font-bold">{fmt(secMatTotal + secLaborTotal)}</span></span>
                             </div>
                             {secLines.length > 0 && (
                               <div className="px-4 py-2">
                                 <table className="w-full text-xs">
                                   <thead>
-                                    <tr className="border-b border-[#2a3d55]">
+                                    <tr className="border-b border-fp-border">
                                       {['Item', 'Part #', 'Qty', 'Unit', 'Your Cost', 'Markup %', 'Customer Price'].map(h => (
-                                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">{h}</th>
+                                        <th key={h} className="text-fp-muted text-left py-2 pr-4 font-normal">{h}</th>
                                       ))}
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {secLines.map(l => (
-                                      <tr key={l.id} className="border-b border-[#2a3d55]/30">
-                                        <td className="text-white py-2 pr-4">{l.item_name}</td>
-                                        <td className="text-[#8A9AB0] py-2 pr-4">{l.part_number_sku || '—'}</td>
-                                        <td className="text-[#8A9AB0] py-2 pr-4">{l.quantity}</td>
-                                        <td className="text-[#8A9AB0] py-2 pr-4">{l.unit}</td>
-                                        <td className="text-[#8A9AB0] py-2 pr-4">{fmt(l.your_cost_unit)}</td>
-                                        <td className="text-[#8A9AB0] py-2 pr-4">{l.markup_percent}%</td>
+                                      <tr key={l.id} className="border-b border-fp-border/30">
+                                        <td className="text-fp-text py-2 pr-4">{l.item_name}</td>
+                                        <td className="text-fp-muted py-2 pr-4">{l.part_number_sku || '—'}</td>
+                                        <td className="text-fp-muted py-2 pr-4">{l.quantity}</td>
+                                        <td className="text-fp-muted py-2 pr-4">{l.unit}</td>
+                                        <td className="text-fp-muted py-2 pr-4">{fmt(l.your_cost_unit)}</td>
+                                        <td className="text-fp-muted py-2 pr-4">{l.markup_percent}%</td>
                                         <td className="text-[#C8622A] py-2 pr-4 font-semibold">{fmt(l.customer_price_unit)}</td>
                                       </tr>
                                     ))}
@@ -889,22 +889,22 @@ export default function Templates({ isAdmin }) {
                               </div>
                             )}
                             {secLabor.length > 0 && (
-                              <div className="border-t border-[#2a3d55] px-4 py-2">
-                                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Section Labor</p>
+                              <div className="border-t border-fp-border px-4 py-2">
+                                <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Section Labor</p>
                                 <table className="w-full text-xs">
                                   <thead>
-                                    <tr className="border-b border-[#2a3d55]">
+                                    <tr className="border-b border-fp-border">
                                       {['Role', 'Qty', 'Unit', 'Total Labor'].map(h => (
-                                        <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">{h}</th>
+                                        <th key={h} className="text-fp-muted text-left py-2 pr-4 font-normal">{h}</th>
                                       ))}
                                     </tr>
                                   </thead>
                                   <tbody>
                                     {secLabor.map((l, i) => (
-                                      <tr key={i} className="border-b border-[#2a3d55]/30">
-                                        <td className="text-white py-2 pr-4">{l.role}</td>
-                                        <td className="text-[#8A9AB0] py-2 pr-4">{l.quantity}</td>
-                                        <td className="text-[#8A9AB0] py-2 pr-4">{l.unit || 'hr'}</td>
+                                      <tr key={i} className="border-b border-fp-border/30">
+                                        <td className="text-fp-text py-2 pr-4">{l.role}</td>
+                                        <td className="text-fp-muted py-2 pr-4">{l.quantity}</td>
+                                        <td className="text-fp-muted py-2 pr-4">{l.unit || 'hr'}</td>
                                         <td className="text-[#C8622A] py-2 pr-4 font-semibold">{fmt(l.customer_price)}</td>
                                       </tr>
                                     ))}
@@ -919,21 +919,21 @@ export default function Templates({ isAdmin }) {
                       {/* Global labor */}
                       {labor.filter(l => l.role).length > 0 && (
                         <div>
-                          <p className="text-white text-sm font-semibold mb-3">Labor</p>
+                          <p className="text-fp-text text-sm font-semibold mb-3">Labor</p>
                           <table className="w-full text-xs">
                             <thead>
-                              <tr className="border-b border-[#2a3d55]">
+                              <tr className="border-b border-fp-border">
                                 {['Role', 'Qty', 'Unit', 'Total Labor'].map(h => (
-                                  <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal">{h}</th>
+                                  <th key={h} className="text-fp-muted text-left py-2 pr-4 font-normal">{h}</th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody>
                               {labor.filter(l => l.role).map((l, i) => (
-                                <tr key={i} className="border-b border-[#2a3d55]/30">
-                                  <td className="text-white py-2 pr-4">{l.role}</td>
-                                  <td className="text-[#8A9AB0] py-2 pr-4">{l.quantity}</td>
-                                  <td className="text-[#8A9AB0] py-2 pr-4">{l.unit || 'hr'}</td>
+                                <tr key={i} className="border-b border-fp-border/30">
+                                  <td className="text-fp-text py-2 pr-4">{l.role}</td>
+                                  <td className="text-fp-muted py-2 pr-4">{l.quantity}</td>
+                                  <td className="text-fp-muted py-2 pr-4">{l.unit || 'hr'}</td>
                                   <td className="text-[#C8622A] py-2 pr-4 font-semibold">{fmt(l.customer_price)}</td>
                                 </tr>
                               ))}
@@ -943,7 +943,7 @@ export default function Templates({ isAdmin }) {
                       )}
 
                       {td.lines.length === 0 && labor.filter(l => l.role).length === 0 && td.sections.length === 0 && (
-                        <p className="text-[#8A9AB0] text-sm">No items in this template yet.</p>
+                        <p className="text-fp-muted text-sm">No items in this template yet.</p>
                       )}
                     </div>
                   )}

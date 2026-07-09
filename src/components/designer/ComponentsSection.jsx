@@ -132,7 +132,7 @@ export default function ComponentsSection({ placementId, orgId, category, produc
   }
 
   const defaultTypes = DEFAULT_COMPONENTS[category] || ['Mount', 'Housing', 'Power Supply', 'Surge Protector']
-  const inputClass   = "w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]"
+  const inputClass   = "w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand placeholder-[#4a5a6a]"
 
   const handleSelectOption = async (group, choice) => {
     // Remove any existing component of this group type
@@ -163,14 +163,14 @@ export default function ComponentsSection({ placementId, orgId, category, produc
   }
 
   return (
-    <div className="border-t border-[#2a3d55] pt-3">
+    <div className="border-t border-fp-border pt-3">
 
       {/* Accessories option groups */}
       {accessories?.options?.map((group, gi) => {
         const selected = components.find(c => c.component_type === group.group)
         return (
           <div key={gi} className="mb-3">
-            <p className="text-[#8A9AB0] text-xs font-medium mb-1.5">
+            <p className="text-fp-muted text-xs font-medium mb-1.5">
               {group.group}
               {group.required && <span className="text-[#C8622A] ml-1">*</span>}
             </p>
@@ -207,15 +207,15 @@ export default function ComponentsSection({ placementId, orgId, category, produc
                           }
                         }
                       }}
-                      className="accent-[#C8622A] flex-shrink-0"
+                      className="accent-fp-brand flex-shrink-0"
                     />
                     <div className="flex-1">
-                      <span className="text-white text-xs">{choice.name}</span>
+                      <span className="text-fp-text text-xs">{choice.name}</span>
                       <span className="text-[#C8622A] font-mono text-xs ml-2">{choice.part_number}</span>
                     </div>
                     {existing && (
                       <div className="flex items-center gap-1">
-                        <span className="text-[#8A9AB0] text-xs">×</span>
+                        <span className="text-fp-muted text-xs">×</span>
                         <input
                           type="number" min="1" value={existing.quantity || 1}
                           onChange={async (e) => {
@@ -223,7 +223,7 @@ export default function ComponentsSection({ placementId, orgId, category, produc
                             await supabase.from('placement_components').update({ quantity: qty }).eq('id', existing.id)
                             setComponents(prev => prev.map(c => c.id === existing.id ? { ...c, quantity: qty } : c))
                           }}
-                          className="w-10 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-1 py-0.5 text-xs text-center focus:outline-none focus:border-[#C8622A]"
+                          className="w-10 bg-fp-inset text-fp-text border border-fp-border rounded px-1 py-0.5 text-xs text-center focus:outline-none focus:border-fp-brand"
                         />
                       </div>
                     )}
@@ -239,7 +239,7 @@ export default function ComponentsSection({ placementId, orgId, category, produc
         <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide">Components</p>
         <button
           onClick={() => setAdding(s => !s)}
-          className="text-xs text-[#C8622A] hover:text-white transition-colors flex items-center gap-1"
+          className="text-xs text-[#C8622A] hover:text-fp-text transition-colors flex items-center gap-1"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/>
@@ -250,12 +250,12 @@ export default function ComponentsSection({ placementId, orgId, category, produc
 
       {/* Add component picker */}
       {adding && (
-        <div className="mb-3 bg-[#1a2d45] rounded-lg p-2 border border-[#2a3d55]">
-          <p className="text-[#8A9AB0] text-xs mb-2">Select component type:</p>
+        <div className="mb-3 bg-fp-card rounded-lg p-2 border border-fp-border">
+          <p className="text-fp-muted text-xs mb-2">Select component type:</p>
           <div className="flex flex-wrap gap-1 mb-2">
             {defaultTypes.map(type => (
               <button key={type} onClick={() => handleAdd(type)}
-                className="px-2 py-1 text-xs bg-[#0F1C2E] text-[#8A9AB0] hover:text-[#C8622A] hover:border-[#C8622A] border border-[#2a3d55] rounded transition-colors">
+                className="px-2 py-1 text-xs bg-fp-inset text-fp-muted hover:text-[#C8622A] hover:border-fp-brand border border-fp-border rounded transition-colors">
                 {type}
               </button>
             ))}
@@ -273,24 +273,24 @@ export default function ComponentsSection({ placementId, orgId, category, produc
               }}
             />
             <button onClick={() => setAdding(false)}
-              className="text-[#8A9AB0] hover:text-white text-xs px-2">✕</button>
+              className="text-fp-muted hover:text-fp-text text-xs px-2">✕</button>
           </div>
         </div>
       )}
 
       {/* Component list */}
       {loading ? (
-        <p className="text-[#8A9AB0] text-xs">Loading...</p>
+        <p className="text-fp-muted text-xs">Loading...</p>
       ) : components.length === 0 ? (
-        <p className="text-[#4a5a6a] text-xs">No components added yet</p>
+        <p className="text-fp-muted text-xs">No components added yet</p>
       ) : (
         <div className="space-y-2">
           {components.map(component => (
-            <div key={component.id} className="bg-[#1a2d45] rounded-lg p-2 border border-[#2a3d55] group">
+            <div key={component.id} className="bg-fp-card rounded-lg p-2 border border-fp-border group">
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[#C8622A] text-xs font-medium">{component.component_type}</span>
                 <button onClick={() => handleDelete(component.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[#8A9AB0] hover:text-red-400">
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-fp-muted hover:text-red-400">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
                   </svg>
@@ -312,21 +312,21 @@ export default function ComponentsSection({ placementId, orgId, category, produc
                     value={component.manufacturer || ''}
                     onChange={e => handleUpdate(component.id, 'manufacturer', e.target.value)}
                     onBlur={e => handleSave(component.id, 'manufacturer', e.target.value)}
-                    className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
+                    className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand placeholder-[#4a5a6a]" />
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="text-[#8A9AB0] text-xs">Qty:</span>
+                  <span className="text-fp-muted text-xs">Qty:</span>
                   <input type="number" min="1"
                     value={component.quantity || 1}
                     onChange={e => handleUpdate(component.id, 'quantity', parseInt(e.target.value) || 1)}
                     onBlur={e => handleSave(component.id, 'quantity', parseInt(e.target.value) || 1)}
-                    className="w-14 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] text-center" />
+                    className="w-14 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand text-center" />
                   {component.notes !== undefined && (
                     <input type="text" placeholder="Notes"
                       value={component.notes || ''}
                       onChange={e => handleUpdate(component.id, 'notes', e.target.value)}
                       onBlur={e => handleSave(component.id, 'notes', e.target.value)}
-                      className="flex-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
+                      className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand placeholder-[#4a5a6a]" />
                   )}
                 </div>
               </div>

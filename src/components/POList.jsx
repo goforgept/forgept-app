@@ -83,24 +83,24 @@ export default function POList({ proposalId }) {
   if (loading || pos.length === 0) return null
 
   return (
-    <div className="bg-[#1a2d45] rounded-xl p-6">
-      <h3 className="text-white font-bold text-lg mb-4">Purchase Orders ({pos.length})</h3>
+    <div className="bg-fp-card rounded-xl p-6">
+      <h3 className="text-fp-text font-bold text-lg mb-4">Purchase Orders ({pos.length})</h3>
       <div className="space-y-3">
         {pos.map(po => {
           const isExpanded = expandedPO === po.id
           const progress = getReceivingProgress(po.id)
 
           return (
-            <div key={po.id} className="border border-[#2a3d55] rounded-xl overflow-hidden">
+            <div key={po.id} className="border border-fp-border rounded-xl overflow-hidden">
               {/* PO Header Row */}
               <div
-                className="flex items-center justify-between p-4 cursor-pointer hover:bg-[#1f3550] transition-colors"
+                className="flex items-center justify-between p-4 cursor-pointer hover:bg-fp-hover transition-colors"
                 onClick={() => toggleExpand(po)}
               >
                 <div className="flex items-center gap-4">
                   <div>
-                    <p className="text-white font-semibold text-sm">{po.po_number}</p>
-                    <p className="text-[#8A9AB0] text-xs">{po.vendor_name} · {new Date(po.created_at).toLocaleDateString()}</p>
+                    <p className="text-fp-text font-semibold text-sm">{po.po_number}</p>
+                    <p className="text-fp-muted text-xs">{po.vendor_name} · {new Date(po.created_at).toLocaleDateString()}</p>
                   </div>
                   <span className={`text-xs font-semibold px-2 py-1 rounded ${
                     po.status === 'Received' ? 'bg-green-500/20 text-green-400' :
@@ -111,45 +111,45 @@ export default function POList({ proposalId }) {
                     {po.status}
                   </span>
                   {progress && (
-                    <span className="text-[#8A9AB0] text-xs">
+                    <span className="text-fp-muted text-xs">
                       {progress.received} of {progress.total} received
                     </span>
                   )}
                 </div>
                 <div className="flex items-center gap-4">
-                  <p className="text-white text-sm font-semibold">
+                  <p className="text-fp-text text-sm font-semibold">
                     ${(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </p>
                   <select
                     value={po.status}
                     onChange={e => { e.stopPropagation(); updateStatus(po.id, e.target.value) }}
                     onClick={e => e.stopPropagation()}
-                    className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]"
+                    className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand"
                   >
                     {['Sent', 'Partial', 'Received', 'Cancelled'].map(s => (
                       <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
-                  <span className="text-[#8A9AB0] text-sm">{isExpanded ? '▲' : '▼'}</span>
+                  <span className="text-fp-muted text-sm">{isExpanded ? '▲' : '▼'}</span>
                 </div>
               </div>
 
               {/* Expanded Receiving Table */}
               {isExpanded && (
-                <div className="border-t border-[#2a3d55] p-4">
+                <div className="border-t border-fp-border p-4">
                   {!lineItems[po.id] ? (
-                    <p className="text-[#8A9AB0] text-sm">Loading items...</p>
+                    <p className="text-fp-muted text-sm">Loading items...</p>
                   ) : lineItems[po.id].length === 0 ? (
-                    <p className="text-[#8A9AB0] text-sm">No line items found for this PO.</p>
+                    <p className="text-fp-muted text-sm">No line items found for this PO.</p>
                   ) : (
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b border-[#2a3d55]">
-                          <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Item</th>
-                          <th className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs">Part #</th>
-                          <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal text-xs">Ordered</th>
-                          <th className="text-[#8A9AB0] text-right py-2 pr-4 font-normal text-xs">Received Qty</th>
-                          <th className="text-[#8A9AB0] text-left py-2 font-normal text-xs">Status</th>
+                        <tr className="border-b border-fp-border">
+                          <th className="text-fp-muted text-left py-2 pr-4 font-normal text-xs">Item</th>
+                          <th className="text-fp-muted text-left py-2 pr-4 font-normal text-xs">Part #</th>
+                          <th className="text-fp-muted text-right py-2 pr-4 font-normal text-xs">Ordered</th>
+                          <th className="text-fp-muted text-right py-2 pr-4 font-normal text-xs">Received Qty</th>
+                          <th className="text-fp-muted text-left py-2 font-normal text-xs">Status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -158,10 +158,10 @@ export default function POList({ proposalId }) {
                           const received = parseFloat(item.received_qty) || 0
                           const itemStatus = received === 0 ? 'Pending' : received >= ordered ? 'Received' : 'Partial'
                           return (
-                            <tr key={item.id} className="border-b border-[#2a3d55]/30">
-                              <td className="text-white py-3 pr-4">{item.item_name}</td>
-                              <td className="text-[#8A9AB0] py-3 pr-4">{item.part_number_sku || '—'}</td>
-                              <td className="text-white py-3 pr-4 text-right">{ordered} {item.unit || 'ea'}</td>
+                            <tr key={item.id} className="border-b border-fp-border/30">
+                              <td className="text-fp-text py-3 pr-4">{item.item_name}</td>
+                              <td className="text-fp-muted py-3 pr-4">{item.part_number_sku || '—'}</td>
+                              <td className="text-fp-text py-3 pr-4 text-right">{ordered} {item.unit || 'ea'}</td>
                               <td className="py-3 pr-4 text-right">
                                 <input
                                   type="number"
@@ -170,20 +170,20 @@ export default function POList({ proposalId }) {
                                   value={received || ''}
                                   onChange={e => updateReceivedQty(po.id, item.id, e.target.value, ordered)}
                                   placeholder="0"
-                                  className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] text-right"
+                                  className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand text-right"
                                 />
-                                {savingReceiving[item.id] && <span className="text-[#8A9AB0] text-xs ml-1">✓</span>}
+                                {savingReceiving[item.id] && <span className="text-fp-muted text-xs ml-1">✓</span>}
                               </td>
                               <td className="py-3">
                                 <span className={`text-xs font-semibold px-2 py-1 rounded ${
                                   itemStatus === 'Received' ? 'bg-green-500/20 text-green-400' :
                                   itemStatus === 'Partial' ? 'bg-yellow-500/20 text-yellow-400' :
-                                  'bg-[#2a3d55] text-[#8A9AB0]'
+                                  'bg-fp-inset text-fp-muted'
                                 }`}>
                                   {itemStatus}
                                 </span>
                                 {item.received_at && (
-                                  <span className="text-[#8A9AB0] text-xs ml-2">
+                                  <span className="text-fp-muted text-xs ml-2">
                                     {new Date(item.received_at).toLocaleDateString()}
                                   </span>
                                 )}
@@ -194,8 +194,8 @@ export default function POList({ proposalId }) {
                       </tbody>
                       <tfoot>
                         <tr>
-                          <td colSpan="2" className="text-[#8A9AB0] pt-3 text-right font-semibold text-xs pr-4">Totals</td>
-                          <td className="text-white pt-3 pr-4 text-right text-xs font-semibold">
+                          <td colSpan="2" className="text-fp-muted pt-3 text-right font-semibold text-xs pr-4">Totals</td>
+                          <td className="text-fp-text pt-3 pr-4 text-right text-xs font-semibold">
                             {lineItems[po.id].reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0)}
                           </td>
                           <td className="text-[#C8622A] pt-3 pr-4 text-right text-xs font-semibold">

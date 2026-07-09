@@ -32,33 +32,33 @@ function MultiSelect({ options, selected, onChange, placeholder = 'Search…' })
   return (
     <div ref={ref} className="relative min-w-[200px]">
       <div
-        className="flex flex-wrap items-center gap-1.5 bg-[#0F1C2E] border border-[#2a3d55] rounded-lg px-2 py-1.5 focus-within:border-[#C8622A] cursor-text"
+        className="flex flex-wrap items-center gap-1.5 bg-fp-inset border border-fp-border rounded-lg px-2 py-1.5 focus-within:border-[#C8622A] cursor-text"
         onClick={() => setOpen(true)}
       >
         {selected.map(s => (
           <span key={s.value} className="flex items-center gap-1 bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-medium">
             {s.label}
-            <button onClick={(e) => { e.stopPropagation(); remove(s.value) }} className="hover:text-white leading-none">×</button>
+            <button onClick={(e) => { e.stopPropagation(); remove(s.value) }} className="hover:text-fp-text leading-none">×</button>
           </span>
         ))}
         <input
-          className="bg-transparent text-white text-sm outline-none flex-1 min-w-[120px] py-0.5"
+          className="bg-transparent text-fp-text text-sm outline-none flex-1 min-w-[120px] py-0.5"
           placeholder={selected.length === 0 ? placeholder : 'Add more…'}
           value={query}
           onFocus={() => setOpen(true)}
           onChange={e => { setQuery(e.target.value); setOpen(true) }}
         />
         {selected.length > 0 && (
-          <button onClick={(e) => { e.stopPropagation(); clear() }} className="text-[#8A9AB0] hover:text-white text-xs shrink-0 ml-1">✕ Clear</button>
+          <button onClick={(e) => { e.stopPropagation(); clear() }} className="text-fp-muted hover:text-fp-text text-xs shrink-0 ml-1">✕ Clear</button>
         )}
       </div>
       {open && (
-        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-[#1a2d45] border border-[#2a3d55] rounded-lg shadow-xl max-h-56 overflow-y-auto">
+        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-fp-card border border-fp-border rounded-lg shadow-xl max-h-56 overflow-y-auto">
           {filtered.length === 0
-            ? <p className="text-[#8A9AB0] text-sm px-3 py-2">{query ? 'No results' : 'All selected or no options'}</p>
+            ? <p className="text-fp-muted text-sm px-3 py-2">{query ? 'No results' : 'All selected or no options'}</p>
             : filtered.map(opt => (
               <button key={opt.value} onClick={() => add(opt)}
-                className="w-full text-left px-3 py-2 text-sm text-white hover:bg-[#0F1C2E] transition-colors">
+                className="w-full text-left px-3 py-2 text-sm text-fp-text hover:bg-fp-inset transition-colors">
                 {opt.label}
               </button>
             ))
@@ -89,27 +89,27 @@ function SearchSelect({ options, value, onChange, placeholder = 'Search…' }) {
 
   return (
     <div ref={ref} className="relative min-w-[180px]">
-      <div className="flex items-center bg-[#0F1C2E] border border-[#2a3d55] rounded-lg px-3 py-2 gap-2 focus-within:border-[#C8622A]">
-        {display && !open && <span className="text-white text-sm truncate max-w-[140px]">{display}</span>}
+      <div className="flex items-center bg-fp-inset border border-fp-border rounded-lg px-3 py-2 gap-2 focus-within:border-[#C8622A]">
+        {display && !open && <span className="text-fp-text text-sm truncate max-w-[140px]">{display}</span>}
         <input
-          className="bg-transparent text-white text-sm outline-none flex-1"
+          className="bg-transparent text-fp-text text-sm outline-none flex-1"
           placeholder={display ? '' : placeholder}
           value={open ? query : ''}
           onFocus={() => { setOpen(true); setQuery('') }}
           onChange={e => { setQuery(e.target.value); setOpen(true) }}
         />
         {display
-          ? <button onClick={clear} className="text-[#8A9AB0] hover:text-white text-xs shrink-0">✕</button>
-          : <span className="text-[#8A9AB0] text-xs shrink-0">▾</span>
+          ? <button onClick={clear} className="text-fp-muted hover:text-fp-text text-xs shrink-0">✕</button>
+          : <span className="text-fp-muted text-xs shrink-0">▾</span>
         }
       </div>
       {open && (
-        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-[#1a2d45] border border-[#2a3d55] rounded-lg shadow-xl max-h-56 overflow-y-auto">
+        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-fp-card border border-fp-border rounded-lg shadow-xl max-h-56 overflow-y-auto">
           {filtered.length === 0
-            ? <p className="text-[#8A9AB0] text-sm px-3 py-2">No results</p>
+            ? <p className="text-fp-muted text-sm px-3 py-2">No results</p>
             : filtered.map(opt => (
               <button key={opt.value} onClick={() => select(opt)}
-                className="w-full text-left px-3 py-2 text-sm text-white hover:bg-[#0F1C2E] transition-colors">
+                className="w-full text-left px-3 py-2 text-sm text-fp-text hover:bg-fp-inset transition-colors">
                 {opt.label}
               </button>
             ))
@@ -750,20 +750,20 @@ export default function Reports(props) {
     doc.save(`${prefix}_${reportLabel.replace(/ /g, '_')}_${today()}.pdf`)
   }
 
-  const selClass = "bg-[#0F1C2E] border border-[#2a3d55] text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]"
+  const selClass = "bg-fp-inset border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand"
 
   const MiniTable = ({ rows }) => {
-    if (!rows?.length) return <p className="text-[#8A9AB0] text-sm py-3">None</p>
+    if (!rows?.length) return <p className="text-fp-muted text-sm py-3">None</p>
     const cols = Object.keys(rows[0])
     return (
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead><tr className="border-b border-[#2a3d55]">
-            {cols.map(c => <th key={c} className="text-left px-3 py-2 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{c}</th>)}
+          <thead><tr className="border-b border-fp-border">
+            {cols.map(c => <th key={c} className="text-left px-3 py-2 text-fp-muted text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{c}</th>)}
           </tr></thead>
           <tbody>{rows.map((row, i) => (
             <tr key={i} className="border-b border-[#0F1C2E]/60">
-              {cols.map(c => <td key={c} className="px-3 py-2 text-white whitespace-nowrap">{row[c]}</td>)}
+              {cols.map(c => <td key={c} className="px-3 py-2 text-fp-text whitespace-nowrap">{row[c]}</td>)}
             </tr>
           ))}</tbody>
         </table>
@@ -772,15 +772,15 @@ export default function Reports(props) {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#0F1C2E]">
+    <div className="flex min-h-screen bg-fp-inset">
       <Sidebar {...props} />
       <div className="flex-1 p-8 overflow-auto">
         <div className="max-w-6xl mx-auto">
 
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-white text-2xl font-bold">Reports</h1>
-              <p className="text-[#8A9AB0] text-sm mt-1">Export data as Excel or PDF</p>
+              <h1 className="text-fp-text text-2xl font-bold">Reports</h1>
+              <p className="text-fp-muted text-sm mt-1">Export data as Excel or PDF</p>
             </div>
             {activeReport !== 'client_report' && (
               <div className="flex items-center gap-4">
@@ -789,16 +789,16 @@ export default function Reports(props) {
                     type="checkbox"
                     checked={branded}
                     onChange={e => setBranded(e.target.checked)}
-                    className="accent-[#C8622A] w-4 h-4"
+                    className="accent-fp-brand w-4 h-4"
                   />
-                  <span className="text-[#8A9AB0] text-sm hover:text-white transition-colors">Include branding</span>
+                  <span className="text-fp-muted text-sm hover:text-fp-text transition-colors">Include branding</span>
                 </label>
                 <button onClick={exportExcel} disabled={data.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#1a7a4a] hover:bg-[#1a7a4a]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
+                  className="flex items-center gap-2 px-4 py-2 bg-[#1a7a4a] hover:bg-[#1a7a4a]/80 disabled:opacity-40 disabled:cursor-not-allowed text-fp-text text-sm font-medium rounded-lg transition-colors">
                   <span>📊</span> Export Excel
                 </button>
                 <button onClick={exportPDF} disabled={data.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] hover:bg-[#C8622A]/80 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors">
+                  className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] hover:bg-[#C8622A]/80 disabled:opacity-40 disabled:cursor-not-allowed text-fp-text text-sm font-medium rounded-lg transition-colors">
                   <span>📄</span> Export PDF
                 </button>
               </div>
@@ -810,12 +810,12 @@ export default function Reports(props) {
             <div className="w-48 shrink-0 space-y-4">
               {navGroups.map(group => (
                 <div key={group.label}>
-                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wider px-3 mb-1">{group.label}</p>
+                  <p className="text-fp-muted text-xs font-semibold uppercase tracking-wider px-3 mb-1">{group.label}</p>
                   <div className="space-y-0.5">
                     {group.items.map(r => (
                       <button key={r.key} onClick={() => switchReport(r.key)}
                         className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2.5 transition-all ${
-                          activeReport === r.key ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'text-[#8A9AB0] hover:text-white hover:bg-[#1a2d45]'
+                          activeReport === r.key ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'text-fp-muted hover:text-fp-text hover:bg-fp-card'
                         }`}>
                         <span>{r.icon}</span>{r.label}
                       </button>
@@ -830,8 +830,8 @@ export default function Reports(props) {
               {/* ── Client Report ── */}
               {activeReport === 'client_report' ? (
                 <div>
-                  <div className="bg-[#1a2d45] rounded-xl p-4 mb-4">
-                    <label className="block text-[#8A9AB0] text-xs font-medium mb-2">Search Client</label>
+                  <div className="bg-fp-card rounded-xl p-4 mb-4">
+                    <label className="block text-fp-muted text-xs font-medium mb-2">Search Client</label>
                     <div className="max-w-xs">
                       <SearchSelect
                         options={clients}
@@ -841,19 +841,19 @@ export default function Reports(props) {
                       />
                     </div>
                   </div>
-                  {clientLoading && <div className="text-center text-[#8A9AB0] py-16 text-sm">Loading…</div>}
+                  {clientLoading && <div className="text-center text-fp-muted py-16 text-sm">Loading…</div>}
                   {!clientLoading && !clientReport && (
-                    <div className="text-center text-[#8A9AB0] py-16 text-sm">Search for a client to see their report</div>
+                    <div className="text-center text-fp-muted py-16 text-sm">Search for a client to see their report</div>
                   )}
                   {clientReport && (
                     <div className="space-y-4">
                       <div className="flex justify-end gap-3">
                         <label className="flex items-center gap-2 cursor-pointer select-none">
-                          <input type="checkbox" checked={branded} onChange={e => setBranded(e.target.checked)} className="accent-[#C8622A] w-4 h-4"/>
-                          <span className="text-[#8A9AB0] text-sm hover:text-white transition-colors">Include branding</span>
+                          <input type="checkbox" checked={branded} onChange={e => setBranded(e.target.checked)} className="accent-fp-brand w-4 h-4"/>
+                          <span className="text-fp-muted text-sm hover:text-fp-text transition-colors">Include branding</span>
                         </label>
                         <button onClick={exportClientPDF}
-                          className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] hover:bg-[#C8622A]/80 text-white text-sm font-medium rounded-lg transition-colors">
+                          className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] hover:bg-[#C8622A]/80 text-fp-text text-sm font-medium rounded-lg transition-colors">
                           <span>📄</span> Export PDF
                         </button>
                       </div>
@@ -867,23 +867,23 @@ export default function Reports(props) {
                           { label: 'Completed Jobs', value: clientReport.summary.closedJobs,      sub: '' },
                           { label: 'Open Tickets',   value: clientReport.summary.openTickets,     sub: '' },
                         ].map(card => (
-                          <div key={card.label} className="bg-[#1a2d45] rounded-xl p-4">
-                            <p className="text-[#8A9AB0] text-xs font-medium mb-1">{card.label}</p>
-                            <p className="text-white text-xl font-bold">{card.value}</p>
-                            {card.sub && <p className="text-[#8A9AB0] text-xs mt-0.5">{card.sub}</p>}
+                          <div key={card.label} className="bg-fp-card rounded-xl p-4">
+                            <p className="text-fp-muted text-xs font-medium mb-1">{card.label}</p>
+                            <p className="text-fp-text text-xl font-bold">{card.value}</p>
+                            {card.sub && <p className="text-fp-muted text-xs mt-0.5">{card.sub}</p>}
                           </div>
                         ))}
                       </div>
-                      <div className="bg-[#1a2d45] rounded-xl p-4">
-                        <p className="text-white font-semibold mb-3">Proposals ({clientReport.proposals.length})</p>
+                      <div className="bg-fp-card rounded-xl p-4">
+                        <p className="text-fp-text font-semibold mb-3">Proposals ({clientReport.proposals.length})</p>
                         <MiniTable rows={clientReport.proposals} />
                       </div>
-                      <div className="bg-[#1a2d45] rounded-xl p-4">
-                        <p className="text-white font-semibold mb-3">Jobs ({clientReport.jobs.length})</p>
+                      <div className="bg-fp-card rounded-xl p-4">
+                        <p className="text-fp-text font-semibold mb-3">Jobs ({clientReport.jobs.length})</p>
                         <MiniTable rows={clientReport.jobs} />
                       </div>
-                      <div className="bg-[#1a2d45] rounded-xl p-4">
-                        <p className="text-white font-semibold mb-3">Service Tickets ({clientReport.tickets.length})</p>
+                      <div className="bg-fp-card rounded-xl p-4">
+                        <p className="text-fp-text font-semibold mb-3">Service Tickets ({clientReport.tickets.length})</p>
                         <MiniTable rows={clientReport.tickets} />
                       </div>
                     </div>
@@ -893,33 +893,33 @@ export default function Reports(props) {
               ) : (
                 <>
                   {/* Filters */}
-                  <div className="bg-[#1a2d45] rounded-xl p-4 mb-4 space-y-3">
+                  <div className="bg-fp-card rounded-xl p-4 mb-4 space-y-3">
                     {/* Date row */}
                     <div className={`flex flex-wrap items-end gap-3 ${noDate ? 'opacity-40 pointer-events-none select-none' : ''}`}>
                       <div>
-                        <label className="block text-[#8A9AB0] text-xs font-medium mb-1">From</label>
+                        <label className="block text-fp-muted text-xs font-medium mb-1">From</label>
                         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={selClass} />
                       </div>
                       <div>
-                        <label className="block text-[#8A9AB0] text-xs font-medium mb-1">To</label>
+                        <label className="block text-fp-muted text-xs font-medium mb-1">To</label>
                         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={selClass} />
                       </div>
                       <div className="flex gap-2 pb-0.5">
-                        <button onClick={() => { setDateFrom(daysAgo(30)); setDateTo(today()) }} className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">30d</button>
-                        <button onClick={() => { setDateFrom(daysAgo(90)); setDateTo(today()) }} className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">90d</button>
-                        <button onClick={() => { setDateFrom(''); setDateTo('') }}               className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">All</button>
+                        <button onClick={() => { setDateFrom(daysAgo(30)); setDateTo(today()) }} className="text-xs px-3 py-1.5 rounded-lg bg-fp-inset text-fp-muted hover:text-fp-text transition-colors">30d</button>
+                        <button onClick={() => { setDateFrom(daysAgo(90)); setDateTo(today()) }} className="text-xs px-3 py-1.5 rounded-lg bg-fp-inset text-fp-muted hover:text-fp-text transition-colors">90d</button>
+                        <button onClick={() => { setDateFrom(''); setDateTo('') }}               className="text-xs px-3 py-1.5 rounded-lg bg-fp-inset text-fp-muted hover:text-fp-text transition-colors">All</button>
                       </div>
-                      <div className="ml-auto text-[#8A9AB0] text-sm self-end pb-0.5">
+                      <div className="ml-auto text-fp-muted text-sm self-end pb-0.5">
                         {!loading && <span>{data.length} row{data.length !== 1 ? 's' : ''}</span>}
                       </div>
                     </div>
 
                     {/* Contextual filters */}
                     {activeFilters.length > 0 && (
-                      <div className="flex flex-wrap gap-3 pt-2 border-t border-[#2a3d55]">
+                      <div className="flex flex-wrap gap-3 pt-2 border-t border-fp-border">
                         {activeFilters.includes('clients') && (
                           <div>
-                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Client</label>
+                            <label className="block text-fp-muted text-xs font-medium mb-1">Client</label>
                             <MultiSelect
                               options={clients}
                               selected={filters.clients}
@@ -930,7 +930,7 @@ export default function Reports(props) {
                         )}
                         {activeFilters.includes('rep') && (
                           <div>
-                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Rep</label>
+                            <label className="block text-fp-muted text-xs font-medium mb-1">Rep</label>
                             <select value={filters.rep} onChange={e => setFilter('rep', e.target.value)} className={selClass}>
                               <option value="">All Reps</option>
                               {reps.map(r => <option key={r} value={r}>{r}</option>)}
@@ -939,7 +939,7 @@ export default function Reports(props) {
                         )}
                         {activeFilters.includes('industry') && (
                           <div>
-                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Industry</label>
+                            <label className="block text-fp-muted text-xs font-medium mb-1">Industry</label>
                             <select value={filters.industry} onChange={e => setFilter('industry', e.target.value)} className={selClass}>
                               <option value="">All Industries</option>
                               {industries.map(i => <option key={i} value={i}>{i}</option>)}
@@ -948,7 +948,7 @@ export default function Reports(props) {
                         )}
                         {activeFilters.includes('tech') && (
                           <div>
-                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Technician</label>
+                            <label className="block text-fp-muted text-xs font-medium mb-1">Technician</label>
                             <SearchSelect
                               options={techs}
                               value={filters.tech}
@@ -959,7 +959,7 @@ export default function Reports(props) {
                         )}
                         {activeFilters.includes('status') && (
                           <div>
-                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Status</label>
+                            <label className="block text-fp-muted text-xs font-medium mb-1">Status</label>
                             <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className={selClass}>
                               <option value="">All Statuses</option>
                               {activeReport === 'service_tickets' && ['Open','In Progress','Resolved','Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
@@ -970,7 +970,7 @@ export default function Reports(props) {
                         )}
                         {activeFilters.includes('priority') && (
                           <div>
-                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Priority</label>
+                            <label className="block text-fp-muted text-xs font-medium mb-1">Priority</label>
                             <select value={filters.priority} onChange={e => setFilter('priority', e.target.value)} className={selClass}>
                               <option value="">All Priorities</option>
                               {['Low','Normal','High','Urgent'].map(p => <option key={p} value={p}>{p}</option>)}
@@ -979,7 +979,7 @@ export default function Reports(props) {
                         )}
                         {activeFilters.includes('vendor') && (
                           <div>
-                            <label className="block text-[#8A9AB0] text-xs font-medium mb-1">Vendor</label>
+                            <label className="block text-fp-muted text-xs font-medium mb-1">Vendor</label>
                             <SearchSelect
                               options={vendors}
                               value={filters.vendorName}
@@ -990,7 +990,7 @@ export default function Reports(props) {
                         )}
                         {(filters.clients.length > 0 || filters.rep || filters.industry || filters.tech || filters.status || filters.priority || filters.vendorName) && (
                           <div className="self-end pb-0.5">
-                            <button onClick={() => setFilters(BLANK_FILTERS)} className="text-xs px-3 py-1.5 rounded-lg bg-[#0F1C2E] text-[#8A9AB0] hover:text-white transition-colors">Clear filters</button>
+                            <button onClick={() => setFilters(BLANK_FILTERS)} className="text-xs px-3 py-1.5 rounded-lg bg-fp-inset text-fp-muted hover:text-fp-text transition-colors">Clear filters</button>
                           </div>
                         )}
                       </div>
@@ -998,29 +998,29 @@ export default function Reports(props) {
                   </div>
 
                   {/* Table */}
-                  <div className="bg-[#1a2d45] rounded-xl overflow-hidden">
+                  <div className="bg-fp-card rounded-xl overflow-hidden">
                     {loading ? (
-                      <div className="text-center text-[#8A9AB0] py-16 text-sm">Loading…</div>
+                      <div className="text-center text-fp-muted py-16 text-sm">Loading…</div>
                     ) : data.length === 0 ? (
-                      <div className="text-center text-[#8A9AB0] py-16 text-sm">No data for this report</div>
+                      <div className="text-center text-fp-muted py-16 text-sm">No data for this report</div>
                     ) : activeReport === 'vendor_spend' ? (
                       /* Vendor summary — expandable rows */
                       <div>
-                        <div className="px-4 py-3 border-b border-[#2a3d55]">
+                        <div className="px-4 py-3 border-b border-fp-border">
                           <input
                             type="text"
                             placeholder="Search vendor…"
                             value={vendorSearch}
                             onChange={e => setVendorSearch(e.target.value)}
-                            className="bg-[#0F1C2E] border border-[#2a3d55] text-white text-sm rounded-lg px-3 py-1.5 w-56 focus:outline-none focus:border-[#C8622A]"
+                            className="bg-fp-inset border border-fp-border text-fp-text text-sm rounded-lg px-3 py-1.5 w-56 focus:outline-none focus:border-fp-brand"
                           />
                         </div>
                         <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="border-b border-[#2a3d55]">
-                                <th className="text-left px-4 py-3 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide w-6" />
-                                {columns.map(col => <th key={col} className="text-left px-4 py-3 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{col}</th>)}
+                              <tr className="border-b border-fp-border">
+                                <th className="text-left px-4 py-3 text-fp-muted text-xs font-semibold uppercase tracking-wide w-6" />
+                                {columns.map(col => <th key={col} className="text-left px-4 py-3 text-fp-muted text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{col}</th>)}
                               </tr>
                             </thead>
                             <tbody>
@@ -1034,33 +1034,33 @@ export default function Reports(props) {
                                   <>
                                     <tr key={i}
                                       onClick={() => setExpandedVendor(isOpen ? null : vendor)}
-                                      className="border-b border-[#0F1C2E]/60 hover:bg-[#0F1C2E]/40 transition-colors cursor-pointer">
-                                      <td className="px-4 py-3 text-[#8A9AB0] text-xs">{isOpen ? '▾' : '▸'}</td>
-                                      {columns.map(col => <td key={col} className="px-4 py-3 text-white whitespace-nowrap">{row[col]}</td>)}
+                                      className="border-b border-[#0F1C2E]/60 hover:bg-fp-inset/40 transition-colors cursor-pointer">
+                                      <td className="px-4 py-3 text-fp-muted text-xs">{isOpen ? '▾' : '▸'}</td>
+                                      {columns.map(col => <td key={col} className="px-4 py-3 text-fp-text whitespace-nowrap">{row[col]}</td>)}
                                     </tr>
                                     {isOpen && (
-                                      <tr key={`${i}-detail`} className="border-b border-[#0F1C2E]/60 bg-[#0F1C2E]/60">
+                                      <tr key={`${i}-detail`} className="border-b border-[#0F1C2E]/60 bg-fp-inset/60">
                                         <td colSpan={columns.length + 1} className="px-6 py-3">
                                           <table className="w-full text-xs">
                                             <thead>
-                                              <tr className="border-b border-[#2a3d55]">
-                                                <th className="text-left py-2 pr-4 text-[#8A9AB0] font-semibold uppercase tracking-wide">Item</th>
-                                                <th className="text-left py-2 pr-4 text-[#8A9AB0] font-semibold uppercase tracking-wide">SKU</th>
-                                                <th className="text-left py-2 pr-4 text-[#8A9AB0] font-semibold uppercase tracking-wide">Category</th>
-                                                <th className="text-right py-2 pr-4 text-[#8A9AB0] font-semibold uppercase tracking-wide">Qty</th>
-                                                <th className="text-right py-2 pr-4 text-[#8A9AB0] font-semibold uppercase tracking-wide">Total Cost</th>
-                                                <th className="text-right py-2 text-[#8A9AB0] font-semibold uppercase tracking-wide">Total Rev</th>
+                                              <tr className="border-b border-fp-border">
+                                                <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Item</th>
+                                                <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">SKU</th>
+                                                <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Category</th>
+                                                <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Qty</th>
+                                                <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Total Cost</th>
+                                                <th className="text-right py-2 text-fp-muted font-semibold uppercase tracking-wide">Total Rev</th>
                                               </tr>
                                             </thead>
                                             <tbody>
                                               {items.map((item, j) => (
-                                                <tr key={j} className="border-b border-[#2a3d55]/40">
-                                                  <td className="py-1.5 pr-4 text-white">{item.name}</td>
-                                                  <td className="py-1.5 pr-4 text-[#8A9AB0] font-mono">{item.sku}</td>
-                                                  <td className="py-1.5 pr-4 text-[#8A9AB0]">{item.category}</td>
-                                                  <td className="py-1.5 pr-4 text-white text-right">{item.qty}</td>
-                                                  <td className="py-1.5 pr-4 text-white text-right">{fmt$(item.cost)}</td>
-                                                  <td className="py-1.5 text-white text-right">{fmt$(item.revenue)}</td>
+                                                <tr key={j} className="border-b border-fp-border/40">
+                                                  <td className="py-1.5 pr-4 text-fp-text">{item.name}</td>
+                                                  <td className="py-1.5 pr-4 text-fp-muted font-mono">{item.sku}</td>
+                                                  <td className="py-1.5 pr-4 text-fp-muted">{item.category}</td>
+                                                  <td className="py-1.5 pr-4 text-fp-text text-right">{item.qty}</td>
+                                                  <td className="py-1.5 pr-4 text-fp-text text-right">{fmt$(item.cost)}</td>
+                                                  <td className="py-1.5 text-fp-text text-right">{fmt$(item.revenue)}</td>
                                                 </tr>
                                               ))}
                                             </tbody>
@@ -1079,14 +1079,14 @@ export default function Reports(props) {
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
-                            <tr className="border-b border-[#2a3d55]">
-                              {columns.map(col => <th key={col} className="text-left px-4 py-3 text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{col}</th>)}
+                            <tr className="border-b border-fp-border">
+                              {columns.map(col => <th key={col} className="text-left px-4 py-3 text-fp-muted text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{col}</th>)}
                             </tr>
                           </thead>
                           <tbody>
                             {data.map((row, i) => (
-                              <tr key={i} className="border-b border-[#0F1C2E]/60 hover:bg-[#0F1C2E]/40 transition-colors">
-                                {columns.map(col => <td key={col} className="px-4 py-3 text-white whitespace-nowrap">{row[col]}</td>)}
+                              <tr key={i} className="border-b border-[#0F1C2E]/60 hover:bg-fp-inset/40 transition-colors">
+                                {columns.map(col => <td key={col} className="px-4 py-3 text-fp-text whitespace-nowrap">{row[col]}</td>)}
                               </tr>
                             ))}
                           </tbody>
