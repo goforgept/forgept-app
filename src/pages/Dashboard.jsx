@@ -36,19 +36,21 @@ function RevenueMetricsWidget({ proposals }) {
   const avgMargin = marginSrc.length > 0
     ? marginSrc.reduce((s, p) => s + p.total_gross_margin_percent, 0) / marginSrc.length
     : null
+  const last30 = proposals.filter(p => new Date(p.created_at) >= new Date(Date.now() - 30 * 864e5)).length
 
   const cards = [
-    { label: 'Active Pipeline', value: fmt(activeVal),  color: 'text-fp-text' },
-    { label: 'Total Won',       value: fmt(wonVal),     color: 'text-green-400' },
-    { label: 'Win Rate',        value: winRate !== null ? `${winRate}%` : '—', color: 'text-fp-brand' },
-    { label: 'Avg Deal Size',   value: fmt(avgDeal),    color: 'text-blue-400' },
-    { label: 'Avg Margin',      value: avgMargin !== null ? `${avgMargin.toFixed(1)}%` : '—', color: 'text-purple-400' },
-    { label: 'Closing in 30d',  value: closing,         color: closing > 0 ? 'text-yellow-400' : 'text-fp-muted' },
+    { label: 'Active Pipeline',    value: fmt(activeVal),  color: 'text-fp-text' },
+    { label: 'Total Won',          value: fmt(wonVal),     color: 'text-green-400' },
+    { label: 'Win Rate',           value: winRate !== null ? `${winRate}%` : '—', color: 'text-fp-brand' },
+    { label: 'Avg Deal Size',      value: fmt(avgDeal),    color: 'text-blue-400' },
+    { label: 'Avg Margin',         value: avgMargin !== null ? `${avgMargin.toFixed(1)}%` : '—', color: 'text-purple-400' },
+    { label: 'Closing in 30d',     value: closing,         color: closing > 0 ? 'text-yellow-400' : 'text-fp-muted' },
+    { label: 'Created (30d)',       value: last30,          color: last30 > 0 ? 'text-sky-400' : 'text-fp-muted' },
   ]
   return (
     <div className="col-span-2">
       <p className="text-fp-text font-bold mb-3">Revenue Metrics</p>
-      <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-3 lg:grid-cols-7 gap-3">
         {cards.map(c => (
           <div key={c.label} className="bg-fp-inset rounded-xl p-4 border border-fp-border/50">
             <p className="text-fp-muted text-xs mb-2">{c.label}</p>

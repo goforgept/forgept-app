@@ -345,14 +345,20 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-6 gap-4 mb-6">
-          <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Active Pipeline</p><p className="text-fp-text text-xl font-bold">${activePipeline.toLocaleString()}</p></div>
-          <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Won Revenue</p><p className="text-green-400 text-xl font-bold">${wonPipeline.toLocaleString()}</p></div>
-          <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Avg Margin</p><p className="text-fp-brand text-xl font-bold">{avgMargin ? `${avgMargin}%` : '—'}</p></div>
-          <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Close Rate</p><p className="text-fp-brand text-xl font-bold">{closeRate ? `${closeRate}%` : '—'}</p></div>
-          <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Closing in 30d</p><p className="text-fp-brand text-xl font-bold">{closingSoon}</p></div>
-          <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Total Proposals</p><p className="text-fp-text text-xl font-bold">{filteredProposals.length}</p></div>
-        </div>
+        {(() => {
+          const myLast30 = proposals.filter(p => p.user_id === profile?.id && new Date(p.created_at) >= new Date(Date.now() - 30 * 864e5)).length
+          return (
+            <div className="grid grid-cols-7 gap-4 mb-6">
+              <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Active Pipeline</p><p className="text-fp-text text-xl font-bold">${activePipeline.toLocaleString()}</p></div>
+              <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Won Revenue</p><p className="text-green-400 text-xl font-bold">${wonPipeline.toLocaleString()}</p></div>
+              <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Avg Margin</p><p className="text-fp-brand text-xl font-bold">{avgMargin ? `${avgMargin}%` : '—'}</p></div>
+              <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Close Rate</p><p className="text-fp-brand text-xl font-bold">{closeRate ? `${closeRate}%` : '—'}</p></div>
+              <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Closing in 30d</p><p className="text-fp-brand text-xl font-bold">{closingSoon}</p></div>
+              <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Total Proposals</p><p className="text-fp-text text-xl font-bold">{filteredProposals.length}</p></div>
+              <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">My Created (30d)</p><p className={`text-xl font-bold ${myLast30 > 0 ? 'text-sky-400' : 'text-fp-text'}`}>{myLast30}</p></div>
+            </div>
+          )
+        })()}
 
         {/* ── Customizable Analytics Widgets ── */}
         {!loading && (on('pipeline-chart') || on('top-clients')) && (
