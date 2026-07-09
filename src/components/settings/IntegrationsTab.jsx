@@ -10,12 +10,12 @@ const INTEGRATIONS = [
     icon: '🟢',
     iconBg: 'bg-[#2CA01C]/10',
     accentColor: 'bg-[#2CA01C]',
-    what: ['Won proposals → QBO Invoice', 'Line items with descriptions', 'Labor line items', 'Sales tax if applicable', 'Auto-create customer if new', 'Quote number → Invoice #'],
+    what: ['Push any proposal to QBO as an invoice on demand', 'Line items with descriptions', 'Labor line items', 'Sales tax if applicable', 'Auto-create customer if new', 'Quote number → Invoice #', 'Payment status syncs back when paid in QBO', 'New clients push to QBO automatically'],
     steps: [
       'Click Connect QuickBooks below.',
       'Sign in to your QuickBooks account and approve permissions.',
       'You\'ll be redirected back to ForgePt automatically.',
-      'Won proposals will now sync to QBO as invoices.',
+      'Open any proposal and click "Send to QuickBooks" to push it as an invoice.',
     ],
   },
   {
