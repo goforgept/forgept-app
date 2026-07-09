@@ -1209,7 +1209,6 @@ export default function ProposalDetail({ isAdmin }) {
       .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
       .eq('id', id)
       .single()
-      .single()
     const p = freshProposal ? { ...proposal, ...freshProposal } : proposal
 
     const primaryColor = (profile?.primary_color || '#0F1C2E').replace('#', '')
@@ -1287,12 +1286,22 @@ export default function ProposalDetail({ isAdmin }) {
     const docxTaxRate = (!p?.tax_exempt && p?.tax_rate) ? parseFloat(p.tax_rate) : 0
     const docxTaxAmt = Math.round(matTotal * (docxTaxRate / 100) * 100) / 100
 
+    const docxCsl = [profile?.bill_to_city, profile?.bill_to_state, profile?.bill_to_zip].filter(Boolean).join(', ')
     const children = [
       new Paragraph({ children: [new TextRun({ text: profile?.company_name || proposal?.company || 'ForgePt.', bold: true, size: 36, color: primaryColor })] }),
+      ...(profile?.bill_to_address ? [new Paragraph({ children: [new TextRun({ text: profile.bill_to_address, size: 18, color: '888888' })] })] : []),
+      ...(docxCsl ? [new Paragraph({ children: [new TextRun({ text: docxCsl, size: 18, color: '888888' })] })] : []),
+      ...(profile?.license_number ? [new Paragraph({ children: [new TextRun({ text: `Lic #: ${profile.license_number}`, size: 18, color: '888888' })] })] : []),
+      new Paragraph({ children: [new TextRun({ text: '' })] }),
       new Paragraph({ children: [new TextRun({ text: proposal?.proposal_name || 'Proposal', bold: true, size: 48 })] }),
       new Paragraph({ children: [new TextRun({ text: `Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, size: 20, color: '666666' })] }),
-      new Paragraph({ children: [new TextRun({ text: clientAddress ? `Address: ${clientAddress}` : `Email: ${proposal?.client_email || ''}`, size: 20, color: '666666' })] }),
+      ...(clientAddress ? [new Paragraph({ children: [new TextRun({ text: `Address: ${clientAddress}`, size: 20, color: '666666' })] })] : []),
+      new Paragraph({ children: [new TextRun({ text: `Email: ${proposal?.client_email || ''}`, size: 20, color: '666666' })] }),
       new Paragraph({ children: [new TextRun({ text: `Date: ${new Date().toLocaleDateString()}`, size: 20, color: '666666' })] }),
+      ...(proposal?.rep_name ? [new Paragraph({ children: [new TextRun({ text: `Rep: ${proposal.rep_name}`, size: 18, color: '888888' })] })] : []),
+      ...(proposal?.rep_title ? [new Paragraph({ children: [new TextRun({ text: proposal.rep_title, size: 18, color: '888888' })] })] : []),
+      ...(proposal?.rep_email ? [new Paragraph({ children: [new TextRun({ text: proposal.rep_email, size: 18, color: '888888' })] })] : []),
+      ...(proposal?.rep_phone ? [new Paragraph({ children: [new TextRun({ text: proposal.rep_phone, size: 18, color: '888888' })] })] : []),
       new Paragraph({ children: [new TextRun({ text: '' })] }),
     ]
 
