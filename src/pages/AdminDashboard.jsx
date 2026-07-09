@@ -8,11 +8,10 @@ import { useProfile } from '../context/ProfileContext'
 const ADMIN_WIDGET_DEFS = [
   { id: 'pipeline-chart',   label: 'Pipeline by Stage',  desc: 'Bar chart of deal count/value per status' },
   { id: 'team-leaderboard', label: 'Team Leaderboard',   desc: 'Rep-by-rep revenue ranking and targets' },
-  { id: 'top-clients',      label: 'Top Clients',        desc: 'Top 20 clients by total proposal value' },
   { id: 'ar-summary',       label: 'AR & PO Summary',    desc: 'Outstanding invoices and purchase orders' },
   { id: 'needs-attention',  label: 'Needs Attention',    desc: 'Drafts not sent in 3+ days' },
 ]
-const DEFAULT_ADMIN_WIDGETS = ['pipeline-chart', 'team-leaderboard', 'top-clients', 'ar-summary', 'needs-attention']
+const DEFAULT_ADMIN_WIDGETS = ['pipeline-chart', 'team-leaderboard', 'ar-summary', 'needs-attention']
 const PIPE_STATUS_COLOR = { Draft: '#6B7280', Sent: '#3B82F6', Won: '#22C55E', Lost: '#EF4444' }
 const fmtAd = (n) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
@@ -355,7 +354,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         </div>
 
         {/* ── Customizable Analytics Widgets ── */}
-        {!loading && (on('pipeline-chart') || on('team-leaderboard') || on('top-clients')) && (
+        {!loading && (on('pipeline-chart') || on('team-leaderboard')) && (
           <div className="grid grid-cols-2 gap-4 mb-6">
             {on('pipeline-chart') && (() => {
               const stages = ['Draft','Sent','Won','Lost']
@@ -378,34 +377,6 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                   <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-fp-border/40">
                     {data.map(d => <div key={d.stage} className="text-center"><p className="text-fp-text text-xl font-bold">{d.count}</p><p style={{ color: PIPE_STATUS_COLOR[d.stage] }} className="text-xs font-semibold">{d.stage}</p></div>)}
                   </div>
-                </div>
-              )
-            })()}
-
-            {on('top-clients') && (() => {
-              const byClient = {}
-              filteredProposals.forEach(p => {
-                const key = p.company || 'Unknown'
-                if (!byClient[key]) byClient[key] = { name: key, total: 0, count: 0 }
-                byClient[key].total += (p.proposal_value || 0)
-                byClient[key].count++
-              })
-              const sorted = Object.values(byClient).sort((a,b) => b.total - a.total).slice(0, 20)
-              return (
-                <div className="bg-fp-card rounded-xl p-5 border border-fp-border/40">
-                  <p className="text-fp-text font-bold mb-3">Top Clients{periodShort[period]}</p>
-                  {sorted.length === 0 ? <p className="text-fp-muted text-sm">No data yet.</p> : (
-                    <div className="space-y-1.5 max-h-80 overflow-y-auto">
-                      {sorted.map((c, i) => (
-                        <div key={c.name} className="flex items-center bg-fp-inset rounded-lg px-3 py-2">
-                          <span className="text-fp-muted text-xs w-6">{i+1}</span>
-                          <span className="text-fp-text text-sm flex-1 truncate">{c.name}</span>
-                          <span className="text-fp-muted text-xs mr-3">{c.count} deal{c.count!==1?'s':''}</span>
-                          <span className="text-fp-text text-sm font-semibold">{fmtAd(c.total)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               )
             })()}
