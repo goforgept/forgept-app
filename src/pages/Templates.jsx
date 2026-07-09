@@ -18,7 +18,7 @@ const emptySection = (sortOrder = 0) => ({
   _id: mkKey(), name: '', sort_order: sortOrder, include_labor: false, labor_items: [], isNew: true,
 })
 
-const emptyTemplate = { name: '', description: '', industry: '' }
+const emptyTemplate = { name: '', description: '', industry: '', scope_of_work: '' }
 const industries = ['Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security', 'General Contractor', 'Other']
 const matCategories = ['Electrical', 'Mechanical', 'Audio/Visual', 'Security', 'Networking', 'Material', 'Other']
 const unitOptions = ['ea', 'ft', 'lot', 'hr', 'box', 'roll']
@@ -388,7 +388,7 @@ export default function Templates({ isAdmin }) {
 
   const startEditing = async (template) => {
     setEditingTemplate(template.id)
-    setEditForm({ name: template.name, description: template.description || '', industry: template.industry || '' })
+    setEditForm({ name: template.name, description: template.description || '', industry: template.industry || '', scope_of_work: template.scope_of_work || '' })
     setEditLaborItems(template.labor_items?.length ? template.labor_items : [])
     if (!templateData[template.id]) await fetchTemplateData(template.id)
     const td = templateData[template.id] || { lines: [], sections: [] }
@@ -404,6 +404,7 @@ export default function Templates({ isAdmin }) {
     await supabase.from('templates').update({
       name: editForm.name, description: editForm.description,
       industry: editForm.industry, labor_items: editLaborItems,
+      scope_of_work: editForm.scope_of_work || null,
     }).eq('id', templateId)
 
     const idMap = {}
@@ -690,6 +691,14 @@ export default function Templates({ isAdmin }) {
               </div>
             </div>
 
+            <div>
+              <label className="text-[#8A9AB0] text-xs mb-1 block">Scope of Work <span className="text-[#8A9AB0] font-normal">(optional — applied to proposals when this template is loaded)</span></label>
+              <textarea value={form.scope_of_work} onChange={e => setForm(p => ({ ...p, scope_of_work: e.target.value }))}
+                placeholder="Describe the scope of work for this template..."
+                rows={5}
+                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-y leading-relaxed" />
+            </div>
+
             {renderBomEditor(lines, setLines, laborItems, setLaborItems, sections, setSections, 'create')}
 
             <div className="flex justify-end gap-3 pt-2 border-t border-[#2a3d55]">
@@ -730,6 +739,14 @@ export default function Templates({ isAdmin }) {
                   <input type="text" value={editForm.description} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))}
                     className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
+              </div>
+
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Scope of Work <span className="text-[#8A9AB0] font-normal">(optional — applied to proposals when this template is loaded)</span></label>
+                <textarea value={editForm.scope_of_work} onChange={e => setEditForm(p => ({ ...p, scope_of_work: e.target.value }))}
+                  placeholder="Describe the scope of work for this template..."
+                  rows={5}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-y leading-relaxed" />
               </div>
 
               {renderBomEditor(editLines, setEditLines, editLaborItems, setEditLaborItems, editSections, setEditSections, 'edit')}

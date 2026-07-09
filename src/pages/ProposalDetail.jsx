@@ -1805,7 +1805,7 @@ export default function ProposalDetail({ isAdmin }) {
     setTemplatePickerSelected(null)
     setTemplatePickerLoading(true)
     const { data } = await supabase.from('templates')
-      .select('id, name, description, industry, labor_items')
+      .select('id, name, description, industry, labor_items, scope_of_work')
       .eq('org_id', profile.org_id)
       .order('name')
     setTemplatePickerList(data || [])
@@ -1858,6 +1858,15 @@ export default function ProposalDetail({ isAdmin }) {
       setEditSections(prev => [...prev, ...newSections])
       setEditLines(prev => [...prev, ...newLines])
       if (newLabor.length) setLaborItems(prev => [...prev, ...newLabor])
+    }
+
+    // Apply template SOW to the proposal if present
+    if (template.scope_of_work) {
+      const applySOW = mode === 'replace' || !proposal?.scope_of_work
+      if (applySOW) {
+        await supabase.from('proposals').update({ scope_of_work: template.scope_of_work }).eq('id', id)
+        setProposal(prev => ({ ...prev, scope_of_work: template.scope_of_work }))
+      }
     }
 
     setShowTemplatePicker(false)

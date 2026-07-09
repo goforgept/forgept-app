@@ -122,7 +122,15 @@ export default function ScopeSection({
           )}
         </div>
       ) : (
-        <p className="text-[#8A9AB0] text-sm">No Scope of Work yet.{canEdit ? ' Click Generate SOW to create one.' : ''}</p>
+        <div className="flex items-center gap-3">
+          <p className="text-[#8A9AB0] text-sm">No Scope of Work yet.</p>
+          {canEdit && (
+            <button onClick={() => { setSowDraft(''); setEditingSOW(true) }}
+              className="text-[#C8622A] hover:text-white text-sm font-medium transition-colors">
+              ✏️ Write my SOW
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
