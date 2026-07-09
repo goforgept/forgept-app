@@ -412,7 +412,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     document.documentElement.setAttribute('data-theme', t)
   }
 
-  const inputClass = "w-full bg-fp-bg text-white border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+  const inputClass = "w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   const navGroups = [
     { items: [{ key: 'general', label: 'General' }] },
@@ -445,7 +445,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       <div className="flex flex-1 min-w-0">
         {/* Settings nav */}
         <div className="w-52 border-r border-fp-border p-4 shrink-0">
-          <p className="text-white font-bold text-lg mb-5 px-3">Settings</p>
+          <p className="text-fp-text font-bold text-lg mb-5 px-3">Settings</p>
           <nav className="space-y-0.5">
             {navGroups.map((group, gi) => (
               <div key={gi} className={gi > 0 ? 'pt-4' : ''}>
@@ -457,8 +457,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                     onClick={() => { setActiveTab(item.key); setSuccess(null) }}
                     className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                       activeTab === item.key
-                        ? 'bg-fp-card text-white font-medium border-l-2 border-fp-brand pl-[10px]'
-                        : 'text-fp-muted hover:text-white hover:bg-fp-card/50'
+                        ? 'bg-fp-card text-fp-text font-medium border-l-2 border-fp-brand pl-[10px]'
+                        : 'text-fp-muted hover:text-fp-text hover:bg-fp-card/50'
                     }`}>
                     {item.label}
                   </button>
@@ -544,7 +544,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
 
           {activeTab === 'catalog' && isDevTeam && !isAdmin && (
             <div className="p-6">
-              <h2 className="text-white text-lg font-bold mb-1">Product Catalog</h2>
+              <h2 className="text-fp-text text-lg font-bold mb-1">Product Catalog</h2>
               <p className="text-fp-muted text-sm mb-6">Upload or manage your global product library used in embedded sessions.</p>
               <GlobalProductsImport />
             </div>
@@ -600,12 +600,12 @@ function FeedbackTab({ profile }) {
     setForm({ title: '', description: '', category: 'feature' })
   }
 
-  const inputClass = "w-full bg-fp-bg text-white border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]"
+  const inputClass = "w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]"
 
   return (
     <div className="space-y-6 max-w-xl">
       <div>
-        <h2 className="text-white font-bold text-xl mb-1">Request a Feature</h2>
+        <h2 className="text-fp-text font-bold text-xl mb-1">Request a Feature</h2>
         <p className="text-fp-muted text-sm">Have an idea or something you wish ForgePt could do? Let us know — we read every submission and use this to shape the product roadmap.</p>
       </div>
 
@@ -615,7 +615,7 @@ function FeedbackTab({ profile }) {
             <p className="text-green-400 font-semibold text-sm">Request submitted — thank you!</p>
             <p className="text-fp-muted text-xs mt-0.5">We'll review it and update the roadmap accordingly.</p>
           </div>
-          <button onClick={() => setSubmitted(false)} className="text-fp-muted hover:text-white text-xs transition-colors flex-shrink-0">Submit another</button>
+          <button onClick={() => setSubmitted(false)} className="text-fp-muted hover:text-fp-text text-xs transition-colors flex-shrink-0">Submit another</button>
         </div>
       ) : (
         <div className="bg-fp-card border border-fp-border rounded-xl p-5 space-y-4">
@@ -633,7 +633,7 @@ function FeedbackTab({ profile }) {
           <div>
             <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide block mb-1">Type</label>
             <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))}
-              className="bg-fp-bg text-white border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+              className="bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
               <option value="feature">New Feature</option>
               <option value="improvement">Improvement to existing</option>
               <option value="bug_fix">Bug Fix</option>

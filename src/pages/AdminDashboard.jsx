@@ -1,8 +1,20 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+
+const ADMIN_WIDGET_DEFS = [
+  { id: 'pipeline-chart',   label: 'Pipeline by Stage',  desc: 'Bar chart of deal count/value per status' },
+  { id: 'team-leaderboard', label: 'Team Leaderboard',   desc: 'Rep-by-rep revenue ranking and targets' },
+  { id: 'top-clients',      label: 'Top Clients',        desc: 'Top 20 clients by total proposal value' },
+  { id: 'ar-summary',       label: 'AR & PO Summary',    desc: 'Outstanding invoices and purchase orders' },
+  { id: 'needs-attention',  label: 'Needs Attention',    desc: 'Drafts not sent in 3+ days' },
+]
+const DEFAULT_ADMIN_WIDGETS = ['pipeline-chart', 'team-leaderboard', 'top-clients', 'ar-summary', 'needs-attention']
+const PIPE_STATUS_COLOR = { Draft: '#6B7280', Sent: '#3B82F6', Won: '#22C55E', Lost: '#EF4444' }
+const fmtAd = (n) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
 export default function AdminDashboard({ isAdmin, featureProposals = true, featureCRM = false, role = 'admin', isSalesManager = false, isPM = false, defaultMode = null, featureRegions = false }) {
   const { profile } = useProfile()
@@ -26,9 +38,19 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const [recurringItems, setRecurringItems] = useState([])
   const [targetPeriod, setTargetPeriod] = useState('monthly')
   const [recurringModal, setRecurringModal] = useState(null) // 'revenue' | 'quoting' | 'all'
+  const [widgetConfig, setWidgetConfig] = useState(DEFAULT_ADMIN_WIDGETS)
+  const [showCustomize, setShowCustomize] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => { if (profile?.org_id) fetchOrgData() }, [profile?.org_id])
+  useEffect(() => { if (profile?.dashboard_widgets_admin) setWidgetConfig(profile.dashboard_widgets_admin) }, [profile])
+
+  const saveWidgetConfig = async (cfg) => {
+    setWidgetConfig(cfg)
+    if (profile?.id) await supabase.from('profiles').update({ dashboard_widgets_admin: cfg }).eq('id', profile.id)
+  }
+  const toggleWidget = (id) => saveWidgetConfig(widgetConfig.includes(id) ? widgetConfig.filter(w => w !== id) : [...widgetConfig, id])
+  const on = (id) => widgetConfig.includes(id)
 
   const fetchOrgData = async () => {
     if (!profile?.org_id) { setLoading(false); return }
@@ -309,11 +331,15 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
                 <p className="text-fp-muted text-xs mt-0.5">Showing your region only</p>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               {Object.entries(periodLabels).map(([key, label]) => (
                 <button key={key} onClick={() => setPeriod(key)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${period === key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>{label}</button>
               ))}
+              <button onClick={() => setShowCustomize(true)}
+                className="flex items-center gap-1.5 bg-fp-card border border-fp-border text-fp-muted hover:text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ml-2">
+                ⚙ Customize
+              </button>
             </div>
           </div>
         </div>
@@ -328,8 +354,96 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Total Proposals</p><p className="text-fp-text text-xl font-bold">{filteredProposals.length}</p></div>
         </div>
 
+        {/* ── Customizable Analytics Widgets ── */}
+        {!loading && (on('pipeline-chart') || on('team-leaderboard') || on('top-clients')) && (
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {on('pipeline-chart') && (() => {
+              const stages = ['Draft','Sent','Won','Lost']
+              const data = stages.map(s => ({ stage: s, count: filteredProposals.filter(p => p.status === s).length, value: filteredProposals.filter(p => p.status === s).reduce((sum, p) => sum + (p.proposal_value || 0), 0) }))
+              return (
+                <div className="bg-fp-card rounded-xl p-5 border border-fp-border/40">
+                  <p className="text-fp-text font-bold mb-4">Pipeline by Stage{periodShort[period]}</p>
+                  <ResponsiveContainer width="100%" height={140}>
+                    <BarChart data={data} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+                      <XAxis dataKey="stage" tick={{ fill: 'var(--fp-muted)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} tick={{ fill: 'var(--fp-muted)', fontSize: 10 }} axisLine={false} tickLine={false} width={48} />
+                      <Tooltip content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null
+                        const d = payload[0].payload
+                        return <div className="bg-fp-card border border-fp-border rounded-lg px-3 py-2 text-sm shadow-xl"><p className="text-fp-text font-bold">{d.stage}</p><p className="text-fp-muted">{d.count} deals</p><p className="text-fp-text font-semibold">{fmtAd(d.value)}</p></div>
+                      }} cursor={{ fill: 'var(--fp-hover)' }} />
+                      <Bar dataKey="value" radius={[4,4,0,0]}>{data.map(d => <Cell key={d.stage} fill={PIPE_STATUS_COLOR[d.stage]} />)}</Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                  <div className="grid grid-cols-4 gap-2 mt-3 pt-3 border-t border-fp-border/40">
+                    {data.map(d => <div key={d.stage} className="text-center"><p className="text-fp-text text-xl font-bold">{d.count}</p><p style={{ color: PIPE_STATUS_COLOR[d.stage] }} className="text-xs font-semibold">{d.stage}</p></div>)}
+                  </div>
+                </div>
+              )
+            })()}
+
+            {on('top-clients') && (() => {
+              const byClient = {}
+              filteredProposals.forEach(p => {
+                const key = p.company || 'Unknown'
+                if (!byClient[key]) byClient[key] = { name: key, total: 0, count: 0 }
+                byClient[key].total += (p.proposal_value || 0)
+                byClient[key].count++
+              })
+              const sorted = Object.values(byClient).sort((a,b) => b.total - a.total).slice(0, 20)
+              return (
+                <div className="bg-fp-card rounded-xl p-5 border border-fp-border/40">
+                  <p className="text-fp-text font-bold mb-3">Top Clients{periodShort[period]}</p>
+                  {sorted.length === 0 ? <p className="text-fp-muted text-sm">No data yet.</p> : (
+                    <div className="space-y-1.5 max-h-80 overflow-y-auto">
+                      {sorted.map((c, i) => (
+                        <div key={c.name} className="flex items-center bg-fp-inset rounded-lg px-3 py-2">
+                          <span className="text-fp-muted text-xs w-6">{i+1}</span>
+                          <span className="text-fp-text text-sm flex-1 truncate">{c.name}</span>
+                          <span className="text-fp-muted text-xs mr-3">{c.count} deal{c.count!==1?'s':''}</span>
+                          <span className="text-fp-text text-sm font-semibold">{fmtAd(c.total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
+            {on('team-leaderboard') && (() => {
+              const sorted = [...repStats].sort((a,b) => b.won - a.won).slice(0, 10)
+              const maxWon = Math.max(...sorted.map(r => r.won), 1)
+              return (
+                <div className="bg-fp-card rounded-xl p-5 border border-fp-border/40 col-span-2">
+                  <p className="text-fp-text font-bold mb-4">Team Leaderboard — Won Revenue{periodShort[period]}</p>
+                  {sorted.length === 0 ? <p className="text-fp-muted text-sm">No data yet.</p> : (
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+                      {sorted.map((rep, i) => (
+                        <div key={rep.name}>
+                          <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-xs font-bold w-5 ${i===0?'text-yellow-400':i===1?'text-gray-300':i===2?'text-amber-600':'text-fp-muted'}`}>#{i+1}</span>
+                              <span className="text-fp-text text-sm font-medium">{rep.name}</span>
+                              {rep.avgMargin && <span className="text-fp-muted text-xs">· {rep.avgMargin}%</span>}
+                            </div>
+                            <span className="text-green-400 text-sm font-semibold">{fmtAd(rep.won)}</span>
+                          </div>
+                          <div className="w-full bg-fp-inset rounded-full h-1.5">
+                            <div className="h-1.5 rounded-full bg-green-500" style={{ width: `${(rep.won/maxWon)*100}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+          </div>
+        )}
+
+
         {/* AR + PO Summary */}
-        <div className={`grid ${orgType === 'manufacturer' ? 'grid-cols-1' : 'grid-cols-2'} gap-4 mb-6`}>
+        {on('ar-summary') && <div className={`grid ${orgType === 'manufacturer' ? 'grid-cols-1' : 'grid-cols-2'} gap-4 mb-6`}>
           <div className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors" onClick={() => navigate('/invoices')}>
             <p className="text-fp-text font-bold mb-3">Invoicing & AR</p>
             <div className="grid grid-cols-4 gap-3">
@@ -349,7 +463,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Dashboard Mode Toggle — hidden for manufacturers (no PM/jobs) */}
         {orgType !== 'manufacturer' && (
@@ -667,7 +781,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
             </div>
           </div>
         )}
-        {!loading && needsAttention.length > 0 && (
+        {on('needs-attention') && !loading && needsAttention.length > 0 && (
           <div className="bg-fp-card border border-yellow-500/30 rounded-xl p-5 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
@@ -975,6 +1089,43 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         {/* End Sales Dashboard */}
 
       {/* Set Target Modal */}
+      {/* Customize Widget Panel */}
+      {showCustomize && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="flex-1 bg-black/50" onClick={() => setShowCustomize(false)} />
+          <div className="w-80 bg-[#1a2d45] border-l border-[#2a3d55] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-[#2a3d55]">
+              <p className="text-white font-bold">Customize Dashboard</p>
+              <button onClick={() => setShowCustomize(false)} className="text-[#8A9AB0] hover:text-white text-xl leading-none transition-colors">✕</button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-3">
+              <p className="text-[#8A9AB0] text-xs mb-4">Toggle sections on or off. Changes save automatically.</p>
+              {ADMIN_WIDGET_DEFS.map(d => {
+                const isOn = widgetConfig.includes(d.id)
+                return (
+                  <div key={d.id} className="flex items-start justify-between gap-3 bg-[#0F1C2E] rounded-xl px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-semibold">{d.label}</p>
+                      <p className="text-[#8A9AB0] text-xs mt-0.5 leading-relaxed">{d.desc}</p>
+                    </div>
+                    <button onClick={() => toggleWidget(d.id)}
+                      className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 relative mt-0.5 ${isOn ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isOn ? 'left-6' : 'left-1'}`} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+            <div className="p-5 border-t border-[#2a3d55]">
+              <button onClick={() => saveWidgetConfig(DEFAULT_ADMIN_WIDGETS)}
+                className="w-full bg-[#2a3d55] text-[#8A9AB0] hover:text-white px-4 py-2 rounded-lg text-sm transition-colors">
+                Reset to Default
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showSetTargetModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-fp-card rounded-2xl p-6 w-full max-w-md">

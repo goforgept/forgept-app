@@ -13,7 +13,7 @@ export default function GeneralTab({
     <div className="space-y-6">
       {/* Appearance */}
       <div className="bg-fp-card rounded-xl p-6">
-        <h3 className="text-white font-bold mb-1">Appearance</h3>
+        <h3 className="text-fp-text font-bold mb-1">Appearance</h3>
         <p className="text-fp-muted text-sm mb-5">Choose how ForgePt looks for you. Light mode is rolling out gradually across the app.</p>
         <div className="flex gap-3">
           {[
@@ -27,7 +27,7 @@ export default function GeneralTab({
                   : 'border-fp-border hover:border-fp-brand/50'
               }`}>
               <span className="text-2xl">{opt.icon}</span>
-              <span className="text-white text-sm font-semibold">{opt.label}</span>
+              <span className="text-fp-text text-sm font-semibold">{opt.label}</span>
               <span className="text-fp-muted text-xs">{opt.desc}</span>
             </button>
           ))}
@@ -35,7 +35,7 @@ export default function GeneralTab({
       </div>
       {/* Profile */}
       <div className="bg-fp-card rounded-xl p-6">
-        <h3 className="text-white font-bold mb-4">Profile</h3>
+        <h3 className="text-fp-text font-bold mb-4">Profile</h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="text-fp-muted text-xs mb-1 block">Full Name</label>
@@ -62,7 +62,7 @@ export default function GeneralTab({
 
       {/* Change Password */}
       <div className="bg-fp-card rounded-xl p-6">
-        <h3 className="text-white font-bold mb-4">Change Password</h3>
+        <h3 className="text-fp-text font-bold mb-4">Change Password</h3>
         {passwordError && <p className="text-red-400 text-sm mb-4">{passwordError}</p>}
         {passwordSuccess && <p className="text-green-400 text-sm mb-4">{passwordSuccess}</p>}
         <div className="grid grid-cols-2 gap-4 mb-4">
@@ -87,11 +87,11 @@ export default function GeneralTab({
 
       {/* Support PIN */}
       <div className="bg-fp-card rounded-xl p-6">
-        <h3 className="text-white font-bold mb-1">Support PIN</h3>
+        <h3 className="text-fp-text font-bold mb-1">Support PIN</h3>
         <p className="text-fp-muted text-sm mb-5">Share this 6-digit PIN with ForgePt support when you need help.</p>
         <div className="flex items-center gap-3 mb-4">
           {supportPin.split('').map((digit, i) => (
-            <div key={i} className="w-10 h-12 bg-fp-bg border border-fp-border rounded-lg flex items-center justify-center text-white text-2xl font-mono font-bold select-all">
+            <div key={i} className="w-10 h-12 bg-fp-bg border border-fp-border rounded-lg flex items-center justify-center text-fp-text text-2xl font-mono font-bold select-all">
               {digit}
             </div>
           ))}
@@ -99,13 +99,13 @@ export default function GeneralTab({
         <div className="flex items-center gap-3">
           <input type="text" inputMode="numeric" maxLength={6} value={pinInput}
             onChange={e => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            className="w-32 bg-fp-bg text-white border border-fp-border rounded-lg px-3 py-2 text-sm font-mono tracking-widest focus:outline-none focus:border-fp-brand"
+            className="w-32 bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm font-mono tracking-widest focus:outline-none focus:border-fp-brand"
             placeholder="000000" />
           <button onClick={savePin} disabled={savingPin || pinInput.length !== 6 || pinInput === supportPin}
             className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-40">
             {savingPin ? 'Saving...' : 'Save PIN'}
           </button>
-          <button onClick={regeneratePin} disabled={savingPin} className="text-fp-muted hover:text-white text-sm transition-colors disabled:opacity-40">
+          <button onClick={regeneratePin} disabled={savingPin} className="text-fp-muted hover:text-fp-text text-sm transition-colors disabled:opacity-40">
             ↺ Regenerate
           </button>
           {pinSaved && <span className="text-green-400 text-sm">Saved!</span>}
@@ -114,7 +114,7 @@ export default function GeneralTab({
 
       {/* Proposal Branding */}
       <div className="bg-fp-card rounded-xl p-6">
-        <h3 className="text-white font-bold mb-1">Proposal Branding</h3>
+        <h3 className="text-fp-text font-bold mb-1">Proposal Branding</h3>
         <p className="text-fp-muted text-sm mb-4">Appears on all PDF proposals and purchase orders.</p>
         <div className="space-y-4">
           <div>
@@ -141,7 +141,7 @@ export default function GeneralTab({
             <label className="text-fp-muted text-xs mb-1 block">Brand Color</label>
             <div className="flex items-center gap-3">
               <input type="color" value={form.primary_color} onChange={e => setForm(prev => ({ ...prev, primary_color: e.target.value }))} className="w-12 h-10 rounded cursor-pointer border border-fp-border bg-transparent" />
-              <input type="text" value={form.primary_color} onChange={e => setForm(prev => ({ ...prev, primary_color: e.target.value }))} className="w-32 bg-fp-bg text-white border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+              <input type="text" value={form.primary_color} onChange={e => setForm(prev => ({ ...prev, primary_color: e.target.value }))} className="w-32 bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
             </div>
             <p className="text-fp-muted text-xs mt-1">Used in PDF proposals and purchase orders.</p>
           </div>
@@ -160,12 +160,12 @@ export default function GeneralTab({
       {/* Proposal Defaults */}
       {isAdmin && (
         <div className="bg-fp-card rounded-xl p-6">
-          <h3 className="text-white font-bold mb-1">Proposal Defaults</h3>
+          <h3 className="text-fp-text font-bold mb-1">Proposal Defaults</h3>
           <p className="text-fp-muted text-sm mb-4">Default features applied to all proposals. Markup % and tax rate are set in the Rate Card tab.</p>
           <div className="space-y-4">
             <div className="flex items-center justify-between bg-fp-bg rounded-xl px-4 py-3">
               <div>
-                <p className="text-white text-sm font-semibold">Enable MSRP</p>
+                <p className="text-fp-text text-sm font-semibold">Enable MSRP</p>
                 <p className="text-fp-muted text-xs mt-0.5">Adds an MSRP field to the product library and BOM. Control visibility per proposal in Pricing options.</p>
               </div>
               <button onClick={onToggleMsrp}
@@ -174,7 +174,7 @@ export default function GeneralTab({
               </button>
             </div>
             <div>
-              <p className="text-white text-sm font-semibold mb-2">PDF Font</p>
+              <p className="text-fp-text text-sm font-semibold mb-2">PDF Font</p>
               <div className="flex gap-2">
                 {[
                   { value: 'helvetica', label: 'Sans-serif' },
@@ -182,7 +182,7 @@ export default function GeneralTab({
                   { value: 'courier', label: 'Monospace' },
                 ].map(opt => (
                   <button key={opt.value} onClick={() => onChangeDocFont?.(opt.value)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${docFont === opt.value ? 'bg-fp-brand text-white' : 'bg-fp-bg text-fp-muted hover:text-white border border-fp-border'}`}>
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${docFont === opt.value ? 'bg-fp-brand text-white' : 'bg-fp-bg text-fp-muted hover:text-fp-text border border-fp-border'}`}>
                     {opt.label}
                   </button>
                 ))}
@@ -190,7 +190,7 @@ export default function GeneralTab({
             </div>
             <div className="flex items-center justify-between bg-fp-bg rounded-xl px-4 py-3">
               <div>
-                <p className="text-white text-sm font-semibold">Striped Table Rows</p>
+                <p className="text-fp-text text-sm font-semibold">Striped Table Rows</p>
                 <p className="text-fp-muted text-xs mt-0.5">Alternates row shading in PDF tables. Turn off for a plain white table.</p>
               </div>
               <button onClick={onChangePdfTableStyle}
@@ -204,11 +204,11 @@ export default function GeneralTab({
 
       {/* Bill To / Ship To */}
       <div className="bg-fp-card rounded-xl p-6">
-        <h3 className="text-white font-bold mb-1">Bill To / Ship To</h3>
+        <h3 className="text-fp-text font-bold mb-1">Bill To / Ship To</h3>
         <p className="text-fp-muted text-sm mb-5">Your company's addresses printed on every purchase order.</p>
         <div className="space-y-5">
           <div>
-            <h4 className="text-white text-sm font-semibold mb-3">Ship To</h4>
+            <h4 className="text-fp-text text-sm font-semibold mb-3">Ship To</h4>
             <div className="space-y-3">
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Street Address</label>
@@ -223,7 +223,7 @@ export default function GeneralTab({
           </div>
           <div>
             <div className="flex items-center justify-between mb-3">
-              <h4 className="text-white text-sm font-semibold">Bill To</h4>
+              <h4 className="text-fp-text text-sm font-semibold">Bill To</h4>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={sameAsShipTo} onChange={e => handleSameAsShipTo(e.target.checked)} className="accent-[#C8622A]" />
                 <span className="text-fp-muted text-xs">Same as Ship To</span>
@@ -246,9 +246,9 @@ export default function GeneralTab({
 
       {/* Terms and Conditions */}
       <div className="bg-fp-card rounded-xl p-6">
-        <h3 className="text-white font-bold mb-1">Terms and Conditions</h3>
+        <h3 className="text-fp-text font-bold mb-1">Terms and Conditions</h3>
         <p className="text-fp-muted text-sm mb-4">Appears at the bottom of every PDF proposal.</p>
-        <textarea value={form.terms_and_conditions} onChange={e => setForm(prev => ({ ...prev, terms_and_conditions: e.target.value }))} placeholder="Enter your standard terms and conditions here..." rows={8} className="w-full bg-fp-bg text-white border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
+        <textarea value={form.terms_and_conditions} onChange={e => setForm(prev => ({ ...prev, terms_and_conditions: e.target.value }))} placeholder="Enter your standard terms and conditions here..." rows={8} className="w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
       </div>
 
       <button onClick={handleSave} disabled={saving} className="bg-fp-brand text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-colors disabled:opacity-50">
