@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
     let accessToken = org.qbo_access_token
     const expiresAt = new Date(org.qbo_token_expires_at)
     if (expiresAt <= new Date(Date.now() + 60000)) {
-      accessToken = await refreshQBOToken(supabase, org)
+      accessToken = await refreshQBOToken(adminSupabase, org)
     }
 
     const realmId = org.qbo_realm_id
@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     if (!customerId) return new Response(JSON.stringify({ error: 'Could not find or create customer' }), { status: 500, headers: corsHeaders })
 
     // Fetch line items
-    const { data: lineItems } = await supabase
+    const { data: lineItems } = await adminSupabase
       .from('bom_line_items')
       .select('*')
       .eq('proposal_id', proposalId)
@@ -200,7 +200,7 @@ Deno.serve(async (req) => {
     }
 
     // Store QBO invoice ID on proposal
-    await supabase.from('proposals').update({
+    await adminSupabase.from('proposals').update({
       qbo_invoice_id: invoice.Id,
       qbo_invoice_number: invoice.DocNumber || ''
     }).eq('id', proposalId)

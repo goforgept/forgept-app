@@ -113,3 +113,9 @@ verify_jwt = false
 
 [functions.microsoft-oauth-callback]
 verify_jwt = false
+
+[functions.qbo-webhook]
+verify_jwt = false
+
+[functions.qbo-oauth-callback]
+verify_jwt = false

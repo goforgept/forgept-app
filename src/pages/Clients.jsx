@@ -97,14 +97,13 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
     fetchOrgAndClients()
     setSaving(false)
 
-    // Push to Zoho if connected (fire-and-forget)
+    // Push to Zoho and QBO if connected (fire-and-forget)
     if (newClient?.id) {
       const { data: { session } } = await supabase.auth.getSession()
-      fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ clientId: newClient.id }),
-      }).catch(() => {})
+      const pushHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }
+      const pushBody = JSON.stringify({ clientId: newClient.id })
+      fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
+      fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
     }
   }
 
