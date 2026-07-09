@@ -7,12 +7,14 @@ const corsHeaders = {
 }
 
 const PRICE_IDS: Record<string, string> = {
-  'Solo':     'price_1TD56GLWULkmrAab38fniIuB',
-  'Team':     'price_1TD58BLWULkmrAabCUiTtFPY',
-  'Business': 'price_1TD58bLWULkmrAaboF2E1pGR',
+  'Early Adopter': 'price_1TrQ8DLWULkmrAabEB6qm1Kg',
+  'Designer Only': 'price_1TrQ5rLWULkmrAabaDRGDK06',
+  'Small Team':    'price_1TrQ4OLWULkmrAabCpzuU6wH',
+  'Business':      'price_1TrQ5ILWULkmrAab8dAhQkKR',
+  'QuickBooks':    'price_1TrQ6kLWULkmrAabf33JNWF9',
 }
 
-const ONBOARDING_PRICE_ID = 'price_1TD59bLWULkmrAabU0CW816a'
+// No onboarding fee
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -100,8 +102,8 @@ Deno.serve(async (req) => {
     if (!priceId) throw new Error(`Unknown plan: ${plan}`)
 
     const items: string[] = [`items[0][price]=${priceId}`]
-    if (chargeOnboarding) {
-      items.push(`add_invoice_items[0][price]=${ONBOARDING_PRICE_ID}`)
+    if (false) {
+      // Onboarding fee removed
     }
 
     // Create subscription
@@ -111,7 +113,7 @@ Deno.serve(async (req) => {
       body: new URLSearchParams([
         ['customer', customerId],
         ['items[0][price]', priceId],
-        ...(chargeOnboarding ? [['add_invoice_items[0][price]', ONBOARDING_PRICE_ID]] : []),
+        
         ['payment_behavior', 'default_incomplete'],
         ['payment_settings[save_default_payment_method]', 'on_subscription'],
         ['expand[]', 'latest_invoice.payment_intent'],

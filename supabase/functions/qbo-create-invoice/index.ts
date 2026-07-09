@@ -205,6 +205,84 @@ Deno.serve(async (req) => {
       qbo_invoice_number: invoice.DocNumber || ''
     }).eq('id', proposalId)
 
+    // Create or update a ForgePt invoice so it appears in the Invoices tab and reports
+    const invoiceTotal = invoice.TotalAmt || 0
+    const taxAmount = !taxExempt && taxRate > 0 ? matTotal * taxRate / 100 : 0
+    const invoiceNumber = invoice.DocNumber || `QBO-${invoice.Id}`
+    const today = new Date().toISOString().split('T')[0]
+
+    const { data: existingFPInvoice } = await adminSupabase
+      .from('invoices')
+      .select('id')
+      .eq('proposal_id', proposalId)
+      .eq('org_id', profile.org_id)
+      .maybeSingle()
+
+    let fpInvoiceId: string | null = existingFPInvoice?.id || null
+
+    if (existingFPInvoice) {
+      // Update existing ForgePt invoice to reflect latest QBO push
+      await adminSupabase.from('invoices').update({
+        invoice_number: invoiceNumber,
+        status: 'Sent',
+        subtotal: matTotal,
+        tax_percent: taxRate,
+        tax_amount: taxAmount,
+        total: invoiceTotal,
+        balance_due: invoiceTotal,
+        issued_date: today,
+        due_date: proposal.close_date || null,
+        description: `QuickBooks invoice for ${proposal.proposal_name}`,
+      }).eq('id', existingFPInvoice.id)
+    } else {
+      const { data: newFPInvoice } = await adminSupabase.from('invoices').insert({
+        org_id: profile.org_id,
+        proposal_id: proposalId,
+        invoice_number: invoiceNumber,
+        status: 'Sent',
+        issued_date: today,
+        due_date: proposal.close_date || null,
+        subtotal: matTotal,
+        tax_percent: taxRate,
+        tax_amount: taxAmount,
+        total: invoiceTotal,
+        amount_paid: 0,
+        balance_due: invoiceTotal,
+        description: `QuickBooks invoice for ${proposal.proposal_name}`,
+        notes: `Pushed to QuickBooks — Invoice #${invoiceNumber}`,
+      }).select('id').single()
+
+      fpInvoiceId = newFPInvoice?.id || null
+
+      // Create line items mirroring what was pushed to QBO
+      if (fpInvoiceId) {
+        const fpLineItems = []
+        for (const item of (lineItems || [])) {
+          if (!item.customer_price_unit || !item.quantity) continue
+          fpLineItems.push({
+            invoice_id: fpInvoiceId,
+            description: `${item.item_name}${item.part_number_sku ? ` (${item.part_number_sku})` : ''}`,
+            quantity: item.quantity,
+            unit_price: item.customer_price_unit,
+            total: (item.customer_price_unit || 0) * (item.quantity || 0),
+          })
+        }
+        for (const labor of (laborItems || [])) {
+          if (!labor.role || !labor.customer_price) continue
+          fpLineItems.push({
+            invoice_id: fpInvoiceId,
+            description: `${labor.role} (${labor.quantity} ${labor.unit || 'hr'})`,
+            quantity: 1,
+            unit_price: parseFloat(labor.customer_price) || 0,
+            total: parseFloat(labor.customer_price) || 0,
+          })
+        }
+        if (fpLineItems.length > 0) {
+          await adminSupabase.from('invoice_line_items').insert(fpLineItems)
+        }
+      }
+    }
+
     // Log activity
     await adminSupabase.from('activities').insert({
       proposal_id: proposalId,
@@ -219,7 +297,8 @@ Deno.serve(async (req) => {
       success: true,
       invoiceId: invoice.Id,
       invoiceNumber: invoice.DocNumber,
-      totalAmt: invoice.TotalAmt
+      totalAmt: invoice.TotalAmt,
+      fpInvoiceId,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (err) {

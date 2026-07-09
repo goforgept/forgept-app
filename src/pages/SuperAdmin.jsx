@@ -6,9 +6,11 @@ import AccessoriesEditor from '../components/AccessoriesEditor'
 
 const PLANS = [
   { name: 'Trial', rate: 0, color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
-  { name: 'Solo', rate: 49, color: 'text-blue-400', bg: 'bg-blue-500/20' },
-  { name: 'Team', rate: 149, color: 'text-purple-400', bg: 'bg-purple-500/20' },
-  { name: 'Business', rate: 349, color: 'text-[#C8622A]', bg: 'bg-[#C8622A]/20' },
+  { name: 'Early Adopter', rate: 100, color: 'text-green-400', bg: 'bg-green-500/20' },
+  { name: 'Designer Only', rate: 49, color: 'text-blue-400', bg: 'bg-blue-500/20' },
+  { name: 'Small Team', rate: 99, color: 'text-purple-400', bg: 'bg-purple-500/20' },
+  { name: 'Business', rate: 199, color: 'text-[#C8622A]', bg: 'bg-[#C8622A]/20' },
+  { name: 'QuickBooks Add-on', rate: 25, color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
   { name: 'Enterprise', rate: null, color: 'text-green-400', bg: 'bg-green-500/20' },
 ]
 
@@ -284,7 +286,7 @@ export default function SuperAdmin() {
   const [orgForm, setOrgForm] = useState({})
   const [unauthorized, setUnauthorized] = useState(false)
   const [stripeModal, setStripeModal] = useState(null)
-  const [stripeForm, setStripeForm] = useState({ plan: 'Solo', chargeOnboarding: true })
+  const [stripeForm, setStripeForm] = useState({ plan: 'Early Adopter', chargeOnboarding: false })
   const [creatingSubscription, setCreatingSubscription] = useState(false)
   const [stripeResult, setStripeResult] = useState(null)
   const [deleteModal, setDeleteModal] = useState(null)
@@ -595,7 +597,7 @@ export default function SuperAdmin() {
   const openStripeModal = (org) => {
     const admin = getOrgAdmin(org.id)
     setStripeModal({ org, admin })
-    setStripeForm({ plan: org.plan && org.plan !== 'Trial' ? org.plan : 'Solo', chargeOnboarding: !org.stripe_customer_id })
+    setStripeForm({ plan: org.plan && org.plan !== 'Trial' ? org.plan : 'Early Adopter', chargeOnboarding: false })
     setStripeResult(null)
   }
 
@@ -1389,16 +1391,21 @@ export default function SuperAdmin() {
             <h3 className="text-white font-bold text-lg mb-1">Create Stripe Subscription</h3>
             <p className="text-[#8A9AB0] text-sm mb-5">{stripeModal.org.name} · {stripeModal.admin?.email || 'No admin email'}</p>
             <div className="space-y-4">
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label><select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"><option value="Solo">Solo — $49/mo</option><option value="Team">Team — $149/mo</option><option value="Business">Business — $349/mo</option></select></div>
+              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label><select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"></select></div>
+              <option value="Early Adopter">Early Adopter — $100/mo</option>
+              <option value="Designer Only">Designer Only — $49/mo</option>
+              <option value="Small Team">Small Team — $99/mo</option>
+              <option value="Business">Business — $199/mo</option>
+              <option value="QuickBooks Add-on">QuickBooks Add-on — $25/mo</option>
               <div className="flex items-center gap-3 bg-[#0F1C2E] rounded-lg px-4 py-3">
-                <input type="checkbox" id="onboarding" checked={stripeForm.chargeOnboarding} onChange={e => setStripeForm(p => ({ ...p, chargeOnboarding: e.target.checked }))} className="accent-[#C8622A]" />
+                {/* Onboarding fee removed */}
                 <label htmlFor="onboarding" className="text-white text-sm cursor-pointer">Charge one-time onboarding fee <span className="text-[#C8622A] font-semibold">$249</span></label>
               </div>
               <div className="bg-[#0F1C2E] rounded-lg p-3 text-xs text-[#8A9AB0]">
                 <p className="font-semibold text-white mb-1">What this does:</p>
                 <p>• Creates a Stripe customer for {stripeModal.org.name}</p>
-                <p>• Creates a {stripeForm.plan} subscription at ${stripeForm.plan === 'Solo' ? '49' : stripeForm.plan === 'Team' ? '149' : '349'}/mo</p>
-                {stripeForm.chargeOnboarding && <p>• Adds $249 onboarding fee to first invoice</p>}
+                <p>• Creates a {stripeForm.plan} subscription at ${{ 'Early Adopter': 100, 'Designer Only': 49, 'Small Team': 99, 'Business': 199, 'QuickBooks Add-on': 25 }[stripeForm.plan]}/mo</p>
+                
                 <p>• Updates billing status in ForgePt.</p>
                 <p className="mt-2 text-yellow-400">Note: Customer will need to add payment method via Stripe dashboard or payment link.</p>
               </div>
