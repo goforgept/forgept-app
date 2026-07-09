@@ -177,6 +177,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [pendingContractDates, setPendingContractDates] = useState({})
   const [savingContractDates, setSavingContractDates] = useState(false)
   const [activityRefreshKey, setActivityRefreshKey] = useState(0)
+  const [pipelineStages, setPipelineStages] = useState([])
 
   useEffect(() => {
     fetchProposal()
@@ -193,6 +194,8 @@ export default function ProposalDetail({ isAdmin }) {
       .then(({ data }) => setQboConnected(data?.qbo_connected || false))
     supabase.from('profiles').select('id, full_name, email').eq('org_id', profile.org_id)
       .then(({ data }) => setOrgProfiles(data || []))
+    supabase.from('pipeline_stages').select('id, name, color, position').eq('org_id', profile.org_id).order('position')
+      .then(({ data }) => setPipelineStages(data || []))
   }, [profile?.org_id])
 
   useEffect(() => {
@@ -206,7 +209,7 @@ export default function ProposalDetail({ isAdmin }) {
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,show_msrp,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,show_msrp,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
       .eq('id', id)
       .single()
 
@@ -377,7 +380,9 @@ export default function ProposalDetail({ isAdmin }) {
     setActivityRefreshKey(k => k + 1)
   }
 
-  const updateStatus = async (newStatus) => {
+  const updateStatus = async (newStatus, stageId = null) => {
+    const stageUpdate = stageId !== null ? { pipeline_stage_id: stageId } : {}
+    const stageStateUpdate = stageId !== null ? { pipeline_stage_id: stageId } : {}
     if (newStatus === 'Won' && proposal?.status !== 'Won') {
       try {
         const { data: orgData } = await supabase.from('organizations').select('job_counter').eq('id', proposal.org_id).single()
@@ -401,8 +406,8 @@ export default function ProposalDetail({ isAdmin }) {
         setPendingRenewalItems(recurringMissingDate)
         setPendingRenewalDates(initialDates)
         setShowRenewalModal(true)
-        await supabase.from('proposals').update({ status: newStatus }).eq('id', id)
-        setProposal(prev => ({ ...prev, status: newStatus }))
+        await supabase.from('proposals').update({ status: newStatus, ...stageUpdate }).eq('id', id)
+        setProposal(prev => ({ ...prev, status: newStatus, ...stageStateUpdate }))
         return
       }
       // Check agreements missing a start date
@@ -416,17 +421,27 @@ export default function ProposalDetail({ isAdmin }) {
         agreementsMissingDate.forEach(c => { initialDates[`${c._type}_${c._idx}`] = '' })
         setPendingContractItems(agreementsMissingDate)
         setPendingContractDates(initialDates)
-        await supabase.from('proposals').update({ status: newStatus }).eq('id', id)
-        setProposal(prev => ({ ...prev, status: newStatus }))
+        await supabase.from('proposals').update({ status: newStatus, ...stageUpdate }).eq('id', id)
+        setProposal(prev => ({ ...prev, status: newStatus, ...stageStateUpdate }))
         setShowContractStartModal(true)
         return
       }
       // All agreements have dates — create contract rows now
       await createContractRows(slaContracts, monitoringContracts)
     }
-    await supabase.from('proposals').update({ status: newStatus }).eq('id', id)
-    setProposal(prev => ({ ...prev, status: newStatus }))
+    await supabase.from('proposals').update({ status: newStatus, ...stageUpdate }).eq('id', id)
+    setProposal(prev => ({ ...prev, status: newStatus, ...stageStateUpdate }))
     logActivity(`Status changed to ${newStatus}`)
+  }
+
+  const updateStage = async (stageId) => {
+    const stage = pipelineStages.find(s => s.id === stageId)
+    if (!stage) return
+    let newStatus = 'Draft'
+    if (stage.name === 'Won') newStatus = 'Won'
+    else if (stage.name === 'Lost') newStatus = 'Lost'
+    else if (stage.name === 'Proposal Sent') newStatus = 'Sent'
+    await updateStatus(newStatus, stageId)
   }
 
   const saveRenewalModalDates = async () => {
@@ -3042,7 +3057,7 @@ const analyzeDrawing = async () => {
           saveProposalName={saveProposalName}
           openEditClientModal={openEditClientModal} clientAddress={clientAddress} locationName={locationName}
           collaborators={collaborators} orgProfiles={orgProfiles}
-          updateStatus={updateStatus} onUpdateRep={updateRep}
+          updateStatus={updateStatus} updateStage={updateStage} pipelineStages={pipelineStages} onUpdateRep={updateRep}
           editingQuoteNumber={editingQuoteNumber} quoteNumberDraft={quoteNumberDraft}
           setQuoteNumberDraft={setQuoteNumberDraft} quoteNumberError={quoteNumberError}
           setQuoteNumberError={setQuoteNumberError} saveQuoteNumber={saveQuoteNumber}

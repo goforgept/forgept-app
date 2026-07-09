@@ -1,8 +1,10 @@
+const STATUS_FALLBACK = { Won: 'Won', Lost: 'Lost', Sent: 'Proposal Sent', Draft: 'Lead' }
+
 export default function ProposalHeader({
   proposal, profile, features, isAdmin,
   editingProposalName, proposalNameDraft, setProposalNameDraft, setEditingProposalName, saveProposalName,
   openEditClientModal, clientAddress, locationName, collaborators, orgProfiles,
-  updateStatus, onUpdateRep,
+  updateStatus, updateStage, pipelineStages = [], onUpdateRep,
   editingQuoteNumber, quoteNumberDraft, setQuoteNumberDraft, quoteNumberError, setQuoteNumberError,
   saveQuoteNumber, setEditingQuoteNumber,
   editingContractNumber, contractNumberDraft, setContractNumberDraft, saveContractNumber, setEditingContractNumber,
@@ -92,7 +94,21 @@ export default function ProposalHeader({
             <button onClick={() => { setDeleteConfirmText(''); setShowDeleteModal(true) }}
               className="bg-red-900/30 text-red-400 px-3 py-2 rounded-lg text-xs font-semibold hover:bg-red-900/50 transition-colors">Delete</button>
           )}
-          {canEdit ? (
+          {pipelineStages.length > 0 ? (() => {
+            const activeStageId = proposal?.pipeline_stage_id ||
+              pipelineStages.find(s => s.name === STATUS_FALLBACK[proposal?.status])?.id ||
+              pipelineStages[0]?.id
+            const activeStage = pipelineStages.find(s => s.id === activeStageId)
+            return canEdit ? (
+              <select value={activeStageId || ''} onChange={e => updateStage(e.target.value)}
+                style={{ borderColor: activeStage?.color }}
+                className="bg-fp-inset text-fp-text border-2 rounded-lg px-3 py-2 text-sm focus:outline-none">
+                {pipelineStages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            ) : (
+              <span style={{ borderColor: activeStage?.color }} className="bg-fp-inset text-fp-muted border-2 rounded-lg px-3 py-2 text-sm">{activeStage?.name || proposal?.status}</span>
+            )
+          })() : canEdit ? (
             <select value={proposal?.status} onChange={e => updateStatus(e.target.value)}
               className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
               {['Draft', 'Sent', 'Won', 'Lost'].map(s => <option key={s} value={s}>{s}</option>)}
