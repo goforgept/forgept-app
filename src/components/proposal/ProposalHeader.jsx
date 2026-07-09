@@ -5,6 +5,7 @@ export default function ProposalHeader({
   updateStatus, onUpdateRep,
   editingQuoteNumber, quoteNumberDraft, setQuoteNumberDraft, quoteNumberError, setQuoteNumberError,
   saveQuoteNumber, setEditingQuoteNumber,
+  editingContractNumber, contractNumberDraft, setContractNumberDraft, saveContractNumber, setEditingContractNumber,
   updateCloseDate, updateTaxExempt, updateTaxRate,
   setShowDealSummaryModal, setDealSummary,
   setShowShareModal, setDeleteConfirmText, setShowDeleteModal,
@@ -115,7 +116,7 @@ export default function ProposalHeader({
         </div>
       )}
 
-      <div className="grid grid-cols-6 gap-4 mt-6">
+      <div className="grid grid-cols-7 gap-4 mt-6">
         <div>
           <p className="text-[#8A9AB0] text-xs mb-1">Rep</p>
           {isAdmin && onUpdateRep && orgProfiles?.length > 0 ? (
@@ -159,6 +160,27 @@ export default function ProposalHeader({
             </button>
           ) : (
             <p className="text-white text-sm font-medium">{proposal?.quote_number || <span className="text-[#8A9AB0] italic">—</span>}</p>
+          )}
+        </div>
+        <div>
+          <p className="text-[#8A9AB0] text-xs mb-1">Contract #</p>
+          {canEdit && editingContractNumber ? (
+            <div className="flex items-center gap-1">
+              <input type="text" value={contractNumberDraft}
+                onChange={e => setContractNumberDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') saveContractNumber(); if (e.key === 'Escape') setEditingContractNumber(false) }}
+                className="w-24 bg-[#0F1C2E] text-white border border-[#C8622A]/50 rounded px-2 py-0.5 text-sm focus:outline-none focus:border-[#C8622A]" autoFocus />
+              <button onClick={saveContractNumber} className="text-green-400 hover:text-green-300 text-xs">✓</button>
+              <button onClick={() => setEditingContractNumber(false)} className="text-[#8A9AB0] hover:text-white text-xs">✕</button>
+            </div>
+          ) : canEdit ? (
+            <button onClick={() => { setContractNumberDraft(proposal?.contract_number || ''); setEditingContractNumber(true) }}
+              className="text-white text-sm font-medium hover:text-[#C8622A] transition-colors group flex items-center gap-1" title="Click to edit contract number">
+              {proposal?.contract_number || <span className="text-[#8A9AB0] italic">Add #</span>}
+              <span className="text-[#2a3d55] group-hover:text-[#C8622A] text-xs transition-colors">✏️</span>
+            </button>
+          ) : (
+            <p className="text-white text-sm font-medium">{proposal?.contract_number || <span className="text-[#8A9AB0] italic">—</span>}</p>
           )}
         </div>
         <div>

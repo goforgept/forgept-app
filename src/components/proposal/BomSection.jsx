@@ -690,7 +690,7 @@ export default function BomSection({
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b border-[#2a3d55]">
-                                {['Role','Qty','Unit','Your Cost/hr','Markup %','Total Labor',''].map(h => (
+                                {['Role','Qty','Unit','Your Cost/hr','Margin %','Total Labor',''].map(h => (
                                   <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
                                 ))}
                               </tr>
@@ -706,7 +706,16 @@ export default function BomSection({
                                     </select>
                                   </td>
                                   <td className="pr-2 py-1"><input type="number" placeholder="0.00" value={item.your_cost || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'your_cost', e.target.value)} className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
-                                  <td className="pr-2 py-1"><input type="number" placeholder="35" value={item.markup || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'markup', e.target.value)} className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                                  <td className="pr-2 py-1">
+                                    <input type="number" placeholder="0" min="0" max="99.9" step="0.1"
+                                      value={item.markup != null && item.markup !== '' ? (parseFloat(item.markup) / (100 + parseFloat(item.markup)) * 100).toFixed(1) : ''}
+                                      onChange={e => {
+                                        const m = parseFloat(e.target.value)
+                                        const markup = (m >= 0 && m < 100) ? (m / (100 - m) * 100).toFixed(2) : '0'
+                                        onUpdateSectionLabor(section.id, idx, 'markup', markup)
+                                      }}
+                                      className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                                  </td>
                                   <td className="pr-2 py-1"><input type="number" placeholder="0.00" value={item.customer_price || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'customer_price', e.target.value)} className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold" /></td>
                                   <td className="py-1"><button onClick={() => onRemoveSectionLaborLine(section.id, idx)} className="text-[#8A9AB0] hover:text-red-400 text-xs">✕</button></td>
                                 </tr>
@@ -749,7 +758,7 @@ export default function BomSection({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#2a3d55]">
-                  {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', 'Markup %', 'Total Labor', ''].map(h => (
+                  {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', 'Margin %', 'Total Labor', ''].map(h => (
                     <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
                   ))}
                 </tr>
@@ -767,7 +776,17 @@ export default function BomSection({
                       </select>
                     </td>
                     <td className="pr-2 py-1"><input type="number" placeholder="0.00" value={item.your_cost || ''} onChange={e => onUpdateLabor(index, 'your_cost', e.target.value)} className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
-                    <td className="pr-2 py-1"><input type="number" placeholder="35" value={item.markup || ''} onChange={e => onUpdateLabor(index, 'markup', e.target.value)} className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" /></td>
+                    <td className="pr-2 py-1">
+                      {/* Display margin %; convert to/from markup internally */}
+                      <input type="number" placeholder="0" min="0" max="99.9" step="0.1"
+                        value={item.markup != null && item.markup !== '' ? (parseFloat(item.markup) / (100 + parseFloat(item.markup)) * 100).toFixed(1) : ''}
+                        onChange={e => {
+                          const m = parseFloat(e.target.value)
+                          const markup = (m >= 0 && m < 100) ? (m / (100 - m) * 100).toFixed(2) : '0'
+                          onUpdateLabor(index, 'markup', markup)
+                        }}
+                        className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
+                    </td>
                     <td className="pr-2 py-1"><input type="number" placeholder="0.00" value={item.customer_price || ''} onChange={e => onUpdateLabor(index, 'customer_price', e.target.value)} className="w-20 bg-[#0F1C2E] text-[#C8622A] border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A] font-semibold" /></td>
                     <td className="py-1">
                       <div className="flex items-center gap-2">
@@ -818,10 +837,11 @@ export default function BomSection({
               const liveTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
               const liveTaxAmount = liveBOMTotal * (liveTaxRate / 100)
               const liveGrandTotal = liveBOMTotal + liveLaborTotal + liveTaxAmount
+              const liveRevenueForMargin = liveBOMTotal + liveLaborTotal  // exclude tax from margin calc
               const liveBOMCost = editLines.reduce((sum, l) => sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
               const liveLaborCost = laborItems.reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
               const liveTotalCost = liveBOMCost + liveLaborCost
-              const liveMargin = liveGrandTotal > 0 ? ((liveGrandTotal - liveTotalCost) / liveGrandTotal * 100).toFixed(1) : '0.0'
+              const liveMargin = liveRevenueForMargin > 0 ? ((liveRevenueForMargin - liveTotalCost) / liveRevenueForMargin * 100).toFixed(1) : '0.0'
               return (
                 <>
                   <div className="flex justify-between text-sm"><span className="text-[#8A9AB0]">Materials</span><span className="text-white">${liveBOMTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>

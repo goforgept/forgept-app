@@ -29,7 +29,7 @@ const LABOR_DATALIST_ID = 'labor-roles-datalist'
 
 const LaborTableHeader = () => (
   <tr className="border-b border-[#2a3d55]">
-    {['Role', 'Qty', 'Unit', 'Your Cost/hr', 'Markup %', 'Total Labor', ''].map(h => (
+    {['Role', 'Qty', 'Unit', 'Your Cost/hr', 'Margin %', 'Total Labor', ''].map(h => (
       <th key={h} className="text-[#8A9AB0] text-left py-2 pr-2 font-normal text-xs">{h}</th>
     ))}
   </tr>
@@ -60,7 +60,13 @@ const LaborRow = ({ item, onUpdate, onRemove, laborRates, defaultMarkup }) => (
         className="w-20 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
     </td>
     <td className="pr-2 py-1">
-      <input type="number" placeholder={String(defaultMarkup)} value={item.markup} onChange={e => onUpdate('markup', e.target.value)}
+      <input type="number" placeholder="0" min="0" max="99.9" step="0.1"
+        value={item.markup != null && item.markup !== '' ? (parseFloat(item.markup) / (100 + parseFloat(item.markup)) * 100).toFixed(1) : ''}
+        onChange={e => {
+          const m = parseFloat(e.target.value)
+          const markup = (m >= 0 && m < 100) ? (m / (100 - m) * 100).toFixed(2) : '0'
+          onUpdate('markup', markup)
+        }}
         className="w-16 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1 text-xs focus:outline-none focus:border-[#C8622A]" />
     </td>
     <td className="pr-2 py-1">

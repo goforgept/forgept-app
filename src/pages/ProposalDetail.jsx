@@ -151,6 +151,8 @@ export default function ProposalDetail({ isAdmin }) {
   const [editingQuoteNumber, setEditingQuoteNumber] = useState(false)
   const [quoteNumberDraft, setQuoteNumberDraft] = useState('')
   const [quoteNumberError, setQuoteNumberError] = useState('')
+  const [editingContractNumber, setEditingContractNumber] = useState(false)
+  const [contractNumberDraft, setContractNumberDraft] = useState('')
   const [editingSOW, setEditingSOW] = useState(false)
   const [sowDraft, setSowDraft] = useState('')
   const [uploadingSignedPDF, setUploadingSignedPDF] = useState(false)
@@ -204,7 +206,7 @@ export default function ProposalDetail({ isAdmin }) {
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,show_msrp,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,show_msrp,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
       .eq('id', id)
       .single()
 
@@ -545,6 +547,14 @@ export default function ProposalDetail({ isAdmin }) {
     setEditingQuoteNumber(false)
     setQuoteNumberError('')
     logActivity(`Quote number updated to ${trimmed}`)
+  }
+
+  const saveContractNumber = async () => {
+    const trimmed = contractNumberDraft.trim()
+    await supabase.from('proposals').update({ contract_number: trimmed || null }).eq('id', id)
+    setProposal(prev => ({ ...prev, contract_number: trimmed || null }))
+    setEditingContractNumber(false)
+    if (trimmed) logActivity(`Contract number set to ${trimmed}`)
   }
 
   const saveSOW = async () => {
@@ -1298,6 +1308,8 @@ export default function ProposalDetail({ isAdmin }) {
       ...(clientAddress ? [new Paragraph({ children: [new TextRun({ text: `Address: ${clientAddress}`, size: 20, color: '666666' })] })] : []),
       new Paragraph({ children: [new TextRun({ text: `Email: ${proposal?.client_email || ''}`, size: 20, color: '666666' })] }),
       new Paragraph({ children: [new TextRun({ text: `Date: ${new Date().toLocaleDateString()}`, size: 20, color: '666666' })] }),
+      ...(proposal?.quote_number ? [new Paragraph({ children: [new TextRun({ text: `Quote #: ${proposal.quote_number}`, size: 20, color: '666666' })] })] : []),
+      ...(proposal?.contract_number ? [new Paragraph({ children: [new TextRun({ text: `Contract #: ${proposal.contract_number}`, size: 20, color: '666666' })] })] : []),
       ...(proposal?.rep_name ? [new Paragraph({ children: [new TextRun({ text: `Rep: ${proposal.rep_name}`, size: 18, color: '888888' })] })] : []),
       ...(proposal?.rep_title ? [new Paragraph({ children: [new TextRun({ text: proposal.rep_title, size: 18, color: '888888' })] })] : []),
       ...(proposal?.rep_email ? [new Paragraph({ children: [new TextRun({ text: proposal.rep_email, size: 18, color: '888888' })] })] : []),
@@ -2613,7 +2625,11 @@ const analyzeDrawing = async () => {
     doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100)
     doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
     if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, 72)
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, clientAddress ? 79 : 72)
+    let pdfRefY = clientAddress ? 79 : 72
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, pdfRefY)
+    pdfRefY += 7
+    if (proposal?.quote_number) { doc.text(`Quote #: ${proposal.quote_number}`, 14, pdfRefY); pdfRefY += 7 }
+    if (proposal?.contract_number) { doc.text(`Contract #: ${proposal.contract_number}`, 14, pdfRefY); pdfRefY += 7 }
 
     // Rep contact info, right-aligned in the same area
     {
@@ -2628,7 +2644,7 @@ const analyzeDrawing = async () => {
       }
     }
 
-    let yPos = 92
+    let yPos = Math.max(92, pdfRefY + 5)
 
     if (p?.scope_of_work) {
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -3022,6 +3038,9 @@ const analyzeDrawing = async () => {
           setQuoteNumberDraft={setQuoteNumberDraft} quoteNumberError={quoteNumberError}
           setQuoteNumberError={setQuoteNumberError} saveQuoteNumber={saveQuoteNumber}
           setEditingQuoteNumber={setEditingQuoteNumber}
+          editingContractNumber={editingContractNumber} contractNumberDraft={contractNumberDraft}
+          setContractNumberDraft={setContractNumberDraft} saveContractNumber={saveContractNumber}
+          setEditingContractNumber={setEditingContractNumber}
           updateCloseDate={updateCloseDate} updateTaxExempt={updateTaxExempt} updateTaxRate={updateTaxRate}
           setShowDealSummaryModal={setShowDealSummaryModal} setDealSummary={setDealSummary}
           setShowShareModal={setShowShareModal}
