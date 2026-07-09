@@ -1,8 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUser, corsHeaders } from '../_shared/auth.ts'
+import { zohoAuthBase, zohoApiBase } from '../_shared/zoho.ts'
 
 async function refreshToken(supabase: any, org: any) {
-  const res = await fetch('https://accounts.zoho.com/oauth/v2/token', {
+  const authBase = zohoAuthBase(org.zoho_dc)
+  const res = await fetch(`${authBase}/oauth/v2/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -22,12 +24,12 @@ async function refreshToken(supabase: any, org: any) {
   return tokens.access_token
 }
 
-async function fetchAll(token: string, module: string) {
+async function fetchAll(token: string, module: string, apiBase: string) {
   const records: any[] = []
   let page = 1
   while (true) {
     const res = await fetch(
-      `https://www.zohoapis.com/crm/v2/${module}?page=${page}&per_page=200`,
+      `${apiBase}/crm/v2/${module}?page=${page}&per_page=200`,
       { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
     )
     if (res.status === 204) break // no records
@@ -58,7 +60,7 @@ Deno.serve(async (req) => {
   try {
     const { data: org } = await supabase
       .from('organizations')
-      .select('id, zoho_access_token, zoho_refresh_token, zoho_token_expires, zoho_crm_connected')
+      .select('id, zoho_access_token, zoho_refresh_token, zoho_token_expires, zoho_crm_connected, zoho_dc')
       .eq('id', profile.org_id)
       .single()
 
@@ -78,8 +80,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: `Token refresh failed: ${err.message} — try disconnecting and reconnecting Zoho CRM.` }), { status: 401, headers: corsHeaders })
     }
 
+    const apiBase = zohoApiBase(org.zoho_dc)
+
     // ── Accounts → clients ───────────────────────────────────────────────
-    const accounts = await fetchAll(token, 'Accounts')
+    const accounts = await fetchAll(token, 'Accounts', apiBase)
     let accountsAdded = 0, accountsUpdated = 0
 
     for (const acct of accounts) {
@@ -137,7 +141,7 @@ Deno.serve(async (req) => {
     ;(clientRows || []).forEach((c: any) => { accountMap[c.zoho_account_id] = c.id })
 
     // ── Contacts → client_contacts ────────────────────────────────────────
-    const contacts = await fetchAll(token, 'Contacts')
+    const contacts = await fetchAll(token, 'Contacts', apiBase)
     let contactsAdded = 0, contactsUpdated = 0
 
     for (const c of contacts) {

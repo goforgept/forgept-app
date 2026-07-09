@@ -86,9 +86,9 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
     setError(null)
     if (!form.company) { setError('Company name is required'); setSaving(false); return }
 
-    const { error } = await supabase.from('clients').insert({
-      ...form, active: true, org_id: orgId
-    })
+    const { data: newClient, error } = await supabase.from('clients')
+      .insert({ ...form, active: true, org_id: orgId })
+      .select('id').single()
 
     if (error) { setError(error.message); setSaving(false); return }
 
@@ -96,6 +96,16 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
     setShowModal(false)
     fetchOrgAndClients()
     setSaving(false)
+
+    // Push to Zoho if connected (fire-and-forget)
+    if (newClient?.id) {
+      const { data: { session } } = await supabase.auth.getSession()
+      fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ clientId: newClient.id }),
+      }).catch(() => {})
+    }
   }
 
   const archiveCompany = async (e, company) => {

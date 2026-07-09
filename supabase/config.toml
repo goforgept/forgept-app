@@ -96,3 +96,20 @@ verify_jwt = false
 
 [functions.submit-rfq-response]
 verify_jwt = false
+[functions.zoho-oauth-callback]
+verify_jwt = false
+
+[functions.zoho-webhook]
+verify_jwt = false
+
+[functions.zoho-oauth-start]
+verify_jwt = false
+
+[functions.inbound-ticket-parser]
+verify_jwt = false
+
+[functions.google-oauth-callback]
+verify_jwt = false
+
+[functions.microsoft-oauth-callback]
+verify_jwt = false

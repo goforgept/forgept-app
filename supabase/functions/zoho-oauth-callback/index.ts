@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { zohoAuthBase, zohoApiBase } from "../_shared/zoho.ts"
 
 const STATE_MAX_AGE_MS = 10 * 60 * 1000 // 10 minutes
 
@@ -52,7 +53,8 @@ Deno.serve(async (req) => {
     const CLIENT_SECRET = Deno.env.get('ZOHO_CLIENT_SECRET')!
     const REDIRECT_URI  = Deno.env.get('ZOHO_REDIRECT_URI')!
 
-    // Exchange code for tokens
+    // Exchange code for tokens (use global accounts.zoho.com for initial exchange —
+    // the api_domain in the response tells us the actual DC for all subsequent calls)
     const tokenRes = await fetch('https://accounts.zoho.com/oauth/v2/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -72,6 +74,9 @@ Deno.serve(async (req) => {
     }
 
     const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000)
+    // api_domain tells us the regional DC (e.g. https://www.zohoapis.eu for EU accounts)
+    const apiDomain = tokens.api_domain || 'https://www.zohoapis.com'
+    const apiBase   = zohoApiBase(apiDomain)
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -83,11 +88,12 @@ Deno.serve(async (req) => {
       zoho_refresh_token: tokens.refresh_token,
       zoho_token_expires: expiresAt.toISOString(),
       zoho_connected:     true,
+      zoho_dc:            apiDomain,
     }
 
     if (scope === 'crm') {
       updateData.zoho_crm_connected = true
-      const userRes = await fetch('https://www.zohoapis.com/crm/v2/users?type=CurrentUser', {
+      const userRes = await fetch(`${apiBase}/crm/v2/users?type=CurrentUser`, {
         headers: { 'Authorization': `Zoho-oauthtoken ${tokens.access_token}` }
       })
       const userData = await userRes.json()
@@ -100,7 +106,7 @@ Deno.serve(async (req) => {
       const webhookUrl = `${supabaseUrl}/functions/v1/zoho-webhook?org_id=${org_id}&token=${webhookToken}`
       const expiry = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().replace('T', 'T').split('.')[0] + '+00:00'
       try {
-        await fetch('https://www.zohoapis.com/crm/v2/actions/watch', {
+        await fetch(`${apiBase}/crm/v2/actions/watch`, {
           method: 'POST',
           headers: {
             Authorization: `Zoho-oauthtoken ${tokens.access_token}`,
@@ -119,7 +125,7 @@ Deno.serve(async (req) => {
       } catch { /* non-fatal — webhook can be set up manually */ }
     } else {
       updateData.zoho_books_connected = true
-      const orgsRes = await fetch('https://www.zohoapis.com/books/v3/organizations', {
+      const orgsRes = await fetch(`${apiBase}/books/v3/organizations`, {
         headers: { 'Authorization': `Zoho-oauthtoken ${tokens.access_token}` }
       })
       const orgsData = await orgsRes.json()

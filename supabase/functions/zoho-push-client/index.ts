@@ -1,8 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { validateUser, corsHeaders } from '../_shared/auth.ts'
+import { zohoAuthBase, zohoApiBase } from '../_shared/zoho.ts'
 
 async function refreshToken(supabase: any, org: any) {
-  const res = await fetch('https://accounts.zoho.com/oauth/v2/token', {
+  const authBase = zohoAuthBase(org.zoho_dc)
+  const res = await fetch(`${authBase}/oauth/v2/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -38,7 +40,7 @@ Deno.serve(async (req) => {
 
     const { data: org } = await supabase
       .from('organizations')
-      .select('id, zoho_access_token, zoho_refresh_token, zoho_token_expires, zoho_crm_connected')
+      .select('id, zoho_access_token, zoho_refresh_token, zoho_token_expires, zoho_crm_connected, zoho_dc')
       .eq('id', profile.org_id)
       .single()
 
@@ -49,6 +51,7 @@ Deno.serve(async (req) => {
       token = await refreshToken(supabase, org)
     }
 
+    const apiBase = zohoApiBase(org.zoho_dc)
     const headers = {
       Authorization: `Zoho-oauthtoken ${token}`,
       'Content-Type': 'application/json',
@@ -75,14 +78,14 @@ Deno.serve(async (req) => {
 
         if (zohoAccountId) {
           // Update existing
-          await fetch(`https://www.zohoapis.com/crm/v2/Accounts/${zohoAccountId}`, {
+          await fetch(`${apiBase}/crm/v2/Accounts/${zohoAccountId}`, {
             method: 'PUT',
             headers,
             body: JSON.stringify({ data: [acctData] }),
           })
         } else {
           // Create new
-          const res = await fetch('https://www.zohoapis.com/crm/v2/Accounts', {
+          const res = await fetch(`${apiBase}/crm/v2/Accounts`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ data: [acctData] }),
@@ -118,13 +121,13 @@ Deno.serve(async (req) => {
         if (zohoAcctId) contactData.Account_Name = { id: zohoAcctId }
 
         if (contact.zoho_contact_id) {
-          await fetch(`https://www.zohoapis.com/crm/v2/Contacts/${contact.zoho_contact_id}`, {
+          await fetch(`${apiBase}/crm/v2/Contacts/${contact.zoho_contact_id}`, {
             method: 'PUT',
             headers,
             body: JSON.stringify({ data: [contactData] }),
           })
         } else {
-          const res = await fetch('https://www.zohoapis.com/crm/v2/Contacts', {
+          const res = await fetch(`${apiBase}/crm/v2/Contacts`, {
             method: 'POST',
             headers,
             body: JSON.stringify({ data: [contactData] }),
