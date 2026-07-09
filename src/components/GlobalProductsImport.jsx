@@ -521,21 +521,21 @@ export default function GlobalProductsImport({ onClose, onImported }) {
     })
   }
 
-  const inputClass = "bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+  const inputClass = "bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+      <div className="bg-fp-card border border-fp-border rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#2a3d55] flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-fp-border flex-shrink-0">
           <div>
-            <h2 className="text-white font-bold text-lg">Import Manufacturer Products</h2>
-            <p className="text-[#8A9AB0] text-xs mt-0.5">
+            <h2 className="text-fp-text font-bold text-lg">Import Manufacturer Products</h2>
+            <p className="text-fp-muted text-xs mt-0.5">
               System Surveyor Element Profile (.xlsx) or ForgePt CSV template (.csv)
             </p>
           </div>
-          <button onClick={onClose} className="text-[#8A9AB0] hover:text-white transition-colors">
+          <button onClick={onClose} className="text-fp-muted hover:text-fp-text transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
             </svg>
@@ -557,33 +557,33 @@ export default function GlobalProductsImport({ onClose, onImported }) {
                 onClick={() => fileRef.current?.click()}
                 className={`relative flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-10 cursor-pointer transition-colors ${
                   isDragging
-                    ? 'border-[#C8622A] bg-[#C8622A]/10'
-                    : 'border-[#2a3d55] bg-[#0F1C2E] hover:border-[#C8622A]/50 hover:bg-[#0F1C2E]/80'
+                    ? 'border-fp-brand bg-fp-brand/10'
+                    : 'border-fp-border bg-fp-inset hover:border-fp-brand/50 hover:bg-fp-inset/80'
                 }`}
               >
                 <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFile}/>
-                <svg className={`w-8 h-8 transition-colors ${isDragging ? 'text-[#C8622A]' : 'text-[#2a3d55]'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className={`w-8 h-8 transition-colors ${isDragging ? 'text-fp-brand' : 'text-fp-muted'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                 </svg>
                 <div className="text-center">
-                  <p className="text-white text-sm font-medium">Drop your file here</p>
-                  <p className="text-[#8A9AB0] text-xs mt-0.5">or click to browse — .xlsx and .csv supported</p>
+                  <p className="text-fp-text text-sm font-medium">Drop your file here</p>
+                  <p className="text-fp-muted text-xs mt-0.5">or click to browse — .xlsx and .csv supported</p>
                 </div>
               </div>
 
               {/* Format options */}
               <div className="grid grid-cols-2 gap-4">
                 {/* System Surveyor */}
-                <div className="bg-[#0F1C2E] border border-[#2a3d55] rounded-xl p-4">
+                <div className="bg-fp-inset border border-fp-border rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-lg">📊</span>
-                    <p className="text-white font-semibold text-sm">System Surveyor Format</p>
+                    <p className="text-fp-text font-semibold text-sm">System Surveyor Format</p>
                   </div>
-                  <p className="text-[#8A9AB0] text-xs mb-3">
+                  <p className="text-fp-muted text-xs mb-3">
                     Upload any manufacturer's Element Profile Excel file downloaded from System Surveyor's website.
                     Automatically extracts part numbers, FOV angles, and specifications.
                   </p>
-                  <label className="flex items-center gap-2 px-3 py-2 bg-[#C8622A] text-white text-xs font-semibold rounded-lg cursor-pointer hover:bg-[#b5571f] transition-colors">
+                  <label className="flex items-center gap-2 px-3 py-2 bg-fp-brand text-white text-xs font-semibold rounded-lg cursor-pointer hover:bg-[#b5571f] transition-colors">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                     </svg>
@@ -593,19 +593,19 @@ export default function GlobalProductsImport({ onClose, onImported }) {
                 </div>
 
                 {/* ForgePt CSV */}
-                <div className="bg-[#0F1C2E] border border-[#2a3d55] rounded-xl p-4">
+                <div className="bg-fp-inset border border-fp-border rounded-xl p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-lg">📋</span>
-                    <p className="text-white font-semibold text-sm">ForgePt CSV Template</p>
+                    <p className="text-fp-text font-semibold text-sm">ForgePt CSV Template</p>
                   </div>
-                  <p className="text-[#8A9AB0] text-xs mb-3">
-                    Use our CSV template for any device type — cameras, AV equipment, intrusion detection, access control, and more. Set the <strong className="text-white">Category</strong> column to any valid ForgePt category.
+                  <p className="text-fp-muted text-xs mb-3">
+                    Use our CSV template for any device type — cameras, AV equipment, intrusion detection, access control, and more. Set the <strong className="text-fp-text">Category</strong> column to any valid ForgePt category.
                   </p>
                   <div className="flex gap-2">
                     <a
                       href="/forgept_manufacturer_import_template.csv"
                       download="forgept_manufacturer_import_template.csv"
-                      className="flex items-center gap-1.5 px-3 py-2 bg-[#2a3d55] text-[#8A9AB0] text-xs font-medium rounded-lg hover:text-white transition-colors"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-fp-inset text-fp-muted text-xs font-medium rounded-lg hover:text-fp-text transition-colors"
                       onClick={(e) => {
                         // Generate and download the template
                         e.preventDefault()
@@ -645,7 +645,7 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
                       </svg>
                       Download Template
                     </a>
-                    <label className="flex items-center gap-1.5 px-3 py-2 bg-[#C8622A] text-white text-xs font-semibold rounded-lg cursor-pointer hover:bg-[#b5571f] transition-colors">
+                    <label className="flex items-center gap-1.5 px-3 py-2 bg-fp-brand text-white text-xs font-semibold rounded-lg cursor-pointer hover:bg-[#b5571f] transition-colors">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
                       </svg>
@@ -663,15 +663,15 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
               )}
 
               {/* Supported manufacturers note */}
-              <div className="bg-[#0F1C2E] rounded-xl p-4 border border-[#2a3d55]">
-                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">System Surveyor Files Available From</p>
-                <div className="flex flex-wrap gap-2 text-xs text-[#8A9AB0]">
+              <div className="bg-fp-inset rounded-xl p-4 border border-fp-border">
+                <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">System Surveyor Files Available From</p>
+                <div className="flex flex-wrap gap-2 text-xs text-fp-muted">
                   {['Axis', 'Hikvision', 'Pelco', 'Hanwha', 'Bosch', 'Avigilon', 'Verkada',
                     'HID', 'Allegion', 'ASSA ABLOY', 'Lenel', 'Software House',
                     'Triton Sensors', 'Verkada', 'Motorola', 'Genetec'].map(m => (
-                    <span key={m} className="px-2 py-1 bg-[#1a2d45] rounded border border-[#2a3d55]">{m}</span>
+                    <span key={m} className="px-2 py-1 bg-fp-card rounded border border-fp-border">{m}</span>
                   ))}
-                  <span className="px-2 py-1 bg-[#1a2d45] rounded border border-[#2a3d55]">+ hundreds more</span>
+                  <span className="px-2 py-1 bg-fp-card rounded border border-fp-border">+ hundreds more</span>
                 </div>
               </div>
             </div>
@@ -681,24 +681,24 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
           {step === 'preview' && parsed && (
             <div className="flex flex-col h-full">
               {/* Summary */}
-              <div className="px-6 py-3 border-b border-[#2a3d55] bg-[#0F1C2E] flex items-center gap-6 text-xs flex-shrink-0">
+              <div className="px-6 py-3 border-b border-fp-border bg-fp-inset flex items-center gap-6 text-xs flex-shrink-0">
                 <div>
-                  <span className="text-[#8A9AB0]">File type</span>
-                  <span className="ml-2 text-white font-medium">{fileType === 'csv' ? 'ForgePt CSV' : 'System Surveyor'}</span>
+                  <span className="text-fp-muted">File type</span>
+                  <span className="ml-2 text-fp-text font-medium">{fileType === 'csv' ? 'ForgePt CSV' : 'System Surveyor'}</span>
                 </div>
                 <div>
-                  <span className="text-[#8A9AB0]">Element</span>
-                  <span className="ml-2 text-white font-medium">{parsed.elementType}</span>
+                  <span className="text-fp-muted">Element</span>
+                  <span className="ml-2 text-fp-text font-medium">{parsed.elementType}</span>
                 </div>
                 <div>
-                  <span className="text-[#8A9AB0]">Products found</span>
-                  <span className="ml-2 text-[#C8622A] font-bold">{parsed.products.length}</span>
+                  <span className="text-fp-muted">Products found</span>
+                  <span className="ml-2 text-fp-brand font-bold">{parsed.products.length}</span>
                 </div>
                 <div>
-                  <span className="text-[#8A9AB0]">Selected</span>
-                  <span className="ml-2 text-white font-bold">{selected.size}</span>
+                  <span className="text-fp-muted">Selected</span>
+                  <span className="ml-2 text-fp-text font-bold">{selected.size}</span>
                 </div>
-                <button onClick={toggleAll} className="text-[#C8622A] hover:text-white transition-colors ml-auto">
+                <button onClick={toggleAll} className="text-fp-brand hover:text-fp-text transition-colors ml-auto">
                   {selected.size === parsed.products.length ? 'Deselect All' : 'Select All'}
                 </button>
               </div>
@@ -707,35 +707,35 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
               <div className="flex-1 overflow-y-auto">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0">
-                    <tr className="bg-[#1a2d45] border-b border-[#2a3d55]">
+                    <tr className="bg-fp-card border-b border-fp-border">
                       <th className="w-8 px-3 py-2"/>
-                      <th className="text-left px-3 py-2 font-medium text-[#8A9AB0]">Part Number</th>
-                      <th className="text-left px-3 py-2 font-medium text-[#8A9AB0]">Name</th>
-                      <th className="text-left px-3 py-2 font-medium text-[#8A9AB0]">Manufacturer</th>
-                      <th className="text-left px-3 py-2 font-medium text-[#8A9AB0]">Category</th>
-                      <th className="text-left px-3 py-2 font-medium text-[#8A9AB0]">Industry</th>
-                      <th className="text-center px-3 py-2 font-medium text-[#8A9AB0]">FOV°</th>
-                      <th className="text-center px-3 py-2 font-medium text-[#8A9AB0]">IR</th>
+                      <th className="text-left px-3 py-2 font-medium text-fp-muted">Part Number</th>
+                      <th className="text-left px-3 py-2 font-medium text-fp-muted">Name</th>
+                      <th className="text-left px-3 py-2 font-medium text-fp-muted">Manufacturer</th>
+                      <th className="text-left px-3 py-2 font-medium text-fp-muted">Category</th>
+                      <th className="text-left px-3 py-2 font-medium text-fp-muted">Industry</th>
+                      <th className="text-center px-3 py-2 font-medium text-fp-muted">FOV°</th>
+                      <th className="text-center px-3 py-2 font-medium text-fp-muted">IR</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#2a3d55]/50">
+                  <tbody className="divide-y divide-fp-border/50">
                     {parsed.products.map(p => (
                       <tr key={p.part_number}
                         className={`transition-colors ${
-                          selected.has(p.part_number) ? 'bg-[#C8622A]/5' : 'hover:bg-[#1a2d45]/50'
+                          selected.has(p.part_number) ? 'bg-fp-brand/5' : 'hover:bg-fp-card/50'
                         }`}>
                         <td className="px-3 py-2 text-center">
                           <input type="checkbox" checked={selected.has(p.part_number)}
                             onChange={() => toggleOne(p.part_number)}
-                            className="accent-[#C8622A]"/>
+                            className="accent-fp-brand"/>
                         </td>
-                        <td className="px-3 py-2 font-mono text-[#C8622A] whitespace-nowrap">{p.part_number}</td>
-                        <td className="px-2 py-1 text-white max-w-xs">
+                        <td className="px-3 py-2 font-mono text-fp-brand whitespace-nowrap">{p.part_number}</td>
+                        <td className="px-2 py-1 text-fp-text max-w-xs">
                           <input
                             value={getField(p, 'name')}
                             onChange={e => patchEdit(p.part_number, 'name', e.target.value)}
                             onClick={e => e.stopPropagation()}
-                            className="w-full bg-transparent border border-transparent hover:border-[#2a3d55] focus:border-[#C8622A] focus:bg-[#1a2d45] rounded px-1 py-0.5 text-xs outline-none transition-colors"
+                            className="w-full bg-transparent border border-transparent hover:border-fp-border focus:border-fp-brand focus:bg-fp-card rounded px-1 py-0.5 text-xs outline-none transition-colors"
                           />
                         </td>
                         <td className="px-2 py-1 whitespace-nowrap">
@@ -743,7 +743,7 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
                             value={getField(p, 'manufacturer')}
                             onChange={e => patchEdit(p.part_number, 'manufacturer', e.target.value)}
                             onClick={e => e.stopPropagation()}
-                            className="w-full bg-transparent border border-transparent hover:border-[#2a3d55] focus:border-[#C8622A] focus:bg-[#1a2d45] rounded px-1 py-0.5 text-xs text-[#8A9AB0] outline-none transition-colors"
+                            className="w-full bg-transparent border border-transparent hover:border-fp-border focus:border-fp-brand focus:bg-fp-card rounded px-1 py-0.5 text-xs text-fp-muted outline-none transition-colors"
                           />
                         </td>
                         <td className="px-2 py-1">
@@ -751,7 +751,7 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
                             value={getField(p, 'category')}
                             onChange={e => patchEdit(p.part_number, 'category', e.target.value)}
                             onClick={e => e.stopPropagation()}
-                            className="bg-[#1a2d45] border border-[#2a3d55] focus:border-[#C8622A] text-[#8A9AB0] rounded px-1 py-0.5 text-xs outline-none cursor-pointer w-full"
+                            className="bg-fp-card border border-fp-border focus:border-fp-brand text-fp-muted rounded px-1 py-0.5 text-xs outline-none cursor-pointer w-full"
                           >
                             {ALL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                             {!ALL_CATEGORIES.includes(getField(p, 'category')) && (
@@ -759,14 +759,14 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
                             )}
                           </select>
                         </td>
-                        <td className="px-3 py-2 text-[#8A9AB0] capitalize">{p.industry?.replace('_', ' ')}</td>
-                        <td className="px-3 py-2 text-center text-[#8A9AB0]">
+                        <td className="px-3 py-2 text-fp-muted capitalize">{p.industry?.replace('_', ' ')}</td>
+                        <td className="px-3 py-2 text-center text-fp-muted">
                           {p.specs?.fov_angle ? `${p.specs.fov_angle}°` : '—'}
                         </td>
                         <td className="px-3 py-2 text-center">
                           {p.specs?.has_ir
                             ? <span className="text-green-400">✓</span>
-                            : <span className="text-[#4a5a6a]">—</span>}
+                            : <span className="text-fp-muted">—</span>}
                         </td>
                       </tr>
                     ))}
@@ -779,15 +779,15 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
           {/* ── Importing step ── */}
           {step === 'importing' && (
             <div className="flex flex-col items-center justify-center py-16 gap-4">
-              <svg className="w-10 h-10 animate-spin text-[#C8622A]" fill="none" viewBox="0 0 24 24">
+              <svg className="w-10 h-10 animate-spin text-fp-brand" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
               </svg>
-              <p className="text-white font-semibold">Importing products...</p>
-              <div className="w-64 bg-[#0F1C2E] rounded-full h-2">
-                <div className="bg-[#C8622A] h-2 rounded-full transition-all" style={{ width: `${progress}%` }}/>
+              <p className="text-fp-text font-semibold">Importing products...</p>
+              <div className="w-64 bg-fp-inset rounded-full h-2">
+                <div className="bg-fp-brand h-2 rounded-full transition-all" style={{ width: `${progress}%` }}/>
               </div>
-              <p className="text-[#8A9AB0] text-sm">{progress}% complete</p>
+              <p className="text-fp-muted text-sm">{progress}% complete</p>
             </div>
           )}
 
@@ -799,20 +799,20 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/>
                 </svg>
               </div>
-              <p className="text-white font-bold text-lg">Import Complete</p>
+              <p className="text-fp-text font-bold text-lg">Import Complete</p>
               <div className="flex gap-8 text-center">
                 <div>
-                  <p className="text-[#C8622A] text-2xl font-bold">{imported}</p>
-                  <p className="text-[#8A9AB0] text-xs">Products imported</p>
+                  <p className="text-fp-brand text-2xl font-bold">{imported}</p>
+                  <p className="text-fp-muted text-xs">Products imported</p>
                 </div>
                 {skipped > 0 && (
                   <div>
                     <p className="text-yellow-400 text-2xl font-bold">{skipped}</p>
-                    <p className="text-[#8A9AB0] text-xs">Skipped / errors</p>
+                    <p className="text-fp-muted text-xs">Skipped / errors</p>
                   </div>
                 )}
               </div>
-              <p className="text-[#8A9AB0] text-sm text-center max-w-sm">
+              <p className="text-fp-muted text-sm text-center max-w-sm">
                 Products are now available in the symbol picker for all organizations.
               </p>
             </div>
@@ -820,9 +820,9 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-[#2a3d55] flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-fp-border flex-shrink-0">
           <button onClick={() => { setStep('upload'); setParsed(null); setError(null) }}
-            className="px-4 py-2 text-sm text-[#8A9AB0] hover:text-white transition-colors">
+            className="px-4 py-2 text-sm text-fp-muted hover:text-fp-text transition-colors">
             {step === 'done' ? 'Import Another File' : 'Cancel'}
           </button>
 
@@ -832,8 +832,8 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
               disabled={selected.size === 0}
               className={`px-6 py-2 text-sm font-semibold rounded-lg transition-colors ${
                 selected.size === 0
-                  ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
-                  : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
+                  ? 'bg-fp-inset text-fp-muted cursor-not-allowed'
+                  : 'bg-fp-brand text-white hover:bg-[#b5571f]'
               }`}>
               Import {selected.size} Product{selected.size !== 1 ? 's' : ''}
             </button>
@@ -841,7 +841,7 @@ EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
 
           {step === 'done' && (
             <button onClick={onClose}
-              className="px-6 py-2 text-sm font-semibold rounded-lg bg-[#C8622A] text-white hover:bg-[#b5571f] transition-colors">
+              className="px-6 py-2 text-sm font-semibold rounded-lg bg-fp-brand text-white hover:bg-[#b5571f] transition-colors">
               Done
             </button>
           )}

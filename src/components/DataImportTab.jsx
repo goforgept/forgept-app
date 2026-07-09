@@ -170,17 +170,17 @@ export default function DataImportTab({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-white font-bold text-lg mb-1">Data & Import</h3>
-        <p className="text-[#8A9AB0] text-sm">Import clients and locations from a CSV or Excel file.</p>
+        <h3 className="text-fp-text font-bold text-lg mb-1">Data & Import</h3>
+        <p className="text-fp-muted text-sm">Import clients and locations from a CSV or Excel file.</p>
       </div>
 
       {/* Import Type Toggle */}
-      <div className="bg-[#1a2d45] rounded-xl p-5">
-        <p className="text-white font-semibold mb-3">What are you importing?</p>
+      <div className="bg-fp-card rounded-xl p-5">
+        <p className="text-fp-text font-semibold mb-3">What are you importing?</p>
         <div className="flex gap-3">
           {['clients', 'locations'].map(type => (
             <button key={type} onClick={() => { setImportType(type); setImportFile(null); setImportPreview([]); setImportHeaders([]); setImportResults(null) }}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-colors ${importType === type ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition-colors ${importType === type ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
               {type === 'clients' ? '🏢 Clients' : '📍 Locations'}
             </button>
           ))}
@@ -188,14 +188,14 @@ export default function DataImportTab({
       </div>
 
       {/* Template Download */}
-      <div className="bg-[#1a2d45] rounded-xl p-5">
+      <div className="bg-fp-card rounded-xl p-5">
         <div className="flex justify-between items-center">
           <div>
-            <p className="text-white font-semibold text-sm">Download Template</p>
-            <p className="text-[#8A9AB0] text-xs mt-0.5">Download the Excel template with the correct column headers</p>
+            <p className="text-fp-text font-semibold text-sm">Download Template</p>
+            <p className="text-fp-muted text-xs mt-0.5">Download the Excel template with the correct column headers</p>
           </div>
           <button onClick={() => downloadTemplate(importType)}
-            className="bg-[#0F1C2E] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#2a3d55] transition-colors">
+            className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-inset transition-colors">
             ⬇ Download {importType === 'clients' ? 'Clients' : 'Locations'} Template
           </button>
         </div>
@@ -203,26 +203,26 @@ export default function DataImportTab({
 
       {/* Location Match Options */}
       {importType === 'locations' && (
-        <div className="bg-[#1a2d45] rounded-xl p-5">
-          <p className="text-white font-semibold mb-3">How should locations be matched to clients?</p>
+        <div className="bg-fp-card rounded-xl p-5">
+          <p className="text-fp-text font-semibold mb-3">How should locations be matched to clients?</p>
           <div className="flex gap-3 mb-4">
             <button onClick={() => setLocationMatchType('auto')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${locationMatchType === 'auto' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${locationMatchType === 'auto' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
               Auto-match by Company Name
             </button>
             <button onClick={() => setLocationMatchType('single')}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${locationMatchType === 'single' ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${locationMatchType === 'single' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
               Import Under One Client
             </button>
           </div>
           {locationMatchType === 'auto' && (
-            <p className="text-[#8A9AB0] text-xs">Your file must have a "Client Company Name" column that matches an existing client name exactly.</p>
+            <p className="text-fp-muted text-xs">Your file must have a "Client Company Name" column that matches an existing client name exactly.</p>
           )}
           {locationMatchType === 'single' && (
             <div>
-              <label className="text-[#8A9AB0] text-xs mb-1 block">Select Client</label>
+              <label className="text-fp-muted text-xs mb-1 block">Select Client</label>
               <select value={locationMatchClient} onChange={e => setLocationMatchClient(e.target.value)}
-                className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                 <option value="">— Select a client —</option>
                 {importClients.map(c => <option key={c.id} value={c.id}>{c.company}</option>)}
               </select>
@@ -232,39 +232,39 @@ export default function DataImportTab({
       )}
 
       {/* File Upload */}
-      <div className="bg-[#1a2d45] rounded-xl p-5">
-        <p className="text-white font-semibold mb-3">Upload File</p>
+      <div className="bg-fp-card rounded-xl p-5">
+        <p className="text-fp-text font-semibold mb-3">Upload File</p>
         <input type="file" accept=".xlsx,.xls,.csv"
           onChange={e => e.target.files[0] && handleFileUpload(e.target.files[0])}
-          className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
-        {importFile && <p className="text-[#8A9AB0] text-xs mt-1">{importFile.name} — {(importFile.size / 1024).toFixed(1)} KB</p>}
+          className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+        {importFile && <p className="text-fp-muted text-xs mt-1">{importFile.name} — {(importFile.size / 1024).toFixed(1)} KB</p>}
       </div>
 
       {/* Preview */}
       {importPreview.length > 0 && (
-        <div className="bg-[#1a2d45] rounded-xl p-5">
-          <p className="text-white font-semibold mb-3">Preview — first {importPreview.length} rows</p>
+        <div className="bg-fp-card rounded-xl p-5">
+          <p className="text-fp-text font-semibold mb-3">Preview — first {importPreview.length} rows</p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-[#2a3d55]">
+                <tr className="border-b border-fp-border">
                   {importHeaders.map((h, i) => (
-                    <th key={i} className="text-[#8A9AB0] text-left py-2 px-3 font-normal whitespace-nowrap">{h}</th>
+                    <th key={i} className="text-fp-muted text-left py-2 px-3 font-normal whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {importPreview.map((row, i) => (
-                  <tr key={i} className="border-b border-[#2a3d55]/30">
+                  <tr key={i} className="border-b border-fp-border/30">
                     {importHeaders.map((h, j) => (
-                      <td key={j} className="text-white py-2 px-3 whitespace-nowrap">{row[h] || '—'}</td>
+                      <td key={j} className="text-fp-text py-2 px-3 whitespace-nowrap">{row[h] || '—'}</td>
                     ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="text-[#8A9AB0] text-xs mt-3">Showing first {importPreview.length} rows. All rows will be imported.</p>
+          <p className="text-fp-muted text-xs mt-3">Showing first {importPreview.length} rows. All rows will be imported.</p>
         </div>
       )}
 
@@ -275,28 +275,28 @@ export default function DataImportTab({
             {importResults.errors > 0 ? '⚠ Import completed with errors' : '✓ Import complete'}
           </p>
           <div className="grid grid-cols-4 gap-3">
-            <div className="bg-[#0F1C2E] rounded-lg p-3 text-center">
-              <p className="text-[#8A9AB0] text-xs mb-1">Total Rows</p>
-              <p className="text-white font-bold">{importResults.total}</p>
+            <div className="bg-fp-inset rounded-lg p-3 text-center">
+              <p className="text-fp-muted text-xs mb-1">Total Rows</p>
+              <p className="text-fp-text font-bold">{importResults.total}</p>
             </div>
-            <div className="bg-[#0F1C2E] rounded-lg p-3 text-center">
-              <p className="text-[#8A9AB0] text-xs mb-1">Created</p>
+            <div className="bg-fp-inset rounded-lg p-3 text-center">
+              <p className="text-fp-muted text-xs mb-1">Created</p>
               <p className="text-green-400 font-bold">{importResults.created}</p>
             </div>
-            <div className="bg-[#0F1C2E] rounded-lg p-3 text-center">
-              <p className="text-[#8A9AB0] text-xs mb-1">Skipped</p>
+            <div className="bg-fp-inset rounded-lg p-3 text-center">
+              <p className="text-fp-muted text-xs mb-1">Skipped</p>
               <p className="text-yellow-400 font-bold">{importResults.skipped}</p>
             </div>
-            <div className="bg-[#0F1C2E] rounded-lg p-3 text-center">
-              <p className="text-[#8A9AB0] text-xs mb-1">Errors</p>
-              <p className={`font-bold ${importResults.errors > 0 ? 'text-red-400' : 'text-white'}`}>{importResults.errors}</p>
+            <div className="bg-fp-inset rounded-lg p-3 text-center">
+              <p className="text-fp-muted text-xs mb-1">Errors</p>
+              <p className={`font-bold ${importResults.errors > 0 ? 'text-red-400' : 'text-fp-text'}`}>{importResults.errors}</p>
             </div>
           </div>
           {importResults.skipped > 0 && importType === 'clients' && (
-            <p className="text-[#8A9AB0] text-xs mt-3">Skipped rows had missing company names or already exist in your account.</p>
+            <p className="text-fp-muted text-xs mt-3">Skipped rows had missing company names or already exist in your account.</p>
           )}
           {importResults.skipped > 0 && importType === 'locations' && (
-            <p className="text-[#8A9AB0] text-xs mt-3">Skipped rows had missing location names or couldn't be matched to a client.</p>
+            <p className="text-fp-muted text-xs mt-3">Skipped rows had missing location names or couldn't be matched to a client.</p>
           )}
         </div>
       )}
@@ -304,7 +304,7 @@ export default function DataImportTab({
       {/* Import Button */}
       {importPreview.length > 0 && !importResults && (
         <button onClick={runImport} disabled={importing || (importType === 'locations' && locationMatchType === 'single' && !locationMatchClient)}
-          className="w-full bg-[#C8622A] text-white py-3 rounded-xl font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+          className="w-full bg-fp-brand text-white py-3 rounded-xl font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
           {importing ? 'Importing...' : `Import ${importType === 'clients' ? 'Clients' : 'Locations'} →`}
         </button>
       )}

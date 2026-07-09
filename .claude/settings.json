@@ -5,7 +5,9 @@
       "Bash(npx --yes acorn --ecma2020 --module src/pages/ProposalDetail.jsx)",
       "Bash(npx --yes @babel/parser --help)",
       "Bash(node -e ' *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(grep -n \"text-white\\\\|#[0-9a-fA-F]\\\\{3,6\\\\}\" /Users/codysobas/Desktop/forgept-app/src/components/DataImportTab.jsx)",
+      "Bash(grep -n \"text-white\\\\|#[0-9a-fA-F]\\\\{3,6\\\\}\" /Users/codysobas/Desktop/forgept-app/src/components/GlobalProductsImport.jsx)"
     ]
   }
 }
