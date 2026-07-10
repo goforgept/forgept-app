@@ -129,7 +129,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [editingCable,   setEditingCable]   = useState(null) // cable id being edited
   const [dragPoint,      setDragPoint]      = useState(null) // {cableId, pointIndex}
   const [hoveredWaypoint,  setHoveredWaypoint]  = useState(null)
-  const [industryFilter,   setIndustryFilter]   = useState('all')
+  const [industryFilter,   setIndustryFilter]   = useState([])
   const copiedPlacement    = externalCopied
   const setCopiedPlacement = onCopyPlacement || (() => {})
   const [contextMenu,     setContextMenu]     = useState(null) // {x, y, placementId}
@@ -945,53 +945,48 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             </svg>
             Labels
           </button>
-          <button
-            onClick={() => setShowCableRuns(s => !s)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
-              showCableRuns
-                ? 'border-[#C8622A]/40 bg-[#C8622A]/10 text-[#C8622A]'
-                : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
-            }`}
-            title="Toggle cable runs">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16M4 12l4-4M4 12l4 4"/>
-            </svg>
-            Cables
-          </button>
-          <button
-            onClick={() => setShowPathways(s => !s)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
-              showPathways
-                ? 'border-[#4a90d9]/40 bg-[#4a90d9]/10 text-[#4a90d9]'
-                : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
-            }`}
-            title="Toggle pathways">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
-            </svg>
-            Pathways
-          </button>
-
-          {/* Industry filter */}
-          <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5 border border-[#2a3d55]">
+          {/* Layer / industry checkboxes */}
+          <div className="flex items-center gap-2 px-2 py-1 rounded-lg border border-[#2a3d55] bg-[#0F1C2E]">
             {[
-              { id: 'all',        label: 'All' },
-              { id: 'security',   label: 'SEC' },
-              { id: 'av',         label: 'AV' },
-              { id: 'fire_alarm', label: 'FA' },
-              { id: 'low_voltage',label: 'LV' },
-              { id: 'hvac',       label: 'HVAC' },
-            ].map(f => (
-              <button key={f.id}
-                onClick={() => setIndustryFilter(f.id)}
-                className={`px-1.5 py-0.5 rounded text-xs transition-colors ${
-                  industryFilter === f.id
-                    ? 'bg-[#C8622A] text-white'
-                    : 'text-[#8A9AB0] hover:text-white'
-                }`}>
-                {f.label}
-              </button>
-            ))}
+              { id: 'cables',      label: 'Cables',    color: '#3b82f6',  isLayer: true },
+              { id: 'pathways',    label: 'Pathways',  color: '#4a90d9',  isLayer: true },
+              { id: 'security',    label: 'SEC',        color: '#C8622A', isLayer: false },
+              { id: 'av',          label: 'AV',         color: '#C8622A', isLayer: false },
+              { id: 'fire_alarm',  label: 'FA',         color: '#C8622A', isLayer: false },
+              { id: 'low_voltage', label: 'LV',         color: '#C8622A', isLayer: false },
+              { id: 'hvac',        label: 'HVAC',       color: '#C8622A', isLayer: false },
+              { id: 'das',         label: 'DAS',        color: '#C8622A', isLayer: false },
+            ].map(f => {
+              const isChecked = f.isLayer
+                ? (f.id === 'cables' ? showCableRuns : showPathways)
+                : industryFilter.includes(f.id)
+              const toggle = () => {
+                if (f.isLayer) {
+                  if (f.id === 'cables') setShowCableRuns(s => !s)
+                  else setShowPathways(s => !s)
+                } else {
+                  setIndustryFilter(prev =>
+                    prev.includes(f.id) ? prev.filter(x => x !== f.id) : [...prev, f.id]
+                  )
+                }
+              }
+              return (
+                <label key={f.id} className="flex items-center gap-1 cursor-pointer select-none group">
+                  <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
+                    isChecked ? 'border-[#C8622A] bg-[#C8622A]' : 'border-[#4a5568] bg-transparent group-hover:border-[#8A9AB0]'
+                  }`} onClick={toggle}>
+                    {isChecked && (
+                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/>
+                      </svg>
+                    )}
+                  </span>
+                  <span onClick={toggle} className={`text-xs transition-colors ${isChecked ? 'text-white' : 'text-[#8A9AB0] group-hover:text-white'}`}>
+                    {f.label}
+                  </span>
+                </label>
+              )
+            })}
           </div>
 
           {(cableMode || pathwayMode) && (
@@ -1838,7 +1833,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                     isSelected={isSelected} isHovered={isHovered}
                     cableMode={cableMode} pathwayMode={pathwayMode}
                     showLabels={showLabels}
-                    opacity={industryFilter === 'all' || placement.global_products?.industry === industryFilter ? 1 : 0.15}
+                    opacity={industryFilter.length === 0 || industryFilter.includes(placement.global_products?.industry) ? 1 : 0.15}
                     markerColor={placement.marker_color || '#C8622A'}
                     onContextMenu={(e) => {
                       const pointer = stageRef.current.getPointerPosition()
