@@ -286,7 +286,7 @@ export default function SuperAdmin() {
   const [orgForm, setOrgForm] = useState({})
   const [unauthorized, setUnauthorized] = useState(false)
   const [stripeModal, setStripeModal] = useState(null)
-  const [stripeForm, setStripeForm] = useState({ plan: 'Early Adopter', chargeOnboarding: false })
+  const [stripeForm, setStripeForm] = useState({ plan: 'Early Adopter', qboAddon: false })
   const [creatingSubscription, setCreatingSubscription] = useState(false)
   const [stripeResult, setStripeResult] = useState(null)
   const [deleteModal, setDeleteModal] = useState(null)
@@ -597,7 +597,7 @@ export default function SuperAdmin() {
   const openStripeModal = (org) => {
     const admin = getOrgAdmin(org.id)
     setStripeModal({ org, admin })
-    setStripeForm({ plan: org.plan && org.plan !== 'Trial' ? org.plan : 'Early Adopter', chargeOnboarding: false })
+    setStripeForm({ plan: org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter', qboAddon: org.quickbooks_addon || false })
     setStripeResult(null)
   }
 
@@ -607,7 +607,7 @@ export default function SuperAdmin() {
     setStripeResult(null)
     try {
       const { data: result, error } = await supabase.functions.invoke('stripe-create-subscription', {
-        body: { orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeModal.admin?.email || '', plan: stripeForm.plan, chargeOnboarding: stripeForm.chargeOnboarding }
+        body: { orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeModal.admin?.email || '', plan: stripeForm.plan, qboAddon: stripeForm.qboAddon }
       })
       if (error) setStripeResult({ success: false, message: error.message })
       else if (result?.error) setStripeResult({ success: false, message: result.error })
@@ -1388,32 +1388,37 @@ export default function SuperAdmin() {
       {stripeModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-white font-bold text-lg mb-1">Create Stripe Subscription</h3>
+            <h3 className="text-white font-bold text-lg mb-1">{stripeModal.org.stripe_subscription_id ? 'Update' : 'Create'} Stripe Subscription</h3>
             <p className="text-[#8A9AB0] text-sm mb-5">{stripeModal.org.name} · {stripeModal.admin?.email || 'No admin email'}</p>
             <div className="space-y-4">
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label><select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                <option value="Early Adopter">Early Adopter — $100/mo</option>
-                <option value="Designer Only">Designer Only — $49/mo</option>
-                <option value="Small Team">Small Team — $99/mo</option>
-                <option value="Business">Business — $199/mo</option>
-                <option value="QuickBooks Add-on">QuickBooks Add-on — $25/mo</option>
-              </select></div>
-              <div className="flex items-center gap-3 bg-[#0F1C2E] rounded-lg px-4 py-3">
-                {/* Onboarding fee removed */}
-                <label htmlFor="onboarding" className="text-white text-sm cursor-pointer">Charge one-time onboarding fee <span className="text-[#C8622A] font-semibold">$249</span></label>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Base Plan</label>
+                <select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  <option value="Early Adopter">Early Adopter — $100/mo</option>
+                  <option value="Designer Only">Designer Only — $49/mo</option>
+                  <option value="Small Team">Small Team — $99/mo</option>
+                  <option value="Business">Business — $199/mo</option>
+                </select>
               </div>
+              <label className="flex items-center gap-3 bg-[#0F1C2E] rounded-lg px-4 py-3 cursor-pointer">
+                <input type="checkbox" checked={stripeForm.qboAddon} onChange={e => setStripeForm(p => ({ ...p, qboAddon: e.target.checked }))} className="w-4 h-4 rounded accent-[#C8622A]" />
+                <div>
+                  <p className="text-white text-sm font-medium">QuickBooks Add-on <span className="text-[#C8622A] font-semibold">+$25/mo</span></p>
+                  <p className="text-[#8A9AB0] text-xs">Added as a separate line item on the same subscription</p>
+                </div>
+              </label>
               <div className="bg-[#0F1C2E] rounded-lg p-3 text-xs text-[#8A9AB0]">
                 <p className="font-semibold text-white mb-1">What this does:</p>
-                <p>• Creates a Stripe customer for {stripeModal.org.name}</p>
-                <p>• Creates a {stripeForm.plan} subscription at ${{ 'Early Adopter': 100, 'Designer Only': 49, 'Small Team': 99, 'Business': 199, 'QuickBooks Add-on': 25 }[stripeForm.plan]}/mo</p>
-                
+                <p>• Creates or updates a Stripe customer for {stripeModal.org.name}</p>
+                <p>• {stripeModal.org.stripe_subscription_id ? 'Updates the existing' : 'Creates a'} {stripeForm.plan} subscription at ${{ 'Early Adopter': 100, 'Designer Only': 49, 'Small Team': 99, 'Business': 199 }[stripeForm.plan]}/mo{stripeForm.qboAddon ? ' + $25/mo QBO' : ''}</p>
+                <p>• Stripe auto-sends invoices each cycle once a payment method is added</p>
                 <p>• Updates billing status in ForgePt.</p>
-                <p className="mt-2 text-yellow-400">Note: Customer will need to add payment method via Stripe dashboard or payment link.</p>
+                <p className="mt-2 text-yellow-400">Note: Customer will need to add a payment method before charges begin.</p>
               </div>
               {stripeResult && <div className={`rounded-lg px-4 py-3 text-sm font-semibold ${stripeResult.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{stripeResult.message}</div>}
               <div className="flex gap-3 pt-2">
                 <button onClick={() => { setStripeModal(null); setStripeResult(null) }} className="flex-1 py-2 text-[#8A9AB0] hover:text-white text-sm transition-colors">Cancel</button>
-                <button onClick={createSubscription} disabled={creatingSubscription} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{creatingSubscription ? 'Creating...' : 'Create Subscription'}</button>
+                <button onClick={createSubscription} disabled={creatingSubscription} className="flex-1 bg-[#C8622A] text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{creatingSubscription ? 'Saving...' : stripeModal.org.stripe_subscription_id ? 'Update Subscription' : 'Create Subscription'}</button>
               </div>
             </div>
           </div>
