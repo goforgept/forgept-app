@@ -21,6 +21,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
   const [dragging, setDragging] = useState(null)
   const [showAddStage, setShowAddStage] = useState(false)
   const [newStageName, setNewStageName] = useState('')
+  const [search, setSearch] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -72,14 +73,22 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
   }
 
   const getProposalsForStage = (stage) => {
+    const q = search.toLowerCase()
     return proposals.filter(p => {
-      if (p.pipeline_stage_id) return p.pipeline_stage_id === stage.id
-      // Map existing statuses to default stages if no pipeline_stage_id
-      if (stage.name === 'Proposal Sent') return !p.pipeline_stage_id && p.status === 'Sent'
-      if (stage.name === 'Won') return !p.pipeline_stage_id && p.status === 'Won'
-      if (stage.name === 'Lost') return !p.pipeline_stage_id && p.status === 'Lost'
-      if (stage.name === 'Lead') return !p.pipeline_stage_id && p.status === 'Draft'
-      return false
+      if (p.pipeline_stage_id) { if (p.pipeline_stage_id !== stage.id) return false }
+      else {
+        if (stage.name === 'Proposal Sent' && p.status !== 'Sent') return false
+        else if (stage.name === 'Won' && p.status !== 'Won') return false
+        else if (stage.name === 'Lost' && p.status !== 'Lost') return false
+        else if (stage.name === 'Lead' && p.status !== 'Draft') return false
+        else if (!['Proposal Sent','Won','Lost','Lead'].includes(stage.name)) return false
+      }
+      if (!q) return true
+      return (
+        (p.proposal_name || '').toLowerCase().includes(q) ||
+        (p.company || '').toLowerCase().includes(q) ||
+        (p.rep_name || '').toLowerCase().includes(q)
+      )
     })
   }
 
@@ -152,6 +161,13 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
             </p>
           </div>
           <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Search deals..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm w-48 focus:outline-none focus:border-fp-brand placeholder-fp-muted"
+            />
             <button
               onClick={() => setShowAddStage(!showAddStage)}
               className="bg-fp-card text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm transition-colors"

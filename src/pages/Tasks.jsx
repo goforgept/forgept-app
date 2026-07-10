@@ -13,6 +13,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState('pending')
+  const [search, setSearch] = useState('')
   const [view, setView] = useState('list') // 'list' | 'calendar'
   const [calendarDate, setCalendarDate] = useState(new Date())
   const [selectedDay, setSelectedDay] = useState(null)
@@ -209,10 +210,18 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
   }
 
   const filtered = tasks.filter(t => {
-    if (filter === 'pending') return !t.completed
-    if (filter === 'completed') return t.completed
-    if (filter === 'overdue') return isOverdue(t)
-    if (filter === 'today') return isDueToday(t)
+    if (filter === 'pending' && t.completed) return false
+    if (filter === 'completed' && !t.completed) return false
+    if (filter === 'overdue' && !isOverdue(t)) return false
+    if (filter === 'today' && !isDueToday(t)) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.clients?.company || '').toLowerCase().includes(q) ||
+        (t.profiles?.full_name || '').toLowerCase().includes(q)
+      )
+    }
     return true
   })
 
@@ -579,7 +588,14 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
         {/* ── LIST VIEW ── */}
         {view === 'list' && (
           <>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <input
+                type="text"
+                placeholder="Search tasks, clients, assignees..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-fp-muted"
+              />
               {[
                 { key: 'pending', label: `Pending (${pendingCount})` },
                 { key: 'today', label: `Today (${todayCount})` },
@@ -588,7 +604,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 { key: 'all', label: 'All' },
               ].map(f => (
                 <button key={f.key} onClick={() => setFilter(f.key)}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${filter === f.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${filter === f.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
                   {f.label}
                 </button>
               ))}
