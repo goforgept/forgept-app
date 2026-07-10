@@ -130,6 +130,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [dragPoint,      setDragPoint]      = useState(null) // {cableId, pointIndex}
   const [hoveredWaypoint,  setHoveredWaypoint]  = useState(null)
   const [industryFilter,   setIndustryFilter]   = useState([])
+  const [showLayerMenu,    setShowLayerMenu]    = useState(false)
   const copiedPlacement    = externalCopied
   const setCopiedPlacement = onCopyPlacement || (() => {})
   const [contextMenu,     setContextMenu]     = useState(null) // {x, y, placementId}
@@ -945,48 +946,66 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             </svg>
             Labels
           </button>
-          {/* Layer / industry checkboxes */}
-          <div className="flex items-center gap-2 px-2 py-1 rounded-lg border border-[#2a3d55] bg-[#0F1C2E]">
-            {[
-              { id: 'cables',      label: 'Cables',    color: '#3b82f6',  isLayer: true },
-              { id: 'pathways',    label: 'Pathways',  color: '#4a90d9',  isLayer: true },
-              { id: 'security',    label: 'SEC',        color: '#C8622A', isLayer: false },
-              { id: 'av',          label: 'AV',         color: '#C8622A', isLayer: false },
-              { id: 'fire_alarm',  label: 'FA',         color: '#C8622A', isLayer: false },
-              { id: 'low_voltage', label: 'LV',         color: '#C8622A', isLayer: false },
-              { id: 'hvac',        label: 'HVAC',       color: '#C8622A', isLayer: false },
-              { id: 'das',         label: 'DAS',        color: '#C8622A', isLayer: false },
-            ].map(f => {
-              const isChecked = f.isLayer
-                ? (f.id === 'cables' ? showCableRuns : showPathways)
-                : industryFilter.includes(f.id)
-              const toggle = () => {
-                if (f.isLayer) {
-                  if (f.id === 'cables') setShowCableRuns(s => !s)
-                  else setShowPathways(s => !s)
-                } else {
-                  setIndustryFilter(prev =>
-                    prev.includes(f.id) ? prev.filter(x => x !== f.id) : [...prev, f.id]
+          {/* Layers dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowLayerMenu(s => !s)}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+                showLayerMenu || !showCableRuns || !showPathways || industryFilter.length > 0
+                  ? 'border-[#C8622A]/40 bg-[#C8622A]/10 text-[#C8622A]'
+                  : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
+              }`}>
+              Layers
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showLayerMenu ? 'M5 15l7-7 7 7' : 'M19 9l-7 7-7-7'}/>
+              </svg>
+            </button>
+            {showLayerMenu && (
+              <div className="absolute top-full mt-1 left-0 z-50 bg-[#0F1C2E] border border-[#2a3d55] rounded-lg p-3 min-w-[140px] shadow-xl">
+                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Overlays</p>
+                {[
+                  { id: 'cables',   label: 'Cables',   isLayer: true },
+                  { id: 'pathways', label: 'Pathways', isLayer: true },
+                ].map(f => {
+                  const isChecked = f.id === 'cables' ? showCableRuns : showPathways
+                  const toggle = () => f.id === 'cables' ? setShowCableRuns(s => !s) : setShowPathways(s => !s)
+                  return (
+                    <label key={f.id} onClick={toggle} className="flex items-center gap-2 cursor-pointer select-none group mb-1.5">
+                      <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${isChecked ? 'border-[#C8622A] bg-[#C8622A]' : 'border-[#4a5568] group-hover:border-[#8A9AB0]'}`}>
+                        {isChecked && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                      </span>
+                      <span className={`text-xs ${isChecked ? 'text-white' : 'text-[#8A9AB0] group-hover:text-white'}`}>{f.label}</span>
+                    </label>
                   )
-                }
-              }
-              return (
-                <label key={f.id} className="flex items-center gap-1 cursor-pointer select-none group">
-                  <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${
-                    isChecked ? 'border-[#C8622A] bg-[#C8622A]' : 'border-[#4a5568] bg-transparent group-hover:border-[#8A9AB0]'
-                  }`} onClick={toggle}>
-                    {isChecked && (
-                      <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/>
-                      </svg>
-                    )}
-                  </span>
-                  <span onClick={toggle} className={`text-xs transition-colors ${isChecked ? 'text-white' : 'text-[#8A9AB0] group-hover:text-white'}`}>
-                    {f.label}
-                  </span>
-                </label>
-              )
-            })}
+                })}
+                <div className="border-t border-[#2a3d55] my-2"/>
+                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Industries</p>
+                {[
+                  { id: 'security',    label: 'Security' },
+                  { id: 'av',          label: 'AV' },
+                  { id: 'fire_alarm',  label: 'Fire Alarm' },
+                  { id: 'low_voltage', label: 'Low Voltage' },
+                  { id: 'hvac',        label: 'HVAC' },
+                  { id: 'das',         label: 'DAS' },
+                ].map(f => {
+                  const isChecked = industryFilter.includes(f.id)
+                  const toggle = () => setIndustryFilter(prev => prev.includes(f.id) ? prev.filter(x => x !== f.id) : [...prev, f.id])
+                  return (
+                    <label key={f.id} onClick={toggle} className="flex items-center gap-2 cursor-pointer select-none group mb-1.5">
+                      <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 transition-colors ${isChecked ? 'border-[#C8622A] bg-[#C8622A]' : 'border-[#4a5568] group-hover:border-[#8A9AB0]'}`}>
+                        {isChecked && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                      </span>
+                      <span className={`text-xs ${isChecked ? 'text-white' : 'text-[#8A9AB0] group-hover:text-white'}`}>{f.label}</span>
+                    </label>
+                  )
+                })}
+                {industryFilter.length > 0 && (
+                  <button onClick={() => setIndustryFilter([])} className="mt-1 text-xs text-[#8A9AB0] hover:text-white transition-colors">
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {(cableMode || pathwayMode) && (
