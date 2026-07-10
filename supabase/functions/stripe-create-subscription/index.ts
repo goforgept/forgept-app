@@ -10,6 +10,7 @@ const PRICE_IDS: Record<string, string> = {
   'Early Adopter':     'price_1TrQ8DLWULkmrAabEB6qm1Kg',
   'Designer Only':     'price_1TrQ5rLWULkmrAabaDRGDK06',
   'Small Team':        'price_1TrQ4OLWULkmrAabCpzuU6wH',
+  'Team':              'price_1TD58BLWULkmrAabCUiTtFPY',
   'Business':          'price_1TrQ5ILWULkmrAab8dAhQkKR',
   'QuickBooks Add-on': 'price_1TrQ6kLWULkmrAabf33JNWF9',
 }
@@ -18,6 +19,7 @@ const PLAN_RATES: Record<string, number> = {
   'Early Adopter':     100,
   'Designer Only':     49,
   'Small Team':        99,
+  'Team':              149,
   'Business':          199,
   'QuickBooks Add-on': 25,
 }

@@ -9,6 +9,7 @@ const PLANS = [
   { name: 'Early Adopter', rate: 100, color: 'text-green-400', bg: 'bg-green-500/20' },
   { name: 'Designer Only', rate: 49, color: 'text-blue-400', bg: 'bg-blue-500/20' },
   { name: 'Small Team', rate: 99, color: 'text-purple-400', bg: 'bg-purple-500/20' },
+  { name: 'Team', rate: 149, color: 'text-indigo-400', bg: 'bg-indigo-500/20' },
   { name: 'Business', rate: 199, color: 'text-[#C8622A]', bg: 'bg-[#C8622A]/20' },
   { name: 'QuickBooks Add-on', rate: 25, color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
   { name: 'Enterprise', rate: null, color: 'text-green-400', bg: 'bg-green-500/20' },
@@ -1397,6 +1398,7 @@ export default function SuperAdmin() {
                   <option value="Early Adopter">Early Adopter — $100/mo</option>
                   <option value="Designer Only">Designer Only — $49/mo</option>
                   <option value="Small Team">Small Team — $99/mo</option>
+                  <option value="Team">Team — $149/mo</option>
                   <option value="Business">Business — $199/mo</option>
                 </select>
               </div>
@@ -1410,7 +1412,7 @@ export default function SuperAdmin() {
               <div className="bg-[#0F1C2E] rounded-lg p-3 text-xs text-[#8A9AB0]">
                 <p className="font-semibold text-white mb-1">What this does:</p>
                 <p>• Creates or updates a Stripe customer for {stripeModal.org.name}</p>
-                <p>• {stripeModal.org.stripe_subscription_id ? 'Updates the existing' : 'Creates a'} {stripeForm.plan} subscription at ${{ 'Early Adopter': 100, 'Designer Only': 49, 'Small Team': 99, 'Business': 199 }[stripeForm.plan]}/mo{stripeForm.qboAddon ? ' + $25/mo QBO' : ''}</p>
+                <p>• {stripeModal.org.stripe_subscription_id ? 'Updates the existing' : 'Creates a'} {stripeForm.plan} subscription at ${{ 'Early Adopter': 100, 'Designer Only': 49, 'Small Team': 99, 'Team': 149, 'Business': 199 }[stripeForm.plan]}/mo{stripeForm.qboAddon ? ' + $25/mo QBO' : ''}</p>
                 <p>• Stripe auto-sends invoices each cycle once a payment method is added</p>
                 <p>• Updates billing status in ForgePt.</p>
                 <p className="mt-2 text-yellow-400">Note: Customer will need to add a payment method before charges begin.</p>
