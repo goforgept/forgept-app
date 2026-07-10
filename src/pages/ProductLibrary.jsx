@@ -35,7 +35,7 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [activeTab, setActiveTab] = useState('library') // 'library' | catalog slug
   // Add product form
   const [showAddForm, setShowAddForm] = useState(false)
-  const [addForm, setAddForm] = useState({ item_name: '', manufacturer: '', part_number: '', category: '', unit: 'ea', description: '', msrp: '' })
+  const [addForm, setAddForm] = useState({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '' })
   const [saving, setSaving] = useState(false)
   // Add vendor price inline
   const [addingPriceFor, setAddingPriceFor] = useState(null) // product_id or `cat_${catalog_product_id}`
@@ -331,11 +331,12 @@ if (!finalCost) continue
       ...addForm,
       org_id: orgId,
       part_number: addForm.part_number || null,
+      sub_category: addForm.sub_category || null,
       msrp: addForm.msrp ? parseFloat(addForm.msrp) : null,
       active: true,
     })
     if (err) { setError(err.message); setSaving(false); return }
-    setAddForm({ item_name: '', manufacturer: '', part_number: '', category: '', unit: 'ea', description: '', msrp: '' })
+    setAddForm({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '' })
     setShowAddForm(false); setSaving(false)
     const { data: newProd } = await supabase
       .from('product_library')
@@ -464,6 +465,7 @@ if (!finalCost) continue
                   {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
+              <div><label className="text-fp-muted text-xs mb-1 block">Sub-Category</label><input type="text" placeholder="e.g. Dome Camera, NVR..." value={addForm.sub_category} onChange={e => setAddForm(p => ({ ...p, sub_category: e.target.value }))} className={inputCls} /></div>
               <div><label className="text-fp-muted text-xs mb-1 block">Unit</label>
                 <select value={addForm.unit} onChange={e => setAddForm(p => ({ ...p, unit: e.target.value }))} className={inputCls}>
                   {['ea', 'ft', 'lot', 'roll', 'box', 'hr'].map(u => <option key={u}>{u}</option>)}
@@ -615,6 +617,7 @@ if (!finalCost) continue
                             {p.manufacturer && <span className="text-fp-muted text-xs">{p.manufacturer}</span>}
                             {p.part_number && <span className="text-fp-muted text-xs font-mono bg-fp-card px-1.5 py-0.5 rounded">{p.part_number}</span>}
                             {p.category && <span className="text-fp-muted text-xs">{p.category}</span>}
+                            {p.sub_category && <span className="text-fp-muted text-xs bg-fp-card px-1.5 py-0.5 rounded">{p.sub_category}</span>}
                             {p.unit !== 'ea' && <span className="text-fp-muted text-xs">/ {p.unit}</span>}
                           </div>
                         </div>
@@ -659,6 +662,9 @@ if (!finalCost) continue
               {CATEGORIES.map(c => <option key={c}>{c}</option>)}
             </select>
           </div>
+          <div><label className="text-fp-muted text-xs mb-1 block">Sub-Category</label>
+            <input type="text" placeholder="e.g. Dome Camera, NVR..." value={editForm.sub_category || ''} onChange={e => setEditForm(p => ({ ...p, sub_category: e.target.value }))} className={inputCls} />
+          </div>
           <div><label className="text-fp-muted text-xs mb-1 block">Unit</label>
             <select value={editForm.unit || 'ea'} onChange={e => setEditForm(p => ({ ...p, unit: e.target.value }))} className={inputCls}>
               {['ea', 'ft', 'lot', 'roll', 'box', 'hr'].map(u => <option key={u}>{u}</option>)}
@@ -681,6 +687,7 @@ if (!finalCost) continue
               manufacturer: editForm.manufacturer || null,
               part_number: editForm.part_number || null,
               category: editForm.category || null,
+              sub_category: editForm.sub_category || null,
               unit: editForm.unit || 'ea',
               description: editForm.description || null,
               msrp: editForm.msrp ? parseFloat(editForm.msrp) : null,
@@ -697,7 +704,7 @@ if (!finalCost) continue
       <div className="flex items-center justify-between mb-2">
         {p.description && <p className="text-fp-muted text-xs italic">{p.description}</p>}
         {!p.description && <span />}
-        <button onClick={() => { setEditingProductId(p.id); setEditForm({ item_name: p.item_name, manufacturer: p.manufacturer, part_number: p.part_number, category: p.category, unit: p.unit, description: p.description, msrp: p.msrp ?? '' }) }}
+        <button onClick={() => { setEditingProductId(p.id); setEditForm({ item_name: p.item_name, manufacturer: p.manufacturer, part_number: p.part_number, category: p.category, sub_category: p.sub_category || '', unit: p.unit, description: p.description, msrp: p.msrp ?? '' }) }}
           className="text-fp-muted hover:text-fp-text text-xs transition-colors">✎ Edit</button>
       </div>
     )}
