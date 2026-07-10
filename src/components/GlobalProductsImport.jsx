@@ -52,6 +52,22 @@ const ELEMENT_TYPE_MAP = {
   'Fire Alarm Control Panel Element Profile Template': { industry: 'fire_alarm', defaultCategory: 'FACP' },
   'Fire Alarm Panel Element Profile Template':      { industry: 'fire_alarm', defaultCategory: 'FACP' },
   'Notification Appliance Element Profile Template': { industry: 'fire_alarm', defaultCategory: 'Horn Strobe' },
+  'Horn Element Profile Template':                   { industry: 'fire_alarm', defaultCategory: 'Horn' },
+  'Bell Element Profile Template':                   { industry: 'fire_alarm', defaultCategory: 'Bell' },
+  'CO Detector Element Profile Template':            { industry: 'fire_alarm', defaultCategory: 'CO Detector' },
+  'Carbon Monoxide Detector Element Profile Template': { industry: 'fire_alarm', defaultCategory: 'CO Detector' },
+  'Beam Detector Element Profile Template':          { industry: 'fire_alarm', defaultCategory: 'Beam Detector' },
+  'Annunciator Element Profile Template':            { industry: 'fire_alarm', defaultCategory: 'Annunciator' },
+  'Monitor Module Element Profile Template':         { industry: 'fire_alarm', defaultCategory: 'Monitor Module' },
+  'Control Module Element Profile Template':         { industry: 'fire_alarm', defaultCategory: 'Control Module' },
+  'Door Holder Element Profile Template':            { industry: 'fire_alarm', defaultCategory: 'Door Holder' },
+  'Air Sampling Element Profile Template':           { industry: 'fire_alarm', defaultCategory: 'Air Sampling' },
+  'Suppression Panel Element Profile Template':      { industry: 'fire_alarm', defaultCategory: 'Suppression Panel' },
+  // New security video types
+  'Turret Camera Element Profile Template':          { industry: 'security', defaultCategory: 'Turret Camera' },
+  'Video Encoder Element Profile Template':          { industry: 'security', defaultCategory: 'Video Encoder' },
+  'Cabinet System Element Profile Template':         { industry: 'security', defaultCategory: 'Cabinet System' },
+  'Cabinet Solar System Element Profile Template':   { industry: 'security', defaultCategory: 'Cabinet Solar System' },
   // ACS Expansion
   'ACS Expansion Module Element Profile Template':  { industry: 'security', defaultCategory: 'Controller' },
 }
@@ -62,7 +78,7 @@ const STYLE_CATEGORY_MAP = {
   'Dome':    'Dome Camera',
   'Wedge':   'Dome Camera',
   'PTZ':     'PTZ Camera',
-  'Turret':  'Dome Camera',
+  'Turret':  'Turret Camera',
   'Box':     'Bullet Camera',
   'Covert':  'Dome Camera',
   'Fisheye':       'Fisheye Camera',
@@ -240,9 +256,24 @@ async function parseSystemSurveyorFile(file) {
       else if (etLower.includes('panic'))                    category = 'Panic Button'
       else if (etLower.includes('shock'))                    category = 'Shock Sensor'
       else if (etLower.includes('door operator') || etLower.includes('automatic door') || etLower.includes('door opener')) category = 'Door Operator'
+      else if (etLower.includes('turret'))                  category = 'Turret Camera'
+      else if (etLower.includes('video encoder') || etLower.includes('encoder')) category = 'Video Encoder'
+      else if (etLower.includes('cabinet solar'))           category = 'Cabinet Solar System'
+      else if (etLower.includes('cabinet'))                 category = 'Cabinet System'
       else if (etLower.includes('smoke') || etLower.includes('duct detector')) category = 'Smoke Detector'
-      else if (etLower.includes('heat detector')) category = 'Heat Detector'
-      else if (etLower.includes('detector')) category = 'PIR Detector'
+      else if (etLower.includes('heat detector'))           category = 'Heat Detector'
+      else if (etLower.includes('co detector') || etLower.includes('carbon monoxide')) category = 'CO Detector'
+      else if (etLower.includes('beam detector'))           category = 'Beam Detector'
+      else if (etLower.includes('annunciator'))             category = 'Annunciator'
+      else if (etLower.includes('monitor module'))          category = 'Monitor Module'
+      else if (etLower.includes('control module'))          category = 'Control Module'
+      else if (etLower.includes('door holder'))             category = 'Door Holder'
+      else if (etLower.includes('air sampling'))            category = 'Air Sampling'
+      else if (etLower.includes('suppression'))             category = 'Suppression Panel'
+      else if (etLower.includes('horn strobe') || etLower.includes('notification appliance')) category = 'Horn Strobe'
+      else if (etLower.includes('horn'))                    category = 'Horn'
+      else if (etLower.includes('bell'))                    category = 'Bell'
+      else if (etLower.includes('detector'))                category = 'PIR Detector'
       else if (etLower.includes('camera') ||
                etLower.includes('fixed') ||
                etLower.includes('dome') ||
@@ -372,7 +403,8 @@ function guessIndustry(category) {
   if (['switch', 'patch', 'fiber', 'data', 'ups', 'rack', 'wireless ap'].some(k => cat.includes(k))) return 'low_voltage'
   if (['outlet', 'panel', 'conduit', 'lighting'].some(k => cat.includes(k))) return 'electrical'
   if (['diffuser', 'thermostat', 'vav'].some(k => cat.includes(k))) return 'hvac'
-  if (['smoke', 'heat', 'horn', 'pull', 'facp', 'duct'].some(k => cat.includes(k))) return 'fire_alarm'
+  if (['turret', 'cabinet', 'solar cabinet', 'encoder'].some(k => cat.includes(k))) return 'security'
+  if (['smoke', 'heat', 'horn', 'strobe', 'bell', 'pull', 'facp', 'duct', 'co detector', 'beam', 'annunciator', 'monitor module', 'control module', 'door holder', 'air sampling', 'suppression'].some(k => cat.includes(k))) return 'fire_alarm'
   return 'security'
 }
 
@@ -387,15 +419,27 @@ function dedupeByPartNumber(products) {
 
 // ─── GlobalProductsImport component ──────────────────────────────────────────
 const ALL_CATEGORIES = [
+  // Security — Cameras
   'Dome Camera','Bullet Camera','PTZ Camera','Fisheye Camera','Multi Sensor Camera','Indoor Camera',
+  'Turret Camera','LPR Camera','Multi-Lens Camera',
+  // Security — Access Control
   'Access Reader','Access Control Door','Controller','Intercom','Wireless Lock','Door Operator',
+  // Security — Intrusion
   'PIR Detector','Door Contact','Glass Break','Alarm Keypad','Alarm Panel','Interior Siren',
   'Exterior Siren','Panic Button','Shock Sensor','Dual Tech Detector','Motion Sensor',
+  // Security — Video
+  'NVR','Video Encoder','Cabinet System','Cabinet Solar System',
+  // AV
   'Projector','Projection Screen','Ceiling Speaker','Subwoofer','Microphone','Wireless Mic',
   'Touch Panel','Control Processor','Video Conference','Media Player','HDMI Extender',
   'AV Receiver','Digital Signage','Display','Document Camera','Streaming Encoder','Wall Plate','Clock',
-  'NVR','Network','Sensor','Smoke Detector','Horn Strobe','Heat Detector','Pull Station','FACP',
-  'Power Supply','UPS','Rack','Panel',
+  // Fire Alarm
+  'Smoke Detector','Heat Detector','Horn Strobe','Horn','Strobe','Bell',
+  'Pull Station','Duct Detector','CO Detector','Beam Detector',
+  'Annunciator','Monitor Module','Control Module','Door Holder',
+  'Air Sampling','Suppression Panel','FACP',
+  // Other
+  'Network','Sensor','Power Supply','UPS','Rack','Panel',
 ].sort()
 
 export default function GlobalProductsImport({ onClose, onImported }) {
@@ -628,9 +672,14 @@ EXAMPLE-INT-003,Example Alarm Keypad,Alarm Keypad,Example Corp,LCD alarm keypad,
 EXAMPLE-AV-001,Example Ceiling Speaker,Ceiling Speaker,Example Corp,8-inch 2-way ceiling speaker,,,70,
 EXAMPLE-AV-002,Example Projector,Projector,Example Corp,5000 lumen laser projector,,,500,
 EXAMPLE-AV-003,Example Touch Panel,Touch Panel,Example Corp,10-inch control touch panel,,,25,
-# ── Other ─────────────────────────────────────────────────────────────────────
-# Valid categories: NVR | Network | Sensor | Smoke Detector | Horn Strobe
-EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,`
+# ── Security — Video ──────────────────────────────────────────────────────────
+# Valid categories: NVR | Video Encoder | Cabinet System | Cabinet Solar System | Turret Camera
+EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,
+EXAMPLE-ENC-001,Example 4ch Encoder,Video Encoder,Example Corp,4-channel IP encoder,,,25,
+# ── Fire Alarm ────────────────────────────────────────────────────────────────
+# Valid categories: Smoke Detector | Heat Detector | Horn Strobe | Horn | Strobe | Bell | Pull Station | Duct Detector | CO Detector | Beam Detector | Annunciator | Monitor Module | Control Module | Door Holder | Air Sampling | Suppression Panel | FACP
+EXAMPLE-FA-001,Example Smoke Detector,Smoke Detector,Example Corp,Addressable smoke detector,,,1,
+EXAMPLE-FA-002,Example Horn Strobe,Horn Strobe,Example Corp,Wall mount horn strobe,,,0.5,`
                         const blob = new Blob([csv], { type: 'text/csv' })
                         const url  = URL.createObjectURL(blob)
                         const a    = document.createElement('a')
