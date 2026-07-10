@@ -9,6 +9,8 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
   const [pos, setPOs] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('All')
+  const [search, setSearch] = useState('')
+  const [vendorFilter, setVendorFilter] = useState('')
   const [expandedPO, setExpandedPO] = useState(null)
   const [lineItems, setLineItems] = useState({})
   const [savingReceiving, setSavingReceiving] = useState({})
@@ -335,7 +337,21 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     setGeneratingPO(false)
   }
 
-  const filtered = pos.filter(p => statusFilter === 'All' || p.status === statusFilter)
+  const filtered = pos.filter(p => {
+    if (statusFilter !== 'All' && p.status !== statusFilter) return false
+    if (vendorFilter && p.vendor_name !== vendorFilter) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        p.po_number?.toLowerCase().includes(q) ||
+        p.vendor_name?.toLowerCase().includes(q) ||
+        p.proposals?.proposal_name?.toLowerCase().includes(q) ||
+        p.description?.toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
+  const uniqueVendors = [...new Set(pos.map(p => p.vendor_name).filter(Boolean))].sort()
   const totalSent = pos.reduce((sum, p) => sum + (p.total_amount || 0), 0)
   const totalReceived = pos.filter(p => p.status === 'Received').reduce((sum, p) => sum + (p.total_amount || 0), 0)
   const pendingCount = pos.filter(p => p.status === 'Sent' || p.status === 'Partial').length
@@ -374,13 +390,31 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
         </div>
 
         {/* Filters */}
-        <div className="flex gap-2">
-          {['All', 'Sent', 'Partial', 'Received', 'Cancelled'].map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${statusFilter === s ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
-              {s}
+        <div className="flex gap-3 items-center">
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search PO #, vendor, proposal..."
+            className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 w-64 focus:outline-none focus:border-fp-brand placeholder-fp-muted"
+          />
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
+            {['All', 'Sent', 'Partial', 'Received', 'Cancelled'].map(s => (
+              <option key={s} value={s}>{s === 'All' ? 'All Statuses' : s}</option>
+            ))}
+          </select>
+          <select value={vendorFilter} onChange={e => setVendorFilter(e.target.value)}
+            className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
+            <option value="">All Vendors</option>
+            {uniqueVendors.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+          {(search || statusFilter !== 'All' || vendorFilter) && (
+            <button onClick={() => { setSearch(''); setStatusFilter('All'); setVendorFilter('') }}
+              className="text-fp-muted hover:text-fp-text text-xs transition-colors">
+              Clear
             </button>
-          ))}
+          )}
         </div>
 
         {/* PO List */}
