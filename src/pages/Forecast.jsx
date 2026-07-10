@@ -27,6 +27,17 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
 
   const fmt = (num) => num?.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) ?? '0'
 
+  // Must be declared first — other useMemos depend on it
+  const filteredProposals = useMemo(() => {
+    if (dayRange === 'all') return proposals
+    const cutoff = new Date(Date.now() + dayRange * 86400000)
+    return proposals.filter(p => {
+      if (p.status === 'Won' || p.status === 'Lost') return true
+      if (!p.close_date) return false
+      return new Date(p.close_date) <= cutoff
+    })
+  }, [proposals, dayRange])
+
   const monthlyWon = useMemo(() => {
     const months = []
     for (let i = 5; i >= 0; i--) {
@@ -54,7 +65,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
       const value = stageProposals.reduce((sum, p) => sum + (p.proposal_value || 0), 0)
       return { ...stage, count: stageProposals.length, value }
     }).filter(s => s.count > 0)
-  }, [proposals, stages])
+  }, [filteredProposals, stages])
 
   const stageProbability = (stageName) => {
     const map = { 'Lead': 10, 'Contacted': 25, 'Proposal Sent': 50, 'Negotiating': 75, 'Won': 100, 'Lost': 0 }
@@ -93,18 +104,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
       repMap[rep].count += 1
     })
     return Object.values(repMap).sort((a, b) => b.pipeline - a.pipeline)
-  }, [proposals])
-
-  // Proposals filtered to close_date within the selected window
-  const filteredProposals = useMemo(() => {
-    if (dayRange === 'all') return proposals
-    const cutoff = new Date(Date.now() + dayRange * 86400000)
-    return proposals.filter(p => {
-      if (p.status === 'Won' || p.status === 'Lost') return true
-      if (!p.close_date) return false
-      return new Date(p.close_date) <= cutoff
-    })
-  }, [proposals, dayRange])
+  }, [filteredProposals])
 
   const totalActivePipeline = filteredProposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
   const totalWon = proposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
