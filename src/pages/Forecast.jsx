@@ -9,6 +9,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
   const [proposals, setProposals] = useState([])
   const [stages, setStages] = useState([])
   const [loading, setLoading] = useState(true)
+  const [dayRange, setDayRange] = useState(90)
   const navigate = useNavigate()
 
   useEffect(() => { if (profile?.org_id) fetchData() }, [profile?.org_id])
@@ -42,7 +43,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
 
   const stageBreakdown = useMemo(() => {
     return stages.map(stage => {
-      const stageProposals = proposals.filter(p => {
+      const stageProposals = filteredProposals.filter(p => {
         if (p.pipeline_stage_id) return p.pipeline_stage_id === stage.id
         if (stage.name === 'Proposal Sent') return !p.pipeline_stage_id && p.status === 'Sent'
         if (stage.name === 'Won') return !p.pipeline_stage_id && p.status === 'Won'
@@ -66,13 +67,13 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
 
   const closingThisMonth = useMemo(() => {
     const now = new Date()
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    const end = dayRange === 'all' ? new Date('2099-01-01') : new Date(Date.now() + dayRange * 86400000)
     return proposals.filter(p => {
       if (!p.close_date || p.status === 'Won' || p.status === 'Lost') return false
       const close = new Date(p.close_date)
-      return close >= now && close <= endOfMonth
+      return close >= now && close <= end
     }).sort((a, b) => new Date(a.close_date) - new Date(b.close_date))
-  }, [proposals])
+  }, [proposals, dayRange])
 
   const closeRateByMonth = useMemo(() => {
     return monthlyWon.map(m => {
@@ -84,7 +85,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
 
   const repForecast = useMemo(() => {
     const repMap = Object.create(null)
-    proposals.filter(p => p.status !== 'Lost').forEach(p => {
+    filteredProposals.filter(p => p.status !== 'Lost').forEach(p => {
       const rep = p.rep_name || 'Unknown'
       if (!repMap[rep]) repMap[rep] = { name: rep, pipeline: 0, won: 0, count: 0 }
       repMap[rep].pipeline += p.proposal_value || 0
@@ -94,7 +95,18 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
     return Object.values(repMap).sort((a, b) => b.pipeline - a.pipeline)
   }, [proposals])
 
-  const totalActivePipeline = proposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+  // Proposals filtered to close_date within the selected window
+  const filteredProposals = useMemo(() => {
+    if (dayRange === 'all') return proposals
+    const cutoff = new Date(Date.now() + dayRange * 86400000)
+    return proposals.filter(p => {
+      if (p.status === 'Won' || p.status === 'Lost') return true
+      if (!p.close_date) return false
+      return new Date(p.close_date) <= cutoff
+    })
+  }, [proposals, dayRange])
+
+  const totalActivePipeline = filteredProposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
   const totalWon = proposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
   const maxMonthlyValue = Math.max(...monthlyWon.map(m => m.total), 1)
   const maxStageValue = Math.max(...stageBreakdown.map(s => s.value), 1)
@@ -109,9 +121,19 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
         </div>
       ) : (
       <div className="flex-1 p-6 space-y-6">
-        <div>
-          <h2 className="text-fp-text text-2xl font-bold">Forecast</h2>
-          <p className="text-fp-muted text-sm mt-0.5">Revenue pipeline and close projections</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-fp-text text-2xl font-bold">Forecast</h2>
+            <p className="text-fp-muted text-sm mt-0.5">Revenue pipeline and close projections</p>
+          </div>
+          <select value={dayRange} onChange={e => setDayRange(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+            className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
+            <option value={30}>Next 30 days</option>
+            <option value={60}>Next 60 days</option>
+            <option value={90}>Next 90 days</option>
+            <option value={180}>Next 180 days</option>
+            <option value="all">All Time</option>
+          </select>
         </div>
 
         <div className="grid grid-cols-4 gap-4">
@@ -131,7 +153,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
             <p className="text-fp-muted text-xs mt-1">{proposals.filter(p => p.status === 'Won').length} deals closed</p>
           </div>
           <div className="bg-fp-card rounded-xl p-5">
-            <p className="text-fp-muted text-xs mb-1">Closing This Month</p>
+            <p className="text-fp-muted text-xs mb-1">Closing {dayRange === 'all' ? 'All Time' : `in ${dayRange}d`}</p>
             <p className="text-[#C8622A] text-2xl font-bold">{closingThisMonth.length}</p>
             <p className="text-fp-muted text-xs mt-1">${fmt(closingThisMonth.reduce((s, p) => s + (p.proposal_value || 0), 0))} at stake</p>
           </div>
