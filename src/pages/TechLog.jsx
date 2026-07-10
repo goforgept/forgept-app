@@ -12,6 +12,9 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [filterJob, setFilterJob] = useState('all')
+  const [filterTech, setFilterTech] = useState('all')
+  const [filterDate, setFilterDate] = useState('all')
+  const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
     job_id: '',
@@ -230,7 +233,53 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     }
   })
 
-  const filteredLogs = filterJob === 'all' ? logs : logs.filter(l => l.job_id === filterJob)
+  const uniqueTechs = [...new Map(
+    logs.filter(l => l.user_id && l.profiles?.full_name).map(l => [l.user_id, l.profiles.full_name])
+  ).entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+
+  const getDateBounds = () => {
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    if (filterDate === 'this_week') {
+      const mon = new Date(now); mon.setDate(now.getDate() - now.getDay() + 1)
+      return [mon.toISOString().split('T')[0], today]
+    }
+    if (filterDate === 'last_week') {
+      const mon = new Date(now); mon.setDate(now.getDate() - now.getDay() - 6)
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
+      return [mon.toISOString().split('T')[0], sun.toISOString().split('T')[0]]
+    }
+    if (filterDate === 'this_month') {
+      return [`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, today]
+    }
+    if (filterDate === 'last_month') {
+      const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+      const m = now.getMonth() === 0 ? 12 : now.getMonth()
+      const last = new Date(y, m, 0)
+      return [`${y}-${String(m).padStart(2, '0')}-01`, last.toISOString().split('T')[0]]
+    }
+    return [null, null]
+  }
+  const [dateFrom, dateTo] = getDateBounds()
+
+  const filteredLogs = logs.filter(l => {
+    if (filterJob !== 'all' && l.job_id !== filterJob) return false
+    if (filterTech !== 'all' && l.user_id !== filterTech) return false
+    if (dateFrom && l.log_date < dateFrom) return false
+    if (dateTo && l.log_date > dateTo) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        (l.work_summary || '').toLowerCase().includes(q) ||
+        (l.jobs?.name || '').toLowerCase().includes(q) ||
+        (l.jobs?.job_number || '').toLowerCase().includes(q) ||
+        (l.jobs?.clients?.company || '').toLowerCase().includes(q) ||
+        (l.profiles?.full_name || '').toLowerCase().includes(q) ||
+        (l.issues || '').toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
   const totalHours = filteredLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0)
   const uniqueDays = new Set(filteredLogs.map(l => l.log_date)).size
   const logsThisWeek = filteredLogs.filter(l => {
@@ -274,23 +323,43 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
           ))}
         </div>
 
-        <div className="flex gap-3 items-center">
-          <span className="text-fp-muted text-sm">Filter by job:</span>
+        <div className="flex gap-3 items-center flex-wrap">
+          <input type="text" placeholder="Search summary, job, tech, client..." value={search} onChange={e => setSearch(e.target.value)}
+            className="flex-1 min-w-48 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-fp-muted" />
           <select value={filterJob} onChange={e => setFilterJob(e.target.value)}
-            className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+            className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand cursor-pointer">
             <option value="all">All Jobs</option>
             {jobs.map(j => <option key={j.id} value={j.id}>{j.job_number ? `${j.job_number} — ` : ''}{j.name}</option>)}
           </select>
-          {filterJob !== 'all' && jobLogTotals[filterJob] && (
-            <div className="flex items-center gap-4 ml-2 bg-fp-card rounded-lg px-4 py-2 text-sm">
-              <span className="text-fp-muted">Job totals:</span>
-              <span className="text-fp-text font-semibold">{jobLogTotals[filterJob].hours.toFixed(1)} hrs logged</span>
-              {Object.keys(jobLogTotals[filterJob].materials).length > 0 && (
-                <span className="text-fp-muted">{Object.keys(jobLogTotals[filterJob].materials).length} material types used</span>
-              )}
-            </div>
+          {uniqueTechs.length > 1 && (
+            <select value={filterTech} onChange={e => setFilterTech(e.target.value)}
+              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand cursor-pointer">
+              <option value="all">All Techs</option>
+              {uniqueTechs.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
+          <select value={filterDate} onChange={e => setFilterDate(e.target.value)}
+            className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand cursor-pointer">
+            <option value="all">All Time</option>
+            <option value="this_week">This Week</option>
+            <option value="last_week">Last Week</option>
+            <option value="this_month">This Month</option>
+            <option value="last_month">Last Month</option>
+          </select>
+          {(search || filterJob !== 'all' || filterTech !== 'all' || filterDate !== 'all') && (
+            <button onClick={() => { setSearch(''); setFilterJob('all'); setFilterTech('all'); setFilterDate('all') }}
+              className="text-fp-muted hover:text-fp-text text-xs transition-colors">Clear</button>
           )}
         </div>
+        {filterJob !== 'all' && jobLogTotals[filterJob] && (
+          <div className="flex items-center gap-4 bg-fp-card rounded-lg px-4 py-2 text-sm w-fit">
+            <span className="text-fp-muted">Job totals:</span>
+            <span className="text-fp-text font-semibold">{jobLogTotals[filterJob].hours.toFixed(1)} hrs logged</span>
+            {Object.keys(jobLogTotals[filterJob].materials).length > 0 && (
+              <span className="text-fp-muted">{Object.keys(jobLogTotals[filterJob].materials).length} material types used</span>
+            )}
+          </div>
+        )}
 
         {/* Per-job material running totals panel */}
         {filterJob !== 'all' && jobLogTotals[filterJob] && Object.keys(jobLogTotals[filterJob].materials).length > 0 && (
