@@ -128,6 +128,17 @@ function App() {
       {session?.user?.app_metadata?.must_change_password && (
         <TempPasswordBanner />
       )}
+      {(() => {
+        const org = profile?.organizations
+        const isTrialExpired = org?.billing_status === 'trial' && org?.trial_ends_at && new Date(org.trial_ends_at) < new Date()
+        if (!isTrialExpired) return null
+        return (
+          <div className="fixed top-0 left-0 right-0 z-[9998] bg-amber-600 text-white text-xs flex items-center justify-center gap-3 px-4 py-2">
+            <span>⚠ Your free trial has ended. Contact us to continue using ForgePt.</span>
+            <a href="mailto:support@forgept.com" className="underline font-semibold hover:no-underline whitespace-nowrap">Get in touch →</a>
+          </div>
+        )
+      })()}
       <Routes location={location} key={location.key}>
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/sign/:token" element={<SignProposal />} />

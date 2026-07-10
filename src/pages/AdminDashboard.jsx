@@ -332,12 +332,14 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               )}
             </div>
             <div className="flex items-center gap-2">
-              {Object.entries(periodLabels).map(([key, label]) => (
-                <button key={key} onClick={() => setPeriod(key)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${period === key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>{label}</button>
-              ))}
+              <select value={period} onChange={e => setPeriod(e.target.value)}
+                className="bg-fp-card border border-fp-border text-fp-text text-xs font-semibold rounded-lg px-3 py-1.5 focus:outline-none focus:border-fp-brand cursor-pointer">
+                {Object.entries(periodLabels).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
               <button onClick={() => setShowCustomize(true)}
-                className="flex items-center gap-1.5 bg-fp-card border border-fp-border text-fp-muted hover:text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ml-2">
+                className="flex items-center gap-1.5 bg-fp-card border border-fp-border text-fp-muted hover:text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors">
                 ⚙ Customize
               </button>
             </div>
@@ -355,7 +357,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Close Rate</p><p className="text-fp-brand text-xl font-bold">{closeRate ? `${closeRate}%` : '—'}</p></div>
               <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Closing in 30d</p><p className="text-fp-brand text-xl font-bold">{closingSoon}</p></div>
               <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Total Proposals</p><p className="text-fp-text text-xl font-bold">{filteredProposals.length}</p></div>
-              <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">My Created (30d)</p><p className={`text-xl font-bold ${myLast30 > 0 ? 'text-sky-400' : 'text-fp-text'}`}>{myLast30}</p></div>
+              <div className="bg-fp-card rounded-xl p-5"><p className="text-fp-muted text-xs mb-1">Deals Created (30d)</p><p className={`text-xl font-bold ${myLast30 > 0 ? 'text-sky-400' : 'text-fp-text'}`}>{myLast30}</p></div>
             </div>
           )
         })()}
