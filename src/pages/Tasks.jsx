@@ -596,18 +596,14 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 onChange={e => setSearch(e.target.value)}
                 className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-fp-muted"
               />
-              {[
-                { key: 'pending', label: `Pending (${pendingCount})` },
-                { key: 'today', label: `Today (${todayCount})` },
-                { key: 'overdue', label: `Overdue (${overdueCount})` },
-                { key: 'completed', label: 'Completed' },
-                { key: 'all', label: 'All' },
-              ].map(f => (
-                <button key={f.key} onClick={() => setFilter(f.key)}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${filter === f.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
-                  {f.label}
-                </button>
-              ))}
+              <select value={filter} onChange={e => setFilter(e.target.value)}
+                className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
+                <option value="pending">Pending ({pendingCount})</option>
+                <option value="today">Today ({todayCount})</option>
+                <option value="overdue">Overdue ({overdueCount})</option>
+                <option value="completed">Completed</option>
+                <option value="all">All</option>
+              </select>
             </div>
 
             <div className="bg-fp-card rounded-xl p-6">
