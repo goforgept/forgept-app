@@ -311,6 +311,15 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
         )
       }
 
+      // Link BOM items to this PO so the receiving view can find them
+      const linkedProposalId = linkedJob?.proposal_id || null
+      if (newPO && linkedProposalId) {
+        await supabase.from('bom_line_items')
+          .update({ po_number: finalPONumber })
+          .eq('proposal_id', linkedProposalId)
+          .is('po_number', null)
+      }
+
       // Download PDF
       doc.save(`${finalPONumber}.pdf`)
 
