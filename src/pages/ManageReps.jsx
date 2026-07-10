@@ -68,6 +68,8 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
   const [deletingId, setDeletingId] = useState(null)
   const [expanded, setExpanded]     = useState({}) // { [repId]: true }
   const [savingPerm, setSavingPerm] = useState({}) // { [repId:key]: true }
+  const [search, setSearch]         = useState('')
+  const [filterRole, setFilterRole] = useState('all')
 
   useEffect(() => { if (currentProfile?.org_id) fetchReps(currentProfile.org_id) }, [currentProfile?.org_id])
 
@@ -139,6 +141,16 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
 
   const hasCustomPerms = (rep) => Object.keys(rep.permissions || {}).length > 0
 
+  const filteredReps = reps.filter(r => {
+    const role = r.org_role || r.role || 'rep'
+    if (filterRole !== 'all' && role !== filterRole) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (r.full_name || '').toLowerCase().includes(q) || (r.email || '').toLowerCase().includes(q)
+    }
+    return true
+  })
+
   const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   return (
@@ -203,14 +215,28 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
 
         {/* Team list */}
         <div className="bg-fp-card rounded-xl p-6">
-          <h3 className="text-fp-text font-bold mb-4">Team Members ({reps.length})</h3>
+          <div className="flex items-center gap-3 mb-4">
+            <h3 className="text-fp-text font-bold">Team Members ({reps.length})</h3>
+            <div className="flex-1" />
+            <input type="text" placeholder="Search name or email..." value={search} onChange={e => setSearch(e.target.value)}
+              className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm w-56 focus:outline-none focus:border-fp-brand placeholder-fp-muted" />
+            <select value={filterRole} onChange={e => setFilterRole(e.target.value)}
+              className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand cursor-pointer">
+              <option value="all">All Roles</option>
+              {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+            {(search || filterRole !== 'all') && (
+              <button onClick={() => { setSearch(''); setFilterRole('all') }}
+                className="text-fp-muted hover:text-fp-text text-xs transition-colors">Clear</button>
+            )}
+          </div>
           {loading ? (
             <p className="text-fp-muted">Loading...</p>
-          ) : reps.length === 0 ? (
-            <p className="text-fp-muted">No team members yet. Add your first above.</p>
+          ) : filteredReps.length === 0 ? (
+            <p className="text-fp-muted">{reps.length === 0 ? 'No team members yet. Add your first above.' : 'No members match your search.'}</p>
           ) : (
             <div className="space-y-2">
-              {reps.map(rep => {
+              {filteredReps.map(rep => {
                 const isCurrentUser = rep.id === currentProfile?.id
                 const currentRole   = rep.org_role || rep.role || 'rep'
                 const isOpen        = !!expanded[rep.id]
