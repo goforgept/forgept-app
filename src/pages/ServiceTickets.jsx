@@ -163,21 +163,25 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
           ))}
         </div>
 
-        <div className="flex gap-3 flex-wrap">
-          <input type="text" placeholder="Search tickets, clients..." value={search} onChange={e => setSearch(e.target.value)}
+        <div className="flex gap-3 flex-wrap items-center">
+          <input type="text" placeholder="Search tickets, clients, #..." value={search} onChange={e => setSearch(e.target.value)}
             className="flex-1 min-w-48 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
-          <div className="flex gap-2 flex-wrap">
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
             {['All', 'Open', 'In Progress', 'Resolved', 'Cancelled'].map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)}
-                className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${statusFilter === s ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>{s}</button>
+              <option key={s} value={s}>{s === 'All' ? 'All Statuses' : s}</option>
             ))}
-          </div>
-          <div className="flex gap-2">
+          </select>
+          <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}
+            className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
             {['All', 'Urgent', 'High', 'Normal', 'Low'].map(p => (
-              <button key={p} onClick={() => setPriorityFilter(p)}
-                className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${priorityFilter === p ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>{p}</button>
+              <option key={p} value={p}>{p === 'All' ? 'All Priorities' : p}</option>
             ))}
-          </div>
+          </select>
+          {(search || statusFilter !== 'All' || priorityFilter !== 'All') && (
+            <button onClick={() => { setSearch(''); setStatusFilter('All'); setPriorityFilter('All') }}
+              className="text-fp-muted hover:text-fp-text text-xs transition-colors">Clear</button>
+          )}
         </div>
 
         {loading ? <p className="text-fp-muted">Loading...</p> : filtered.length === 0 ? (

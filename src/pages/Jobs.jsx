@@ -113,14 +113,12 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
             onChange={e => setSearch(e.target.value)}
             className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]"
           />
-          <div className="flex gap-2">
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
             {['All', 'Active', 'On Hold', 'Completed', 'Cancelled'].map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${statusFilter === s ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
-                {s}
-              </button>
+              <option key={s} value={s}>{s === 'All' ? 'All Statuses' : s}</option>
             ))}
-          </div>
+          </select>
         </div>
 
         {/* Jobs list */}

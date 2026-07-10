@@ -18,6 +18,7 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('All')
+  const [search, setSearch] = useState('')
 
   useEffect(() => { if (profile?.org_id) fetchInvoices() }, [profile?.org_id])
 
@@ -43,7 +44,19 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
     setLoading(false)
   }
 
-  const filtered = filter === 'All' ? invoices : invoices.filter(i => i.status === filter)
+  const filtered = invoices.filter(i => {
+    if (filter !== 'All' && i.status !== filter) return false
+    if (search) {
+      const q = search.toLowerCase()
+      return (
+        i.invoice_number?.toLowerCase().includes(q) ||
+        i.proposals?.proposal_name?.toLowerCase().includes(q) ||
+        i.proposals?.company?.toLowerCase().includes(q) ||
+        i.description?.toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
 
   const totalOutstanding = invoices
     .filter(i => ['Sent', 'Partially Paid', 'Overdue'].includes(i.status))
@@ -99,13 +112,19 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
         </div>
 
         {/* Filters */}
-        <div className="flex gap-2 mb-4">
-          {['All', 'Draft', 'Sent', 'Partially Paid', 'Paid', 'Overdue'].map(s => (
-            <button key={s} onClick={() => setFilter(s)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${filter === s ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
-              {s}
-            </button>
-          ))}
+        <div className="flex gap-3 items-center mb-4">
+          <input type="text" placeholder="Search invoice #, client, proposal..." value={search} onChange={e => setSearch(e.target.value)}
+            className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-fp-muted" />
+          <select value={filter} onChange={e => setFilter(e.target.value)}
+            className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
+            {['All', 'Draft', 'Sent', 'Partially Paid', 'Paid', 'Overdue'].map(s => (
+              <option key={s} value={s}>{s === 'All' ? 'All Statuses' : s}</option>
+            ))}
+          </select>
+          {(search || filter !== 'All') && (
+            <button onClick={() => { setSearch(''); setFilter('All') }}
+              className="text-fp-muted hover:text-fp-text text-xs transition-colors">Clear</button>
+          )}
         </div>
 
         {loading ? <p className="text-fp-muted">Loading...</p> : filtered.length === 0 ? (

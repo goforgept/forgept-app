@@ -19,6 +19,7 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
   const [success, setSuccess] = useState(null)
   const [orgId, setOrgId] = useState(null)
   const [form, setForm] = useState(emptyForm)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     fetchOrgAndVendors()
@@ -165,14 +166,18 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
         )}
 
         <div className="bg-fp-card rounded-xl p-6">
-          <h3 className="text-fp-text font-bold mb-4">All Vendors ({vendors.length})</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-fp-text font-bold">All Vendors ({vendors.length})</h3>
+            <input type="text" placeholder="Search vendors..." value={search} onChange={e => setSearch(e.target.value)}
+              className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm w-56 focus:outline-none focus:border-fp-brand placeholder-fp-muted" />
+          </div>
           {loading ? (
             <p className="text-fp-muted">Loading...</p>
           ) : vendors.length === 0 ? (
             <p className="text-fp-muted">No vendors yet. Add your first vendor above.</p>
           ) : (
             <div className="space-y-3">
-              {vendors.map(v => (
+              {vendors.filter(v => !search || v.vendor_name?.toLowerCase().includes(search.toLowerCase()) || v.contact_name?.toLowerCase().includes(search.toLowerCase()) || v.contact_email?.toLowerCase().includes(search.toLowerCase())).map(v => (
                 <div key={v.id} className="border border-fp-border rounded-xl p-4">
                   {editingId === v.id ? (
                     <div>
