@@ -332,6 +332,14 @@ function CategoryIcon({ category }) {
       return <svg {...props}><rect x="6" y="12" width="28" height="16" rx="2" strokeWidth="1.5"/><circle cx="13" cy="20" r="2" fill="currentColor"/><circle cx="20" cy="20" r="2" fill="currentColor"/><circle cx="27" cy="20" r="2" fill="currentColor"/></svg>
     case 'Motion Sensor':
       return <svg {...props}><path d="M20 20 L8 10 M20 20 L8 30 M20 20 L32 20" strokeWidth="1.5" strokeLinecap="round"/><circle cx="20" cy="20" r="3" strokeWidth="1.5"/><path d="M26 14 Q32 20 26 26" strokeWidth="1.5" strokeLinecap="round" fill="none"/></svg>
+    case 'Turret Camera':
+      return <svg {...props}><ellipse cx="20" cy="26" rx="12" ry="5" strokeWidth="1.5"/><path d="M8 26 Q8 16 20 14 Q32 16 32 26" strokeWidth="1.5"/><circle cx="20" cy="20" r="5" strokeWidth="1.5"/><circle cx="20" cy="20" r="2" fill="currentColor"/><path d="M14 30 L12 36 M26 30 L28 36" strokeWidth="1.5" strokeLinecap="round"/></svg>
+    case 'Cabinet System':
+      return <svg {...props}><rect x="8" y="4" width="24" height="32" rx="2" strokeWidth="1.5"/><path d="M8 10 L32 10 M8 30 L32 30" strokeWidth="1.5"/><rect x="12" y="13" width="16" height="8" rx="1" strokeWidth="1"/><circle cx="28" cy="34" r="1.5" fill="currentColor"/><circle cx="12" cy="34" r="1.5" fill="currentColor"/></svg>
+    case 'Cabinet Solar System':
+      return <svg {...props}><rect x="8" y="14" width="20" height="22" rx="2" strokeWidth="1.5"/><path d="M8 20 L28 20 M8 30 L28 30" strokeWidth="1.5"/><rect x="11" y="22" width="14" height="6" rx="1" strokeWidth="1"/><rect x="4" y="4" width="32" height="8" rx="1" strokeWidth="1.5"/><path d="M10 4 L10 12 M16 4 L16 12 M22 4 L22 12 M28 4 L28 12" strokeWidth="1"/><path d="M18 12 L18 14" strokeLinecap="round" strokeWidth="1.5"/></svg>
+    case 'Video Encoder':
+      return <svg {...props}><rect x="4" y="12" width="24" height="16" rx="2" strokeWidth="1.5"/><path d="M28 16 L36 12 L36 28 L28 24 Z" strokeWidth="1.5"/><circle cx="10" cy="18" r="1.5" fill="currentColor"/><circle cx="10" cy="22" r="1.5" fill="currentColor"/><path d="M14 17 L22 17 M14 20 L22 20 M14 23 L20 23" strokeLinecap="round" strokeWidth="1"/></svg>
     case 'NVR':
       return <svg {...props}><rect x="6" y="10" width="28" height="20" rx="2" strokeWidth="1.5"/><rect x="10" y="14" width="8" height="6" rx="1" strokeWidth="1.5"/><rect x="22" y="14" width="8" height="6" rx="1" strokeWidth="1.5"/></svg>
     case 'Display':

@@ -239,6 +239,43 @@ const CATEGORY_SVGS = {
       <path d="M8 24 L18 24 M8 28 L18 28" stroke-linecap="round" stroke-width="1"/>
     </svg>`,
 
+  'Turret Camera': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <ellipse cx="20" cy="26" rx="12" ry="5" />
+      <path d="M8 26 Q8 16 20 14 Q32 16 32 26"/>
+      <circle cx="20" cy="20" r="5"/>
+      <circle cx="20" cy="20" r="2" fill="${color}" stroke="none"/>
+      <path d="M14 30 L12 36 M26 30 L28 36" stroke-linecap="round"/>
+    </svg>`,
+
+  'Cabinet System': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="8" y="4" width="24" height="32" rx="2"/>
+      <path d="M8 10 L32 10 M8 30 L32 30"/>
+      <rect x="12" y="13" width="16" height="8" rx="1" stroke-width="1"/>
+      <circle cx="28" cy="34" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="12" cy="34" r="1.5" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Cabinet Solar System': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="8" y="14" width="20" height="22" rx="2"/>
+      <path d="M8 20 L28 20 M8 30 L28 30"/>
+      <rect x="11" y="22" width="14" height="6" rx="1" stroke-width="1"/>
+      <rect x="4" y="4" width="32" height="8" rx="1"/>
+      <path d="M10 4 L10 12 M16 4 L16 12 M22 4 L22 12 M28 4 L28 12" stroke-width="1"/>
+      <path d="M18 12 L18 14" stroke-linecap="round"/>
+    </svg>`,
+
+  'Video Encoder': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="12" width="24" height="16" rx="2"/>
+      <path d="M28 16 L36 12 L36 28 L28 24 Z"/>
+      <circle cx="10" cy="18" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="10" cy="22" r="1.5" fill="${color}" stroke="none"/>
+      <path d="M14 17 L22 17 M14 20 L22 20 M14 23 L20 23" stroke-linecap="round" stroke-width="1"/>
+    </svg>`,
+
   'Amplifier': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
       <rect x="4" y="10" width="32" height="20" rx="2"/>

@@ -5,12 +5,16 @@ import { useCategoryIcons } from './useCategoryIcons'
 import { PATHWAY_DEFS } from './SymbolPicker'
 
 const LABEL_PREFIXES = {
-  'Dome Camera':         'CAM',
-  'Bullet Camera':       'CAM',
-  'PTZ Camera':          'PTZ',
-  'Multi-Lens Camera':   'CAM',
-  'Fisheye Camera':      'CAM',
-  'LPR Camera':          'LPR',
+  'Dome Camera':             'CAM',
+  'Bullet Camera':           'CAM',
+  'PTZ Camera':              'PTZ',
+  'Turret Camera':           'CAM',
+  'Multi-Lens Camera':       'CAM',
+  'Fisheye Camera':          'CAM',
+  'LPR Camera':              'LPR',
+  'Cabinet System':          'CAB',
+  'Cabinet Solar System':    'SOL',
+  'Video Encoder':           'ENC',
   'Access Reader':       'RDR',
   'Access Control Door': 'DR',
   'Controller':          'CTRL',

@@ -2104,8 +2104,9 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
   const [saving, setSaving] = useState(false)
 
   const CATEGORIES = [
-    'Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera',
-    'LPR Camera','NVR','Access Reader','Access Control Door','Controller',
+    'Dome Camera','Bullet Camera','PTZ Camera','Turret Camera','Multi-Lens Camera','Fisheye Camera',
+    'LPR Camera','NVR','Video Encoder','Cabinet System','Cabinet Solar System',
+    'Access Reader','Access Control Door','Controller',
     'Motion Sensor','Sensor','Intercom','Wireless Lock','Guard Tour',
     'Speaker','Display','Projector','Amplifier','DSP','Network',
     'Rack','UPS','Data Drop','Patch Panel','Cable Tray',
@@ -2213,8 +2214,9 @@ function AddProductForm({ onAdded }) {
   const [error,   setError]   = useState(null)
 
   const CATEGORIES = [
-    'Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera',
-    'LPR Camera','NVR','Access Reader','Access Control Door','Controller',
+    'Dome Camera','Bullet Camera','PTZ Camera','Turret Camera','Multi-Lens Camera','Fisheye Camera',
+    'LPR Camera','NVR','Video Encoder','Cabinet System','Cabinet Solar System',
+    'Access Reader','Access Control Door','Controller',
     'Motion Sensor','Sensor','Intercom','Wireless Lock','Guard Tour',
     'Speaker','Display','Projector','Amplifier','DSP','Network',
     'Rack','UPS','Data Drop','Patch Panel','Cable Tray',
