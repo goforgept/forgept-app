@@ -7,7 +7,8 @@ const corsHeaders = {
 }
 
 const PRICE_IDS: Record<string, string> = {
-  'Early Adopter':     'price_1TrQ8DLWULkmrAabEB6qm1Kg',
+  'Early Adopter Annual': 'price_1TrULWLWULkmrAabcDTNonpU',
+  'Early Adopter':        'price_1TrQ8DLWULkmrAabEB6qm1Kg',
   'Designer Only':     'price_1TrQ5rLWULkmrAabaDRGDK06',
   'Small Team':        'price_1TrQ4OLWULkmrAabCpzuU6wH',
   'Team':              'price_1TD58BLWULkmrAabCUiTtFPY',
@@ -16,7 +17,8 @@ const PRICE_IDS: Record<string, string> = {
 }
 
 const PLAN_RATES: Record<string, number> = {
-  'Early Adopter':     100,
+  'Early Adopter Annual': 100,  // stored as monthly equivalent for MRR
+  'Early Adopter':        100,
   'Designer Only':     49,
   'Small Team':        99,
   'Team':              149,
