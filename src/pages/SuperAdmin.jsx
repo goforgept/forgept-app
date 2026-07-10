@@ -1391,12 +1391,13 @@ export default function SuperAdmin() {
             <h3 className="text-white font-bold text-lg mb-1">Create Stripe Subscription</h3>
             <p className="text-[#8A9AB0] text-sm mb-5">{stripeModal.org.name} · {stripeModal.admin?.email || 'No admin email'}</p>
             <div className="space-y-4">
-              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label><select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"></select></div>
-              <option value="Early Adopter">Early Adopter — $100/mo</option>
-              <option value="Designer Only">Designer Only — $49/mo</option>
-              <option value="Small Team">Small Team — $99/mo</option>
-              <option value="Business">Business — $199/mo</option>
-              <option value="QuickBooks Add-on">QuickBooks Add-on — $25/mo</option>
+              <div><label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label><select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                <option value="Early Adopter">Early Adopter — $100/mo</option>
+                <option value="Designer Only">Designer Only — $49/mo</option>
+                <option value="Small Team">Small Team — $99/mo</option>
+                <option value="Business">Business — $199/mo</option>
+                <option value="QuickBooks Add-on">QuickBooks Add-on — $25/mo</option>
+              </select></div>
               <div className="flex items-center gap-3 bg-[#0F1C2E] rounded-lg px-4 py-3">
                 {/* Onboarding fee removed */}
                 <label htmlFor="onboarding" className="text-white text-sm cursor-pointer">Charge one-time onboarding fee <span className="text-[#C8622A] font-semibold">$249</span></label>
