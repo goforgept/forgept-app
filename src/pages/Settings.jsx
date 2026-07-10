@@ -108,6 +108,41 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [inboundMessage, setInboundMessage] = useState(null)
   const [verifyingInbound, setVerifyingInbound] = useState(false)
 
+  // Populate form immediately from already-loaded profile context data
+  useEffect(() => {
+    if (!profile?.id) return
+    setForm(prev => ({
+      ...prev,
+      full_name: profile.full_name || '',
+      email: profile.email || '',
+      company_name: profile.company_name || '',
+      phone: profile.phone || '',
+      job_title: profile.job_title || '',
+      license_number: profile.license_number || '',
+      default_markup_percent: profile.default_markup_percent || '35',
+      followup_days: profile.followup_days || '30,14,7,0',
+      terms_and_conditions: profile.terms_and_conditions || '',
+      primary_color: profile.primary_color || '#0F1C2E',
+      bill_to_address: profile.bill_to_address || '',
+      bill_to_city: profile.bill_to_city || '',
+      bill_to_state: profile.bill_to_state || '',
+      bill_to_zip: profile.bill_to_zip || '',
+      ship_to_address: profile.ship_to_address || '',
+      ship_to_city: profile.ship_to_city || '',
+      ship_to_state: profile.ship_to_state || '',
+      ship_to_zip: profile.ship_to_zip || '',
+    }))
+    setInvoicingForm(prev => ({
+      ...prev,
+      payment_instructions_payable_to: profile.payment_instructions_payable_to || '',
+      payment_instructions_zelle: profile.payment_instructions_zelle || '',
+      payment_instructions_notes: profile.payment_instructions_notes || '',
+    }))
+    setOrgTaxRate(profile.organizations?.default_tax_rate ?? '')
+    setOrgId(profile.org_id || null)
+    if (profile.logo_url && profile.logo_url.startsWith('http')) setLogoUrl(profile.logo_url)
+  }, [profile?.id])
+
   useEffect(() => {
     if (profile?.id) fetchProfile()
     const params = new URLSearchParams(window.location.search)
