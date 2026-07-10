@@ -2109,7 +2109,10 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
     'Motion Sensor','Sensor','Intercom','Wireless Lock','Guard Tour',
     'Speaker','Display','Projector','Amplifier','DSP','Network',
     'Rack','UPS','Data Drop','Patch Panel','Cable Tray',
-    'Smoke Detector','Heat Detector','Horn Strobe','Pull Station','FACP',
+    'Smoke Detector','Heat Detector','Horn Strobe','Horn','Strobe','Bell',
+    'Pull Station','Duct Detector','CO Detector','Beam Detector',
+    'Annunciator','Monitor Module','Control Module','Door Holder',
+    'Air Sampling','Suppression Panel','FACP',
     'Panel','Outlet','Thermostat','Other'
   ]
 
@@ -2215,7 +2218,10 @@ function AddProductForm({ onAdded }) {
     'Motion Sensor','Sensor','Intercom','Wireless Lock','Guard Tour',
     'Speaker','Display','Projector','Amplifier','DSP','Network',
     'Rack','UPS','Data Drop','Patch Panel','Cable Tray',
-    'Smoke Detector','Heat Detector','Horn Strobe','Pull Station','FACP',
+    'Smoke Detector','Heat Detector','Horn Strobe','Horn','Strobe','Bell',
+    'Pull Station','Duct Detector','CO Detector','Beam Detector',
+    'Annunciator','Monitor Module','Control Module','Door Holder',
+    'Air Sampling','Suppression Panel','FACP',
     'Panel','Outlet','Thermostat','Other'
   ]
 

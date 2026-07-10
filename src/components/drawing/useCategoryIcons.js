@@ -152,6 +152,93 @@ const CATEGORY_SVGS = {
       <path d="M20 4 L20 14 M20 26 L20 36" stroke-linecap="round"/>
     </svg>`,
 
+  'Horn': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="8" y="14" width="12" height="12" rx="2"/>
+      <path d="M20 15 L32 9 L32 31 L20 25 Z"/>
+      <path d="M29 17 L35 14 M29 23 L35 26" stroke-width="1"/>
+    </svg>`,
+
+  'Strobe': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="8" y="10" width="24" height="20" rx="2"/>
+      <path d="M22 14 L17 20 L21 20 L18 26 L24 19 L20 19 Z" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Bell': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <path d="M12 28 Q12 12 20 12 Q28 12 28 28 Z"/>
+      <path d="M8 28 L32 28"/>
+      <path d="M17 28 Q17 32 20 32 Q23 32 23 28"/>
+      <path d="M20 8 L20 12"/>
+    </svg>`,
+
+  'CO Detector': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <circle cx="20" cy="20" r="12"/>
+      <circle cx="20" cy="20" r="5"/>
+      <path d="M15 17 Q13 20 15 23" stroke-linecap="round"/>
+      <path d="M25 17 Q27 20 25 23" stroke-linecap="round"/>
+    </svg>`,
+
+  'Beam Detector': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="2" y="14" width="10" height="12" rx="2"/>
+      <rect x="28" y="14" width="10" height="12" rx="2"/>
+      <path d="M12 18 L28 18 M12 22 L28 22" stroke-dasharray="3 2" stroke-width="1.5"/>
+      <path d="M14 20 L18 16 M14 20 L18 24" stroke-width="1"/>
+    </svg>`,
+
+  'Annunciator': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="6" width="32" height="28" rx="2"/>
+      <circle cx="12" cy="14" r="2.5" fill="${color}"/>
+      <circle cx="20" cy="14" r="2.5" fill="${color}"/>
+      <circle cx="28" cy="14" r="2.5" fill="${color}"/>
+      <circle cx="12" cy="22" r="2.5"/>
+      <circle cx="20" cy="22" r="2.5"/>
+      <circle cx="28" cy="22" r="2.5"/>
+      <path d="M8 29 L32 29" stroke-width="1"/>
+    </svg>`,
+
+  'Monitor Module': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="6" y="10" width="28" height="20" rx="2"/>
+      <path d="M6 20 L2 20 M14 20 L6 14 M6 14 L6 20" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M18 16 L18 24 M22 16 L30 16 M22 20 L28 20 M22 24 L30 24" stroke-linecap="round" stroke-width="1.2"/>
+    </svg>`,
+
+  'Control Module': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="6" y="10" width="28" height="20" rx="2"/>
+      <path d="M34 20 L38 20 M32 20 L34 14 M34 14 L34 20" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M10 16 L10 24 M14 16 L22 16 M14 20 L20 20 M14 24 L22 24" stroke-linecap="round" stroke-width="1.2"/>
+    </svg>`,
+
+  'Door Holder': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="8" y="22" width="24" height="10" rx="2"/>
+      <path d="M12 22 L12 10 M28 22 L28 10"/>
+      <path d="M10 10 L30 10"/>
+      <path d="M14 26 Q20 24 26 26" stroke-width="1"/>
+    </svg>`,
+
+  'Air Sampling': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="10" y="14" width="20" height="14" rx="2"/>
+      <path d="M20 14 L20 8 M14 8 L26 8"/>
+      <path d="M13 19 Q20 17 27 19 M13 23 Q20 21 27 23" stroke-width="1"/>
+    </svg>`,
+
+  'Suppression Panel': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="6" width="32" height="28" rx="2"/>
+      <rect x="8" y="10" width="10" height="8" rx="1"/>
+      <path d="M22 12 L32 12 M22 16 L32 16 M22 20 L32 20"/>
+      <circle cx="30" cy="26" r="2.5"/>
+      <path d="M8 24 L18 24 M8 28 L18 28" stroke-linecap="round" stroke-width="1"/>
+    </svg>`,
+
   'Amplifier': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
       <rect x="4" y="10" width="32" height="20" rx="2"/>

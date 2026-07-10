@@ -134,16 +134,12 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
         <>
           <div className="px-3 pt-3 pb-2 border-b border-[#2a3d55]">
             <p className="text-xs font-medium text-[#8A9AB0] mb-2">Industry</p>
-            <div className="flex flex-wrap gap-1">
+            <select value={industry} onChange={e => setIndustry(e.target.value)}
+              className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white focus:outline-none focus:border-[#C8622A] cursor-pointer">
               {Object.entries(INDUSTRY_LABELS).map(([key, label]) => (
-                <button key={key} onClick={() => setIndustry(key)}
-                  className={`px-2 py-1 text-xs rounded-md transition-colors ${
-                    industry === key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'
-                  }`}>
-                  {label}
-                </button>
+                <option key={key} value={key}>{label}</option>
               ))}
-            </div>
+            </select>
           </div>
 
           <div className="px-3 py-2 border-b border-[#2a3d55]">
