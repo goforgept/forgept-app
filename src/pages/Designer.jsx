@@ -762,11 +762,29 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                   })()}
                   <span className="text-white font-bold text-base">{selectedRoom.name}</span>
                 </div>
-                <button
-                  onClick={() => setSelectedRoom(null)}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:text-white text-xs"
-                  style={{ color: '#4a6080', background: '#162030' }}
-                >✕</button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={async () => {
+                      if (!window.confirm(`Delete "${selectedRoom.name}" and all its racks?`)) return
+                      await supabase.from('rooms').delete().eq('id', selectedRoom.id)
+                      setRooms(prev => prev.filter(r => r.id !== selectedRoom.id))
+                      setSelectedRoom(null)
+                    }}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-colors hover:bg-red-900/20 hover:text-red-400"
+                    style={{ color: '#4a6080', background: '#162030' }}
+                    title="Delete this room"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Delete Room
+                  </button>
+                  <button
+                    onClick={() => setSelectedRoom(null)}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:text-white text-xs"
+                    style={{ color: '#4a6080', background: '#162030' }}
+                  >✕</button>
+                </div>
               </div>
               {/* RackBuilder fills remaining space */}
               <div className="flex-1 overflow-hidden">

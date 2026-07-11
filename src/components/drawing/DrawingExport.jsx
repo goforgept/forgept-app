@@ -1077,7 +1077,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const logoImg = await loadOrgLogo()
 
       // ── Title page ───────────────────────────────────────────────────────
-      pdf.setFillColor(15, 28, 46)
+      pdf.setFillColor(255, 255, 255)
       pdf.rect(0, 0, pageW, pageH, 'F')
 
       if (logoImg) {
@@ -1091,14 +1091,18 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.text(orgProfile.company_name, margin, margin + 8)
       }
 
+      // Orange accent bar under logo
+      pdf.setFillColor(200, 98, 42)
+      pdf.rect(0, 36, pageW, 1.5, 'F')
+
       pdf.setTextColor(200, 98, 42); pdf.setFontSize(26); pdf.setFont('helvetica', 'bold')
-      pdf.text('RACK SCHEDULE', pageW / 2, 55, { align: 'center' })
-      pdf.setTextColor(255, 255, 255); pdf.setFontSize(14); pdf.setFont('helvetica', 'normal')
-      pdf.text(proposal?.proposal_name || '', pageW / 2, 68, { align: 'center' })
-      pdf.setTextColor(138, 154, 176); pdf.setFontSize(10)
-      if (proposal?.company) pdf.text(proposal.company, pageW / 2, 78, { align: 'center' })
-      pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW / 2, 88, { align: 'center' })
-      pdf.text(`${rooms.length} room${rooms.length !== 1 ? 's' : ''} · ${rackList.length} rack${rackList.length !== 1 ? 's' : ''} · ${rackItemsData.length} device${rackItemsData.length !== 1 ? 's' : ''}`, pageW / 2, 97, { align: 'center' })
+      pdf.text('RACK SCHEDULE', pageW / 2, 58, { align: 'center' })
+      pdf.setTextColor(30, 30, 30); pdf.setFontSize(14); pdf.setFont('helvetica', 'normal')
+      pdf.text(proposal?.proposal_name || '', pageW / 2, 71, { align: 'center' })
+      pdf.setTextColor(90, 100, 110); pdf.setFontSize(10)
+      if (proposal?.company) pdf.text(proposal.company, pageW / 2, 81, { align: 'center' })
+      pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW / 2, 91, { align: 'center' })
+      pdf.text(`${rooms.length} room${rooms.length !== 1 ? 's' : ''} · ${rackList.length} rack${rackList.length !== 1 ? 's' : ''} · ${rackItemsData.length} device${rackItemsData.length !== 1 ? 's' : ''}`, pageW / 2, 100, { align: 'center' })
 
       // ── One page per room ────────────────────────────────────────────────
       for (const room of rooms) {
