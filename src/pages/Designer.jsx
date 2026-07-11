@@ -531,21 +531,6 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
             </button>
           )}
 
-          {/* Room tool toggle */}
-          {activeTab === 'canvas' && sheets.length > 0 && (
-            <button
-              onClick={() => setActiveTool(t => t?.type === 'room' ? null : { type: 'room' })}
-              className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors`}
-              style={activeTool?.type === 'room'
-                ? { borderColor: '#34d39966', background: '#34d39922', color: '#34d399' }
-                : { borderColor: '#2a3d55', color: '#8A9AB0' }}
-              title="Place Room Marker">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-              </svg>
-            </button>
-          )}
-
           {/* Symbol picker toggle */}
           {activeTab === 'canvas' && sheets.length > 0 && (
             <button onClick={() => setSidebarOpen(s => !s)}
@@ -702,30 +687,6 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                   </div>
 
                   {/* Right panel — selected placement, cable, or pathway */}
-                  {/* Room panel — slides in when a room marker is clicked */}
-                  {selectedRoom && !selectedPlacement && !selectedCable && !selectedPathway && (
-                    <div className="w-80 border-l border-[#2a3d55] flex-shrink-0 overflow-hidden bg-[#080e18] flex flex-col">
-                      <div className="flex items-center justify-between px-4 py-3 border-b border-[#162030]">
-                        <div className="flex items-center gap-2">
-                          {(() => {
-                            const COLORS = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981', electrical: '#f59e0b', server: '#a855f7', closet: '#06b6d4', av: '#8b5cf6', other: '#64748b' }
-                            const LABELS = { mdf: 'MDF', idf: 'IDF', headend: 'Headend', electrical: 'Electrical', server: 'Server', closet: 'Wiring Closet', av: 'AV Room', other: 'Other' }
-                            const col = COLORS[selectedRoom.room_type] || '#64748b'
-                            return <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ background: col + '22', color: col }}>{LABELS[selectedRoom.room_type] || selectedRoom.room_type}</span>
-                          })()}
-                          <span className="text-white font-bold text-sm">{selectedRoom.name}</span>
-                        </div>
-                        <button onClick={() => setSelectedRoom(null)} className="text-[#4a6080] hover:text-white text-xs transition-colors">✕</button>
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        <RackBuilder
-                          proposalId={proposalId}
-                          orgId={orgId}
-                          lockedRoomId={selectedRoom.id}
-                        />
-                      </div>
-                    </div>
-                  )}
 
                   {(selectedPlacement || selectedCable || selectedPathway) && (
                     <div className="w-64 border-l border-[#2a3d55] flex-shrink-0 overflow-y-auto bg-[#0F1C2E]">
@@ -776,6 +737,48 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
               </>
             )}
           </>
+        )}
+
+        {/* Room rack builder modal — opens when a room marker is clicked on canvas */}
+        {selectedRoom && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ background: 'rgba(0,0,0,0.7)' }}
+            onClick={() => setSelectedRoom(null)}
+          >
+            <div
+              className="flex flex-col rounded-2xl shadow-2xl overflow-hidden"
+              style={{ width: '88vw', height: '88vh', background: '#080e18', border: '1px solid #1e3048' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Modal header */}
+              <div className="flex items-center justify-between px-5 py-3 border-b flex-shrink-0" style={{ borderColor: '#162030' }}>
+                <div className="flex items-center gap-3">
+                  {(() => {
+                    const COLORS = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981', electrical: '#f59e0b', server: '#a855f7', closet: '#06b6d4', av: '#8b5cf6', other: '#64748b' }
+                    const LABELS = { mdf: 'MDF', idf: 'IDF', headend: 'Headend', electrical: 'Electrical', server: 'Server Room', closet: 'Wiring Closet', av: 'AV Room', other: 'Other' }
+                    const col = COLORS[selectedRoom.room_type] || '#64748b'
+                    return <span className="text-xs font-bold px-2.5 py-1 rounded-lg" style={{ background: col + '22', color: col }}>{LABELS[selectedRoom.room_type] || selectedRoom.room_type}</span>
+                  })()}
+                  <span className="text-white font-bold text-base">{selectedRoom.name}</span>
+                </div>
+                <button
+                  onClick={() => setSelectedRoom(null)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg transition-colors hover:text-white text-xs"
+                  style={{ color: '#4a6080', background: '#162030' }}
+                >✕</button>
+              </div>
+              {/* RackBuilder fills remaining space */}
+              <div className="flex-1 overflow-hidden">
+                <RackBuilder
+                  proposalId={proposalId}
+                  orgId={orgId}
+                  lockedRoomId={selectedRoom.id}
+                  sheetPlacements={sheetPlacements}
+                />
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Place-room modal */}

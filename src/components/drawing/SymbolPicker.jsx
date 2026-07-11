@@ -46,6 +46,7 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
   useEffect(() => {
     if (activeTool?.type === 'cable')   setTab('cable')
     if (activeTool?.type === 'pathway') setTab('pathways')
+    if (activeTool?.type === 'room')    setTab('rooms')
   }, [activeTool?.type])
 
   useEffect(() => {
@@ -103,9 +104,9 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
 
   const handleTabChange = (newTab) => {
     setTab(newTab)
-    if (newTab === 'devices') {
-      onToolSelect?.(null)
-    }
+    if (newTab === 'devices') onToolSelect?.(null)
+    if (newTab === 'rooms' && activeTool?.type !== 'room') onToolSelect?.({ type: 'room' })
+    if (newTab !== 'rooms' && activeTool?.type === 'room') onToolSelect?.(null)
   }
 
   return (
@@ -117,6 +118,7 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
           { id: 'devices',   label: 'Devices' },
           { id: 'cable',     label: 'Cable' },
           { id: 'pathways',  label: 'Pathways' },
+          { id: 'rooms',     label: 'Rooms' },
         ].map(t => (
           <button key={t.id} onClick={() => handleTabChange(t.id)}
             className={`flex-1 py-2 text-xs font-medium transition-colors ${
@@ -285,6 +287,44 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
               </div>
             )
           })()}
+        </div>
+      )}
+
+      {/* ROOMS tab */}
+      {tab === 'rooms' && (
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="px-3 pt-3 pb-2">
+            <p className="text-xs text-[#8A9AB0]">Click on the floor plan to drop a room marker (MDF, IDF, Headend, etc). Then click the marker to build racks inside it.</p>
+          </div>
+          <div className="flex-1 overflow-y-auto px-3 pb-3">
+            <button
+              onClick={() => onToolSelect?.(activeTool?.type === 'room' ? null : { type: 'room' })}
+              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-colors ${
+                activeTool?.type === 'room'
+                  ? 'bg-emerald-500/15 border-emerald-400/60 text-emerald-300'
+                  : 'bg-[#1a2d45] border-[#2a3d55] text-white hover:border-emerald-400/40 hover:bg-emerald-500/5'
+              }`}>
+              <svg className="w-5 h-5 flex-shrink-0 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+              </svg>
+              <div>
+                <p className="text-xs font-semibold">Place Room Marker</p>
+                <p className="text-xs mt-0.5" style={{ color: activeTool?.type === 'room' ? '#6ee7b7' : '#4a6080' }}>
+                  {activeTool?.type === 'room' ? 'Click canvas to place — Active' : 'MDF · IDF · Headend · Electrical · AV'}
+                </p>
+              </div>
+              {activeTool?.type === 'room' && <span className="ml-auto text-emerald-400 text-xs font-semibold">Active</span>}
+            </button>
+          </div>
+          {activeTool?.type === 'room' && (
+            <div className="px-3 py-2 border-t flex-shrink-0" style={{ borderColor: '#34d39955', backgroundColor: '#34d39915' }}>
+              <p className="text-xs font-medium text-emerald-400">Placing Room Marker</p>
+              <p className="text-xs mt-0.5 text-emerald-600">Click anywhere on the floor plan</p>
+              <button onClick={() => onToolSelect?.(null)} className="mt-1.5 text-xs text-[#8A9AB0] hover:text-white underline">
+                Exit placement mode
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
