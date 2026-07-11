@@ -96,6 +96,47 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
         grouped[key].by_floor[p.drawing_sheet_id] = (grouped[key].by_floor[p.drawing_sheet_id] || 0) + p.quantity
       })
 
+      // Load rack items (rooms → racks → rack_items) and merge into BOM
+      const { data: roomsForBOM } = await supabase
+        .from('rooms')
+        .select('id')
+        .eq('proposal_id', proposalId)
+      if (roomsForBOM?.length) {
+        const roomIds = roomsForBOM.map(r => r.id)
+        const { data: racksForBOM } = await supabase
+          .from('racks')
+          .select('id')
+          .in('room_id', roomIds)
+        if (racksForBOM?.length) {
+          const rackIds = racksForBOM.map(r => r.id)
+          const { data: rackItemsList } = await supabase
+            .from('rack_items')
+            .select('id, label, manufacturer, model, part_number, category, quantity, global_products(id, name, part_number, manufacturer, category)')
+            .in('rack_id', rackIds)
+          ;(rackItemsList || []).forEach(ri => {
+            const gp = ri.global_products
+            const partNumber   = ri.part_number || gp?.part_number || `ri-${ri.id}`
+            const name         = ri.label || gp?.name || ri.model || 'Unknown Device'
+            const manufacturer = ri.manufacturer || gp?.manufacturer || ''
+            const category     = ri.category || gp?.category || 'Rack Equipment'
+            if (!grouped[partNumber]) {
+              grouped[partNumber] = {
+                part_number:  partNumber,
+                model_number: ri.model || null,
+                name,
+                manufacturer,
+                category,
+                unit_price:   null,
+                has_pricing:  false,
+                total_qty:    0,
+                by_floor:     {},
+              }
+            }
+            grouped[partNumber].total_qty += ri.quantity || 1
+          })
+        }
+      }
+
       const sorted = Object.values(grouped).sort((a, b) => {
         if (a.manufacturer !== b.manufacturer) return a.manufacturer.localeCompare(b.manufacturer)
         if (a.category !== b.category) return a.category.localeCompare(b.category)
