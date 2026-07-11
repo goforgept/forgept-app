@@ -1558,6 +1558,10 @@ export default function SuperAdmin() {
               await supabase.from('roadmap_items').delete().eq('id', id)
               setRoadmapItems(prev => prev.filter(i => i.id !== id))
             }}
+            onCreate={async (item) => {
+              const { data, error } = await supabase.from('roadmap_items').insert([item]).select().single()
+              if (!error && data) setRoadmapItems(prev => [data, ...prev])
+            }}
           />
         </>
       )}
@@ -1590,12 +1594,33 @@ const SA_NEXT = {
   declined:    [{ v: 'backlog', l: 'Reopen' }],
 }
 
-function SAoadmapPanel({ items, orgs, onStatusChange, onDelete }) {
+const BLANK_ITEM = { title: '', description: '', category: 'feature', status: 'backlog', target_quarter: '', org_id: '' }
+
+function SAoadmapPanel({ items, orgs, onStatusChange, onDelete, onCreate }) {
   const [filter, setFilter] = useState('')
   const [orgFilter, setOrgFilter] = useState('')
   const [view, setView] = useState('board') // 'board' | 'list'
+  const [showAdd, setShowAdd] = useState(false)
+  const [addForm, setAddForm] = useState(BLANK_ITEM)
+  const [saving, setSaving] = useState(false)
 
   const orgMap = Object.fromEntries(orgs.map(o => [o.id, o.company_name]))
+
+  const handleAdd = async () => {
+    if (!addForm.title.trim()) return
+    setSaving(true)
+    await onCreate({
+      title: addForm.title.trim(),
+      description: addForm.description.trim() || null,
+      category: addForm.category,
+      status: addForm.status,
+      target_quarter: addForm.target_quarter.trim() || null,
+      org_id: addForm.org_id || null,
+    })
+    setAddForm(BLANK_ITEM)
+    setShowAdd(false)
+    setSaving(false)
+  }
 
   const filtered = items.filter(i => {
     if (orgFilter && i.org_id !== orgFilter) return false
@@ -1623,7 +1648,63 @@ function SAoadmapPanel({ items, orgs, onStatusChange, onDelete }) {
           <button onClick={() => setView('list')}  className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${view === 'list'  ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'}`}>List</button>
         </div>
         <span className="text-[#8A9AB0] text-xs">{filtered.length} item{filtered.length !== 1 ? 's' : ''}</span>
+        <button onClick={() => setShowAdd(s => !s)}
+          className="px-3 py-1.5 bg-[#C8622A] text-white text-xs font-semibold rounded-lg hover:bg-[#b5571f] transition-colors">
+          + Add Item
+        </button>
       </div>
+
+      {/* Add form */}
+      {showAdd && (
+        <div className="bg-[#1a2d45] border border-[#C8622A]/40 rounded-xl p-4 space-y-3">
+          <p className="text-white text-sm font-semibold">New Roadmap Item</p>
+          <div className="grid grid-cols-2 gap-3">
+            <input
+              placeholder="Title *"
+              value={addForm.title}
+              onChange={e => setAddForm(p => ({ ...p, title: e.target.value }))}
+              className="col-span-2 bg-[#0F1C2E] border border-[#2a3d55] text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
+            />
+            <textarea
+              placeholder="Description (optional)"
+              value={addForm.description}
+              onChange={e => setAddForm(p => ({ ...p, description: e.target.value }))}
+              rows={2}
+              className="col-span-2 bg-[#0F1C2E] border border-[#2a3d55] text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0] resize-none"
+            />
+            <select value={addForm.category} onChange={e => setAddForm(p => ({ ...p, category: e.target.value }))}
+              className="bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]">
+              <option value="feature">Feature</option>
+              <option value="product">Product</option>
+              <option value="improvement">Improvement</option>
+              <option value="bug_fix">Bug Fix</option>
+            </select>
+            <select value={addForm.status} onChange={e => setAddForm(p => ({ ...p, status: e.target.value }))}
+              className="bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]">
+              {Object.entries(SA_STATUS_META).map(([v, m]) => <option key={v} value={v}>{m.label}</option>)}
+            </select>
+            <input
+              placeholder="Target quarter (e.g. Q3 2026)"
+              value={addForm.target_quarter}
+              onChange={e => setAddForm(p => ({ ...p, target_quarter: e.target.value }))}
+              className="bg-[#0F1C2E] border border-[#2a3d55] text-white text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
+            />
+            <select value={addForm.org_id} onChange={e => setAddForm(p => ({ ...p, org_id: e.target.value }))}
+              className="bg-[#0F1C2E] border border-[#2a3d55] text-[#8A9AB0] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A]">
+              <option value="">No org / Internal</option>
+              {orgs.map(o => <option key={o.id} value={o.id}>{o.company_name}</option>)}
+            </select>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => { setShowAdd(false); setAddForm(BLANK_ITEM) }}
+              className="px-3 py-1.5 text-xs text-[#8A9AB0] hover:text-white transition-colors">Cancel</button>
+            <button onClick={handleAdd} disabled={saving || !addForm.title.trim()}
+              className="px-4 py-1.5 text-xs font-semibold bg-[#C8622A] text-white rounded-lg hover:bg-[#b5571f] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              {saving ? 'Saving…' : 'Add Item'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Board */}
       {view === 'board' && (
