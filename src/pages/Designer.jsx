@@ -37,8 +37,12 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const [deletedCableId,    setDeletedCableId]    = useState(null)
   const [selectedPathway,   setSelectedPathway]   = useState(null)
   const [deletedPathwayId,  setDeletedPathwayId]  = useState(null)
-  const [activeTool,        setActiveTool]        = useState(null) // {type:'cable',cableType} | {type:'pathway',pathwayType} | null
+  const [activeTool,        setActiveTool]        = useState(null) // {type:'cable',cableType} | {type:'pathway',pathwayType} | {type:'room'} | null
   const [copiedPlacement,   setCopiedPlacement]   = useState(null)
+  const [rooms,             setRooms]             = useState([])
+  const [selectedRoom,      setSelectedRoom]      = useState(null) // room clicked on canvas
+  const [placeRoomModal,    setPlaceRoomModal]    = useState(null) // { x, y, drawing_sheet_id }
+  const [newRoomForm,       setNewRoomForm]       = useState({ name: '', room_type: 'mdf' })
   const [showLabels,        setShowLabels]        = useState(() => localStorage.getItem('designer_show_labels') !== 'false')
   const [industryFilter,    setIndustryFilter]    = useState('all')
   const stageRefs = useRef({}) // sheetId -> Konva stage
@@ -104,6 +108,11 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
 
       setSheets(sheetData || [])
       if (sheetData?.length > 0) setActiveSheetId(sheetData[0].id)
+
+      // Load rooms for this proposal
+      const { data: roomData } = await supabase
+        .from('rooms').select('*').eq('proposal_id', proposalId).order('sort_order')
+      setRooms(roomData || [])
     } catch (err) {
       setError('Failed to load project.')
       console.error(err)
@@ -522,6 +531,21 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
             </button>
           )}
 
+          {/* Room tool toggle */}
+          {activeTab === 'canvas' && sheets.length > 0 && (
+            <button
+              onClick={() => setActiveTool(t => t?.type === 'room' ? null : { type: 'room' })}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors`}
+              style={activeTool?.type === 'room'
+                ? { borderColor: '#34d39966', background: '#34d39922', color: '#34d399' }
+                : { borderColor: '#2a3d55', color: '#8A9AB0' }}
+              title="Place Room Marker">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+              </svg>
+            </button>
+          )}
+
           {/* Symbol picker toggle */}
           {activeTab === 'canvas' && sheets.length > 0 && (
             <button onClick={() => setSidebarOpen(s => !s)}
@@ -666,11 +690,43 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                           setShowLabels(val)
                           localStorage.setItem('designer_show_labels', val)
                         }}
+                        rooms={rooms}
+                        onRoomClick={(room) => { setSelectedRoom(room); setSelectedPlacement(null); setSelectedCable(null) }}
+                        onRoomPlace={(pos) => { setPlaceRoomModal(pos); setNewRoomForm({ name: '', room_type: 'mdf' }) }}
+                        onRoomMove={async (id, x, y) => {
+                          await supabase.from('rooms').update({ x, y }).eq('id', id)
+                          setRooms(prev => prev.map(r => r.id === id ? { ...r, x, y } : r))
+                        }}
                       />
                     )}
                   </div>
 
                   {/* Right panel — selected placement, cable, or pathway */}
+                  {/* Room panel — slides in when a room marker is clicked */}
+                  {selectedRoom && !selectedPlacement && !selectedCable && !selectedPathway && (
+                    <div className="w-80 border-l border-[#2a3d55] flex-shrink-0 overflow-hidden bg-[#080e18] flex flex-col">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-[#162030]">
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const COLORS = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981', electrical: '#f59e0b', server: '#a855f7', closet: '#06b6d4', av: '#8b5cf6', other: '#64748b' }
+                            const LABELS = { mdf: 'MDF', idf: 'IDF', headend: 'Headend', electrical: 'Electrical', server: 'Server', closet: 'Wiring Closet', av: 'AV Room', other: 'Other' }
+                            const col = COLORS[selectedRoom.room_type] || '#64748b'
+                            return <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ background: col + '22', color: col }}>{LABELS[selectedRoom.room_type] || selectedRoom.room_type}</span>
+                          })()}
+                          <span className="text-white font-bold text-sm">{selectedRoom.name}</span>
+                        </div>
+                        <button onClick={() => setSelectedRoom(null)} className="text-[#4a6080] hover:text-white text-xs transition-colors">✕</button>
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <RackBuilder
+                          proposalId={proposalId}
+                          orgId={orgId}
+                          lockedRoomId={selectedRoom.id}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {(selectedPlacement || selectedCable || selectedPathway) && (
                     <div className="w-64 border-l border-[#2a3d55] flex-shrink-0 overflow-y-auto bg-[#0F1C2E]">
                       {selectedPlacement && (
@@ -720,6 +776,72 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
               </>
             )}
           </>
+        )}
+
+        {/* Place-room modal */}
+        {placeRoomModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}
+            onClick={() => setPlaceRoomModal(null)}>
+            <div className="rounded-2xl p-5 w-80 shadow-2xl space-y-3"
+              style={{ background: '#0d1927', border: '1px solid #1e3048' }}
+              onClick={e => e.stopPropagation()}>
+              <p className="text-white font-bold text-sm">Name this room</p>
+              <input
+                autoFocus
+                placeholder="Room name (e.g. MDF, IDF-1, Headend)"
+                value={newRoomForm.name}
+                onChange={e => setNewRoomForm(p => ({ ...p, name: e.target.value }))}
+                onKeyDown={async e => {
+                  if (e.key !== 'Enter' || !newRoomForm.name.trim()) return
+                  const { data } = await supabase.from('rooms').insert([{
+                    proposal_id: proposalId, org_id: orgId,
+                    name: newRoomForm.name.trim(), room_type: newRoomForm.room_type,
+                    drawing_sheet_id: placeRoomModal.drawing_sheet_id,
+                    x: placeRoomModal.x, y: placeRoomModal.y, sort_order: rooms.length,
+                  }]).select().single()
+                  if (data) { setRooms(prev => [...prev, data]); setActiveTool(null) }
+                  setPlaceRoomModal(null)
+                }}
+                className="w-full text-sm rounded-xl px-4 py-2.5 focus:outline-none"
+                style={{ background: '#0a1220', border: '1px solid #1e3048', color: '#fff' }}
+              />
+              <select
+                value={newRoomForm.room_type}
+                onChange={e => setNewRoomForm(p => ({ ...p, room_type: e.target.value }))}
+                className="w-full text-sm rounded-xl px-4 py-2.5 focus:outline-none"
+                style={{ background: '#0a1220', border: '1px solid #1e3048', color: '#8A9AB0' }}
+              >
+                {[
+                  { value: 'mdf', label: 'MDF' },
+                  { value: 'idf', label: 'IDF' },
+                  { value: 'headend', label: 'Headend' },
+                  { value: 'electrical', label: 'Electrical Room' },
+                  { value: 'server', label: 'Server Room' },
+                  { value: 'closet', label: 'Wiring Closet' },
+                  { value: 'av', label: 'AV Rack Room' },
+                  { value: 'other', label: 'Other' },
+                ].map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              <div className="flex gap-2">
+                <button onClick={() => setPlaceRoomModal(null)} className="flex-1 py-2 text-xs rounded-lg transition-colors" style={{ background: '#162030', color: '#8A9AB0' }}>Cancel</button>
+                <button
+                  disabled={!newRoomForm.name.trim()}
+                  onClick={async () => {
+                    const { data } = await supabase.from('rooms').insert([{
+                      proposal_id: proposalId, org_id: orgId,
+                      name: newRoomForm.name.trim(), room_type: newRoomForm.room_type,
+                      drawing_sheet_id: placeRoomModal.drawing_sheet_id,
+                      x: placeRoomModal.x, y: placeRoomModal.y, sort_order: rooms.length,
+                    }]).select().single()
+                    if (data) { setRooms(prev => [...prev, data]); setActiveTool(null) }
+                    setPlaceRoomModal(null)
+                  }}
+                  className="flex-1 py-2 text-xs font-bold rounded-lg transition-colors disabled:opacity-40"
+                  style={{ background: '#C8622A', color: '#fff' }}
+                >Place Room</button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Rooms & Racks tab */}

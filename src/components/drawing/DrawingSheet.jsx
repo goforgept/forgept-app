@@ -78,7 +78,7 @@ const getNextLabel = async (category, sheetIds) => {
   return `${prefix}-${String(next).padStart(2, '0')}`
 }
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange, activeTool, onPathwaySelect, deletedPathwayId }) {
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange, activeTool, onPathwaySelect, deletedPathwayId, rooms, onRoomClick, onRoomPlace, onRoomMove }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
 
@@ -118,6 +118,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const cableType      = activeTool?.cableType || 'Cat6'
   const pathwayMode    = activeTool?.type === 'pathway'
   const pathwayType    = activeTool?.pathwayType || 'EMT'
+  const roomMode       = activeTool?.type === 'room'
   const [cableRuns,      setCableRuns]      = useState([])
   const [activeCable,    setActiveCable]    = useState(null)
   const [activePoints,   setActivePoints]   = useState([])
@@ -674,6 +675,17 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       return
     }
 
+    // Room placement mode
+    if (roomMode) {
+      const onBgClick = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
+      if (!onBgClick) return
+      const pointer = stageRef.current.getPointerPosition()
+      const x = Math.min(Math.max((pointer.x - position.x) / scale / canvasW, 0.01), 0.99)
+      const y = Math.min(Math.max((pointer.y - position.y) / scale / canvasH, 0.01), 0.99)
+      onRoomPlace?.({ x, y, drawing_sheet_id: sheet.id })
+      return
+    }
+
     // Cable drawing mode — only add points on background clicks
     if (cableMode) {
       const onBgClick = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
@@ -885,6 +897,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   </span>
                 )
               })()
+            : roomMode
+            ? <span className="flex items-center gap-1.5 font-medium" style={{ color: '#34d399' }}>
+                <span className="w-2 h-2 rounded-full animate-pulse inline-block" style={{ background: '#34d399' }}/>
+                Room mode — click on the floor plan to place a room marker
+              </span>
             : editingCable
             ? <span className="flex items-center gap-1.5 text-green-400 font-medium">
                 <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse inline-block"/>
@@ -1903,6 +1920,43 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                     onRotate={() => handleRotate(placement.id)}
                     onDragEnd={(e) => handleDragEnd(placement.id, e)}
                   />
+                )
+              })}
+
+              {/* ── Room markers ── */}
+              {(rooms || []).filter(r => r.drawing_sheet_id === sheet.id && r.x != null).map(room => {
+                const ROOM_COLORS = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981', electrical: '#f59e0b', server: '#a855f7', closet: '#06b6d4', av: '#8b5cf6', other: '#64748b' }
+                const ROOM_ABBREV = { mdf: 'MDF', idf: 'IDF', headend: 'HE', electrical: 'ELEC', server: 'SRV', closet: 'WC', av: 'AV', other: '...' }
+                const col   = ROOM_COLORS[room.room_type] || '#64748b'
+                const abbr  = ROOM_ABBREV[room.room_type] || '?'
+                const px    = position.x + room.x * canvasW * scale
+                const py    = position.y + room.y * canvasH * scale
+                const W = 130, H = 30, BADGE = 34
+
+                return (
+                  <Group
+                    key={room.id}
+                    x={px} y={py}
+                    draggable={!roomMode}
+                    onDragEnd={e => {
+                      const nx = Math.min(Math.max((e.target.x() - position.x) / scale / canvasW, 0.01), 0.99)
+                      const ny = Math.min(Math.max((e.target.y() - position.y) / scale / canvasH, 0.01), 0.99)
+                      onRoomMove?.(room.id, nx, ny)
+                    }}
+                    onClick={e => { e.cancelBubble = true; onRoomClick?.(room) }}
+                  >
+                    {/* Shadow */}
+                    <Rect x={2} y={2} width={W} height={H} fill="rgba(0,0,0,0.4)" cornerRadius={5} listening={false} />
+                    {/* Main body */}
+                    <Rect x={0} y={0} width={W} height={H} fill="#0d1927" stroke={col} strokeWidth={1.5} cornerRadius={5} />
+                    {/* Type badge */}
+                    <Rect x={0} y={0} width={BADGE} height={H} fill={col + '33'} cornerRadius={[5, 0, 0, 5]} listening={false} />
+                    <Text x={0} y={0} width={BADGE} height={H} text={abbr} fontSize={9} fontStyle="bold" fill={col} align="center" verticalAlign="middle" listening={false} />
+                    {/* Name */}
+                    <Text x={BADGE + 5} y={0} width={W - BADGE - 8} height={H} text={room.name} fontSize={11} fontStyle="bold" fill="#ffffff" verticalAlign="middle" listening={false} />
+                    {/* Rack count dot */}
+                    <Circle x={W - 8} y={H / 2} radius={3} fill={col} listening={false} />
+                  </Group>
                 )
               })}
             </Layer>

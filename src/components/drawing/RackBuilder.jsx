@@ -67,17 +67,20 @@ function buildSlotMap(items) {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-export default function RackBuilder({ proposalId, orgId }) {
+export default function RackBuilder({ proposalId, orgId, lockedRoomId = null }) {
   const [rooms, setRooms]               = useState([])
   const [racks, setRacks]               = useState([])
   const [items, setItems]               = useState([])
-  const [selectedRoomId, setSelectedRoomId] = useState(null)
+  const [selectedRoomId, setSelectedRoomId] = useState(lockedRoomId)
   const [picker, setPicker]             = useState(null) // { rackId, uStart, isWallMount }
   const [addRoomOpen, setAddRoomOpen]   = useState(false)
   const [newRoom, setNewRoom]           = useState({ name: '', room_type: 'mdf' })
   const [addRackFor, setAddRackFor]     = useState(null)
   const [newRack, setNewRack]           = useState({ name: 'Rack 1', rack_type: 'four_post', total_u: 42 })
   const [saving, setSaving]             = useState(false)
+
+  // When lockedRoomId changes (e.g. user clicks a different room marker), update selection
+  useEffect(() => { if (lockedRoomId) setSelectedRoomId(lockedRoomId) }, [lockedRoomId])
 
   useEffect(() => { if (proposalId) load() }, [proposalId])
 
@@ -193,8 +196,8 @@ export default function RackBuilder({ proposalId, orgId }) {
   return (
     <div className="flex h-full overflow-hidden" style={{ background: '#080e18' }}>
 
-      {/* ── Left: Room list ── */}
-      <div className="w-52 flex-shrink-0 flex flex-col border-r" style={{ borderColor: '#162030' }}>
+      {/* ── Left: Room list (hidden in locked/canvas mode) ── */}
+      {!lockedRoomId && <div className="w-52 flex-shrink-0 flex flex-col border-r" style={{ borderColor: '#162030' }}>
         <div className="px-3 py-3 border-b flex items-center justify-between" style={{ borderColor: '#162030' }}>
           <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#4a6080' }}>Rooms</span>
           <button
@@ -271,7 +274,7 @@ export default function RackBuilder({ proposalId, orgId }) {
             )
           })}
         </div>
-      </div>
+      </div>}
 
       {/* ── Right: Rack view ── */}
       <div className="flex-1 overflow-auto">
