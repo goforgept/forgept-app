@@ -9,6 +9,7 @@ import SheetTab from '../components/designer/SheetTab'
 import PlacementPanel from '../components/designer/PlacementPanel'
 import CablePanel from '../components/designer/CablePanel'
 import PathwayPanel from '../components/designer/PathwayPanel'
+import RackBuilder from '../components/drawing/RackBuilder'
 
 export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const { proposalId } = useParams()
@@ -496,6 +497,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
           <div className="flex items-center gap-0.5 bg-[#0F1C2E] rounded-lg p-0.5">
             {[
               { id: 'canvas', label: 'Drawing' },
+              { id: 'racks',  label: 'Rooms & Racks' },
               { id: 'bom',    label: 'BOM Preview' },
               { id: 'export', label: 'Export' },
             ].map(tab => (
@@ -718,6 +720,13 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
               </>
             )}
           </>
+        )}
+
+        {/* Rooms & Racks tab */}
+        {activeTab === 'racks' && (
+          <div className="flex-1 overflow-hidden">
+            <RackBuilder proposalId={proposalId} orgId={orgId} />
+          </div>
         )}
 
         {/* BOM Preview tab */}
