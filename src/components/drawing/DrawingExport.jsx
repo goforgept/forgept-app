@@ -51,6 +51,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [verticalRises, setVerticalRises] = useState([])
   const [components,    setComponents]    = useState([])
   const [orgProfile,    setOrgProfile]    = useState(null)
+  const [rooms,         setRooms]         = useState([])
+  const [rackList,      setRackList]      = useState([])
+  const [rackItemsData, setRackItemsData] = useState([])
   const [loading,       setLoading]       = useState(true)
   const [generating,    setGenerating]    = useState(false)
   const [sharing,       setSharing]       = useState(false)
@@ -120,6 +123,25 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       })
       setComponents(Object.values(compMap))
       setOrgProfile(profileData)
+
+      // Rooms / racks / rack items
+      const { data: roomData } = await supabase
+        .from('rooms').select('*').eq('proposal_id', proposalId).order('sort_order,created_at')
+      setRooms(roomData || [])
+
+      if (roomData?.length) {
+        const { data: rackData } = await supabase
+          .from('racks').select('*').in('room_id', roomData.map(r => r.id)).order('sort_order,created_at')
+        setRackList(rackData || [])
+        if (rackData?.length) {
+          const { data: riData } = await supabase
+            .from('rack_items')
+            .select('*, global_products(name, part_number, manufacturer, category)')
+            .in('rack_id', rackData.map(r => r.id))
+            .order('u_start')
+          setRackItemsData(riData || [])
+        }
+      }
     } catch (err) {
       console.error('Export data load failed:', err)
     } finally {
@@ -1030,6 +1052,164 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     setPackages(prev => prev.filter(p => p.id !== id))
   }
 
+  // ── Rack Schedule PDF ──────────────────────────────────────────────────────
+  const handleRackSchedule = async () => {
+    setGenerating(true)
+    try {
+      const { default: jsPDF }     = await import('jspdf')
+      const { default: autoTable } = await import('jspdf-autotable')
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' })
+
+      const pageW  = pdf.internal.pageSize.getWidth()
+      const pageH  = pdf.internal.pageSize.getHeight()
+      const margin = 12
+
+      const hexToRgb = (hex) => {
+        const n = parseInt(hex.replace('#', ''), 16)
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+      }
+
+      const ROOM_COLORS = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981', electrical: '#f59e0b', server: '#a855f7', closet: '#06b6d4', av: '#8b5cf6', other: '#64748b' }
+      const ROOM_LABELS = { mdf: 'MDF', idf: 'IDF', headend: 'Headend', electrical: 'Electrical Room', server: 'Server Room', closet: 'Wiring Closet', av: 'AV Rack Room', other: 'Other' }
+      const RACK_LABELS = { four_post: '4-Post Open Frame', two_post: '2-Post Open Frame', enclosed: 'Enclosed Cabinet', open_frame: 'Open Frame', wall_mount: 'Wall Mount', shelf: 'Shelf / Surface' }
+      const RACK_HAS_U  = { four_post: true, two_post: true, enclosed: true, open_frame: true, wall_mount: false, shelf: false }
+
+      const logoImg = await loadOrgLogo()
+
+      // ── Title page ───────────────────────────────────────────────────────
+      pdf.setFillColor(15, 28, 46)
+      pdf.rect(0, 0, pageW, pageH, 'F')
+
+      if (logoImg) {
+        try {
+          const maxW = 50, maxH = 18
+          const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+          pdf.addImage(logoImg, 'PNG', margin, margin, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
+        } catch { /* skip */ }
+      } else if (orgProfile?.company_name) {
+        pdf.setTextColor(200, 98, 42); pdf.setFontSize(11); pdf.setFont('helvetica', 'bold')
+        pdf.text(orgProfile.company_name, margin, margin + 8)
+      }
+
+      pdf.setTextColor(200, 98, 42); pdf.setFontSize(26); pdf.setFont('helvetica', 'bold')
+      pdf.text('RACK SCHEDULE', pageW / 2, 55, { align: 'center' })
+      pdf.setTextColor(255, 255, 255); pdf.setFontSize(14); pdf.setFont('helvetica', 'normal')
+      pdf.text(proposal?.proposal_name || '', pageW / 2, 68, { align: 'center' })
+      pdf.setTextColor(138, 154, 176); pdf.setFontSize(10)
+      if (proposal?.company) pdf.text(proposal.company, pageW / 2, 78, { align: 'center' })
+      pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW / 2, 88, { align: 'center' })
+      pdf.text(`${rooms.length} room${rooms.length !== 1 ? 's' : ''} · ${rackList.length} rack${rackList.length !== 1 ? 's' : ''} · ${rackItemsData.length} device${rackItemsData.length !== 1 ? 's' : ''}`, pageW / 2, 97, { align: 'center' })
+
+      // ── One page per room ────────────────────────────────────────────────
+      for (const room of rooms) {
+        const roomRacks = rackList.filter(r => r.room_id === room.id)
+        if (!roomRacks.length) continue
+
+        pdf.addPage()
+        pdf.setFillColor(255, 255, 255)
+        pdf.rect(0, 0, pageW, pageH, 'F')
+
+        // Room color header bar
+        const col = ROOM_COLORS[room.room_type] || '#64748b'
+        const [r, g, b] = hexToRgb(col)
+        pdf.setFillColor(r, g, b)
+        pdf.rect(0, 0, pageW, 14, 'F')
+        pdf.setTextColor(255, 255, 255); pdf.setFontSize(11); pdf.setFont('helvetica', 'bold')
+        pdf.text(room.name, margin, 9)
+        pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(230, 230, 230)
+        pdf.text(ROOM_LABELS[room.room_type] || room.room_type, pageW - margin, 9, { align: 'right' })
+
+        let currentY = 20
+
+        for (const rack of roomRacks) {
+          const rItems    = rackItemsData.filter(i => i.rack_id === rack.id)
+          const isUBased  = RACK_HAS_U[rack.rack_type] !== false
+          const rackLabel = RACK_LABELS[rack.rack_type] || rack.rack_type
+
+          // Rack subheader
+          pdf.setFillColor(26, 45, 69)
+          pdf.rect(margin - 2, currentY - 2, pageW - margin * 2 + 4, 9, 'F')
+          pdf.setTextColor(200, 98, 42); pdf.setFontSize(9); pdf.setFont('helvetica', 'bold')
+          pdf.text(rack.name, margin, currentY + 4)
+          pdf.setTextColor(138, 154, 176); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8)
+          const rackMeta = `${rackLabel}${rack.total_u ? ` · ${rack.total_u}U` : ''}`
+          pdf.text(rackMeta, pageW - margin, currentY + 4, { align: 'right' })
+          currentY += 12
+
+          if (rItems.length === 0) {
+            pdf.setTextColor(150, 150, 150); pdf.setFontSize(8); pdf.setFont('helvetica', 'italic')
+            pdf.text('(empty)', margin, currentY + 3)
+            currentY += 10
+            continue
+          }
+
+          const head = isUBased
+            ? [['U', 'Label / Device', 'Category', 'Manufacturer', 'Part Number', 'Qty', 'Notes']]
+            : [['#', 'Label / Device', 'Category', 'Manufacturer', 'Part Number', 'Qty', 'Notes']]
+
+          const body = rItems.map((item, idx) => {
+            const gp = item.global_products
+            const uLabel = isUBased
+              ? (item.u_size > 1 ? `${item.u_start}–${item.u_start + item.u_size - 1}` : String(item.u_start))
+              : String(idx + 1)
+            return [
+              uLabel,
+              item.label || gp?.name || item.model || '—',
+              item.category || gp?.category || '—',
+              item.manufacturer || gp?.manufacturer || '—',
+              item.part_number || gp?.part_number || '—',
+              String(item.quantity || 1),
+              item.notes || '',
+            ]
+          })
+
+          autoTable(pdf, {
+            startY: currentY,
+            margin: { left: margin, right: margin },
+            head,
+            body,
+            theme: 'grid',
+            styles:     { fontSize: 7.5, cellPadding: 2, textColor: [40, 40, 40], fillColor: [255, 255, 255], lineColor: [200, 200, 200] },
+            headStyles: { fillColor: [26, 45, 69], textColor: [200, 98, 42], fontStyle: 'bold', fontSize: 7.5 },
+            alternateRowStyles: { fillColor: [245, 247, 250] },
+            columnStyles: {
+              0: { cellWidth: isUBased ? 14 : 10 },
+              5: { cellWidth: 10, halign: 'center' },
+              6: { cellWidth: 28 },
+            },
+          })
+
+          currentY = pdf.lastAutoTable.finalY + 10
+
+          if (currentY > pageH - 25) {
+            pdf.addPage()
+            pdf.setFillColor(255, 255, 255)
+            pdf.rect(0, 0, pageW, pageH, 'F')
+            currentY = margin
+          }
+        }
+      }
+
+      // Page footers
+      const total = pdf.internal.getNumberOfPages()
+      for (let i = 1; i <= total; i++) {
+        pdf.setPage(i)
+        pdf.setFontSize(7); pdf.setTextColor(138, 154, 176); pdf.setFont('helvetica', 'normal')
+        pdf.text(
+          `${orgProfile?.company_name || ''} · ${proposal?.proposal_name || ''} · Rack Schedule · Page ${i} of ${total}`,
+          pageW / 2, pageH - 6, { align: 'center' }
+        )
+      }
+
+      pdf.save(`${proposal?.proposal_name || 'Drawing'}_Rack_Schedule.pdf`)
+    } catch (err) {
+      console.error('Rack schedule failed:', err)
+      alert('PDF generation failed: ' + err.message)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   const exports = [
     {
       id:          'client',
@@ -1058,6 +1238,14 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       description: 'Spreadsheet export of all devices, components, cable footage, and vertical rises.',
       icon:        '📊',
       action:      handleCSVExport,
+    },
+    {
+      id:          'racks',
+      label:       'Rack Schedule',
+      description: `Room-by-room rack diagram schedule with U positions, device labels, part numbers, and notes. ${rooms.length} room${rooms.length !== 1 ? 's' : ''}, ${rackItemsData.length} device${rackItemsData.length !== 1 ? 's' : ''}.`,
+      icon:        '🗄️',
+      action:      handleRackSchedule,
+      disabled:    rooms.length === 0,
     },
   ]
 
@@ -1102,9 +1290,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             </div>
             <button
               onClick={exp.action}
-              disabled={generating || sheets.length === 0}
+              disabled={generating || (exp.disabled ?? sheets.length === 0)}
               className={`flex-shrink-0 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                generating || sheets.length === 0
+                generating || (exp.disabled ?? sheets.length === 0)
                   ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
                   : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
               }`}>

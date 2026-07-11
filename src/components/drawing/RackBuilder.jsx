@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../../supabase'
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -603,177 +603,265 @@ function WallMountList({ rack, items, selectedItemId, onAddItem, onItemClick, on
 
 // ─── Item Detail Panel ────────────────────────────────────────────────────────
 
-const CATEGORIES = [
+const RACK_ITEM_CATEGORIES = [
   'Access Reader', 'Access Control Door', 'Controller', 'Wireless Lock', 'Door Contact', 'Motion Sensor', 'PIR Detector',
   'Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Turret Camera', 'Fisheye Camera', 'LPR Camera', 'NVR', 'Video Encoder', 'Cabinet System', 'Cabinet Solar System',
   'FACP', 'Smoke Detector', 'Heat Detector', 'Pull Station', 'Horn Strobe', 'Horn', 'Bell', 'Strobe', 'CO Detector', 'Beam Detector', 'Annunciator', 'Monitor Module', 'Control Module', 'Duct Detector', 'Air Sampling', 'Suppression Panel',
-  'Network', 'UPS', 'Power Supply', 'Panel', 'Rack', 'Server',
-  'Display', 'Ceiling Speaker', 'Speaker', 'Subwoofer', 'AV Receiver', 'Projector', 'Media Player', 'Control Processor', 'Touch Panel',
+  'Network', 'UPS', 'Power Supply', 'PDU', 'Panel', 'Rack', 'Server', 'Patch Panel', 'Fiber Panel',
+  'Display', 'Ceiling Speaker', 'Speaker', 'Subwoofer', 'AV Receiver', 'Projector', 'Media Player', 'Control Processor', 'Touch Panel', 'DSP Amplifier',
   'Other',
 ]
 
-function DetailField({ label, children }) {
-  return (
-    <div>
-      <label className="block text-xs mb-1" style={{ color: '#4a6080' }}>{label}</label>
-      {children}
-    </div>
-  )
-}
+const POWER_CATEGORIES = ['UPS', 'PDU', 'Power Supply', 'Panel', 'NVR', 'Network', 'Server']
 
-function DetailInput({ value, onChange, onBlur, placeholder = '', type = 'text' }) {
-  return (
-    <input
-      type={type}
-      value={value}
-      onChange={onChange}
-      onBlur={onBlur}
-      placeholder={placeholder}
-      className="w-full text-xs rounded-lg px-3 py-2 focus:outline-none"
-      style={{ background: '#0a1220', border: '1px solid #1e3048', color: '#fff' }}
-    />
-  )
+const ic = "w-full text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]"
+const icStyle = { background: '#0a1220', border: '1px solid #1e3048', color: '#fff' }
+const lc = "text-xs mb-1 block"
+const lcStyle = { color: '#8A9AB0' }
+
+function SectionHead({ children }) {
+  return <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#C8622A' }}>{children}</p>
 }
 
 function ItemDetail({ item, allRackItems, rack, sheetPlacements, onUpdate, onDelete, onClose }) {
-  const [form, setForm] = useState({
-    label:           item.label           || '',
-    part_number:     item.part_number     || item.model || '',
-    manufacturer:    item.manufacturer    || '',
-    category:        item.category        || '',
-    u_size:          item.u_size          ?? 1,
-    quantity:        item.quantity        ?? 1,
-    power_source_id: item.power_source_id || '',
+  const getInitialForm = (i) => ({
+    label:             i.label             || '',
+    description:       i.description       || '',
+    category:          i.category          || '',
+    manufacturer:      i.manufacturer      || '',
+    part_number:       i.part_number       || i.model || '',
+    u_size:            i.u_size            ?? 1,
+    quantity:          i.quantity          ?? 1,
+    watts_draw:        i.watts_draw        || '',
+    power_source_id:   i.power_source_id   || '',
+    notes:             i.notes             || '',
+    serial_number:     i.serial_number     || '',
+    ip_address:        i.ip_address        || '',
+    mac_address:       i.mac_address       || '',
+    switch_name:       i.switch_name       || '',
+    switch_port:       i.switch_port       || '',
+    patch_panel_label: i.patch_panel_label || '',
   })
 
+  const [form, setForm] = useState(() => getInitialForm(item))
+  const [saved, setSaved] = useState(false)
+  const [showAsBuilt, setShowAsBuilt] = useState(false)
+  const saveTimer = useRef(null)
+  const formRef   = useRef(form)
+  useEffect(() => { formRef.current = form }, [form])
+
   useEffect(() => {
-    setForm({
-      label:           item.label           || '',
-      part_number:     item.part_number     || item.model || '',
-      manufacturer:    item.manufacturer    || '',
-      category:        item.category        || '',
-      u_size:          item.u_size          ?? 1,
-      quantity:        item.quantity        ?? 1,
-      power_source_id: item.power_source_id || '',
-    })
+    setForm(getInitialForm(item))
+    setSaved(false)
   }, [item.id])
 
-  const save = (patch) => onUpdate(item.id, patch)
+  const update = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      const f = formRef.current
+      await onUpdate(item.id, {
+        label:             f.label             || null,
+        description:       f.description       || null,
+        category:          f.category          || null,
+        manufacturer:      f.manufacturer      || null,
+        part_number:       f.part_number       || null,
+        model:             f.part_number       || null,
+        quantity:          parseInt(f.quantity) || 1,
+        u_size:            parseInt(f.u_size)   || 1,
+        watts_draw:        f.watts_draw ? parseFloat(f.watts_draw) : null,
+        power_source_id:   f.power_source_id   || null,
+        notes:             f.notes             || null,
+        serial_number:     f.serial_number     || null,
+        ip_address:        f.ip_address        || null,
+        mac_address:       f.mac_address       || null,
+        switch_name:       f.switch_name       || null,
+        switch_port:       f.switch_port       || null,
+        patch_panel_label: f.patch_panel_label || null,
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 1500)
+    }, 600)
+  }
 
+  const isUBased = rack && rackHasU(rack)
+  const s = getCatStyle(form.category)
+
+  const isPowerSource = POWER_CATEGORIES.some(c => (form.category || '').toLowerCase().includes(c.toLowerCase()))
   const powerCandidates = allRackItems.filter(i =>
     i.id !== item.id &&
-    /ups|pdu|power supply|panel|battery/i.test(i.category || i.label || '')
+    POWER_CATEGORIES.some(c => (i.category || i.label || '').toLowerCase().includes(c.toLowerCase()))
   )
+  // devices that list this item as their power source
+  const poweredDevices = allRackItems.filter(i => i.id !== item.id && i.power_source_id === item.id)
 
-  const s = getCatStyle(form.category)
-  const isUBased = rack && rackHasU(rack)
+  const totalDrawnWatts = poweredDevices.reduce((sum, d) => sum + (d.watts_draw || 0), 0)
+  const supplyWatts = parseFloat(form.watts_draw) || 0
 
   return (
     <div
-      className="flex-shrink-0 flex flex-col border-l overflow-y-auto"
-      style={{ width: 288, borderColor: '#162030', background: '#0d1927' }}
+      className="flex-shrink-0 flex flex-col border-l overflow-hidden"
+      style={{ width: 292, borderColor: '#162030', background: '#0d1927' }}
       onClick={e => e.stopPropagation()}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: '#162030' }}>
         <div className="flex items-center gap-2 min-w-0">
           <div style={{ width: 3, height: 20, background: s.bar, borderRadius: 2, flexShrink: 0 }} />
-          <span className="text-white font-bold text-sm truncate">{form.label || 'Unnamed Device'}</span>
+          <span className="text-white font-bold text-sm truncate">{form.label || form.description || 'Unnamed Device'}</span>
         </div>
-        <button onClick={onClose} className="text-xs hover:text-white transition-colors flex-shrink-0 ml-2" style={{ color: '#4a6080' }}>✕</button>
+        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+          <span className={`text-xs transition-opacity ${saved ? 'opacity-100' : 'opacity-0'}`} style={{ color: '#22c55e' }}>✓ Saved</span>
+          <button onClick={onClose} className="text-xs hover:text-white transition-colors" style={{ color: '#4a6080' }}>✕</button>
+        </div>
       </div>
 
-      {/* Fields */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Scrollable fields */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
 
-        <DetailField label="Name / Label">
-          <DetailInput
-            value={form.label}
-            placeholder="e.g. Core Switch, NVR-1, Main UPS"
-            onChange={e => setForm(p => ({ ...p, label: e.target.value }))}
-            onBlur={() => save({ label: form.label || null })}
-          />
-        </DetailField>
-
-        <DetailField label="Category">
-          <select
-            value={form.category}
-            onChange={e => { setForm(p => ({ ...p, category: e.target.value })); save({ category: e.target.value }) }}
-            className="w-full text-xs rounded-lg px-3 py-2 focus:outline-none"
-            style={{ background: '#0a1220', border: '1px solid #1e3048', color: form.category ? '#fff' : '#8A9AB0' }}
-          >
-            <option value="">— Select category —</option>
-            {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </DetailField>
-
-        <DetailField label="Manufacturer">
-          <DetailInput
-            value={form.manufacturer}
-            placeholder="e.g. Cisco, Hikvision, Bosch"
-            onChange={e => setForm(p => ({ ...p, manufacturer: e.target.value }))}
-            onBlur={() => save({ manufacturer: form.manufacturer || null })}
-          />
-        </DetailField>
-
-        <DetailField label="Part Number / Model">
-          <DetailInput
-            value={form.part_number}
-            placeholder="e.g. C9200-24P"
-            onChange={e => setForm(p => ({ ...p, part_number: e.target.value }))}
-            onBlur={() => save({ part_number: form.part_number || null, model: form.part_number || null })}
-          />
-        </DetailField>
-
-        <div className="flex gap-3">
-          {isUBased && (
-            <DetailField label="U Size">
-              <select
-                value={form.u_size}
-                onChange={e => { const v = +e.target.value; setForm(p => ({ ...p, u_size: v })); save({ u_size: v }) }}
-                className="w-full text-xs rounded-lg px-3 py-2 focus:outline-none"
-                style={{ background: '#0a1220', border: '1px solid #1e3048', color: '#fff' }}
-              >
-                {[1,2,3,4,6,8,10,12,16,20].map(u => <option key={u} value={u}>{u}U</option>)}
+        {/* ── Device Data ── */}
+        <div>
+          <SectionHead>Device Data</SectionHead>
+          <div className="space-y-2">
+            <div>
+              <label className={lc} style={lcStyle}>Device Address / Label</label>
+              <input className={ic} style={icStyle}
+                value={form.label} placeholder="e.g. SW-01, NVR-MDF, UPS-1"
+                onChange={e => update('label', e.target.value)} />
+            </div>
+            <div>
+              <label className={lc} style={lcStyle}>Part Number</label>
+              <input className={ic} style={icStyle}
+                value={form.part_number} placeholder="e.g. C9200-24P-E"
+                onChange={e => update('part_number', e.target.value)} />
+            </div>
+            <div>
+              <label className={lc} style={lcStyle}>Manufacturer</label>
+              <input className={ic} style={icStyle}
+                value={form.manufacturer} placeholder="e.g. Cisco, Ubiquiti"
+                onChange={e => update('manufacturer', e.target.value)} />
+            </div>
+            <div>
+              <label className={lc} style={lcStyle}>Description</label>
+              <input className={ic} style={icStyle}
+                value={form.description} placeholder="e.g. 24-port PoE+ Managed Switch"
+                onChange={e => update('description', e.target.value)} />
+            </div>
+            <div>
+              <label className={lc} style={lcStyle}>Category</label>
+              <select className={ic} style={{ ...icStyle, color: form.category ? '#fff' : '#4a5a6a' }}
+                value={form.category} onChange={e => update('category', e.target.value)}>
+                <option value="">— Select category —</option>
+                {RACK_ITEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-            </DetailField>
-          )}
-          <DetailField label="Qty (BOM)">
-            <input
-              type="number"
-              min={1}
-              value={form.quantity}
-              onChange={e => { const v = Math.max(1, +e.target.value); setForm(p => ({ ...p, quantity: v })); save({ quantity: v }) }}
-              className="w-full text-xs rounded-lg px-3 py-2 focus:outline-none"
-              style={{ background: '#0a1220', border: '1px solid #1e3048', color: '#fff' }}
-            />
-          </DetailField>
+            </div>
+            <div className="flex gap-2">
+              {isUBased && (
+                <div className="flex-1">
+                  <label className={lc} style={lcStyle}>U Size</label>
+                  <select className={ic} style={icStyle}
+                    value={form.u_size} onChange={e => update('u_size', +e.target.value)}>
+                    {[1,2,3,4,6,8,10,12,14,16,20].map(u => <option key={u} value={u}>{u}U</option>)}
+                  </select>
+                </div>
+              )}
+              <div className="flex-1">
+                <label className={lc} style={lcStyle}>Qty (BOM)</label>
+                <input type="number" min={1} className={`${ic} w-20`} style={icStyle}
+                  value={form.quantity} onChange={e => update('quantity', Math.max(1, +e.target.value))} />
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Power source */}
-        <DetailField label="Powered By">
-          <select
-            value={form.power_source_id}
-            onChange={e => { setForm(p => ({ ...p, power_source_id: e.target.value })); save({ power_source_id: e.target.value || null }) }}
-            className="w-full text-xs rounded-lg px-3 py-2 focus:outline-none"
-            style={{ background: '#0a1220', border: '1px solid #1e3048', color: form.power_source_id ? '#fff' : '#8A9AB0' }}
-          >
-            <option value="">None / Unknown</option>
-            {powerCandidates.map(c => (
-              <option key={c.id} value={c.id}>{c.label || c.model || c.global_products?.name || 'Power Device'}</option>
-            ))}
-            {powerCandidates.length === 0 && allRackItems.filter(i => i.id !== item.id).map(c => (
-              <option key={c.id} value={c.id}>{c.label || c.model || c.global_products?.name || 'Device'}</option>
-            ))}
-          </select>
-          {powerCandidates.length === 0 && (
-            <p className="text-xs mt-1" style={{ color: '#2a4060' }}>Add a UPS/PDU to this rack to see power source options</p>
+        {/* ── Power ── */}
+        <div className="border-t pt-3" style={{ borderColor: '#1e3048' }}>
+          {isPowerSource ? (
+            <>
+              <SectionHead>Power Supply</SectionHead>
+              <div className="space-y-2">
+                <div>
+                  <label className={lc} style={lcStyle}>Supply Capacity (W)</label>
+                  <input type="number" step="1" min="0" className={`${ic} w-28`} style={icStyle}
+                    value={form.watts_draw} placeholder="e.g. 1500"
+                    onChange={e => update('watts_draw', e.target.value)} />
+                </div>
+                {supplyWatts > 0 && (
+                  <>
+                    <div className="flex justify-between text-xs">
+                      <span style={{ color: '#8A9AB0' }}>Devices draw</span>
+                      <span className="font-mono font-semibold" style={{ color: totalDrawnWatts > supplyWatts ? '#ef4444' : totalDrawnWatts / supplyWatts >= 0.8 ? '#f59e0b' : '#22c55e' }}>
+                        {totalDrawnWatts.toFixed(1)}W / {supplyWatts}W
+                      </span>
+                    </div>
+                    <div className="w-full rounded-full h-1.5" style={{ background: '#1e3048' }}>
+                      <div className="h-1.5 rounded-full transition-all"
+                        style={{ width: `${Math.min(100, (totalDrawnWatts / supplyWatts) * 100)}%`, background: totalDrawnWatts > supplyWatts ? '#ef4444' : totalDrawnWatts / supplyWatts >= 0.8 ? '#f59e0b' : '#22c55e' }} />
+                    </div>
+                    <p className="text-xs text-right" style={{ color: '#4a5a6a' }}>{(supplyWatts - totalDrawnWatts).toFixed(1)}W available</p>
+                  </>
+                )}
+                {poweredDevices.length > 0 && (
+                  <div className="rounded-lg overflow-hidden" style={{ border: '1px solid #1e3048' }}>
+                    {poweredDevices.map(d => (
+                      <div key={d.id} className="flex justify-between px-2.5 py-1.5 text-xs" style={{ borderBottom: '1px solid #1e3048' }}>
+                        <span className="truncate" style={{ color: '#8A9AB0' }}>{d.label || d.global_products?.name || 'Device'}</span>
+                        <span className="font-mono ml-2 flex-shrink-0" style={{ color: '#f59e0b' }}>{d.watts_draw || 0}W</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {poweredDevices.length === 0 && (
+                  <p className="text-xs" style={{ color: '#2a4060' }}>No devices assigned — open a device and set "Powered By" to this item.</p>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <SectionHead>Power Draw</SectionHead>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span style={{ color: '#8A9AB0' }}>This device draws</span>
+                  <span className="font-mono font-semibold" style={{ color: '#f59e0b' }}>
+                    {form.watts_draw ? `${form.watts_draw}W` : '—'}
+                  </span>
+                </div>
+                <div>
+                  <label className={lc} style={lcStyle}>Watts draw</label>
+                  <input type="number" step="0.1" min="0" className={`${ic} w-28`} style={icStyle}
+                    value={form.watts_draw} placeholder="e.g. 7.5"
+                    onChange={e => update('watts_draw', e.target.value)} />
+                </div>
+                <div>
+                  <label className={lc} style={lcStyle}>Powered By</label>
+                  <select className={ic} style={{ ...icStyle, color: form.power_source_id ? '#fff' : '#4a5a6a' }}
+                    value={form.power_source_id} onChange={e => update('power_source_id', e.target.value || null)}>
+                    <option value="">— Not assigned —</option>
+                    {(powerCandidates.length > 0 ? powerCandidates : allRackItems.filter(i => i.id !== item.id)).map(c => (
+                      <option key={c.id} value={c.id}>{c.label || c.global_products?.name || c.model || 'Device'}</option>
+                    ))}
+                  </select>
+                  {powerCandidates.length === 0 && (
+                    <p className="text-xs mt-1" style={{ color: '#2a4060' }}>Add a UPS/PDU to this rack for power source options.</p>
+                  )}
+                </div>
+              </div>
+            </>
           )}
-        </DetailField>
+        </div>
 
-        {/* Linked canvas placements */}
-        {sheetPlacements.length > 0 && (
-          <DetailField label="Linked Floor Plan Devices">
+        {/* ── Notes ── */}
+        <div className="border-t pt-3" style={{ borderColor: '#1e3048' }}>
+          <label className={lc} style={lcStyle}>Notes</label>
+          <textarea className={`${ic} resize-none`} style={icStyle}
+            rows={2} value={form.notes} placeholder="e.g. Mount at top of rack, needs short patch cables"
+            onChange={e => update('notes', e.target.value)} />
+        </div>
+
+        {/* ── Linked canvas placements ── */}
+        {sheetPlacements.length > 0 && (item.connected_placement_ids || []).length > 0 && (
+          <div className="border-t pt-3" style={{ borderColor: '#1e3048' }}>
+            <SectionHead>Linked Floor Plan Devices</SectionHead>
             <div className="space-y-1">
               {(item.connected_placement_ids || []).map(pid => {
                 const p = sheetPlacements.find(x => x.id === pid)
@@ -783,24 +871,69 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, onUpdate, onDel
                     <button
                       onClick={() => {
                         const next = (item.connected_placement_ids || []).filter(x => x !== pid)
-                        save({ connected_placement_ids: next })
+                        onUpdate(item.id, { connected_placement_ids: next })
                       }}
                       className="ml-2 hover:text-red-400 flex-shrink-0" style={{ color: '#2a4060' }}
                     >✕</button>
                   </div>
                 ) : null
               })}
-              <p className="text-xs" style={{ color: '#2a4060' }}>Link floor plan devices to track which are served by this rack item.</p>
             </div>
-          </DetailField>
+          </div>
         )}
+
+        {/* ── As-Built Data ── */}
+        <div className="border-t pt-3" style={{ borderColor: '#1e3048' }}>
+          <button onClick={() => setShowAsBuilt(s => !s)} className="flex items-center justify-between w-full text-left mb-2">
+            <SectionHead>As-Built Data</SectionHead>
+            <svg className={`w-3 h-3 transition-transform flex-shrink-0 -mt-1`} style={{ color: '#8A9AB0', transform: showAsBuilt ? 'rotate(180deg)' : 'rotate(0deg)' }}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+            </svg>
+          </button>
+          {showAsBuilt && (
+            <div className="space-y-2">
+              <div>
+                <label className={lc} style={lcStyle}>Serial Number</label>
+                <input className={ic} style={icStyle} value={form.serial_number} placeholder="Device serial number"
+                  onChange={e => update('serial_number', e.target.value)} />
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>IP Address</label>
+                <input className={ic} style={icStyle} value={form.ip_address} placeholder="192.168.1.x"
+                  onChange={e => update('ip_address', e.target.value)} />
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>MAC Address</label>
+                <input className={ic} style={icStyle} value={form.mac_address} placeholder="AA:BB:CC:DD:EE:FF"
+                  onChange={e => update('mac_address', e.target.value)} />
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>Switch Name</label>
+                <input className={ic} style={icStyle} value={form.switch_name} placeholder="e.g. SW-IDF1"
+                  onChange={e => update('switch_name', e.target.value)} />
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>Switch Port</label>
+                <input className={ic} style={icStyle} value={form.switch_port} placeholder="e.g. Gi1/0/12"
+                  onChange={e => update('switch_port', e.target.value)} />
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>Patch Panel Label</label>
+                <input className={ic} style={icStyle} value={form.patch_panel_label} placeholder="e.g. PP-A · C01"
+                  onChange={e => update('patch_panel_label', e.target.value)} />
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
 
       {/* Footer */}
-      <div className="px-4 pb-4 pt-2 border-t flex-shrink-0" style={{ borderColor: '#162030' }}>
+      <div className="px-3 py-2 border-t flex-shrink-0 text-center" style={{ borderColor: '#1e3048' }}>
         <button
           onClick={() => onDelete(item.id)}
-          className="w-full text-xs py-2 rounded-lg transition-colors hover:bg-red-900/20"
+          className="w-full text-xs py-1.5 rounded-lg transition-colors hover:bg-red-900/20"
           style={{ color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
         >Remove from rack</button>
       </div>
