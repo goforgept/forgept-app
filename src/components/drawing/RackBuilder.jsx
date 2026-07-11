@@ -287,14 +287,14 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
       {/* ── Right: Rack view + Item detail ── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Scrollable rack area */}
-        <div className="flex-1 overflow-auto" onClick={() => setSelectedItemId(null)}>
+        <div className="flex-1 overflow-auto">
           {!selectedRoom ? (
             <div className="flex flex-col items-center justify-center h-full gap-3">
               <p className="text-sm" style={{ color: '#2a4060' }}>Select or create a room to get started</p>
               <button onClick={() => setAddRoomOpen(true)} className="text-xs font-semibold px-4 py-2 rounded-lg transition-colors" style={{ background: '#C8622A', color: '#fff' }}>+ New Room</button>
             </div>
           ) : (
-            <div className="p-5" onClick={e => e.stopPropagation()}>
+            <div className="p-5">
               {/* Room header */}
               <div className="flex items-center gap-3 mb-5">
                 {(() => { const rt = getRoomType(selectedRoom.room_type); return (
@@ -371,7 +371,7 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
                         items={rackItems(rack.id)}
                         selectedItemId={selectedItemId}
                         onSlotClick={(rackId, uStart) => setPicker({ rackId, uStart, isWallMount: false })}
-                        onItemClick={(id) => setSelectedItemId(p => p === id ? null : id)}
+                        onItemClick={(id) => setSelectedItemId(id)}
                         onDeleteItem={deleteItem}
                         onDeleteRack={deleteRack}
                       />
@@ -382,7 +382,7 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
                         items={rackItems(rack.id)}
                         selectedItemId={selectedItemId}
                         onAddItem={(rackId) => setPicker({ rackId, uStart: null, isWallMount: true })}
-                        onItemClick={(id) => setSelectedItemId(p => p === id ? null : id)}
+                        onItemClick={(id) => setSelectedItemId(id)}
                         onDeleteItem={deleteItem}
                         onDeleteRack={deleteRack}
                       />
