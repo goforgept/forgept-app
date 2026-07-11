@@ -96,23 +96,36 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
         grouped[key].by_floor[p.drawing_sheet_id] = (grouped[key].by_floor[p.drawing_sheet_id] || 0) + p.quantity
       })
 
-      // Load rack items (rooms → racks → rack_items) and merge into BOM
+      // Load rack items, enclosures, and accessories via rooms chain
       const { data: roomsForBOM } = await supabase
-        .from('rooms')
-        .select('id')
-        .eq('proposal_id', proposalId)
+        .from('rooms').select('id').eq('proposal_id', proposalId)
       if (roomsForBOM?.length) {
         const roomIds = roomsForBOM.map(r => r.id)
         const { data: racksForBOM } = await supabase
-          .from('racks')
-          .select('id')
-          .in('room_id', roomIds)
+          .from('racks').select('id, name, part_number, manufacturer, model').in('room_id', roomIds)
         if (racksForBOM?.length) {
           const rackIds = racksForBOM.map(r => r.id)
-          const { data: rackItemsList } = await supabase
-            .from('rack_items')
-            .select('id, label, manufacturer, model, part_number, category, quantity, global_products(id, name, part_number, manufacturer, category)')
-            .in('rack_id', rackIds)
+          const [{ data: rackItemsList }, { data: rackCompsList }] = await Promise.all([
+            supabase.from('rack_items')
+              .select('id, label, manufacturer, model, part_number, category, quantity, global_products(id, name, part_number, manufacturer, category)')
+              .in('rack_id', rackIds),
+            supabase.from('rack_components')
+              .select('id, component_type, name, part_number, manufacturer, quantity')
+              .in('rack_id', rackIds),
+          ])
+          // Rack enclosures (the physical cabinet)
+          racksForBOM.forEach(rack => {
+            if (!rack.part_number) return
+            if (!grouped[rack.part_number]) {
+              grouped[rack.part_number] = {
+                part_number: rack.part_number, model_number: rack.model || null,
+                name: rack.name || 'Rack', manufacturer: rack.manufacturer || '',
+                category: 'Rack', unit_price: null, has_pricing: false, total_qty: 0, by_floor: {},
+              }
+            }
+            grouped[rack.part_number].total_qty += 1
+          })
+          // Devices in U slots
           ;(rackItemsList || []).forEach(ri => {
             const gp = ri.global_products
             const partNumber   = ri.part_number || gp?.part_number || `ri-${ri.id}`
@@ -121,18 +134,24 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
             const category     = ri.category || gp?.category || 'Rack Equipment'
             if (!grouped[partNumber]) {
               grouped[partNumber] = {
-                part_number:  partNumber,
-                model_number: ri.model || null,
-                name,
-                manufacturer,
-                category,
-                unit_price:   null,
-                has_pricing:  false,
-                total_qty:    0,
-                by_floor:     {},
+                part_number: partNumber, model_number: ri.model || null,
+                name, manufacturer, category, unit_price: null, has_pricing: false, total_qty: 0, by_floor: {},
               }
             }
             grouped[partNumber].total_qty += ri.quantity || 1
+          })
+          // Rack accessories (cable management, patch cords, blank panels, etc.)
+          ;(rackCompsList || []).forEach(rc => {
+            const partNumber = rc.part_number || `rc-${rc.id}`
+            const name       = rc.name || rc.component_type || 'Rack Accessory'
+            if (!grouped[partNumber]) {
+              grouped[partNumber] = {
+                part_number: partNumber, model_number: null,
+                name, manufacturer: rc.manufacturer || '', category: rc.component_type || 'Rack Accessory',
+                unit_price: null, has_pricing: false, total_qty: 0, by_floor: {},
+              }
+            }
+            grouped[partNumber].total_qty += rc.quantity || 1
           })
         }
       }

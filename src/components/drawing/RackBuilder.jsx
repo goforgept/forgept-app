@@ -79,6 +79,8 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
   const [addRackFor, setAddRackFor]     = useState(null)
   const [newRack, setNewRack]           = useState({ name: 'Rack 1', rack_type: 'four_post', total_u: 42 })
   const [saving, setSaving]             = useState(false)
+  const [components,     setComponents]     = useState([])
+  const [selectedRackId, setSelectedRackId] = useState(null)
 
   // When lockedRoomId changes (e.g. user clicks a different room marker), update selection
   useEffect(() => { if (lockedRoomId) setSelectedRoomId(lockedRoomId) }, [lockedRoomId])
@@ -100,12 +102,18 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
 
     if (racksData?.length) {
       const rackIds = racksData.map(r => r.id)
-      const { data: itemsData } = await supabase
-        .from('rack_items')
-        .select('*, global_products(name, part_number, manufacturer, category)')
-        .in('rack_id', rackIds)
-        .order('u_start')
+      const [{ data: itemsData }, { data: compsData }] = await Promise.all([
+        supabase.from('rack_items')
+          .select('*, global_products(name, part_number, manufacturer, category)')
+          .in('rack_id', rackIds)
+          .order('u_start'),
+        supabase.from('rack_components')
+          .select('*')
+          .in('rack_id', rackIds)
+          .order('created_at'),
+      ])
       setItems(itemsData || [])
+      setComponents(compsData || [])
     }
   }
 
@@ -158,6 +166,23 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
     await supabase.from('racks').delete().eq('id', id)
     setRacks(prev => prev.filter(r => r.id !== id))
     setItems(prev => prev.filter(i => i.rack_id !== id))
+    setComponents(prev => prev.filter(c => c.rack_id !== id))
+    if (selectedRackId === id) setSelectedRackId(null)
+  }
+
+  const updateRack = async (id, patch) => {
+    await supabase.from('racks').update(patch).eq('id', id)
+    setRacks(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r))
+  }
+
+  const addComponent = async (rackId, data) => {
+    const { data: comp } = await supabase.from('rack_components').insert([{ rack_id: rackId, ...data }]).select().single()
+    if (comp) setComponents(prev => [...prev, comp])
+  }
+
+  const deleteComponent = async (id) => {
+    await supabase.from('rack_components').delete().eq('id', id)
+    setComponents(prev => prev.filter(c => c.id !== id))
   }
 
   const addItem = async (rackId, uStart, product, uSize = 1, customLabel = null) => {
@@ -370,10 +395,12 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
                         rack={rack}
                         items={rackItems(rack.id)}
                         selectedItemId={selectedItemId}
+                        selectedRackId={selectedRackId}
                         onSlotClick={(rackId, uStart) => setPicker({ rackId, uStart, isWallMount: false })}
-                        onItemClick={(id) => setSelectedItemId(id)}
+                        onItemClick={(id) => { setSelectedItemId(id); setSelectedRackId(null) }}
                         onDeleteItem={deleteItem}
                         onDeleteRack={deleteRack}
+                        onOpenSettings={(rackId) => { setSelectedRackId(rackId); setSelectedItemId(null) }}
                       />
                     ) : (
                       <WallMountList
@@ -381,10 +408,12 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
                         rack={rack}
                         items={rackItems(rack.id)}
                         selectedItemId={selectedItemId}
+                        selectedRackId={selectedRackId}
                         onAddItem={(rackId) => setPicker({ rackId, uStart: null, isWallMount: true })}
-                        onItemClick={(id) => setSelectedItemId(id)}
+                        onItemClick={(id) => { setSelectedItemId(id); setSelectedRackId(null) }}
                         onDeleteItem={deleteItem}
                         onDeleteRack={deleteRack}
+                        onOpenSettings={(rackId) => { setSelectedRackId(rackId); setSelectedItemId(null) }}
                       />
                     )
                   )}
@@ -394,8 +423,19 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
           )}
         </div>
 
-        {/* Item detail panel */}
-        {selectedItem && (
+        {/* Rack settings panel OR item detail panel */}
+        {selectedRackId && !selectedItemId ? (
+          <RackSettings
+            key={selectedRackId}
+            rack={racks.find(r => r.id === selectedRackId)}
+            components={components.filter(c => c.rack_id === selectedRackId)}
+            onUpdate={updateRack}
+            onDelete={deleteRack}
+            addComponent={addComponent}
+            deleteComponent={deleteComponent}
+            onClose={() => setSelectedRackId(null)}
+          />
+        ) : selectedItem ? (
           <ItemDetail
             key={selectedItem.id}
             item={selectedItem}
@@ -406,7 +446,7 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
             onDelete={deleteItem}
             onClose={() => setSelectedItemId(null)}
           />
-        )}
+        ) : null}
       </div>
 
       {/* ── Product picker modal ── */}
@@ -426,17 +466,30 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
 
 // ─── U-slot Rack Diagram ───────────────────────────────────────────────────────
 
-function RackDiagram({ rack, items, selectedItemId, onSlotClick, onItemClick, onDeleteItem, onDeleteRack }) {
+function RackDiagram({ rack, items, selectedItemId, selectedRackId, onSlotClick, onItemClick, onDeleteItem, onDeleteRack, onOpenSettings }) {
   const slotMap = buildSlotMap(items)
   const rt = getRackType(rack.rack_type)
+  const isSettingsOpen = rack.id === selectedRackId
 
   return (
     <div style={{ width: 300, flexShrink: 0 }}>
       {/* Rack header */}
-      <div className="flex items-center gap-2 mb-2 px-0.5">
+      <div className="flex items-center gap-1.5 mb-2 px-0.5">
         <span className="text-white text-sm font-bold truncate flex-1">{rack.name}</span>
+        {rack.part_number && (
+          <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ background: '#162030', color: '#4a6080' }} title={`${rack.manufacturer || ''} ${rack.part_number}`.trim()}>{rack.part_number}</span>
+        )}
         <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: '#162030', color: '#8A9AB0' }}>{rack.total_u}U</span>
-        <span className="text-xs px-1.5 py-0.5 rounded truncate max-w-[90px]" style={{ background: '#162030', color: '#8A9AB0' }}>{rt.label}</span>
+        <button
+          onClick={() => onOpenSettings(rack.id)}
+          title="Rack settings & accessories"
+          className="flex-shrink-0 hover:text-white transition-colors"
+          style={{ color: isSettingsOpen ? '#C8622A' : '#4a6080' }}
+        >
+          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
         <button onClick={() => onDeleteRack(rack.id)} className="text-xs flex-shrink-0 hover:text-red-400 transition-colors" style={{ color: '#2a4060' }}>✕</button>
       </div>
 
@@ -542,15 +595,29 @@ function RackDiagram({ rack, items, selectedItemId, onSlotClick, onItemClick, on
 
 // ─── Wall Mount / Shelf List ───────────────────────────────────────────────────
 
-function WallMountList({ rack, items, selectedItemId, onAddItem, onItemClick, onDeleteItem, onDeleteRack }) {
+function WallMountList({ rack, items, selectedItemId, selectedRackId, onAddItem, onItemClick, onDeleteItem, onDeleteRack, onOpenSettings }) {
   const rt = getRackType(rack.rack_type)
   const sorted = [...items].sort((a, b) => a.u_start - b.u_start)
+  const isSettingsOpen = rack.id === selectedRackId
 
   return (
     <div style={{ width: 280, flexShrink: 0 }}>
-      <div className="flex items-center gap-2 mb-2 px-0.5">
+      <div className="flex items-center gap-1.5 mb-2 px-0.5">
         <span className="text-white text-sm font-bold truncate flex-1">{rack.name}</span>
+        {rack.part_number && (
+          <span className="text-xs font-mono px-1.5 py-0.5 rounded" style={{ background: '#162030', color: '#4a6080' }}>{rack.part_number}</span>
+        )}
         <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: '#162030', color: '#8A9AB0' }}>{rt.label}</span>
+        <button
+          onClick={() => onOpenSettings(rack.id)}
+          title="Rack settings & accessories"
+          className="flex-shrink-0 hover:text-white transition-colors"
+          style={{ color: isSettingsOpen ? '#C8622A' : '#4a6080' }}
+        >
+          <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
         <button onClick={() => onDeleteRack(rack.id)} className="text-xs flex-shrink-0 hover:text-red-400 transition-colors" style={{ color: '#2a4060' }}>✕</button>
       </div>
 
@@ -936,6 +1003,255 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, onUpdate, onDel
           className="w-full text-xs py-1.5 rounded-lg transition-colors hover:bg-red-900/20"
           style={{ color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
         >Remove from rack</button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Rack Settings Panel ──────────────────────────────────────────────────────
+
+const COMPONENT_TYPES = [
+  'Cable Management', 'Blank Panel', 'Patch Cord', 'Brush Panel',
+  'PDU Strip', 'Keyboard Tray', 'KVM', 'Shelf', 'Airflow Panel',
+  'Cable Tie / Velcro', 'Label Strip', 'Other',
+]
+
+function RackSettings({ rack, components, onUpdate, onDelete, addComponent, deleteComponent, onClose }) {
+  const [form, setForm] = useState({
+    name:         rack.name         || '',
+    rack_type:    rack.rack_type    || 'four_post',
+    total_u:      rack.total_u      || 42,
+    manufacturer: rack.manufacturer || '',
+    model:        rack.model        || '',
+    part_number:  rack.part_number  || '',
+  })
+  const [saved,       setSaved]       = useState(false)
+  const [showAddComp, setShowAddComp] = useState(false)
+  const [newComp,     setNewComp]     = useState({ component_type: 'Cable Management', name: '', part_number: '', manufacturer: '', quantity: 1, notes: '' })
+  const [addingComp,  setAddingComp]  = useState(false)
+  const saveTimer = useRef(null)
+  const formRef   = useRef(form)
+  useEffect(() => { formRef.current = form }, [form])
+
+  const update = (field, value) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+    if (saveTimer.current) clearTimeout(saveTimer.current)
+    saveTimer.current = setTimeout(async () => {
+      const f = formRef.current
+      const isU = getRackType(f.rack_type).hasU
+      await onUpdate(rack.id, {
+        name:         f.name         || rack.name,
+        rack_type:    f.rack_type,
+        total_u:      isU ? (parseInt(f.total_u) || 42) : 0,
+        manufacturer: f.manufacturer || null,
+        model:        f.model        || null,
+        part_number:  f.part_number  || null,
+      })
+      setSaved(true)
+      setTimeout(() => setSaved(false), 1500)
+    }, 600)
+  }
+
+  const handleAddComp = async () => {
+    if (!newComp.name.trim() && !newComp.component_type) return
+    setAddingComp(true)
+    await addComponent(rack.id, {
+      component_type: newComp.component_type,
+      name:           newComp.name.trim() || newComp.component_type,
+      part_number:    newComp.part_number.trim()    || null,
+      manufacturer:   newComp.manufacturer.trim()   || null,
+      quantity:       parseInt(newComp.quantity)     || 1,
+      notes:          newComp.notes.trim()           || null,
+    })
+    setNewComp({ component_type: 'Cable Management', name: '', part_number: '', manufacturer: '', quantity: 1, notes: '' })
+    setShowAddComp(false)
+    setAddingComp(false)
+  }
+
+  return (
+    <div
+      className="flex-shrink-0 flex flex-col border-l overflow-hidden"
+      style={{ width: 292, borderColor: '#162030', background: '#0d1927' }}
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0" style={{ borderColor: '#162030' }}>
+        <div className="flex items-center gap-2 min-w-0">
+          <div style={{ width: 3, height: 20, background: '#C8622A', borderRadius: 2, flexShrink: 0 }} />
+          <span className="text-white font-bold text-sm truncate">Rack Settings</span>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+          <span className={`text-xs transition-opacity ${saved ? 'opacity-100' : 'opacity-0'}`} style={{ color: '#22c55e' }}>✓ Saved</span>
+          <button onClick={onClose} className="text-xs hover:text-white transition-colors" style={{ color: '#4a6080' }}>✕</button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+
+        {/* ── Rack Details ── */}
+        <div>
+          <SectionHead>Rack Details</SectionHead>
+          <div className="space-y-2">
+            <div>
+              <label className={lc} style={lcStyle}>Name</label>
+              <input className={ic} style={icStyle}
+                value={form.name} placeholder="e.g. MDF-R1, IDF-Rack-A"
+                onChange={e => update('name', e.target.value)} />
+            </div>
+            <div>
+              <label className={lc} style={lcStyle}>Type</label>
+              <select className={ic} style={icStyle}
+                value={form.rack_type} onChange={e => update('rack_type', e.target.value)}>
+                {RACK_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            {getRackType(form.rack_type).hasU && (
+              <div>
+                <label className={lc} style={lcStyle}>Total U</label>
+                <select className={ic} style={icStyle}
+                  value={form.total_u} onChange={e => update('total_u', +e.target.value)}>
+                  {U_OPTIONS.map(u => <option key={u} value={u}>{u}U</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Enclosure / Cabinet ── */}
+        <div className="border-t pt-3" style={{ borderColor: '#1e3048' }}>
+          <SectionHead>Enclosure / Cabinet</SectionHead>
+          <div className="space-y-2">
+            <div>
+              <label className={lc} style={lcStyle}>Manufacturer</label>
+              <input className={ic} style={icStyle}
+                value={form.manufacturer} placeholder="e.g. Chatsworth, Tripp Lite, StarTech"
+                onChange={e => update('manufacturer', e.target.value)} />
+            </div>
+            <div>
+              <label className={lc} style={lcStyle}>Model</label>
+              <input className={ic} style={icStyle}
+                value={form.model} placeholder="e.g. SR42UBMD"
+                onChange={e => update('model', e.target.value)} />
+            </div>
+            <div>
+              <label className={lc} style={lcStyle}>Part Number</label>
+              <input className={ic} style={icStyle}
+                value={form.part_number} placeholder="e.g. 12129-715"
+                onChange={e => update('part_number', e.target.value)} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Accessories & Components ── */}
+        <div className="border-t pt-3" style={{ borderColor: '#1e3048' }}>
+          <div className="flex items-center justify-between mb-2">
+            <SectionHead>Accessories & Components</SectionHead>
+            <button
+              onClick={() => setShowAddComp(s => !s)}
+              className="text-xs font-semibold transition-colors"
+              style={{ color: showAddComp ? '#C8622A' : '#4a6080' }}
+            >+ Add</button>
+          </div>
+
+          {components.length === 0 && !showAddComp && (
+            <p className="text-xs" style={{ color: '#2a4060' }}>No accessories yet. Add cable management, patch cords, blank panels, etc.</p>
+          )}
+
+          <div className="space-y-1.5">
+            {components.map(c => (
+              <div key={c.id} className="group flex items-start gap-2 rounded-lg px-2.5 py-2"
+                style={{ background: '#0a1220', border: '1px solid #1e3048' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold" style={{ color: '#fff' }}>{c.name || c.component_type}</span>
+                    {c.quantity > 1 && <span className="text-xs font-mono font-bold" style={{ color: '#C8622A' }}>×{c.quantity}</span>}
+                  </div>
+                  <div className="flex flex-wrap gap-x-2 mt-0.5">
+                    <span className="text-xs px-1 rounded" style={{ background: '#162030', color: '#4a6080' }}>{c.component_type}</span>
+                    {c.part_number && <span className="text-xs font-mono" style={{ color: '#4a6080' }}>{c.part_number}</span>}
+                    {c.manufacturer && <span className="text-xs" style={{ color: '#4a6080' }}>{c.manufacturer}</span>}
+                  </div>
+                  {c.notes && <p className="text-xs mt-0.5" style={{ color: '#2a4060' }}>{c.notes}</p>}
+                </div>
+                <button
+                  onClick={() => deleteComponent(c.id)}
+                  className="opacity-0 group-hover:opacity-100 text-xs transition-all hover:text-red-400 flex-shrink-0 mt-0.5"
+                  style={{ color: '#2a4060' }}
+                >✕</button>
+              </div>
+            ))}
+          </div>
+
+          {/* Add form */}
+          {showAddComp && (
+            <div className="rounded-xl border p-3 mt-2 space-y-2" style={{ background: '#0a1220', borderColor: '#1e3048' }}>
+              <div>
+                <label className={lc} style={lcStyle}>Type</label>
+                <select className={ic} style={icStyle}
+                  value={newComp.component_type}
+                  onChange={e => setNewComp(p => ({ ...p, component_type: e.target.value }))}>
+                  {COMPONENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>Name / Description</label>
+                <input className={ic} style={icStyle}
+                  autoFocus
+                  value={newComp.name}
+                  placeholder="e.g. 1U Horizontal Cable Manager"
+                  onChange={e => setNewComp(p => ({ ...p, name: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={lc} style={lcStyle}>Part Number</label>
+                  <input className={ic} style={icStyle}
+                    value={newComp.part_number}
+                    onChange={e => setNewComp(p => ({ ...p, part_number: e.target.value }))} />
+                </div>
+                <div>
+                  <label className={lc} style={lcStyle}>Qty</label>
+                  <input type="number" min="1" className={ic} style={icStyle}
+                    value={newComp.quantity}
+                    onChange={e => setNewComp(p => ({ ...p, quantity: +e.target.value }))} />
+                </div>
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>Manufacturer</label>
+                <input className={ic} style={icStyle}
+                  value={newComp.manufacturer}
+                  onChange={e => setNewComp(p => ({ ...p, manufacturer: e.target.value }))} />
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>Notes</label>
+                <input className={ic} style={icStyle}
+                  value={newComp.notes}
+                  onChange={e => setNewComp(p => ({ ...p, notes: e.target.value }))} />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={handleAddComp}
+                  disabled={addingComp || (!newComp.name.trim() && !newComp.component_type)}
+                  className="flex-1 text-xs font-semibold py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                  style={{ background: '#C8622A', color: '#fff' }}
+                >{addingComp ? 'Adding…' : 'Add Accessory'}</button>
+                <button
+                  onClick={() => setShowAddComp(false)}
+                  className="text-xs py-1.5 px-3 rounded-lg transition-colors"
+                  style={{ color: '#4a6080' }}
+                >Cancel</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="px-3 py-2 border-t flex-shrink-0" style={{ borderColor: '#1e3048' }}>
+        <button
+          onClick={() => onDelete(rack.id)}
+          className="w-full text-xs py-1.5 rounded-lg transition-colors hover:bg-red-900/20"
+          style={{ color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}
+        >Delete Rack</button>
       </div>
     </div>
   )

@@ -51,9 +51,10 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [verticalRises, setVerticalRises] = useState([])
   const [components,    setComponents]    = useState([])
   const [orgProfile,    setOrgProfile]    = useState(null)
-  const [rooms,         setRooms]         = useState([])
-  const [rackList,      setRackList]      = useState([])
-  const [rackItemsData, setRackItemsData] = useState([])
+  const [rooms,          setRooms]          = useState([])
+  const [rackList,       setRackList]       = useState([])
+  const [rackItemsData,  setRackItemsData]  = useState([])
+  const [rackComponents, setRackComponents] = useState([])
   const [loading,       setLoading]       = useState(true)
   const [generating,    setGenerating]    = useState(false)
   const [sharing,       setSharing]       = useState(false)
@@ -134,12 +135,19 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           .from('racks').select('*').in('room_id', roomData.map(r => r.id)).order('sort_order,created_at')
         setRackList(rackData || [])
         if (rackData?.length) {
-          const { data: riData } = await supabase
-            .from('rack_items')
-            .select('*, global_products(name, part_number, manufacturer, category)')
-            .in('rack_id', rackData.map(r => r.id))
-            .order('u_start')
+          const rackIds = rackData.map(r => r.id)
+          const [{ data: riData }, { data: rcData }] = await Promise.all([
+            supabase.from('rack_items')
+              .select('*, global_products(name, part_number, manufacturer, category)')
+              .in('rack_id', rackIds)
+              .order('u_start'),
+            supabase.from('rack_components')
+              .select('*')
+              .in('rack_id', rackIds)
+              .order('created_at'),
+          ])
           setRackItemsData(riData || [])
+          setRackComponents(rcData || [])
         }
       }
     } catch (err) {
@@ -1121,7 +1129,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.setTextColor(255, 255, 255); pdf.setFontSize(11); pdf.setFont('helvetica', 'bold')
         pdf.text(room.name, margin, 9)
         pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(230, 230, 230)
-        pdf.text(ROOM_LABELS[room.room_type] || room.room_type, pageW - margin, 9, { align: 'right' })
+        pdf.text(ROOM_LABELS[room.room_type] || room.room_type, pageW - margin, 6, { align: 'right' })
+        pdf.setFontSize(7); pdf.setTextColor(255, 255, 255, 0.8)
+        pdf.text(`${orgProfile?.company_name || ''} · ${proposal?.proposal_name || ''}`, pageW - margin, 11.5, { align: 'right' })
 
         let currentY = 20
 
@@ -1169,7 +1179,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
           autoTable(pdf, {
             startY: currentY,
-            margin: { left: margin, right: margin },
+            margin: { left: margin, right: margin, bottom: 15 },
             head,
             body,
             theme: 'grid',
@@ -1183,9 +1193,37 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             },
           })
 
-          currentY = pdf.lastAutoTable.finalY + 10
+          currentY = pdf.lastAutoTable.finalY + 6
 
-          if (currentY > pageH - 25) {
+          // Accessories for this rack
+          const rComps = rackComponents.filter(c => c.rack_id === rack.id)
+          if (rComps.length > 0) {
+            pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(138, 154, 176)
+            pdf.text('ACCESSORIES & COMPONENTS', margin, currentY + 3)
+            currentY += 7
+            autoTable(pdf, {
+              startY: currentY,
+              margin: { left: margin, right: margin, bottom: 15 },
+              head: [['Type', 'Name / Description', 'Part Number', 'Manufacturer', 'Qty', 'Notes']],
+              body: rComps.map(c => [
+                c.component_type || '—',
+                c.name || '—',
+                c.part_number || '—',
+                c.manufacturer || '—',
+                String(c.quantity || 1),
+                c.notes || '',
+              ]),
+              theme: 'grid',
+              styles:     { fontSize: 7, cellPadding: 1.5, textColor: [60, 80, 100], fillColor: [248, 250, 255], lineColor: [200, 215, 230] },
+              headStyles: { fillColor: [42, 61, 85], textColor: [138, 154, 176], fontStyle: 'bold', fontSize: 7 },
+              columnStyles: { 4: { cellWidth: 10, halign: 'center' }, 5: { cellWidth: 28 } },
+            })
+            currentY = pdf.lastAutoTable.finalY + 10
+          } else {
+            currentY += 4
+          }
+
+          if (currentY > pageH - 35) {
             pdf.addPage()
             pdf.setFillColor(255, 255, 255)
             pdf.rect(0, 0, pageW, pageH, 'F')
@@ -1194,15 +1232,21 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         }
       }
 
-      // Page footers
+      // Page footers — dark title bar on every page
       const total = pdf.internal.getNumberOfPages()
       for (let i = 1; i <= total; i++) {
         pdf.setPage(i)
-        pdf.setFontSize(7); pdf.setTextColor(138, 154, 176); pdf.setFont('helvetica', 'normal')
-        pdf.text(
-          `${orgProfile?.company_name || ''} · ${proposal?.proposal_name || ''} · Rack Schedule · Page ${i} of ${total}`,
-          pageW / 2, pageH - 6, { align: 'center' }
-        )
+        pdf.setFillColor(26, 45, 69)
+        pdf.rect(0, pageH - 10, pageW, 10, 'F')
+        pdf.setDrawColor(42, 61, 85); pdf.setLineWidth(0.3)
+        pdf.line(0, pageH - 10, pageW, pageH - 10)
+        pdf.setFontSize(7); pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(200, 98, 42)
+        pdf.text(orgProfile?.company_name || '', margin, pageH - 4)
+        pdf.setFont('helvetica', 'normal'); pdf.setTextColor(255, 255, 255)
+        pdf.text(proposal?.proposal_name || '', pageW / 2, pageH - 4, { align: 'center' })
+        pdf.setTextColor(138, 154, 176)
+        pdf.text(`Rack Schedule · Page ${i} of ${total}`, pageW - margin, pageH - 4, { align: 'right' })
       }
 
       pdf.save(`${proposal?.proposal_name || 'Drawing'}_Rack_Schedule.pdf`)
