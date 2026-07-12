@@ -194,27 +194,42 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     loadFloorPlan()
   }, [sheet?.storage_path])
 
+  const [loadStep, setLoadStep] = useState('')
+
   const loadFloorPlan = async () => {
     setLoading(true)
     setError(null)
-    try {
+    setLoadStep('Connecting…')
+
+    const run = async () => {
+      setLoadStep('Getting file URL…')
       const { getR2Url } = await import('../../r2')
       const signedUrl = await getR2Url(sheet.storage_path, 3600)
       if (!signedUrl) {
-        setError('Could not load floor plan — file not found. Try re-uploading this sheet.')
-        setLoading(false)
-        return
+        throw new Error('File not found in storage. Try re-uploading this sheet.')
       }
       if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
+        setLoadStep('Loading PDF…')
         await renderPDF(signedUrl, sheet.page_number || 1)
       } else {
+        setLoadStep('Loading image…')
         await loadImageFromUrl(signedUrl)
       }
+    }
+
+    try {
+      await Promise.race([
+        run(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Timed out at step: "${loadStep}" — check your connection and try again.`)), 25000)
+        ),
+      ])
     } catch (err) {
       console.warn('Floor plan load failed:', err)
-      setError(`Floor plan failed to load: ${err.message || 'Unknown error'}. Try refreshing the page.`)
+      setError(`Floor plan failed to load: ${err.message || 'Unknown error'}`)
     } finally {
       setLoading(false)
+      setLoadStep('')
     }
   }
 
@@ -1217,7 +1232,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
               </svg>
-              <span className="text-[#8A9AB0] text-sm">Loading floor plan...</span>
+              <span className="text-[#8A9AB0] text-sm">{loadStep || 'Loading floor plan…'}</span>
             </div>
           </div>
         )}
