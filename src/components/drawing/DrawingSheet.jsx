@@ -200,7 +200,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       const { getR2Url } = await import('../../r2')
       const signedUrl = await getR2Url(sheet.storage_path, 3600)
       if (!signedUrl) {
-        console.warn('Floor plan not found in R2:', sheet.storage_path)
+        setError('Could not load floor plan — file not found. Try re-uploading this sheet.')
         setLoading(false)
         return
       }
@@ -210,31 +210,36 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         await loadImageFromUrl(signedUrl)
       }
     } catch (err) {
-      // Don't show error to user for missing files — just show blank canvas
-      console.warn('Floor plan load failed:', err.message)
+      console.warn('Floor plan load failed:', err)
+      setError(`Floor plan failed to load: ${err.message || 'Unknown error'}. Try refreshing the page.`)
     } finally {
       setLoading(false)
     }
   }
 
   const renderPDF = async (url, pageNum = 1) => {
-   const pdfjsLib = await import('pdfjs-dist')
-    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.min.mjs',
-      import.meta.url
-    ).toString()
-    const pdf      = await pdfjsLib.getDocument(url).promise
+    const pdfjsLib = await import('pdfjs-dist')
+    // Try ES module worker first; fall back to legacy worker for iOS Safari
+    try {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+        'pdfjs-dist/build/pdf.worker.min.mjs',
+        import.meta.url
+      ).toString()
+    } catch {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = ''
+    }
+    const pdf      = await pdfjsLib.getDocument({ url, useWorkerFetch: false }).promise
     const page     = await pdf.getPage(pageNum)
     const viewport = page.getViewport({ scale: 1 })
-    // Render at 3x for retina/zoom quality, cap at 3600px wide
-    const renderScale = Math.min(3, 3600 / viewport.width)
+    // Cap at 4096px on either side — iOS Safari canvas memory limit
+    const maxDim = 4096
+    const renderScale = Math.min(3, 3600 / viewport.width, maxDim / viewport.height)
     const scaled   = page.getViewport({ scale: renderScale })
     const canvas   = document.createElement('canvas')
-    canvas.width   = scaled.width
-    canvas.height  = scaled.height
+    canvas.width   = Math.floor(scaled.width)
+    canvas.height  = Math.floor(scaled.height)
     const ctx = canvas.getContext('2d')
-    // Fill white background before rendering PDF
-    // (prevents dark stage background bleeding through transparent PDF)
+    if (!ctx) throw new Error('Canvas 2D context unavailable — the floor plan may be too large for this device.')
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     await page.render({ canvasContext: ctx, viewport: scaled }).promise
