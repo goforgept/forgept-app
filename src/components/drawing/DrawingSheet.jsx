@@ -583,13 +583,17 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   // ── Pinch zoom ─────────────────────────────────────────────────────────────
   const lastTouchPos = useRef(null)
 
+  const touchPanStarted = useRef(false) // true once finger has moved enough to be a pan (not a tap)
+
   const handleTouchStart = useCallback((e) => {
     const t = e.evt.touches
     if (t.length === 2) {
       lastDist.current = Math.sqrt((t[0].clientX - t[1].clientX) ** 2 + (t[0].clientY - t[1].clientY) ** 2)
       lastTouchPos.current = null
+      touchPanStarted.current = false
     } else if (t.length === 1) {
       lastTouchPos.current = { x: t[0].clientX, y: t[0].clientY }
+      touchPanStarted.current = false
     }
   }, [])
 
@@ -605,9 +609,13 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       lastDist.current = dist
       lastTouchPos.current = null
     } else if (t.length === 1 && lastTouchPos.current) {
-      // Single finger pan
       const dx = t[0].clientX - lastTouchPos.current.x
       const dy = t[0].clientY - lastTouchPos.current.y
+      // Only start panning after moving >6px so stationary taps don't drift the canvas
+      if (!touchPanStarted.current) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
+        touchPanStarted.current = true
+      }
       setPosition(p => ({ x: p.x + dx, y: p.y + dy }))
       lastTouchPos.current = { x: t[0].clientX, y: t[0].clientY }
     }
@@ -616,6 +624,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const handleTouchEnd = useCallback(() => {
     lastDist.current = 0
     lastTouchPos.current = null
+    touchPanStarted.current = false
   }, [])
 
   // ── Canvas dimensions ──────────────────────────────────────────────────────
@@ -653,6 +662,58 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       placement: null,
     }
   }, [placements, position, canvasW, canvasH, scale])
+
+  // ── Finish cable/pathway drawing (double-click on desktop, double-tap on tablet) ──
+  const handleFinishDraw = useCallback(async () => {
+    if (cableMode && activePoints.length >= 2) {
+      let pixels = 0
+      for (let i = 1; i < activePoints.length; i++) {
+        const dx = (activePoints[i].x - activePoints[i-1].x) * imageSize.w
+        const dy = (activePoints[i].y - activePoints[i-1].y) * imageSize.h
+        pixels += Math.sqrt(dx*dx + dy*dy)
+      }
+      const footage = scaleRatio ? Math.round(pixels * scaleRatio) : 0
+      const totalFootage = Math.round(footage * (1 + wasteFactor / 100))
+      const firstPoint = activePoints[0]
+      const lastPoint  = activePoints[activePoints.length - 1]
+      const { data, error } = await supabase.from('cable_runs').insert({
+        org_id:             orgId,
+        drawing_sheet_id:   sheet.id,
+        proposal_id:        sheet.proposal_id,
+        cable_type:         cableType,
+        points:             activePoints,
+        footage,
+        waste_factor:       wasteFactor,
+        total_footage:      totalFootage,
+        from_placement_id:  firstPoint?.placement_id || null,
+        to_placement_id:    lastPoint?.placement_id  || null,
+      }).select().single()
+      if (!error && data) {
+        setCableRuns(prev => [...prev, data])
+        onPlacementChange?.()
+      }
+      setActivePoints([])
+    }
+    if (pathwayMode && activePathwayPoints.length >= 2) {
+      let pwPixels = 0
+      for (let i = 1; i < activePathwayPoints.length; i++) {
+        const dx = (activePathwayPoints[i].x - activePathwayPoints[i-1].x) * imageSize.w
+        const dy = (activePathwayPoints[i].y - activePathwayPoints[i-1].y) * imageSize.h
+        pwPixels += Math.sqrt(dx*dx + dy*dy)
+      }
+      const pwFootage = scaleRatio ? Math.round(pwPixels * scaleRatio) : 0
+      const { data, error } = await supabase.from('drawing_pathways').insert({
+        org_id:           orgId,
+        drawing_sheet_id: sheet.id,
+        pathway_type:     pathwayType,
+        points:           activePathwayPoints,
+        cable_types:      [],
+        total_footage:    pwFootage,
+      }).select().single()
+      if (!error && data) setPathways(prev => [...prev, data])
+      setActivePathwayPoints([])
+    }
+  }, [cableMode, pathwayMode, activePoints, activePathwayPoints, imageSize, scaleRatio, wasteFactor, cableType, pathwayType, orgId, sheet, onPlacementChange])
 
   // ── Click to place ─────────────────────────────────────────────────────────
   const handleStageClick = useCallback(async (e) => {
@@ -1177,61 +1238,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 setContextMenu({ x: pointer.x, y: pointer.y, clientX: rect.left + pointer.x, clientY: rect.top + pointer.y, placement: null })
               }
             }}
-            onDblClick={async () => {
-              // Save cable run
-              if (cableMode && activePoints.length >= 2) {
-                let pixels = 0
-                for (let i = 1; i < activePoints.length; i++) {
-                  const dx = (activePoints[i].x - activePoints[i-1].x) * imageSize.w
-                  const dy = (activePoints[i].y - activePoints[i-1].y) * imageSize.h
-                  pixels += Math.sqrt(dx*dx + dy*dy)
-                }
-                const footage = scaleRatio ? Math.round(pixels * scaleRatio) : 0
-                const totalFootage = Math.round(footage * (1 + wasteFactor / 100))
-                const firstPoint = activePoints[0]
-                const lastPoint  = activePoints[activePoints.length - 1]
-                const { data, error } = await supabase.from('cable_runs').insert({
-                  org_id:             orgId,
-                  drawing_sheet_id:   sheet.id,
-                  proposal_id:        sheet.proposal_id,
-                  cable_type:         cableType,
-                  points:             activePoints,
-                  footage,
-                  waste_factor:       wasteFactor,
-                  total_footage:      totalFootage,
-                  from_placement_id:  firstPoint?.placement_id || null,
-                  to_placement_id:    lastPoint?.placement_id  || null,
-                }).select().single()
-                if (!error && data) {
-                  setCableRuns(prev => [...prev, data])
-                  onPlacementChange?.()
-                }
-                setActivePoints([])
-              }
-
-              // Save pathway
-              if (pathwayMode && activePathwayPoints.length >= 2) {
-                let pwPixels = 0
-                for (let i = 1; i < activePathwayPoints.length; i++) {
-                  const dx = (activePathwayPoints[i].x - activePathwayPoints[i-1].x) * imageSize.w
-                  const dy = (activePathwayPoints[i].y - activePathwayPoints[i-1].y) * imageSize.h
-                  pwPixels += Math.sqrt(dx*dx + dy*dy)
-                }
-                const pwFootage = scaleRatio ? Math.round(pwPixels * scaleRatio) : 0
-                const { data, error } = await supabase.from('drawing_pathways').insert({
-                  org_id:           orgId,
-                  drawing_sheet_id: sheet.id,
-                  pathway_type:     pathwayType,
-                  points:           activePathwayPoints,
-                  cable_types:      [],
-                  total_footage:    pwFootage,
-                }).select().single()
-                if (!error && data) {
-                  setPathways(prev => [...prev, data])
-                }
-                setActivePathwayPoints([])
-              }
-            }}>
+            onDblClick={handleFinishDraw}
+            onDblTap={handleFinishDraw}>
 
             <Layer>
               {bgImage && !isBlank ? (
@@ -1944,6 +1952,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                       onRoomMove?.(room.id, nx, ny)
                     }}
                     onClick={e => { e.cancelBubble = true; onRoomClick?.(room) }}
+                    onTap={e => { e.cancelBubble = true; onRoomClick?.(room) }}
                   >
                     {/* Shadow */}
                     <Rect x={2} y={2} width={W} height={H} fill="rgba(0,0,0,0.4)" cornerRadius={5} listening={false} />
