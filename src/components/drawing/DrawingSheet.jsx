@@ -218,6 +218,10 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   }
 
   const renderPDF = async (url, pageNum = 1) => {
+    // Polyfill URL.parse for iOS < 18 — pdfjs-dist uses it internally
+    if (!URL.parse) {
+      URL.parse = (u, base) => { try { return new URL(u, base) } catch { return null } }
+    }
     const pdfjsLib = await import('pdfjs-dist')
     // Try ES module worker first; fall back to legacy worker for iOS Safari
     try {
