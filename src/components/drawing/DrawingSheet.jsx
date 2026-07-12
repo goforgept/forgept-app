@@ -3,6 +3,7 @@ import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Shape, Li
 import { supabase } from '../../supabase'
 import { useCategoryIcons } from './useCategoryIcons'
 import { PATHWAY_DEFS } from './SymbolPicker'
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 
 const LABEL_PREFIXES = {
   'Dome Camera':             'CAM',
@@ -222,28 +223,30 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     if (!URL.parse) {
       URL.parse = (u, base) => { try { return new URL(u, base) } catch { return null } }
     }
+
     const pdfjsLib = await import('pdfjs-dist')
-    // Try ES module worker first; fall back to legacy worker for iOS Safari
-    try {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-        'pdfjs-dist/build/pdf.worker.min.mjs',
-        import.meta.url
-      ).toString()
-    } catch {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = ''
-    }
-    const pdf      = await pdfjsLib.getDocument({ url, useWorkerFetch: false }).promise
+    // Use the Vite-hashed asset URL — more reliable than new URL(import.meta.url) on iOS
+    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+
+    // Wrap getDocument in a 30s timeout — iOS can hang indefinitely if the worker fails
+    const loadingTask = pdfjsLib.getDocument({ url, useWorkerFetch: false })
+    const pdf = await Promise.race([
+      loadingTask.promise,
+      new Promise((_, reject) =>
+        setTimeout(() => { loadingTask.destroy?.(); reject(new Error('PDF load timed out — try a smaller file or re-upload.')) }, 30000)
+      ),
+    ])
+
     const page     = await pdf.getPage(pageNum)
     const viewport = page.getViewport({ scale: 1 })
     // Cap at 4096px on either side — iOS Safari canvas memory limit
-    const maxDim = 4096
-    const renderScale = Math.min(3, 3600 / viewport.width, maxDim / viewport.height)
+    const renderScale = Math.min(3, 3600 / viewport.width, 4096 / viewport.height)
     const scaled   = page.getViewport({ scale: renderScale })
     const canvas   = document.createElement('canvas')
     canvas.width   = Math.floor(scaled.width)
     canvas.height  = Math.floor(scaled.height)
     const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Canvas 2D context unavailable — the floor plan may be too large for this device.')
+    if (!ctx) throw new Error('Canvas context unavailable — the floor plan may be too large for this device.')
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
     await page.render({ canvasContext: ctx, viewport: scaled }).promise
