@@ -543,10 +543,9 @@ export default function ProposalDetail({ isAdmin }) {
     setBulkSelectedLines(new Set())
   }
 
-  const saveQuoteNumber = async () => {
-    const trimmed = quoteNumberDraft.trim()
+  const saveQuoteNumber = async (valueOverride) => {
+    const trimmed = (valueOverride !== undefined ? valueOverride : quoteNumberDraft).trim()
     if (!trimmed) { setQuoteNumberError('Quote number cannot be empty'); return }
-    // Check for duplicates within org
     const { data: existing } = await supabase
       .from('proposals')
       .select('id')
@@ -564,8 +563,8 @@ export default function ProposalDetail({ isAdmin }) {
     logActivity(`Quote number updated to ${trimmed}`)
   }
 
-  const saveContractNumber = async () => {
-    const trimmed = contractNumberDraft.trim()
+  const saveContractNumber = async (valueOverride) => {
+    const trimmed = (valueOverride !== undefined ? valueOverride : contractNumberDraft).trim()
     await supabase.from('proposals').update({ contract_number: trimmed || null }).eq('id', id)
     setProposal(prev => ({ ...prev, contract_number: trimmed || null }))
     setEditingContractNumber(false)

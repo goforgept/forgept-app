@@ -1,10 +1,12 @@
+import { useState, useEffect } from 'react'
+
 const STATUS_FALLBACK = { Won: 'Won', Lost: 'Lost', Sent: 'Proposal Sent', Draft: 'Lead' }
 
-// Reusable CRM-style field cell
+// Reusable CRM-style editable cell
 function Cell({ label, children, className = '' }) {
   return (
-    <div className={`flex flex-col gap-0.5 bg-[#0a1525] border border-[#162030] rounded-xl px-3 py-2.5 focus-within:border-[#C8622A]/40 hover:border-[#1e3048] transition-colors ${className}`}>
-      <span className="text-[10px] font-semibold uppercase tracking-wider text-[#3a5272]">{label}</span>
+    <div className={`flex flex-col gap-0.5 bg-fp-inset border border-fp-border rounded-xl px-3 py-2.5 focus-within:border-fp-brand/40 hover:border-fp-border/80 transition-colors ${className}`}>
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-fp-muted/70 select-none">{label}</span>
       {children}
     </div>
   )
@@ -15,16 +17,26 @@ export default function ProposalHeader({
   editingProposalName, proposalNameDraft, setProposalNameDraft, setEditingProposalName, saveProposalName,
   openEditClientModal, clientAddress, locationName, collaborators, orgProfiles,
   updateStatus, updateStage, pipelineStages = [], onUpdateRep,
-  editingQuoteNumber, quoteNumberDraft, setQuoteNumberDraft, quoteNumberError, setQuoteNumberError,
+  quoteNumberError, setQuoteNumberError,
   saveQuoteNumber, setEditingQuoteNumber,
-  editingContractNumber, contractNumberDraft, setContractNumberDraft, saveContractNumber, setEditingContractNumber,
+  saveContractNumber, setEditingContractNumber,
   updateCloseDate, updateTaxExempt, updateTaxRate,
   setShowDealSummaryModal, setDealSummary,
   setShowShareModal, setDeleteConfirmText, setShowDeleteModal,
   onArchive, onRestore, onCreateRevision,
   canEdit = true,
 }) {
-  const inputCls = "bg-transparent text-fp-text text-sm font-medium focus:outline-none placeholder-[#2a4060] w-full"
+  // Local draft state — keeps inputs always controlled without depending on parent editing flags
+  const [quoteDraft,    setQuoteDraft]    = useState(proposal?.quote_number    ?? '')
+  const [contractDraft, setContractDraft] = useState(proposal?.contract_number ?? '')
+  const [taxRateDraft,  setTaxRateDraft]  = useState(proposal?.tax_rate        ?? '')
+
+  // Sync from parent when proposal data changes externally (e.g. after save)
+  useEffect(() => { setQuoteDraft(proposal?.quote_number    ?? '') }, [proposal?.quote_number])
+  useEffect(() => { setContractDraft(proposal?.contract_number ?? '') }, [proposal?.contract_number])
+  useEffect(() => { setTaxRateDraft(proposal?.tax_rate        ?? '') }, [proposal?.tax_rate])
+
+  const inputCls = "bg-transparent text-fp-text text-sm font-medium focus:outline-none placeholder-fp-muted/30 w-full"
 
   return (
     <div className="bg-fp-card rounded-xl p-6">
@@ -35,8 +47,8 @@ export default function ProposalHeader({
               <input autoFocus type="text" value={proposalNameDraft}
                 onChange={e => setProposalNameDraft(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') saveProposalName(); if (e.key === 'Escape') setEditingProposalName(false) }}
-                className="bg-fp-inset text-fp-text text-2xl font-bold border-b-2 border-[#C8622A] focus:outline-none px-1 w-96" />
-              <button onClick={saveProposalName} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors">Save</button>
+                className="bg-fp-inset text-fp-text text-2xl font-bold border-b-2 border-fp-brand focus:outline-none px-1 w-96" />
+              <button onClick={saveProposalName} className="text-fp-brand text-sm font-semibold hover:text-fp-text transition-colors">Save</button>
               <button onClick={() => setEditingProposalName(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">Cancel</button>
             </div>
           ) : (
@@ -56,7 +68,7 @@ export default function ProposalHeader({
           <div className="flex items-center gap-2 mt-1">
             <p className="text-fp-muted">{proposal?.company} · {proposal?.client_name}</p>
             {canEdit && (
-              <button onClick={openEditClientModal} className="text-fp-muted hover:text-[#C8622A] text-xs transition-colors" title="Edit client info">✏️</button>
+              <button onClick={openEditClientModal} className="text-fp-muted hover:text-fp-brand text-xs transition-colors" title="Edit client info">✏️</button>
             )}
           </div>
           <p className="text-fp-muted text-sm">{proposal?.client_email}</p>
@@ -73,7 +85,7 @@ export default function ProposalHeader({
               <span className="text-fp-muted text-xs">Shared with:</span>
               {collaborators.map(cid => {
                 const cp = orgProfiles.find(p => p.id === cid)
-                return cp ? <span key={cid} className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full">{cp.full_name}</span> : null
+                return cp ? <span key={cid} className="bg-fp-brand/20 text-fp-brand text-xs px-2 py-0.5 rounded-full">{cp.full_name}</span> : null
               })}
             </div>
           )}
@@ -160,7 +172,7 @@ export default function ProposalHeader({
           ) : (
             <span className="text-fp-text text-sm font-medium">{proposal?.rep_name || '—'}</span>
           )}
-          {proposal?.rep_title && <span className="text-[11px] text-[#3a5272] leading-none">{proposal.rep_title}</span>}
+          {proposal?.rep_title && <span className="text-[11px] text-fp-muted leading-none mt-0.5">{proposal.rep_title}</span>}
         </Cell>
 
         {/* Quote # */}
@@ -168,12 +180,14 @@ export default function ProposalHeader({
           {canEdit ? (
             <input
               type="text"
-              value={editingQuoteNumber ? quoteNumberDraft : (proposal?.quote_number || '')}
+              value={quoteDraft}
               placeholder="—"
-              onFocus={() => { setQuoteNumberDraft(proposal?.quote_number || ''); setEditingQuoteNumber(true) }}
-              onChange={e => { setQuoteNumberDraft(e.target.value); setQuoteNumberError('') }}
-              onBlur={saveQuoteNumber}
-              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setEditingQuoteNumber(false); setQuoteNumberError('') } }}
+              onChange={e => { setQuoteDraft(e.target.value); setQuoteNumberError('') }}
+              onBlur={e => saveQuoteNumber(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') { setQuoteDraft(proposal?.quote_number ?? ''); setQuoteNumberError(''); e.currentTarget.blur() }
+              }}
               className={inputCls}
             />
           ) : (
@@ -187,12 +201,14 @@ export default function ProposalHeader({
           {canEdit ? (
             <input
               type="text"
-              value={editingContractNumber ? contractNumberDraft : (proposal?.contract_number || '')}
+              value={contractDraft}
               placeholder="—"
-              onFocus={() => { setContractNumberDraft(proposal?.contract_number || ''); setEditingContractNumber(true) }}
-              onChange={e => setContractNumberDraft(e.target.value)}
-              onBlur={saveContractNumber}
-              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setEditingContractNumber(false) }}
+              onChange={e => setContractDraft(e.target.value)}
+              onBlur={e => saveContractNumber(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') e.currentTarget.blur()
+                if (e.key === 'Escape') { setContractDraft(proposal?.contract_number ?? ''); e.currentTarget.blur() }
+              }}
               className={inputCls}
             />
           ) : (
@@ -221,7 +237,7 @@ export default function ProposalHeader({
 
         {/* Margin */}
         <Cell label="Margin" className="min-w-[80px]">
-          <span className="text-sm font-semibold text-[#C8622A]">
+          <span className="text-sm font-semibold text-fp-brand">
             {proposal?.total_gross_margin_percent ? `${proposal.total_gross_margin_percent.toFixed(1)}%` : '—'}
           </span>
         </Cell>
@@ -231,11 +247,11 @@ export default function ProposalHeader({
           {canEdit ? (
             <button
               onClick={() => updateTaxExempt(!proposal?.tax_exempt)}
-              className={`text-sm font-semibold text-left transition-colors ${proposal?.tax_exempt ? 'text-green-400' : 'text-fp-text hover:text-fp-muted'}`}>
+              className={`text-sm font-semibold text-left transition-colors ${proposal?.tax_exempt ? 'text-green-500' : 'text-fp-text hover:text-fp-muted'}`}>
               {proposal?.tax_exempt ? 'Exempt' : 'Taxable'}
             </button>
           ) : (
-            <span className={`text-sm font-semibold ${proposal?.tax_exempt ? 'text-green-400' : 'text-fp-muted'}`}>
+            <span className={`text-sm font-semibold ${proposal?.tax_exempt ? 'text-green-500' : 'text-fp-muted'}`}>
               {proposal?.tax_exempt ? 'Exempt' : 'Taxable'}
             </span>
           )}
@@ -243,14 +259,16 @@ export default function ProposalHeader({
 
         {/* Tax Rate — hidden when exempt */}
         {!proposal?.tax_exempt && (
-          <Cell label="Tax Rate" className="min-w-[80px]">
+          <Cell label="Tax Rate" className="min-w-[85px]">
             {canEdit ? (
               <input
                 type="number"
                 step="0.01"
                 placeholder="8.5"
-                value={proposal?.tax_rate ?? ''}
-                onChange={e => updateTaxRate(e.target.value)}
+                value={taxRateDraft}
+                onChange={e => setTaxRateDraft(e.target.value)}
+                onBlur={e => updateTaxRate(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
                 className={inputCls}
               />
             ) : (
