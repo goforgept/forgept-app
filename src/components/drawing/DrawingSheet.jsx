@@ -3,7 +3,7 @@ import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Shape, Li
 import { supabase } from '../../supabase'
 import { useCategoryIcons } from './useCategoryIcons'
 import { PATHWAY_DEFS } from './SymbolPicker'
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import PDFWorkerConstructor from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
 
 const LABEL_PREFIXES = {
   'Dome Camera':             'CAM',
@@ -221,7 +221,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       await Promise.race([
         run(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`Timed out at step: "${loadStep}" — check your connection and try again.`)), 25000)
+          setTimeout(() => reject(new Error(`Timed out at step: "${loadStep}" — check your connection and try again.`)), 90000)
         ),
       ])
     } catch (err) {
@@ -239,16 +239,29 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       URL.parse = (u, base) => { try { return new URL(u, base) } catch { return null } }
     }
 
-    const pdfjsLib = await import('pdfjs-dist')
-    // Use the Vite-hashed asset URL — more reliable than new URL(import.meta.url) on iOS
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
+    // Fetch PDF bytes on the main thread so the worker never needs to make network requests.
+    // This avoids CORS / fetch-inside-module-worker failures on iOS WebKit.
+    setLoadStep('Downloading PDF…')
+    const fetchResp = await fetch(url)
+    if (!fetchResp.ok) throw new Error(`Failed to download PDF (HTTP ${fetchResp.status}) — try re-uploading the file.`)
+    const pdfData = await fetchResp.arrayBuffer()
 
-    // Wrap getDocument in a 30s timeout — iOS can hang indefinitely if the worker fails
-    const loadingTask = pdfjsLib.getDocument({ url, useWorkerFetch: false })
+    setLoadStep('Rendering PDF…')
+    const pdfjsLib = await import('pdfjs-dist')
+
+    // Use a Vite-bundled Worker instance via ?worker import. This avoids the ES-module
+    // worker MIME-type / type:'module' hang on iOS WebKit that occurs when setting workerSrc
+    // to a .mjs URL. workerPort accepts a live Worker and bypasses URL loading entirely.
+    if (!pdfjsLib.GlobalWorkerOptions.workerPort) {
+      pdfjsLib.GlobalWorkerOptions.workerPort = new PDFWorkerConstructor()
+    }
+
+    // Wrap getDocument in a 30s timeout — iOS can still hang if the worker crashes silently
+    const loadingTask = pdfjsLib.getDocument({ data: pdfData })
     const pdf = await Promise.race([
       loadingTask.promise,
       new Promise((_, reject) =>
-        setTimeout(() => { loadingTask.destroy?.(); reject(new Error('PDF load timed out — try a smaller file or re-upload.')) }, 30000)
+        setTimeout(() => { loadingTask.destroy?.(); reject(new Error('PDF render timed out — the file may be too large for this device.')) }, 30000)
       ),
     ])
 

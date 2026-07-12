@@ -1209,7 +1209,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           // Rack accessories & item-level components (SFP modules, etc.)
           const rComps = rackComponents.filter(c => c.rack_id === rack.id)
           // Gather all item components for this rack's items
-          const rackItemIds = rackItems.map(i => i.id)
+          const rackItemIds = rItems.map(i => i.id)
           const riComps = rackItemComponents.filter(c => rackItemIds.includes(c.rack_item_id))
           const allComps = [
             ...rComps.map(c => ({ ...c, _source: 'rack' })),
