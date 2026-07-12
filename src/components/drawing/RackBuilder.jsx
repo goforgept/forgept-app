@@ -48,7 +48,7 @@ function getCatStyle(cat) {
     return { bar: '#f59e0b', bg: 'rgba(245,158,11,0.15)', text: '#fcd34d' }
   if (c.includes('fire') || c.includes('alarm') || c.includes('facp') || c.includes('suppression') || c.includes('annun') || c.includes('smoke') || c.includes('heat') || c.includes('horn') || c.includes('strobe'))
     return { bar: '#ef4444', bg: 'rgba(239,68,68,0.15)', text: '#fca5a5' }
-  if (c.includes('speaker') || c.includes('display') || c.includes('projector') || c.includes('amplif') || c.includes('receiver') || c.includes('dsp') || c.includes('control processor') || c.includes('touch panel'))
+  if (c.includes('speaker') || c.includes('paging') || c.includes('display') || c.includes('projector') || c.includes('amplif') || c.includes('receiver') || c.includes('dsp') || c.includes('control processor') || c.includes('touch panel'))
     return { bar: '#a855f7', bg: 'rgba(168,85,247,0.15)', text: '#d8b4fe' }
   if (c.includes('access') || c.includes('reader') || c.includes('controller') || c.includes('intercom') || c.includes('lock'))
     return { bar: '#06b6d4', bg: 'rgba(6,182,212,0.15)', text: '#67e8f9' }
@@ -80,6 +80,7 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
   const [newRack, setNewRack]           = useState({ name: 'Rack 1', rack_type: 'four_post', total_u: 42 })
   const [saving, setSaving]             = useState(false)
   const [components,     setComponents]     = useState([])
+  const [itemComponents, setItemComponents] = useState([])
   const [selectedRackId, setSelectedRackId] = useState(null)
 
   // When lockedRoomId changes (e.g. user clicks a different room marker), update selection
@@ -114,6 +115,16 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
       ])
       setItems(itemsData || [])
       setComponents(compsData || [])
+
+      if (itemsData?.length) {
+        const itemIds = itemsData.map(i => i.id)
+        const { data: itemCompsData } = await supabase
+          .from('rack_item_components')
+          .select('*')
+          .in('rack_item_id', itemIds)
+          .order('created_at')
+        setItemComponents(itemCompsData || [])
+      }
     }
   }
 
@@ -185,6 +196,16 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
     setComponents(prev => prev.filter(c => c.id !== id))
   }
 
+  const addItemComponent = async (rackItemId, data) => {
+    const { data: comp } = await supabase.from('rack_item_components').insert([{ rack_item_id: rackItemId, ...data }]).select().single()
+    if (comp) setItemComponents(prev => [...prev, comp])
+  }
+
+  const deleteItemComponent = async (id) => {
+    await supabase.from('rack_item_components').delete().eq('id', id)
+    setItemComponents(prev => prev.filter(c => c.id !== id))
+  }
+
   const addItem = async (rackId, uStart, product, uSize = 1, customLabel = null) => {
     const gp = product?.source === 'global' ? product : null
     const rack = racks.find(r => r.id === rackId)
@@ -213,6 +234,7 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
   const deleteItem = async (id) => {
     await supabase.from('rack_items').delete().eq('id', id)
     setItems(prev => prev.filter(i => i.id !== id))
+    setItemComponents(prev => prev.filter(c => c.rack_item_id !== id))
     if (selectedItemId === id) setSelectedItemId(null)
   }
 
@@ -442,6 +464,9 @@ export default function RackBuilder({ proposalId, orgId, lockedRoomId = null, sh
             allRackItems={items.filter(i => i.rack_id === selectedItem.rack_id)}
             rack={racks.find(r => r.id === selectedItem.rack_id)}
             sheetPlacements={sheetPlacements}
+            itemComponents={itemComponents.filter(c => c.rack_item_id === selectedItem.id)}
+            addItemComponent={addItemComponent}
+            deleteItemComponent={deleteItemComponent}
             onUpdate={updateItem}
             onDelete={deleteItem}
             onClose={() => setSelectedItemId(null)}
@@ -675,7 +700,7 @@ const RACK_ITEM_CATEGORIES = [
   'Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Turret Camera', 'Fisheye Camera', 'LPR Camera', 'NVR', 'Video Encoder', 'Cabinet System', 'Cabinet Solar System',
   'FACP', 'Smoke Detector', 'Heat Detector', 'Pull Station', 'Horn Strobe', 'Horn', 'Bell', 'Strobe', 'CO Detector', 'Beam Detector', 'Annunciator', 'Monitor Module', 'Control Module', 'Duct Detector', 'Air Sampling', 'Suppression Panel',
   'Network', 'UPS', 'Power Supply', 'PDU', 'Panel', 'Rack', 'Server', 'Patch Panel', 'Fiber Panel',
-  'Display', 'Ceiling Speaker', 'Speaker', 'Subwoofer', 'AV Receiver', 'Projector', 'Media Player', 'Control Processor', 'Touch Panel', 'DSP Amplifier',
+  'Display', 'Ceiling Speaker', 'Speaker', 'Paging Speaker', 'IP Paging Device', 'Paging Amplifier', 'Paging Controller', 'Subwoofer', 'AV Receiver', 'Projector', 'Media Player', 'Control Processor', 'Touch Panel', 'DSP Amplifier',
   'Other',
 ]
 
@@ -690,7 +715,14 @@ function SectionHead({ children }) {
   return <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: '#C8622A' }}>{children}</p>
 }
 
-function ItemDetail({ item, allRackItems, rack, sheetPlacements, onUpdate, onDelete, onClose }) {
+const ITEM_COMPONENT_TYPES = [
+  'SFP Module', 'SFP+ Module', 'SFP28 Module (25G)', 'QSFP+ Module (40G)',
+  'QSFP28 Module (100G)', 'QSFP-DD Module (400G)', 'Power Supply', 'Fan Module',
+  'Line Card', 'Expansion Card / NIC', 'Hard Drive / SSD', 'License Key',
+  'Transceiver', 'USB / Console Adapter', 'Other',
+]
+
+function ItemDetail({ item, allRackItems, rack, sheetPlacements, itemComponents = [], addItemComponent, deleteItemComponent, onUpdate, onDelete, onClose }) {
   const getInitialForm = (i) => ({
     label:             i.label             || '',
     description:       i.description       || '',
@@ -713,6 +745,9 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, onUpdate, onDel
   const [form, setForm] = useState(() => getInitialForm(item))
   const [saved, setSaved] = useState(false)
   const [showAsBuilt, setShowAsBuilt] = useState(false)
+  const [showAddComp,  setShowAddComp]  = useState(false)
+  const [newComp,      setNewComp]      = useState({ component_type: 'SFP Module', name: '', part_number: '', manufacturer: '', quantity: 1 })
+  const [addingComp,   setAddingComp]   = useState(false)
   const saveTimer = useRef(null)
   const formRef   = useRef(form)
   useEffect(() => { formRef.current = form }, [form])
@@ -720,6 +755,7 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, onUpdate, onDel
   useEffect(() => {
     setForm(getInitialForm(item))
     setSaved(false)
+    setShowAddComp(false)
   }, [item.id])
 
   const update = (field, value) => {
@@ -989,6 +1025,116 @@ function ItemDetail({ item, allRackItems, rack, sheetPlacements, onUpdate, onDel
                 <label className={lc} style={lcStyle}>Patch Panel Label</label>
                 <input className={ic} style={icStyle} value={form.patch_panel_label} placeholder="e.g. PP-A · C01"
                   onChange={e => update('patch_panel_label', e.target.value)} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Item Components (SFP modules, PSUs, etc.) ── */}
+        <div className="border-t pt-3" style={{ borderColor: '#1e3048' }}>
+          <div className="flex items-center justify-between mb-2">
+            <SectionHead>Components</SectionHead>
+            {addItemComponent && (
+              <button
+                onClick={() => setShowAddComp(s => !s)}
+                className="text-xs font-semibold transition-colors"
+                style={{ color: showAddComp ? '#C8622A' : '#4a6080' }}
+              >+ Add</button>
+            )}
+          </div>
+
+          {/* Existing components list */}
+          {itemComponents.length > 0 && (
+            <div className="space-y-1 mb-2">
+              {itemComponents.map(c => (
+                <div key={c.id} className="flex items-start gap-2 px-2.5 py-2 rounded-lg group" style={{ background: '#0a1220', border: '1px solid #1a2d40' }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-semibold" style={{ color: '#8A9AB0' }}>{c.component_type}</span>
+                      {c.quantity > 1 && <span className="text-[10px] font-bold px-1 rounded" style={{ background: '#C8622A22', color: '#C8622A' }}>×{c.quantity}</span>}
+                    </div>
+                    {c.name && <p className="text-xs text-white truncate mt-0.5">{c.name}</p>}
+                    {c.part_number && <p className="text-[10px] font-mono truncate" style={{ color: '#4a6080' }}>{c.part_number}</p>}
+                    {c.manufacturer && <p className="text-[10px] truncate" style={{ color: '#4a6080' }}>{c.manufacturer}</p>}
+                  </div>
+                  {deleteItemComponent && (
+                    <button
+                      onClick={() => deleteItemComponent(c.id)}
+                      className="opacity-0 group-hover:opacity-100 text-xs flex-shrink-0 hover:text-red-400 transition-all"
+                      style={{ color: '#2a4060' }}
+                    >✕</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {itemComponents.length === 0 && !showAddComp && (
+            <p className="text-xs" style={{ color: '#2a4060' }}>No components yet — add SFP modules, power supplies, etc.</p>
+          )}
+
+          {/* Add component form */}
+          {showAddComp && addItemComponent && (
+            <div className="space-y-2 rounded-lg p-2.5" style={{ background: '#0a1220', border: '1px solid #1e3048' }}>
+              <div>
+                <label className={lc} style={lcStyle}>Type</label>
+                <select className={ic} style={{ ...icStyle, color: '#fff' }}
+                  value={newComp.component_type}
+                  onChange={e => setNewComp(p => ({ ...p, component_type: e.target.value }))}>
+                  {ITEM_COMPONENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>Name / Description</label>
+                <input className={ic} style={icStyle}
+                  placeholder="e.g. 10G SR SFP+"
+                  value={newComp.name}
+                  onChange={e => setNewComp(p => ({ ...p, name: e.target.value }))} />
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>Part Number</label>
+                <input className={ic} style={icStyle}
+                  placeholder="e.g. SFP-10G-SR"
+                  value={newComp.part_number}
+                  onChange={e => setNewComp(p => ({ ...p, part_number: e.target.value }))} />
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>Manufacturer</label>
+                <input className={ic} style={icStyle}
+                  placeholder="e.g. Cisco"
+                  value={newComp.manufacturer}
+                  onChange={e => setNewComp(p => ({ ...p, manufacturer: e.target.value }))} />
+              </div>
+              <div>
+                <label className={lc} style={lcStyle}>Qty</label>
+                <input type="number" min={1} className={`${ic} w-20`} style={icStyle}
+                  value={newComp.quantity}
+                  onChange={e => setNewComp(p => ({ ...p, quantity: Math.max(1, +e.target.value) }))} />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  disabled={addingComp}
+                  onClick={async () => {
+                    setAddingComp(true)
+                    await addItemComponent(item.id, {
+                      component_type: newComp.component_type,
+                      name:           newComp.name.trim()         || null,
+                      part_number:    newComp.part_number.trim()  || null,
+                      manufacturer:   newComp.manufacturer.trim() || null,
+                      quantity:       newComp.quantity,
+                    })
+                    setNewComp({ component_type: 'SFP Module', name: '', part_number: '', manufacturer: '', quantity: 1 })
+                    setShowAddComp(false)
+                    setAddingComp(false)
+                  }}
+                  className="flex-1 text-xs font-semibold py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                  style={{ background: '#C8622A', color: '#fff' }}
+                >{addingComp ? 'Adding…' : 'Add Component'}</button>
+                <button
+                  onClick={() => { setShowAddComp(false); setNewComp({ component_type: 'SFP Module', name: '', part_number: '', manufacturer: '', quantity: 1 }) }}
+                  className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                  style={{ background: '#0d1927', color: '#4a6080', border: '1px solid #1e3048' }}
+                >Cancel</button>
               </div>
             </div>
           )}

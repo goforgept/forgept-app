@@ -54,7 +54,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [rooms,          setRooms]          = useState([])
   const [rackList,       setRackList]       = useState([])
   const [rackItemsData,  setRackItemsData]  = useState([])
-  const [rackComponents, setRackComponents] = useState([])
+  const [rackComponents,     setRackComponents]     = useState([])
+  const [rackItemComponents, setRackItemComponents] = useState([])
   const [loading,       setLoading]       = useState(true)
   const [generating,    setGenerating]    = useState(false)
   const [sharing,       setSharing]       = useState(false)
@@ -148,6 +149,16 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           ])
           setRackItemsData(riData || [])
           setRackComponents(rcData || [])
+
+          if (riData?.length) {
+            const riIds = riData.map(ri => ri.id)
+            const { data: ricData } = await supabase
+              .from('rack_item_components')
+              .select('*')
+              .in('rack_item_id', riIds)
+              .order('created_at')
+            setRackItemComponents(ricData || [])
+          }
         }
       }
     } catch (err) {
@@ -1195,9 +1206,17 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
           currentY = pdf.lastAutoTable.finalY + 6
 
-          // Accessories for this rack
+          // Rack accessories & item-level components (SFP modules, etc.)
           const rComps = rackComponents.filter(c => c.rack_id === rack.id)
-          if (rComps.length > 0) {
+          // Gather all item components for this rack's items
+          const rackItemIds = rackItems.map(i => i.id)
+          const riComps = rackItemComponents.filter(c => rackItemIds.includes(c.rack_item_id))
+          const allComps = [
+            ...rComps.map(c => ({ ...c, _source: 'rack' })),
+            ...riComps.map(c => ({ ...c, _source: 'item' })),
+          ]
+
+          if (allComps.length > 0) {
             pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(138, 154, 176)
             pdf.text('ACCESSORIES & COMPONENTS', margin, currentY + 3)
             currentY += 7
@@ -1205,7 +1224,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
               startY: currentY,
               margin: { left: margin, right: margin, bottom: 15 },
               head: [['Type', 'Name / Description', 'Part Number', 'Manufacturer', 'Qty', 'Notes']],
-              body: rComps.map(c => [
+              body: allComps.map(c => [
                 c.component_type || '—',
                 c.name || '—',
                 c.part_number || '—',

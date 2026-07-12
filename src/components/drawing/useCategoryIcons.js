@@ -565,6 +565,41 @@ const CATEGORY_SVGS = {
       <circle cx="20" cy="20" r="1.5" fill="${color}" stroke="none"/>
     </svg>`,
 
+  'Paging Speaker': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <circle cx="18" cy="20" r="12"/>
+      <circle cx="18" cy="20" r="5"/>
+      <circle cx="18" cy="20" r="2" fill="${color}" stroke="none"/>
+      <path d="M30 14 Q34 20 30 26" stroke-linecap="round" stroke-width="1.5" fill="none"/>
+      <path d="M33 11 Q39 20 33 29" stroke-linecap="round" stroke-width="1" fill="none"/>
+    </svg>`,
+
+  'IP Paging Device': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="12" width="24" height="16" rx="2"/>
+      <path d="M28 16 L34 13 L34 27 L28 24 Z" fill="none"/>
+      <path d="M8 19 L10 19 M8 23 L10 23 M14 16 L14 24 M18 16 L18 24 M22 16 L22 24" stroke-linecap="round" stroke-width="1"/>
+    </svg>`,
+
+  'Paging Amplifier': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="12" width="32" height="16" rx="2"/>
+      <path d="M10 20 L16 14 L16 26 Z" fill="${color}" stroke="none"/>
+      <path d="M20 17 Q24 20 20 23" stroke-linecap="round" fill="none"/>
+      <path d="M23 14 Q29 20 23 26" stroke-linecap="round" fill="none"/>
+      <circle cx="32" cy="16" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="32" cy="22" r="1.5" fill="${color}" stroke="none"/>
+    </svg>`,
+
+  'Paging Controller': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <rect x="4" y="10" width="32" height="20" rx="2"/>
+      <rect x="8" y="14" width="12" height="8" rx="1"/>
+      <circle cx="27" cy="17" r="2" fill="${color}" stroke="none"/>
+      <circle cx="33" cy="17" r="2" fill="${color}" stroke="none"/>
+      <path d="M24 22 L36 22" stroke-linecap="round" stroke-width="1"/>
+    </svg>`,
+
   'Microphone': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
       <rect x="14" y="4" width="12" height="18" rx="6"/>

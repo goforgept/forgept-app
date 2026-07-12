@@ -408,6 +408,14 @@ function CategoryIcon({ category }) {
       return <svg {...props}><rect x="4" y="10" width="32" height="20" rx="2" strokeWidth="1.5"/><rect x="8" y="14" width="10" height="8" rx="1" strokeWidth="1.5"/><circle cx="26" cy="17" r="2" fill="currentColor"/><circle cx="32" cy="17" r="2" fill="currentColor"/><path d="M22 24 L36 24 M8 26 L18 26" strokeWidth="1" strokeLinecap="round"/></svg>
     case 'Ceiling Speaker':
       return <svg {...props}><circle cx="20" cy="20" r="14" strokeWidth="1.5"/><circle cx="20" cy="20" r="8" strokeWidth="1.5"/><circle cx="20" cy="20" r="3" fill="currentColor"/><path d="M20 6 L20 2 M34 20 L38 20 M20 34 L20 38 M6 20 L2 20" strokeLinecap="round" strokeWidth="1"/></svg>
+    case 'Paging Speaker':
+      return <svg {...props}><circle cx="18" cy="20" r="12" strokeWidth="1.5"/><circle cx="18" cy="20" r="5" strokeWidth="1.5"/><circle cx="18" cy="20" r="2" fill="currentColor"/><path d="M30 14 Q34 20 30 26" strokeLinecap="round" strokeWidth="1.5" fill="none"/><path d="M33 11 Q39 20 33 29" strokeLinecap="round" strokeWidth="1" fill="none"/></svg>
+    case 'IP Paging Device':
+      return <svg {...props}><rect x="4" y="12" width="24" height="16" rx="2" strokeWidth="1.5"/><path d="M28 16 L34 13 L34 27 L28 24 Z" fill="none" strokeWidth="1.5"/><path d="M8 19 L10 19 M8 23 L10 23" strokeLinecap="round" strokeWidth="1"/></svg>
+    case 'Paging Amplifier':
+      return <svg {...props}><rect x="4" y="12" width="32" height="16" rx="2" strokeWidth="1.5"/><path d="M10 20 L16 14 L16 26 Z" fill="currentColor"/><path d="M20 17 Q24 20 20 23 M23 14 Q29 20 23 26" strokeLinecap="round" fill="none" strokeWidth="1.5"/></svg>
+    case 'Paging Controller':
+      return <svg {...props}><rect x="4" y="10" width="32" height="20" rx="2" strokeWidth="1.5"/><rect x="8" y="14" width="12" height="8" rx="1" strokeWidth="1.5"/><circle cx="27" cy="17" r="2" fill="currentColor"/><circle cx="33" cy="17" r="2" fill="currentColor"/></svg>
     case 'Subwoofer':
       return <svg {...props}><rect x="6" y="8" width="28" height="24" rx="2" strokeWidth="1.5"/><circle cx="20" cy="20" r="9" strokeWidth="1.5"/><circle cx="20" cy="20" r="4" strokeWidth="1.5"/><circle cx="20" cy="20" r="1.5" fill="currentColor"/></svg>
     case 'Microphone':

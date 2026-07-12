@@ -113,6 +113,16 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
               .select('id, component_type, name, part_number, manufacturer, quantity')
               .in('rack_id', rackIds),
           ])
+          // Also fetch item-level components (SFP modules, PSUs, etc.)
+          let rackItemCompsList = []
+          if (rackItemsList?.length) {
+            const riIds = rackItemsList.map(ri => ri.id)
+            const { data: ricData } = await supabase
+              .from('rack_item_components')
+              .select('id, rack_item_id, component_type, name, part_number, manufacturer, quantity')
+              .in('rack_item_id', riIds)
+            rackItemCompsList = ricData || []
+          }
           // Rack enclosures (the physical cabinet)
           racksForBOM.forEach(rack => {
             if (!rack.part_number) return
@@ -152,6 +162,19 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
               }
             }
             grouped[partNumber].total_qty += rc.quantity || 1
+          })
+          // Item-level components (SFP modules, power supplies, etc.)
+          ;(rackItemCompsList || []).forEach(ric => {
+            const partNumber = ric.part_number || `ric-${ric.id}`
+            const name       = ric.name || ric.component_type || 'Module'
+            if (!grouped[partNumber]) {
+              grouped[partNumber] = {
+                part_number: partNumber, model_number: null,
+                name, manufacturer: ric.manufacturer || '', category: ric.component_type || 'Module',
+                unit_price: null, has_pricing: false, total_qty: 0, by_floor: {},
+              }
+            }
+            grouped[partNumber].total_qty += ric.quantity || 1
           })
         }
       }
