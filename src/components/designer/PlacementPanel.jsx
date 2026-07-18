@@ -5,6 +5,25 @@ import ComponentsSection from './ComponentsSection'
 // Categories that act as power sources (provide PoE / power to other devices)
 const POE_SOURCE_CATEGORIES = ['Network', 'Network Switch', 'Switch', 'NVR', 'UPS', 'Panel', 'Controller', 'Rack', 'Power Supply']
 
+const CAMERA_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Multi-Lens Camera', 'Fisheye Camera']
+
+const SENSOR_WIDTHS = {
+  '1/4"': 3.68,
+  '1/3"': 4.80,
+  '1/2.8"': 5.37,
+  '1/2"': 6.40,
+  '1/1.8"': 7.18,
+  '2/3"': 8.80,
+  '1"': 13.20,
+}
+
+const DORI_THRESHOLDS = [
+  { label: 'Detection',      ppm: 25,  color: 'bg-green-400'  },
+  { label: 'Observation',    ppm: 62,  color: 'bg-blue-400'   },
+  { label: 'Recognition',    ppm: 125, color: 'bg-yellow-400' },
+  { label: 'Identification', ppm: 250, color: 'bg-red-400'    },
+]
+
 export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, currentSheetId, proposalId, allSheetIds, laborEnabled = false, laborDefaults = [], sheetPlacements = [] }) {
   const [attachedRun,      setAttachedRun]      = useState(null)
 
@@ -130,6 +149,14 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
   const saveTimer = useRef(null)
   const formRef   = useRef(form)
   useEffect(() => { formRef.current = form }, [form])
+
+  // DORI calculator local state (not persisted)
+  const [showDori,   setShowDori]   = useState(false)
+  const [doriMode,   setDoriMode]   = useState('hfov') // 'hfov' | 'focal'
+  const [doriHfov,   setDoriHfov]   = useState('')
+  const [doriResH,   setDoriResH]   = useState('1920')
+  const [doriFocal,  setDoriFocal]  = useState('')
+  const [doriSensor, setDoriSensor] = useState('1/3"')
 
   // Only these fields have visible impact on the canvas marker — all others are text-only
   const VISUAL_FIELDS = new Set(['symbol_size', 'rotation', 'marker_color', 'fov_angle', 'fov_range', 'device_address'])
@@ -514,7 +541,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
             </div>
 
             {/* FOV settings — cameras only */}
-            {['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Fisheye Camera'].includes(product.category) && (
+            {[...CAMERA_CATEGORIES, 'Motion Sensor'].includes(product.category) && (
               <div className="border-t border-[#2a3d55] pt-3">
                 <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Coverage / FOV</p>
                 <div className="space-y-2">
@@ -560,6 +587,159 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                 </div>
               </div>
             )}
+
+            {/* DORI Calculator — cameras only */}
+            {CAMERA_CATEGORIES.includes(product.category) && (() => {
+              // Compute effective HFoV and resolution
+              let effHfov = null
+              let effResH = parseInt(doriResH) || null
+              if (doriMode === 'hfov') {
+                effHfov = parseFloat(doriHfov) || null
+              } else {
+                const focal = parseFloat(doriFocal)
+                const sw    = SENSOR_WIDTHS[doriSensor]
+                if (focal > 0 && sw) effHfov = 2 * Math.atan(sw / (2 * focal)) * (180 / Math.PI)
+              }
+              const doriResult = (effHfov > 0 && effResH > 0)
+                ? DORI_THRESHOLDS.map(t => {
+                    const rad    = effHfov * Math.PI / 180
+                    const meters = effResH / (t.ppm * 2 * Math.tan(rad / 2))
+                    return { ...t, meters, feet: meters * 3.28084 }
+                  })
+                : null
+
+              return (
+                <div className="border-t border-[#2a3d55] pt-3">
+                  <button
+                    onClick={() => setShowDori(s => !s)}
+                    className="flex items-center justify-between w-full text-left mb-2"
+                  >
+                    <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide">DORI Calculator</p>
+                    <svg className={`w-3 h-3 text-[#8A9AB0] transition-transform ${showDori ? 'rotate-180' : ''}`}
+                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7"/>
+                    </svg>
+                  </button>
+
+                  {showDori && (
+                    <div className="space-y-3">
+                      {/* Mode toggle */}
+                      <div className="flex rounded-lg bg-[#0F1C2E] border border-[#2a3d55] p-0.5">
+                        <button
+                          onClick={() => setDoriMode('hfov')}
+                          className={`flex-1 text-xs py-1.5 rounded-md transition-colors font-medium ${
+                            doriMode === 'hfov' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'
+                          }`}
+                        >
+                          HFoV + Resolution
+                        </button>
+                        <button
+                          onClick={() => setDoriMode('focal')}
+                          className={`flex-1 text-xs py-1.5 rounded-md transition-colors font-medium ${
+                            doriMode === 'focal' ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'
+                          }`}
+                        >
+                          Focal + Sensor
+                        </button>
+                      </div>
+
+                      {/* Inputs */}
+                      {doriMode === 'hfov' ? (
+                        <div className="space-y-2">
+                          <div>
+                            <label className={labelClass}>
+                              Horizontal FoV (°)
+                              {form.fov_angle && (
+                                <button
+                                  onClick={() => setDoriHfov(String(form.fov_angle))}
+                                  className="ml-2 text-[#C8622A] hover:text-white transition-colors"
+                                >
+                                  ← use canvas value ({form.fov_angle}°)
+                                </button>
+                              )}
+                            </label>
+                            <input type="number" min="1" max="360"
+                              value={doriHfov}
+                              onChange={e => setDoriHfov(e.target.value)}
+                              placeholder={form.fov_angle ? String(form.fov_angle) : 'e.g. 90'}
+                              className={`${inputClass} w-28`} />
+                          </div>
+                          <div>
+                            <label className={labelClass}>Horizontal Resolution (px)</label>
+                            <input type="number" min="1"
+                              value={doriResH}
+                              onChange={e => setDoriResH(e.target.value)}
+                              placeholder="e.g. 1920"
+                              className={`${inputClass} w-32`} />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <div>
+                            <label className={labelClass}>Focal Length (mm)</label>
+                            <input type="number" min="0.1" step="0.1"
+                              value={doriFocal}
+                              onChange={e => setDoriFocal(e.target.value)}
+                              placeholder="e.g. 2.8"
+                              className={`${inputClass} w-28`} />
+                          </div>
+                          <div>
+                            <label className={labelClass}>Sensor Size</label>
+                            <select value={doriSensor} onChange={e => setDoriSensor(e.target.value)} className={inputClass}>
+                              {Object.keys(SENSOR_WIDTHS).map(s => (
+                                <option key={s} value={s}>{s} ({SENSOR_WIDTHS[s].toFixed(2)}mm)</option>
+                              ))}
+                            </select>
+                          </div>
+                          {effHfov && (
+                            <p className="text-[#8A9AB0] text-xs">
+                              Calculated HFoV: <span className="text-white font-mono">{effHfov.toFixed(1)}°</span>
+                            </p>
+                          )}
+                          <div>
+                            <label className={labelClass}>Horizontal Resolution (px)</label>
+                            <input type="number" min="1"
+                              value={doriResH}
+                              onChange={e => setDoriResH(e.target.value)}
+                              placeholder="e.g. 1920"
+                              className={`${inputClass} w-32`} />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Results */}
+                      {doriResult ? (
+                        <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] overflow-hidden">
+                          <div className="px-3 py-1.5 border-b border-[#2a3d55] flex justify-between text-xs text-[#4a5a6a]">
+                            <span>Level</span>
+                            <span>PPM</span>
+                            <span>Distance</span>
+                          </div>
+                          <div className="divide-y divide-[#2a3d55]/50">
+                            {doriResult.map(({ label, ppm, meters, feet, color }) => (
+                              <div key={label} className="flex items-center px-3 py-2 gap-2">
+                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${color}`} />
+                                <span className="text-white text-xs font-medium flex-1">{label}</span>
+                                <span className="text-[#8A9AB0] text-xs w-10 text-center">{ppm}</span>
+                                <span className="text-white text-xs font-mono text-right">
+                                  {feet.toFixed(0)}ft <span className="text-[#4a5a6a]">/ {meters.toFixed(0)}m</span>
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-[#4a5a6a] text-xs">
+                          {doriMode === 'hfov'
+                            ? 'Enter HFoV and resolution to calculate distances.'
+                            : 'Enter focal length, sensor size, and resolution.'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Symbol size */}
             <div>
