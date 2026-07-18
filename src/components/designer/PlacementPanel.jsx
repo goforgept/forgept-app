@@ -720,27 +720,87 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                       )}
 
                       {/* Results */}
-                      {doriResult ? (
-                        <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] overflow-hidden">
-                          <div className="px-3 py-1.5 border-b border-[#2a3d55] flex justify-between text-xs text-[#4a5a6a]">
-                            <span>Level</span>
-                            <span>PPM</span>
-                            <span>Distance</span>
-                          </div>
-                          <div className="divide-y divide-[#2a3d55]/50">
-                            {doriResult.map(({ label, ppm, meters, feet, color }) => (
-                              <div key={label} className="flex items-center px-3 py-2 gap-2">
-                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${color}`} />
-                                <span className="text-white text-xs font-medium flex-1">{label}</span>
-                                <span className="text-[#8A9AB0] text-xs w-10 text-center">{ppm}</span>
-                                <span className="text-white text-xs font-mono text-right">
-                                  {feet.toFixed(0)}ft <span className="text-[#4a5a6a]">/ {meters.toFixed(0)}m</span>
-                                </span>
+                      {doriResult ? (() => {
+                        const W = 252, H = 112
+                        const cx = 18, cy = H / 2
+                        const halfDeg = Math.min((effHfov || 90) / 2, 72)
+                        const halfRad = halfDeg * Math.PI / 180
+                        const maxD = doriResult[0].feet
+                        const scale = (W - cx - 6) / maxD
+                        const xOf = d => cx + d * scale
+                        const tOf = d => Math.max(3, cy - d * Math.tan(halfRad))
+                        const bOf = d => Math.min(H - 3, cy + d * Math.tan(halfRad))
+                        const distances = doriResult.map(r => r.feet)
+                        const zoneFills   = ['#22c55e28','#3b82f628','#eab30828','#ef444428']
+                        const zoneStrokes = ['#22c55e',  '#3b82f6',  '#eab308',  '#ef4444'  ]
+                        const abbr        = ['D','O','R','I']
+
+                        return (
+                          <>
+                            {/* Zone diagram */}
+                            <div className="bg-[#060d18] rounded-lg border border-[#2a3d55] overflow-hidden">
+                              <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 92 }}>
+                                {/* Zones drawn farthest → nearest so red sits on top */}
+                                {distances.map((d, i) => {
+                                  const prevD = i < distances.length - 1 ? distances[i + 1] : 0
+                                  const pts = prevD === 0
+                                    ? `${cx},${cy} ${xOf(d)},${tOf(d)} ${xOf(d)},${bOf(d)}`
+                                    : `${xOf(prevD)},${tOf(prevD)} ${xOf(d)},${tOf(d)} ${xOf(d)},${bOf(d)} ${xOf(prevD)},${bOf(prevD)}`
+                                  return <polygon key={i} points={pts} fill={zoneFills[i]} />
+                                })}
+
+                                {/* Fan outline */}
+                                <line x1={cx} y1={cy} x2={xOf(maxD)} y2={tOf(maxD)} stroke="#22c55e" strokeWidth={0.7} opacity={0.35} />
+                                <line x1={cx} y1={cy} x2={xOf(maxD)} y2={bOf(maxD)} stroke="#22c55e" strokeWidth={0.7} opacity={0.35} />
+
+                                {/* Zone boundary lines + abbreviation labels */}
+                                {distances.map((d, i) => (
+                                  <g key={i}>
+                                    <line x1={xOf(d)} y1={tOf(d)} x2={xOf(d)} y2={bOf(d)}
+                                      stroke={zoneStrokes[i]} strokeWidth={1} opacity={0.75} />
+                                    <text x={xOf(d) - 2} y={tOf(d) - 2}
+                                      textAnchor="end" fontSize={7.5} fill={zoneStrokes[i]}
+                                      fontFamily="ui-monospace,monospace" fontWeight="bold">
+                                      {abbr[i]}
+                                    </text>
+                                    <text x={xOf(d)} y={H - 3}
+                                      textAnchor="middle" fontSize={6.5} fill={zoneStrokes[i]}
+                                      fontFamily="ui-monospace,monospace" opacity={0.8}>
+                                      {d.toFixed(0)}ft
+                                    </text>
+                                  </g>
+                                ))}
+
+                                {/* Camera body */}
+                                <rect x={2} y={cy - 8} width={14} height={16} rx={2} fill="#C8622A" />
+                                <circle cx={9} cy={cy} r={5} fill="#060d18" stroke="#C8622A" strokeWidth={1} />
+                                <circle cx={9} cy={cy} r={2} fill="#2a3d55" />
+                              </svg>
+                            </div>
+
+                            {/* Results table */}
+                            <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] overflow-hidden">
+                              <div className="px-3 py-1.5 border-b border-[#2a3d55] flex justify-between text-xs text-[#4a5a6a]">
+                                <span>Level</span>
+                                <span>PPM</span>
+                                <span>Distance</span>
                               </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
+                              <div className="divide-y divide-[#2a3d55]/50">
+                                {doriResult.map(({ label, ppm, meters, feet, color }) => (
+                                  <div key={label} className="flex items-center px-3 py-2 gap-2">
+                                    <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${color}`} />
+                                    <span className="text-white text-xs font-medium flex-1">{label}</span>
+                                    <span className="text-[#8A9AB0] text-xs w-10 text-center">{ppm}</span>
+                                    <span className="text-white text-xs font-mono text-right">
+                                      {feet.toFixed(0)}ft <span className="text-[#4a5a6a]">/ {meters.toFixed(0)}m</span>
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        )
+                      })() : (
                         <p className="text-[#4a5a6a] text-xs">
                           {doriMode === 'hfov'
                             ? 'Enter HFoV and resolution to calculate distances.'
