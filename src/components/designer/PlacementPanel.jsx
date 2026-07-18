@@ -24,18 +24,16 @@ const DORI_THRESHOLDS = [
   { label: 'Identification', ppm: 250, color: 'bg-red-400'    },
 ]
 
-function guessResH(product) {
+function guessMp(product) {
   const text = `${product.name || ''} ${product.description || ''}`.toLowerCase()
   const match = text.match(/(\d+(?:\.\d+)?)\s*mp\b/)
-  if (!match) return '1920'
-  const mp = parseFloat(match[1])
-  if (mp <= 1)  return '1280'
-  if (mp <= 2)  return '1920'
-  if (mp <= 4)  return '2560'
-  if (mp <= 6)  return '3072'
-  if (mp <= 8)  return '3840'
-  if (mp <= 12) return '4000'
-  return '3840'
+  return match ? String(parseFloat(match[1])) : '2'
+}
+
+function mpToResH(mp) {
+  const n = parseFloat(mp)
+  if (!n || n <= 0) return null
+  return Math.round(Math.sqrt(n * 1_000_000 * 16 / 9))
 }
 
 export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, currentSheetId, proposalId, allSheetIds, laborEnabled = false, laborDefaults = [], sheetPlacements = [] }) {
@@ -170,7 +168,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
   // DORI calculator local state (not persisted)
   const [doriMode,   setDoriMode]   = useState('hfov') // 'hfov' | 'focal'
   const [doriHfov,   setDoriHfov]   = useState(() => String(placement.fov_angle ?? product.specs?.fov_angle ?? ''))
-  const [doriResH,   setDoriResH]   = useState(() => guessResH(product))
+  const [doriMp,   setDoriMp]     = useState(() => guessMp(product))
   const [doriFocal,  setDoriFocal]  = useState('')
   const [doriSensor, setDoriSensor] = useState('1/3"')
 
@@ -178,7 +176,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
   useEffect(() => {
     setActiveTab('properties')
     setDoriHfov(String(placement.fov_angle ?? product.specs?.fov_angle ?? ''))
-    setDoriResH(guessResH(product))
+    setDoriMp(guessMp(product))
     setDoriFocal('')
   }, [placement.id])
 
@@ -632,7 +630,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
             {false && (() => {
               // Compute effective HFoV and resolution
               let effHfov = null
-              let effResH = parseInt(doriResH) || null
+              let effResH = mpToResH(doriMp)
               if (doriMode === 'hfov') {
                 effHfov = parseFloat(doriHfov) || null
               } else {
@@ -695,11 +693,11 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                               className={`${inputClass} w-28`} />
                           </div>
                           <div>
-                            <label className={labelClass}>Horizontal Resolution (px)</label>
-                            <input type="number" min="1"
-                              value={doriResH}
-                              onChange={e => setDoriResH(e.target.value)}
-                              placeholder="e.g. 1920"
+                            <label className={labelClass}>Megapixels (MP)</label>
+                            <input type="number" min="0.1" step="0.1"
+                              value={doriMp}
+                              onChange={e => setDoriMp(e.target.value)}
+                              placeholder="e.g. 4"
                               className={`${inputClass} w-32`} />
                           </div>
                         </div>
@@ -727,11 +725,11 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                             </p>
                           )}
                           <div>
-                            <label className={labelClass}>Horizontal Resolution (px)</label>
-                            <input type="number" min="1"
-                              value={doriResH}
-                              onChange={e => setDoriResH(e.target.value)}
-                              placeholder="e.g. 1920"
+                            <label className={labelClass}>Megapixels (MP)</label>
+                            <input type="number" min="0.1" step="0.1"
+                              value={doriMp}
+                              onChange={e => setDoriMp(e.target.value)}
+                              placeholder="e.g. 4"
                               className={`${inputClass} w-32`} />
                           </div>
                         </div>
@@ -976,7 +974,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
       {/* ── DORI tab panel ── */}
       {activeTab === 'dori' && CAMERA_CATEGORIES.includes(product.category) && (() => {
         let effHfov = null
-        let effResH = parseInt(doriResH) || null
+        let effResH = parseInt(doriMp) || null
         if (doriMode === 'hfov') {
           effHfov = parseFloat(doriHfov) || null
         } else {
@@ -1008,21 +1006,24 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
 
             {/* Inputs */}
             {doriMode === 'hfov' ? (
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Horizontal FoV (°)</label>
-                  <input type="number" min="1" max="360" value={doriHfov}
-                    onChange={e => setDoriHfov(e.target.value)}
-                    placeholder="e.g. 90"
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[#8A9AB0] text-xs mb-1 block">Horizontal FoV (°)</label>
+                    <input type="number" min="1" max="360" value={doriHfov}
+                      onChange={e => setDoriHfov(e.target.value)}
+                      placeholder="e.g. 90"
+                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
+                  </div>
+                  <div>
+                    <label className="text-[#8A9AB0] text-xs mb-1 block">Megapixels (MP)</label>
+                    <input type="number" min="0.1" step="0.1" value={doriMp}
+                      onChange={e => setDoriMp(e.target.value)}
+                      placeholder="e.g. 4"
+                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Horiz. Resolution (px)</label>
-                  <input type="number" min="1" value={doriResH}
-                    onChange={e => setDoriResH(e.target.value)}
-                    placeholder="e.g. 1920"
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
-                </div>
+                {effResH && <p className="text-[#4a5a6a] text-xs">≈ {effResH.toLocaleString()}px horizontal (16:9)</p>}
               </div>
             ) : (
               <div className="space-y-2">
@@ -1035,10 +1036,10 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                       className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
                   </div>
                   <div>
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Horiz. Resolution (px)</label>
-                    <input type="number" min="1" value={doriResH}
-                      onChange={e => setDoriResH(e.target.value)}
-                      placeholder="e.g. 1920"
+                    <label className="text-[#8A9AB0] text-xs mb-1 block">Megapixels (MP)</label>
+                    <input type="number" min="0.1" step="0.1" value={doriMp}
+                      onChange={e => setDoriMp(e.target.value)}
+                      placeholder="e.g. 4"
                       className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
                   </div>
                 </div>
@@ -1051,9 +1052,11 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                     ))}
                   </select>
                 </div>
-                {effHfov && (
-                  <p className="text-[#8A9AB0] text-xs">
-                    Calculated HFoV: <span className="text-white font-mono">{effHfov.toFixed(1)}°</span>
+                {(effHfov || effResH) && (
+                  <p className="text-[#4a5a6a] text-xs">
+                    {effHfov ? <>HFoV: <span className="text-white font-mono">{effHfov.toFixed(1)}°</span></> : null}
+                    {effHfov && effResH ? '  ·  ' : null}
+                    {effResH ? <>≈ {effResH.toLocaleString()}px horizontal</> : null}
                   </p>
                 )}
               </div>
