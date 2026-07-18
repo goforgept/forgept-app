@@ -24,6 +24,20 @@ const DORI_THRESHOLDS = [
   { label: 'Identification', ppm: 250, color: 'bg-red-400'    },
 ]
 
+function guessResH(product) {
+  const text = `${product.name || ''} ${product.description || ''}`.toLowerCase()
+  const match = text.match(/(\d+(?:\.\d+)?)\s*mp\b/)
+  if (!match) return '1920'
+  const mp = parseFloat(match[1])
+  if (mp <= 1)  return '1280'
+  if (mp <= 2)  return '1920'
+  if (mp <= 4)  return '2560'
+  if (mp <= 6)  return '3072'
+  if (mp <= 8)  return '3840'
+  if (mp <= 12) return '4000'
+  return '3840'
+}
+
 export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, sheets, currentSheetId, proposalId, allSheetIds, laborEnabled = false, laborDefaults = [], sheetPlacements = [] }) {
   const [attachedRun,      setAttachedRun]      = useState(null)
 
@@ -106,6 +120,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
     }
     formRef.current = { ...formRef.current, ...patch }
     setForm(prev => ({ ...prev, ...patch }))
+    if (placement.fov_angle) setDoriHfov(String(placement.fov_angle))
   }, [placement.rotation, placement.fov_angle, placement.fov_range])
 
   useEffect(() => {
@@ -153,10 +168,17 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
   // DORI calculator local state (not persisted)
   const [showDori,   setShowDori]   = useState(false)
   const [doriMode,   setDoriMode]   = useState('hfov') // 'hfov' | 'focal'
-  const [doriHfov,   setDoriHfov]   = useState('')
-  const [doriResH,   setDoriResH]   = useState('1920')
+  const [doriHfov,   setDoriHfov]   = useState(() => String(placement.fov_angle ?? product.specs?.fov_angle ?? ''))
+  const [doriResH,   setDoriResH]   = useState(() => guessResH(product))
   const [doriFocal,  setDoriFocal]  = useState('')
   const [doriSensor, setDoriSensor] = useState('1/3"')
+
+  // Re-seed when the user selects a different device
+  useEffect(() => {
+    setDoriHfov(String(placement.fov_angle ?? product.specs?.fov_angle ?? ''))
+    setDoriResH(guessResH(product))
+    setDoriFocal('')
+  }, [placement.id])
 
   // Only these fields have visible impact on the canvas marker — all others are text-only
   const VISUAL_FIELDS = new Set(['symbol_size', 'rotation', 'marker_color', 'fov_angle', 'fov_range', 'device_address'])
@@ -647,21 +669,11 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                       {doriMode === 'hfov' ? (
                         <div className="space-y-2">
                           <div>
-                            <label className={labelClass}>
-                              Horizontal FoV (°)
-                              {form.fov_angle && (
-                                <button
-                                  onClick={() => setDoriHfov(String(form.fov_angle))}
-                                  className="ml-2 text-[#C8622A] hover:text-white transition-colors"
-                                >
-                                  ← use canvas value ({form.fov_angle}°)
-                                </button>
-                              )}
-                            </label>
+                            <label className={labelClass}>Horizontal FoV (°)</label>
                             <input type="number" min="1" max="360"
                               value={doriHfov}
                               onChange={e => setDoriHfov(e.target.value)}
-                              placeholder={form.fov_angle ? String(form.fov_angle) : 'e.g. 90'}
+                              placeholder="e.g. 90"
                               className={`${inputClass} w-28`} />
                           </div>
                           <div>
