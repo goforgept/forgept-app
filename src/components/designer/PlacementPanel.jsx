@@ -974,7 +974,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
       {/* ── DORI tab panel ── */}
       {activeTab === 'dori' && CAMERA_CATEGORIES.includes(product.category) && (() => {
         let effHfov = null
-        let effResH = parseInt(doriMp) || null
+        let effResH = mpToResH(doriMp)
         if (doriMode === 'hfov') {
           effHfov = parseFloat(doriHfov) || null
         } else {
