@@ -982,7 +982,10 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
           const sw    = SENSOR_WIDTHS[doriSensor]
           if (focal > 0 && sw) effHfov = 2 * Math.atan(sw / (2 * focal)) * (180 / Math.PI)
         }
-        const doriResult = (effHfov > 0 && effResH > 0)
+        const doriError = effHfov >= 180
+          ? 'HFoV must be less than 180° for the standard DORI formula. For fisheye or multi-sensor cameras, enter the individual lens HFoV.'
+          : null
+        const doriResult = (!doriError && effHfov > 0 && effResH > 0)
           ? DORI_THRESHOLDS.map(t => {
               const rad    = effHfov * Math.PI / 180
               const meters = effResH / (t.ppm * 2 * Math.tan(rad / 2))
@@ -1063,7 +1066,14 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
             )}
 
             {/* Diagram + table */}
-            {doriResult ? (() => {
+            {doriError ? (
+              <div className="bg-[#0F1C2E] rounded-xl border border-yellow-500/30 p-4 flex gap-3">
+                <svg className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+                <p className="text-yellow-400 text-xs leading-relaxed">{doriError}</p>
+              </div>
+            ) : doriResult ? (() => {
               const W = 280, H = 160
               const cx = 22, cy = H / 2
               const halfDeg = Math.min((effHfov || 90) / 2, 72)
@@ -1139,7 +1149,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                   </div>
                 </>
               )
-            })() : (
+            })() : !doriError ? (
               <div className="bg-[#0F1C2E] rounded-xl border border-[#2a3d55] p-6 text-center">
                 <p className="text-[#4a5a6a] text-xs">
                   {doriMode === 'hfov'
@@ -1147,7 +1157,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                     : 'Enter focal length, sensor size, and resolution to calculate DORI distances.'}
                 </p>
               </div>
-            )}
+            ) : null}
           </div>
         )
       })()}
