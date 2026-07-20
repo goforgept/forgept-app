@@ -59,17 +59,24 @@ const LABEL_PREFIXES = {
   // Intrusion / wireless
   'Repeater':            'REP',
   'Wireless Repeater':   'REP',
+  'Alarm Keypad':        'KPD',
   'Keypad':              'KPD',
   'Wireless Keypad':     'KPD',
+  'Alarm Panel':         'PNL',
   'Glass Break':         'GB',
   'Glass Break Detector':'GB',
   'PIR Detector':        'PIR',
   'PIR':                 'PIR',
+  'Dual Tech Detector':  'DT',
   'Door Contact':        'CT',
   'Window Contact':      'CT',
   'Contact':             'CT',
   'Wireless Sensor':     'WS',
   'Wireless Device':     'WD',
+  'Shock Sensor':        'SHK',
+  'Panic Button':        'PB',
+  'Interior Siren':      'SRN',
+  'Exterior Siren':      'SRN',
   'Siren':               'SRN',
   'Indoor Siren':        'SRN',
   'Outdoor Siren':       'SRN',
@@ -86,7 +93,6 @@ const LABEL_PREFIXES = {
   'Vehicle Barrier':     'VB',
   'Turnstile':           'TURN',
   'License Plate Reader':'LPR',
-  'Wireless Lock':       'WL',
   'Elevator Reader':     'ELV',
   'Request to Exit':     'REX',
   'Credential Reader':   'RDR',
@@ -2668,6 +2674,16 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
         </Group>
       )}
 
+      {/* Notes indicator badge — top-left, yellow dot */}
+      {placement.notes && (
+        <Group x={-totalSize * 0.28} y={-totalSize * 0.52} listening={false}>
+          <Circle radius={totalSize * 0.24} fill="#f59e0b" stroke="white" strokeWidth={1.5}/>
+          <Text text="!" fontSize={Math.max(7, totalSize * 0.24)} fontStyle="bold" fill="white"
+            width={totalSize * 0.48} x={-totalSize * 0.24}
+            align="center" verticalAlign="middle" y={-totalSize * 0.19}/>
+        </Group>
+      )}
+
       {/* Device address label below marker */}
       {placement.device_address && !isSelected && showLabels !== false && (
         <Text
@@ -2689,13 +2705,21 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
       {/* Hover tooltip */}
       {isHovered && !isSelected && (
         <Group x={totalSize / 2 + 6} y={-totalSize / 2} listening={false}>
-          <Rect width={tooltipW} height={placement.runs_to_label ? 58 : 48} fill="#0F1C2E" stroke="#2a3d55" strokeWidth={1} cornerRadius={6}/>
-          <Text text={placement.device_address ? `${placement.device_address} · ${product.name}` : product.name} fontSize={10} fontStyle="bold" fill="white" x={6} y={6} width={tooltipW - 12}/>
-          <Text text={placement.part_number_override || product.part_number} fontSize={9} fill="#8A9AB0" fontFamily="monospace" x={6} y={20}/>
-          <Text text={placement.manufacturer_override || product.manufacturer} fontSize={9} fill="#8A9AB0" x={6} y={32}/>
-          {placement.runs_to_label && (
-            <Text text={`→ ${placement.runs_to_label}`} fontSize={8} fill="#60a5fa" x={6} y={42}/>
-          )}
+          {(() => {
+            const hasRuns  = !!placement.runs_to_label
+            const hasNotes = !!placement.notes
+            const h = 46 + (hasRuns ? 12 : 0) + (hasNotes ? 12 + Math.ceil(placement.notes.length / 28) * 10 : 0)
+            return (
+              <>
+                <Rect width={tooltipW} height={h} fill="#0F1C2E" stroke="#2a3d55" strokeWidth={1} cornerRadius={6}/>
+                <Text text={placement.device_address ? `${placement.device_address} · ${product.name}` : product.name} fontSize={10} fontStyle="bold" fill="white" x={6} y={6} width={tooltipW - 12}/>
+                <Text text={placement.part_number_override || product.part_number} fontSize={9} fill="#8A9AB0" fontFamily="monospace" x={6} y={20}/>
+                <Text text={placement.manufacturer_override || product.manufacturer} fontSize={9} fill="#8A9AB0" x={6} y={32}/>
+                {hasRuns  && <Text text={`→ ${placement.runs_to_label}`} fontSize={8} fill="#60a5fa" x={6} y={44}/>}
+                {hasNotes && <Text text={placement.notes} fontSize={8} fill="#f59e0b" x={6} y={44 + (hasRuns ? 12 : 0)} width={tooltipW - 12} wrap="word"/>}
+              </>
+            )
+          })()}
         </Group>
       )}
 
@@ -2703,12 +2727,25 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
       {isSelected && (
         <Group>
           {/* Info above */}
-          <Group x={-tooltipW / 2} y={-(totalSize / 2) - 58} listening={false}>
-            <Rect width={tooltipW} height={50} fill="#C8622A" cornerRadius={6}/>
-            <Text text={product.name} fontSize={10} fontStyle="bold" fill="white" x={6} y={6} width={tooltipW - 12}/>
-            <Text text={product.part_number} fontSize={9} fill="rgba(255,255,255,0.85)" fontFamily="monospace" x={6} y={20}/>
-            <Text text={`${product.manufacturer} · ${product.category}`} fontSize={8} fill="rgba(255,255,255,0.7)" x={6} y={33}/>
-          </Group>
+          {(() => {
+            const hasNotes = !!placement.notes
+            const noteLines = hasNotes ? Math.ceil(placement.notes.length / 30) : 0
+            const boxH = 50 + (hasNotes ? 8 + noteLines * 11 : 0)
+            return (
+              <Group x={-tooltipW / 2} y={-(totalSize / 2) - boxH - 6} listening={false}>
+                <Rect width={tooltipW} height={boxH} fill="#C8622A" cornerRadius={6}/>
+                <Text text={product.name} fontSize={10} fontStyle="bold" fill="white" x={6} y={6} width={tooltipW - 12}/>
+                <Text text={product.part_number} fontSize={9} fill="rgba(255,255,255,0.85)" fontFamily="monospace" x={6} y={20}/>
+                <Text text={`${product.manufacturer} · ${product.category}`} fontSize={8} fill="rgba(255,255,255,0.7)" x={6} y={33}/>
+                {hasNotes && (
+                  <>
+                    <Rect x={4} y={44} width={tooltipW - 8} height={noteLines * 11 + 6} fill="rgba(0,0,0,0.2)" cornerRadius={3}/>
+                    <Text text={placement.notes} fontSize={8} fill="rgba(255,255,255,0.95)" x={8} y={47} width={tooltipW - 16} wrap="word"/>
+                  </>
+                )}
+              </Group>
+            )
+          })()}
 
           {/* Buttons below */}
           <Group y={totalSize / 2 + 6}>
