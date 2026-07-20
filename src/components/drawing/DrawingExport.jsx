@@ -344,6 +344,26 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.addImage(iconPng, 'PNG', px - iconSize/2, py - iconSize/2, iconSize, iconSize)
       }
 
+      // Site condition badge (E/R/D) — top-right of marker, matches canvas rendering
+      if (p.site_condition && p.site_condition !== 'new') {
+        const badgeR   = Math.max(symbolSizeMM * 0.24, 1.2)
+        const bx       = px + symbolSizeMM * 0.28
+        const by       = py - symbolSizeMM * 0.52
+        const badgeCol = p.site_condition === 'existing' ? [34, 197, 94]
+                       : p.site_condition === 'demo'     ? [168, 85, 247]
+                       : [239, 68, 68]
+        const letter   = p.site_condition === 'existing' ? 'E'
+                       : p.site_condition === 'demo'     ? 'D' : 'R'
+        pdf.setFillColor(...badgeCol)
+        pdf.setDrawColor(255, 255, 255)
+        pdf.setLineWidth(0.4)
+        pdf.circle(bx, by, badgeR, 'FD')
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(Math.max(badgeR * 3.5, 4))
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(letter, bx, by + badgeR * 0.38, { align: 'center' })
+      }
+
       // Device label — try below, then above, right, left; fall back to below if all overlap
       if (p.device_address) {
         const fs    = Math.max(symbolSizeMM * 0.7, 3)   // points — for setFontSize only
@@ -583,9 +603,40 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         }
       }
 
+      // Site condition key
+      const condKeyY = ly + (col > 0 ? rowH : 0) + 10
+      pdf.setTextColor(200, 98, 42)
+      pdf.setFontSize(9)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('SITE CONDITIONS', margin, condKeyY)
+      const condItems = [
+        { label: 'New',      color: [200, 98, 42], letter: null },
+        { label: 'Existing', color: [34, 197, 94],  letter: 'E' },
+        { label: 'Replace',  color: [239, 68, 68],  letter: 'R' },
+        { label: 'Demo',     color: [168, 85, 247],  letter: 'D' },
+      ]
+      let ckx = margin
+      condItems.forEach(({ label, color, letter }) => {
+        pdf.setFillColor(...color)
+        pdf.setDrawColor(255, 255, 255)
+        pdf.setLineWidth(0.3)
+        pdf.circle(ckx + 3, condKeyY + 6, 3, letter ? 'FD' : 'F')
+        if (letter) {
+          pdf.setTextColor(255, 255, 255)
+          pdf.setFontSize(5)
+          pdf.setFont('helvetica', 'bold')
+          pdf.text(letter, ckx + 3, condKeyY + 7.1, { align: 'center' })
+        }
+        pdf.setTextColor(30, 30, 30)
+        pdf.setFontSize(8)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(label, ckx + 8, condKeyY + 7.5)
+        ckx += 30
+      })
+
       // Cable summary on legend page
       if (Object.keys(cableByType).length > 0) {
-        const cableY = Math.max(ly + rowH + 10, pageH - 60)
+        const cableY = Math.max(condKeyY + 20, pageH - 60)
         pdf.setTextColor(200, 98, 42)
         pdf.setFontSize(11)
         pdf.setFont('helvetica', 'bold')
