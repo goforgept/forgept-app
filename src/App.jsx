@@ -144,6 +144,7 @@ function App() {
         <Route path="/sign/:token" element={<SignProposal />} />
         <Route path="/rfq-response/:token" element={<RFQResponse />} />
         <Route path="/embed" element={<EmbedDesigner />} />
+        <Route path="/designer/review/:token" element={<DrawingReview />} />
         {!session ? (
           <Route path="*" element={<Login />} />
         ) : (
@@ -199,7 +200,6 @@ function App() {
             <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />
             <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />
             {features.designerOnly && <Route path="*" element={<Navigate to="/designer" replace />} />}
-            <Route path="/designer/review/:token" element={<DrawingReview />} />
             <Route path="/roadmap" element={<Roadmap {...sharedProps} />} />
           </>
         )}
