@@ -103,6 +103,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
     labor_overrides:        p.labor_overrides        || {},
     switch_placement_id:    p.switch_placement_id    || '',
     watts_override:         p.watts_override         || '',
+    site_condition:         p.site_condition         || '',
   })
 
   const [form, setForm] = useState(() => getInitialForm(placement))
@@ -218,6 +219,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
         labor_overrides: Object.keys(f.labor_overrides || {}).length > 0 ? f.labor_overrides : null,
         switch_placement_id:   f.switch_placement_id   || null,
         watts_override:        f.watts_override ? parseFloat(f.watts_override) : null,
+        site_condition:        f.site_condition || null,
       }).eq('id', placement.id)
       if (!error) {
         setSaved(true)
@@ -278,6 +280,29 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
         <div>
           <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide mb-2">Device Data</p>
           <div className="space-y-2">
+            {/* Site condition */}
+            <div>
+              <label className={labelClass}>Site Condition</label>
+              <div className="flex gap-1.5">
+                {[
+                  { value: '',         label: 'New',      bg: '#C8622A' },
+                  { value: 'existing', label: 'Existing', bg: '#22c55e' },
+                  { value: 'replace',  label: 'Replace',  bg: '#ef4444' },
+                ].map(opt => {
+                  const active = (form.site_condition || '') === opt.value
+                  return (
+                    <button key={opt.value}
+                      onClick={() => update('site_condition', opt.value || null)}
+                      style={active ? { backgroundColor: opt.bg, borderColor: opt.bg } : {}}
+                      className={`flex-1 py-1.5 text-xs rounded-lg border font-semibold transition-colors ${
+                        active ? 'text-white' : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white bg-[#0F1C2E]'
+                      }`}>
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
             <div>
               <label className={labelClass}>Device Address / Label</label>
               <input type="text" value={form.device_address || ''}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Shape, Line } from 'react-konva'
+import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Shape, Line, Arrow } from 'react-konva'
 import { supabase } from '../../supabase'
 import { useCategoryIcons } from './useCategoryIcons'
 import { PATHWAY_DEFS } from './SymbolPicker'
@@ -56,6 +56,23 @@ const LABEL_PREFIXES = {
   'Thermostat':          'THERM',
   'Point to Point':      'P2P',
   'Power Box':           'PWR',
+}
+
+// Draw a revision-cloud path on a canvas 2D context (bumpy arcs around a rectangle)
+function drawCloudPath(ctx, ax1, ay1, ax2, ay2) {
+  const minX = Math.min(ax1, ax2), maxX = Math.max(ax1, ax2)
+  const minY = Math.min(ay1, ay2), maxY = Math.max(ay1, ay2)
+  const w = maxX - minX, h = maxY - minY
+  if (w < 10 || h < 10) return
+  const nx = Math.max(2, Math.round(w / Math.max(14, w * 0.13)))
+  const ny = Math.max(2, Math.round(h / Math.max(14, h * 0.13)))
+  const rx = w / (2 * nx), ry = h / (2 * ny)
+  ctx.beginPath()
+  for (let i = 0; i < nx; i++) ctx.arc(minX + rx * (2*i+1), minY, rx, Math.PI, 0, true)
+  for (let j = 0; j < ny; j++) ctx.arc(maxX, minY + ry * (2*j+1), ry, -Math.PI/2, Math.PI/2, false)
+  for (let i = nx-1; i >= 0; i--) ctx.arc(minX + rx * (2*i+1), maxY, rx, 0, Math.PI, false)
+  for (let j = ny-1; j >= 0; j--) ctx.arc(minX, minY + ry * (2*j+1), ry, Math.PI/2, -Math.PI/2, false)
+  ctx.closePath()
 }
 
 const getNextLabel = async (category, sheetIds) => {
@@ -140,6 +157,13 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const copiedPlacement    = externalCopied
   const setCopiedPlacement = onCopyPlacement || (() => {})
   const [contextMenu,     setContextMenu]     = useState(null) // {x, y, placementId}
+
+  // ── Annotations (arrows + revision clouds) ─────────────────────────────────
+  const [annotations,       setAnnotations]       = useState([])
+  const [annotationTool,    setAnnotationTool]    = useState(null) // 'arrow' | 'cloud' | null
+  const [annotationColor,   setAnnotationColor]   = useState('#ef4444')
+  const [annotationStart,   setAnnotationStart]   = useState(null) // {x,y} normalised
+  const [annotationPreview, setAnnotationPreview] = useState(null) // {x,y} normalised live
 
   
   const snapRadius = 20 // pixels — snap to device marker within this distance
@@ -359,6 +383,15 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   }, [sheet.id])
 
   useEffect(() => { loadPathways() }, [loadPathways])
+
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('drawing_annotations')
+        .select('*').eq('drawing_sheet_id', sheet.id).order('created_at')
+      setAnnotations(data || [])
+    }
+    load()
+  }, [sheet.id])
 
   useEffect(() => {
     if (editingCableId) {
@@ -590,6 +623,15 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }))
   }, [])
 
+  const updateAnnotationPreview = useCallback((clientX, clientY) => {
+    if (!annotationTool || !annotationStart || !stageRef.current) return
+    const pos = stageRef.current.getPointerPosition()
+    if (!pos) return
+    const nx = Math.min(Math.max((pos.x - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
+    const ny = Math.min(Math.max((pos.y - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
+    setAnnotationPreview({ x: nx, y: ny })
+  }, [annotationTool, annotationStart])
+
   const handleMouseUp = useCallback(() => {
     isPanning.current = false
     if (isSelecting.current) {
@@ -810,6 +852,28 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       const nx = Math.min(Math.max((pointer.x - position.x) / scale / canvasW, 0.01), 0.99)
       const ny = Math.min(Math.max((pointer.y - position.y) / scale / canvasH, 0.01), 0.99)
       setActivePathwayPoints(prev => [...prev, { x: nx, y: ny }])
+      return
+    }
+
+    // Annotation drawing mode (arrow or cloud) — works on background and over devices
+    if (annotationTool) {
+      const pointer = stageRef.current.getPointerPosition()
+      const nx = Math.min(Math.max((pointer.x - position.x) / scale / canvasW, 0.005), 0.995)
+      const ny = Math.min(Math.max((pointer.y - position.y) / scale / canvasH, 0.005), 0.995)
+      if (!annotationStart) {
+        setAnnotationStart({ x: nx, y: ny })
+      } else {
+        const { data } = await supabase.from('drawing_annotations').insert({
+          drawing_sheet_id: sheet.id,
+          org_id:           orgId,
+          annotation_type:  annotationTool,
+          points:           [annotationStart, { x: nx, y: ny }],
+          color:            annotationColor,
+        }).select().single()
+        if (data) setAnnotations(prev => [...prev, data])
+        setAnnotationStart(null)
+        setAnnotationPreview(null)
+      }
       return
     }
 
@@ -1068,6 +1132,38 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             </svg>
             Labels
           </button>
+          {/* Annotation tools */}
+          <div className="flex items-center gap-1 border-l border-[#2a3d55] pl-2 ml-1">
+            {[
+              { type: 'arrow', title: 'Arrow',
+                icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3"/> },
+              { type: 'cloud', title: 'Cloud',
+                icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/> },
+            ].map(({ type, title, icon }) => (
+              <button key={type}
+                onClick={() => {
+                  setAnnotationTool(t => t === type ? null : type)
+                  setAnnotationStart(null)
+                  setAnnotationPreview(null)
+                }}
+                title={title}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs transition-colors ${
+                  annotationTool === type
+                    ? 'border-red-400/50 bg-red-500/10 text-red-400'
+                    : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white'
+                }`}>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">{icon}</svg>
+                {title}
+              </button>
+            ))}
+            {annotationTool && (
+              <input type="color" value={annotationColor}
+                onChange={e => setAnnotationColor(e.target.value)}
+                className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
+                title="Annotation color" />
+            )}
+          </div>
+
           {/* Layers dropdown */}
           <div className="relative">
             <button
@@ -1129,6 +1225,15 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               </div>
             )}
           </div>
+
+          {annotationTool && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-red-400/40 bg-red-500/10 text-red-300 text-xs">
+              <span style={{ color: annotationColor }}>●</span>
+              {annotationStart ? 'Click to finish' : `Drawing ${annotationTool}`}
+              <button onClick={() => { setAnnotationTool(null); setAnnotationStart(null); setAnnotationPreview(null) }}
+                className="ml-1 opacity-60 hover:opacity-100">✕</button>
+            </div>
+          )}
 
           {(cableMode || pathwayMode) && (
             <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs ${
@@ -1194,7 +1299,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       )}
 
       <div ref={containerRef} className="flex-1 overflow-hidden bg-[#060f1c] relative"
-        style={{ cursor: pickingPoint ? 'crosshair' : selectedSymbol ? 'crosshair' : 'grab' }}
+        style={{ cursor: pickingPoint || annotationTool ? 'crosshair' : selectedSymbol ? 'crosshair' : 'grab' }}
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
         onDrop={async (e) => {
           e.preventDefault()
@@ -1261,7 +1366,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
         {!loading && !error && stageSize.w > 0 && (
           <Stage ref={stageRef} width={stageSize.w} height={stageSize.h} style={{ background: '#ffffff' }}
-            onWheel={handleWheel} onMouseDown={(e) => { if (e.evt.button === 2) return; handleMouseDown(e) }} onMouseMove={handleMouseMove}
+            onWheel={handleWheel} onMouseDown={(e) => { if (e.evt.button === 2) return; handleMouseDown(e) }}
+            onMouseMove={(e) => { handleMouseMove(e); updateAnnotationPreview(e.evt.clientX, e.evt.clientY) }}
             onMouseUp={handleMouseUp} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
             onClick={(e) => {
               if (e.evt.button === 2) return // ignore right-click
@@ -1971,6 +2077,73 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 )
               })}
 
+              {/* ── Annotations (arrows + revision clouds) ── */}
+              {annotations.map(ann => {
+                if (!ann.points?.[0] || !ann.points?.[1]) return null
+                const ax1 = position.x + ann.points[0].x * canvasW * scale
+                const ay1 = position.y + ann.points[0].y * canvasH * scale
+                const ax2 = position.x + ann.points[1].x * canvasW * scale
+                const ay2 = position.y + ann.points[1].y * canvasH * scale
+                const col = ann.color || '#ef4444'
+                return (
+                  <Group key={ann.id}
+                    onClick={() => {
+                      supabase.from('drawing_annotations').delete().eq('id', ann.id)
+                      setAnnotations(prev => prev.filter(a => a.id !== ann.id))
+                    }}
+                    onTap={() => {
+                      supabase.from('drawing_annotations').delete().eq('id', ann.id)
+                      setAnnotations(prev => prev.filter(a => a.id !== ann.id))
+                    }}>
+                    {ann.annotation_type === 'arrow' ? (
+                      <Arrow
+                        points={[ax1, ay1, ax2, ay2]}
+                        stroke={col} strokeWidth={2.5}
+                        fill={col}
+                        pointerLength={10} pointerWidth={8}
+                        shadowColor="black" shadowBlur={4} shadowOpacity={0.4}
+                      />
+                    ) : (
+                      <Shape
+                        sceneFunc={(ctx, shape) => {
+                          drawCloudPath(ctx, ax1, ay1, ax2, ay2)
+                          ctx.fillStrokeShape(shape)
+                        }}
+                        stroke={col} strokeWidth={2}
+                        fill={col + '18'}
+                        dash={[]}
+                      />
+                    )}
+                  </Group>
+                )
+              })}
+
+              {/* In-progress annotation preview */}
+              {annotationTool && annotationStart && annotationPreview && (() => {
+                const ax1 = position.x + annotationStart.x * canvasW * scale
+                const ay1 = position.y + annotationStart.y * canvasH * scale
+                const ax2 = position.x + annotationPreview.x * canvasW * scale
+                const ay2 = position.y + annotationPreview.y * canvasH * scale
+                const col = annotationColor
+                return annotationTool === 'arrow' ? (
+                  <Arrow
+                    points={[ax1, ay1, ax2, ay2]}
+                    stroke={col} strokeWidth={2} fill={col}
+                    pointerLength={10} pointerWidth={8} opacity={0.6}
+                    dash={[6, 4]} listening={false}
+                  />
+                ) : (
+                  <Shape
+                    sceneFunc={(ctx, shape) => {
+                      drawCloudPath(ctx, ax1, ay1, ax2, ay2)
+                      ctx.fillStrokeShape(shape)
+                    }}
+                    stroke={col} strokeWidth={2} fill={col + '18'}
+                    dash={[4, 3]} opacity={0.6} listening={false}
+                  />
+                )
+              })()}
+
               {/* ── Room markers ── */}
               {(rooms || []).filter(r => r.drawing_sheet_id === sheet.id && r.x != null).map(room => {
                 const ROOM_COLORS = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981', electrical: '#f59e0b', server: '#a855f7', closet: '#06b6d4', av: '#8b5cf6', other: '#64748b' }
@@ -2276,6 +2449,22 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
 
       {/* Icon */}
       {icon && <KonvaImage image={icon} x={-iconSize / 2} y={-iconSize / 2} width={iconSize} height={iconSize} listening={false}/>}
+
+      {/* Site condition badge (E = existing, R = replace) */}
+      {placement.site_condition && (
+        <Group x={totalSize * 0.28} y={-totalSize * 0.52} listening={false}>
+          <Circle radius={totalSize * 0.24}
+            fill={placement.site_condition === 'existing' ? '#22c55e' : '#ef4444'}
+            stroke="white" strokeWidth={1.5}/>
+          <Text
+            text={placement.site_condition === 'existing' ? 'E' : 'R'}
+            fontSize={Math.max(7, totalSize * 0.22)}
+            fontStyle="bold" fill="white"
+            width={totalSize * 0.48} x={-totalSize * 0.24}
+            align="center" verticalAlign="middle"
+            y={-totalSize * 0.19}/>
+        </Group>
+      )}
 
       {/* Device address label below marker */}
       {placement.device_address && !isSelected && showLabels !== false && (
