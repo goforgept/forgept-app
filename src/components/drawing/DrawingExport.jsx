@@ -804,6 +804,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       drawTitleBlock('Legend', 2)
 
+      const conditionLabel = (c) => c === 'existing' ? 'Existing' : c === 'replace' ? 'Replace' : c === 'demo' ? 'Demo' : 'New'
+
       // ── Device schedule sheet ────────────────────────────────────────────
       pdf.addPage()
       pdf.setFillColor(255, 255, 255)
@@ -825,6 +827,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           p.manufacturer_override || gp?.manufacturer || '—',
           gp?.category || '—',
           p.quantity || 1,
+          conditionLabel(p.site_condition),
           sheet?.name || '—',
           p.runs_to_label || '—',
         ]
@@ -833,7 +836,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       autoTable(pdf, {
         startY:     margin + 14,
         margin:     { left: margin, right: margin, bottom: titleBlockH + margin + 5 },
-        head:       [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Category', 'Qty', 'Sheet', 'Runs To']],
+        head:       [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Category', 'Qty', 'Condition', 'Sheet', 'Runs To']],
         body:       scheduleRows,
         theme:      'grid',
         styles:     { fontSize: 7, cellPadding: 2, textColor: [40, 40, 40], fillColor: [255, 255, 255], lineColor: [200, 200, 200] },
@@ -998,6 +1001,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           p.part_number_override || gp?.part_number || '—',
           p.description_override || gp?.name        || '—',
           p.manufacturer_override || gp?.manufacturer || '—',
+          conditionLabel(p.site_condition),
           sheet?.name         || '—',
           p.serial_number     || '—',
           p.ip_address        || '—',
@@ -1012,7 +1016,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       autoTable(pdf, {
         startY:     margin + 14,
         margin:     { left: margin, right: margin, bottom: margin + 5 },
-        head:       [['#', 'Address', 'Part #', 'Description', 'Manufacturer', 'Sheet', 'Serial', 'IP', 'MAC', 'Switch', 'Port', 'Patch Panel', 'Runs To']],
+        head:       [['#', 'Address', 'Part #', 'Description', 'Manufacturer', 'Condition', 'Sheet', 'Serial', 'IP', 'MAC', 'Switch', 'Port', 'Patch Panel', 'Runs To']],
         body:       asBuiltRows,
         theme:      'grid',
         styles:     { fontSize: 6, cellPadding: 1.5, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] },

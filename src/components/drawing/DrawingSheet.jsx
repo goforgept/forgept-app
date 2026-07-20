@@ -164,11 +164,13 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [contextMenu,     setContextMenu]     = useState(null) // {x, y, placementId}
 
   // ── Annotations (arrows + revision clouds) ─────────────────────────────────
-  const [annotations,       setAnnotations]       = useState([])
-  const [annotationTool,    setAnnotationTool]    = useState(null) // 'arrow' | 'cloud' | null
-  const [annotationColor,   setAnnotationColor]   = useState('#ef4444')
-  const [annotationStart,   setAnnotationStart]   = useState(null) // {x,y} normalised
-  const [annotationPreview, setAnnotationPreview] = useState(null) // {x,y} normalised live
+  const [annotations,         setAnnotations]         = useState([])
+  const [annotationTool,      setAnnotationTool]      = useState(null) // 'arrow' | 'cloud' | null
+  const [annotationColor,     setAnnotationColor]     = useState('#ef4444')
+  const [annotationStart,     setAnnotationStart]     = useState(null) // {x,y} normalised
+  const [annotationPreview,   setAnnotationPreview]   = useState(null) // {x,y} normalised live
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState(null)
+  const lastAnnotationPosRef = useRef(null) // last known pointer pos during drag
   useEffect(() => { annotationToolRef.current  = annotationTool },  [annotationTool])
   useEffect(() => { annotationStartRef.current = annotationStart }, [annotationStart])
   useEffect(() => { annotationColorRef.current = annotationColor }, [annotationColor])
@@ -437,6 +439,14 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         }
       }
 
+      // Delete selected annotation
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedAnnotationId && !isInput) {
+        await supabase.from('drawing_annotations').delete().eq('id', selectedAnnotationId)
+        setAnnotations(prev => prev.filter(a => a.id !== selectedAnnotationId))
+        setSelectedAnnotationId(null)
+        return
+      }
+
       // Delete selected placement
       if ((e.key === 'Delete' || e.key === 'Backspace') && !isInput) {
         if (selectedIds.size > 0) {
@@ -531,7 +541,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedCable, selectedPathwayId, selectedId, copiedPlacement, cableMode, pathwayMode, placements, editingPathwayId])
+  }, [selectedCable, selectedPathwayId, selectedId, selectedAnnotationId, copiedPlacement, cableMode, pathwayMode, placements, editingPathwayId])
 
   useEffect(() => {
     if (!updatedPlacement) return
@@ -601,12 +611,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const handleMouseDown = useCallback((e) => {
     // Annotation draw mode: capture start point and block panning entirely
     if (annotationToolRef.current && e.evt.button === 0) {
-      const pos = stageRef.current?.getPointerPosition()
-      if (!pos) return
-      const nx = Math.min(Math.max((pos.x - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
-      const ny = Math.min(Math.max((pos.y - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
-      setAnnotationStart({ x: nx, y: ny })
-      annotationStartRef.current = { x: nx, y: ny }
+      const norm = clientToNorm(e.evt.clientX, e.evt.clientY)
+      if (!norm) return
+      setAnnotationStart(norm)
+      annotationStartRef.current = norm
+      lastAnnotationPosRef.current = norm
       return
     }
     const isOnBackground = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
@@ -652,24 +661,37 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     if (!pos) return
     const nx = Math.min(Math.max((pos.x - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
     const ny = Math.min(Math.max((pos.y - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
+    lastAnnotationPosRef.current = { x: nx, y: ny }
     setAnnotationPreview({ x: nx, y: ny })
   }, [])
 
-  const handleMouseUp = useCallback(async () => {
+  // Shared helper: normalise stage clientX/Y to canvas 0-1 coords
+  const clientToNorm = useCallback((clientX, clientY) => {
+    const stage = stageRef.current
+    if (!stage) return null
+    const rect = stage.container().getBoundingClientRect()
+    const sx = (clientX - rect.left) * (stage.width() / rect.width)
+    const sy = (clientY - rect.top)  * (stage.height() / rect.height)
+    return {
+      x: Math.min(Math.max((sx - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995),
+      y: Math.min(Math.max((sy - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995),
+    }
+  }, [])
+
+  const handleMouseUp = useCallback(async (e) => {
     // Save annotation on drag release
     if (annotationToolRef.current && annotationStartRef.current) {
-      const pos = stageRef.current?.getPointerPosition()
-      if (pos) {
-        const nx = Math.min(Math.max((pos.x - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
-        const ny = Math.min(Math.max((pos.y - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
+      // Use event clientX/Y (most reliable) — fallback to last known position from mousemove
+      const norm = (e?.evt) ? clientToNorm(e.evt.clientX, e.evt.clientY) : lastAnnotationPosRef.current
+      if (norm) {
         const start = annotationStartRef.current
-        const dx = Math.abs(nx - start.x), dy = Math.abs(ny - start.y)
-        if (dx > 0.005 || dy > 0.005) {
+        const dx = Math.abs(norm.x - start.x), dy = Math.abs(norm.y - start.y)
+        if (dx > 0.003 || dy > 0.003) {
           const { data } = await supabase.from('drawing_annotations').insert({
             drawing_sheet_id: sheetIdRef.current,
             org_id:           orgIdRef.current,
             annotation_type:  annotationToolRef.current,
-            points:           [start, { x: nx, y: ny }],
+            points:           [start, norm],
             color:            annotationColorRef.current,
           }).select().single()
           if (data) setAnnotations(prev => [...prev, data])
@@ -677,6 +699,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       }
       setAnnotationStart(null)
       annotationStartRef.current = null
+      lastAnnotationPosRef.current = null
       setAnnotationPreview(null)
       isPanning.current = false
       return
@@ -718,16 +741,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const handleTouchStart = useCallback((e) => {
     const t = e.evt.touches
     if (annotationToolRef.current && t.length === 1) {
-      const touch = t[0]
-      const stage = stageRef.current
-      if (stage) {
-        const rect = stage.container().getBoundingClientRect()
-        const sx = (touch.clientX - rect.left) * (stage.width() / rect.width)
-        const sy = (touch.clientY - rect.top)  * (stage.height() / rect.height)
-        const nx = Math.min(Math.max((sx - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
-        const ny = Math.min(Math.max((sy - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
-        setAnnotationStart({ x: nx, y: ny })
-        annotationStartRef.current = { x: nx, y: ny }
+      const norm = clientToNorm(t[0].clientX, t[0].clientY)
+      if (norm) {
+        setAnnotationStart(norm)
+        annotationStartRef.current = norm
+        lastAnnotationPosRef.current = norm
       }
       lastTouchPos.current = null // block touch pan
       return
@@ -740,21 +758,16 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       lastTouchPos.current = { x: t[0].clientX, y: t[0].clientY }
       touchPanStarted.current = false
     }
-  }, [])
+  }, [clientToNorm])
 
   const handleTouchMove = useCallback((e) => {
     const t = e.evt.touches
     // Annotation draw: update preview, block pan
     if (annotationToolRef.current && annotationStartRef.current && t.length === 1) {
-      const touch = t[0]
-      const stage = stageRef.current
-      if (stage) {
-        const rect = stage.container().getBoundingClientRect()
-        const sx = (touch.clientX - rect.left) * (stage.width() / rect.width)
-        const sy = (touch.clientY - rect.top)  * (stage.height() / rect.height)
-        const nx = Math.min(Math.max((sx - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
-        const ny = Math.min(Math.max((sy - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
-        setAnnotationPreview({ x: nx, y: ny })
+      const norm = clientToNorm(t[0].clientX, t[0].clientY)
+      if (norm) {
+        lastAnnotationPosRef.current = norm
+        setAnnotationPreview(norm)
       }
       return
     }
@@ -783,39 +796,34 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const handleTouchEnd = useCallback(async (e) => {
     // Save annotation on touch release
     if (annotationToolRef.current && annotationStartRef.current) {
-      const changedTouches = e.evt.changedTouches
-      if (changedTouches.length > 0) {
-        const touch = changedTouches[0]
-        const stage = stageRef.current
-        if (stage) {
-          const rect = stage.container().getBoundingClientRect()
-          const sx = (touch.clientX - rect.left) * (stage.width() / rect.width)
-          const sy = (touch.clientY - rect.top)  * (stage.height() / rect.height)
-          const nx = Math.min(Math.max((sx - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
-          const ny = Math.min(Math.max((sy - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
-          const start = annotationStartRef.current
-          const dx = Math.abs(nx - start.x), dy = Math.abs(ny - start.y)
-          if (dx > 0.005 || dy > 0.005) {
-            const { data } = await supabase.from('drawing_annotations').insert({
-              drawing_sheet_id: sheetIdRef.current,
-              org_id:           orgIdRef.current,
-              annotation_type:  annotationToolRef.current,
-              points:           [start, { x: nx, y: ny }],
-              color:            annotationColorRef.current,
-            }).select().single()
-            if (data) setAnnotations(prev => [...prev, data])
-          }
+      const ct = e.evt.changedTouches
+      const norm = (ct?.length > 0)
+        ? clientToNorm(ct[0].clientX, ct[0].clientY)
+        : lastAnnotationPosRef.current
+      if (norm) {
+        const start = annotationStartRef.current
+        const dx = Math.abs(norm.x - start.x), dy = Math.abs(norm.y - start.y)
+        if (dx > 0.003 || dy > 0.003) {
+          const { data } = await supabase.from('drawing_annotations').insert({
+            drawing_sheet_id: sheetIdRef.current,
+            org_id:           orgIdRef.current,
+            annotation_type:  annotationToolRef.current,
+            points:           [start, norm],
+            color:            annotationColorRef.current,
+          }).select().single()
+          if (data) setAnnotations(prev => [...prev, data])
         }
       }
       setAnnotationStart(null)
       annotationStartRef.current = null
+      lastAnnotationPosRef.current = null
       setAnnotationPreview(null)
       return
     }
     lastDist.current = 0
     lastTouchPos.current = null
     touchPanStarted.current = false
-  }, [])
+  }, [clientToNorm])
 
   // ── Canvas dimensions ──────────────────────────────────────────────────────
   const isBlank = sheet.storage_path === 'blank'
@@ -908,6 +916,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   // ── Click to place ─────────────────────────────────────────────────────────
   const handleStageClick = useCallback(async (e) => {
     const onBg = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
+    if (onBg) setSelectedAnnotationId(null) // deselect annotation when clicking background
     if (!onBg) return
 
     // Handle two-point calibration picking
@@ -2171,34 +2180,58 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 const ax2 = position.x + ann.points[1].x * canvasW * scale
                 const ay2 = position.y + ann.points[1].y * canvasH * scale
                 const col = ann.color || '#ef4444'
+                const isSel = ann.id === selectedAnnotationId
+                const midX = (ax1 + ax2) / 2
+                const midY = Math.min(ay1, ay2) - 18
+                const handleSelect = (e) => {
+                  e.cancelBubble = true
+                  setSelectedAnnotationId(isSel ? null : ann.id)
+                }
+                const handleDelete = async (e) => {
+                  e.cancelBubble = true
+                  await supabase.from('drawing_annotations').delete().eq('id', ann.id)
+                  setAnnotations(prev => prev.filter(a => a.id !== ann.id))
+                  setSelectedAnnotationId(null)
+                }
                 return (
-                  <Group key={ann.id}
-                    onClick={() => {
-                      supabase.from('drawing_annotations').delete().eq('id', ann.id)
-                      setAnnotations(prev => prev.filter(a => a.id !== ann.id))
-                    }}
-                    onTap={() => {
-                      supabase.from('drawing_annotations').delete().eq('id', ann.id)
-                      setAnnotations(prev => prev.filter(a => a.id !== ann.id))
-                    }}>
+                  <Group key={ann.id}>
                     {ann.annotation_type === 'arrow' ? (
-                      <Arrow
-                        points={[ax1, ay1, ax2, ay2]}
-                        stroke={col} strokeWidth={2.5}
-                        fill={col}
-                        pointerLength={10} pointerWidth={8}
-                        shadowColor="black" shadowBlur={4} shadowOpacity={0.4}
-                      />
+                      <>
+                        {/* Wide transparent hit area so the line is easy to click */}
+                        <Line
+                          points={[ax1, ay1, ax2, ay2]}
+                          stroke="transparent" strokeWidth={20}
+                          onClick={handleSelect} onTap={handleSelect}
+                        />
+                        <Arrow
+                          points={[ax1, ay1, ax2, ay2]}
+                          stroke={isSel ? '#fff' : col} strokeWidth={isSel ? 3 : 2.5}
+                          fill={isSel ? '#fff' : col}
+                          pointerLength={10} pointerWidth={8}
+                          shadowColor="black" shadowBlur={4} shadowOpacity={0.4}
+                          listening={false}
+                        />
+                      </>
                     ) : (
                       <Shape
                         sceneFunc={(ctx, shape) => {
                           drawCloudPath(ctx, ax1, ay1, ax2, ay2)
                           ctx.fillStrokeShape(shape)
                         }}
-                        stroke={col} strokeWidth={2}
+                        stroke={isSel ? '#fff' : col} strokeWidth={isSel ? 3 : 2}
                         fill={col + '18'}
-                        dash={[]}
+                        onClick={handleSelect} onTap={handleSelect}
                       />
+                    )}
+                    {/* Delete button — shown only when selected */}
+                    {isSel && (
+                      <Group x={midX} y={midY}>
+                        <Circle radius={12} fill="#ef4444" shadowColor="black" shadowBlur={6} shadowOpacity={0.5}/>
+                        <Text text="✕" fill="white" fontSize={13} fontStyle="bold"
+                          x={-5} y={-7} listening={false}/>
+                        <Circle radius={12} fill="transparent"
+                          onClick={handleDelete} onTap={handleDelete}/>
+                      </Group>
                     )}
                   </Group>
                 )
