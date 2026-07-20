@@ -7,7 +7,7 @@ import { useCategoryIcons } from '../components/drawing/useCategoryIcons'
 const FOV_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Fisheye Camera']
 
 // ── SheetCanvas ────────────────────────────────────────────────────────────────
-function SheetCanvas({ sheet, placements, comments, addingNote, onCanvasClick, onNoteClick, selectedNoteId }) {
+function SheetCanvas({ sheet, placements, comments, addingNote, onCanvasClick, onNoteClick, selectedNoteId, shareToken }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
   const isPanning    = useRef(false)
@@ -55,8 +55,10 @@ function SheetCanvas({ sheet, placements, comments, addingNote, onCanvasClick, o
   const loadFloorPlan = async () => {
     setLoading(true)
     try {
-      const { getR2Url } = await import('../r2')
-      const url = await getR2Url(sheet.storage_path, 3600)
+      const { getR2Url, getR2UrlPublic, BUCKETS } = await import('../r2')
+      const url = shareToken
+        ? await getR2UrlPublic(sheet.storage_path, shareToken, 3600, BUCKETS.FLOOR_PLANS)
+        : await getR2Url(sheet.storage_path, 3600)
       if (!url) { setLoading(false); return }
       if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
         const pdfjsLib = await import('pdfjs-dist')
@@ -568,6 +570,7 @@ export default function DrawingReview() {
               onCanvasClick={handleCanvasClick}
               onNoteClick={(c) => setSelectedNote(prev => prev?.id === c.id ? null : c)}
               selectedNoteId={selectedNote?.id}
+              shareToken={token}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center text-[#8A9AB0] text-sm">No floor plan</div>
