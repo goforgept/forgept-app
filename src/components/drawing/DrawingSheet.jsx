@@ -63,15 +63,18 @@ function drawCloudPath(ctx, ax1, ay1, ax2, ay2) {
   const minX = Math.min(ax1, ax2), maxX = Math.max(ax1, ax2)
   const minY = Math.min(ay1, ay2), maxY = Math.max(ay1, ay2)
   const w = maxX - minX, h = maxY - minY
-  if (w < 10 || h < 10) return
-  const nx = Math.max(2, Math.round(w / Math.max(14, w * 0.13)))
-  const ny = Math.max(2, Math.round(h / Math.max(14, h * 0.13)))
-  const rx = w / (2 * nx), ry = h / (2 * ny)
+  if (w < 20 || h < 20) return
+  // bump radius: consistent size, capped so clouds don't look lumpy
+  const bumpR = Math.min(18, Math.max(8, Math.min(w, h) * 0.12))
+  const nx = Math.max(2, Math.round(w / (2 * bumpR)))
+  const ny = Math.max(2, Math.round(h / (2 * bumpR)))
+  const rx = w / (2 * nx)   // actual horizontal bump radius (fills edge exactly)
+  const ry = h / (2 * ny)   // actual vertical bump radius
   ctx.beginPath()
-  for (let i = 0; i < nx; i++) ctx.arc(minX + rx * (2*i+1), minY, rx, Math.PI, 0, true)
-  for (let j = 0; j < ny; j++) ctx.arc(maxX, minY + ry * (2*j+1), ry, -Math.PI/2, Math.PI/2, false)
-  for (let i = nx-1; i >= 0; i--) ctx.arc(minX + rx * (2*i+1), maxY, rx, 0, Math.PI, false)
-  for (let j = ny-1; j >= 0; j--) ctx.arc(minX, minY + ry * (2*j+1), ry, Math.PI/2, -Math.PI/2, false)
+  for (let i = 0; i < nx; i++) ctx.arc(minX + rx*(2*i+1), minY, rx, Math.PI,    0,         true)  // top — UP
+  for (let j = 0; j < ny; j++) ctx.arc(maxX, minY + ry*(2*j+1), ry, -Math.PI/2, Math.PI/2, false) // right — RIGHT
+  for (let i = nx-1; i >= 0; i--) ctx.arc(minX + rx*(2*i+1), maxY, rx, 0,       Math.PI,   false) // bottom — DOWN
+  for (let j = ny-1; j >= 0; j--) ctx.arc(minX, minY + ry*(2*j+1), ry, Math.PI/2, -Math.PI/2, true) // left — LEFT (was false = bug)
   ctx.closePath()
 }
 
@@ -1321,14 +1324,19 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             )}
           </div>
 
-          {annotationTool && (
+          {annotationTool ? (
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-red-400/40 bg-red-500/10 text-red-300 text-xs">
               <span style={{ color: annotationColor }}>●</span>
               {annotationStart ? 'Release to place' : `Drag to draw ${annotationTool}`}
-              <button onClick={() => { setAnnotationTool(null); setAnnotationStart(null); setAnnotationPreview(null) }}
+              <button onClick={() => { setAnnotationTool(null); setAnnotationStart(null); annotationStartRef.current = null; setAnnotationPreview(null) }}
                 className="ml-1 opacity-60 hover:opacity-100">✕</button>
             </div>
-          )}
+          ) : selectedAnnotationId ? (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-yellow-400/40 bg-yellow-500/10 text-yellow-300 text-xs">
+              Selected — tap ✕ on canvas to delete, or press Delete key
+              <button onClick={() => setSelectedAnnotationId(null)} className="ml-1 opacity-60 hover:opacity-100">✕</button>
+            </div>
+          ) : null}
 
           {(cableMode || pathwayMode) && (
             <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs ${
@@ -2182,27 +2190,43 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 const col = ann.color || '#ef4444'
                 const isSel = ann.id === selectedAnnotationId
                 const midX = (ax1 + ax2) / 2
-                const midY = Math.min(ay1, ay2) - 18
-                const handleSelect = (e) => {
-                  e.cancelBubble = true
-                  setSelectedAnnotationId(isSel ? null : ann.id)
+                const midY = Math.min(ay1, ay2) - 20
+
+                const savePoints = async (newPoints) => {
+                  setAnnotations(prev => prev.map(a => a.id === ann.id ? {...a, points: newPoints} : a))
+                  await supabase.from('drawing_annotations').update({ points: newPoints }).eq('id', ann.id)
                 }
-                const handleDelete = async (e) => {
-                  e.cancelBubble = true
-                  await supabase.from('drawing_annotations').delete().eq('id', ann.id)
-                  setAnnotations(prev => prev.filter(a => a.id !== ann.id))
-                  setSelectedAnnotationId(null)
-                }
+
+                // Convert absolute stage coords back to normalised 0-1
+                const stageToNorm = (sx, sy) => ({
+                  x: Math.min(Math.max((sx - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995),
+                  y: Math.min(Math.max((sy - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995),
+                })
+
                 return (
-                  <Group key={ann.id}>
+                  <Group key={ann.id}
+                    draggable={isSel && !annotationTool}
+                    onMouseDown={e => e.cancelBubble = true}
+                    onTouchStart={e => e.cancelBubble = true}
+                    onClick={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
+                    onTap={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
+                    onDragEnd={async (e) => {
+                      // Group drag = move whole annotation
+                      const dx = e.target.x()
+                      const dy = e.target.y()
+                      e.target.position({ x: 0, y: 0 }) // reset offset — points encode position
+                      const normDx = dx / (canvasWRef.current * scaleRef.current)
+                      const normDy = dy / (canvasHRef.current * scaleRef.current)
+                      const newPoints = ann.points.map(p => ({
+                        x: Math.min(Math.max(p.x + normDx, 0.005), 0.995),
+                        y: Math.min(Math.max(p.y + normDy, 0.005), 0.995),
+                      }))
+                      await savePoints(newPoints)
+                    }}>
+
                     {ann.annotation_type === 'arrow' ? (
                       <>
-                        {/* Wide transparent hit area so the line is easy to click */}
-                        <Line
-                          points={[ax1, ay1, ax2, ay2]}
-                          stroke="transparent" strokeWidth={20}
-                          onClick={handleSelect} onTap={handleSelect}
-                        />
+                        <Line points={[ax1, ay1, ax2, ay2]} stroke="transparent" strokeWidth={22} listening={true}/>
                         <Arrow
                           points={[ax1, ay1, ax2, ay2]}
                           stroke={isSel ? '#fff' : col} strokeWidth={isSel ? 3 : 2.5}
@@ -2220,17 +2244,42 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                         }}
                         stroke={isSel ? '#fff' : col} strokeWidth={isSel ? 3 : 2}
                         fill={col + '18'}
-                        onClick={handleSelect} onTap={handleSelect}
                       />
                     )}
-                    {/* Delete button — shown only when selected */}
+
+                    {/* Endpoint / corner handles — drag to reshape */}
+                    {isSel && ann.points.map((pt, hi) => {
+                      const hx = position.x + pt.x * canvasW * scale
+                      const hy = position.y + pt.y * canvasH * scale
+                      return (
+                        <Circle key={`h${hi}`}
+                          x={hx} y={hy} radius={9}
+                          fill="white" stroke={col} strokeWidth={2.5}
+                          shadowColor="black" shadowBlur={4} shadowOpacity={0.5}
+                          draggable
+                          onMouseDown={e => e.cancelBubble = true}
+                          onTouchStart={e => e.cancelBubble = true}
+                          onDragStart={e => e.cancelBubble = true}
+                          onDragEnd={async (e) => {
+                            e.cancelBubble = true
+                            const norm = stageToNorm(e.target.x(), e.target.y())
+                            e.target.position({ x: hx, y: hy }) // React will reposition from state
+                            const newPts = ann.points.map((p, i) => i === hi ? norm : p)
+                            await savePoints(newPts)
+                          }}
+                        />
+                      )
+                    })}
+
+                    {/* Delete button */}
                     {isSel && (
                       <Group x={midX} y={midY}>
-                        <Circle radius={12} fill="#ef4444" shadowColor="black" shadowBlur={6} shadowOpacity={0.5}/>
-                        <Text text="✕" fill="white" fontSize={13} fontStyle="bold"
-                          x={-5} y={-7} listening={false}/>
-                        <Circle radius={12} fill="transparent"
-                          onClick={handleDelete} onTap={handleDelete}/>
+                        <Circle radius={13} fill="#ef4444" shadowColor="black" shadowBlur={6} shadowOpacity={0.5}/>
+                        <Text text="✕" fill="white" fontSize={14} fontStyle="bold" x={-5} y={-8} listening={false}/>
+                        <Circle radius={13} fill="transparent"
+                          onClick={async (e) => { e.cancelBubble = true; await supabase.from('drawing_annotations').delete().eq('id', ann.id); setAnnotations(prev => prev.filter(a => a.id !== ann.id)); setSelectedAnnotationId(null) }}
+                          onTap={async (e) => { e.cancelBubble = true; await supabase.from('drawing_annotations').delete().eq('id', ann.id); setAnnotations(prev => prev.filter(a => a.id !== ann.id)); setSelectedAnnotationId(null) }}
+                        />
                       </Group>
                     )}
                   </Group>
