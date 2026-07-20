@@ -283,25 +283,15 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
             {/* Site condition */}
             <div>
               <label className={labelClass}>Site Condition</label>
-              <div className="flex gap-1.5">
-                {[
-                  { value: '',         label: 'New',      bg: '#C8622A' },
-                  { value: 'existing', label: 'Existing', bg: '#22c55e' },
-                  { value: 'replace',  label: 'Replace',  bg: '#ef4444' },
-                ].map(opt => {
-                  const active = (form.site_condition || '') === opt.value
-                  return (
-                    <button key={opt.value}
-                      onClick={() => update('site_condition', opt.value || null)}
-                      style={active ? { backgroundColor: opt.bg, borderColor: opt.bg } : {}}
-                      className={`flex-1 py-1.5 text-xs rounded-lg border font-semibold transition-colors ${
-                        active ? 'text-white' : 'border-[#2a3d55] text-[#8A9AB0] hover:text-white bg-[#0F1C2E]'
-                      }`}>
-                      {opt.label}
-                    </button>
-                  )
-                })}
-              </div>
+              <select
+                value={form.site_condition || ''}
+                onChange={e => update('site_condition', e.target.value || null)}
+                className={inputClass}>
+                <option value="">New</option>
+                <option value="existing">Existing</option>
+                <option value="replace">Replace</option>
+                <option value="demo">Demo</option>
+              </select>
             </div>
             <div>
               <label className={labelClass}>Device Address / Label</label>
@@ -998,15 +988,11 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
 
       {/* ── DORI tab panel ── */}
       {activeTab === 'dori' && CAMERA_CATEGORIES.includes(product.category) && (() => {
-        let effHfov = null
-        let effResH = mpToResH(doriMp)
-        if (doriMode === 'hfov') {
-          effHfov = parseFloat(doriHfov) || null
-        } else {
-          const focal = parseFloat(doriFocal)
-          const sw    = SENSOR_WIDTHS[doriSensor]
-          if (focal > 0 && sw) effHfov = 2 * Math.atan(sw / (2 * focal)) * (180 / Math.PI)
-        }
+        const focalVal  = parseFloat(doriFocal)
+        const sensorW   = SENSOR_WIDTHS[doriSensor]
+        const lensHfov  = (focalVal > 0 && sensorW) ? 2 * Math.atan(sensorW / (2 * focalVal)) * (180 / Math.PI) : null
+        const effHfov   = lensHfov ?? (parseFloat(doriHfov) || null)
+        const effResH   = mpToResH(doriMp)
         const doriError = effHfov >= 180
           ? 'HFoV must be less than 180° for the standard DORI formula. For fisheye or multi-sensor cameras, enter the individual lens HFoV.'
           : null
@@ -1020,41 +1006,30 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
 
         return (
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
-            {/* Mode toggle */}
-            <div className="flex rounded-lg bg-[#0F1C2E] border border-[#2a3d55] p-0.5">
-              {[['hfov', 'HFoV + Resolution'], ['focal', 'Focal + Sensor']].map(([id, label]) => (
-                <button key={id} onClick={() => setDoriMode(id)}
-                  className={`flex-1 text-xs py-2 rounded-md transition-colors font-medium ${
-                    doriMode === id ? 'bg-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'
-                  }`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {/* Inputs */}
-            {doriMode === 'hfov' ? (
-              <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Horizontal FoV (°)</label>
-                    <input type="number" min="1" max="360" value={doriHfov}
-                      onChange={e => setDoriHfov(e.target.value)}
-                      placeholder="e.g. 90"
-                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
-                  </div>
-                  <div>
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Megapixels (MP)</label>
-                    <input type="number" min="0.1" step="0.1" value={doriMp}
-                      onChange={e => setDoriMp(e.target.value)}
-                      placeholder="e.g. 4"
-                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
-                  </div>
+            {/* Camera inputs — all in one panel */}
+            <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] p-3 space-y-2.5">
+              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Camera Settings</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Horizontal FoV (°)</label>
+                  <input type="number" min="1" max="360" value={lensHfov ? lensHfov.toFixed(1) : doriHfov}
+                    onChange={e => { setDoriHfov(e.target.value); setDoriFocal('') }}
+                    placeholder="e.g. 90"
+                    className={`w-full text-white border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a] ${lensHfov ? 'bg-[#1a3a28] border-green-600/60 text-green-300' : 'bg-[#0F1C2E] border-[#2a3d55]'}`} />
+                  {lensHfov && <p className="text-green-400 text-[10px] mt-0.5">Computed from lens</p>}
                 </div>
-                {effResH && <p className="text-[#4a5a6a] text-xs">≈ {effResH.toLocaleString()}px horizontal (16:9)</p>}
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Megapixels (MP)</label>
+                  <input type="number" min="0.1" step="0.1" value={doriMp}
+                    onChange={e => setDoriMp(e.target.value)}
+                    placeholder="e.g. 4"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
+                  {effResH && <p className="text-[#4a5a6a] text-[10px] mt-0.5">{effResH.toLocaleString()}px horiz (16:9)</p>}
+                </div>
               </div>
-            ) : (
-              <div className="space-y-2">
+              {/* Lens settings */}
+              <div className="pt-1 border-t border-[#2a3d55]">
+                <p className="text-[#4a5a6a] text-[10px] mb-1.5">Optional — compute HFoV from lens specs</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="text-[#8A9AB0] text-xs mb-1 block">Focal Length (mm)</label>
@@ -1064,31 +1039,17 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                       className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
                   </div>
                   <div>
-                    <label className="text-[#8A9AB0] text-xs mb-1 block">Megapixels (MP)</label>
-                    <input type="number" min="0.1" step="0.1" value={doriMp}
-                      onChange={e => setDoriMp(e.target.value)}
-                      placeholder="e.g. 4"
-                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A] placeholder-[#4a5a6a]" />
+                    <label className="text-[#8A9AB0] text-xs mb-1 block">Sensor Size</label>
+                    <select value={doriSensor} onChange={e => setDoriSensor(e.target.value)}
+                      className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
+                      {Object.keys(SENSOR_WIDTHS).map(s => (
+                        <option key={s} value={s}>{s} ({SENSOR_WIDTHS[s].toFixed(2)}mm)</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-                <div>
-                  <label className="text-[#8A9AB0] text-xs mb-1 block">Sensor Size</label>
-                  <select value={doriSensor} onChange={e => setDoriSensor(e.target.value)}
-                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">
-                    {Object.keys(SENSOR_WIDTHS).map(s => (
-                      <option key={s} value={s}>{s} ({SENSOR_WIDTHS[s].toFixed(2)}mm)</option>
-                    ))}
-                  </select>
-                </div>
-                {(effHfov || effResH) && (
-                  <p className="text-[#4a5a6a] text-xs">
-                    {effHfov ? <>HFoV: <span className="text-white font-mono">{effHfov.toFixed(1)}°</span></> : null}
-                    {effHfov && effResH ? '  ·  ' : null}
-                    {effResH ? <>≈ {effResH.toLocaleString()}px horizontal</> : null}
-                  </p>
-                )}
               </div>
-            )}
+            </div>
 
             {/* Diagram + table */}
             {doriError ? (

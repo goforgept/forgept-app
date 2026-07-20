@@ -111,6 +111,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const positionRef  = useRef({ x: 0, y: 0 })
   const scaleRef     = useRef(1)
   const placementsRef = useRef([])
+  const annotationToolRef  = useRef(null)
+  const annotationStartRef = useRef(null)
+  const annotationColorRef = useRef('#ef4444')
+  const sheetIdRef = useRef(sheet.id)
+  const orgIdRef   = useRef(orgId)
 
   const [bgImage,    setBgImage]    = useState(null)
   const [imageSize,  setImageSize]  = useState({ w: 1200, h: 900 })
@@ -164,6 +169,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [annotationColor,   setAnnotationColor]   = useState('#ef4444')
   const [annotationStart,   setAnnotationStart]   = useState(null) // {x,y} normalised
   const [annotationPreview, setAnnotationPreview] = useState(null) // {x,y} normalised live
+  useEffect(() => { annotationToolRef.current  = annotationTool },  [annotationTool])
+  useEffect(() => { annotationStartRef.current = annotationStart }, [annotationStart])
+  useEffect(() => { annotationColorRef.current = annotationColor }, [annotationColor])
+  useEffect(() => { sheetIdRef.current = sheet.id }, [sheet.id])
+  useEffect(() => { orgIdRef.current   = orgId },    [orgId])
 
   
   const snapRadius = 20 // pixels — snap to device marker within this distance
@@ -510,6 +520,9 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       if (e.key === 'Escape') {
         setActivePoints([])
         setActivePathwayPoints([])
+        setAnnotationStart(null)
+        annotationStartRef.current = null
+        setAnnotationPreview(null)
         setEditingCable(null)
         setEditingPathwayId(null)
         setContextMenu(null)
@@ -586,6 +599,16 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   // ── Pan ────────────────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e) => {
+    // Annotation draw mode: capture start point and block panning entirely
+    if (annotationToolRef.current && e.evt.button === 0) {
+      const pos = stageRef.current?.getPointerPosition()
+      if (!pos) return
+      const nx = Math.min(Math.max((pos.x - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
+      const ny = Math.min(Math.max((pos.y - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
+      setAnnotationStart({ x: nx, y: ny })
+      annotationStartRef.current = { x: nx, y: ny }
+      return
+    }
     const isOnBackground = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
     // Middle mouse OR left mouse when no symbol selected = pan or selection box
     if (e.evt.button === 1 || (e.evt.button === 0 && !selectedSymbol)) {
@@ -623,16 +646,41 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }))
   }, [])
 
-  const updateAnnotationPreview = useCallback((clientX, clientY) => {
-    if (!annotationTool || !annotationStart || !stageRef.current) return
+  const updateAnnotationPreview = useCallback(() => {
+    if (!annotationToolRef.current || !annotationStartRef.current || !stageRef.current) return
     const pos = stageRef.current.getPointerPosition()
     if (!pos) return
     const nx = Math.min(Math.max((pos.x - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
     const ny = Math.min(Math.max((pos.y - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
     setAnnotationPreview({ x: nx, y: ny })
-  }, [annotationTool, annotationStart])
+  }, [])
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback(async () => {
+    // Save annotation on drag release
+    if (annotationToolRef.current && annotationStartRef.current) {
+      const pos = stageRef.current?.getPointerPosition()
+      if (pos) {
+        const nx = Math.min(Math.max((pos.x - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
+        const ny = Math.min(Math.max((pos.y - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
+        const start = annotationStartRef.current
+        const dx = Math.abs(nx - start.x), dy = Math.abs(ny - start.y)
+        if (dx > 0.005 || dy > 0.005) {
+          const { data } = await supabase.from('drawing_annotations').insert({
+            drawing_sheet_id: sheetIdRef.current,
+            org_id:           orgIdRef.current,
+            annotation_type:  annotationToolRef.current,
+            points:           [start, { x: nx, y: ny }],
+            color:            annotationColorRef.current,
+          }).select().single()
+          if (data) setAnnotations(prev => [...prev, data])
+        }
+      }
+      setAnnotationStart(null)
+      annotationStartRef.current = null
+      setAnnotationPreview(null)
+      isPanning.current = false
+      return
+    }
     isPanning.current = false
     if (isSelecting.current) {
       const box = selectionBoxRef.current
@@ -669,6 +717,21 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   const handleTouchStart = useCallback((e) => {
     const t = e.evt.touches
+    if (annotationToolRef.current && t.length === 1) {
+      const touch = t[0]
+      const stage = stageRef.current
+      if (stage) {
+        const rect = stage.container().getBoundingClientRect()
+        const sx = (touch.clientX - rect.left) * (stage.width() / rect.width)
+        const sy = (touch.clientY - rect.top)  * (stage.height() / rect.height)
+        const nx = Math.min(Math.max((sx - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
+        const ny = Math.min(Math.max((sy - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
+        setAnnotationStart({ x: nx, y: ny })
+        annotationStartRef.current = { x: nx, y: ny }
+      }
+      lastTouchPos.current = null // block touch pan
+      return
+    }
     if (t.length === 2) {
       lastDist.current = Math.sqrt((t[0].clientX - t[1].clientX) ** 2 + (t[0].clientY - t[1].clientY) ** 2)
       lastTouchPos.current = null
@@ -681,6 +744,20 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   const handleTouchMove = useCallback((e) => {
     const t = e.evt.touches
+    // Annotation draw: update preview, block pan
+    if (annotationToolRef.current && annotationStartRef.current && t.length === 1) {
+      const touch = t[0]
+      const stage = stageRef.current
+      if (stage) {
+        const rect = stage.container().getBoundingClientRect()
+        const sx = (touch.clientX - rect.left) * (stage.width() / rect.width)
+        const sy = (touch.clientY - rect.top)  * (stage.height() / rect.height)
+        const nx = Math.min(Math.max((sx - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
+        const ny = Math.min(Math.max((sy - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
+        setAnnotationPreview({ x: nx, y: ny })
+      }
+      return
+    }
     if (t.length === 2) {
       // Pinch zoom
       const dist = Math.sqrt((t[0].clientX - t[1].clientX) ** 2 + (t[0].clientY - t[1].clientY) ** 2)
@@ -703,7 +780,38 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     }
   }, [])
 
-  const handleTouchEnd = useCallback(() => {
+  const handleTouchEnd = useCallback(async (e) => {
+    // Save annotation on touch release
+    if (annotationToolRef.current && annotationStartRef.current) {
+      const changedTouches = e.evt.changedTouches
+      if (changedTouches.length > 0) {
+        const touch = changedTouches[0]
+        const stage = stageRef.current
+        if (stage) {
+          const rect = stage.container().getBoundingClientRect()
+          const sx = (touch.clientX - rect.left) * (stage.width() / rect.width)
+          const sy = (touch.clientY - rect.top)  * (stage.height() / rect.height)
+          const nx = Math.min(Math.max((sx - positionRef.current.x) / scaleRef.current / canvasWRef.current, 0.005), 0.995)
+          const ny = Math.min(Math.max((sy - positionRef.current.y) / scaleRef.current / canvasHRef.current, 0.005), 0.995)
+          const start = annotationStartRef.current
+          const dx = Math.abs(nx - start.x), dy = Math.abs(ny - start.y)
+          if (dx > 0.005 || dy > 0.005) {
+            const { data } = await supabase.from('drawing_annotations').insert({
+              drawing_sheet_id: sheetIdRef.current,
+              org_id:           orgIdRef.current,
+              annotation_type:  annotationToolRef.current,
+              points:           [start, { x: nx, y: ny }],
+              color:            annotationColorRef.current,
+            }).select().single()
+            if (data) setAnnotations(prev => [...prev, data])
+          }
+        }
+      }
+      setAnnotationStart(null)
+      annotationStartRef.current = null
+      setAnnotationPreview(null)
+      return
+    }
     lastDist.current = 0
     lastTouchPos.current = null
     touchPanStarted.current = false
@@ -852,28 +960,6 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       const nx = Math.min(Math.max((pointer.x - position.x) / scale / canvasW, 0.01), 0.99)
       const ny = Math.min(Math.max((pointer.y - position.y) / scale / canvasH, 0.01), 0.99)
       setActivePathwayPoints(prev => [...prev, { x: nx, y: ny }])
-      return
-    }
-
-    // Annotation drawing mode (arrow or cloud) — works on background and over devices
-    if (annotationTool) {
-      const pointer = stageRef.current.getPointerPosition()
-      const nx = Math.min(Math.max((pointer.x - position.x) / scale / canvasW, 0.005), 0.995)
-      const ny = Math.min(Math.max((pointer.y - position.y) / scale / canvasH, 0.005), 0.995)
-      if (!annotationStart) {
-        setAnnotationStart({ x: nx, y: ny })
-      } else {
-        const { data } = await supabase.from('drawing_annotations').insert({
-          drawing_sheet_id: sheet.id,
-          org_id:           orgId,
-          annotation_type:  annotationTool,
-          points:           [annotationStart, { x: nx, y: ny }],
-          color:            annotationColor,
-        }).select().single()
-        if (data) setAnnotations(prev => [...prev, data])
-        setAnnotationStart(null)
-        setAnnotationPreview(null)
-      }
       return
     }
 
@@ -1229,7 +1315,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           {annotationTool && (
             <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-red-400/40 bg-red-500/10 text-red-300 text-xs">
               <span style={{ color: annotationColor }}>●</span>
-              {annotationStart ? 'Click to finish' : `Drawing ${annotationTool}`}
+              {annotationStart ? 'Release to place' : `Drag to draw ${annotationTool}`}
               <button onClick={() => { setAnnotationTool(null); setAnnotationStart(null); setAnnotationPreview(null) }}
                 className="ml-1 opacity-60 hover:opacity-100">✕</button>
             </div>
@@ -1367,7 +1453,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         {!loading && !error && stageSize.w > 0 && (
           <Stage ref={stageRef} width={stageSize.w} height={stageSize.h} style={{ background: '#ffffff' }}
             onWheel={handleWheel} onMouseDown={(e) => { if (e.evt.button === 2) return; handleMouseDown(e) }}
-            onMouseMove={(e) => { handleMouseMove(e); updateAnnotationPreview(e.evt.clientX, e.evt.clientY) }}
+            onMouseMove={(e) => { handleMouseMove(e); updateAnnotationPreview() }}
             onMouseUp={handleMouseUp} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
             onClick={(e) => {
               if (e.evt.button === 2) return // ignore right-click
@@ -2450,14 +2536,14 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
       {/* Icon */}
       {icon && <KonvaImage image={icon} x={-iconSize / 2} y={-iconSize / 2} width={iconSize} height={iconSize} listening={false}/>}
 
-      {/* Site condition badge (E = existing, R = replace) */}
+      {/* Site condition badge (E=existing, R=replace, D=demo) */}
       {placement.site_condition && (
         <Group x={totalSize * 0.28} y={-totalSize * 0.52} listening={false}>
           <Circle radius={totalSize * 0.24}
-            fill={placement.site_condition === 'existing' ? '#22c55e' : '#ef4444'}
+            fill={placement.site_condition === 'existing' ? '#22c55e' : placement.site_condition === 'demo' ? '#a855f7' : '#ef4444'}
             stroke="white" strokeWidth={1.5}/>
           <Text
-            text={placement.site_condition === 'existing' ? 'E' : 'R'}
+            text={placement.site_condition === 'existing' ? 'E' : placement.site_condition === 'demo' ? 'D' : 'R'}
             fontSize={Math.max(7, totalSize * 0.22)}
             fontStyle="bold" fill="white"
             width={totalSize * 0.48} x={-totalSize * 0.24}
