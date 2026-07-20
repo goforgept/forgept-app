@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { Stage, Layer, Image as KonvaImage, Circle, Group, Text, Rect, Line } from 'react-konva'
 import { useCategoryIcons } from '../components/drawing/useCategoryIcons'
+import PDFWorkerConstructor from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
 
 const FOV_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Fisheye Camera']
 
@@ -62,7 +63,9 @@ function SheetCanvas({ sheet, placements, comments, addingNote, onCanvasClick, o
       if (!url) { setLoading(false); return }
       if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
         const pdfjsLib = await import('pdfjs-dist')
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
+        if (!pdfjsLib.GlobalWorkerOptions.workerPort) {
+          pdfjsLib.GlobalWorkerOptions.workerPort = new PDFWorkerConstructor()
+        }
         const buf    = await (await fetch(url)).arrayBuffer()
         const pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise
         const page   = await pdfDoc.getPage(sheet.page_number || 1)
