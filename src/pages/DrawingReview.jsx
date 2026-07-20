@@ -246,10 +246,21 @@ function SheetCanvas({ sheet, placements, comments, addingNote, onCanvasClick, o
                 const col  = p.marker_color || '#C8622A'
                 const icon = getIcon(product.category)
                 const iconSize = markerSize * 0.65
+                const condColor = p.site_condition === 'existing' ? '#22c55e' : p.site_condition === 'demo' ? '#a855f7' : '#ef4444'
+                const condLetter = p.site_condition === 'existing' ? 'E' : p.site_condition === 'demo' ? 'D' : 'R'
                 return (
                   <Group key={p.id}>
                     <Circle x={px} y={py} radius={markerSize / 2} fill={col} />
                     {icon && <KonvaImage image={icon} x={px - iconSize / 2} y={py - iconSize / 2} width={iconSize} height={iconSize} />}
+                    {p.site_condition && p.site_condition !== 'new' && (
+                      <Group x={px + markerSize * 0.28} y={py - markerSize * 0.52}>
+                        <Circle radius={markerSize * 0.24} fill={condColor} stroke="white" strokeWidth={1.5} />
+                        <Text text={condLetter}
+                          fontSize={Math.max(7, markerSize * 0.22)} fontStyle="bold" fill="white"
+                          width={markerSize * 0.48} x={-markerSize * 0.24}
+                          align="center" verticalAlign="middle" y={-markerSize * 0.19} />
+                      </Group>
+                    )}
                     {p.device_address && (
                       <Text text={p.device_address}
                         x={px - 40} y={py + markerSize / 2 + 2}
@@ -694,7 +705,7 @@ export default function DrawingReview() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-[#0F1C2E] text-[#C8622A] text-left sticky top-0">
-                    {['#','Address','Part Number','Description','Manufacturer','Category','Sheet'].map(h => (
+                    {['#','Address','Condition','Part Number','Description','Manufacturer','Category','Sheet'].map(h => (
                       <th key={h} className="px-4 py-2 font-semibold whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
@@ -707,6 +718,12 @@ export default function DrawingReview() {
                       <tr key={p.id} className={idx % 2 === 0 ? 'bg-[#1a2d45]' : 'bg-[#162338]'}>
                         <td className="px-4 py-2 text-[#8A9AB0]">{idx + 1}</td>
                         <td className="px-4 py-2 text-white font-medium whitespace-nowrap">{p.device_address || '—'}</td>
+                        <td className="px-4 py-2 whitespace-nowrap">
+                          {p.site_condition === 'existing' && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-900/60 text-blue-300 border border-blue-700/50">Existing</span>}
+                          {p.site_condition === 'replace' && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-900/60 text-amber-300 border border-amber-700/50">Replace</span>}
+                          {p.site_condition === 'demo' && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-purple-900/60 text-purple-300 border border-purple-700/50">Demo</span>}
+                          {(!p.site_condition || p.site_condition === 'new') && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-900/60 text-green-300 border border-green-700/50">New</span>}
+                        </td>
                         <td className="px-4 py-2 text-[#8A9AB0] font-mono whitespace-nowrap">{p.part_number_override || gp?.part_number || '—'}</td>
                         <td className="px-4 py-2 text-white whitespace-nowrap">{p.description_override || gp?.name || '—'}</td>
                         <td className="px-4 py-2 text-[#8A9AB0] whitespace-nowrap">{p.manufacturer_override || gp?.manufacturer || '—'}</td>
