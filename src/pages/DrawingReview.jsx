@@ -341,35 +341,41 @@ export default function DrawingReview() {
   const load = async () => {
     setLoading(true); setError(null)
     try {
-      const { data, error } = await supabase.rpc('get_drawing_review', { p_token: token })
-      if (error || !data) { setError('This link is invalid or has expired.'); return }
-
-      const pkgData = data.package
-      if (!pkgData) { setError('This link is invalid or has expired.'); return }
+      const { data: pkgData, error: pkgErr } = await supabase
+        .from('drawing_packages').select('*').eq('share_token', token).single()
+      if (pkgErr || !pkgData) { setError('This link is invalid or has expired.'); return }
       if (pkgData.share_expires_at && new Date(pkgData.share_expires_at) < new Date()) {
         setError('This review link has expired. Please contact the sender for a new link.'); return
       }
-
-      const sheetData     = data.sheets     || []
-      const placementData = data.placements || []
-      const commentData   = data.comments   || []
-      const profileData   = data.org        || null
-
       setPkg(pkgData)
       setApproved(pkgData.client_approved || false)
 
-      const sheetIds = sheetData.map(s => s.id)
+      const { data: sheetData } = await supabase
+        .from('drawing_sheets').select('*').eq('proposal_id', pkgData.proposal_id).order('sort_order', { ascending: true })
+
+      const sheetIds = (sheetData || []).map(s => s.id)
       if (sheetIds.length) setActiveSheetId(sheetIds[0])
 
-      setSheets(sheetData)
-      const sorted = placementData.sort((a, b) => {
+      const [{ data: placementData }, { data: profileData }, { data: commentData }] = await Promise.all([
+        sheetIds.length
+          ? supabase.from('drawing_placements')
+              .select('*, global_products(id, name, part_number, manufacturer, category, specs)')
+              .in('drawing_sheet_id', sheetIds)
+              .order('created_at', { ascending: true })
+          : Promise.resolve({ data: [] }),
+        supabase.from('profiles').select('company_name, logo_url, primary_color').eq('org_id', pkgData.org_id).limit(1).single(),
+        supabase.from('drawing_review_comments').select('*').eq('share_token', token).order('created_at', { ascending: true }),
+      ])
+
+      setSheets(sheetData || [])
+      const sorted = (placementData || []).sort((a, b) => {
         const ai = sheetIds.indexOf(a.drawing_sheet_id), bi = sheetIds.indexOf(b.drawing_sheet_id)
         if (ai !== bi) return ai - bi
         return new Date(a.created_at) - new Date(b.created_at)
       })
       setPlacements(sorted)
       setOrgProfile(profileData)
-      setComments(commentData)
+      setComments(commentData || [])
     } catch { setError('Failed to load drawing review.') }
     finally { setLoading(false) }
   }
