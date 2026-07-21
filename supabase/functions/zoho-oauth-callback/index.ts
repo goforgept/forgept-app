@@ -74,9 +74,10 @@ Deno.serve(async (req) => {
     }
 
     const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000)
-    // api_domain tells us the regional DC (e.g. https://www.zohoapis.eu for EU accounts)
-    const apiDomain = tokens.api_domain || 'https://www.zohoapis.com'
-    const apiBase   = zohoApiBase(apiDomain)
+    // api_domain tells us the regional DC (e.g. https://www.zohoapis.eu for EU accounts).
+    // zohoApiBase() validates it against an allowlist to prevent SSRF.
+    const apiBase   = zohoApiBase(tokens.api_domain)
+    const apiDomain = apiBase
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,

@@ -416,13 +416,18 @@ export default function DrawingReview() {
     if (!approvalName.trim()) return
     setApproving(true)
     try {
-      const { error } = await supabase.from('drawing_packages').update({
-        client_approved:       true,
-        client_approved_at:    new Date().toISOString(),
-        client_approved_by:    approvalName.trim(),
-        client_approved_title: approvalTitle.trim(),
-      }).eq('share_token', token)
-      if (!error) setApproved(true)
+      // Routed through a SECURITY DEFINER RPC that requires an exact
+      // share_token match server-side, rather than a raw UPDATE whose
+      // RLS policy could only check "is this token non-null" — which
+      // would let anyone with the anon key approve any org's proposal.
+      const { data, error } = await supabase.rpc('approve_shared_package', {
+        p_token: token,
+        p_name:  approvalName.trim(),
+        p_title: approvalTitle.trim(),
+      })
+      if (!error && data) setApproved(true)
+      else if (!error && !data) alert('This review link is no longer valid or has expired.')
+      else alert('Approval failed. Please try again.')
     } catch { alert('Approval failed. Please try again.') }
     finally { setApproving(false) }
   }
