@@ -96,6 +96,13 @@ const LABEL_PREFIXES = {
   'Elevator Reader':     'ELV',
   'Request to Exit':     'REX',
   'Credential Reader':   'RDR',
+  // IT / Networking
+  'Router':                'RTR',
+  'Firewall':              'FW',
+  'Wireless Access Point': 'WAP',
+  'PoE Switch':            'SW',
+  'Managed Switch':        'SW',
+  'Unmanaged Switch':      'SW',
 }
 
 // Draw a revision-cloud path on a canvas 2D context (bumpy arcs around a rectangle)

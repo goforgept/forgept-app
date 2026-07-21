@@ -412,6 +412,113 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     return img
   }
 
+  // ── DORI Report PDF ────────────────────────────────────────────────────────
+  const handleDoriExport = async () => {
+    const CAMERA_CATS = ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera']
+    const THRESHOLDS  = [
+      { label: 'Detection',      ppm: 25  },
+      { label: 'Observation',    ppm: 62  },
+      { label: 'Recognition',    ppm: 125 },
+      { label: 'Identification', ppm: 250 },
+    ]
+
+    const cameras = placements.filter(p => CAMERA_CATS.includes(p.global_products?.category))
+    if (!cameras.length) { alert('No cameras found on this project.'); return }
+
+    const { default: jsPDF }     = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+
+    const pdf      = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+    const pageW    = pdf.internal.pageSize.getWidth()
+    const pageH    = pdf.internal.pageSize.getHeight()
+    const margin   = 14
+    const orgName  = orgProfile?.company_name || ''
+    const projName = proposal?.name || proposal?.address || 'Project'
+
+    // Title block
+    pdf.setFillColor(15, 28, 46)
+    pdf.rect(0, 0, pageW, 18, 'F')
+    pdf.setTextColor(200, 98, 42)
+    pdf.setFontSize(11)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text('DORI ANALYSIS REPORT', margin, 11)
+    pdf.setTextColor(180, 180, 180)
+    pdf.setFontSize(8)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(`${orgName}  ·  ${projName}`, pageW - margin, 11, { align: 'right' })
+
+    // Subtitle legend
+    pdf.setFontSize(7)
+    pdf.setTextColor(120, 130, 145)
+    pdf.text('Per IEC 62676-4  ·  All distances in feet  ·  Based on 16:9 sensor aspect ratio', margin, 16)
+
+    // Build table rows
+    const rows = cameras.map((p, idx) => {
+      const gp      = p.global_products
+      const sheet   = sheets.find(s => s.id === p.drawing_sheet_id)
+      const hfov    = p.fov_angle || gp?.specs?.fov_angle || null
+      const mpText  = `${gp?.name || ''} ${gp?.specs?.mp || ''}`.toLowerCase()
+      const mpMatch = mpText.match(/(\d+(?:\.\d+)?)\s*mp/)
+      const mp      = mpMatch ? parseFloat(mpMatch[1]) : 2
+      const resH    = Math.round(Math.sqrt(mp * 1_000_000 * 16 / 9))
+
+      const dori = hfov && hfov < 180 && resH
+        ? THRESHOLDS.map(t => {
+            const rad    = hfov * Math.PI / 180
+            const meters = resH / (t.ppm * 2 * Math.tan(rad / 2))
+            return Math.round(meters * 3.28084)
+          })
+        : [null, null, null, null]
+
+      return [
+        idx + 1,
+        p.device_address || '—',
+        sheet?.name || '—',
+        p.description_override || gp?.name || '—',
+        hfov != null ? `${hfov}°` : '—',
+        `${mp} MP`,
+        dori[0] != null ? `${dori[0]} ft` : '—',
+        dori[1] != null ? `${dori[1]} ft` : '—',
+        dori[2] != null ? `${dori[2]} ft` : '—',
+        dori[3] != null ? `${dori[3]} ft` : '—',
+      ]
+    })
+
+    autoTable(pdf, {
+      startY:    22,
+      margin:    { left: margin, right: margin },
+      head:      [['#', 'Address', 'Sheet', 'Model', 'HFoV', 'Resolution', 'Detection', 'Observation', 'Recognition', 'Identification']],
+      body:      rows,
+      styles:    { fontSize: 7.5, cellPadding: 3, font: 'helvetica', textColor: [220, 220, 220], fillColor: [26, 45, 69] },
+      headStyles:{ fillColor: [15, 28, 46], textColor: [200, 98, 42], fontStyle: 'bold', fontSize: 7.5 },
+      alternateRowStyles: { fillColor: [22, 35, 56] },
+      columnStyles: {
+        0:  { cellWidth: 8,  halign: 'center' },
+        1:  { cellWidth: 20, fontStyle: 'bold' },
+        2:  { cellWidth: 30 },
+        3:  { cellWidth: 55 },
+        4:  { cellWidth: 14, halign: 'center' },
+        5:  { cellWidth: 20, halign: 'center' },
+        6:  { cellWidth: 22, halign: 'right', textColor: [74, 222, 128] },
+        7:  { cellWidth: 22, halign: 'right', textColor: [96, 165, 250] },
+        8:  { cellWidth: 22, halign: 'right', textColor: [250, 204, 21] },
+        9:  { cellWidth: 22, halign: 'right', textColor: [248, 113, 113] },
+      },
+      didDrawPage: (d) => {
+        // Footer
+        pdf.setFillColor(15, 28, 46)
+        pdf.rect(0, pageH - 8, pageW, 8, 'F')
+        pdf.setTextColor(100, 110, 125)
+        pdf.setFontSize(6.5)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text('D=25 PPM  ·  O=62 PPM  ·  R=125 PPM  ·  I=250 PPM', margin, pageH - 2.5)
+        pdf.text(`Page ${d.pageNumber}`, pageW - margin, pageH - 2.5, { align: 'right' })
+      },
+    })
+
+    pdf.save(`DORI-Report-${projName.replace(/\s+/g, '-')}.pdf`)
+  }
+
   // ── CSV BOM Export ─────────────────────────────────────────────────────────
   const handleCSVExport = () => {
     const rows = []
@@ -1360,6 +1467,14 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       description: 'Spreadsheet export of all devices, components, cable footage, and vertical rises.',
       icon:        '📊',
       action:      handleCSVExport,
+    },
+    {
+      id:          'dori',
+      label:       'DORI Analysis Report',
+      description: `IEC 62676-4 detection/observation/recognition/identification distances for all cameras. ${placements.filter(p => ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera'].includes(p.global_products?.category)).length} camera${placements.filter(p => ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera'].includes(p.global_products?.category)).length !== 1 ? 's' : ''}.`,
+      icon:        '🎯',
+      action:      handleDoriExport,
+      disabled:    placements.filter(p => ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera'].includes(p.global_products?.category)).length === 0,
     },
     {
       id:          'racks',

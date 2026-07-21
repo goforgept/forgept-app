@@ -10,6 +10,7 @@ const INDUSTRY_LABELS = {
   electrical:  'Electrical',
   das:         'DAS',
   low_voltage: 'Low Voltage',
+  it:          'IT / Networking',
 }
 
 const CABLE_TYPES = [

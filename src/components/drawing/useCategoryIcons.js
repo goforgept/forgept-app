@@ -716,6 +716,40 @@ const CATEGORY_SVGS = {
       <path d="M29 24 L29 21 Q29 19 31 19 Q33 19 33 21 L33 24" stroke-width="1.2"/>
     </svg>`,
 
+  'Router': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="4" y="15" width="32" height="11" rx="2"/>
+      <circle cx="11" cy="20.5" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="16" cy="20.5" r="1.5" fill="${color}" stroke="none"/>
+      <circle cx="21" cy="20.5" r="1.5" fill="${color}" stroke="none"/>
+      <path d="M27 17.5 L33 20.5 L27 23.5"/>
+      <path d="M10 15 L10 9 M16 15 L16 9 M22 15 L22 9 M28 15 L28 9"/>
+    </svg>`,
+
+  'Firewall': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="4" y="8" width="32" height="24" rx="2"/>
+      <path d="M4 16 L36 16 M4 24 L36 24"/>
+      <path d="M14 8 L14 16 M22 16 L22 24 M14 24 L14 32"/>
+      <path d="M22 8 L22 16 M30 16 L30 24"/>
+    </svg>`,
+
+  'Wireless Access Point': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="10" y="27" width="20" height="6" rx="2"/>
+      <line x1="20" y1="27" x2="20" y2="22"/>
+      <circle cx="20" cy="20" r="2" fill="${color}" stroke="none"/>
+      <path d="M14 23 Q14 16 20 16 Q26 16 26 23"/>
+      <path d="M9 26 Q9 10 20 10 Q31 10 31 26"/>
+    </svg>`,
+
+  'PoE Switch': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round">
+      <rect x="3" y="15" width="34" height="11" rx="2"/>
+      <path d="M8 15 L8 10 M13 15 L13 10 M18 15 L18 10 M23 15 L23 10 M28 15 L28 10 M33 15 L33 10"/>
+      <path d="M21 25 L19 22 L21 22 L19 17" stroke-width="1.3"/>
+    </svg>`,
+
   'default': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
       <rect x="10" y="10" width="20" height="20" rx="4"/>
