@@ -526,9 +526,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     // Header
     rows.push(['Device Address', 'Part Number', 'Name', 'Manufacturer', 'Category', 'Qty', 'Notes'])
 
-    // Devices — aggregated by part number across all sheets
+    // Devices — New and Replace only (Existing/Demo excluded from BOM)
     const deviceMap = {}
-    placements.forEach(p => {
+    placements.filter(p => !p.site_condition || p.site_condition === 'new' || p.site_condition === 'replace').forEach(p => {
       const gp  = p.global_products
       const key = p.part_number_override || gp?.part_number || 'unknown'
       if (!deviceMap[key]) {
