@@ -242,13 +242,13 @@ export default function EmbedDesigner() {
       const sheetIds = sheets.map(s => s.id)
       const [{ data: placements }, { data: cables }] = await Promise.all([
         supabase.from('drawing_placements')
-          .select('quantity, part_number_override, manufacturer_override, description_override, notes, device_address, global_products(name, part_number, manufacturer, category), placement_components(*)')
+          .select('quantity, part_number_override, manufacturer_override, description_override, notes, device_address, site_condition, global_products(name, part_number, manufacturer, category), placement_components(*)')
           .in('drawing_sheet_id', sheetIds),
         supabase.from('cable_runs').select('cable_type, total_footage').in('drawing_sheet_id', sheetIds),
       ])
 
       const bom = {}
-      for (const p of placements || []) {
+      for (const p of (placements || []).filter(p => !p.site_condition || p.site_condition === 'new' || p.site_condition === 'replace')) {
         const key = p.part_number_override || p.global_products?.part_number || 'unassigned'
         const qty = p.quantity ?? 1
         if (bom[key]) bom[key].quantity += qty
