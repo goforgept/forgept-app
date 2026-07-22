@@ -189,20 +189,20 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     your_cost_unit: '', markup_percent: 35, customer_price_unit: ''
   }])
 
-  const updateMaterial = (i, field, value) => {
-    setLineItems(prev => {
-      const updated = [...prev]
-      updated[i] = { ...updated[i], [field]: value }
+  const updateMaterial = (id, field, value) => {
+    setLineItems(prev => prev.map(item => {
+      if (item.id !== id) return item
+      const updated = { ...item, [field]: value }
       if (field === 'your_cost_unit' || field === 'markup_percent') {
-        const cost = parseFloat(field === 'your_cost_unit' ? value : updated[i].your_cost_unit) || 0
-        const mkp = parseFloat(field === 'markup_percent' ? value : updated[i].markup_percent) || 0
-        updated[i].customer_price_unit = (cost * (1 + mkp / 100)).toFixed(2)
+        const cost = parseFloat(field === 'your_cost_unit' ? value : updated.your_cost_unit) || 0
+        const mkp = parseFloat(field === 'markup_percent' ? value : updated.markup_percent) || 0
+        updated.customer_price_unit = (cost * (1 + mkp / 100)).toFixed(2)
       }
       return updated
-    })
+    }))
   }
 
-  const removeMaterial = (i) => setLineItems(prev => prev.filter((_, idx) => idx !== i))
+  const removeMaterial = (id) => setLineItems(prev => prev.filter(item => item.id !== id))
 
   // --- Labor helpers ---
   const addLabor = () => setLaborItems(prev => [...prev, {
@@ -810,35 +810,35 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                       </tr>
                     </thead>
                     <tbody>
-                      {lineItems.map((line, i) => {
+                      {lineItems.map((line) => {
                         const lineTotal = (parseFloat(line.customer_price_unit) || 0) * (parseFloat(line.quantity) || 0)
                         return (
                           <tr key={line.id} className="border-b border-fp-border/30">
                             <td className="pr-3 py-1.5">
-                              <input value={line.item_name} onChange={e => updateMaterial(i, 'item_name', e.target.value)} placeholder="Item name" className={`w-40 ${cellInput}`} />
+                              <input value={line.item_name} onChange={e => updateMaterial(line.id, 'item_name', e.target.value)} placeholder="Item name" className={`w-40 ${cellInput}`} />
                             </td>
                             <td className="pr-3 py-1.5">
-                              <input type="number" min="0" value={line.quantity} onChange={e => updateMaterial(i, 'quantity', e.target.value)} className={`w-16 ${cellInput}`} />
+                              <input type="number" min="0" value={line.quantity} onChange={e => updateMaterial(line.id, 'quantity', e.target.value)} className={`w-16 ${cellInput}`} />
                             </td>
                             <td className="pr-3 py-1.5">
-                              <select value={line.unit} onChange={e => updateMaterial(i, 'unit', e.target.value)} className={cellInput}>
+                              <select value={line.unit} onChange={e => updateMaterial(line.id, 'unit', e.target.value)} className={cellInput}>
                                 {['ea', 'ft', 'lot', 'hr', 'box', 'roll'].map(u => <option key={u}>{u}</option>)}
                               </select>
                             </td>
                             {!isTechnician && <>
                               <td className="pr-3 py-1.5">
-                                <input type="number" min="0" step="0.01" placeholder="0.00" value={line.your_cost_unit} onChange={e => updateMaterial(i, 'your_cost_unit', e.target.value)} className={`w-20 ${cellInput}`} />
+                                <input type="number" min="0" step="0.01" placeholder="0.00" value={line.your_cost_unit} onChange={e => updateMaterial(line.id, 'your_cost_unit', e.target.value)} className={`w-20 ${cellInput}`} />
                               </td>
                               <td className="pr-3 py-1.5">
-                                <input type="number" min="0" placeholder="35" value={line.markup_percent} onChange={e => updateMaterial(i, 'markup_percent', e.target.value)} className={`w-16 ${cellInput}`} />
+                                <input type="number" min="0" placeholder="35" value={line.markup_percent} onChange={e => updateMaterial(line.id, 'markup_percent', e.target.value)} className={`w-16 ${cellInput}`} />
                               </td>
                               <td className="pr-3 py-1.5">
-                                <input type="number" min="0" step="0.01" placeholder="0.00" value={line.customer_price_unit} onChange={e => updateMaterial(i, 'customer_price_unit', e.target.value)} className={`w-20 ${cellInput}`} />
+                                <input type="number" min="0" step="0.01" placeholder="0.00" value={line.customer_price_unit} onChange={e => updateMaterial(line.id, 'customer_price_unit', e.target.value)} className={`w-20 ${cellInput}`} />
                               </td>
                               <td className="pr-3 py-1.5 text-fp-text font-medium">${lineTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                             </>}
                             <td className="py-1.5">
-                              <button onClick={() => removeMaterial(i)} className="text-fp-muted hover:text-red-400 transition-colors">✕</button>
+                              <button onClick={() => removeMaterial(line.id)} className="text-fp-muted hover:text-red-400 transition-colors">✕</button>
                             </td>
                           </tr>
                         )
