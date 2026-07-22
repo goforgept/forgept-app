@@ -1550,17 +1550,29 @@ export default function SuperAdmin() {
             items={roadmapItems}
             orgs={orgs}
             onStatusChange={async (id, status) => {
-              await supabase.from('roadmap_items').update({ status }).eq('id', id)
-              setRoadmapItems(prev => prev.map(i => i.id === id ? { ...i, status } : i))
+              const result = await supabase.functions.invoke('superadmin-manage-sa-user', {
+                body: { sa_password: getSaPassword(), action: 'roadmap_update_status', id, status },
+              })
+              if (!result.error && !result.data?.error) {
+                setRoadmapItems(prev => prev.map(i => i.id === id ? { ...i, status } : i))
+              }
             }}
             onDelete={async (id) => {
               if (!window.confirm('Delete this roadmap item?')) return
-              await supabase.from('roadmap_items').delete().eq('id', id)
-              setRoadmapItems(prev => prev.filter(i => i.id !== id))
+              const result = await supabase.functions.invoke('superadmin-manage-sa-user', {
+                body: { sa_password: getSaPassword(), action: 'roadmap_delete', id },
+              })
+              if (!result.error && !result.data?.error) {
+                setRoadmapItems(prev => prev.filter(i => i.id !== id))
+              }
             }}
             onCreate={async (item) => {
-              const { data, error } = await supabase.from('roadmap_items').insert([item]).select().single()
-              if (!error && data) setRoadmapItems(prev => [data, ...prev])
+              const result = await supabase.functions.invoke('superadmin-manage-sa-user', {
+                body: { sa_password: getSaPassword(), action: 'roadmap_insert', item },
+              })
+              if (!result.error && !result.data?.error && result.data?.data) {
+                setRoadmapItems(prev => [result.data.data, ...prev])
+              }
             }}
           />
         </>

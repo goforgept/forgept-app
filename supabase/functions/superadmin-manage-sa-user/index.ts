@@ -39,5 +39,38 @@ Deno.serve(async (req) => {
     return json({ ok: true })
   }
 
+  // ── Roadmap mutations ──────────────────────────────────────────────────────
+  if (body.action === 'roadmap_insert') {
+    const item = body.item as unknown as Record<string, unknown>
+    if (!item?.title) return json({ error: 'title required' }, 400)
+    const { data, error } = await adminClient
+      .from('roadmap_items')
+      .insert([item])
+      .select('*, requester:requested_by(full_name, email), org:org_id(company_name)')
+      .single()
+    if (error) return json({ error: error.message }, 500)
+    return json({ ok: true, data })
+  }
+
+  if (body.action === 'roadmap_update_status') {
+    if (!body.id || !body.status) return json({ error: 'id and status required' }, 400)
+    const { error } = await adminClient
+      .from('roadmap_items')
+      .update({ status: body.status })
+      .eq('id', body.id)
+    if (error) return json({ error: error.message }, 500)
+    return json({ ok: true })
+  }
+
+  if (body.action === 'roadmap_delete') {
+    if (!body.id) return json({ error: 'id required' }, 400)
+    const { error } = await adminClient
+      .from('roadmap_items')
+      .delete()
+      .eq('id', body.id)
+    if (error) return json({ error: error.message }, 500)
+    return json({ ok: true })
+  }
+
   return json({ error: 'Unknown action' }, 400)
 })
