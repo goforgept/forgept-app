@@ -175,7 +175,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       acc[rep].count += 1
       if (p.total_gross_margin_percent) acc[rep].margins.push(p.total_gross_margin_percent)
       return acc
-    }, {})
+    }, Object.create(null))
   ).map(rep => ({
     ...rep,
     avgMargin: rep.margins.length > 0 ? (rep.margins.reduce((a, b) => a + b, 0) / rep.margins.length).toFixed(1) : null

@@ -127,7 +127,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
     if (!acc[company]) acc[company] = []
     acc[company].push(client)
     return acc
-  }, {})
+  }, Object.create(null))
 
   // One card per company — archived if all contacts are archived
   const companies = Object.entries(grouped).map(([company, contacts]) => ({

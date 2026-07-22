@@ -4,7 +4,7 @@ export default function RFQModal({ lineItems, rfqVendorData, setRfqVendorData, s
     if (!acc[vendor]) acc[vendor] = []
     acc[vendor].push(item)
     return acc
-  }, {})
+  }, Object.create(null))
 
   const addCompetingVendor = (vendorName) => {
     setRfqVendorData(prev => ({

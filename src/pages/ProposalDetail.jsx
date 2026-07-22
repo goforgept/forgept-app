@@ -988,7 +988,7 @@ export default function ProposalDetail({ isAdmin }) {
       if (!acc[vendor]) acc[vendor] = []
       acc[vendor].push(item)
       return acc
-    }, {})
+    }, Object.create(null))
     const initData = {}
     Object.keys(byVendor).forEach(v => {
       const found = vendors.find(vr => vr.vendor_name === v)
@@ -1009,7 +1009,7 @@ export default function ProposalDetail({ isAdmin }) {
       if (!acc[vendor]) acc[vendor] = []
       acc[vendor].push(item)
       return acc
-    }, {})
+    }, Object.create(null))
 
     const { data: vendorRecords } = await supabase
       .from('vendors')
