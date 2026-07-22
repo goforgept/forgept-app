@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
   )
 
   try {
-    const { clientId, contactId } = await req.json()
+    const { clientId, contactId, proposalId } = await req.json()
 
     const { data: org } = await supabase
       .from('organizations')
@@ -139,6 +139,53 @@ Deno.serve(async (req) => {
               zoho_contact_id: String(zohoContactId),
               zoho_last_sync_at: new Date().toISOString(),
             }).eq('id', contactId)
+          }
+        }
+      }
+    }
+
+    // ── Push proposal → Zoho Deal ─────────────────────────────────────────
+    if (proposalId) {
+      const { data: proposal } = await supabase
+        .from('proposals')
+        .select('id, proposal_name, job_description, proposal_value, close_date, status, client_id, zoho_deal_id, clients(zoho_account_id)')
+        .eq('id', proposalId)
+        .single()
+
+      if (proposal) {
+        const stageMap: Record<string, string> = {
+          Draft:  'Qualification',
+          Sent:   'Proposal/Price Quote',
+          Won:    'Closed Won',
+          Lost:   'Closed Lost',
+        }
+        const dealData: any = {
+          Deal_Name:    proposal.proposal_name || proposal.job_description || 'Untitled Deal',
+          Amount:       proposal.proposal_value || 0,
+          Stage:        stageMap[proposal.status] || 'Qualification',
+          Closing_Date: proposal.close_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        }
+        const zohoAccountId = (proposal.clients as any)?.zoho_account_id
+        if (zohoAccountId) dealData.Account_Name = { id: zohoAccountId }
+
+        if (proposal.zoho_deal_id) {
+          await fetch(`${apiBase}/crm/v2/Deals/${proposal.zoho_deal_id}`, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify({ data: [dealData] }),
+          })
+        } else {
+          const res = await fetch(`${apiBase}/crm/v2/Deals`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ data: [dealData] }),
+          })
+          const body = await res.json()
+          const zohoDealId = body?.data?.[0]?.details?.id
+          if (zohoDealId) {
+            await supabase.from('proposals').update({
+              zoho_deal_id: String(zohoDealId),
+            }).eq('id', proposalId)
           }
         }
       }

@@ -199,6 +199,17 @@ export default function NewProposal() {
     }).select().single()
 
     if (error) { alert('Error creating deal: ' + error.message); setSaving(false); return }
+
+    // Push new deal to Zoho CRM (fire-and-forget)
+    const { data: { session: sess } } = await supabase.auth.getSession()
+    if (sess?.access_token) {
+      fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sess.access_token}` },
+        body: JSON.stringify({ proposalId: proposal.id }),
+      }).catch(() => {})
+    }
+
     navigate(`/proposal/${proposal.id}`)
   }
 

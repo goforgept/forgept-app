@@ -432,6 +432,16 @@ export default function ProposalDetail({ isAdmin }) {
     await supabase.from('proposals').update({ status: newStatus, ...stageUpdate }).eq('id', id)
     setProposal(prev => ({ ...prev, status: newStatus, ...stageStateUpdate }))
     logActivity(`Status changed to ${newStatus}`)
+
+    // Sync stage change to Zoho Deal (fire-and-forget)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.access_token) return
+      fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ proposalId: id }),
+      }).catch(() => {})
+    })
   }
 
   const updateStage = async (stageId) => {
