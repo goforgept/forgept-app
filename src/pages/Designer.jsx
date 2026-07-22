@@ -306,7 +306,8 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
     const [{ data: placementData }, { data: cableData }, { data: riseData }] = await Promise.all([
       supabase.from('drawing_placements')
         .select('*, global_products(name, part_number, manufacturer, category, accessories), placement_components(*)')
-        .in('drawing_sheet_id', sheetIds),
+        .in('drawing_sheet_id', sheetIds)
+        .or('site_condition.is.null,site_condition.eq.new,site_condition.eq.replace'),
       supabase.from('cable_runs').select('cable_type, total_footage').in('drawing_sheet_id', sheetIds),
       supabase.from('vertical_rises').select('cable_type, total_footage').eq('proposal_id', proposalId),
     ])
