@@ -1,10 +1,10 @@
 export default function RFQModal({ lineItems, rfqVendorData, setRfqVendorData, sendingRFQs, onSend, onClose }) {
   const byVendor = lineItems.reduce((acc, item) => {
     const vendor = item.vendor || 'Unknown Vendor'
-    if (!acc[vendor]) acc[vendor] = []
-    acc[vendor].push(item)
+    if (!acc.has(vendor)) acc.set(vendor, [])
+    acc.get(vendor).push(item)
     return acc
-  }, Object.create(null))
+  }, new Map())
 
   const addCompetingVendor = (vendorName) => {
     setRfqVendorData(prev => ({
@@ -43,7 +43,7 @@ export default function RFQModal({ lineItems, rfqVendorData, setRfqVendorData, s
         <h3 className="text-fp-text font-bold text-lg mb-1">Send RFQs</h3>
         <p className="text-fp-muted text-sm mb-5">Verify vendor emails and add competing vendors to receive the same items.</p>
         <div className="space-y-4">
-          {Object.entries(byVendor).map(([vendorName, items]) => (
+          {Array.from(byVendor.entries()).map(([vendorName, items]) => (
             <div key={vendorName} className="bg-fp-inset rounded-xl p-4">
               <div className="flex justify-between items-start mb-3">
                 <div>

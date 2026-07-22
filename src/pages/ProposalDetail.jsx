@@ -985,12 +985,12 @@ export default function ProposalDetail({ isAdmin }) {
     }
     const byVendor = candidates.reduce((acc, item) => {
       const vendor = item.vendor || 'Unknown Vendor'
-      if (!acc[vendor]) acc[vendor] = []
-      acc[vendor].push(item)
+      if (!acc.has(vendor)) acc.set(vendor, [])
+      acc.get(vendor).push(item)
       return acc
-    }, Object.create(null))
+    }, new Map())
     const initData = {}
-    Object.keys(byVendor).forEach(v => {
+    byVendor.forEach((_, v) => {
       const found = vendors.find(vr => vr.vendor_name === v)
       initData[v] = { email: found?.contact_email || '', contactName: found?.contact_name || '', attachExcel: false }
     })
@@ -1006,10 +1006,10 @@ export default function ProposalDetail({ isAdmin }) {
       : lineItems.filter(l => l.pricing_status === 'Needs Pricing' && l.vendor)
     const byVendor = candidates.reduce((acc, item) => {
       const vendor = item.vendor || 'Unknown Vendor'
-      if (!acc[vendor]) acc[vendor] = []
-      acc[vendor].push(item)
+      if (!acc.has(vendor)) acc.set(vendor, [])
+      acc.get(vendor).push(item)
       return acc
-    }, Object.create(null))
+    }, new Map())
 
     const { data: vendorRecords } = await supabase
       .from('vendors')
@@ -1019,7 +1019,7 @@ export default function ProposalDetail({ isAdmin }) {
     const vendorExpiryMap = {}
     ;(vendorRecords || []).forEach(v => { vendorExpiryMap[v.vendor_name] = v.pricing_valid_days || 30 })
 
-    for (const [vendorName, items] of Object.entries(byVendor)) {
+    for (const [vendorName, items] of byVendor.entries()) {
       const vendorInfo = rfqVendorData[vendorName]
       if (!vendorInfo?.email) continue
 

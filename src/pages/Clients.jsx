@@ -124,13 +124,13 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
   // Group clients by company
   const grouped = clients.reduce((acc, client) => {
     const company = client.company || 'No Company'
-    if (!acc[company]) acc[company] = []
-    acc[company].push(client)
+    if (!acc.has(company)) acc.set(company, [])
+    acc.get(company).push(client)
     return acc
-  }, Object.create(null))
+  }, new Map())
 
   // One card per company — archived if all contacts are archived
-  const companies = Object.entries(grouped).map(([company, contacts]) => ({
+  const companies = Array.from(grouped.entries()).map(([company, contacts]) => ({
     company,
     contacts,
     primary: contacts[0],

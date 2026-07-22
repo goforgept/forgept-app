@@ -166,16 +166,17 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const pendingPOs = purchaseOrders.filter(p => p.status === 'Sent').length
   const totalPOValue = purchaseOrders.reduce((sum, p) => sum + (p.total_amount || 0), 0)
 
-  const repStats = Object.values(
+  const repStats = Array.from(
     filteredProposals.reduce((acc, p) => {
       const rep = p.rep_name || 'Unknown'
-      if (!acc[rep]) acc[rep] = { name: rep, pipeline: 0, won: 0, count: 0, margins: [] }
-      acc[rep].pipeline += p.proposal_value || 0
-      if (p.status === 'Won') acc[rep].won += p.proposal_value || 0
-      acc[rep].count += 1
-      if (p.total_gross_margin_percent) acc[rep].margins.push(p.total_gross_margin_percent)
+      if (!acc.has(rep)) acc.set(rep, { name: rep, pipeline: 0, won: 0, count: 0, margins: [] })
+      const entry = acc.get(rep)
+      entry.pipeline += p.proposal_value || 0
+      if (p.status === 'Won') entry.won += p.proposal_value || 0
+      entry.count += 1
+      if (p.total_gross_margin_percent) entry.margins.push(p.total_gross_margin_percent)
       return acc
-    }, Object.create(null))
+    }, new Map()).values()
   ).map(rep => ({
     ...rep,
     avgMargin: rep.margins.length > 0 ? (rep.margins.reduce((a, b) => a + b, 0) / rep.margins.length).toFixed(1) : null
