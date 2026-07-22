@@ -549,7 +549,7 @@ const deleteMeeting = async (meetingId) => {
         {/* Contact strip */}
         <div className="bg-fp-card rounded-xl px-6 py-4 flex gap-8 flex-wrap">
           {client?.email && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Email</span><a href={`mailto:${encodeURIComponent(client.email)}`} className="text-[#C8622A] text-sm hover:underline">{client.email}</a></div>}
-          {client?.phone && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Phone</span><a href={`tel:${client.phone}`} className="text-fp-text text-sm hover:text-[#C8622A] transition-colors">{client.phone}</a></div>}
+          {client?.phone && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Phone</span><a href={`tel:${client.phone.replace(/[^0-9+\-().#, ]/g, '')}`} className="text-fp-text text-sm hover:text-[#C8622A] transition-colors">{client.phone}</a></div>}
           {client?.industry && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Industry</span><span className="text-fp-text text-sm">{client.industry}</span></div>}
           {fullAddress && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Address</span><a href={`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`} target="_blank" rel="noreferrer" className="text-fp-text text-sm hover:text-[#C8622A] transition-colors">{fullAddress}</a></div>}
           {client?.store_id && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Store ID</span><span className="text-fp-text text-sm font-mono">{client.store_id}</span></div>}
@@ -652,7 +652,7 @@ const deleteMeeting = async (meetingId) => {
                       {contact.phone && (
                         <div className="flex items-center gap-2">
                           <span className="text-fp-muted text-xs w-10">Phone</span>
-                          <a href={`tel:${contact.phone}`} className="text-fp-text text-xs hover:text-[#C8622A] transition-colors">{contact.phone}</a>
+                          <a href={`tel:${contact.phone.replace(/[^0-9+\-().#, ]/g, '')}`} className="text-fp-text text-xs hover:text-[#C8622A] transition-colors">{contact.phone}</a>
                         </div>
                       )}
                       {contact.notes && <p className="text-fp-muted text-xs mt-1 italic">{contact.notes}</p>}
@@ -708,7 +708,7 @@ const deleteMeeting = async (meetingId) => {
                           <p className="text-fp-muted text-xs font-semibold">Site Contact</p>
                           {loc.site_contact_name && <p className="text-fp-text text-xs font-medium">{loc.site_contact_name}</p>}
                           {loc.site_contact_email && <a href={`mailto:${encodeURIComponent(loc.site_contact_email)}`} className="text-[#C8622A] text-xs hover:underline block">{loc.site_contact_email}</a>}
-                          {loc.site_contact_phone && <a href={`tel:${loc.site_contact_phone}`} className="text-fp-muted text-xs hover:text-fp-text transition-colors block">{loc.site_contact_phone}</a>}
+                          {loc.site_contact_phone && <a href={`tel:${loc.site_contact_phone.replace(/[^0-9+\-().#, ]/g, '')}`} className="text-fp-muted text-xs hover:text-fp-text transition-colors block">{loc.site_contact_phone}</a>}
                         </div>
                       )}
                       {loc.notes && <p className="text-fp-muted text-xs mt-2 italic">{loc.notes}</p>}
