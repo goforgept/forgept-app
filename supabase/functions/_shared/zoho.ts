@@ -1,31 +1,26 @@
-// Keys are the values Zoho puts in api_domain; values are the canonical
-// hardcoded strings that flow into fetch(). Returning the Map value (not the
-// input) breaks the taint chain for static-analysis tools.
-const ZOHO_API_DOMAIN_MAP = new Map<string, string>([
-  ['https://www.zohoapis.com',    'https://www.zohoapis.com'],
-  ['https://www.zohoapis.eu',     'https://www.zohoapis.eu'],
-  ['https://www.zohoapis.com.au', 'https://www.zohoapis.com.au'],
-  ['https://www.zohoapis.in',     'https://www.zohoapis.in'],
-  ['https://www.zohoapis.com.cn', 'https://www.zohoapis.com.cn'],
-  ['https://www.zohoapis.jp',     'https://www.zohoapis.jp'],
-  ['https://www.zohoapis.ca',     'https://www.zohoapis.ca'],
-])
-
-const DEFAULT_API_DOMAIN = 'https://www.zohoapis.com'
-
 /** Return a validated Zoho API base URL.
- *  The return value is always a hardcoded Map value, never the raw input,
- *  preventing SSRF from a tampered api_domain in the token response.
+ *  Each branch returns a string literal — never the raw input — so taint
+ *  analysis tools can see the fetch URL is always a hardcoded constant.
  */
 export function zohoApiBase(apiDomain: string | null | undefined): string {
-  return ZOHO_API_DOMAIN_MAP.get(apiDomain ?? '') ?? DEFAULT_API_DOMAIN
+  if (apiDomain === 'https://www.zohoapis.eu')     return 'https://www.zohoapis.eu'
+  if (apiDomain === 'https://www.zohoapis.com.au') return 'https://www.zohoapis.com.au'
+  if (apiDomain === 'https://www.zohoapis.in')     return 'https://www.zohoapis.in'
+  if (apiDomain === 'https://www.zohoapis.com.cn') return 'https://www.zohoapis.com.cn'
+  if (apiDomain === 'https://www.zohoapis.jp')     return 'https://www.zohoapis.jp'
+  if (apiDomain === 'https://www.zohoapis.ca')     return 'https://www.zohoapis.ca'
+  return 'https://www.zohoapis.com'
 }
 
 /** Derive the Zoho accounts (auth) base URL from the stored api_domain.
- *  api_domain examples: https://www.zohoapis.com  https://www.zohoapis.eu
- *  auth domain  result: https://accounts.zoho.com https://accounts.zoho.eu
+ *  Each branch returns a string literal so the auth URL is always a constant.
  */
 export function zohoAuthBase(apiDomain: string | null | undefined): string {
-  const base = zohoApiBase(apiDomain)
-  return base.replace('https://www.zohoapis.', 'https://accounts.zoho.')
+  if (apiDomain === 'https://www.zohoapis.eu')     return 'https://accounts.zoho.eu'
+  if (apiDomain === 'https://www.zohoapis.com.au') return 'https://accounts.zoho.com.au'
+  if (apiDomain === 'https://www.zohoapis.in')     return 'https://accounts.zoho.in'
+  if (apiDomain === 'https://www.zohoapis.com.cn') return 'https://accounts.zoho.com.cn'
+  if (apiDomain === 'https://www.zohoapis.jp')     return 'https://accounts.zoho.jp'
+  if (apiDomain === 'https://www.zohoapis.ca')     return 'https://accounts.zoho.ca'
+  return 'https://accounts.zoho.com'
 }
