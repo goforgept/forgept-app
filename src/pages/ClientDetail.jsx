@@ -548,7 +548,7 @@ const deleteMeeting = async (meetingId) => {
 
         {/* Contact strip */}
         <div className="bg-fp-card rounded-xl px-6 py-4 flex gap-8 flex-wrap">
-          {client?.email && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Email</span><a href={`mailto:${encodeURIComponent(client.email)}`} className="text-[#C8622A] text-sm hover:underline">{client.email}</a></div>}
+          {client?.email && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Email</span><a href={`mailto:${client.email.replace(/[^a-zA-Z0-9.@_%+\-]/g, '')}`} className="text-[#C8622A] text-sm hover:underline">{client.email}</a></div>}
           {client?.phone && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Phone</span><a href={`tel:${client.phone.replace(/[^0-9+\-().#, ]/g, '')}`} className="text-fp-text text-sm hover:text-[#C8622A] transition-colors">{client.phone}</a></div>}
           {client?.industry && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Industry</span><span className="text-fp-text text-sm">{client.industry}</span></div>}
           {fullAddress && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Address</span><a href={`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`} target="_blank" rel="noreferrer" className="text-fp-text text-sm hover:text-[#C8622A] transition-colors">{fullAddress}</a></div>}
