@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const { data, error } = await adminClient
       .from('roadmap_items')
       .insert([item])
-      .select('*, requester:requested_by(full_name, email), org:org_id(company_name)')
+      .select('*, requester:requested_by(full_name, email), org:org_id(name)')
       .single()
     if (error) return json({ error: error.message }, 500)
     return json({ ok: true, data })
