@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
       adminClient.from('profiles').select('id, full_name, email, created_at').eq('role', 'superadmin').order('created_at'),
       adminClient
         .from('roadmap_items')
-        .select('*, requester:requested_by(full_name, email), org:org_id(company_name)')
+        .select('*, requester:requested_by(full_name, email), org:org_id(name)')
         .order('created_at', { ascending: false }),
       adminClient
         .from('embed_sessions')

@@ -70,6 +70,12 @@ const ELEMENT_TYPE_MAP = {
   'Cabinet Solar System Element Profile Template':   { industry: 'security', defaultCategory: 'Cabinet Solar System' },
   // ACS Expansion
   'ACS Expansion Module Element Profile Template':  { industry: 'security', defaultCategory: 'Controller' },
+  // Server / workstation types
+  'Server Element Profile Template':       { industry: 'security', defaultCategory: 'NVR' },
+  'Workstation Element Profile Template':  { industry: 'security', defaultCategory: 'Workstation' },
+  'Thin Client Element Profile Template':  { industry: 'security', defaultCategory: 'Thin Client' },
+  'Thick Client Element Profile Template': { industry: 'security', defaultCategory: 'Thick Client' },
+  'Badging Station Element Profile Template': { industry: 'security', defaultCategory: 'Badging Station' },
 }
 
 // Camera style → category override
@@ -438,6 +444,8 @@ const ALL_CATEGORIES = [
   'Pull Station','Duct Detector','CO Detector','Beam Detector',
   'Annunciator','Monitor Module','Control Module','Door Holder',
   'Air Sampling','Suppression Panel','FACP',
+  // Workstations / clients
+  'Workstation','Thin Client','Thick Client','Badging Station',
   // Other
   'Network','Sensor','Power Supply','UPS','Rack','Panel',
 ].sort()

@@ -9,6 +9,7 @@ const INDUSTRIES = ['Security', 'AV', 'IT / Networking', 'Low Voltage', 'Fire Al
 const ALL_CATEGORIES = [
   'Access Control Door',
   'Access Reader','Alarm Keypad','Alarm Panel','Amplifier','AV Receiver',
+  'Badging Station',
   'Bullet Camera','Cable Tray','Ceiling Speaker','Clock','Control Processor',
   'Controller','Data Drop','Diffuser','Digital Signage','Disconnect',
   'Document Camera','Dome Camera','Door Contact','Door Operator','DSP',
@@ -20,12 +21,12 @@ const ALL_CATEGORIES = [
   'PIR Detector','Point to Point','Power Box','Projection Screen',
   'Projector','PTZ Camera','Pull Station','Rack','Sensor',
   'Shock Sensor','Smoke Detector','Speaker','Streaming Encoder',
-  'Subwoofer','Switcher','Thermostat','Touch Panel','UPS',
-  'Video Conference','Wall Plate','Wireless Lock','Wireless Mic',
+  'Subwoofer','Switcher','Thermostat','Thick Client','Thin Client','Touch Panel','UPS',
+  'Video Conference','Wall Plate','Wireless Lock','Wireless Mic','Workstation',
 ]
 
 const CATEGORY_MAP = {
-  'Security':        ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','Bullet Camera','Controller','Door Contact','Door Operator','Dome Camera','Dual Tech Detector','Exterior Siren','Glass Break','Interior Siren','Motion Sensor','Network','NVR','Panel','Panic Button','PIR Detector','PTZ Camera','Shock Sensor'],
+  'Security':        ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','Badging Station','Bullet Camera','Controller','Door Contact','Door Operator','Dome Camera','Dual Tech Detector','Exterior Siren','Glass Break','Interior Siren','Motion Sensor','Network','NVR','Panel','Panic Button','PIR Detector','PTZ Camera','Shock Sensor','Thick Client','Thin Client','Workstation'],
   'AV':              ['Accessory','AV Receiver','Ceiling Speaker','Clock','Control Processor','Digital Signage','Display','Document Camera','HDMI Extender','Media Player','Microphone','Network','Projection Screen','Projector','Speaker','Streaming Encoder','Subwoofer','Touch Panel','Video Conference','Wall Plate','Wireless Mic'],
   'IT / Networking': ['Accessory','Controller','Display','Network','Outlet','Panel','Wall Plate'],
   'Low Voltage':     ['Access Reader','Accessory','Controller','Display','Door Contact','Door Operator','Network','Outlet','Panel','Speaker','Wall Plate'],
@@ -33,7 +34,7 @@ const CATEGORY_MAP = {
   'HVAC':            ['Accessory','Controller','Diffuser','Network','Panel','Thermostat'],
   'Electrical':      ['Accessory','Controller','Lighting','Outlet','Panel'],
   'Telecom':         ['Accessory','Controller','Network','Outlet','Panel','Wall Plate'],
-  'Other':           ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','AV Receiver','Bullet Camera','Ceiling Speaker','Clock','Control Processor','Controller','Diffuser','Digital Signage','Display','Document Camera','Dome Camera','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','HDMI Extender','Interior Siren','Lighting','Media Player','Microphone','Motion Sensor','Network','NVR','Outlet','Panel','Panic Button','PIR Detector','PTZ Camera','Projection Screen','Projector','Shock Sensor','Speaker','Streaming Encoder','Subwoofer','Thermostat','Touch Panel','Video Conference','Wall Plate','Wireless Mic'],
+  'Other':           ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','AV Receiver','Badging Station','Bullet Camera','Ceiling Speaker','Clock','Control Processor','Controller','Diffuser','Digital Signage','Display','Document Camera','Dome Camera','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','HDMI Extender','Interior Siren','Lighting','Media Player','Microphone','Motion Sensor','Network','NVR','Outlet','Panel','Panic Button','PIR Detector','PTZ Camera','Projection Screen','Projector','Shock Sensor','Speaker','Streaming Encoder','Subwoofer','Thermostat','Thick Client','Thin Client','Touch Panel','Video Conference','Wall Plate','Wireless Mic','Workstation'],
 }
 
 const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
