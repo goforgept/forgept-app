@@ -2013,34 +2013,49 @@ function GlobalProductStats() {
   const [showAccessories, setShowAccessories] = useState(false)
 
   const load = async () => {
-      const { data } = await supabase
-        .from('global_products')
-        .select('manufacturer, industry, is_active')
-        .order('manufacturer')
-
-      if (data) {
-        const grouped = {}
-        data.forEach(p => {
-          if (!grouped[p.manufacturer]) grouped[p.manufacturer] = { count: 0, industries: new Set(), active: 0 }
-          grouped[p.manufacturer].count++
-          grouped[p.manufacturer].industries.add(p.industry)
-          if (p.is_active) grouped[p.manufacturer].active++
-        })
-        setStats(Object.entries(grouped)
-          .map(([mfr, d]) => ({ manufacturer: mfr, count: d.count, active: d.active, industries: [...d.industries] }))
-          .sort((a, b) => b.count - a.count))
+      const PAGE = 1000
+      let page = 0, all = []
+      while (true) {
+        const { data } = await supabase
+          .from('global_products')
+          .select('manufacturer, industry, is_active')
+          .order('manufacturer')
+          .range(page * PAGE, (page + 1) * PAGE - 1)
+        if (!data || data.length === 0) break
+        all = all.concat(data)
+        if (data.length < PAGE) break
+        page++
       }
+      const grouped = {}
+      all.forEach(p => {
+        if (!grouped[p.manufacturer]) grouped[p.manufacturer] = { count: 0, industries: new Set(), active: 0 }
+        grouped[p.manufacturer].count++
+        grouped[p.manufacturer].industries.add(p.industry)
+        if (p.is_active) grouped[p.manufacturer].active++
+      })
+      setStats(Object.entries(grouped)
+        .map(([mfr, d]) => ({ manufacturer: mfr, count: d.count, active: d.active, industries: [...d.industries] }))
+        .sort((a, b) => b.count - a.count))
       setLoading(false)
     }
 
     const loadProducts = async (manufacturer) => {
       setLoadingP(true)
-      const { data } = await supabase
-        .from('global_products')
-        .select('*')
-        .eq('manufacturer', manufacturer)
-        .order('category').order('name')
-      setProducts(data || [])
+      const PAGE = 1000
+      let page = 0, all = []
+      while (true) {
+        const { data } = await supabase
+          .from('global_products')
+          .select('*')
+          .eq('manufacturer', manufacturer)
+          .order('category').order('name')
+          .range(page * PAGE, (page + 1) * PAGE - 1)
+        if (!data || data.length === 0) break
+        all = all.concat(data)
+        if (data.length < PAGE) break
+        page++
+      }
+      setProducts(all)
       setLoadingP(false)
     }
   useEffect(() => {
