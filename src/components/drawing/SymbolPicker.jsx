@@ -53,13 +53,26 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
   useEffect(() => {
     const loadAll = async () => {
       setLoading(true)
-      const [{ data: global }, { data: org }] = await Promise.all([
-        supabase.from('global_products').select('*').eq('is_active', true).order('category').order('name'),
-        orgId ? supabase.from('org_products').select('*').eq('org_id', orgId).eq('is_active', true).order('name') : Promise.resolve({ data: [] }),
-      ])
+      const PAGE = 1000
+      let page = 0, all = []
+      while (true) {
+        const { data } = await supabase
+          .from('global_products')
+          .select('*')
+          .eq('is_active', true)
+          .order('category').order('name')
+          .range(page * PAGE, (page + 1) * PAGE - 1)
+        if (!data || data.length === 0) break
+        all = all.concat(data)
+        if (data.length < PAGE) break
+        page++
+      }
+      const { data: org } = orgId
+        ? await supabase.from('org_products').select('*').eq('org_id', orgId).eq('is_active', true).order('name')
+        : { data: [] }
       const globalFiltered = allowedManufacturers?.length
-        ? (global || []).filter(p => p.manufacturer === 'Generic' || allowedManufacturers.includes(p.manufacturer))
-        : (global || [])
+        ? all.filter(p => p.manufacturer === 'Generic' || allowedManufacturers.includes(p.manufacturer))
+        : all
       setAllProducts([...globalFiltered, ...(org || []).map(p => ({ ...p, is_custom: true }))])
       setLoading(false)
     }
