@@ -2011,6 +2011,8 @@ function GlobalProductStats() {
   const [loadingP,      setLoadingP]      = useState(false)
   const [editingProduct, setEditingProduct] = useState(null) // product being edited
   const [showAccessories, setShowAccessories] = useState(false)
+  const [search, setSearch] = useState('')
+  const [productSearch, setProductSearch] = useState('')
 
   const load = async () => {
       const PAGE = 1000
@@ -2072,12 +2074,31 @@ function GlobalProductStats() {
   )
 
   const total = stats.reduce((s, r) => s + r.count, 0)
+  const filteredStats = search.trim()
+    ? stats.filter(r => r.manufacturer.toLowerCase().includes(search.toLowerCase()))
+    : stats
+  const filteredProducts = productSearch.trim()
+    ? products.filter(p =>
+        (p.name || '').toLowerCase().includes(productSearch.toLowerCase()) ||
+        (p.part_number || '').toLowerCase().includes(productSearch.toLowerCase()) ||
+        (p.category || '').toLowerCase().includes(productSearch.toLowerCase())
+      )
+    : products
 
   return (
     <>
-      <div className="flex items-center gap-6 text-sm">
-        <div><span className="text-[#8A9AB0]">Total products</span><span className="ml-2 text-white font-bold">{total.toLocaleString()}</span></div>
-        <div><span className="text-[#8A9AB0]">Manufacturers</span><span className="ml-2 text-white font-bold">{stats.length}</span></div>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-6 text-sm">
+          <div><span className="text-[#8A9AB0]">Total products</span><span className="ml-2 text-white font-bold">{total.toLocaleString()}</span></div>
+          <div><span className="text-[#8A9AB0]">Manufacturers</span><span className="ml-2 text-white font-bold">{stats.length}</span></div>
+        </div>
+        <input
+          type="text"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search manufacturers…"
+          className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-sm w-56 focus:outline-none focus:border-[#C8622A] placeholder-[#4a5d75]"
+        />
       </div>
 
       <div className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
@@ -2092,7 +2113,7 @@ function GlobalProductStats() {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#2a3d55]/50">
-            {stats.map(row => (
+            {filteredStats.map(row => (
               <>
                 <tr key={row.manufacturer}
                   className="hover:bg-[#0F1C2E]/50 cursor-pointer"
@@ -2100,8 +2121,10 @@ function GlobalProductStats() {
                     if (expanded === row.manufacturer) {
                       setExpanded(null)
                       setProducts([])
+                      setProductSearch('')
                     } else {
                       setExpanded(row.manufacturer)
+                      setProductSearch('')
                       loadProducts(row.manufacturer)
                     }
                   }}>
@@ -2152,7 +2175,15 @@ function GlobalProductStats() {
                           Loading products...
                         </div>
                       ) : (
-                        <div className="space-y-1 max-h-64 overflow-y-auto">
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            value={productSearch}
+                            onChange={e => setProductSearch(e.target.value)}
+                            placeholder="Search by name, part number, or category…"
+                            className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-xs mb-2 focus:outline-none focus:border-[#C8622A] placeholder-[#4a5d75]"
+                          />
+                          <div className="max-h-64 overflow-y-auto space-y-1">
                           <div className="grid grid-cols-5 gap-2 text-xs text-[#8A9AB0] font-medium pb-1 border-b border-[#2a3d55] sticky top-0 bg-[#0F1C2E]">
                             <span>Part Number</span>
                             <span>Name</span>
@@ -2160,7 +2191,7 @@ function GlobalProductStats() {
                             <span>FOV°</span>
                             <span className="text-right">Actions</span>
                           </div>
-                          {products.map(p => (
+                          {filteredProducts.map(p => (
                             <EditableProductRow
                               key={p.id}
                               product={p}
@@ -2169,6 +2200,7 @@ function GlobalProductStats() {
                               onEditAccessories={() => { setEditingProduct(p); setShowAccessories(true) }}
                             />
                           ))}
+                          </div>
                         </div>
                       )}
                     </td>
