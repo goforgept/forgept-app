@@ -446,6 +446,10 @@ const ALL_CATEGORIES = [
   'Air Sampling','Suppression Panel','FACP',
   // Workstations / clients
   'Workstation','Thin Client','Thick Client','Badging Station','KVM',
+  // Healthcare / emergency communication
+  'Nurse Call Controller','Patient Station','Staff Station','Dome Light','Pull Cord Station','Corridor Light',
+  'Code Blue Phone','Code Blue Light','Code Blue Panel',
+  'Area of Rescue Station','Area of Rescue Remote Master','Area of Rescue Annunciator',
   // Other
   'Network','Sensor','Power Supply','UPS','Rack','Panel',
 ].sort()
