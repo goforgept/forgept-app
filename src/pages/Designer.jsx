@@ -22,6 +22,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const [laborEnabled,         setLaborEnabled]         = useState(false)
   const [allowedManufacturers, setAllowedManufacturers] = useState(null)
   const [enabledIndustries,    setEnabledIndustries]    = useState(null)
+  const [designerOnly,         setDesignerOnly]         = useState(false)
   const [laborDefaults,   setLaborDefaults]   = useState([])
   const [loading,         setLoading]         = useState(true)
   const [uploading,       setUploading]       = useState(false)
@@ -74,12 +75,13 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
       setOrgId(profile.org_id)
 
       const [{ data: org }, { data: defaults }] = await Promise.all([
-        supabase.from('organizations').select('designer_labor_enabled, designer_allowed_manufacturers, designer_enabled_industries').eq('id', profile.org_id).single(),
+        supabase.from('organizations').select('designer_labor_enabled, designer_allowed_manufacturers, designer_enabled_industries, feature_designer_only').eq('id', profile.org_id).single(),
         supabase.from('designer_labor_defaults').select('category, labor_role, hours_per_unit').eq('org_id', profile.org_id),
       ])
       setLaborEnabled(org?.designer_labor_enabled ?? false)
       setAllowedManufacturers(org?.designer_allowed_manufacturers || null)
       setEnabledIndustries(org?.designer_enabled_industries?.length ? org.designer_enabled_industries : null)
+      setDesignerOnly(org?.feature_designer_only || false)
       setLaborDefaults(defaults || [])
 
       if (proposalId && proposalId !== 'new') {
@@ -910,14 +912,29 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
               ? `${sheets.filter(s => s.status === 'draft').length} sheet(s) pending approval`
               : 'All sheets approved'}
           </div>
-          <button onClick={handleApprove} disabled={approving || sheets.length === 0}
-            className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${
-              approving || sheets.length === 0
-                ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
-                : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
-            }`}>
-            {approving ? 'Pushing to BOM...' : allApproved ? 'Re-approve & Sync BOM' : 'Approve & Push to BOM'}
-          </button>
+          {designerOnly ? (
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-xs text-[#8A9AB0] leading-tight">
+                  <span className="font-semibold text-[#C8622A]">Upgrade to ForgePt Full Suite</span> to approve drawings,
+                </p>
+                <p className="text-xs text-[#8A9AB0] leading-tight">generate proposals, and push your BOM automatically.</p>
+              </div>
+              <a href="mailto:hello@goforgept.com?subject=Upgrade%20to%20Full%20Suite"
+                className="whitespace-nowrap px-4 py-1.5 text-sm font-semibold rounded-lg bg-[#C8622A] text-white hover:bg-[#b5571f] transition-colors">
+                Contact Us
+              </a>
+            </div>
+          ) : (
+            <button onClick={handleApprove} disabled={approving || sheets.length === 0}
+              className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${
+                approving || sheets.length === 0
+                  ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
+                  : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
+              }`}>
+              {approving ? 'Pushing to BOM...' : allApproved ? 'Re-approve & Sync BOM' : 'Approve & Push to BOM'}
+            </button>
+          )}
         </div>
       )}
 
