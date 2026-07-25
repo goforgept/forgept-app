@@ -445,7 +445,7 @@ const ALL_CATEGORIES = [
   'Annunciator','Monitor Module','Control Module','Door Holder',
   'Air Sampling','Suppression Panel','FACP',
   // Workstations / clients
-  'Workstation','Thin Client','Thick Client','Badging Station',
+  'Workstation','Thin Client','Thick Client','Badging Station','KVM',
   // Other
   'Network','Sensor','Power Supply','UPS','Rack','Panel',
 ].sort()
