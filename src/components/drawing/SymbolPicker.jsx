@@ -31,7 +31,7 @@ export const PATHWAY_DEFS = [
   { type: 'Surface Raceway', color: '#06b6d4', label: 'Surface Raceway',  dash: [] },
 ]
 
-export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedManufacturers, activeTool, onToolSelect }) {
+export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedManufacturers, enabledIndustries, activeTool, onToolSelect }) {
   const [tab,           setTab]           = useState('devices')
   const [industry,      setIndustry]      = useState('all')
   const [manufacturer,  setManufacturer]  = useState('Generic')
@@ -70,9 +70,12 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
       const { data: org } = orgId
         ? await supabase.from('org_products').select('*').eq('org_id', orgId).eq('is_active', true).order('name')
         : { data: [] }
-      const globalFiltered = allowedManufacturers?.length
+      let globalFiltered = allowedManufacturers?.length
         ? all.filter(p => p.manufacturer === 'Generic' || allowedManufacturers.includes(p.manufacturer))
         : all
+      if (enabledIndustries?.length) {
+        globalFiltered = globalFiltered.filter(p => enabledIndustries.includes(p.industry))
+      }
       setAllProducts([...globalFiltered, ...(org || []).map(p => ({ ...p, is_custom: true }))])
       setLoading(false)
     }
@@ -152,9 +155,11 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
             <p className="text-xs font-medium text-[#8A9AB0] mb-2">Industry</p>
             <select value={industry} onChange={e => setIndustry(e.target.value)}
               className="w-full text-xs border border-[#2a3d55] rounded-lg px-2 py-1.5 bg-[#1a2d45] text-white focus:outline-none focus:border-[#C8622A] cursor-pointer">
-              {Object.entries(INDUSTRY_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
+              {Object.entries(INDUSTRY_LABELS)
+                .filter(([key]) => key === 'all' || !enabledIndustries?.length || enabledIndustries.includes(key))
+                .map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
             </select>
           </div>
 

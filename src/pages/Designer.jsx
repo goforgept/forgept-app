@@ -21,6 +21,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const [orgId,           setOrgId]           = useState(null)
   const [laborEnabled,         setLaborEnabled]         = useState(false)
   const [allowedManufacturers, setAllowedManufacturers] = useState(null)
+  const [enabledIndustries,    setEnabledIndustries]    = useState(null)
   const [laborDefaults,   setLaborDefaults]   = useState([])
   const [loading,         setLoading]         = useState(true)
   const [uploading,       setUploading]       = useState(false)
@@ -73,11 +74,12 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
       setOrgId(profile.org_id)
 
       const [{ data: org }, { data: defaults }] = await Promise.all([
-        supabase.from('organizations').select('designer_labor_enabled, designer_allowed_manufacturers').eq('id', profile.org_id).single(),
+        supabase.from('organizations').select('designer_labor_enabled, designer_allowed_manufacturers, designer_enabled_industries').eq('id', profile.org_id).single(),
         supabase.from('designer_labor_defaults').select('category, labor_role, hours_per_unit').eq('org_id', profile.org_id),
       ])
       setLaborEnabled(org?.designer_labor_enabled ?? false)
       setAllowedManufacturers(org?.designer_allowed_manufacturers || null)
+      setEnabledIndustries(org?.designer_enabled_industries?.length ? org.designer_enabled_industries : null)
       setLaborDefaults(defaults || [])
 
       if (proposalId && proposalId !== 'new') {
@@ -628,6 +630,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                       }}
                       orgId={orgId}
                       allowedManufacturers={allowedManufacturers}
+                      enabledIndustries={enabledIndustries}
                       activeTool={activeTool}
                       onToolSelect={(tool) => {
                         setActiveTool(tool)

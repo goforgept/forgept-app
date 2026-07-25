@@ -19,8 +19,10 @@ export default function EmbedDesigner() {
   const [proposal,        setProposal]        = useState(null)
   const [sheets,          setSheets]          = useState([])
   const [activeSheetId,   setActiveSheetId]   = useState(null)
-  const [laborEnabled,    setLaborEnabled]    = useState(false)
-  const [laborDefaults,   setLaborDefaults]   = useState([])
+  const [laborEnabled,      setLaborEnabled]      = useState(false)
+  const [laborDefaults,     setLaborDefaults]     = useState([])
+  const [allowedManufacturers, setAllowedManufacturers] = useState(null)
+  const [enabledIndustries,    setEnabledIndustries]    = useState(null)
   const [uploading,       setUploading]       = useState(false)
   const [error,           setError]           = useState(null)
   const [selectedSymbol,  setSelectedSymbol]  = useState(null)
@@ -104,11 +106,13 @@ export default function EmbedDesigner() {
       setOrgId(resolvedOrgId)
 
       const [{ data: org }, { data: defaults }] = await Promise.all([
-        supabase.from('organizations').select('designer_labor_enabled').eq('id', resolvedOrgId).single(),
+        supabase.from('organizations').select('designer_labor_enabled, designer_allowed_manufacturers, designer_enabled_industries').eq('id', resolvedOrgId).single(),
         supabase.from('designer_labor_defaults').select('category, labor_role, hours_per_unit').eq('org_id', resolvedOrgId),
       ])
       setLaborEnabled(org?.designer_labor_enabled ?? false)
       setLaborDefaults(defaults || [])
+      setAllowedManufacturers(org?.designer_allowed_manufacturers || null)
+      setEnabledIndustries(org?.designer_enabled_industries?.length ? org.designer_enabled_industries : null)
 
       let pid = proposalIdParam
       if (!pid) {
@@ -411,7 +415,7 @@ export default function EmbedDesigner() {
               <>
                 {sidebarOpen && (
                   <div className="w-60 border-r border-fp-border flex-shrink-0 overflow-y-auto min-h-0 h-full">
-                    <SymbolPicker selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} orgId={orgId} />
+                    <SymbolPicker selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} orgId={orgId} allowedManufacturers={allowedManufacturers} enabledIndustries={enabledIndustries} />
                   </div>
                 )}
 

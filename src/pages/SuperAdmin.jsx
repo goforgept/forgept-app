@@ -24,6 +24,35 @@ const ORG_TYPES = [
 
 const emptyBillingForm = { plan: 'Trial', billing_status: 'trial', monthly_rate: 0, trial_ends_at: '' }
 
+const INDUSTRY_OPTIONS = [
+  { key: 'security',    label: 'Security' },
+  { key: 'fire_alarm',  label: 'Fire Alarm' },
+  { key: 'av',          label: 'AV' },
+  { key: 'hvac',        label: 'HVAC' },
+  { key: 'electrical',  label: 'Electrical' },
+  { key: 'das',         label: 'DAS' },
+  { key: 'low_voltage', label: 'Low Voltage' },
+  { key: 'it',          label: 'IT / Networking' },
+]
+
+function DesignerIndustryPicker({ selected, onChange }) {
+  const toggle = (key) => {
+    if (selected.includes(key)) onChange(selected.filter(k => k !== key))
+    else onChange([...selected, key])
+  }
+  return (
+    <div className="border border-[#2a3d55] rounded-lg divide-y divide-[#2a3d55] overflow-hidden">
+      {INDUSTRY_OPTIONS.map(ind => (
+        <label key={ind.key} className="flex items-center gap-3 px-3 py-2 bg-[#0F1C2E] cursor-pointer hover:bg-[#1a2d45] transition-colors">
+          <input type="checkbox" checked={selected.includes(ind.key)} onChange={() => toggle(ind.key)}
+            className="w-4 h-4 rounded accent-[#C8622A]" />
+          <span className="text-white text-sm">{ind.label}</span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
 function DesignerMfrPicker({ selected, onChange }) {
   const [manufacturers, setManufacturers] = useState([])
   useEffect(() => {
@@ -545,6 +574,7 @@ export default function SuperAdmin() {
       feature_embed:          org.feature_embed          || false,
       feature_regions:        org.feature_regions        || false,
       designer_allowed_manufacturers: org.designer_allowed_manufacturers || null,
+      designer_enabled_industries: org.designer_enabled_industries || [],
       enabled_catalogs: org.enabled_catalogs || [],
     })
   }
@@ -568,6 +598,7 @@ export default function SuperAdmin() {
       feature_embed:          orgForm.feature_embed,
       feature_regions:        orgForm.feature_regions,
       designer_allowed_manufacturers: orgForm.designer_allowed_manufacturers?.length ? orgForm.designer_allowed_manufacturers : null,
+      designer_enabled_industries: orgForm.designer_enabled_industries?.length ? orgForm.designer_enabled_industries : null,
       enabled_catalogs: orgForm.enabled_catalogs?.length ? orgForm.enabled_catalogs : [],
     }).eq('id', orgId)
     setEditingOrg(null)
@@ -1010,6 +1041,18 @@ export default function SuperAdmin() {
                                 <DesignerMfrPicker
                                   selected={orgForm.designer_allowed_manufacturers || []}
                                   onChange={v => setOrgForm(p => ({ ...p, designer_allowed_manufacturers: v }))}
+                                />
+                              </div>
+                            )}
+
+                            {/* Designer industry filter */}
+                            {orgForm.feature_drawing_tool && (
+                              <div>
+                                <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">Designer — Enabled Industries</p>
+                                <p className="text-[#8A9AB0] text-xs mb-2">Leave all unchecked to show every industry. Check specific ones to restrict this org to only those categories.</p>
+                                <DesignerIndustryPicker
+                                  selected={orgForm.designer_enabled_industries || []}
+                                  onChange={v => setOrgForm(p => ({ ...p, designer_enabled_industries: v }))}
                                 />
                               </div>
                             )}
