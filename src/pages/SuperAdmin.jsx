@@ -2258,6 +2258,8 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
     'Pull Station','Duct Detector','CO Detector','Beam Detector',
     'Annunciator','Monitor Module','Control Module','Door Holder',
     'Air Sampling','Suppression Panel','FACP',
+    'Waterflow Switch','Tamper Switch','Mass Notification Speaker',
+    'Firefighter Phone','Firefighter Phone Jack',
     'Panel','Outlet','Thermostat','Other'
   ]
 
@@ -2372,6 +2374,8 @@ function AddProductForm({ onAdded }) {
     'Pull Station','Duct Detector','CO Detector','Beam Detector',
     'Annunciator','Monitor Module','Control Module','Door Holder',
     'Air Sampling','Suppression Panel','FACP',
+    'Waterflow Switch','Tamper Switch','Mass Notification Speaker',
+    'Firefighter Phone','Firefighter Phone Jack',
     'Panel','Outlet','Thermostat','Other'
   ]
 

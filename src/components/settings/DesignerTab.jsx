@@ -28,7 +28,9 @@ const ALL_CATEGORIES = [
   'Projector','PTZ Camera','Pull Station','Rack','Sensor',
   'Shock Sensor','Smoke Detector','Speaker','Streaming Encoder',
   'Patient Station','Pull Cord Station',
-  'Staff Station','Subwoofer','Switcher','Thermostat','Thick Client','Thin Client','Touch Panel','UPS',
+  'Staff Station','Subwoofer','Switcher',
+  'Tamper Switch','Thermostat','Thick Client','Thin Client','Touch Panel',
+  'UPS',
   'Video Conference','Wall Plate','Wireless Lock','Wireless Mic','Workstation',
 ]
 
@@ -37,7 +39,7 @@ const CATEGORY_MAP = {
   'AV':              ['Accessory','AV Receiver','Ceiling Speaker','Clock','Control Processor','Digital Signage','Display','Document Camera','HDMI Extender','Media Player','Microphone','Network','Projection Screen','Projector','Speaker','Streaming Encoder','Subwoofer','Touch Panel','Video Conference','Wall Plate','Wireless Mic'],
   'IT / Networking': ['Accessory','Controller','Display','Network','Outlet','Panel','Wall Plate'],
   'Low Voltage':     ['Access Reader','Accessory','Controller','Display','Door Contact','Door Operator','Network','Outlet','Panel','Speaker','Wall Plate'],
-  'Fire Alarm':      ['Accessory','Alarm Keypad','Alarm Panel','Door Contact','Exterior Siren','Interior Siren','Motion Sensor','Panel','PIR Detector','Shock Sensor'],
+  'Fire Alarm':      ['Accessory','Air Sampling','Alarm Keypad','Alarm Panel','Annunciator','Beam Detector','Bell','CO Detector','Control Module','Door Contact','Door Holder','Duct Detector','Exterior Siren','FACP','Firefighter Phone','Firefighter Phone Jack','Heat Detector','Horn','Horn Strobe','Interior Siren','Mass Notification Speaker','Monitor Module','Motion Sensor','Panel','PIR Detector','Pull Station','Shock Sensor','Smoke Detector','Strobe','Suppression Panel','Tamper Switch','Waterflow Switch'],
   'HVAC':            ['Accessory','Controller','Diffuser','Network','Panel','Thermostat'],
   'Electrical':      ['Accessory','Controller','Lighting','Outlet','Panel'],
   'Telecom':         ['Accessory','Controller','Network','Outlet','Panel','Wall Plate'],
