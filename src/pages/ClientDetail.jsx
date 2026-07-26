@@ -22,7 +22,7 @@ const emptyLocation = {
 }
 
 const emptyContact = {
-  full_name: '', title: '', email: '', phone: '', is_primary: false, notes: ''
+  full_name: '', title: '', email: '', phone: '', is_primary: false, notes: '', location_id: null
 }
 
 export default function ClientDetail({ isAdmin, featureProposals = true, featureCRM = false, featureAiEmail = false }) {
@@ -193,6 +193,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
       phone: contact.phone || '',
       is_primary: contact.is_primary || false,
       notes: contact.notes || '',
+      location_id: contact.location_id || null,
     })
     setContactPanel(contact)
   }
@@ -637,7 +638,10 @@ const deleteMeeting = async (meetingId) => {
                           <p className="text-fp-text font-semibold text-sm group-hover:text-[#C8622A] transition-colors">{contact.full_name}</p>
                           {contact.is_primary && <span className="text-xs px-1.5 py-0.5 rounded bg-[#C8622A]/15 text-[#C8622A] font-semibold">Primary</span>}
                         </div>
-                        {contact.title && <p className="text-fp-muted text-xs mt-0.5">{contact.title}</p>}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {contact.title && <p className="text-fp-muted text-xs">{contact.title}</p>}
+                          {contact.location_id && (() => { const loc = locations.find(l => l.id === contact.location_id); return loc ? <span className="text-fp-muted text-xs">· {loc.site_name}</span> : null })()}
+                        </div>
                         {/* Mobile-only email/phone */}
                         <div className="md:hidden mt-1 space-y-0.5">
                           {contact.email && <p className="text-fp-muted text-xs truncate">{contact.email}</p>}
@@ -1034,6 +1038,19 @@ const deleteMeeting = async (meetingId) => {
                   <a href={`tel:${panelForm.phone.replace(/[^0-9+\-().#, ]/g, '')}`}
                     className="text-[#C8622A] text-xs mt-1 inline-block hover:underline">Call →</a>
                 )}
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Location</label>
+                <select value={panelForm.location_id || ''}
+                  onChange={e => setPanelForm(p => ({ ...p, location_id: e.target.value || null }))}
+                  className={inputClass}>
+                  <option value="">— No location —</option>
+                  {locations.map(loc => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.site_name}{loc.city ? ` · ${loc.city}` : ''}{loc.store_id ? ` (${loc.store_id})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Notes</label>
