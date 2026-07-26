@@ -52,9 +52,8 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [savingLocation, setSavingLocation] = useState(false)
   // Contacts
   const [contacts, setContacts] = useState([])
-  const [showContactModal, setShowContactModal] = useState(false)
-  const [editingContact, setEditingContact] = useState(null)
-  const [contactForm, setContactForm] = useState(emptyContact)
+  const [contactPanel, setContactPanel] = useState(null) // null | 'new' | contact object
+  const [panelForm, setPanelForm] = useState(emptyContact)
   const [savingContact, setSavingContact] = useState(false)
   // Service Tickets
   const [clientTickets, setClientTickets] = useState([])
@@ -182,14 +181,12 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   }
 
   const openAddContact = () => {
-    setEditingContact(null)
-    setContactForm(emptyContact)
-    setShowContactModal(true)
+    setPanelForm(emptyContact)
+    setContactPanel('new')
   }
 
   const openEditContact = (contact) => {
-    setEditingContact(contact)
-    setContactForm({
+    setPanelForm({
       full_name: contact.full_name || '',
       title: contact.title || '',
       email: contact.email || '',
@@ -197,25 +194,25 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
       is_primary: contact.is_primary || false,
       notes: contact.notes || '',
     })
-    setShowContactModal(true)
+    setContactPanel(contact)
   }
 
   const saveContact = async () => {
-    if (!contactForm.full_name.trim()) return
+    if (!panelForm.full_name.trim()) return
     setSavingContact(true)
-    let savedContactId = editingContact?.id
-    if (editingContact) {
-      await supabase.from('client_contacts').update(contactForm).eq('id', editingContact.id)
+    const isNew = contactPanel === 'new'
+    let savedContactId = isNew ? null : contactPanel.id
+    if (!isNew) {
+      await supabase.from('client_contacts').update(panelForm).eq('id', contactPanel.id)
     } else {
       const { data: newContact } = await supabase.from('client_contacts')
-        .insert({ ...contactForm, client_id: id, org_id: profile.org_id })
+        .insert({ ...panelForm, client_id: id, org_id: profile.org_id })
         .select('id').single()
       savedContactId = newContact?.id
     }
     await fetchContacts()
-    setShowContactModal(false)
+    setContactPanel(null)
     setSavingContact(false)
-    // Push to Zoho if connected
     if (savedContactId) {
       const { data: { session } } = await supabase.auth.getSession()
       fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', {
@@ -227,7 +224,6 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   }
 
   const deleteContact = async (contactId) => {
-    if (!window.confirm('Delete this contact?')) return
     await supabase.from('client_contacts').delete().eq('id', contactId)
     await fetchContacts()
   }
@@ -610,56 +606,51 @@ const deleteMeeting = async (meetingId) => {
 
         {/* Contacts tab */}
         {activeTab === 'contacts' && (
-          <div className="bg-fp-card rounded-xl p-6">
-            <div className="flex justify-between items-center mb-4">
+          <div className="bg-fp-card rounded-xl overflow-hidden">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-fp-border">
               <h3 className="text-fp-text font-bold text-lg">Contacts</h3>
               <button onClick={openAddContact} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Contact</button>
             </div>
             {contacts.length === 0 ? (
-              <div className="text-center py-8 border-2 border-dashed border-fp-border rounded-xl">
-                <p className="text-fp-muted mb-3">No contacts yet.</p>
-                <p className="text-fp-muted text-sm">Add contacts like owners, project managers, or billing contacts for this client.</p>
+              <div className="text-center py-12 border-2 border-dashed border-fp-border m-6 rounded-xl">
+                <p className="text-fp-muted mb-2">No contacts yet.</p>
+                <p className="text-fp-muted text-sm">Add owners, project managers, billing contacts, and more.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {contacts.map(contact => (
-                  <div key={contact.id} className={`bg-fp-inset rounded-xl p-4 border ${contact.is_primary ? 'border-[#C8622A]/40' : 'border-fp-border'}`}>
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-fp-inset flex items-center justify-center flex-shrink-0">
-                          <span className="text-fp-text text-sm font-bold">{(contact.full_name || '?')[0].toUpperCase()}</span>
+              <>
+                <div className="hidden md:grid grid-cols-[auto_1fr_1fr_1fr_auto] gap-4 px-6 py-2 border-b border-fp-border">
+                  <div className="w-9" />
+                  <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Name</p>
+                  <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Email</p>
+                  <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Phone</p>
+                  <div className="w-4" />
+                </div>
+                <div className="divide-y divide-fp-border">
+                  {contacts.map(contact => (
+                    <div key={contact.id} onClick={() => openEditContact(contact)}
+                      className="grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_1fr_1fr_auto] gap-4 items-center px-6 py-4 cursor-pointer hover:bg-fp-hover transition-colors group">
+                      <div className="w-9 h-9 rounded-full bg-[#C8622A]/15 flex items-center justify-center flex-shrink-0">
+                        <span className="text-[#C8622A] text-sm font-bold">{(contact.full_name || '?')[0].toUpperCase()}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-fp-text font-semibold text-sm group-hover:text-[#C8622A] transition-colors">{contact.full_name}</p>
+                          {contact.is_primary && <span className="text-xs px-1.5 py-0.5 rounded bg-[#C8622A]/15 text-[#C8622A] font-semibold">Primary</span>}
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-fp-text font-semibold text-sm truncate">{contact.full_name}</p>
-                            {contact.is_primary && <span className="text-[#C8622A] text-xs font-semibold flex-shrink-0">Primary</span>}
-                          </div>
-                          {contact.title && <p className="text-fp-muted text-xs">{contact.title}</p>}
+                        {contact.title && <p className="text-fp-muted text-xs mt-0.5">{contact.title}</p>}
+                        {/* Mobile-only email/phone */}
+                        <div className="md:hidden mt-1 space-y-0.5">
+                          {contact.email && <p className="text-fp-muted text-xs truncate">{contact.email}</p>}
+                          {contact.phone && <p className="text-fp-muted text-xs">{contact.phone}</p>}
                         </div>
                       </div>
-                      <div className="flex gap-2 flex-shrink-0 ml-2">
-                        <button onClick={() => openEditContact(contact)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>
-                        <button onClick={() => deleteContact(contact.id)} className="text-red-400 hover:text-red-300 text-xs transition-colors">Delete</button>
-                      </div>
+                      <p className="hidden md:block text-fp-muted text-sm truncate">{contact.email}</p>
+                      <p className="hidden md:block text-fp-muted text-sm">{contact.phone}</p>
+                      <span className="hidden md:block text-fp-muted group-hover:text-[#C8622A] transition-colors text-sm">→</span>
                     </div>
-                    <div className="mt-3 space-y-1">
-                      {contact.email && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-fp-muted text-xs w-10">Email</span>
-                          <a href={`mailto:${encodeURIComponent(contact.email)}`} className="text-[#C8622A] text-xs hover:underline truncate">{contact.email}</a>
-                        </div>
-                      )}
-                      {contact.phone && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-fp-muted text-xs w-10">Phone</span>
-                          <a href={`tel:${contact.phone.replace(/[^0-9+\-().#, ]/g, '')}`} className="text-fp-text text-xs hover:text-[#C8622A] transition-colors">{contact.phone}</a>
-                        </div>
-                      )}
-                      {contact.notes && <p className="text-fp-muted text-xs mt-1 italic">{contact.notes}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}
@@ -985,48 +976,102 @@ const deleteMeeting = async (meetingId) => {
         </div>
       )}
 
-      {/* Contact Modal */}
-      {showContactModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h3 className="text-fp-text font-bold text-lg mb-5">{editingContact ? 'Edit Contact' : 'Add Contact'}</h3>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Full Name <span className="text-[#C8622A]">*</span></label>
-                  <input type="text" value={contactForm.full_name} onChange={e => setContactForm(p => ({ ...p, full_name: e.target.value }))} placeholder="Jane Smith" className={inputClass} />
+      {/* Contact detail / edit panel */}
+      {contactPanel && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setContactPanel(null)} />
+          <div className="fixed right-0 top-0 h-full w-full max-w-md bg-fp-card z-50 shadow-2xl flex flex-col border-l border-fp-border">
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-6 py-5 border-b border-fp-border flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#C8622A]/15 flex items-center justify-center flex-shrink-0">
+                  <span className="text-[#C8622A] font-bold text-sm">
+                    {contactPanel === 'new' ? '+' : (panelForm.full_name || '?')[0].toUpperCase()}
+                  </span>
                 </div>
                 <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Title / Role</label>
-                  <input type="text" value={contactForm.title} onChange={e => setContactForm(p => ({ ...p, title: e.target.value }))} placeholder="Owner, PM, Accounting..." className={inputClass} />
+                  <p className="text-fp-text font-bold leading-tight">
+                    {contactPanel === 'new' ? 'New Contact' : panelForm.full_name || 'Contact'}
+                  </p>
+                  {contactPanel !== 'new' && panelForm.title && (
+                    <p className="text-fp-muted text-xs">{panelForm.title}</p>
+                  )}
                 </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Email</label>
-                  <input type="email" value={contactForm.email} onChange={e => setContactForm(p => ({ ...p, email: e.target.value }))} className={inputClass} />
-                </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Phone</label>
-                  <input type="text" value={contactForm.phone} onChange={e => setContactForm(p => ({ ...p, phone: e.target.value }))} className={inputClass} />
-                </div>
+              </div>
+              <button onClick={() => setContactPanel(null)} className="text-fp-muted hover:text-fp-text transition-colors text-2xl leading-none">&times;</button>
+            </div>
+
+            {/* Panel body */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Full Name <span className="text-[#C8622A]">*</span></label>
+                <input type="text" value={panelForm.full_name}
+                  onChange={e => setPanelForm(p => ({ ...p, full_name: e.target.value }))}
+                  placeholder="Jane Smith" className={inputClass} autoFocus />
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Title / Role</label>
+                <input type="text" value={panelForm.title}
+                  onChange={e => setPanelForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="Owner, PM, Accounting..." className={inputClass} />
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Email</label>
+                <input type="email" value={panelForm.email}
+                  onChange={e => setPanelForm(p => ({ ...p, email: e.target.value }))}
+                  placeholder="jane@example.com" className={inputClass} />
+                {panelForm.email && contactPanel !== 'new' && (
+                  <a href={`mailto:${panelForm.email.replace(/[^a-zA-Z0-9.@_%+\-]/g, '')}`}
+                    className="text-[#C8622A] text-xs mt-1 inline-block hover:underline">Send email →</a>
+                )}
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Phone</label>
+                <input type="text" value={panelForm.phone}
+                  onChange={e => setPanelForm(p => ({ ...p, phone: e.target.value }))}
+                  placeholder="(615) 555-0100" className={inputClass} />
+                {panelForm.phone && contactPanel !== 'new' && (
+                  <a href={`tel:${panelForm.phone.replace(/[^0-9+\-().#, ]/g, '')}`}
+                    className="text-[#C8622A] text-xs mt-1 inline-block hover:underline">Call →</a>
+                )}
               </div>
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Notes</label>
-                <input type="text" value={contactForm.notes} onChange={e => setContactForm(p => ({ ...p, notes: e.target.value }))} placeholder="Best time to call, preferences..." className={inputClass} />
+                <textarea value={panelForm.notes}
+                  onChange={e => setPanelForm(p => ({ ...p, notes: e.target.value }))}
+                  placeholder="Best time to call, preferences, context..." rows={4}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
               </div>
-              <button type="button" onClick={() => setContactForm(p => ({ ...p, is_primary: !p.is_primary }))}
+              <button type="button" onClick={() => setPanelForm(p => ({ ...p, is_primary: !p.is_primary }))}
                 className="flex items-center gap-2 text-sm transition-colors">
-                <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${contactForm.is_primary ? 'bg-[#C8622A] border-[#C8622A]' : 'border-fp-border'}`}>
-                  {contactForm.is_primary && <span className="text-fp-text text-xs">✓</span>}
+                <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${panelForm.is_primary ? 'bg-[#C8622A] border-[#C8622A]' : 'border-fp-border'}`}>
+                  {panelForm.is_primary && <span className="text-fp-text text-xs">✓</span>}
                 </span>
-                <span className={contactForm.is_primary ? 'text-fp-text' : 'text-fp-muted'}>Primary contact</span>
+                <span className={panelForm.is_primary ? 'text-fp-text' : 'text-fp-muted'}>Primary contact</span>
               </button>
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowContactModal(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
-                <button onClick={saveContact} disabled={savingContact || !contactForm.full_name.trim()} className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingContact ? 'Saving...' : 'Save Contact'}</button>
+            </div>
+
+            {/* Panel footer */}
+            <div className="px-6 py-4 border-t border-fp-border flex-shrink-0 space-y-2">
+              <div className="flex gap-3">
+                <button onClick={() => setContactPanel(null)}
+                  className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">
+                  Cancel
+                </button>
+                <button onClick={saveContact} disabled={savingContact || !panelForm.full_name.trim()}
+                  className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {savingContact ? 'Saving...' : contactPanel === 'new' ? 'Add Contact' : 'Save Changes'}
+                </button>
               </div>
+              {contactPanel !== 'new' && (
+                <button onClick={async () => { if (window.confirm('Delete this contact?')) { await deleteContact(contactPanel.id); setContactPanel(null) } }}
+                  className="w-full py-2 text-red-400 hover:text-red-300 text-sm transition-colors">
+                  Delete Contact
+                </button>
+              )}
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {/* AI Email Modal */}

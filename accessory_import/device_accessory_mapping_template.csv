@@ -1,0 +1,7 @@
+device_part_number,device_manufacturer,relationship_type,group_name,group_required,is_default,accessory_key,quantity
+QNO-8080R,Hanwha Vision America,option,Mount Type,true,true,HANWHA-MNT-IND,
+QNO-8080R,Hanwha Vision America,option,Mount Type,true,false,HANWHA-MNT-OUT,
+XRN-2011,Hanwha Vision America,required,Power Supply,,,GENERIC-PS-12V,1
+AR-EDGE-READER,HID,option,Strike/Lock,false,true,SDC-1500-STRIKE,
+AR-EDGE-READER,HID,option,Strike/Lock,false,false,SDC-6224-STRIKE,
+DOOR-CTRL-2,Mercury Security,option,Strike/Lock,false,true,SDC-1500-STRIKE,
