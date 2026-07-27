@@ -1141,6 +1141,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       pdf.text(proposal?.company || '', pageW/2, 63, { align: 'center' })
       pdf.text(`As-Built Date: ${new Date().toLocaleDateString()}`, pageW/2, 71, { align: 'center' })
 
+      const conditionLabel = (c) => c === 'existing' ? 'Existing' : c === 'replace' ? 'Replace' : c === 'demo' ? 'Demo' : 'New'
+
       // As-built device schedule
       pdf.addPage()
       pdf.setFillColor(15,28,46)
