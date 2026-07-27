@@ -52,28 +52,41 @@ export default function ProposalHeader({
               <button onClick={() => setEditingProposalName(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">Cancel</button>
             </div>
           ) : (
-            <div className="flex items-center gap-2 group">
-              <h2 className="text-fp-text text-2xl font-bold">{proposal?.proposal_name}</h2>
+            <div className="flex items-center gap-2">
+              {canEdit ? (
+                <button onClick={() => { setProposalNameDraft(proposal?.proposal_name || ''); setEditingProposalName(true) }}
+                  className="text-fp-text text-2xl font-bold hover:text-fp-brand transition-colors text-left">
+                  {proposal?.proposal_name}
+                </button>
+              ) : (
+                <h2 className="text-fp-text text-2xl font-bold">{proposal?.proposal_name}</h2>
+              )}
               {(proposal?.revision_number > 1 || proposal?.original_proposal_id) && (
                 <span className="text-blue-400 text-xs bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded font-semibold">
                   Rev {proposal.revision_number}
                 </span>
               )}
-              {canEdit && (
-                <button onClick={() => { setProposalNameDraft(proposal?.proposal_name || ''); setEditingProposalName(true) }}
-                  className="opacity-0 group-hover:opacity-100 text-fp-muted hover:text-fp-text text-xs transition-all">✏️</button>
-              )}
             </div>
           )}
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-fp-muted">{proposal?.company} · {proposal?.client_name}</p>
-            {canEdit && (
-              <button onClick={openEditClientModal} className="text-fp-muted hover:text-fp-brand text-xs transition-colors" title="Edit client info">✏️</button>
-            )}
-          </div>
-          <p className="text-fp-muted text-sm">{proposal?.client_email}</p>
-          {clientAddress && <p className="text-fp-muted text-sm">{clientAddress}</p>}
-          {locationName && <span className="inline-flex items-center gap-1 bg-fp-inset text-fp-muted text-xs px-2 py-0.5 rounded-full mt-1">📍 {locationName}</span>}
+          {canEdit ? (
+            <button onClick={openEditClientModal}
+              className="group flex flex-col mt-1 text-left rounded-lg px-2 py-1 -ml-2 hover:bg-fp-inset transition-colors">
+              <span className="text-fp-muted group-hover:text-fp-text transition-colors">
+                {proposal?.company}{proposal?.client_name ? ` · ${proposal.client_name}` : ''}
+                <span className="ml-2 opacity-0 group-hover:opacity-100 text-[#C8622A] text-xs font-semibold transition-all">Edit</span>
+              </span>
+              {proposal?.client_email && <span className="text-fp-muted text-sm">{proposal.client_email}</span>}
+              {clientAddress && <span className="text-fp-muted text-sm">{clientAddress}</span>}
+              {locationName && <span className="inline-flex items-center gap-1 bg-fp-inset text-fp-muted text-xs px-2 py-0.5 rounded-full mt-1">📍 {locationName}</span>}
+            </button>
+          ) : (
+            <div className="mt-1">
+              <p className="text-fp-muted">{proposal?.company}{proposal?.client_name ? ` · ${proposal.client_name}` : ''}</p>
+              {proposal?.client_email && <p className="text-fp-muted text-sm">{proposal.client_email}</p>}
+              {clientAddress && <p className="text-fp-muted text-sm">{clientAddress}</p>}
+              {locationName && <span className="inline-flex items-center gap-1 bg-fp-inset text-fp-muted text-xs px-2 py-0.5 rounded-full mt-1">📍 {locationName}</span>}
+            </div>
+          )}
           {proposal?.signature_name && (
             <div className="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full mt-1">
               <span>✍️</span>
