@@ -50,6 +50,8 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [editingLocation, setEditingLocation] = useState(null)
   const [locationForm, setLocationForm] = useState(emptyLocation)
   const [savingLocation, setSavingLocation] = useState(false)
+  const [locationContactMode, setLocationContactMode] = useState('select') // 'select' | 'manual'
+  const [locationSelectedContactId, setLocationSelectedContactId] = useState(null)
   // Contacts
   const [contacts, setContacts] = useState([])
   const [contactPanel, setContactPanel] = useState(null) // null | 'new' | contact object
@@ -138,6 +140,8 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const openAddLocation = () => {
     setEditingLocation(null)
     setLocationForm(emptyLocation)
+    setLocationContactMode('select')
+    setLocationSelectedContactId(null)
     setShowLocationModal(true)
   }
 
@@ -158,16 +162,47 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
       site_contact_phone: loc.site_contact_phone || '',
       notes: loc.notes || ''
     })
+    const linked = contacts.find(c => c.location_id === loc.id)
+    if (linked) {
+      setLocationContactMode('select')
+      setLocationSelectedContactId(linked.id)
+    } else if (loc.site_contact_name) {
+      setLocationContactMode('manual')
+      setLocationSelectedContactId(null)
+    } else {
+      setLocationContactMode('select')
+      setLocationSelectedContactId(null)
+    }
     setShowLocationModal(true)
   }
 
   const saveLocation = async () => {
     if (!locationForm.site_name.trim()) return
     setSavingLocation(true)
+    let locId
     if (editingLocation) {
       await supabase.from('client_locations').update(locationForm).eq('id', editingLocation.id)
+      locId = editingLocation.id
     } else {
-      await supabase.from('client_locations').insert({ ...locationForm, client_id: id, org_id: profile.org_id })
+      const { data: newLoc } = await supabase.from('client_locations')
+        .insert({ ...locationForm, client_id: id, org_id: profile.org_id })
+        .select('id').single()
+      locId = newLoc?.id
+    }
+    if (locId) {
+      if (locationContactMode === 'select' && locationSelectedContactId) {
+        await supabase.from('client_contacts').update({ location_id: locId }).eq('id', locationSelectedContactId)
+        await fetchContacts()
+      } else if (locationContactMode === 'manual' && locationForm.site_contact_name.trim()) {
+        await supabase.from('client_contacts').insert({
+          client_id: id, org_id: profile.org_id, location_id: locId,
+          full_name: locationForm.site_contact_name,
+          email: locationForm.site_contact_email || null,
+          phone: locationForm.site_contact_phone || null,
+          is_primary: false, notes: '',
+        })
+        await fetchContacts()
+      }
     }
     await fetchLocations()
     setShowLocationModal(false)
@@ -698,14 +733,26 @@ const deleteMeeting = async (meetingId) => {
                           <p className="text-fp-text text-xs">{loc.access_notes}</p>
                         </div>
                       )}
-                      {(loc.site_contact_name || loc.site_contact_email || loc.site_contact_phone) && (
-                        <div className="border-t border-fp-border pt-2 mt-2 space-y-1">
-                          <p className="text-fp-muted text-xs font-semibold">Site Contact</p>
-                          {loc.site_contact_name && <p className="text-fp-text text-xs font-medium">{loc.site_contact_name}</p>}
-                          {loc.site_contact_email && <a href={`mailto:${encodeURIComponent(loc.site_contact_email)}`} className="text-[#C8622A] text-xs hover:underline block">{loc.site_contact_email}</a>}
-                          {loc.site_contact_phone && <a href={`tel:${loc.site_contact_phone.replace(/[^0-9+\-().#, ]/g, '')}`} className="text-fp-muted text-xs hover:text-fp-text transition-colors block">{loc.site_contact_phone}</a>}
-                        </div>
-                      )}
+                      {(() => {
+                        const siteContact = contacts.find(c => c.location_id === loc.id)
+                        if (siteContact) return (
+                          <div className="border-t border-fp-border pt-2 mt-2 space-y-1">
+                            <p className="text-fp-muted text-xs font-semibold">Site Contact</p>
+                            <p className="text-fp-text text-xs font-medium">{siteContact.full_name}{siteContact.title ? ` · ${siteContact.title}` : ''}</p>
+                            {siteContact.email && <a href={`mailto:${siteContact.email.replace(/[^a-zA-Z0-9.@_%+\-]/g, '')}`} className="text-[#C8622A] text-xs hover:underline block">{siteContact.email}</a>}
+                            {siteContact.phone && <a href={`tel:${siteContact.phone.replace(/[^0-9+\-().#, ]/g, '')}`} className="text-fp-muted text-xs hover:text-fp-text transition-colors block">{siteContact.phone}</a>}
+                          </div>
+                        )
+                        if (loc.site_contact_name || loc.site_contact_email || loc.site_contact_phone) return (
+                          <div className="border-t border-fp-border pt-2 mt-2 space-y-1">
+                            <p className="text-fp-muted text-xs font-semibold">Site Contact</p>
+                            {loc.site_contact_name && <p className="text-fp-text text-xs font-medium">{loc.site_contact_name}</p>}
+                            {loc.site_contact_email && <a href={`mailto:${loc.site_contact_email.replace(/[^a-zA-Z0-9.@_%+\-]/g, '')}`} className="text-[#C8622A] text-xs hover:underline block">{loc.site_contact_email}</a>}
+                            {loc.site_contact_phone && <a href={`tel:${loc.site_contact_phone.replace(/[^0-9+\-().#, ]/g, '')}`} className="text-fp-muted text-xs hover:text-fp-text transition-colors block">{loc.site_contact_phone}</a>}
+                          </div>
+                        )
+                        return null
+                      })()}
                       {loc.notes && <p className="text-fp-muted text-xs mt-2 italic">{loc.notes}</p>}
                       <div className="mt-3 pt-2 border-t border-fp-border">
                         <button onClick={() => navigate(`/new?clientId=${id}&locationId=${loc.id}`)}
@@ -964,11 +1011,44 @@ const deleteMeeting = async (meetingId) => {
                 <label className="text-fp-muted text-xs mb-1 block">Access Notes</label>
                 <input type="text" value={locationForm.access_notes} onChange={e => setLocationForm(p => ({ ...p, access_notes: e.target.value }))} placeholder="Gate code, parking, building entry..." className={inputClass} />
               </div>
-              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide pt-2">Site Contact (optional)</p>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-fp-muted text-xs mb-1 block">Contact Name</label><input type="text" value={locationForm.site_contact_name} onChange={e => setLocationForm(p => ({ ...p, site_contact_name: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-fp-muted text-xs mb-1 block">Contact Email</label><input type="email" value={locationForm.site_contact_email} onChange={e => setLocationForm(p => ({ ...p, site_contact_email: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-fp-muted text-xs mb-1 block">Contact Phone</label><input type="text" value={locationForm.site_contact_phone} onChange={e => setLocationForm(p => ({ ...p, site_contact_phone: e.target.value }))} className={inputClass} /></div>
+              <div className="pt-2">
+                <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Site Contact</p>
+                <div className="flex gap-2 mb-3">
+                  <button type="button" onClick={() => setLocationContactMode('select')}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors ${locationContactMode === 'select' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
+                    Select Existing
+                  </button>
+                  <button type="button" onClick={() => setLocationContactMode('manual')}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors ${locationContactMode === 'manual' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
+                    Add New
+                  </button>
+                </div>
+                {locationContactMode === 'select' ? (
+                  <div>
+                    <select value={locationSelectedContactId || ''} onChange={e => setLocationSelectedContactId(e.target.value || null)} className={inputClass}>
+                      <option value="">— No site contact —</option>
+                      {contacts.map(c => (
+                        <option key={c.id} value={c.id}>{c.full_name}{c.title ? ` · ${c.title}` : ''}</option>
+                      ))}
+                    </select>
+                    {locationSelectedContactId && (() => {
+                      const c = contacts.find(x => x.id === locationSelectedContactId)
+                      return c ? (
+                        <div className="mt-2 bg-fp-inset rounded-lg px-3 py-2 space-y-0.5">
+                          {c.title && <p className="text-fp-muted text-xs">{c.title}</p>}
+                          {c.email && <p className="text-fp-muted text-xs">{c.email}</p>}
+                          {c.phone && <p className="text-fp-muted text-xs">{c.phone}</p>}
+                        </div>
+                      ) : null
+                    })()}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div><label className="text-fp-muted text-xs mb-1 block">Contact Name</label><input type="text" value={locationForm.site_contact_name} onChange={e => setLocationForm(p => ({ ...p, site_contact_name: e.target.value }))} placeholder="Added to contacts list on save" className={inputClass} /></div>
+                    <div><label className="text-fp-muted text-xs mb-1 block">Contact Email</label><input type="email" value={locationForm.site_contact_email} onChange={e => setLocationForm(p => ({ ...p, site_contact_email: e.target.value }))} className={inputClass} /></div>
+                    <div><label className="text-fp-muted text-xs mb-1 block">Contact Phone</label><input type="text" value={locationForm.site_contact_phone} onChange={e => setLocationForm(p => ({ ...p, site_contact_phone: e.target.value }))} className={inputClass} /></div>
+                  </div>
+                )}
               </div>
               <div><label className="text-fp-muted text-xs mb-1 block">General Notes</label><textarea value={locationForm.notes} onChange={e => setLocationForm(p => ({ ...p, notes: e.target.value }))} placeholder="Additional notes about this location..." rows={2} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" /></div>
               <div className="flex gap-3 pt-2">
