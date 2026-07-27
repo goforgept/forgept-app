@@ -31,6 +31,15 @@ export const PATHWAY_DEFS = [
   { type: 'Surface Raceway', color: '#06b6d4', label: 'Surface Raceway',  dash: [] },
 ]
 
+const FAVS_KEY = (orgId) => `designer_favorites_${orgId || 'default'}`
+
+function loadFavs(orgId) {
+  try { return new Set(JSON.parse(localStorage.getItem(FAVS_KEY(orgId)) || '[]')) } catch { return new Set() }
+}
+function saveFavs(orgId, set) {
+  localStorage.setItem(FAVS_KEY(orgId), JSON.stringify([...set]))
+}
+
 export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedManufacturers, enabledIndustries, activeTool, onToolSelect }) {
   const [tab,           setTab]           = useState('devices')
   const [industry,      setIndustry]      = useState('all')
@@ -42,6 +51,16 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
   const [symbols,       setSymbols]       = useState([])
   const [loading,       setLoading]       = useState(false)
   const [allProducts,   setAllProducts]   = useState([])
+  const [favorites,     setFavorites]     = useState(() => loadFavs(orgId))
+
+  const toggleFavorite = (symbolId) => {
+    setFavorites(prev => {
+      const next = new Set(prev)
+      next.has(symbolId) ? next.delete(symbolId) : next.add(symbolId)
+      saveFavs(orgId, next)
+      return next
+    })
+  }
 
   // Sync tab with active tool type
   useEffect(() => {
@@ -132,6 +151,7 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
       {/* Tab bar */}
       <div className="flex border-b border-[#2a3d55] flex-shrink-0">
         {[
+          { id: 'favorites', label: '★' },
           { id: 'devices',   label: 'Devices' },
           { id: 'cable',     label: 'Cable' },
           { id: 'pathways',  label: 'Pathways' },
@@ -140,13 +160,50 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
           <button key={t.id} onClick={() => handleTabChange(t.id)}
             className={`flex-1 py-2 text-xs font-medium transition-colors ${
               tab === t.id
-                ? 'text-white border-b-2 border-[#C8622A]'
-                : 'text-[#8A9AB0] hover:text-white'
+                ? `border-b-2 border-[#C8622A] ${t.id === 'favorites' ? 'text-yellow-400' : 'text-white'}`
+                : `${t.id === 'favorites' ? (favorites.size > 0 ? 'text-yellow-400/70 hover:text-yellow-400' : 'text-[#8A9AB0] hover:text-white') : 'text-[#8A9AB0] hover:text-white'}`
             }`}>
-            {t.label}
+            {t.label}{t.id === 'favorites' && favorites.size > 0 ? ` (${favorites.size})` : ''}
           </button>
         ))}
       </div>
+
+      {/* FAVORITES tab */}
+      {tab === 'favorites' && (
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="px-3 pt-3 pb-2 border-b border-[#2a3d55]">
+            <p className="text-xs text-[#8A9AB0]">Star any device to pin it here for quick access.</p>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            {favorites.size === 0 ? (
+              <div className="flex flex-col items-center justify-center h-32 gap-2 text-[#8A9AB0]">
+                <span className="text-2xl">☆</span>
+                <p className="text-xs">No favorites yet — star a device from the Devices tab</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {allProducts.filter(p => favorites.has(p.id)).map(symbol => (
+                  <SymbolCard key={symbol.id} symbol={symbol}
+                    isSelected={selectedSymbol?.id === symbol.id}
+                    isFavorited={true}
+                    onToggleFavorite={() => toggleFavorite(symbol.id)}
+                    onSelect={() => {
+                      onToolSelect?.(null)
+                      onSelect(selectedSymbol?.id === symbol.id ? null : symbol)
+                    }} />
+                ))}
+              </div>
+            )}
+          </div>
+          {selectedSymbol && (
+            <div className="px-3 py-2 border-t border-[#2a3d55] bg-[#C8622A]/10 flex-shrink-0">
+              <p className="text-xs font-medium text-[#C8622A] truncate">{selectedSymbol.name}</p>
+              <p className="text-xs text-[#C8622A]/70 font-mono truncate">{selectedSymbol.part_number}</p>
+              <p className="text-xs text-[#8A9AB0] mt-0.5">Click floor plan to place</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* DEVICES tab */}
       {tab === 'devices' && (
@@ -203,6 +260,8 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
                 {filtered.map(symbol => (
                   <SymbolCard key={symbol.id} symbol={symbol}
                     isSelected={selectedSymbol?.id === symbol.id}
+                    isFavorited={favorites.has(symbol.id)}
+                    onToggleFavorite={() => toggleFavorite(symbol.id)}
                     onSelect={() => {
                       onToolSelect?.(null)
                       onSelect(selectedSymbol?.id === symbol.id ? null : symbol)
@@ -350,29 +409,41 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
   )
 }
 
-function SymbolCard({ symbol, isSelected, onSelect }) {
+function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelect }) {
   const handleDragStart = (e) => {
     e.dataTransfer.setData('application/json', JSON.stringify(symbol))
     e.dataTransfer.effectAllowed = 'copy'
   }
 
   return (
-    <button
-      onClick={onSelect}
-      draggable={true}
-      onDragStart={handleDragStart}
-      title={`${symbol.name}\n${symbol.part_number}\nDrag to place on canvas`}
-      className={`flex flex-col items-center gap-1 p-2 rounded-lg border text-center transition-all cursor-grab active:cursor-grabbing ${
-        isSelected
-          ? 'border-[#C8622A]/60 bg-[#C8622A]/10'
-          : 'border-[#2a3d55] bg-[#1a2d45] hover:border-[#C8622A]/40 hover:bg-[#C8622A]/5'
-      }`}>
-      <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${isSelected ? 'text-[#C8622A]' : 'text-[#8A9AB0]'}`}>
-        <CategoryIcon category={symbol.category} />
-      </div>
-      <span className="text-xs text-white leading-tight line-clamp-2">{symbol.name}</span>
-      <span className="text-xs font-mono text-[#8A9AB0] truncate w-full text-center">{symbol.part_number}</span>
-    </button>
+    <div className={`relative group flex flex-col items-center gap-1 p-2 rounded-lg border text-center transition-all ${
+      isSelected
+        ? 'border-[#C8622A]/60 bg-[#C8622A]/10'
+        : 'border-[#2a3d55] bg-[#1a2d45] hover:border-[#C8622A]/40 hover:bg-[#C8622A]/5'
+    }`}>
+      <button
+        onClick={onSelect}
+        draggable={true}
+        onDragStart={handleDragStart}
+        title={`${symbol.name}\n${symbol.part_number}\nDrag to place on canvas`}
+        className="flex flex-col items-center gap-1 w-full cursor-grab active:cursor-grabbing">
+        <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${isSelected ? 'text-[#C8622A]' : 'text-[#8A9AB0]'}`}>
+          <CategoryIcon category={symbol.category} />
+        </div>
+        <span className="text-xs text-white leading-tight line-clamp-2">{symbol.name}</span>
+        <span className="text-xs font-mono text-[#8A9AB0] truncate w-full text-center">{symbol.part_number}</span>
+      </button>
+      {onToggleFavorite && (
+        <button
+          onClick={e => { e.stopPropagation(); onToggleFavorite() }}
+          title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+          className={`absolute top-1 right-1 text-xs leading-none transition-opacity ${
+            isFavorited ? 'opacity-100 text-yellow-400' : 'opacity-0 group-hover:opacity-70 text-[#8A9AB0] hover:text-yellow-400'
+          }`}>
+          {isFavorited ? '★' : '☆'}
+        </button>
+      )}
+    </div>
   )
 }
 

@@ -54,8 +54,10 @@ export function ProfileProvider({ children }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      if (session) fetchProfile(session.user.id)
-      else setLoading(false)
+      if (session) {
+        fetchProfile(session.user.id)
+        supabase.rpc('update_last_login')
+      } else setLoading(false)
     })
 
     supabase.auth.onAuthStateChange((_event, session) => {

@@ -1196,6 +1196,11 @@ export default function ProposalDetail({ isAdmin }) {
     doc.save(`${proposal?.proposal_name || 'Proposal'}.pdf`)
   }
 
+  const downloadInstallerPDF = async () => {
+    const doc = await generatePDFDoc({ forceHidePricing: true })
+    doc.save(`${proposal?.proposal_name || 'Proposal'} - Installer Copy.pdf`)
+  }
+
   const downloadSignedCopy = async () => {
     const doc = await generatePDFDoc()
     const pageWidth = doc.internal.pageSize.getWidth()
@@ -1235,7 +1240,7 @@ export default function ProposalDetail({ isAdmin }) {
     doc.save(`Signed-${proposal?.proposal_name || 'Proposal'}.pdf`)
   }
 
-  const downloadDOCX = async () => {
+  const downloadDOCX = async ({ forceHidePricing = false } = {}) => {
     if (proposal?.status === 'Draft') setShowSentPrompt(true)
 
     const { data: freshProposal } = await supabase
@@ -1243,7 +1248,8 @@ export default function ProposalDetail({ isAdmin }) {
       .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
       .eq('id', id)
       .single()
-    const p = freshProposal ? { ...proposal, ...freshProposal } : proposal
+    let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
+    if (forceHidePricing) p = { ...p, hide_material_prices: true, lump_sum_pricing: true, hide_labor_breakdown: true }
 
     const primaryColor = (profile?.primary_color || '#0F1C2E').replace('#', '')
 
@@ -1676,9 +1682,13 @@ export default function ProposalDetail({ isAdmin }) {
     const url = URL.createObjectURL(buffer)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${proposal?.proposal_name || 'Proposal'}.docx`
+    a.download = `${forceHidePricing ? `${proposal?.proposal_name || 'Proposal'} - Installer Copy` : (proposal?.proposal_name || 'Proposal')}.docx`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const downloadInstallerDOCX = async () => {
+    await downloadDOCX({ forceHidePricing: true })
   }
 
   const generatePO = async () => {
@@ -2597,13 +2607,14 @@ const analyzeDrawing = async () => {
     setPhotos(prev => prev.map(p => p.id === photoId ? { ...p, caption } : p))
   }
 
-  const generatePDFDoc = async () => {
+  const generatePDFDoc = async ({ forceHidePricing = false } = {}) => {
     const { data: freshProposal } = await supabase
       .from('proposals')
       .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, show_msrp, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
       .eq('id', id)
       .single()
-    const p = freshProposal ? { ...proposal, ...freshProposal } : proposal
+    let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
+    if (forceHidePricing) p = { ...p, hide_material_prices: true, lump_sum_pricing: true, hide_labor_breakdown: true }
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
@@ -3094,7 +3105,7 @@ const analyzeDrawing = async () => {
           requestingSignature={requestingSignature} requestSignature={requestSignature}
           uploadingSignedPDF={uploadingSignedPDF} uploadSignedPDF={uploadSignedPDF}
           qboConnected={qboConnected} qboInvoiceId={qboInvoiceId} sendingToQBO={sendingToQBO} sendToQBO={sendToQBO}
-          setShowPricingModal={setShowPricingModal} downloadPDF={downloadPDF} downloadDOCX={downloadDOCX} downloadSignedCopy={downloadSignedCopy}
+          setShowPricingModal={setShowPricingModal} downloadPDF={downloadPDF} downloadDOCX={downloadDOCX} downloadSignedCopy={downloadSignedCopy} downloadInstallerPDF={downloadInstallerPDF} downloadInstallerDOCX={downloadInstallerDOCX}
           setShowPhotosModal={setShowPhotosModal}
           canEdit={canEdit}
         />

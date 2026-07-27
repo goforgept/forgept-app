@@ -1,3 +1,5 @@
+import { useState, useRef, useEffect } from 'react'
+
 export default function ScopeSection({
   proposal, features, photos,
   aiNotes, setAiNotes,
@@ -8,10 +10,19 @@ export default function ScopeSection({
   requestingSignature, requestSignature,
   uploadingSignedPDF, uploadSignedPDF,
   qboConnected, qboInvoiceId, sendingToQBO, sendToQBO,
-  setShowPricingModal, downloadPDF, downloadDOCX, downloadSignedCopy,
+  setShowPricingModal, downloadPDF, downloadDOCX, downloadSignedCopy, downloadInstallerPDF, downloadInstallerDOCX,
   setShowPhotosModal,
   canEdit = true,
 }) {
+  const [dlOpen, setDlOpen] = useState(false)
+  const dlRef = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => { if (dlRef.current && !dlRef.current.contains(e.target)) setDlOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   const applyVars = (str) => (str || '')
     .replace(/\{\{clientName\}\}/g, proposal?.client_name || 'there')
     .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
@@ -76,8 +87,41 @@ export default function ScopeSection({
             className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${(proposal?.hide_material_prices || proposal?.hide_labor_breakdown) ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
             ⚙ Pricing
           </button>
-          <button onClick={downloadPDF} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors">↓ PDF</button>
-          <button onClick={downloadDOCX} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors">↓ DOCX</button>
+          <div className="relative" ref={dlRef}>
+            <button
+              onClick={() => setDlOpen(o => !o)}
+              className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors flex items-center gap-1.5">
+              ↓ Download
+              <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {dlOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-fp-card border border-fp-border rounded-xl shadow-2xl min-w-[190px] py-1 overflow-hidden">
+                <p className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-fp-muted/60">Standard</p>
+                <button onClick={() => { setDlOpen(false); downloadPDF() }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors flex items-center gap-2">
+                  <span className="text-fp-muted text-xs font-mono">PDF</span> Full Proposal
+                </button>
+                <button onClick={() => { setDlOpen(false); downloadDOCX() }}
+                  className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors flex items-center gap-2">
+                  <span className="text-fp-muted text-xs font-mono">DOCX</span> Full Proposal
+                </button>
+                <div className="border-t border-fp-border my-1" />
+                <p className="px-4 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-fp-muted/60">Installer Copy <span className="normal-case font-normal">(no pricing)</span></p>
+                {downloadInstallerPDF && (
+                  <button onClick={() => { setDlOpen(false); downloadInstallerPDF() }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors flex items-center gap-2">
+                    <span className="text-fp-muted text-xs font-mono">PDF</span> Installer Copy
+                  </button>
+                )}
+                {downloadInstallerDOCX && (
+                  <button onClick={() => { setDlOpen(false); downloadInstallerDOCX() }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors flex items-center gap-2">
+                    <span className="text-fp-muted text-xs font-mono">DOCX</span> Installer Copy
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           {features.sitePhotos && (
             <button onClick={() => setShowPhotosModal(true)} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors flex items-center gap-2">
               📷 Photos{photos.length > 0 ? ` (${photos.length})` : ''}
