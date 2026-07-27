@@ -6,7 +6,8 @@ import Sidebar from '../components/Sidebar'
 const emptyForm = {
   client_name: '', company: '', email: '', phone: '',
   industry: '', crm_source: '', notes: '',
-  address: '', city: '', state: '', zip: '', store_id: ''
+  address: '', city: '', state: '', zip: '', store_id: '',
+  net_terms: 'NET 30', payment_method: 'Default',
 }
 
 const industries = ['Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security', 'Low Voltage', 'General Contractor', 'Roofing', 'Home Improvement', 'Flooring', 'Painting', 'Landscaping', 'Solar', 'Fire Protection', 'Telecom', 'IT / Networking', 'Other']
@@ -439,13 +440,30 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                 </div>
               </div>
 
-              <div>
-                <label className="text-fp-muted text-xs mb-1 block">Store ID</label>
-                <input type="text" value={form.store_id}
-                  onChange={e => setForm(p => ({ ...p, store_id: e.target.value }))}
-                  placeholder="e.g. STR-001"
-                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Store ID</label>
+                  <input type="text" value={form.store_id}
+                    onChange={e => setForm(p => ({ ...p, store_id: e.target.value }))}
+                    placeholder="e.g. STR-001"
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                  />
+                </div>
+                <div>{/* spacer */}</div>
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Payment Terms</label>
+                  <select value={form.net_terms} onChange={e => setForm(p => ({ ...p, net_terms: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                    {['Due on Receipt', 'NET 15', 'NET 30', 'NET 45', 'NET 60', 'NET 90'].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Payment Method</label>
+                  <select value={form.payment_method} onChange={e => setForm(p => ({ ...p, payment_method: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                    {['Default', 'Check', 'ACH', 'Credit Card'].map(t => <option key={t}>{t}</option>)}
+                  </select>
+                </div>
               </div>
 
               <div>

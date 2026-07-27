@@ -2714,12 +2714,13 @@ const analyzeDrawing = async () => {
       yPos += sowLines.length * 5 + 12
     }
 
+    const isLumpSum = p?.hide_material_prices || p?.lump_sum_pricing
+
     if (lineItems.length > 0) {
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Materials & Pricing', 14, yPos)
       yPos += 6
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
-      const isLumpSum = p?.hide_material_prices || p?.lump_sum_pricing
       const showMsrpCol = p?.show_msrp && features.msrp
       const showCompliance = features.complianceFields
       const fmtMoney = (v) => `$${(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
