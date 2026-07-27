@@ -1524,7 +1524,7 @@ export default function ProposalDetail({ isAdmin }) {
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         new Paragraph({ children: [new TextRun({ text: 'Labor', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
-        new Table({ width: { size: 7800, type: WidthType.DXA }, columnWidths: lcw, rows: [lHeaderRow, ...lRows, lTotalRow] }),
+        new Table({ width: { size: 7800, type: WidthType.DXA }, columnWidths: lcw, rows: isLumpSum ? [lHeaderRow, ...lRows] : [lHeaderRow, ...lRows, lTotalRow] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
       )
     }
@@ -2815,10 +2815,9 @@ const analyzeDrawing = async () => {
           startY: tableEnd + 6,
           head: [['Role', 'Qty', 'Unit']],
           body: namedLaborItems.map(l => [l.role, l.quantity, l.unit || 'hr']),
-          foot: [['', '', `Total Labor: $${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+          ...(!isLumpSum ? { foot: [['', '', `Total Labor: $${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, showFoot: 'lastPage' } : {}),
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-          footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-          ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 }, showFoot: 'lastPage'
+          ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 },
         })
       } else {
         autoTable(doc, {
