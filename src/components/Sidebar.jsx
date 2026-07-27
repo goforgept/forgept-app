@@ -189,12 +189,13 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
   }
 ]
 
-export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager = false, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, featureDesignerOnly = false, featureInventory = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
+export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager = false, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, featureDesignerOnly = false, featureInventory: featureInventoryProp = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
   const location = useLocation()
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
   const featureSla = featurSlaProp || sessionStorage.getItem('featureSla') === 'true'
-const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featureMonitoring') === 'true'
+  const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featureMonitoring') === 'true'
+  const featureInventory = featureInventoryProp || sessionStorage.getItem('featureInventory') === 'true'
   const [collapsed, setCollapsed] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sidebarCollapsed') || '{}') } catch { return {} }
   })

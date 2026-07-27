@@ -68,6 +68,7 @@ function App() {
   sessionStorage.setItem('featureSla', features.sla)
   sessionStorage.setItem('featureMonitoring', features.monitoring)
   sessionStorage.setItem('featureDrawingTool', features.drawingTool)
+  sessionStorage.setItem('featureInventory', features.inventory)
 
   if (session && isPending) return (
     <div className="min-h-screen bg-fp-inset flex items-center justify-center px-4">
