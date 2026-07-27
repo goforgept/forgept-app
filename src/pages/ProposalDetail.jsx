@@ -1256,8 +1256,11 @@ export default function ProposalDetail({ isAdmin }) {
     const border = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
     const borders = { top: border, bottom: border, left: border, right: border }
     const isLumpSum = p?.hide_material_prices || p?.lump_sum_pricing
-    const colWidths = isLumpSum ? [4200, 1400, 1200] : [2800, 1400, 800, 1000, 1000]
-    const headers = isLumpSum ? ['Item', 'Part #', 'Qty'] : ['Item', 'Part #', 'Qty', 'Unit Price', 'Total']
+    const showDocxCompliance = features.complianceFields
+    const complianceWidths = showDocxCompliance ? [1000, 900, 1000] : []
+    const complianceHeaders = showDocxCompliance ? ['Lead Time', 'COO', 'Berry'] : []
+    const colWidths = isLumpSum ? [4200, 1400, 1200, ...complianceWidths] : [2800, 1400, 800, 1000, 1000, ...complianceWidths]
+    const headers = isLumpSum ? ['Item', 'Part #', 'Qty', ...complianceHeaders] : ['Item', 'Part #', 'Qty', 'Unit Price', 'Total', ...complianceHeaders]
 
     const headerRow = new TableRow({
       children: headers.map((h, i) =>
@@ -1273,16 +1276,20 @@ export default function ProposalDetail({ isAdmin }) {
       )
     })
 
+    const docxComplianceVals = (item) => showDocxCompliance
+      ? [item.lead_time || '—', item.country_of_origin || '—', item.berry_compliance || '—']
+      : []
     const itemRows = lineItems.map(item =>
       new TableRow({
         children: (isLumpSum
-          ? [item.item_name, item.part_number_sku || '—', String(item.quantity || 0)]
+          ? [item.item_name, item.part_number_sku || '—', String(item.quantity || 0), ...docxComplianceVals(item)]
           : [
               item.item_name,
               item.part_number_sku || '—',
               String(item.quantity || 0),
               `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-              `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+              `$${(item.customer_price_total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+              ...docxComplianceVals(item)
             ]
         ).map((val, i) =>
           new TableCell({
@@ -1443,16 +1450,18 @@ export default function ProposalDetail({ isAdmin }) {
               new Paragraph({ children: [new TextRun({ text: '' })] }),
             )
           }
-          children.push(
-            new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 18, color: primaryColor })] }),
-            new Paragraph({ children: [new TextRun({ text: '' })] }),
-          )
+          if (!isLumpSum) {
+            children.push(
+              new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 18, color: primaryColor })] }),
+              new Paragraph({ children: [new TextRun({ text: '' })] }),
+            )
+          }
         }
 
       } else {
         // No sections — original flat table
         children.push(
-          new Table({ width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: [headerRow, ...itemRows, totalRow] }),
+          new Table({ width: { size: isLumpSum ? 6800 : 9800, type: WidthType.DXA }, columnWidths: colWidths, rows: isLumpSum ? [headerRow, ...itemRows] : [headerRow, ...itemRows, totalRow] }),
           new Paragraph({ children: [new TextRun({ text: '' })] }),
         )
       }
@@ -1520,19 +1529,20 @@ export default function ProposalDetail({ isAdmin }) {
       )
     }
 
-    // Unified summary — always shown
-    const docxProposalLaborTotal = docxLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-    const docxSectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
-    const docxAllLaborTotal = docxProposalLaborTotal + docxSectionLaborTotal
-    const docxGrandTotal = docxMatTotal + docxAllLaborTotal + docxTaxAmt
-
-    children.push(
-      new Paragraph({ children: [new TextRun({ text: `Materials Total: $${docxMatTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '444444' })] }),
-      ...(docxAllLaborTotal > 0 ? [new Paragraph({ children: [new TextRun({ text: `Labor Total: $${docxAllLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '444444' })] })] : []),
-      ...(docxTaxRate > 0 ? [new Paragraph({ children: [new TextRun({ text: `Tax (${docxTaxRate}% on materials): $${docxTaxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] })] : []),
-      new Paragraph({ children: [new TextRun({ text: `Grand Total: $${docxGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 28, color: primaryColor })] }),
-      new Paragraph({ children: [new TextRun({ text: '' })] }),
-    )
+    // Unified summary — hidden in installer/lump-sum mode
+    if (!isLumpSum) {
+      const docxProposalLaborTotal = docxLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+      const docxSectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+      const docxAllLaborTotal = docxProposalLaborTotal + docxSectionLaborTotal
+      const docxGrandTotal = docxMatTotal + docxAllLaborTotal + docxTaxAmt
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: `Materials Total: $${docxMatTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '444444' })] }),
+        ...(docxAllLaborTotal > 0 ? [new Paragraph({ children: [new TextRun({ text: `Labor Total: $${docxAllLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '444444' })] })] : []),
+        ...(docxTaxRate > 0 ? [new Paragraph({ children: [new TextRun({ text: `Tax (${docxTaxRate}% on materials): $${docxTaxAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '666666' })] })] : []),
+        new Paragraph({ children: [new TextRun({ text: `Grand Total: $${docxGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 28, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+      )
+    }
 
     if (profile?.terms_and_conditions) {
       children.push(
@@ -2105,6 +2115,9 @@ export default function ProposalDetail({ isAdmin }) {
             customer_price_unit: parseFloat(l.customer_price_unit) || null,
             customer_price_total: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0),
             msrp_unit: parseFloat(l.msrp_unit) || null,
+            lead_time: l.lead_time || null,
+            country_of_origin: l.country_of_origin || null,
+            berry_compliance: l.berry_compliance || null,
             pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing', recurring: l.recurring || false,
             section_id: resolvedSectionId,
           }
@@ -2708,17 +2721,20 @@ const analyzeDrawing = async () => {
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
       const isLumpSum = p?.hide_material_prices || p?.lump_sum_pricing
       const showMsrpCol = p?.show_msrp && features.msrp
+      const showCompliance = features.complianceFields
       const fmtMoney = (v) => `$${(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+      const complianceCols = showCompliance ? ['Lead Time', 'COO', 'Berry'] : []
       const pdfHead = isLumpSum
-        ? [['Item', 'Part #', 'Qty']]
+        ? [['Item', 'Part #', 'Qty', ...complianceCols]]
         : showMsrpCol
-          ? [['Item', 'Part #', 'Qty', 'MSRP', 'Unit Price', 'Total']]
-          : [['Item', 'Part #', 'Qty', 'Unit Price', 'Total']]
+          ? [['Item', 'Part #', 'Qty', 'MSRP', 'Unit Price', 'Total', ...complianceCols]]
+          : [['Item', 'Part #', 'Qty', 'Unit Price', 'Total', ...complianceCols]]
+      const complianceRow = (item) => showCompliance ? [item.lead_time || '—', item.country_of_origin || '—', item.berry_compliance || '—'] : []
       const pdfRow = (item) => isLumpSum
-        ? [item.item_name, item.part_number_sku || '—', item.quantity]
+        ? [item.item_name, item.part_number_sku || '—', item.quantity, ...complianceRow(item)]
         : showMsrpCol
-          ? [item.item_name, item.part_number_sku || '—', item.quantity, item.msrp_unit ? fmtMoney(item.msrp_unit) : '—', fmtMoney(item.customer_price_unit), fmtMoney(item.customer_price_total)]
-          : [item.item_name, item.part_number_sku || '—', item.quantity, fmtMoney(item.customer_price_unit), fmtMoney(item.customer_price_total)]
+          ? [item.item_name, item.part_number_sku || '—', item.quantity, item.msrp_unit ? fmtMoney(item.msrp_unit) : '—', fmtMoney(item.customer_price_unit), fmtMoney(item.customer_price_total), ...complianceRow(item)]
+          : [item.item_name, item.part_number_sku || '—', item.quantity, fmtMoney(item.customer_price_unit), fmtMoney(item.customer_price_total), ...complianceRow(item)]
       const emptyFiller = isLumpSum ? 1 : showMsrpCol ? 4 : 3
       const pdfFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Section Total', fmtMoney(total)]]
       const pdfMatFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Materials Total', fmtMoney(total)]]
@@ -2734,7 +2750,7 @@ const analyzeDrawing = async () => {
           doc.line(14, yPos + 6, pageWidth - 14, yPos + 6)
           yPos += 8
           const unsecTotal = unsectioned.reduce((s, i) => s + (i.customer_price_total || 0), 0)
-          autoTable(doc, { startY: yPos, head: pdfHead, body: unsectioned.map(pdfRow), foot: pdfFoot(unsecTotal), ...tableStyles })
+          autoTable(doc, { startY: yPos, head: pdfHead, body: unsectioned.map(pdfRow), ...(isLumpSum ? {} : { foot: pdfFoot(unsecTotal) }), ...tableStyles })
           yPos = doc.lastAutoTable.finalY + 8
         }
         // Each section
@@ -2765,14 +2781,16 @@ const analyzeDrawing = async () => {
             autoTable(doc, { startY: yPos, head: lHead, body: secLabor.map(lRow), ...tableStyles, showFoot: false })
             yPos = doc.lastAutoTable.finalY + 4
           }
-          // Section subtotal line
-          doc.setFontSize(9); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-          doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
-          yPos += 8
+          // Section subtotal line — hidden in installer/lump-sum mode
+          if (!isLumpSum) {
+            doc.setFontSize(9); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+            doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+            yPos += 8
+          }
         }
       } else {
         // No sections — original flat render
-        autoTable(doc, { startY: yPos, head: pdfHead, body: lineItems.map(pdfRow), foot: pdfMatFoot(materialsTotal), ...tableStyles })
+        autoTable(doc, { startY: yPos, head: pdfHead, body: lineItems.map(pdfRow), ...(isLumpSum ? {} : { foot: pdfMatFoot(materialsTotal) }), ...tableStyles })
       }
     }
 
@@ -2817,34 +2835,36 @@ const analyzeDrawing = async () => {
       yPos = sections.length > 0 ? yPos + 4 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : yPos + 10)
     }
 
-    // Grand total summary — always shown
-    const pageHeight = doc.internal.pageSize.getHeight()
-    const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (pdfTaxRate > 0 ? 7 : 0) + 12
-    if (yPos + summaryHeight > pageHeight - 20) { doc.addPage(); yPos = 20 }
-    const summaryX = pageWidth - 96
-    doc.setDrawColor(200, 200, 200)
-    doc.line(summaryX, yPos, pageWidth - 14, yPos)
-    yPos += 6
-    doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
-    doc.text('Materials Total:', summaryX, yPos)
-    doc.text(`$${pdfMaterialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
-    yPos += 7
-    if (allLaborTotal > 0) {
-      doc.text('Labor Total:', summaryX, yPos)
-      doc.text(`$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+    // Grand total summary — hidden in installer/lump-sum mode
+    if (!isLumpSum) {
+      const pageHeight = doc.internal.pageSize.getHeight()
+      const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (pdfTaxRate > 0 ? 7 : 0) + 12
+      if (yPos + summaryHeight > pageHeight - 20) { doc.addPage(); yPos = 20 }
+      const summaryX = pageWidth - 96
+      doc.setDrawColor(200, 200, 200)
+      doc.line(summaryX, yPos, pageWidth - 14, yPos)
+      yPos += 6
+      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
+      doc.text('Materials Total:', summaryX, yPos)
+      doc.text(`$${pdfMaterialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
       yPos += 7
+      if (allLaborTotal > 0) {
+        doc.text('Labor Total:', summaryX, yPos)
+        doc.text(`$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+        yPos += 7
+      }
+      if (pdfTaxRate > 0) {
+        doc.text(`Tax (${pdfTaxRate}% on materials):`, summaryX, yPos)
+        doc.text(`$${pdfTaxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+        yPos += 7
+      }
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.line(summaryX, yPos - 2, pageWidth - 14, yPos - 2)
+      doc.setFontSize(11); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Grand Total:', summaryX, yPos + 4)
+      doc.setTextColor(200, 98, 42)
+      doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos + 4, { align: 'right' })
     }
-    if (pdfTaxRate > 0) {
-      doc.text(`Tax (${pdfTaxRate}% on materials):`, summaryX, yPos)
-      doc.text(`$${pdfTaxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
-      yPos += 7
-    }
-    doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.line(summaryX, yPos - 2, pageWidth - 14, yPos - 2)
-    doc.setFontSize(11); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.text('Grand Total:', summaryX, yPos + 4)
-    doc.setTextColor(200, 98, 42)
-    doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos + 4, { align: 'right' })
 
     const renderSignatureBlock = (doc, startY) => {
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -3180,6 +3200,7 @@ const analyzeDrawing = async () => {
           onMoveLineToSection={(i) => { setMoveLineIndex(i); setMoveType('move'); setShowMoveModal(true) }}
           fmt={fmt}
           featureMsrp={features.msrp}
+          featureComplianceFields={features.complianceFields}
           canEdit={canEdit}
         />
 

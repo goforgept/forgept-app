@@ -572,7 +572,8 @@ export default function SuperAdmin() {
       feature_drawing_reader: org.feature_drawing_reader || false,
       feature_api:            org.feature_api            || false,
       feature_embed:          org.feature_embed          || false,
-      feature_regions:        org.feature_regions        || false,
+      feature_regions:           org.feature_regions           || false,
+      feature_compliance_fields: org.feature_compliance_fields || false,
       designer_allowed_manufacturers: org.designer_allowed_manufacturers || null,
       designer_enabled_industries: org.designer_enabled_industries || [],
       enabled_catalogs: org.enabled_catalogs || [],
@@ -597,6 +598,7 @@ export default function SuperAdmin() {
       feature_api:            orgForm.feature_api,
       feature_embed:          orgForm.feature_embed,
       feature_regions:        orgForm.feature_regions,
+      feature_compliance_fields: orgForm.feature_compliance_fields,
       designer_allowed_manufacturers: orgForm.designer_allowed_manufacturers?.length ? orgForm.designer_allowed_manufacturers : null,
       designer_enabled_industries: orgForm.designer_enabled_industries?.length ? orgForm.designer_enabled_industries : null,
       enabled_catalogs: orgForm.enabled_catalogs?.length ? orgForm.enabled_catalogs : [],
@@ -1002,6 +1004,7 @@ export default function SuperAdmin() {
                                 { key: 'feature_api',            label: 'API Access',         group: 'Other' },
                                 { key: 'feature_embed',          label: 'Embedded Designer',  group: 'Other', sub: true, requires: 'feature_api' },
                                 { key: 'feature_regions',        label: 'Regions',            group: 'Other' },
+                                { key: 'feature_compliance_fields', label: 'Compliance Fields (Lead Time, COO, Berry)', group: 'Other' },
                               ].reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc }, {})
                             ).map(([group, flags]) => (
                               <div key={group}>

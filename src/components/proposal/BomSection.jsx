@@ -56,6 +56,7 @@ export default function BomSection({
   onDeleteRFQ,
   fmt,
   featureMsrp = false,
+  featureComplianceFields = false,
   canEdit = true,
   laborRates = [],
   defaultMarkup = 35,
@@ -386,6 +387,9 @@ export default function BomSection({
                         <th className="text-fp-muted text-right py-2 pr-4">Unit Price</th>
                         {featureMsrp && <th className="text-fp-muted text-right py-2 pr-4">MSRP</th>}
                         <th className="text-fp-muted text-right py-2 pr-4">Total</th>
+                        {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">Lead Time</th>}
+                        {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">COO</th>}
+                        {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">Berry</th>}
                         <th className="text-fp-muted text-left py-2">Status</th>
                         <th className="text-fp-muted text-center py-2 pr-2">🔄</th>
                       </tr>
@@ -415,6 +419,9 @@ export default function BomSection({
                             <td className="text-fp-text py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
                             {featureMsrp && <td className="text-fp-muted py-3 pr-4 text-right">{item.msrp_unit ? `$${fmt(item.msrp_unit)}` : '—'}</td>}
                             <td className="text-fp-text py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>
+                            {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.lead_time || '—'}</td>}
+                            {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.country_of_origin || '—'}</td>}
+                            {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.berry_compliance || '—'}</td>}
                             <td className="py-3">
                               <div className="flex flex-col gap-1">
                                 <span className={`text-xs font-semibold px-2 py-1 rounded ${item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : item.pricing_status === 'RFQ Sent' ? 'bg-yellow-500/20 text-yellow-400' : item.pricing_status === 'Confirmed' ? 'bg-green-500/20 text-green-400' : 'bg-fp-inset text-fp-muted'}`}>
@@ -632,7 +639,7 @@ export default function BomSection({
                               })
                             }} />
                         </th>
-                        {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ...(featureMsrp ? ['MSRP'] : []), '🔄', ''].map(h => (
+                        {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ...(featureMsrp ? ['MSRP'] : []), ...(featureComplianceFields ? ['Lead Time', 'COO', 'Berry'] : []), '🔄', ''].map(h => (
                           <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
                         ))}
                         {editSections.length > 0 && <th className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">Move</th>}
@@ -702,6 +709,24 @@ export default function BomSection({
                                   className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
                               </td>
                             )}
+                            {featureComplianceFields && (
+                              <td className="pr-2 py-1">
+                                <input type="text" placeholder="Lead time" value={line.lead_time || ''} onChange={e => onUpdateEditLine(i, 'lead_time', e.target.value)}
+                                  className="w-24 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                              </td>
+                            )}
+                            {featureComplianceFields && (
+                              <td className="pr-2 py-1">
+                                <input type="text" placeholder="COO" value={line.country_of_origin || ''} onChange={e => onUpdateEditLine(i, 'country_of_origin', e.target.value)}
+                                  className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                              </td>
+                            )}
+                            {featureComplianceFields && (
+                              <td className="pr-2 py-1">
+                                <input type="text" placeholder="Berry status" value={line.berry_compliance || ''} onChange={e => onUpdateEditLine(i, 'berry_compliance', e.target.value)}
+                                  className="w-28 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                              </td>
+                            )}
                             <td className="py-1 text-center">
                               <input type="checkbox" checked={!!line.recurring} onChange={e => onUpdateEditLine(i, 'recurring', e.target.checked)} className="accent-fp-brand cursor-pointer" title="Recurring" />
                             </td>
@@ -722,6 +747,7 @@ export default function BomSection({
                   <button onClick={() => setEditLines(prev => [...prev, {
                     proposal_id: proposalId, item_name: '', part_number_sku: '', quantity: '', unit: 'ea', category: '',
                     vendor: '', your_cost_unit: '', markup_percent: '35', customer_price_unit: '', customer_price_total: '', msrp_unit: '',
+                    lead_time: '', country_of_origin: '', berry_compliance: '',
                     pricing_status: 'Needs Pricing', section_id: sectionId === 'general' ? null : sectionId
                   }])} className="mt-2 text-[#C8622A] hover:text-fp-text text-xs transition-colors">
                     + Add Item{sectionLabel ? ` to ${sectionLabel}` : ''}
