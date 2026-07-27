@@ -16,7 +16,7 @@ const DEFAULT_ADMIN_WIDGETS = ['pipeline-chart', 'top-clients', 'team-leaderboar
 const PIPE_STATUS_COLOR = { Draft: '#6B7280', Sent: '#3B82F6', Won: '#22C55E', Lost: '#EF4444' }
 const fmtAd = (n) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
-export default function AdminDashboard({ isAdmin, featureProposals = true, featureCRM = false, role = 'admin', isSalesManager = false, isPM = false, defaultMode = null, featureRegions = false }) {
+export default function AdminDashboard({ isAdmin, featureProposals = true, featureCRM = false, role = 'admin', isSalesManager = false, isPM = false, defaultMode = null, featureRegions = false, featureInventory = false }) {
   const { profile } = useProfile()
   const [proposals, setProposals] = useState([])
   const [dashboardMode, setDashboardMode] = useState(() => defaultMode || localStorage.getItem('dashboardMode') || (isPM ? 'pm' : 'sales'))
@@ -321,7 +321,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
   return (
     <div className="flex min-h-screen bg-fp-bg">
-      <Sidebar isAdmin={true} featureProposals={featureProposals} featureCRM={featureCRM} />
+      <Sidebar isAdmin={true} featureProposals={featureProposals} featureCRM={featureCRM} featureInventory={featureInventory} isSalesManager={isSalesManager} isPM={isPM} />
       <div className="flex-1 p-6 overflow-y-auto h-screen">
 
         <div className="sticky top-0 z-10 bg-fp-bg pt-2 pb-4 mb-2 border-b border-fp-border">

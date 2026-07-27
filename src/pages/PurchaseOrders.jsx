@@ -4,7 +4,7 @@ import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
 
-export default function PurchaseOrders({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false }) {
+export default function PurchaseOrders({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false, featureInventory = false, isSalesManager = false }) {
   const { profile } = useProfile()
   const [pos, setPOs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -362,7 +362,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
 
   return (
     <div className="flex min-h-screen bg-fp-inset">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} role={role} isPM={isPM} isTechnician={isTechnician} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureInventory={featureInventory} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-6">
         <div className="flex justify-between items-center">

@@ -41,7 +41,7 @@ function getWeekDates(referenceDate) {
   })
 }
 
-export default function Dispatch({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false }) {
+export default function Dispatch({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false, featureInventory = false, isSalesManager = false }) {
   const navigate = useNavigate()
   const { profile } = useProfile()
   const [tickets, setTickets] = useState([])
@@ -310,7 +310,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
 
   return (
     <div className="flex min-h-screen bg-fp-inset">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} role={role} isPM={isPM} isTechnician={isTechnician} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureInventory={featureInventory} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-5 overflow-x-auto">
 

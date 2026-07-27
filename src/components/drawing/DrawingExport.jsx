@@ -41,6 +41,7 @@ const mkLabelBox = (cx, cy, text, fsMm) => {
 }
 const boxesOverlap = (a, b) =>
   !(a.x2 + 0.5 < b.x1 || b.x2 + 0.5 < a.x1 || a.y2 + 0.5 < b.y1 || b.y2 + 0.5 < a.y1)
+const conditionLabel = (c) => c === 'existing' ? 'Existing' : c === 'replace' ? 'Replace' : c === 'demo' ? 'Demo' : 'New'
 
 // ─── DrawingExport ────────────────────────────────────────────────────────────
 // Export tab — Client Overview, Shop Drawings, As-Builts, CSV BOM
@@ -962,8 +963,6 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       drawTitleBlock('Legend', 2)
 
-      const conditionLabel = (c) => c === 'existing' ? 'Existing' : c === 'replace' ? 'Replace' : c === 'demo' ? 'Demo' : 'New'
-
       // ── Device schedule sheet ────────────────────────────────────────────
       pdf.addPage()
       pdf.setFillColor(255, 255, 255)
@@ -1140,8 +1139,6 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       pdf.setFontSize(10)
       pdf.text(proposal?.company || '', pageW/2, 63, { align: 'center' })
       pdf.text(`As-Built Date: ${new Date().toLocaleDateString()}`, pageW/2, 71, { align: 'center' })
-
-      const conditionLabel = (c) => c === 'existing' ? 'Existing' : c === 'replace' ? 'Replace' : c === 'demo' ? 'Demo' : 'New'
 
       // As-built device schedule
       pdf.addPage()

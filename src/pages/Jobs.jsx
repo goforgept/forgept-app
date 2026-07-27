@@ -11,7 +11,7 @@ const STATUS_COLORS = {
   'Cancelled': 'bg-red-500/20 text-red-400',
 }
 
-export default function Jobs({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, isTechnician = false }) {
+export default function Jobs({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, isTechnician = false, featureInventory = false, isSalesManager = false, isPM = false }) {
   const navigate = useNavigate()
   const { profile } = useProfile()
   const [jobs, setJobs] = useState([])
@@ -68,7 +68,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
 
   return (
     <div className="flex min-h-screen bg-fp-inset">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureInventory={featureInventory} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-6">
         {/* Header */}
