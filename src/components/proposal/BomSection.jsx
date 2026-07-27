@@ -1,3 +1,5 @@
+import { useState, useRef, useEffect } from 'react'
+
 export default function BomSection({
   proposalId,
   proposal,
@@ -58,6 +60,20 @@ export default function BomSection({
   laborRates = [],
   defaultMarkup = 35,
 }) {
+  const [aiOpen, setAiOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const aiRef = useRef(null)
+  const moreRef = useRef(null)
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (aiRef.current && !aiRef.current.contains(e.target)) setAiOpen(false)
+      if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   return (
     <div className="bg-fp-card rounded-xl p-6">
       {canEdit && <div className="mb-4 relative">
@@ -157,40 +173,100 @@ export default function BomSection({
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-fp-text font-bold text-lg">BOM Line Items ({lineItems.length})</h3>
         {canEdit && (!editingBOM ? (
-          <div className="flex gap-2 flex-wrap">
-            {proposal?.status === 'Won' && lineItems.length > 0 && orgType === 'manufacturer' && (
-              <button onClick={onOpenOrderModal} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">🏭 Convert to Order</button>
+          <div className="flex items-center gap-2">
+            {/* Edit BOM — primary action */}
+            <button onClick={onStartEditing} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors">
+              Edit BOM
+            </button>
+
+            {/* AI Tools dropdown — only shown when at least one AI feature is enabled */}
+            {(features.aiBom || features.drawingReader || features.specReader) && (
+              <div className="relative" ref={aiRef}>
+                <button
+                  onClick={() => { setAiOpen(o => !o); setMoreOpen(false) }}
+                  className="bg-purple-600 text-white px-3 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors flex items-center gap-1.5">
+                  ✨ AI Tools
+                  <svg className="w-3 h-3 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+                {aiOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-fp-card border border-fp-border rounded-xl shadow-2xl min-w-[170px] py-1 overflow-hidden">
+                    {features.aiBom && (
+                      <button onClick={() => { setAiOpen(false); onOpenAIBOMModal() }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors">
+                        ✨ AI Build BOM
+                      </button>
+                    )}
+                    {features.drawingReader && (
+                      <button onClick={() => { setAiOpen(false); onOpenDrawingModal() }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors">
+                        📐 Read Drawing
+                      </button>
+                    )}
+                    {features.specReader && (
+                      <button onClick={() => { setAiOpen(false); onOpenSpecModal() }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors">
+                        📋 Read Spec
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
-            {orgType !== 'manufacturer' && (
-              <button onClick={() => selectedForPO.size > 0 && onOpenPOModal()}
-                disabled={selectedForPO.size === 0}
-                title={selectedForPO.size === 0 ? 'Check items below to select for PO' : `Generate PO for ${selectedForPO.size} items`}
-                className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                {selectedForPO.size > 0 ? `Generate PO (${selectedForPO.size})` : 'Generate PO'}
+
+            {/* More overflow menu */}
+            <div className="relative" ref={moreRef}>
+              <button
+                onClick={() => { setMoreOpen(o => !o); setAiOpen(false) }}
+                className="bg-fp-inset text-fp-text px-3 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors flex items-center gap-1">
+                ···
               </button>
-            )}
-            {orgType !== 'manufacturer' && (
-              <button onClick={onOpenRFQModal} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">Send RFQs</button>
-            )}
-            <button onClick={onLoadTemplate} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">Load Template</button>
-            <button onClick={onOpenSaveTemplateModal} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">Save as Template</button>
-            {features.aiBom && (
-              <button onClick={onOpenAIBOMModal} className="bg-purple-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✨ AI Build BOM</button>
-            )}
-            {features.drawingReader && (
-              <button onClick={onOpenDrawingModal} className="bg-purple-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">📐 Read Drawing</button>
-            )}
-            {features.specReader && (
-              <button onClick={onOpenSpecModal} className="bg-purple-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">📋 Read Spec</button>
-            )}
-            {orgType === 'manufacturer' && (
-              <button onClick={onOpenCatalogSearch} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">+ From Catalog</button>
-            )}
-            <button onClick={onStartEditing} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">Edit BOM</button>
-            <label className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors cursor-pointer">
-              Upload Excel
-              <input type="file" accept=".xlsx,.xls,.csv" onChange={onExcelUpload} className="hidden" />
-            </label>
+              {moreOpen && (
+                <div className="absolute right-0 top-full mt-1 z-50 bg-fp-card border border-fp-border rounded-xl shadow-2xl min-w-[190px] py-1 overflow-hidden">
+                  {orgType !== 'manufacturer' && (
+                    <button
+                      onClick={() => { setMoreOpen(false); selectedForPO.size > 0 && onOpenPOModal() }}
+                      disabled={selectedForPO.size === 0}
+                      title={selectedForPO.size === 0 ? 'Check items below to select for PO' : `Generate PO for ${selectedForPO.size} items`}
+                      className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                      {selectedForPO.size > 0 ? `Generate PO (${selectedForPO.size})` : 'Generate PO'}
+                    </button>
+                  )}
+                  {orgType !== 'manufacturer' && (
+                    <button onClick={() => { setMoreOpen(false); onOpenRFQModal() }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors">
+                      Send RFQs
+                    </button>
+                  )}
+                  <button onClick={() => { setMoreOpen(false); onLoadTemplate() }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors">
+                    Load Template
+                  </button>
+                  <button onClick={() => { setMoreOpen(false); onOpenSaveTemplateModal() }}
+                    className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors">
+                    Save as Template
+                  </button>
+                  <label className="w-full block px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors cursor-pointer">
+                    Upload Excel
+                    <input type="file" accept=".xlsx,.xls,.csv" onChange={e => { setMoreOpen(false); onExcelUpload(e) }} className="hidden" />
+                  </label>
+                  {orgType === 'manufacturer' && (
+                    <button onClick={() => { setMoreOpen(false); onOpenCatalogSearch() }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors">
+                      + From Catalog
+                    </button>
+                  )}
+                  {proposal?.status === 'Won' && lineItems.length > 0 && orgType === 'manufacturer' && (
+                    <>
+                      <div className="border-t border-fp-border my-1" />
+                      <button onClick={() => { setMoreOpen(false); onOpenOrderModal() }}
+                        className="w-full text-left px-4 py-2.5 text-sm text-fp-brand font-semibold hover:bg-fp-inset transition-colors">
+                        Convert to Order
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="flex gap-2">
