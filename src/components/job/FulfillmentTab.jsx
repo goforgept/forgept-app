@@ -24,8 +24,17 @@ export default function FulfillmentTab({ job, lineItems, orgId, profileId }) {
   }
 
   const autoMatch = (bomItem) => {
-    if (!bomItem.part_number) return null
-    return inventoryItems.find(i => i.part_number && i.part_number.toLowerCase() === bomItem.part_number.toLowerCase()) || null
+    const sku = bomItem.part_number_sku?.trim()
+    if (sku) {
+      const byPart = inventoryItems.find(i => i.part_number && i.part_number.trim().toLowerCase() === sku.toLowerCase())
+      if (byPart) return byPart
+    }
+    // Fallback: description match
+    const name = bomItem.item_name?.trim().toLowerCase()
+    if (name) {
+      return inventoryItems.find(i => i.description?.trim().toLowerCase() === name) || null
+    }
+    return null
   }
 
   const getInventoryItem = (bomItem) => {
@@ -53,7 +62,7 @@ export default function FulfillmentTab({ job, lineItems, orgId, profileId }) {
       inventory_item_id: invItem.id,
       bom_line_item_id: bomItem.id,
       bom_item_description: bomItem.item_name,
-      bom_part_number: bomItem.part_number,
+      bom_part_number: bomItem.part_number_sku || null,
       quantity_reserved: qty,
       quantity_fulfilled: 0,
       unit_cost: cost,
@@ -189,7 +198,7 @@ export default function FulfillmentTab({ job, lineItems, orgId, profileId }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-fp-text font-semibold text-sm">{item.item_name}</p>
                   <div className="flex gap-3 mt-0.5 flex-wrap">
-                    {item.part_number && <span className="text-fp-muted text-xs font-mono">{item.part_number}</span>}
+                    {item.part_number_sku && <span className="text-fp-muted text-xs font-mono">{item.part_number_sku}</span>}
                     <span className="text-fp-muted text-xs">Qty needed: <span className="text-fp-text font-semibold">{item.quantity}</span></span>
                   </div>
                 </div>
@@ -263,7 +272,7 @@ export default function FulfillmentTab({ job, lineItems, orgId, profileId }) {
                         </>
                       ) : (
                         <div className="space-y-1.5">
-                          <p className="text-fp-muted text-xs">{item.part_number ? 'No inventory match' : 'No part number'}</p>
+                          <p className="text-fp-muted text-xs">No inventory match</p>
                           <select className="text-xs bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 focus:outline-none focus:border-fp-brand max-w-[180px]"
                             value={overrides[item.id] || ''}
                             onChange={e => setOverrides(p => ({ ...p, [item.id]: e.target.value }))}>
