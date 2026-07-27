@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import NotificationBell from './NotificationBell'
 
-const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool) => [
+const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool, featureInventory) => [
   {
     key: 'sales',
     label: 'Sales',
@@ -35,6 +35,7 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
       ...(orgType !== 'manufacturer' && featureProposals ? [
         { label: 'Vendors', path: '/vendors', icon: '🏭' },
         ...(featurePurchaseOrders ? [{ label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' }] : []),
+        ...(featureInventory ? [{ label: 'Inventory', path: '/inventory', icon: '🏭' }] : []),
       ] : []),
       ...(orgType === 'manufacturer' ? [
         { label: 'Catalog', path: '/catalog', icon: '📚' },
@@ -58,7 +59,7 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
   }
 ]
 
-const NAV_GROUPS_PM = (featurePurchaseOrders, featureInvoices) => [
+const NAV_GROUPS_PM = (featurePurchaseOrders, featureInvoices, featureInventory) => [
   {
     key: 'operations',
     label: 'Operations',
@@ -70,6 +71,7 @@ const NAV_GROUPS_PM = (featurePurchaseOrders, featureInvoices) => [
       { label: 'Dispatch', path: '/dispatch', icon: '📍' },
       ...(featureInvoices ? [{ label: 'Invoices', path: '/invoices', icon: '🧾' }] : []),
       ...(featurePurchaseOrders ? [{ label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' }] : []),
+      ...(featureInventory ? [{ label: 'Inventory', path: '/inventory', icon: '🏭' }] : []),
       { label: 'Vendors', path: '/vendors', icon: '🏭' },
     ]
   },
@@ -187,7 +189,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
   }
 ]
 
-export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager = false, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, featureDesignerOnly = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
+export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager = false, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, featureDesignerOnly = false, featureInventory = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
   const location = useLocation()
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
@@ -244,9 +246,9 @@ const featureMonitoring = featureMonitoringProp || sessionStorage.getItem('featu
     : isProductManager
     ? NAV_GROUPS_PRODUCT_MANAGER()
     : isAdmin || isSalesManager
-    ? NAV_GROUPS_ADMIN(featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool || sessionStorage.getItem('featureDrawingTool') === 'true')
+    ? NAV_GROUPS_ADMIN(featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool || sessionStorage.getItem('featureDrawingTool') === 'true', featureInventory)
     : isPM
-    ? NAV_GROUPS_PM(featurePurchaseOrders, featureInvoices)
+    ? NAV_GROUPS_PM(featurePurchaseOrders, featureInvoices, featureInventory)
     : isTechnician
     ? NAV_GROUPS_TECH()
     : NAV_GROUPS_REP(featureProposals, featureCRM, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool || sessionStorage.getItem('featureDrawingTool') === 'true')

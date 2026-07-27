@@ -4,6 +4,7 @@ import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
 import ChecklistTab from '../components/job/ChecklistTab'
+import FulfillmentTab from '../components/job/FulfillmentTab'
 import ChangeOrdersTab from '../components/job/ChangeOrdersTab'
 import POTab from '../components/job/POTab'
 import CostReportTab from '../components/job/CostReportTab'
@@ -46,7 +47,7 @@ const STATUS_COLORS = {
 const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 
-export default function JobDetail({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false }) {
+export default function JobDetail({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureInventory = false, role = 'admin', isPM = false, isTechnician = false }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const { profile } = useProfile()
@@ -1088,7 +1089,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
   return (
     <div className="flex min-h-screen bg-fp-inset">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} role={role} isPM={isPM} isTechnician={isTechnician} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureInventory={featureInventory} role={role} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-6">
 
@@ -1236,6 +1237,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           {[
             { key: 'checklist', label: `Checklist (${completedCount}/${checklist.length})` },
             { key: 'pos', label: 'Purchase Orders' },
+            ...(featureInventory ? [{ key: 'fulfillment', label: 'Fulfillment' }] : []),
             { key: 'changeorders', label: `Change Orders (${changeOrders.length})` },
             { key: 'costReport', label: 'Cost Report' },
             { key: 'techlog', label: `Tech Log (${techLogs.length})` },
@@ -1282,6 +1284,16 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             setSelectedForPO={setSelectedForPO}
             job={job}
             onOpenPOModal={() => setShowPOModal(true)}
+          />
+        )}
+
+        {/* FULFILLMENT TAB */}
+        {activeTab === 'fulfillment' && featureInventory && (
+          <FulfillmentTab
+            job={job}
+            lineItems={lineItems}
+            orgId={profile?.org_id}
+            profileId={profile?.id}
           />
         )}
 

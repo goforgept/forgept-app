@@ -46,6 +46,7 @@ import DesignerProjects from './pages/DesignerProjects'
 import DrawingReview from './pages/DrawingReview'
 import EmbedDesigner from './pages/EmbedDesigner'
 import Roadmap from './pages/Roadmap'
+import Inventory from './pages/Inventory'
 
 function App() {
   const { session, profile, features, loading } = useProfile()
@@ -115,6 +116,7 @@ function App() {
     featureDesignerOnly:   features.designerOnly,
     featureApi:            features.api,
     featureRegions:        features.regions,
+    featureInventory:      features.inventory,
   }
 
   return (
@@ -199,6 +201,7 @@ function App() {
             {(features.sla || features.monitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
             <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />
             <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />
+            {features.inventory && <Route path="/inventory" element={<Inventory {...sharedProps} />} />}
             {features.designerOnly && <Route path="*" element={<Navigate to="/designer" replace />} />}
             <Route path="/roadmap" element={<Roadmap {...sharedProps} />} />
           </>
