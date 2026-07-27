@@ -744,14 +744,28 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         {/* Needs Attention */}
         {!loading && expiredPricingCount > 0 && (
           <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-red-400">⚠</span>
-                <div>
-                  <p className="text-fp-text font-semibold text-sm">Pricing Expired</p>
-                  <p className="text-red-400 text-xs">{expiredPricingCount} proposal{expiredPricingCount !== 1 ? 's' : ''} have expired RFQ pricing — re-quote vendors</p>
-                </div>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-red-400">⚠</span>
+              <div>
+                <p className="text-fp-text font-semibold text-sm">Pricing Expired</p>
+                <p className="text-red-400 text-xs">{expiredPricingCount} proposal{expiredPricingCount !== 1 ? 's' : ''} have expired RFQ pricing — re-quote vendors</p>
               </div>
+            </div>
+            <div className="space-y-1 pl-6">
+              {expiredPricingProposals.map(pid => {
+                const p = proposals.find(pr => pr.id === pid)
+                if (!p) return null
+                return (
+                  <button key={pid} onClick={() => navigate(`/proposal/${pid}`)}
+                    className="w-full text-left flex items-center justify-between bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 rounded-lg px-3 py-2 transition-colors group">
+                    <div>
+                      <span className="text-fp-text text-xs font-semibold">{p.proposal_name || 'Untitled'}</span>
+                      {p.company && <span className="text-red-400/70 text-xs ml-2">· {p.company}</span>}
+                    </div>
+                    <span className="text-red-400/50 group-hover:text-red-400 text-xs transition-colors">View →</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
         )}
