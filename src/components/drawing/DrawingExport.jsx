@@ -772,15 +772,18 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.rect(0, 0, pageW, pageH, 'F')
 
         // Header bar
-        pdf.setFillColor(26, 45, 69)
+        pdf.setFillColor(245, 246, 248)
         pdf.rect(0, 0, pageW, 12, 'F')
+        pdf.setDrawColor(210, 210, 210)
+        pdf.setLineWidth(0.3)
+        pdf.line(0, 12, pageW, 12)
 
-        pdf.setTextColor(255, 255, 255)
+        pdf.setTextColor(30, 30, 30)
         pdf.setFontSize(9)
         pdf.setFont('helvetica', 'bold')
         pdf.text(sheet.name, margin, 8)
 
-        pdf.setTextColor(138, 154, 176)
+        pdf.setTextColor(90, 100, 110)
         pdf.setFont('helvetica', 'normal')
         pdf.text(`${orgProfile?.company_name || ''} · ${proposal?.proposal_name || ''}`, pageW - margin, 8, { align: 'right' })
 
@@ -794,11 +797,11 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         const imgData = await getFloorPlanImage(sheet.id)
         await drawSheetOnPDF(pdf, sheet, imgData, margin, imgY, maxImgW, maxImgH, exportFOV)
 
-        // Title block footer — same style as shop drawings
+        // Title block footer
         const tbY = pageH - titleBlockH
-        pdf.setFillColor(26, 45, 69)
+        pdf.setFillColor(245, 246, 248)
         pdf.rect(0, tbY, pageW, titleBlockH, 'F')
-        pdf.setDrawColor(42, 61, 85)
+        pdf.setDrawColor(210, 210, 210)
         pdf.setLineWidth(0.3)
         pdf.line(0, tbY, pageW, tbY)
 
@@ -809,15 +812,15 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.text(orgProfile?.company_name || '', margin, tbY + 6)
 
         // Center — proposal name + sheet name
-        pdf.setTextColor(255, 255, 255)
+        pdf.setTextColor(30, 30, 30)
         pdf.setFontSize(7)
         pdf.setFont('helvetica', 'normal')
         pdf.text(proposal?.proposal_name || '', pageW / 2, tbY + 5, { align: 'center' })
-        pdf.setTextColor(138, 154, 176)
+        pdf.setTextColor(90, 100, 110)
         pdf.text(sheet.name, pageW / 2, tbY + 11, { align: 'center' })
 
         // Right — sheet number + date
-        pdf.setTextColor(138, 154, 176)
+        pdf.setTextColor(90, 100, 110)
         pdf.setFontSize(7)
         pdf.text(`Sheet ${i + 1} of ${sheets.length}`, pageW - margin, tbY + 5, { align: 'right' })
         pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW - margin, tbY + 11, { align: 'right' })
@@ -847,7 +850,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       const drawTitleBlock = (sheetName, sheetNum) => {
         // Title block border
-        pdf.setDrawColor(42, 61, 85)
+        pdf.setDrawColor(210, 210, 210)
         pdf.setLineWidth(0.3)
         pdf.rect(margin, pageH - titleBlockH - margin, pageW - margin * 2, titleBlockH)
 
@@ -1109,7 +1112,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const logoImg = await loadOrgLogo()
 
       // Title
-      pdf.setFillColor(15,28,46)
+      pdf.setFillColor(255,255,255)
       pdf.rect(0,0,pageW,pageH,'F')
 
       // Logo or company name top-left
@@ -1131,18 +1134,18 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       pdf.setFontSize(28)
       pdf.setFont('helvetica','bold')
       pdf.text('AS-BUILT DRAWINGS', pageW/2, 40, { align: 'center' })
-      pdf.setTextColor(255,255,255)
+      pdf.setTextColor(30,30,30)
       pdf.setFontSize(14)
       pdf.setFont('helvetica','normal')
       pdf.text(proposal?.proposal_name || '', pageW/2, 54, { align: 'center' })
-      pdf.setTextColor(138,154,176)
+      pdf.setTextColor(90,100,110)
       pdf.setFontSize(10)
       pdf.text(proposal?.company || '', pageW/2, 63, { align: 'center' })
       pdf.text(`As-Built Date: ${new Date().toLocaleDateString()}`, pageW/2, 71, { align: 'center' })
 
       // As-built device schedule
       pdf.addPage()
-      pdf.setFillColor(15,28,46)
+      pdf.setFillColor(255,255,255)
       pdf.rect(0,0,pageW,pageH,'F')
       pdf.setTextColor(200,98,42)
       pdf.setFontSize(12)
@@ -1176,9 +1179,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         head:       [['#', 'Address', 'Part #', 'Description', 'Manufacturer', 'Condition', 'Sheet', 'Serial', 'IP', 'MAC', 'Switch', 'Port', 'Patch Panel', 'Runs To']],
         body:       asBuiltRows,
         theme:      'grid',
-        styles:     { fontSize: 6, cellPadding: 1.5, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] },
-        headStyles: { fillColor: [26,45,69], textColor: [200,98,42], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [20,35,55] },
+        styles:     { fontSize: 6, cellPadding: 1.5, textColor: [30,30,30], fillColor: [255,255,255], lineColor: [210,210,210] },
+        headStyles: { fillColor: [245,246,248], textColor: [200,98,42], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248,249,250] },
       })
 
       pdf.save(`${proposal?.proposal_name || 'Drawing'}_As_Built.pdf`)
