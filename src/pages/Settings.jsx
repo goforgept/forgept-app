@@ -72,6 +72,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     payment_instructions_payable_to: '', payment_instructions_bank: '',
     payment_instructions_routing: '', payment_instructions_account: '',
     payment_instructions_zelle: '', payment_instructions_notes: '',
+    cc_fee_percent: '3.0',
   })
   const [savingInvoicing, setSavingInvoicing] = useState(false)
   const [regionsEnabled, setRegionsEnabled] = useState(false)
@@ -222,6 +223,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       payment_instructions_account: data?.payment_instructions_account || '',
       payment_instructions_zelle: data?.payment_instructions_zelle || '',
       payment_instructions_notes: data?.payment_instructions_notes || '',
+      cc_fee_percent: String(profile?.organizations?.cc_fee_percent ?? '3.0'),
     })
     if (data?.org_id) {
       const { data: ratesData } = await supabase.from('labor_rates').select('*').eq('org_id', data.org_id).order('sort_order', { ascending: true })
@@ -357,6 +359,11 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       payment_instructions_zelle: invoicingForm.payment_instructions_zelle,
       payment_instructions_notes: invoicingForm.payment_instructions_notes,
     }).eq('id', user.id)
+    if (profile?.org_id) {
+      await supabase.from('organizations').update({
+        cc_fee_percent: parseFloat(invoicingForm.cc_fee_percent) || 3.0,
+      }).eq('id', profile.org_id)
+    }
     setSuccess('Invoicing settings saved'); setSavingInvoicing(false)
   }
 

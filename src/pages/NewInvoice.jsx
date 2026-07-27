@@ -29,6 +29,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   const [contractFees, setContractFees] = useState([])
   const [includedContractFees, setIncludedContractFees] = useState({})
   const [aiaWarning, setAiaWarning] = useState(false)
+  const [clientPaymentMethod, setClientPaymentMethod] = useState('')
 
   useEffect(() => { if (profile?.org_id) fetchData() }, [profile?.org_id])
 
@@ -47,7 +48,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
     const { data: tickets } = await supabase
       .from('service_tickets')
-      .select('id, ticket_number, title, status, line_items, labor_items, clients(company, client_name)')
+      .select('id, ticket_number, title, status, line_items, labor_items, clients(company, client_name, payment_method)')
       .eq('org_id', profile.org_id)
       .neq('status', 'Cancelled')
       .order('created_at', { ascending: false })
@@ -112,7 +113,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
       // Auto-set due date from client NET terms
       if (jobData.client_id) {
-        const { data: clientData } = await supabase.from('clients').select('net_terms').eq('id', jobData.client_id).single()
+        const { data: clientData } = await supabase.from('clients').select('net_terms, payment_method').eq('id', jobData.client_id).single()
         if (clientData?.net_terms) {
           const termDays = clientData.net_terms === 'Due on Receipt' ? 0
             : parseInt(clientData.net_terms.replace('NET ', '')) || 30
@@ -120,6 +121,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
           due.setDate(due.getDate() + termDays)
           setForm(prev => ({ ...prev, due_date: due.toISOString().split('T')[0] }))
         }
+        setClientPaymentMethod(clientData?.payment_method || '')
       }
 
       const { data: coData } = await supabase
@@ -158,6 +160,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       })
     } else {
       setIncludedCOs([])
+      setClientPaymentMethod('')
     }
 
     setLineItems(items)
@@ -209,8 +212,9 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     setSelectedProposal(null)
     setIncludedCOs([])
 
-    if (!ticket) { setLineItems([]); return }
+    if (!ticket) { setLineItems([]); setClientPaymentMethod(''); return }
 
+    setClientPaymentMethod(ticket.clients?.payment_method || '')
     setForm(prev => ({ ...prev, description: ticket.title || '', tax_percent: orgDefaultTaxRate || '0' }))
 
     const items = []
@@ -244,13 +248,13 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     setForm(prev => ({ ...prev, proposal_id: proposalId, service_ticket_id: '' }))
     setAiaWarning(false)
     if (proposalId) loadProposalItems(proposalId, proposals)
-    else { setSelectedProposal(null); setLineItems([]) }
+    else { setSelectedProposal(null); setLineItems([]); setClientPaymentMethod('') }
   }
 
   const handleTicketChange = (ticketId) => {
     setForm(prev => ({ ...prev, service_ticket_id: ticketId, proposal_id: '' }))
     if (ticketId) loadTicketItems(ticketId)
-    else { setSelectedTicket(null); setLineItems([]) }
+    else { setSelectedTicket(null); setLineItems([]); setClientPaymentMethod('') }
   }
 
   const updateLine = (i, field, value) => {
@@ -268,7 +272,10 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   const removeLine = (i) => setLineItems(prev => prev.filter((_, idx) => idx !== i))
 
   const contractFeesTotal = contractFees.filter(f => includedContractFees[f.key]).reduce((sum, f) => sum + (parseFloat(f.amount) || 0), 0)
-  const subtotal = lineItems.reduce((sum, i) => sum + (parseFloat(i.total) || 0), 0) + contractFeesTotal
+  const lineSubtotal = lineItems.reduce((sum, i) => sum + (parseFloat(i.total) || 0), 0) + contractFeesTotal
+  const ccFeePercent = parseFloat(profile?.organizations?.cc_fee_percent) || 3.0
+  const ccFeeAmount = clientPaymentMethod === 'Credit Card' ? Math.round(lineSubtotal * (ccFeePercent / 100) * 100) / 100 : 0
+  const subtotal = lineSubtotal + ccFeeAmount
   const taxAmount = subtotal * ((parseFloat(form.tax_percent) || 0) / 100)
   const total = subtotal + taxAmount
 
@@ -302,6 +309,9 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       .map(f => ({ description: f.label, quantity: 1, unit_price: f.amount, total: f.amount }))
 
     const allItems = [...lineItems.filter(i => i.description), ...selectedFeeItems]
+    if (ccFeeAmount > 0) {
+      allItems.push({ description: `Credit Card Service Fee (${ccFeePercent}%)`, quantity: 1, unit_price: ccFeeAmount, total: ccFeeAmount })
+    }
     if (allItems.length > 0) {
       await supabase.from('invoice_line_items').insert(
         allItems.map(i => ({
@@ -484,7 +494,8 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
           )}
 
           <div className="mt-6 border-t border-fp-border pt-4 space-y-2 max-w-xs ml-auto">
-            <div className="flex justify-between text-sm"><span className="text-fp-muted">Subtotal</span><span className="text-fp-text">${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-fp-muted">Subtotal</span><span className="text-fp-text">${lineSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+            {ccFeeAmount > 0 && <div className="flex justify-between text-sm"><span className="text-yellow-400">Credit Card Fee ({ccFeePercent}%)</span><span className="text-yellow-400">${ccFeeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>}
             {parseFloat(form.tax_percent) > 0 && <div className="flex justify-between text-sm"><span className="text-fp-muted">Tax ({form.tax_percent}%)</span><span className="text-fp-text">${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>}
             <div className="flex justify-between text-base font-bold border-t border-fp-border pt-2"><span className="text-fp-text">Total</span><span className="text-[#C8622A]">${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
           </div>

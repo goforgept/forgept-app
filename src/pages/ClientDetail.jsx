@@ -310,7 +310,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     setSavingClient(true)
     await supabase.from('clients').update({
       company: editForm.company, client_name: editForm.client_name, email: editForm.email, phone: editForm.phone,
-      industry: editForm.industry, address: editForm.address, city: editForm.city, state: editForm.state, zip: editForm.zip, notes: editForm.notes, store_id: editForm.store_id || null, net_terms: editForm.net_terms || 'NET 30',
+      industry: editForm.industry, address: editForm.address, city: editForm.city, state: editForm.state, zip: editForm.zip, notes: editForm.notes, store_id: editForm.store_id || null, net_terms: editForm.net_terms || 'NET 30', payment_method: editForm.payment_method || 'Default',
     }).eq('id', id)
     await fetchClient()
     setEditingClient(false)
@@ -586,6 +586,7 @@ const deleteMeeting = async (meetingId) => {
           {fullAddress && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Address</span><a href={`https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`} target="_blank" rel="noreferrer" className="text-fp-text text-sm hover:text-[#C8622A] transition-colors">{fullAddress}</a></div>}
           {client?.store_id && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Store ID</span><span className="text-fp-text text-sm font-mono">{client.store_id}</span></div>}
           {client?.net_terms && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Terms</span><span className="text-fp-text text-sm font-semibold">{client.net_terms}</span></div>}
+          {client?.payment_method && client.payment_method !== 'Default' && <div className="flex items-center gap-2"><span className="text-fp-muted text-xs uppercase tracking-wide">Payment</span><span className={`text-sm font-semibold ${client.payment_method === 'Credit Card' ? 'text-yellow-400' : 'text-fp-text'}`}>{client.payment_method}</span></div>}
         </div>
 
         {/* Tabs */}
@@ -1210,6 +1211,7 @@ const deleteMeeting = async (meetingId) => {
                 <div><label className="text-fp-muted text-xs mb-1 block">Industry</label><select value={editForm.industry || ''} onChange={e => setEditForm(p => ({ ...p, industry: e.target.value }))} className={inputClass}><option value="">Select industry</option>{INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}</select></div>
                 <div><label className="text-fp-muted text-xs mb-1 block">Store ID</label><input type="text" value={editForm.store_id || ''} onChange={e => setEditForm(p => ({ ...p, store_id: e.target.value }))} placeholder="e.g. STR-001" className={inputClass} /></div>
                 <div><label className="text-fp-muted text-xs mb-1 block">Payment Terms</label><select value={editForm.net_terms || 'NET 30'} onChange={e => setEditForm(p => ({ ...p, net_terms: e.target.value }))} className={inputClass}>{['Due on Receipt', 'NET 15', 'NET 30', 'NET 45', 'NET 60', 'NET 90'].map(t => <option key={t}>{t}</option>)}</select></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Payment Method</label><select value={editForm.payment_method || 'Default'} onChange={e => setEditForm(p => ({ ...p, payment_method: e.target.value }))} className={inputClass}>{['Default', 'Check', 'ACH', 'Credit Card'].map(t => <option key={t}>{t}</option>)}</select></div>
               </div>
               <div><label className="text-fp-muted text-xs mb-1 block">Street Address</label><input type="text" value={editForm.address || ''} onChange={e => setEditForm(p => ({ ...p, address: e.target.value }))} className={inputClass} /></div>
               <div className="grid grid-cols-3 gap-3">

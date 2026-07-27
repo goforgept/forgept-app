@@ -2,6 +2,22 @@ export default function InvoicingTab({ invoicingForm, setInvoicingForm, inputCla
   return (
     <div className="space-y-6">
       <div className="bg-fp-card rounded-xl p-6">
+        <h3 className="text-fp-text font-bold mb-1">Credit Card Surcharge</h3>
+        <p className="text-fp-muted text-sm mb-5">When a client's payment method is set to Credit Card, this fee is automatically added to their invoices.</p>
+        <div className="flex items-center gap-3 max-w-xs">
+          <input
+            type="number"
+            min="0"
+            max="20"
+            step="0.1"
+            value={invoicingForm.cc_fee_percent}
+            onChange={e => setInvoicingForm(p => ({ ...p, cc_fee_percent: e.target.value }))}
+            className={inputClass}
+          />
+          <span className="text-fp-muted text-sm whitespace-nowrap">% fee</span>
+        </div>
+      </div>
+      <div className="bg-fp-card rounded-xl p-6">
         <h3 className="text-fp-text font-bold mb-1">Payment Instructions</h3>
         <p className="text-fp-muted text-sm mb-5">These appear on every invoice PDF so clients know how to pay you.</p>
         <div className="space-y-4">
