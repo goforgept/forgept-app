@@ -48,14 +48,14 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     const { data: { user } } = await supabase.auth.getUser()
     const { data: prof } = await supabase
       .from('profiles')
-      .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type)')
+      .select('id, full_name, email, phone, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, dispatch_zone, payment_instructions_payable_to, payment_instructions_bank, payment_instructions_routing, payment_instructions_account, payment_instructions_zelle, payment_instructions_notes, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, organizations(org_type)')
       .eq('id', user.id)
       .single()
     setProfile(prof)
 
     const { data: inv } = await supabase
       .from('invoices')
-      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email)')
+      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email, clients(address, city, state, zip, phone))')
       .eq('id', id)
       .single()
     setInvoice(inv)
@@ -63,7 +63,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     if (inv?.service_ticket_id) {
       const { data: st } = await supabase
         .from('service_tickets')
-        .select('title, clients(company, client_name, email)')
+        .select('title, clients(company, client_name, email, address, city, state, zip, phone)')
         .eq('id', inv.service_ticket_id)
         .single()
       setTicketClient(st)
@@ -134,21 +134,56 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     doc.setFontSize(10); doc.setFont('helvetica', 'normal')
     doc.text(invoice?.invoice_number || '', pageWidth - 14, 28, { align: 'right' })
 
-    // Invoice info
-    doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-    doc.text(`Date: ${invoice?.issued_date ? new Date(invoice.issued_date).toLocaleDateString() : new Date().toLocaleDateString()}`, 14, 52)
-    if (invoice?.due_date) doc.text(`Due Date: ${new Date(invoice.due_date).toLocaleDateString()}`, 14, 60)
+    // FROM block (left side, below header)
+    const clientData = invoice?.proposals?.clients || ticketClient?.clients || null
+    const clientCompany = invoice?.proposals?.company || ticketClient?.clients?.company || ''
+    const clientName = invoice?.proposals?.client_name || ticketClient?.clients?.client_name || ''
+    const clientAddr = clientData?.address || ''
+    const clientCityStateZip = [clientData?.city, clientData?.state, clientData?.zip].filter(Boolean).join(', ')
+    const clientPhone = clientData?.phone || ''
 
-    // Bill To
-    doc.setFontSize(9); doc.setFont('helvetica', 'bold')
-    doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.text('BILL TO', pageWidth / 2, 52)
-    doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40)
-    doc.text(invoice?.proposals?.company || ticketClient?.clients?.company || '', pageWidth / 2, 59)
-    doc.text(invoice?.proposals?.client_name || ticketClient?.clients?.client_name || '', pageWidth / 2, 65)
+    let yPos = 48
+    doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text('FROM', 14, yPos)
+    yPos += 5
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(30, 30, 30)
+    doc.text(companyName, 14, yPos)
+    yPos += 5
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80)
+    if (profile?.bill_to_address) { doc.text(profile.bill_to_address, 14, yPos); yPos += 5 }
+    const orgCityStateZip = [profile?.bill_to_city, profile?.bill_to_state, profile?.bill_to_zip].filter(Boolean).join(', ')
+    if (orgCityStateZip) { doc.text(orgCityStateZip, 14, yPos); yPos += 5 }
+    if (profile?.phone) { doc.text(profile.phone, 14, yPos); yPos += 5 }
+    if (profile?.email) { doc.text(profile.email, 14, yPos); yPos += 5 }
+
+    // BILL TO block (right side)
+    const midX = pageWidth / 2
+    let btY = 48
+    doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text('BILL TO', midX, btY)
+    btY += 5
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9); doc.setTextColor(30, 30, 30)
+    if (clientCompany) { doc.text(clientCompany, midX, btY); btY += 5 }
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80)
+    if (clientName && clientName !== clientCompany) { doc.text(clientName, midX, btY); btY += 5 }
+    if (clientAddr) { doc.text(clientAddr, midX, btY); btY += 5 }
+    if (clientCityStateZip) { doc.text(clientCityStateZip, midX, btY); btY += 5 }
+    if (clientPhone) { doc.text(clientPhone, midX, btY); btY += 5 }
+
+    // Invoice date / due date (right-aligned in header)
+    const infoY = 48
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80)
+    doc.text(`Invoice Date: ${invoice?.issued_date ? new Date(invoice.issued_date + 'T12:00:00').toLocaleDateString() : new Date().toLocaleDateString()}`, pageWidth - 14, infoY, { align: 'right' })
+    if (invoice?.due_date) doc.text(`Due Date: ${new Date(invoice.due_date + 'T12:00:00').toLocaleDateString()}`, pageWidth - 14, infoY + 6, { align: 'right' })
+
+    // Divider
+    const blockBottom = Math.max(yPos, btY) + 4
+    doc.setDrawColor(220, 220, 220); doc.setLineWidth(0.3)
+    doc.line(14, blockBottom, pageWidth - 14, blockBottom)
+
+    yPos = blockBottom + 8
 
     // Description of Work
-    let yPos = 78
     const pdfDescription = descOverride !== undefined ? descOverride : (invoice?.description || '')
     if (pdfDescription) {
       const descLines = doc.splitTextToSize(pdfDescription, pageWidth - 32)
