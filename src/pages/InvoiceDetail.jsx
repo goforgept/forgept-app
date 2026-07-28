@@ -30,6 +30,8 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   const [copiedLink, setCopiedLink] = useState(false)
   const [editingDueDate, setEditingDueDate] = useState(false)
   const [dueDateValue, setDueDateValue] = useState('')
+  const [editingLineItems, setEditingLineItems] = useState(false)
+  const [editableItems, setEditableItems] = useState([])
 
   useEffect(() => {
     fetchAll()
@@ -46,7 +48,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
     const { data: inv } = await supabase
       .from('invoices')
-      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email)')
+      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email), service_tickets(title, clients(company, client_name, client_email))')
       .eq('id', id)
       .single()
     setInvoice(inv)
@@ -300,22 +302,24 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   }
 
   const sendInvoice = async () => {
-    if (!invoice?.proposals?.client_email) { alert('No client email on linked proposal.'); return }
+    const clientEmail = invoice?.proposals?.client_email || invoice?.service_tickets?.clients?.client_email
+    if (!clientEmail) { alert('No client email found on this invoice.'); return }
     setSendingInvoice(true)
     try {
       const doc = await generateInvoicePDF(descriptionValue)
       const pdfBase64 = doc.output('datauristring').split(',')[1]
 
       const { data: { session } } = await supabase.auth.getSession()
+      const clientName = invoice.proposals?.client_name || invoice.service_tickets?.clients?.client_name || 'there'
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           proposalId: invoice.proposal_id,
-          clientEmail: invoice.proposals.client_email,
-          clientName: invoice.proposals.client_name || 'there',
-          repName: invoice.proposals.rep_name || profile?.full_name || '',
-          repEmail: invoice.proposals.rep_email || profile?.email || '',
+          clientEmail,
+          clientName,
+          repName: invoice.proposals?.rep_name || profile?.full_name || '',
+          repEmail: invoice.proposals?.rep_email || profile?.email || '',
           companyName: profile?.company_name || '',
           proposalName: invoice.invoice_number,
           subject: sendForm.subject,
@@ -368,6 +372,37 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setEditingNotes(false)
   }
 
+  const saveLineItems = async () => {
+    const validItems = editableItems.filter(i => i.description?.trim())
+    await supabase.from('invoice_line_items').delete().eq('invoice_id', id)
+    if (validItems.length > 0) {
+      await supabase.from('invoice_line_items').insert(
+        validItems.map(i => ({
+          invoice_id: id,
+          description: i.description,
+          quantity: parseFloat(i.quantity) || 1,
+          unit_price: parseFloat(i.unit_price) || 0,
+          total: (parseFloat(i.quantity) || 1) * (parseFloat(i.unit_price) || 0)
+        }))
+      )
+    }
+    const newSubtotal = validItems.reduce((sum, i) => sum + ((parseFloat(i.quantity) || 1) * (parseFloat(i.unit_price) || 0)), 0)
+    const newTax = newSubtotal * ((invoice.tax_percent || 0) / 100)
+    const newTotal = newSubtotal + newTax
+    const newBalance = Math.max(0, newTotal - (invoice.amount_paid || 0))
+    await supabase.from('invoices').update({ subtotal: newSubtotal, tax_amount: newTax, total: newTotal, balance_due: newBalance }).eq('id', id)
+    setEditingLineItems(false)
+    fetchAll()
+  }
+
+  const deleteInvoice = async () => {
+    if (!window.confirm('Delete this invoice? This cannot be undone.')) return
+    await supabase.from('invoice_line_items').delete().eq('invoice_id', id)
+    await supabase.from('invoice_payments').delete().eq('invoice_id', id)
+    await supabase.from('invoices').delete().eq('id', id)
+    navigate('/invoices')
+  }
+
   const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   if (loading) return <div className="min-h-screen bg-fp-inset flex items-center justify-center"><p className="text-fp-text">Loading...</p></div>
@@ -403,10 +438,14 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                   ))}
                 </select>
               </div>
-              <p className="text-fp-muted">{invoice.proposals?.company} · {invoice.proposals?.client_name}</p>
-              <p className="text-fp-muted text-xs mt-0.5">{invoice.proposals?.proposal_name}</p>
+              <p className="text-fp-muted">{invoice.proposals?.company || invoice.service_tickets?.clients?.company} · {invoice.proposals?.client_name || invoice.service_tickets?.clients?.client_name}</p>
+              <p className="text-fp-muted text-xs mt-0.5">{invoice.proposals?.proposal_name || invoice.service_tickets?.title}</p>
             </div>
             <div className="flex gap-2">
+              <button onClick={deleteInvoice}
+                className="bg-fp-inset text-red-400 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-500/10 transition-colors">
+                Delete
+              </button>
               {squareConnected && !invoice?.square_invoice_id && (
                 <button onClick={sendToSquare} disabled={sendingToSquare}
                   className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
@@ -414,7 +453,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 </button>
               )}
               <button onClick={() => {
-                setSendForm({ subject: `Invoice ${invoice.invoice_number}`, message: `Hi ${invoice.proposals?.client_name || 'there'},\n\nPlease find your invoice attached. Payment instructions are included on the invoice.\n\nThank you for your business.\n\n${invoice.proposals?.rep_name || profile?.full_name || ''}` })
+                setSendForm({ subject: `Invoice ${invoice.invoice_number}`, message: `Hi ${invoice.proposals?.client_name || invoice.service_tickets?.clients?.client_name || 'there'},\n\nPlease find your invoice attached. Payment instructions are included on the invoice.\n\nThank you for your business.\n\n${invoice.proposals?.rep_name || profile?.full_name || ''}` })
                 setShowSendModal(true)
               }} className="bg-green-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
                 ✉ Send Invoice
@@ -499,36 +538,70 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
         {/* Line Items */}
         <div className="bg-fp-card rounded-xl p-6">
-          <h3 className="text-fp-text font-bold text-lg mb-4">Line Items</h3>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-fp-border">
-                <th className="text-fp-muted text-left py-2 pr-4 font-normal">Description</th>
-                <th className="text-fp-muted text-right py-2 pr-4 font-normal">Qty</th>
-                <th className="text-fp-muted text-right py-2 pr-4 font-normal">Unit Price</th>
-                <th className="text-fp-muted text-right py-2 font-normal">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lineItems.map(item => (
-                <tr key={item.id} className="border-b border-fp-border/50">
-                  <td className="text-fp-text py-3 pr-4">{item.description}</td>
-                  <td className="text-fp-muted py-3 pr-4 text-right">{item.quantity}</td>
-                  <td className="text-fp-muted py-3 pr-4 text-right">${(item.unit_price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  <td className="text-fp-text py-3 text-right">${(item.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                </tr>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-fp-text font-bold text-lg">Line Items</h3>
+            {!editingLineItems
+              ? <button onClick={() => { setEditableItems(lineItems.map(i => ({ ...i }))); setEditingLineItems(true) }}
+                  className="text-[#C8622A] text-sm hover:text-fp-text transition-colors">Edit</button>
+              : <div className="flex gap-2">
+                  <button onClick={() => setEditingLineItems(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">Cancel</button>
+                  <button onClick={saveLineItems} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors">Save</button>
+                </div>
+            }
+          </div>
+          {editingLineItems ? (
+            <div className="space-y-2">
+              <div className="grid grid-cols-12 gap-2 text-fp-muted text-xs pb-1 border-b border-fp-border">
+                <div className="col-span-6">Description</div>
+                <div className="col-span-2 text-right">Qty</div>
+                <div className="col-span-3 text-right">Unit Price</div>
+                <div className="col-span-1"></div>
+              </div>
+              {editableItems.map((item, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                  <input value={item.description || ''} onChange={e => setEditableItems(prev => prev.map((it, idx) => idx === i ? { ...it, description: e.target.value } : it))}
+                    className="col-span-6 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-sm focus:outline-none focus:border-fp-brand" placeholder="Description" />
+                  <input type="number" value={item.quantity ?? 1} onChange={e => setEditableItems(prev => prev.map((it, idx) => idx === i ? { ...it, quantity: e.target.value, total: (parseFloat(e.target.value) || 0) * (parseFloat(it.unit_price) || 0) } : it))}
+                    className="col-span-2 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-sm text-right focus:outline-none focus:border-fp-brand" />
+                  <input type="number" value={item.unit_price ?? 0} onChange={e => setEditableItems(prev => prev.map((it, idx) => idx === i ? { ...it, unit_price: e.target.value, total: (parseFloat(it.quantity) || 1) * (parseFloat(e.target.value) || 0) } : it))}
+                    className="col-span-3 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-sm text-right focus:outline-none focus:border-fp-brand" />
+                  <button onClick={() => setEditableItems(prev => prev.filter((_, idx) => idx !== i))} className="col-span-1 text-fp-muted hover:text-red-400 text-center transition-colors">×</button>
+                </div>
               ))}
-            </tbody>
-            <tfoot>
-              <tr><td colSpan="3" className="text-fp-muted pt-3 text-right font-semibold pr-4">Subtotal</td><td className="text-fp-text pt-3 text-right">${(invoice.subtotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
-              {invoice.tax_percent > 0 && <tr><td colSpan="3" className="text-fp-muted pt-1 text-right font-semibold pr-4">Tax ({invoice.tax_percent}%)</td><td className="text-fp-text pt-1 text-right">${(invoice.tax_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>}
-              <tr className="border-t border-fp-border"><td colSpan="3" className="text-fp-text pt-3 text-right font-bold pr-4">Total</td><td className="text-fp-text pt-3 text-right font-bold">${(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
-              {invoice.amount_paid > 0 && <>
-                <tr><td colSpan="3" className="text-fp-muted pt-1 text-right pr-4">Amount Paid</td><td className="text-green-400 pt-1 text-right">${(invoice.amount_paid || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
-                <tr><td colSpan="3" className="text-[#C8622A] pt-1 text-right font-bold pr-4">Balance Due</td><td className="text-[#C8622A] pt-1 text-right font-bold">${(invoice.balance_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
-              </>}
-            </tfoot>
-          </table>
+              <button onClick={() => setEditableItems(prev => [...prev, { description: '', quantity: 1, unit_price: 0, total: 0 }])}
+                className="text-[#C8622A] text-sm hover:text-fp-text transition-colors pt-1">+ Add Line</button>
+            </div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-fp-border">
+                  <th className="text-fp-muted text-left py-2 pr-4 font-normal">Description</th>
+                  <th className="text-fp-muted text-right py-2 pr-4 font-normal">Qty</th>
+                  <th className="text-fp-muted text-right py-2 pr-4 font-normal">Unit Price</th>
+                  <th className="text-fp-muted text-right py-2 font-normal">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineItems.map(item => (
+                  <tr key={item.id} className="border-b border-fp-border/50">
+                    <td className="text-fp-text py-3 pr-4">{item.description}</td>
+                    <td className="text-fp-muted py-3 pr-4 text-right">{item.quantity}</td>
+                    <td className="text-fp-muted py-3 pr-4 text-right">${(item.unit_price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    <td className="text-fp-text py-3 text-right">${(item.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr><td colSpan="3" className="text-fp-muted pt-3 text-right font-semibold pr-4">Subtotal</td><td className="text-fp-text pt-3 text-right">${(invoice.subtotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
+                {invoice.tax_percent > 0 && <tr><td colSpan="3" className="text-fp-muted pt-1 text-right font-semibold pr-4">Tax ({invoice.tax_percent}%)</td><td className="text-fp-text pt-1 text-right">${(invoice.tax_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>}
+                <tr className="border-t border-fp-border"><td colSpan="3" className="text-fp-text pt-3 text-right font-bold pr-4">Total</td><td className="text-fp-text pt-3 text-right font-bold">${(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
+                {invoice.amount_paid > 0 && <>
+                  <tr><td colSpan="3" className="text-fp-muted pt-1 text-right pr-4">Amount Paid</td><td className="text-green-400 pt-1 text-right">${(invoice.amount_paid || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
+                  <tr><td colSpan="3" className="text-[#C8622A] pt-1 text-right font-bold pr-4">Balance Due</td><td className="text-[#C8622A] pt-1 text-right font-bold">${(invoice.balance_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td></tr>
+                </>}
+              </tfoot>
+            </table>
+          )}
         </div>
 
         {/* Payment History */}
@@ -623,7 +696,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
           <div className="bg-fp-card rounded-2xl p-6 w-full max-w-lg">
             <h3 className="text-fp-text font-bold text-lg mb-1">Send Invoice</h3>
             <p className="text-fp-muted text-sm mb-5">
-              Sending to <span className="text-fp-text font-medium">{invoice.proposals?.client_email}</span> · PDF will be attached
+              Sending to <span className="text-fp-text font-medium">{invoice.proposals?.client_email || invoice.service_tickets?.clients?.client_email || 'no email on file'}</span> · PDF will be attached
             </p>
             <div className="space-y-4">
               <div>
