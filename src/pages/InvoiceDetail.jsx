@@ -33,6 +33,12 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   const [editingLineItems, setEditingLineItems] = useState(false)
   const [editableItems, setEditableItems] = useState([])
   const [ticketClient, setTicketClient] = useState(null)
+  const [editingInvoiceNumber, setEditingInvoiceNumber] = useState(false)
+  const [invoiceNumberValue, setInvoiceNumberValue] = useState('')
+  const [showBillToModal, setShowBillToModal] = useState(false)
+  const [billToProposals, setBillToProposals] = useState([])
+  const [billToTickets, setBillToTickets] = useState([])
+  const [billToTab, setBillToTab] = useState('proposals')
 
   useEffect(() => {
     fetchAll()
@@ -138,8 +144,8 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
     doc.text('BILL TO', pageWidth / 2, 52)
     doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40)
-    doc.text(invoice?.proposals?.company || '', pageWidth / 2, 59)
-    doc.text(invoice?.proposals?.client_name || '', pageWidth / 2, 65)
+    doc.text(invoice?.proposals?.company || ticketClient?.clients?.company || '', pageWidth / 2, 59)
+    doc.text(invoice?.proposals?.client_name || ticketClient?.clients?.client_name || '', pageWidth / 2, 65)
 
     // Description of Work
     let yPos = 78
@@ -413,6 +419,42 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     navigate('/invoices')
   }
 
+  const saveInvoiceNumber = async () => {
+    const trimmed = invoiceNumberValue.trim()
+    if (!trimmed) return
+    await supabase.from('invoices').update({ invoice_number: trimmed }).eq('id', id)
+    setInvoice(prev => ({ ...prev, invoice_number: trimmed }))
+    setEditingInvoiceNumber(false)
+  }
+
+  const openBillToModal = async () => {
+    const { data: props } = await supabase
+      .from('proposals')
+      .select('id, proposal_name, company, client_name')
+      .eq('org_id', profile.org_id)
+      .order('created_at', { ascending: false })
+    const { data: tickets } = await supabase
+      .from('service_tickets')
+      .select('id, ticket_number, title, clients(company, client_name)')
+      .eq('org_id', profile.org_id)
+      .neq('status', 'Cancelled')
+      .order('created_at', { ascending: false })
+    setBillToProposals(props || [])
+    setBillToTickets(tickets || [])
+    setShowBillToModal(true)
+  }
+
+  const assignBillTo = async (type, sourceId) => {
+    if (type === 'proposal') {
+      await supabase.from('invoices').update({ proposal_id: sourceId, service_ticket_id: null }).eq('id', id)
+    } else {
+      await supabase.from('invoices').update({ service_ticket_id: sourceId, proposal_id: null }).eq('id', id)
+    }
+    setShowBillToModal(false)
+    setTicketClient(null)
+    fetchAll()
+  }
+
   const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   if (loading) return <div className="min-h-screen bg-fp-inset flex items-center justify-center"><p className="text-fp-text">Loading...</p></div>
@@ -436,7 +478,21 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
           <div className="flex justify-between items-start">
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <h2 className="text-fp-text text-2xl font-bold">{invoice.invoice_number}</h2>
+                {editingInvoiceNumber ? (
+                  <div className="flex items-center gap-2">
+                    <input autoFocus value={invoiceNumberValue} onChange={e => setInvoiceNumberValue(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveInvoiceNumber(); if (e.key === 'Escape') setEditingInvoiceNumber(false) }}
+                      className="bg-fp-inset text-fp-text text-2xl font-bold border border-fp-border rounded-lg px-3 py-1 w-48 focus:outline-none focus:border-fp-brand" />
+                    <button onClick={saveInvoiceNumber} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors">Save</button>
+                    <button onClick={() => setEditingInvoiceNumber(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">✕</button>
+                  </div>
+                ) : (
+                  <button onClick={() => { setInvoiceNumberValue(invoice.invoice_number || ''); setEditingInvoiceNumber(true) }}
+                    className="group flex items-center gap-2">
+                    <h2 className="text-fp-text text-2xl font-bold">{invoice.invoice_number}</h2>
+                    <svg className="w-4 h-4 text-fp-muted opacity-0 group-hover:opacity-60 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                  </button>
+                )}
                 <select
                   value={invoice.status || 'Draft'}
                   onChange={e => updateStatus(e.target.value)}
@@ -448,7 +504,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                   ))}
                 </select>
               </div>
-              <p className="text-fp-muted">{invoice.proposals?.company || ticketClient?.clients?.company} · {invoice.proposals?.client_name || ticketClient?.clients?.client_name}</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-fp-muted">{invoice.proposals?.company || ticketClient?.clients?.company || <span className="italic">No customer set</span>}{(invoice.proposals?.client_name || ticketClient?.clients?.client_name) ? ` · ${invoice.proposals?.client_name || ticketClient?.clients?.client_name}` : ''}</p>
+                <button onClick={openBillToModal} className="text-[#C8622A] text-xs hover:text-fp-text transition-colors">Change</button>
+              </div>
               <p className="text-fp-muted text-xs mt-0.5">{invoice.proposals?.proposal_name || ticketClient?.title}</p>
             </div>
             <div className="flex gap-2">
@@ -729,6 +788,44 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                   {sendingInvoice ? 'Sending...' : 'Send Invoice →'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bill To / Customer Modal */}
+      {showBillToModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-fp-text font-bold text-lg">Change Bill To</h3>
+              <button onClick={() => setShowBillToModal(false)} className="text-fp-muted hover:text-fp-text text-xl leading-none">×</button>
+            </div>
+            <div className="flex gap-2 mb-4">
+              <button onClick={() => setBillToTab('proposals')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${billToTab === 'proposals' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
+                Proposals
+              </button>
+              <button onClick={() => setBillToTab('tickets')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${billToTab === 'tickets' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
+                Service Tickets
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 space-y-1">
+              {billToTab === 'proposals' && billToProposals.map(p => (
+                <button key={p.id} onClick={() => assignBillTo('proposal', p.id)}
+                  className={`w-full text-left px-4 py-3 rounded-lg hover:bg-fp-hover transition-colors ${invoice.proposal_id === p.id ? 'bg-fp-brand/10 border border-fp-brand/30' : 'bg-fp-inset'}`}>
+                  <p className="text-fp-text text-sm font-medium">{p.proposal_name}</p>
+                  <p className="text-fp-muted text-xs">{p.company}{p.client_name ? ` · ${p.client_name}` : ''}</p>
+                </button>
+              ))}
+              {billToTab === 'tickets' && billToTickets.map(t => (
+                <button key={t.id} onClick={() => assignBillTo('ticket', t.id)}
+                  className={`w-full text-left px-4 py-3 rounded-lg hover:bg-fp-hover transition-colors ${invoice.service_ticket_id === t.id ? 'bg-fp-brand/10 border border-fp-brand/30' : 'bg-fp-inset'}`}>
+                  <p className="text-fp-text text-sm font-medium">{t.ticket_number ? `${t.ticket_number} — ` : ''}{t.title}</p>
+                  <p className="text-fp-muted text-xs">{t.clients?.company}{t.clients?.client_name ? ` · ${t.clients.client_name}` : ''}</p>
+                </button>
+              ))}
             </div>
           </div>
         </div>
