@@ -46,7 +46,11 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   useEffect(() => { if (profile?.org_id) fetchAll() }, [id, profile?.org_id])
 
   const fetchAll = async () => {
-    const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', profile.org_id).single()
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('timezone, service_billing_mode, trip_fee_default, drive_time_rate_default')
+      .eq('id', profile.org_id)
+      .single()
     setOrgTimezone(orgData?.timezone || 'America/Chicago')
 
     const { data: ticketData } = await supabase
@@ -55,8 +59,38 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
       .eq('id', id)
       .single()
     setTicket(ticketData)
-    setLineItems(ticketData?.line_items || [])
-    setLaborItems(ticketData?.labor_items || [])
+
+    // Auto-inject default service fees when ticket has never had line items set
+    const billingMode = orgData?.service_billing_mode || 'none'
+    const tripFee = parseFloat(orgData?.trip_fee_default) || 0
+    const driveRate = parseFloat(orgData?.drive_time_rate_default) || 0
+
+    const existingLines = ticketData?.line_items
+    const existingLabor = ticketData?.labor_items
+
+    const defaultLines = []
+    const defaultLabor = []
+
+    if (existingLines === null || existingLines === undefined) {
+      if ((billingMode === 'trip_fee' || billingMode === 'both') && tripFee > 0) {
+        defaultLines.push({
+          id: crypto.randomUUID(), item_name: 'Trip Fee', quantity: 1, unit: 'ea',
+          your_cost_unit: '', markup_percent: 0, customer_price_unit: String(tripFee)
+        })
+      }
+    }
+
+    if (existingLabor === null || existingLabor === undefined) {
+      if ((billingMode === 'drive_time' || billingMode === 'both') && driveRate > 0) {
+        defaultLabor.push({
+          id: crypto.randomUUID(), role: 'Drive Time', quantity: 1, unit: 'hr',
+          your_cost: '', markup: 0, customer_price: String(driveRate)
+        })
+      }
+    }
+
+    setLineItems(existingLines ?? defaultLines)
+    setLaborItems(existingLabor ?? defaultLabor)
 
     const { data: techData } = await supabase
       .from('profiles').select('id, full_name, dispatch_zone')

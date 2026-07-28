@@ -30,6 +30,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   const [includedContractFees, setIncludedContractFees] = useState({})
   const [aiaWarning, setAiaWarning] = useState(false)
   const [clientPaymentMethod, setClientPaymentMethod] = useState('')
+  const [orgServiceBilling, setOrgServiceBilling] = useState({ mode: 'none', tripFee: 0, driveRate: 0 })
 
   useEffect(() => { if (profile?.org_id) fetchData() }, [profile?.org_id])
 
@@ -37,6 +38,19 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     const defaultRate = profile?.organizations?.default_tax_rate ?? ''
     setOrgDefaultTaxRate(String(defaultRate))
     setForm(prev => ({ ...prev, tax_percent: String(defaultRate || '0') }))
+
+    const { data: orgSvc } = await supabase
+      .from('organizations')
+      .select('service_billing_mode, trip_fee_default, drive_time_rate_default')
+      .eq('id', profile.org_id)
+      .single()
+    if (orgSvc) {
+      setOrgServiceBilling({
+        mode: orgSvc.service_billing_mode || 'none',
+        tripFee: parseFloat(orgSvc.trip_fee_default) || 0,
+        driveRate: parseFloat(orgSvc.drive_time_rate_default) || 0,
+      })
+    }
 
     const { data: props } = await supabase
       .from('proposals')
@@ -225,28 +239,40 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     setForm(prev => ({ ...prev, description: ticket.title || '', tax_percent: orgDefaultTaxRate || '0' }))
 
     const items = []
+    const { mode, tripFee, driveRate } = orgServiceBilling
 
     // Materials — use customer_price_unit (marked-up price)
-    ;(ticket.line_items || []).forEach(l => {
-      if (l.item_name) items.push({
-        description: l.item_name,
-        quantity: parseFloat(l.quantity) || 1,
-        unit_price: parseFloat(l.customer_price_unit) || 0,
-        total: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 1)
+    const ticketLines = ticket.line_items || []
+    if (ticketLines.length > 0) {
+      ticketLines.forEach(l => {
+        if (l.item_name) items.push({
+          description: l.item_name,
+          quantity: parseFloat(l.quantity) || 1,
+          unit_price: parseFloat(l.customer_price_unit) || 0,
+          total: (parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 1)
+        })
       })
-    })
+    } else if ((mode === 'trip_fee' || mode === 'both') && tripFee > 0) {
+      // Ticket was never opened in detail — inject default trip fee
+      items.push({ description: 'Trip Fee', quantity: 1, unit_price: tripFee, total: tripFee })
+    }
 
     // Labor — use customer_price (marked-up total for that labor line)
-    ;(ticket.labor_items || []).forEach(l => {
-      if (l.role) items.push({
-        description: l.role,
-        quantity: parseFloat(l.quantity) || 1,
-        unit_price: parseFloat(l.quantity) > 0
-          ? (parseFloat(l.customer_price) || 0) / parseFloat(l.quantity)
-          : parseFloat(l.customer_price) || 0,
-        total: parseFloat(l.customer_price) || 0
+    const ticketLabor = ticket.labor_items || []
+    if (ticketLabor.length > 0) {
+      ticketLabor.forEach(l => {
+        if (l.role) items.push({
+          description: l.role,
+          quantity: parseFloat(l.quantity) || 1,
+          unit_price: parseFloat(l.quantity) > 0
+            ? (parseFloat(l.customer_price) || 0) / parseFloat(l.quantity)
+            : parseFloat(l.customer_price) || 0,
+          total: parseFloat(l.customer_price) || 0
+        })
       })
-    })
+    } else if ((mode === 'drive_time' || mode === 'both') && driveRate > 0) {
+      items.push({ description: 'Drive Time', quantity: 1, unit_price: driveRate, total: driveRate })
+    }
 
     setLineItems(items)
   }
