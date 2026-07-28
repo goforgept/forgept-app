@@ -32,6 +32,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   const [dueDateValue, setDueDateValue] = useState('')
   const [editingLineItems, setEditingLineItems] = useState(false)
   const [editableItems, setEditableItems] = useState([])
+  const [ticketClient, setTicketClient] = useState(null)
 
   useEffect(() => {
     fetchAll()
@@ -48,10 +49,19 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
     const { data: inv } = await supabase
       .from('invoices')
-      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email), service_tickets(title, clients(company, client_name, client_email))')
+      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email)')
       .eq('id', id)
       .single()
     setInvoice(inv)
+
+    if (inv?.service_ticket_id) {
+      const { data: st } = await supabase
+        .from('service_tickets')
+        .select('title, clients(company, client_name, client_email)')
+        .eq('id', inv.service_ticket_id)
+        .single()
+      setTicketClient(st)
+    }
     setNotesValue(inv?.notes || '')
     setDescriptionValue(inv?.description || '')
     setDueDateValue(inv?.due_date || '')
@@ -302,7 +312,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   }
 
   const sendInvoice = async () => {
-    const clientEmail = invoice?.proposals?.client_email || invoice?.service_tickets?.clients?.client_email
+    const clientEmail = invoice?.proposals?.client_email || ticketClient?.clients?.client_email
     if (!clientEmail) { alert('No client email found on this invoice.'); return }
     setSendingInvoice(true)
     try {
@@ -310,7 +320,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
       const pdfBase64 = doc.output('datauristring').split(',')[1]
 
       const { data: { session } } = await supabase.auth.getSession()
-      const clientName = invoice.proposals?.client_name || invoice.service_tickets?.clients?.client_name || 'there'
+      const clientName = invoice.proposals?.client_name || ticketClient?.clients?.client_name || 'there'
       await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-proposal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
@@ -438,8 +448,8 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                   ))}
                 </select>
               </div>
-              <p className="text-fp-muted">{invoice.proposals?.company || invoice.service_tickets?.clients?.company} · {invoice.proposals?.client_name || invoice.service_tickets?.clients?.client_name}</p>
-              <p className="text-fp-muted text-xs mt-0.5">{invoice.proposals?.proposal_name || invoice.service_tickets?.title}</p>
+              <p className="text-fp-muted">{invoice.proposals?.company || ticketClient?.clients?.company} · {invoice.proposals?.client_name || ticketClient?.clients?.client_name}</p>
+              <p className="text-fp-muted text-xs mt-0.5">{invoice.proposals?.proposal_name || ticketClient?.title}</p>
             </div>
             <div className="flex gap-2">
               <button onClick={deleteInvoice}
@@ -453,7 +463,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 </button>
               )}
               <button onClick={() => {
-                setSendForm({ subject: `Invoice ${invoice.invoice_number}`, message: `Hi ${invoice.proposals?.client_name || invoice.service_tickets?.clients?.client_name || 'there'},\n\nPlease find your invoice attached. Payment instructions are included on the invoice.\n\nThank you for your business.\n\n${invoice.proposals?.rep_name || profile?.full_name || ''}` })
+                setSendForm({ subject: `Invoice ${invoice.invoice_number}`, message: `Hi ${invoice.proposals?.client_name || ticketClient?.clients?.client_name || 'there'},\n\nPlease find your invoice attached. Payment instructions are included on the invoice.\n\nThank you for your business.\n\n${invoice.proposals?.rep_name || profile?.full_name || ''}` })
                 setShowSendModal(true)
               }} className="bg-green-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
                 ✉ Send Invoice
@@ -696,7 +706,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
           <div className="bg-fp-card rounded-2xl p-6 w-full max-w-lg">
             <h3 className="text-fp-text font-bold text-lg mb-1">Send Invoice</h3>
             <p className="text-fp-muted text-sm mb-5">
-              Sending to <span className="text-fp-text font-medium">{invoice.proposals?.client_email || invoice.service_tickets?.clients?.client_email || 'no email on file'}</span> · PDF will be attached
+              Sending to <span className="text-fp-text font-medium">{invoice.proposals?.client_email || ticketClient?.clients?.client_email || 'no email on file'}</span> · PDF will be attached
             </p>
             <div className="space-y-4">
               <div>
