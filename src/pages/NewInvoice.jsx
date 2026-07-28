@@ -40,7 +40,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
     const { data: props } = await supabase
       .from('proposals')
-      .select('id, proposal_name, company, client_name, total_customer_value, labor_items')
+      .select('id, proposal_name, company, client_name, total_customer_value, labor_items, client_id, clients(net_terms, payment_method)')
       .eq('org_id', profile.org_id)
       .eq('status', 'Won')
       .order('created_at', { ascending: false })
@@ -48,7 +48,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
     const { data: tickets } = await supabase
       .from('service_tickets')
-      .select('id, ticket_number, title, status, line_items, labor_items, clients(company, client_name, payment_method)')
+      .select('id, ticket_number, title, status, line_items, labor_items, clients(company, client_name, payment_method, net_terms)')
       .eq('org_id', profile.org_id)
       .neq('status', 'Cancelled')
       .order('created_at', { ascending: false })
@@ -60,6 +60,18 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       setForm(prev => ({ ...prev, proposal_id: preId }))
       loadProposalItems(preId, props || [])
     }
+  }
+
+  const applyClientTerms = (clientData) => {
+    if (!clientData) return
+    if (clientData.net_terms) {
+      const termDays = clientData.net_terms === 'Due on Receipt' ? 0
+        : parseInt(clientData.net_terms.replace('NET ', '')) || 30
+      const due = new Date()
+      due.setDate(due.getDate() + termDays)
+      setForm(prev => ({ ...prev, due_date: due.toISOString().split('T')[0] }))
+    }
+    setClientPaymentMethod(clientData.payment_method || '')
   }
 
   const loadProposalItems = async (proposalId, propsList) => {
@@ -114,14 +126,9 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       // Auto-set due date from client NET terms
       if (jobData.client_id) {
         const { data: clientData } = await supabase.from('clients').select('net_terms, payment_method').eq('id', jobData.client_id).single()
-        if (clientData?.net_terms) {
-          const termDays = clientData.net_terms === 'Due on Receipt' ? 0
-            : parseInt(clientData.net_terms.replace('NET ', '')) || 30
-          const due = new Date()
-          due.setDate(due.getDate() + termDays)
-          setForm(prev => ({ ...prev, due_date: due.toISOString().split('T')[0] }))
-        }
-        setClientPaymentMethod(clientData?.payment_method || '')
+        applyClientTerms(clientData)
+      } else {
+        applyClientTerms(prop?.clients)
       }
 
       const { data: coData } = await supabase
@@ -160,7 +167,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       })
     } else {
       setIncludedCOs([])
-      setClientPaymentMethod('')
+      applyClientTerms(prop?.clients)
     }
 
     setLineItems(items)
@@ -214,7 +221,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
     if (!ticket) { setLineItems([]); setClientPaymentMethod(''); return }
 
-    setClientPaymentMethod(ticket.clients?.payment_method || '')
+    applyClientTerms(ticket.clients)
     setForm(prev => ({ ...prev, description: ticket.title || '', tax_percent: orgDefaultTaxRate || '0' }))
 
     const items = []

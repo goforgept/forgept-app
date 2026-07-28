@@ -18,7 +18,7 @@ function JobPOList({ proposalId }) {
   if (pos.length === 0) return (
     <div className="text-center py-8 border-2 border-dashed border-fp-border rounded-xl">
       <p className="text-fp-muted">No purchase orders yet.</p>
-      <p className="text-fp-muted text-xs mt-1">Generate POs from the linked proposal's BOM tab.</p>
+      <p className="text-fp-muted text-xs mt-1">Generate POs from the BOM items above.</p>
     </div>
   )
 
@@ -46,6 +46,26 @@ function JobPOList({ proposalId }) {
 }
 
 export default function POTab({ lineItems, selectedForPO, setSelectedForPO, job, onOpenPOModal }) {
+  const [allocations, setAllocations] = useState([])
+
+  useEffect(() => {
+    if (!job?.id) return
+    supabase.from('job_inventory_allocations')
+      .select('bom_line_item_id, status, quantity_reserved, quantity_fulfilled, inventory_items(description)')
+      .eq('job_id', job.id)
+      .in('status', ['reserved', 'fulfilled'])
+      .then(({ data }) => setAllocations(data || []))
+  }, [job?.id])
+
+  const getAlloc = (itemId) => allocations.find(a => a.bom_line_item_id === itemId) || null
+
+  // Items that are sourced from inventory can't also go on a PO
+  const isFromInventory = (itemId) => !!getAlloc(itemId)
+
+  const orderable = lineItems.filter(l =>
+    (!l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing') && !isFromInventory(l.id)
+  )
+
   return (
     <div className="bg-fp-card rounded-xl p-6">
       <div className="flex justify-between items-center mb-5">
@@ -66,9 +86,8 @@ export default function POTab({ lineItems, selectedForPO, setSelectedForPO, job,
               <tr className="border-b border-fp-border">
                 <th className="py-2 pr-2 w-8">
                   <input type="checkbox" className="accent-fp-brand"
-                    checked={lineItems.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing').every(l => selectedForPO.has(l.id)) && lineItems.some(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')}
+                    checked={orderable.length > 0 && orderable.every(l => selectedForPO.has(l.id))}
                     onChange={() => {
-                      const orderable = lineItems.filter(l => !l.po_status || l.po_status === 'Confirmed' || l.po_status === 'Needs Pricing')
                       const allSelected = orderable.every(l => selectedForPO.has(l.id))
                       setSelectedForPO(prev => {
                         const next = new Set(prev)
@@ -85,10 +104,14 @@ export default function POTab({ lineItems, selectedForPO, setSelectedForPO, job,
             <tbody>
               {lineItems.map(item => {
                 const isOrdered = item.po_status === 'PO Sent' || item.po_status === 'Received'
+                const alloc = getAlloc(item.id)
+                const fromInventory = !!alloc
+                const invFulfilled = alloc?.status === 'fulfilled'
+
                 return (
                   <tr key={item.id} className={`border-b border-fp-border/50 ${selectedForPO.has(item.id) ? 'bg-[#C8622A]/5' : ''}`}>
                     <td className="pr-2 py-3">
-                      {!isOrdered && (
+                      {!isOrdered && !fromInventory && (
                         <input type="checkbox" className="accent-fp-brand cursor-pointer"
                           checked={selectedForPO.has(item.id)}
                           onChange={() => setSelectedForPO(prev => {
@@ -98,15 +121,29 @@ export default function POTab({ lineItems, selectedForPO, setSelectedForPO, job,
                           })} />
                       )}
                     </td>
-                    <td className="py-3 pr-4"><p className="text-fp-text text-sm">{item.item_name}</p>{item.part_number_sku && <p className="text-fp-muted text-xs">{item.part_number_sku}</p>}</td>
+                    <td className="py-3 pr-4">
+                      <p className="text-fp-text text-sm">{item.item_name}</p>
+                      {item.part_number_sku && <p className="text-fp-muted text-xs">{item.part_number_sku}</p>}
+                      {fromInventory && (
+                        <p className="text-xs text-fp-muted mt-0.5">
+                          from: <span className="font-medium">{alloc.inventory_items?.description || 'inventory'}</span>
+                        </p>
+                      )}
+                    </td>
                     <td className="text-fp-muted py-3 pr-4 text-sm">{item.vendor || '—'}</td>
                     <td className="text-fp-text py-3 pr-4 text-sm">{item.quantity} {item.unit}</td>
                     <td className="text-fp-text py-3 pr-4 text-sm">${fmt((item.your_cost_unit || 0) * (item.quantity || 0))}</td>
                     <td className="py-3 pr-4">{item.po_number ? <span className="text-fp-muted text-xs font-mono">{item.po_number}</span> : <span className="text-fp-muted">—</span>}</td>
                     <td className="py-3">
-                      <span className={`text-xs px-2 py-1 rounded font-semibold ${item.po_status === 'Received' ? 'bg-green-500/20 text-green-400' : item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-fp-inset text-fp-muted'}`}>
-                        {item.po_status || 'Not Ordered'}
-                      </span>
+                      {fromInventory ? (
+                        <span className={`text-xs px-2 py-1 rounded font-semibold ${invFulfilled ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                          {invFulfilled ? 'Fulfilled from Stock' : 'In Stock / Spoken For'}
+                        </span>
+                      ) : (
+                        <span className={`text-xs px-2 py-1 rounded font-semibold ${item.po_status === 'Received' ? 'bg-green-500/20 text-green-400' : item.po_status === 'PO Sent' ? 'bg-blue-500/20 text-blue-400' : 'bg-fp-inset text-fp-muted'}`}>
+                          {item.po_status || 'Not Ordered'}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 )

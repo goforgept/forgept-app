@@ -147,11 +147,16 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
       yPos += descLines.length * 5.5 + 10
     }
 
+    // Separate CC fee line items from regular line items
+    const ccFeeItems = lineItems.filter(i => i.description?.startsWith('Credit Card Service Fee'))
+    const regularItems = lineItems.filter(i => !i.description?.startsWith('Credit Card Service Fee'))
+    const ccFeeTotal = ccFeeItems.reduce((s, i) => s + (i.total || 0), 0)
+
     // Line items table
     autoTable(doc, {
       startY: yPos,
       head: [['Description', 'Qty', 'Unit Price', 'Total']],
-      body: lineItems.map(item => [
+      body: regularItems.map(item => [
         item.description,
         item.quantity,
         `$${(item.unit_price || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
@@ -164,12 +169,21 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
     yPos = doc.lastAutoTable.finalY + 8
 
-    // Subtotal / tax / total
+    // Subtotal / CC fee / tax / total
     const col = pageWidth - 14
+    const lineSubtotal = regularItems.reduce((s, i) => s + (i.total || 0), 0)
     doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80)
     doc.text('Subtotal:', col - 60, yPos, { align: 'right' })
-    doc.text(`$${(invoice?.subtotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, col, yPos, { align: 'right' })
+    doc.text(`$${lineSubtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, col, yPos, { align: 'right' })
     yPos += 7
+
+    if (ccFeeTotal > 0) {
+      doc.setTextColor(180, 130, 0)
+      doc.text(`${ccFeeItems[0]?.description || 'Credit Card Service Fee'}:`, col - 60, yPos, { align: 'right' })
+      doc.text(`$${ccFeeTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, col, yPos, { align: 'right' })
+      doc.setTextColor(80, 80, 80)
+      yPos += 7
+    }
 
     if (invoice?.tax_percent > 0) {
       doc.text(`Tax (${invoice.tax_percent}%):`, col - 60, yPos, { align: 'right' })
