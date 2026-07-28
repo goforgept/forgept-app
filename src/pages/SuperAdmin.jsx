@@ -328,6 +328,7 @@ export default function SuperAdmin() {
   const [allProposals, setAllProposals] = useState([])
   const [allClients, setAllClients] = useState([])
   const [expandedOrg, setExpandedOrg] = useState(null)
+  const [selectedOrg, setSelectedOrg] = useState(null)
   const [orgNotes, setOrgNotes] = useState({})
   const [savingNote, setSavingNote] = useState(null)
   const [noteSaved, setNoteSaved] = useState(null)
@@ -903,11 +904,264 @@ export default function SuperAdmin() {
 
         {/* Organizations */}
         {activeTab === 'orgs' && (
+          <div>
+          {/* ── Org Detail View ── */}
+          {selectedOrg ? (() => {
+            const org = orgs.find(o => o.id === selectedOrg) || selectedOrg
+            const admin = getOrgAdmin(org.id)
+            const members = getOrgProfiles(org.id)
+            const health = getOrgHealth(org.id)
+            const stats = getOrgStats(org.id)
+            const isEditing = editingOrg === org.id
+            const status = org.status || 'active'
+            if (!orgDetail[org.id] && !loadingDetail) fetchOrgDetail(org.id)
+            return (
+              <div className="space-y-4">
+                {/* Header */}
+                <div className="bg-[#1a2d45] rounded-xl p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <button onClick={() => { setSelectedOrg(null); setEditingOrg(null) }} className="mt-1 text-[#8A9AB0] hover:text-white transition-colors text-sm">← Back</button>
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${health.dot}`} />
+                          <h3 className="text-white font-bold text-xl">{org.name}</h3>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>{org.org_type || 'integrator'}</span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : status === 'suspended' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>{status}</span>
+                          <span className={`text-xs ${health.labelColor}`}>{health.label}</span>
+                        </div>
+                        <p className="text-[#8A9AB0] text-sm mt-1">{admin?.full_name || '—'} · {admin?.email || '—'} · {members.length} users</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      <button onClick={() => isEditing ? setEditingOrg(null) : startEditingOrg(org)} className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs hover:bg-[#3a4d65] transition-colors">{isEditing ? 'Cancel Edit' : 'Edit Settings'}</button>
+                      {status === 'active' && <button onClick={() => suspendOrg(org.id)} className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-colors">Suspend</button>}
+                      {status === 'suspended' && <button onClick={() => reactivateOrg(org.id)} className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-green-500/30 transition-colors">Reactivate</button>}
+                      <button onClick={() => { setDeleteModal(org); setDeleteConfirmText('') }} className="bg-red-900/30 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-900/50 transition-colors">Delete</button>
+                    </div>
+                  </div>
+
+                  {/* Stat cards */}
+                  <div className="grid grid-cols-4 gap-3 mt-5">
+                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Total Proposals</p><p className="text-white text-xl font-bold">{stats.total}</p></div>
+                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Won</p><p className="text-green-400 text-xl font-bold">{stats.won}</p></div>
+                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Clients</p><p className="text-white text-xl font-bold">{stats.clients}</p></div>
+                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Won Value</p><p className="text-[#C8622A] text-xl font-bold">${stats.wonValue.toLocaleString()}</p></div>
+                  </div>
+                </div>
+
+                {/* Users */}
+                <div className="bg-[#1a2d45] rounded-xl p-5">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Users</p>
+                  <div className="space-y-2">
+                    {members.map(u => (
+                      <div key={u.id} className="flex items-center justify-between bg-[#0F1C2E] rounded-lg px-4 py-3 border border-[#2a3d55]">
+                        <div>
+                          <p className="text-white text-sm font-medium">{u.full_name || '—'}</p>
+                          <p className="text-[#8A9AB0] text-xs">{u.email} · {u.role}</p>
+                        </div>
+                        <button onClick={() => impersonateUser(org, u)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">Impersonate</button>
+                      </div>
+                    ))}
+                    {members.length === 0 && <p className="text-[#8A9AB0] text-sm">No users yet.</p>}
+                  </div>
+                </div>
+
+                {/* Recent Proposals */}
+                {stats.recentProps.length > 0 && (
+                  <div className="bg-[#1a2d45] rounded-xl p-5">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Recent Proposals</p>
+                    <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] overflow-hidden">
+                      <table className="w-full text-xs">
+                        <thead><tr className="border-b border-[#2a3d55]">
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Name</th>
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Status</th>
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Value</th>
+                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Date</th>
+                        </tr></thead>
+                        <tbody>
+                          {stats.recentProps.map(prop => (
+                            <tr key={prop.id} className="border-b border-[#2a3d55]/30 last:border-0">
+                              <td className="text-white py-2 px-3">{prop.proposal_name || '—'}</td>
+                              <td className="py-2 px-3"><span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${getProposalStatusColor(prop.status)}`}>{prop.status}</span></td>
+                              <td className="text-[#8A9AB0] py-2 px-3">{prop.proposal_value ? `$${Number(prop.proposal_value).toLocaleString()}` : '—'}</td>
+                              <td className="text-[#8A9AB0] py-2 px-3">{prop.created_at ? new Date(prop.created_at).toLocaleDateString() : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Activity */}
+                {loadingDetail === org.id ? (
+                  <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm">Loading activity...</p></div>
+                ) : orgDetail[org.id]?.activities?.length > 0 && (
+                  <div className="bg-[#1a2d45] rounded-xl p-5">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Recent Activity</p>
+                    <div className="space-y-2">
+                      {orgDetail[org.id].activities.map(a => (
+                        <div key={a.id} className="flex gap-3 items-start">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#C8622A] mt-1.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-white text-xs">{a.description || a.type}</p>
+                            <p className="text-[#8A9AB0] text-xs">{a.created_at ? new Date(a.created_at).toLocaleDateString() : ''}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Billing */}
+                <div className="bg-[#1a2d45] rounded-xl p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Billing</p>
+                    <div className="flex gap-2">
+                      {!org.stripe_customer_id && <button onClick={() => openStripeModal(org)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">Create Stripe Sub</button>}
+                      <button onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">{editingBilling === org.id ? 'Cancel' : 'Edit Billing'}</button>
+                    </div>
+                  </div>
+                  {editingBilling === org.id ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label>
+                          <select value={billingForm.plan} onChange={e => setBillingForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                            {PLANS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[#8A9AB0] text-xs mb-1 block">Status</label>
+                          <select value={billingForm.billing_status} onChange={e => setBillingForm(p => ({ ...p, billing_status: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                            {['trial', 'active', 'past_due', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[#8A9AB0] text-xs mb-1 block">Monthly Rate ($)</label>
+                          <input type="number" value={billingForm.monthly_rate} onChange={e => setBillingForm(p => ({ ...p, monthly_rate: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                        </div>
+                        <div>
+                          <label className="text-[#8A9AB0] text-xs mb-1 block">Trial Ends</label>
+                          <input type="date" value={billingForm.trial_ends_at} onChange={e => setBillingForm(p => ({ ...p, trial_ends_at: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                        </div>
+                      </div>
+                      <button onClick={() => updateBilling(org.id)} className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save Billing</button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Plan</p><p className="text-white text-sm font-semibold">{org.plan || 'Trial'}</p></div>
+                      <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Status</p><span className={`text-xs font-semibold px-2 py-0.5 rounded ${getBillingStatusColor(org.billing_status || 'trial')}`}>{org.billing_status || 'trial'}</span></div>
+                      <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Rate</p><p className="text-white text-sm font-semibold">${org.monthly_rate || 0}/mo</p></div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Feature Settings */}
+                {isEditing && (
+                  <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Feature Settings</p>
+                    <div>
+                      <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">Org Type</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {ORG_TYPES.map(type => (
+                          <button key={type.value} onClick={() => setOrgForm(p => ({ ...p, org_type: type.value }))}
+                            className={`p-3 rounded-lg border text-left transition-colors ${orgForm.org_type === type.value ? 'border-[#C8622A] bg-[#C8622A]/10' : 'border-[#2a3d55] bg-[#0F1C2E] hover:border-[#3a4d65]'}`}>
+                            <p className={`text-sm font-semibold ${orgForm.org_type === type.value ? 'text-[#C8622A]' : 'text-white'}`}>{type.label}</p>
+                            <p className="text-[#8A9AB0] text-xs mt-0.5">{type.desc}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {Object.entries(
+                      [
+                        { key: 'feature_proposals', label: 'Proposals', group: 'Core' },
+                        { key: 'feature_crm', label: 'CRM', group: 'Core' },
+                        { key: 'feature_send_proposal', label: 'Send Proposal', group: 'Core' },
+                        { key: 'feature_purchase_orders', label: 'Purchase Orders', group: 'Core' },
+                        { key: 'feature_invoices', label: 'Invoices', group: 'Core' },
+                        { key: 'feature_site_photos', label: 'Site Photos', group: 'Core' },
+                        { key: 'feature_ai_email', label: 'AI Email', group: 'AI Tools' },
+                        { key: 'feature_ai_bom', label: 'AI BOM', group: 'AI Tools' },
+                        { key: 'feature_drawing_reader', label: 'Drawing Reader', group: 'AI Tools' },
+                        { key: 'feature_spec_reader', label: 'Spec Reader', group: 'AI Tools' },
+                        { key: 'feature_drawing_tool', label: 'Designer', group: 'Designer' },
+                        { key: 'feature_designer_only', label: 'Designer Only Mode', group: 'Designer' },
+                        { key: 'feature_api', label: 'API Access', group: 'Other' },
+                        { key: 'feature_embed', label: 'Embedded Designer', group: 'Other', sub: true, requires: 'feature_api' },
+                        { key: 'feature_regions', label: 'Regions', group: 'Other' },
+                        { key: 'feature_compliance_fields', label: 'Compliance Fields', group: 'Other' },
+                        { key: 'feature_inventory', label: 'Inventory Management', group: 'Other' },
+                      ].reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc }, {})
+                    ).map(([group, flags]) => (
+                      <div key={group}>
+                        <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">{group}</p>
+                        <div className="divide-y divide-[#2a3d55] border border-[#2a3d55] rounded-lg overflow-hidden">
+                          {flags.map(flag => {
+                            const locked = flag.requires && !orgForm[flag.requires]
+                            return (
+                              <div key={flag.key} className={`flex items-center justify-between py-2.5 bg-[#0F1C2E] ${flag.sub ? 'pl-7 pr-3 border-l-2 border-[#C8622A]/20' : 'px-3'}`}>
+                                <span className={`text-sm ${locked ? 'text-[#4a5d75]' : 'text-white'}`}>{flag.label}</span>
+                                <button disabled={locked}
+                                  onClick={() => setOrgForm(p => {
+                                    const next = { ...p, [flag.key]: !p[flag.key] }
+                                    if (flag.key === 'feature_designer_only' && !p.feature_designer_only) next.feature_drawing_tool = true
+                                    if (flag.key === 'feature_api' && p.feature_api) next.feature_embed = false
+                                    return next
+                                  })}
+                                  className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${orgForm[flag.key] ? 'bg-[#C8622A]' : 'bg-[#4B5563]'}`}>
+                                  <span className={`inline-block w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${orgForm[flag.key] ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                    {orgForm.feature_drawing_tool && (
+                      <div>
+                        <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">Designer — Allowed Manufacturers</p>
+                        <DesignerMfrPicker selected={orgForm.designer_allowed_manufacturers || []} onChange={v => setOrgForm(p => ({ ...p, designer_allowed_manufacturers: v }))} />
+                      </div>
+                    )}
+                    {orgForm.feature_drawing_tool && (
+                      <div>
+                        <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">Designer — Enabled Industries</p>
+                        <DesignerIndustryPicker selected={orgForm.designer_enabled_industries || []} onChange={v => setOrgForm(p => ({ ...p, designer_enabled_industries: v }))} />
+                      </div>
+                    )}
+                    <CatalogAccessPicker selected={orgForm.enabled_catalogs || []} onChange={v => setOrgForm(p => ({ ...p, enabled_catalogs: v }))} />
+                    <div className="flex justify-end pt-2">
+                      <button onClick={() => saveOrgSettings(org.id)} className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save Settings</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div className="bg-[#1a2d45] rounded-xl p-5">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Notes</p>
+                  <textarea
+                    value={orgNotes[org.id] || ''}
+                    onChange={e => setOrgNotes(prev => ({ ...prev, [org.id]: e.target.value }))}
+                    placeholder="Add private notes about this org..."
+                    rows={3}
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none placeholder-[#4a5d75]"
+                  />
+                  <div className="flex items-center justify-end gap-3 mt-2">
+                    {noteSaved === org.id && <span className="text-green-400 text-xs font-semibold">Saved!</span>}
+                    <button onClick={() => saveOrgNote(org.id)} disabled={savingNote === org.id} className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingNote === org.id ? 'Saving...' : 'Save Note'}</button>
+                  </div>
+                </div>
+              </div>
+            )
+          })() : (
+          /* ── Org Card Grid ── */
           <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
-                <h3 className="text-white font-bold text-lg">All Organizations</h3>
-                <span className="text-[#8A9AB0] text-sm">{orgs.length}</span>
+                <h3 className="text-white font-bold text-lg">Organizations</h3>
+                <span className="bg-[#2a3d55] text-[#8A9AB0] text-xs font-semibold px-2 py-0.5 rounded-full">{orgs.length}</span>
               </div>
               <input
                 type="text"
@@ -918,7 +1172,7 @@ export default function SuperAdmin() {
               />
             </div>
             {loading ? <p className="text-[#8A9AB0]">Loading...</p> : orgs.length === 0 ? <p className="text-[#8A9AB0]">No organizations yet.</p> : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {orgs.filter(o => {
                   if (!orgSearch) return true
                   const q = orgSearch.toLowerCase()
@@ -928,293 +1182,38 @@ export default function SuperAdmin() {
                   const admin = getOrgAdmin(org.id)
                   const memberCount = getOrgProfiles(org.id).length
                   const status = org.status || 'active'
-                  const isEditing = editingOrg === org.id
-                  const isExpanded = expandedOrg === org.id
                   const health = getOrgHealth(org.id)
                   const stats = getOrgStats(org.id)
 
                   return (
-                    <div key={org.id} className="border border-[#2a3d55] rounded-xl p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${health.dot}`} />
-                            <p className="text-white font-semibold">{org.name}</p>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>{org.org_type || 'integrator'}</span>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : status === 'suspended' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>{status}</span>
-                            <span className={`text-xs ${health.labelColor}`}>{health.label}</span>
-                          </div>
-                          <p className="text-[#8A9AB0] text-xs">{admin?.full_name || '—'} · {admin?.email || '—'} · {memberCount} users</p>
-                          <div className="flex gap-1.5 mt-1.5 flex-wrap items-center">
-                            {org.feature_crm && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">CRM</span>}
-                            {org.feature_send_proposal && <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/15 text-green-400 font-medium">Send</span>}
-                            {org.feature_ai_email && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">AI Email</span>}
-                            {org.feature_ai_bom && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">AI BOM</span>}
-                            {org.feature_drawing_tool && <span className="text-xs px-1.5 py-0.5 rounded bg-[#C8622A]/15 text-[#C8622A] font-medium">Designer</span>}
-                            {org.feature_drawing_reader && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">Draw Reader</span>}
-                            {org.feature_spec_reader && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">Spec Reader</span>}
-                            {org.feature_proposals === false && <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-medium">No Proposals</span>}
-                            {org.feature_purchase_orders === false && <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-medium">No POs</span>}
-                            <span className="text-[#4a5d75] text-xs">·</span>
-                            <span className="text-xs text-[#8A9AB0]">{stats.total} proposals</span>
-                            <span className="text-[#4a5d75] text-xs">·</span>
-                            <span className="text-xs text-[#8A9AB0]">{stats.clients} clients</span>
-                            {stats.last30 > 0 && <><span className="text-[#4a5d75] text-xs">·</span><span className="text-xs text-green-400">{stats.last30} last 30d</span></>}
-                          </div>
-                        </div>
-                        <div className="flex gap-2 flex-wrap justify-end">
-                          <button onClick={() => toggleExpandedOrg(org.id)} className={`px-3 py-1 rounded text-xs font-semibold transition-colors ${isExpanded ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/40' : 'bg-[#0F1C2E] text-[#8A9AB0] border border-[#2a3d55] hover:text-white'}`}>{isExpanded ? 'Hide Details' : 'Details'}</button>
-                          <button onClick={() => isEditing ? setEditingOrg(null) : startEditingOrg(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">{isEditing ? 'Cancel' : 'Edit Settings'}</button>
-                          {status === 'active' && <button onClick={() => suspendOrg(org.id)} className="bg-red-500/20 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-500/30 transition-colors">Suspend</button>}
-                          {status === 'suspended' && <button onClick={() => reactivateOrg(org.id)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">Reactivate</button>}
-                          <button onClick={() => { setDeleteModal(org); setDeleteConfirmText('') }} className="bg-red-900/30 text-red-400 px-3 py-1 rounded text-xs font-semibold hover:bg-red-900/50 transition-colors">Delete</button>
-                        </div>
+                    <div key={org.id} onClick={() => { setSelectedOrg(org.id); setEditingOrg(null); fetchOrgDetail(org.id) }}
+                      className="bg-[#0F1C2E] border border-[#2a3d55] rounded-xl p-4 cursor-pointer hover:border-[#C8622A]/40 transition-all">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${health.dot}`} />
+                        <p className="text-white font-semibold text-sm">{org.name}</p>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>{org.org_type || 'integrator'}</span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : status === 'suspended' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>{status}</span>
                       </div>
-
-                      {isEditing && (
-                        <div className="mt-4 pt-4 border-t border-[#2a3d55] space-y-4">
-                          <div>
-                            <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">Org Type</label>
-                            <div className="grid grid-cols-3 gap-2">
-                              {ORG_TYPES.map(type => (
-                                <button key={type.value} onClick={() => setOrgForm(p => ({ ...p, org_type: type.value }))}
-                                  className={`p-3 rounded-lg border text-left transition-colors ${orgForm.org_type === type.value ? 'border-[#C8622A] bg-[#C8622A]/10' : 'border-[#2a3d55] bg-[#0F1C2E] hover:border-[#3a4d65]'}`}>
-                                  <p className={`text-sm font-semibold ${orgForm.org_type === type.value ? 'text-[#C8622A]' : 'text-white'}`}>{type.label}</p>
-                                  <p className="text-[#8A9AB0] text-xs mt-0.5">{type.desc}</p>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="space-y-4">
-                            <label className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Feature Access</label>
-
-                            {Object.entries(
-                              [
-                                { key: 'feature_proposals',      label: 'Proposals',          group: 'Core' },
-                                { key: 'feature_crm',            label: 'CRM',                group: 'Core' },
-                                { key: 'feature_send_proposal',  label: 'Send Proposal',      group: 'Core' },
-                                { key: 'feature_purchase_orders',label: 'Purchase Orders',    group: 'Core' },
-                                { key: 'feature_invoices',       label: 'Invoices',           group: 'Core' },
-                                { key: 'feature_site_photos',    label: 'Site Photos',        group: 'Core' },
-                                { key: 'feature_ai_email',       label: 'AI Email',           group: 'AI Tools' },
-                                { key: 'feature_ai_bom',         label: 'AI BOM',             group: 'AI Tools' },
-                                { key: 'feature_drawing_reader', label: 'Drawing Reader',     group: 'AI Tools' },
-                                { key: 'feature_spec_reader',    label: 'Spec Reader',        group: 'AI Tools' },
-                                { key: 'feature_drawing_tool',   label: 'Designer',           group: 'Designer' },
-                                { key: 'feature_designer_only',  label: 'Designer Only Mode', group: 'Designer' },
-                                { key: 'feature_api',            label: 'API Access',         group: 'Other' },
-                                { key: 'feature_embed',          label: 'Embedded Designer',  group: 'Other', sub: true, requires: 'feature_api' },
-                                { key: 'feature_regions',        label: 'Regions',            group: 'Other' },
-                                { key: 'feature_compliance_fields', label: 'Compliance Fields (Lead Time, COO, Berry)', group: 'Other' },
-                                { key: 'feature_inventory', label: 'Inventory Management', group: 'Other' },
-                              ].reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc }, {})
-                            ).map(([group, flags]) => (
-                              <div key={group}>
-                                <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">{group}</p>
-                                <div className="divide-y divide-[#2a3d55] border border-[#2a3d55] rounded-lg overflow-hidden">
-                                  {flags.map(flag => {
-                                    const locked = flag.requires && !orgForm[flag.requires]
-                                    return (
-                                      <div key={flag.key} className={`flex items-center justify-between py-2.5 bg-[#0F1C2E] ${flag.sub ? 'pl-7 pr-3 border-l-2 border-[#C8622A]/20' : 'px-3'}`}>
-                                        <div>
-                                          <span className={`text-sm ${locked ? 'text-[#4a5d75]' : 'text-white'}`}>{flag.label}</span>
-                                          {flag.sub && locked && <p className="text-[#4a5d75] text-xs mt-0.5">Requires API Access</p>}
-                                        </div>
-                                        <button
-                                          disabled={locked}
-                                          onClick={() => setOrgForm(p => {
-                                            const next = { ...p, [flag.key]: !p[flag.key] }
-                                            if (flag.key === 'feature_designer_only' && !p.feature_designer_only) next.feature_drawing_tool = true
-                                            if (flag.key === 'feature_api' && p.feature_api) next.feature_embed = false
-                                            return next
-                                          })}
-                                          className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${orgForm[flag.key] ? 'bg-[#C8622A]' : 'bg-[#4B5563]'}`}>
-                                          <span className={`inline-block w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${orgForm[flag.key] ? 'translate-x-6' : 'translate-x-1'}`} />
-                                        </button>
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              </div>
-                            ))}
-
-                            {/* Designer manufacturer filter */}
-                            {orgForm.feature_drawing_tool && (
-                              <div>
-                                <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">Designer — Allowed Manufacturers</p>
-                                <p className="text-[#8A9AB0] text-xs mb-2">Leave all unchecked to show every manufacturer. Check specific ones to restrict this org to only those products.</p>
-                                <DesignerMfrPicker
-                                  selected={orgForm.designer_allowed_manufacturers || []}
-                                  onChange={v => setOrgForm(p => ({ ...p, designer_allowed_manufacturers: v }))}
-                                />
-                              </div>
-                            )}
-
-                            {/* Designer industry filter */}
-                            {orgForm.feature_drawing_tool && (
-                              <div>
-                                <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">Designer — Enabled Industries</p>
-                                <p className="text-[#8A9AB0] text-xs mb-2">Leave all unchecked to show every industry. Check specific ones to restrict this org to only those categories.</p>
-                                <DesignerIndustryPicker
-                                  selected={orgForm.designer_enabled_industries || []}
-                                  onChange={v => setOrgForm(p => ({ ...p, designer_enabled_industries: v }))}
-                                />
-                              </div>
-                            )}
-
-                            {/* Product Catalogs */}
-                            <CatalogAccessPicker
-                              selected={orgForm.enabled_catalogs || []}
-                              onChange={v => setOrgForm(p => ({ ...p, enabled_catalogs: v }))}
-                            />
-                          </div>
-
-                          <div className="flex justify-end">
-                            <button onClick={() => saveOrgSettings(org.id)} className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save Settings</button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Expandable Detail Section */}
-                      {isExpanded && (
-                        <div className="mt-4 pt-4 border-t border-[#2a3d55] space-y-5">
-                          {loadingDetail === org.id ? (
-                            <p className="text-[#8A9AB0] text-sm">Loading details...</p>
-                          ) : (
-                            <>
-                              {/* Metric Cards */}
-                              <div className="grid grid-cols-4 gap-3">
-                                <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
-                                  <p className="text-[#8A9AB0] text-xs mb-1">Total Proposals</p>
-                                  <p className="text-white text-xl font-bold">{stats.total}</p>
-                                </div>
-                                <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
-                                  <p className="text-[#8A9AB0] text-xs mb-1">Won Proposals</p>
-                                  <p className="text-green-400 text-xl font-bold">{stats.won}</p>
-                                </div>
-                                <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
-                                  <p className="text-[#8A9AB0] text-xs mb-1">Clients</p>
-                                  <p className="text-white text-xl font-bold">{stats.clients}</p>
-                                </div>
-                                <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
-                                  <p className="text-[#8A9AB0] text-xs mb-1">Won Value</p>
-                                  <p className="text-[#C8622A] text-xl font-bold">${stats.wonValue.toLocaleString()}</p>
-                                </div>
-                              </div>
-
-                              {/* Recent Proposals */}
-                              {stats.recentProps.length > 0 && (
-                                <div>
-                                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Recent Proposals</p>
-                                  <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] overflow-hidden">
-                                    <table className="w-full text-xs">
-                                      <thead>
-                                        <tr className="border-b border-[#2a3d55]">
-                                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Name</th>
-                                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Status</th>
-                                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Value</th>
-                                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Date</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {stats.recentProps.map(prop => (
-                                          <tr key={prop.id} className="border-b border-[#2a3d55]/30 last:border-0">
-                                            <td className="text-white py-2 px-3">{prop.proposal_name || '—'}</td>
-                                            <td className="py-2 px-3">
-                                              <span className={`px-2 py-0.5 rounded font-semibold ${getProposalStatusColor(prop.status)}`}>{prop.status || 'Draft'}</span>
-                                            </td>
-                                            <td className="text-[#8A9AB0] py-2 px-3">{prop.proposal_value ? `$${prop.proposal_value.toLocaleString()}` : '—'}</td>
-                                            <td className="text-[#8A9AB0] py-2 px-3">{new Date(prop.created_at).toLocaleDateString()}</td>
-                                          </tr>
-                                        ))}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Team Members & Impersonation */}
-                              <div>
-                                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Team Members</p>
-                                <div className="space-y-1.5">
-                                  {getOrgProfiles(org.id).map(member => (
-                                    <div key={member.id} className="flex items-center justify-between bg-[#0F1C2E] rounded-lg px-3 py-2 border border-[#2a3d55]">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-full bg-[#C8622A]/20 flex items-center justify-center text-[#C8622A] text-xs font-bold flex-shrink-0">
-                                          {(member.full_name || member.email || '?')[0].toUpperCase()}
-                                        </div>
-                                        <div>
-                                          <p className="text-white text-xs font-medium">{member.full_name || '—'}</p>
-                                          <p className="text-[#8A9AB0] text-xs">{member.email}</p>
-                                          <p className="text-[#8A9AB0] text-xs">
-                                            {member.last_login
-                                              ? `Last login: ${new Date(member.last_login).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}`
-                                              : 'Never logged in'}
-                                          </p>
-                                        </div>
-                                      </div>
-                                      <span className={`text-xs px-2 py-0.5 rounded font-semibold ${member.org_role === 'admin' ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-[#2a3d55] text-[#8A9AB0]'}`}>
-                                        {member.org_role || 'member'}
-                                      </span>
-                                    </div>
-                                  ))}
-                                  {getOrgProfiles(org.id).length === 0 && (
-                                    <p className="text-[#8A9AB0] text-xs">No team members found.</p>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Recent Activity */}
-                              {orgDetail[org.id]?.activities?.length > 0 && (
-                                <div>
-                                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Recent Activity</p>
-                                  <div className="space-y-1.5">
-                                    {orgDetail[org.id].activities.map(act => (
-                                      <div key={act.id} className="flex items-start gap-2 bg-[#0F1C2E] rounded-lg px-3 py-2 border border-[#2a3d55]">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-[#C8622A] mt-1.5 flex-shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                          <p className="text-white text-xs">{act.title || act.type || 'Activity'}</p>
-                                          <p className="text-[#8A9AB0] text-xs">{new Date(act.created_at).toLocaleString()}</p>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Notes */}
-                              <div>
-                                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Internal Notes</p>
-                                <textarea
-                                  value={orgNotes[org.id] || ''}
-                                  onChange={e => setOrgNotes(prev => ({ ...prev, [org.id]: e.target.value }))}
-                                  placeholder="Add private notes about this org..."
-                                  rows={3}
-                                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A] resize-none placeholder-[#4a5d75]"
-                                />
-                                <div className="flex items-center justify-end gap-3 mt-2">
-                                  {noteSaved === org.id && (
-                                    <span className="text-green-400 text-xs font-semibold">Saved!</span>
-                                  )}
-                                  <button
-                                    onClick={() => saveOrgNote(org.id)}
-                                    disabled={savingNote === org.id}
-                                    className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
-                                  >
-                                    {savingNote === org.id ? 'Saving...' : 'Save Note'}
-                                  </button>
-                                </div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
+                      <p className="text-[#8A9AB0] text-xs mb-2">{admin?.email || '—'} · {memberCount} user{memberCount !== 1 ? 's' : ''}</p>
+                      <div className="flex gap-1 mb-3 flex-wrap">
+                        {org.feature_crm && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">CRM</span>}
+                        {org.feature_drawing_tool && <span className="text-xs px-1.5 py-0.5 rounded bg-[#C8622A]/15 text-[#C8622A]">Designer</span>}
+                        {org.feature_ai_bom && <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400">AI BOM</span>}
+                        {org.feature_inventory && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400">Inventory</span>}
+                      </div>
+                      <div className="flex gap-4 pt-3 border-t border-[#2a3d55]">
+                        <div><p className="text-[#4a5d75] text-xs">Props</p><p className="text-white text-sm font-bold">{stats.total}</p></div>
+                        <div><p className="text-[#4a5d75] text-xs">Won</p><p className="text-green-400 text-sm font-bold">{stats.won}</p></div>
+                        <div><p className="text-[#4a5d75] text-xs">Clients</p><p className="text-white text-sm font-bold">{stats.clients}</p></div>
+                        {stats.last30 > 0 && <div><p className="text-[#4a5d75] text-xs">30d</p><p className="text-[#C8622A] text-sm font-bold">{stats.last30}</p></div>}
+                      </div>
                     </div>
                   )
                 })}
               </div>
             )}
+          </div>
+          )}
           </div>
         )}
 
