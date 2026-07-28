@@ -5,6 +5,9 @@ import './index.css'
 import App from './App.jsx'
 import { ProfileProvider } from './context/ProfileContext'
 
+// Auto-reload when a dynamic chunk fails to load after a new deployment
+window.addEventListener('vite:preloadError', () => window.location.reload())
+
 // Apply saved theme before first paint to prevent flash
 const savedTheme = localStorage.getItem('fp-theme') || 'dark'
 document.documentElement.setAttribute('data-theme', savedTheme)

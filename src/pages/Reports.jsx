@@ -450,10 +450,11 @@ export default function Reports(props) {
 
     // ── User Activity ─────────────────────────────────────────────────────────
     if (activeReport === 'user_activity') {
-      const { data: rows } = await supabase
+      const { data: rows, error: actErr } = await supabase
         .from('profiles').select('full_name, email, org_role, last_login, created_at')
         .eq('org_id', profile.org_id)
-        .order('last_login', { ascending: false, nullsFirst: false })
+        .order('created_at', { ascending: false })
+      if (actErr) console.error('user_activity query error:', actErr)
       setData((rows || []).map(r => ({
         'Name':         r.full_name || '—',
         'Email':        r.email || '—',
