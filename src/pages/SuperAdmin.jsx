@@ -827,13 +827,8 @@ export default function SuperAdmin() {
           {[
             { key: 'requests', label: `Access Requests${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}` },
             { key: 'orgs',     label: 'Organizations' },
-            { key: 'billing',  label: 'Billing & Plans' },
-            { key: 'metrics',  label: 'Metrics' },
-            { key: 'products', label: 'Global Products' },
-            { key: 'catalogs', label: 'Catalogs' },
-            { key: 'api',      label: 'API Keys' },
-            { key: 'sa_users', label: 'Admin Users' },
-            { key: 'roadmap',  label: 'Roadmap' },
+            { key: 'platform', label: 'Platform' },
+            { key: 'admin',    label: 'Admin' },
           ].map(t => (
             <button key={t.key} onClick={() => setActiveTab(t.key)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
@@ -1218,7 +1213,7 @@ export default function SuperAdmin() {
         )}
 
         {/* Billing & Plans */}
-        {activeTab === 'billing' && (
+        {activeTab === 'platform' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-white font-bold text-lg">Billing & Plans</h3>
@@ -1277,7 +1272,7 @@ export default function SuperAdmin() {
         )}
 
         {/* Metrics Tab */}
-        {activeTab === 'metrics' && (
+        {activeTab === 'platform' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-white font-bold text-lg">Org Metrics</h3>
@@ -1359,10 +1354,10 @@ export default function SuperAdmin() {
         )}
       </div>
 
-      {activeTab === 'catalogs' && <CatalogsTab />}
+      {activeTab === 'admin' && <CatalogsTab />}
 
-      {/* Global Products tab */}
-        {activeTab === 'products' && (
+      {/* Global Products */}
+        {activeTab === 'admin' && (
           <div className="p-6 space-y-6">
             <div className="flex items-center justify-between">
               <div>
@@ -1477,10 +1472,10 @@ export default function SuperAdmin() {
         </div>
       )}
 
-      {/* ── API KEYS TAB ── */}
-      {activeTab === 'api' && <APIKeysPanel orgs={orgs} embedUsage={embedUsage} />}
+      {/* ── API KEYS ── */}
+      {activeTab === 'admin' && <APIKeysPanel orgs={orgs} embedUsage={embedUsage} />}
 
-      {activeTab === 'sa_users' && (
+      {activeTab === 'admin' && (
         <div className="space-y-6">
           {/* Add new superadmin */}
           <div className="bg-[#1a2d45] rounded-xl p-5">
@@ -1580,8 +1575,8 @@ export default function SuperAdmin() {
         </div>
       )}
 
-      {/* ── ROADMAP TAB ── */}
-      {activeTab === 'roadmap' && (
+      {/* ── ROADMAP ── */}
+      {activeTab === 'admin' && (
         <>
           <div className="flex justify-end mb-4">
             <button
