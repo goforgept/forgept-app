@@ -587,9 +587,10 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                 ) : (
                   <button
                     onClick={() => { setTicketNumberDraft(ticket.ticket_number || ''); setEditingTicketNumber(true) }}
-                    className="text-fp-muted text-xs font-mono bg-fp-inset px-2 py-0.5 rounded hover:border-fp-brand border border-transparent transition-colors"
+                    className="group flex items-center gap-1.5 text-fp-muted text-xs font-mono bg-fp-inset px-2 py-0.5 rounded hover:border-fp-brand border border-transparent transition-colors"
                     title="Click to edit ticket number">
                     {ticket.ticket_number || 'No #'}
+                    <svg className="w-3 h-3 opacity-0 group-hover:opacity-60 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a2 2 0 01-1.414.586H8v-2.414a2 2 0 01.586-1.414z" /></svg>
                   </button>
                 )}
               </div>

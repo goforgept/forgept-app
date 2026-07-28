@@ -35,7 +35,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
     title: '', description: '', client_id: '', job_id: '',
     assigned_tech_id: '', priority: 'Normal', status: 'Open',
     scheduled_date: '', scheduled_time: '', duration_hours: '2', location_id: '',
-    contact_id: ''
+    contact_id: '', ticket_number: ''
   })
   const [clientJobs, setClientJobs] = useState([])
   const [clientLocations, setClientLocations] = useState([])
@@ -85,7 +85,11 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
     setSaving(true)
     setSaveError('')
     try {
-      const { data: ticketNumber } = await supabase.rpc('get_next_ticket_number', { org_id_input: profile.org_id })
+      let ticketNumber = form.ticket_number.trim()
+      if (!ticketNumber) {
+        const { data: auto } = await supabase.rpc('get_next_ticket_number', { org_id_input: profile.org_id })
+        ticketNumber = auto
+      }
 
       const { error } = await supabase.from('service_tickets').insert({
         org_id: profile.org_id,
@@ -111,7 +115,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
 
       setShowModal(false)
       setSaveError('')
-      setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '', duration_hours: '2', location_id: '', contact_id: '' })
+      setForm({ title: '', description: '', client_id: '', job_id: '', assigned_tech_id: '', priority: 'Normal', status: 'Open', scheduled_date: '', scheduled_time: '', duration_hours: '2', location_id: '', contact_id: '', ticket_number: '' })
       setClientJobs([])
       setClientLocations([])
       setClientContacts([])
@@ -227,10 +231,17 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
           <div className="bg-fp-card rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="text-fp-text font-bold text-lg mb-5">New Service Ticket</h3>
             <div className="space-y-4">
-              <div>
-                <label className="text-fp-muted text-xs mb-1 block">Title <span className="text-[#C8622A]">*</span></label>
-                <input type="text" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                  placeholder="e.g. Camera offline at Building A" className={inputClass} autoFocus />
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="text-fp-muted text-xs mb-1 block">Title <span className="text-[#C8622A]">*</span></label>
+                  <input type="text" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                    placeholder="e.g. Camera offline at Building A" className={inputClass} autoFocus />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Ticket # <span className="text-fp-muted font-normal">(optional)</span></label>
+                  <input type="text" value={form.ticket_number} onChange={e => setForm(p => ({ ...p, ticket_number: e.target.value }))}
+                    placeholder="Auto" className={inputClass} />
+                </div>
               </div>
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Description</label>
