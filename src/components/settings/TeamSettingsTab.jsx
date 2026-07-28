@@ -77,12 +77,12 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
           {success && <p className="text-green-400 text-xs">{success}</p>}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-fp-muted text-xs mb-1 block">Full Name</label>
-              <input type="text" value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} placeholder="Jane Smith" className={inputClass} />
+              <label htmlFor="invite_full_name" className="text-fp-muted text-xs mb-1 block">Full Name</label>
+              <input id="invite_full_name" name="invite_full_name" type="text" value={form.full_name} onChange={e => setForm(p => ({ ...p, full_name: e.target.value }))} placeholder="Jane Smith" className={inputClass} />
             </div>
             <div>
-              <label className="text-fp-muted text-xs mb-1 block">Email</label>
-              <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="jane@company.com" className={inputClass} />
+              <label htmlFor="invite_email" className="text-fp-muted text-xs mb-1 block">Email</label>
+              <input id="invite_email" name="invite_email" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="jane@company.com" className={inputClass} />
             </div>
           </div>
           {!featureDesignerOnly && (

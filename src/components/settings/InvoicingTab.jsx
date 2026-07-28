@@ -6,6 +6,8 @@ export default function InvoicingTab({ invoicingForm, setInvoicingForm, inputCla
         <p className="text-fp-muted text-sm mb-5">When a client's payment method is set to Credit Card, this fee is automatically added to their invoices.</p>
         <div className="flex items-center gap-3 max-w-xs">
           <input
+            id="cc_fee_percent"
+            name="cc_fee_percent"
             type="number"
             min="0"
             max="20"
@@ -22,40 +24,40 @@ export default function InvoicingTab({ invoicingForm, setInvoicingForm, inputCla
         <p className="text-fp-muted text-sm mb-5">These appear on every invoice PDF so clients know how to pay you.</p>
         <div className="space-y-4">
           <div>
-            <label className="text-fp-muted text-xs mb-1 block">Make Checks Payable To</label>
-            <input type="text" value={invoicingForm.payment_instructions_payable_to}
+            <label htmlFor="payment_payable_to" className="text-fp-muted text-xs mb-1 block">Make Checks Payable To</label>
+            <input id="payment_payable_to" name="payment_payable_to" type="text" value={invoicingForm.payment_instructions_payable_to}
               onChange={e => setInvoicingForm(p => ({ ...p, payment_instructions_payable_to: e.target.value }))}
               placeholder="Your company legal name" className={inputClass} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-fp-muted text-xs mb-1 block">Bank Name</label>
-              <input type="text" value={invoicingForm.payment_instructions_bank}
+              <label htmlFor="payment_bank" className="text-fp-muted text-xs mb-1 block">Bank Name</label>
+              <input id="payment_bank" name="payment_bank" type="text" value={invoicingForm.payment_instructions_bank}
                 onChange={e => setInvoicingForm(p => ({ ...p, payment_instructions_bank: e.target.value }))}
                 placeholder="e.g. First National Bank" className={inputClass} />
             </div>
             <div>
-              <label className="text-fp-muted text-xs mb-1 block">Zelle / Venmo</label>
-              <input type="text" value={invoicingForm.payment_instructions_zelle}
+              <label htmlFor="payment_zelle" className="text-fp-muted text-xs mb-1 block">Zelle / Venmo</label>
+              <input id="payment_zelle" name="payment_zelle" type="text" value={invoicingForm.payment_instructions_zelle}
                 onChange={e => setInvoicingForm(p => ({ ...p, payment_instructions_zelle: e.target.value }))}
                 placeholder="email or phone number" className={inputClass} />
             </div>
             <div>
-              <label className="text-fp-muted text-xs mb-1 block">Routing Number</label>
-              <input type="text" value={invoicingForm.payment_instructions_routing}
+              <label htmlFor="payment_routing" className="text-fp-muted text-xs mb-1 block">Routing Number</label>
+              <input id="payment_routing" name="payment_routing" type="text" value={invoicingForm.payment_instructions_routing}
                 onChange={e => setInvoicingForm(p => ({ ...p, payment_instructions_routing: e.target.value }))}
                 placeholder="Optional" className={inputClass} />
             </div>
             <div>
-              <label className="text-fp-muted text-xs mb-1 block">Account Number</label>
-              <input type="text" value={invoicingForm.payment_instructions_account}
+              <label htmlFor="payment_account" className="text-fp-muted text-xs mb-1 block">Account Number</label>
+              <input id="payment_account" name="payment_account" type="text" value={invoicingForm.payment_instructions_account}
                 onChange={e => setInvoicingForm(p => ({ ...p, payment_instructions_account: e.target.value }))}
                 placeholder="Optional" className={inputClass} />
             </div>
           </div>
           <div>
-            <label className="text-fp-muted text-xs mb-1 block">Additional Notes</label>
-            <textarea value={invoicingForm.payment_instructions_notes}
+            <label htmlFor="payment_notes" className="text-fp-muted text-xs mb-1 block">Additional Notes</label>
+            <textarea id="payment_notes" name="payment_notes" value={invoicingForm.payment_instructions_notes}
               onChange={e => setInvoicingForm(p => ({ ...p, payment_instructions_notes: e.target.value }))}
               rows={3} placeholder="e.g. Net 30 terms. Late payments subject to 1.5% monthly finance charge."
               className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
