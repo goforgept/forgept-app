@@ -63,7 +63,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     if (inv?.service_ticket_id) {
       const { data: st } = await supabase
         .from('service_tickets')
-        .select('title, clients(company, client_name, client_email)')
+        .select('title, clients(company, client_name, email)')
         .eq('id', inv.service_ticket_id)
         .single()
       setTicketClient(st)
@@ -318,7 +318,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   }
 
   const sendInvoice = async () => {
-    const clientEmail = invoice?.proposals?.client_email || ticketClient?.clients?.client_email
+    const clientEmail = invoice?.proposals?.client_email || ticketClient?.clients?.email
     if (!clientEmail) { alert('No client email found on this invoice.'); return }
     setSendingInvoice(true)
     try {
@@ -435,7 +435,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
       .order('created_at', { ascending: false })
     const { data: tickets } = await supabase
       .from('service_tickets')
-      .select('id, ticket_number, title, clients(company, client_name)')
+      .select('id, ticket_number, title, client_id, clients(company, client_name, email)')
       .eq('org_id', profile.org_id)
       .neq('status', 'Cancelled')
       .order('created_at', { ascending: false })
@@ -445,14 +445,14 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   }
 
   const assignBillTo = async (type, sourceId) => {
-    if (type === 'proposal') {
-      await supabase.from('invoices').update({ proposal_id: sourceId, service_ticket_id: null }).eq('id', id)
-    } else {
-      await supabase.from('invoices').update({ service_ticket_id: sourceId, proposal_id: null }).eq('id', id)
-    }
+    const updateData = type === 'proposal'
+      ? { proposal_id: sourceId, service_ticket_id: null }
+      : { service_ticket_id: sourceId, proposal_id: null }
+    const { error } = await supabase.from('invoices').update(updateData).eq('id', id)
+    if (error) { alert('Error updating customer: ' + error.message); return }
     setShowBillToModal(false)
     setTicketClient(null)
-    fetchAll()
+    await fetchAll()
   }
 
   const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
@@ -765,7 +765,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
           <div className="bg-fp-card rounded-2xl p-6 w-full max-w-lg">
             <h3 className="text-fp-text font-bold text-lg mb-1">Send Invoice</h3>
             <p className="text-fp-muted text-sm mb-5">
-              Sending to <span className="text-fp-text font-medium">{invoice.proposals?.client_email || ticketClient?.clients?.client_email || 'no email on file'}</span> · PDF will be attached
+              Sending to <span className="text-fp-text font-medium">{invoice.proposals?.client_email || ticketClient?.clients?.email || 'no email on file'}</span> · PDF will be attached
             </p>
             <div className="space-y-4">
               <div>
