@@ -55,7 +55,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
     const { data: inv } = await supabase
       .from('invoices')
-      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email, clients(address, city, state, zip, phone))')
+      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email)')
       .eq('id', id)
       .single()
     setInvoice(inv)
@@ -135,7 +135,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     doc.text(invoice?.invoice_number || '', pageWidth - 14, 28, { align: 'right' })
 
     // FROM block (left side, below header)
-    const clientData = invoice?.proposals?.clients || ticketClient?.clients || null
+    const clientData = ticketClient?.clients || null
     const clientCompany = invoice?.proposals?.company || ticketClient?.clients?.company || ''
     const clientName = invoice?.proposals?.client_name || ticketClient?.clients?.client_name || ''
     const clientAddr = clientData?.address || ''
