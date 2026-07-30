@@ -176,7 +176,6 @@ Deno.serve(async (req) => {
           ...items,
           ['collection_method', 'send_invoice'],
           ['days_until_due', String(daysUntilDue ?? 30)],
-          ['expand[]', 'latest_invoice'],
           ['metadata[org_id]', orgId],
           ['metadata[plan]', plan],
         ]),
@@ -188,15 +187,19 @@ Deno.serve(async (req) => {
       subscriptionId     = subscription.id
       subscriptionStatus = subscription.status
 
-      // Finalize the draft invoice immediately so Stripe sends the email right away
-      const invoiceId = subscription.latest_invoice?.id
-      if (invoiceId && subscription.latest_invoice?.status === 'draft') {
-        const finalizeRes = await fetch(`https://api.stripe.com/v1/invoices/${invoiceId}/finalize`, {
+      // Finalize any draft invoices for this customer so Stripe sends the email immediately
+      const draftRes = await fetch(
+        `https://api.stripe.com/v1/invoices?customer=${customerId}&status=draft&limit=5`,
+        { headers: stripeHeaders }
+      )
+      const draftData = await draftRes.json()
+      for (const inv of draftData?.data || []) {
+        const finalizeRes = await fetch(`https://api.stripe.com/v1/invoices/${inv.id}/finalize`, {
           method: 'POST',
           headers: stripeHeaders,
         })
         const finalizeData = await finalizeRes.json()
-        console.log('Invoice finalize result:', finalizeData.status, finalizeData.error || '')
+        console.log('Finalized invoice:', inv.id, finalizeData.status, finalizeData.error?.message || '')
       }
     }
 

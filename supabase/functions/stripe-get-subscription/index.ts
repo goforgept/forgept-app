@@ -76,13 +76,15 @@ Deno.serve(async (req) => {
         id: sub.id,
         status: sub.status,
         current_period_end: sub.current_period_end,
+        due_date: sub.latest_invoice?.due_date ?? null,
         cancel_at_period_end: sub.cancel_at_period_end,
         amount: sub.items?.data?.[0]?.price?.unit_amount,
         interval: sub.items?.data?.[0]?.price?.recurring?.interval,
         plan_name: sub.metadata?.plan || sub.items?.data?.[0]?.price?.nickname || '',
+        collection_method: sub.collection_method,
       }
 
-      if (sub.status === 'incomplete' && sub.latest_invoice?.hosted_invoice_url) {
+      if (sub.latest_invoice?.hosted_invoice_url) {
         invoiceUrl = sub.latest_invoice.hosted_invoice_url
       }
 

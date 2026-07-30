@@ -1127,12 +1127,17 @@ export default function SuperAdmin() {
                               </p>
                             </div>
                             <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
-                              <p className="text-[#8A9AB0] text-xs mb-1">{stripeData.subscription.status === 'incomplete' ? 'Invoice Date' : 'Next Billing'}</p>
+                              <p className="text-[#8A9AB0] text-xs mb-1">Next Billing</p>
                               <p className="text-white text-sm">
                                 {stripeData.subscription.current_period_end
                                   ? new Date(stripeData.subscription.current_period_end * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                                   : '—'}
                               </p>
+                              {stripeData.subscription.due_date && (
+                                <p className="text-yellow-400 text-xs mt-1">
+                                  Due {new Date(stripeData.subscription.due_date * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </p>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center justify-between pt-1">
