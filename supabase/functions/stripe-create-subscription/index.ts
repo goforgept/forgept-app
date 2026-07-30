@@ -200,6 +200,16 @@ Deno.serve(async (req) => {
         })
         const finalizeData = await finalizeRes.json()
         console.log('Finalized invoice:', inv.id, finalizeData.status, finalizeData.error?.message || '')
+
+        // Send the invoice email to the customer
+        if (finalizeData.status === 'open') {
+          const sendRes = await fetch(`https://api.stripe.com/v1/invoices/${inv.id}/send`, {
+            method: 'POST',
+            headers: stripeHeaders,
+          })
+          const sendData = await sendRes.json()
+          console.log('Sent invoice:', inv.id, sendData.status, sendData.error?.message || '')
+        }
       }
     }
 

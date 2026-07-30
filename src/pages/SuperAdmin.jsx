@@ -1358,65 +1358,6 @@ export default function SuperAdmin() {
           </div>
         )}
 
-        {/* Billing & Plans */}
-        {activeTab === 'platform' && (
-          <div className="bg-[#1a2d45] rounded-xl p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-white font-bold text-lg">Billing & Plans</h3>
-              <div className="flex gap-4">
-                <div className="text-center"><p className="text-[#8A9AB0] text-xs">MRR</p><p className="text-[#C8622A] font-bold">${mrr.toLocaleString()}</p></div>
-                <div className="text-center"><p className="text-[#8A9AB0] text-xs">Paying</p><p className="text-green-400 font-bold">{activeOrgs}</p></div>
-                <div className="text-center"><p className="text-[#8A9AB0] text-xs">Trial</p><p className="text-yellow-400 font-bold">{trialOrgs}</p></div>
-              </div>
-            </div>
-            {loading ? <p className="text-[#8A9AB0]">Loading...</p> : orgs.length === 0 ? <p className="text-[#8A9AB0]">No organizations yet.</p> : (
-              <div className="space-y-3">
-                {orgs.map(org => {
-                  const admin = getOrgAdmin(org.id)
-                  const plan = getPlanInfo(org.plan || 'Trial')
-                  const isEditing = editingBilling === org.id
-                  const trialDaysLeft = org.trial_ends_at ? Math.ceil((new Date(org.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24)) : null
-                  const hasStripe = !!org.stripe_customer_id
-
-                  return (
-                    <div key={org.id} className="border border-[#2a3d55] rounded-xl p-4">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <p className="text-white font-semibold">{org.name}</p>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>{org.org_type || 'integrator'}</span>
-                          </div>
-                          <p className="text-[#8A9AB0] text-xs">{admin?.email || '—'}</p>
-                          {hasStripe && <p className="text-green-400 text-xs mt-1">✓ Stripe connected</p>}
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap justify-end">
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${plan.bg} ${plan.color}`}>{org.plan || 'Trial'}</span>
-                          <span className={`text-xs font-semibold px-2 py-1 rounded ${getBillingStatusColor(org.billing_status)}`}>{org.billing_status || 'trial'}</span>
-                          {org.monthly_rate > 0 && <span className="text-white text-sm font-bold">${org.monthly_rate}/mo</span>}
-                          <button onClick={() => openStripeModal(org)} className="bg-green-500/20 text-green-400 px-3 py-1 rounded text-xs font-semibold hover:bg-green-500/30 transition-colors">{hasStripe ? 'Update Subscription' : 'Create Subscription'}</button>
-                          <button onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">{isEditing ? 'Cancel' : 'Manual Edit'}</button>
-                        </div>
-                      </div>
-                      {org.billing_status === 'trial' && trialDaysLeft !== null && (
-                        <p className={`text-xs mt-2 ${trialDaysLeft <= 3 ? 'text-red-400' : 'text-yellow-400'}`}>{trialDaysLeft > 0 ? `Trial ends in ${trialDaysLeft} days` : 'Trial expired'}</p>
-                      )}
-                      {isEditing && (
-                        <div className="mt-4 grid grid-cols-4 gap-3 pt-4 border-t border-[#2a3d55]">
-                          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label><select value={billingForm.plan} onChange={e => setBillingForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">{PLANS.map(p => <option key={p.name} value={p.name}>{p.name}{p.rate ? ` — $${p.rate}/mo` : p.rate === 0 ? ' — Free' : ' — Custom'}</option>)}</select></div>
-                          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Billing Status</label><select value={billingForm.billing_status} onChange={e => setBillingForm(p => ({ ...p, billing_status: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]">{['trial', 'active', 'past_due', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}</select></div>
-                          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Monthly Rate ($)</label><input type="number" value={billingForm.monthly_rate} onChange={e => setBillingForm(p => ({ ...p, monthly_rate: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]" /></div>
-                          <div><label className="text-[#8A9AB0] text-xs mb-1 block">Trial End Date</label><input type="date" value={billingForm.trial_ends_at} onChange={e => setBillingForm(p => ({ ...p, trial_ends_at: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-1.5 text-xs focus:outline-none focus:border-[#C8622A]" /></div>
-                          <div className="col-span-4 flex justify-end"><button onClick={() => updateBilling(org.id)} className="bg-[#C8622A] text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors">Save Changes</button></div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Metrics Tab */}
         {activeTab === 'platform' && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
