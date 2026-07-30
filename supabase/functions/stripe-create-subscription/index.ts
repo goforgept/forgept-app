@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { orgId, orgName, adminEmail, plan, qboAddon } = await req.json()
+    const { orgId, orgName, adminEmail, plan, qboAddon, address } = await req.json()
     console.log('stripe-create-subscription: plan=', plan, 'orgId=', orgId)
 
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
@@ -78,14 +78,21 @@ Deno.serve(async (req) => {
 
     // Create Stripe customer if one doesn't exist
     if (!customerId) {
+      const customerParams: Record<string, string> = {
+        email: adminEmail,
+        name: orgName,
+        'metadata[org_id]': orgId,
+      }
+      if (address?.line1)      customerParams['address[line1]']      = address.line1
+      if (address?.city)       customerParams['address[city]']       = address.city
+      if (address?.state)      customerParams['address[state]']      = address.state
+      if (address?.postal_code) customerParams['address[postal_code]'] = address.postal_code
+      if (address?.country)    customerParams['address[country]']    = address.country
+
       const customerRes = await fetch('https://api.stripe.com/v1/customers', {
         method: 'POST',
         headers: stripeHeaders,
-        body: new URLSearchParams({
-          email: adminEmail,
-          name: orgName,
-          'metadata[org_id]': orgId,
-        }),
+        body: new URLSearchParams(customerParams),
       })
       const customer = await customerRes.json()
       if (customer.error) throw new Error(`Stripe customer error: ${customer.error.message}`)
@@ -184,10 +191,14 @@ Deno.serve(async (req) => {
       // Auto-send the invoice email to the customer
       const invoiceId = subscription.latest_invoice?.id
       if (invoiceId) {
-        await fetch(`https://api.stripe.com/v1/invoices/${invoiceId}/send`, {
+        const sendRes = await fetch(`https://api.stripe.com/v1/invoices/${invoiceId}/send`, {
           method: 'POST',
           headers: stripeHeaders,
         })
+        const sendData = await sendRes.json()
+        console.log('Invoice send result:', JSON.stringify(sendData))
+      } else {
+        console.log('No invoiceId found on subscription.latest_invoice:', JSON.stringify(subscription.latest_invoice))
       }
     }
 

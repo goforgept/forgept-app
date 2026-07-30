@@ -658,17 +658,18 @@ export default function SuperAdmin() {
   const openStripeModal = (org) => {
     const admin = getOrgAdmin(org.id)
     setStripeModal({ org, admin })
-    setStripeForm({ plan: org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter', qboAddon: org.quickbooks_addon || false })
+    setStripeForm({ plan: org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter', qboAddon: org.quickbooks_addon || false, email: admin?.email || '', address_line1: '', address_city: '', address_state: '', address_zip: '', address_country: 'US' })
     setStripeResult(null)
   }
 
   const createSubscription = async () => {
     if (!stripeModal) return
+    if (!stripeForm.email) { setStripeResult({ success: false, message: 'A billing email is required.' }); return }
     setCreatingSubscription(true)
     setStripeResult(null)
     try {
       const { data: result, error } = await supabase.functions.invoke('stripe-create-subscription', {
-        body: { orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeModal.admin?.email || '', plan: stripeForm.plan, qboAddon: stripeForm.qboAddon }
+        body: { orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeForm.email || '', plan: stripeForm.plan, qboAddon: stripeForm.qboAddon, address: { line1: stripeForm.address_line1 || '', city: stripeForm.address_city || '', state: stripeForm.address_state || '', postal_code: stripeForm.address_zip || '', country: stripeForm.address_country || 'US' } }
       })
       if (error) setStripeResult({ success: false, message: error.message })
       else if (result?.error) setStripeResult({ success: false, message: result.error })
@@ -1595,8 +1596,41 @@ export default function SuperAdmin() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
           <div className="bg-[#1a2d45] rounded-2xl p-6 w-full max-w-md">
             <h3 className="text-white font-bold text-lg mb-1">{stripeModal.org.stripe_subscription_id ? 'Update' : 'Create'} Stripe Subscription</h3>
-            <p className="text-[#8A9AB0] text-sm mb-5">{stripeModal.org.name} · {stripeModal.admin?.email || 'No admin email'}</p>
+            <p className="text-[#8A9AB0] text-sm mb-4">{stripeModal.org.name}</p>
             <div className="space-y-4">
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Billing Email <span className="text-[#C8622A]">*</span></label>
+                <input type="email" value={stripeForm.email || ''} onChange={e => setStripeForm(p => ({ ...p, email: e.target.value }))}
+                  placeholder="customer@example.com"
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                <p className="text-[#8A9AB0] text-xs mt-1">Stripe will send the invoice to this address.</p>
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Street Address</label>
+                <input type="text" value={stripeForm.address_line1 || ''} onChange={e => setStripeForm(p => ({ ...p, address_line1: e.target.value }))}
+                  placeholder="123 Main St"
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="col-span-1">
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">City</label>
+                  <input type="text" value={stripeForm.address_city || ''} onChange={e => setStripeForm(p => ({ ...p, address_city: e.target.value }))}
+                    placeholder="Chicago"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">State</label>
+                  <input type="text" value={stripeForm.address_state || ''} onChange={e => setStripeForm(p => ({ ...p, address_state: e.target.value }))}
+                    placeholder="IL"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">ZIP</label>
+                  <input type="text" value={stripeForm.address_zip || ''} onChange={e => setStripeForm(p => ({ ...p, address_zip: e.target.value }))}
+                    placeholder="60601"
+                    className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                </div>
+              </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Base Plan</label>
                 <select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
