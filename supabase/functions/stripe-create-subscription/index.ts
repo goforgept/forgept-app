@@ -178,8 +178,17 @@ Deno.serve(async (req) => {
       const subscription = await subRes.json()
       console.log('Stripe subscription response:', JSON.stringify(subscription))
       if (subscription.error) throw new Error(`Stripe subscription error: ${subscription.error.message} (code: ${subscription.error.code})`)
-      subscriptionId  = subscription.id
+      subscriptionId     = subscription.id
       subscriptionStatus = subscription.status
+
+      // Auto-send the invoice email to the customer
+      const invoiceId = subscription.latest_invoice?.id
+      if (invoiceId) {
+        await fetch(`https://api.stripe.com/v1/invoices/${invoiceId}/send`, {
+          method: 'POST',
+          headers: stripeHeaders,
+        })
+      }
     }
 
     // Update org in Supabase
