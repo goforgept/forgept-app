@@ -32,9 +32,9 @@ Deno.serve(async (req) => {
     }
     const stripeHeaders = { 'Authorization': `Bearer ${stripeKey}` }
 
-    // Fetch org Stripe IDs
+    // Fetch org — only need stripe_customer_id
     const orgRes = await fetch(
-      `${supabaseUrl}/rest/v1/organizations?id=eq.${orgId}&select=stripe_customer_id,stripe_subscription_id`,
+      `${supabaseUrl}/rest/v1/organizations?id=eq.${orgId}&select=stripe_customer_id`,
       { headers: dbHeaders }
     )
     const orgs = await orgRes.json()
@@ -44,62 +44,74 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ connected: false }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Fetch customer from Stripe
-    const customerRes = await fetch(`https://api.stripe.com/v1/customers/${org.stripe_customer_id}`, { headers: stripeHeaders })
-    const customer = await customerRes.json()
+    const customerId = org.stripe_customer_id
+
+    // Fetch subscriptions for this customer directly from Stripe (no DB column needed)
+    const subsRes = await fetch(
+      `https://api.stripe.com/v1/subscriptions?customer=${customerId}&limit=5&expand[]=data.latest_invoice`,
+      { headers: stripeHeaders }
+    )
+    const subsData = await subsRes.json()
+
+    // Customer was deleted in Stripe — clear it from our DB
+    if (subsData?.error?.code === 'resource_missing' || subsData?.error?.type === 'invalid_request_error') {
+      await fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${orgId}`, {
+        method: 'PATCH',
+        headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ stripe_customer_id: null, billing_status: 'trial' }),
+      })
+      return new Response(JSON.stringify({ connected: false, cleared: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
     let subscription = null
     let invoiceUrl = null
 
-    if (org.stripe_subscription_id) {
-      const subRes = await fetch(
-        `https://api.stripe.com/v1/subscriptions/${org.stripe_subscription_id}?expand[]=latest_invoice`,
-        { headers: stripeHeaders }
-      )
-      const sub = await subRes.json()
-      if (!sub.error) {
-        subscription = {
-          id: sub.id,
-          status: sub.status,
-          current_period_end: sub.current_period_end,
-          cancel_at_period_end: sub.cancel_at_period_end,
-          amount: sub.items?.data?.[0]?.price?.unit_amount,
-          interval: sub.items?.data?.[0]?.price?.recurring?.interval,
-          plan_name: sub.metadata?.plan || '',
-        }
-        // Get hosted invoice URL if incomplete
-        if (sub.latest_invoice && sub.status === 'incomplete') {
-          invoiceUrl = sub.latest_invoice?.hosted_invoice_url || null
-        }
+    if (subsData?.data?.length > 0) {
+      // Prefer active, then incomplete, then most recent
+      const sub = subsData.data.find((s: any) => s.status === 'active')
+        || subsData.data.find((s: any) => s.status === 'incomplete')
+        || subsData.data[0]
 
-        // Sync billing_status, plan, and monthly_rate back to Supabase
-        const billingStatus =
-          sub.status === 'active'    ? 'active'    :
-          sub.status === 'past_due'  ? 'past_due'  :
-          sub.status === 'canceled'  ? 'cancelled' : 'pending'
-
-        const planName    = sub.metadata?.plan || null
-        const amountCents = sub.items?.data?.[0]?.price?.unit_amount || 0
-        const interval    = sub.items?.data?.[0]?.price?.recurring?.interval || 'month'
-        const monthlyRate = interval === 'year'
-          ? Math.round(amountCents / 12 / 100)
-          : Math.round(amountCents / 100)
-
-        const syncPayload: Record<string, unknown> = { billing_status: billingStatus, monthly_rate: monthlyRate }
-        if (planName) syncPayload.plan = planName
-
-        await fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${orgId}`, {
-          method: 'PATCH',
-          headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
-          body: JSON.stringify(syncPayload),
-        })
+      subscription = {
+        id: sub.id,
+        status: sub.status,
+        current_period_end: sub.current_period_end,
+        cancel_at_period_end: sub.cancel_at_period_end,
+        amount: sub.items?.data?.[0]?.price?.unit_amount,
+        interval: sub.items?.data?.[0]?.price?.recurring?.interval,
+        plan_name: sub.metadata?.plan || sub.items?.data?.[0]?.price?.nickname || '',
       }
+
+      if (sub.status === 'incomplete' && sub.latest_invoice?.hosted_invoice_url) {
+        invoiceUrl = sub.latest_invoice.hosted_invoice_url
+      }
+
+      // Sync billing_status, plan, monthly_rate back to Supabase
+      const billingStatus =
+        sub.status === 'active'    ? 'active'    :
+        sub.status === 'past_due'  ? 'past_due'  :
+        sub.status === 'canceled'  ? 'cancelled' : 'pending'
+
+      const planName    = sub.metadata?.plan || null
+      const amountCents = sub.items?.data?.[0]?.price?.unit_amount || 0
+      const interval    = sub.items?.data?.[0]?.price?.recurring?.interval || 'month'
+      const monthlyRate = interval === 'year'
+        ? Math.round(amountCents / 12 / 100)
+        : Math.round(amountCents / 100)
+
+      const syncPayload: Record<string, unknown> = { billing_status: billingStatus, monthly_rate: monthlyRate }
+      if (planName) syncPayload.plan = planName
+
+      await fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${orgId}`, {
+        method: 'PATCH',
+        headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
+        body: JSON.stringify(syncPayload),
+      })
     }
 
     return new Response(JSON.stringify({
       connected: true,
-      customerId: org.stripe_customer_id,
-      customer: { email: customer.email, name: customer.name },
+      customerId,
       subscription,
       invoiceUrl,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

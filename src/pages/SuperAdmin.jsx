@@ -1051,6 +1051,13 @@ export default function SuperAdmin() {
                           <button onClick={() => openStripeModal(org)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">
                             Change Plan
                           </button>
+                          <button onClick={async () => {
+                            if (!confirm('Disconnect this org from Stripe? This only removes the link in ForgePt — it does not delete anything in Stripe.')) return
+                            await supabase.from('organizations').update({ stripe_customer_id: null, billing_status: 'trial' }).eq('id', org.id)
+                            setStripeData(null); setStripeDataError(null); fetchData()
+                          }} className="bg-[#2a3d55] text-[#8A9AB0] hover:text-red-400 px-3 py-1 rounded text-xs transition-colors">
+                            Disconnect
+                          </button>
                         </div>
                       </div>
 
