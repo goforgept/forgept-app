@@ -736,8 +736,10 @@ export default function SuperAdmin() {
 
   const pendingRequests = requests.filter(r => r.status === 'pending')
   const mrr = orgs.filter(o => o.billing_status === 'active').reduce((sum, o) => sum + (o.monthly_rate || 0), 0)
+  const arr = mrr * 12
   const activeOrgs = orgs.filter(o => o.billing_status === 'active').length
   const trialOrgs = orgs.filter(o => o.billing_status === 'trial').length
+  const pastDueOrgs = orgs.filter(o => o.billing_status === 'past_due').length
 
   if (!unlocked) return (
     <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center">
@@ -928,16 +930,47 @@ export default function SuperAdmin() {
         {/* Organizations */}
         {activeTab === 'orgs' && (
           <div>
+
+          {/* ── Metrics strip ── */}
+          {!selectedOrg && (
+            <div className="grid grid-cols-6 gap-3 mb-4">
+              <div className="bg-[#1a2d45] rounded-xl p-4">
+                <p className="text-[#8A9AB0] text-xs mb-1">MRR</p>
+                <p className="text-[#C8622A] text-xl font-bold">${mrr.toLocaleString()}</p>
+              </div>
+              <div className="bg-[#1a2d45] rounded-xl p-4">
+                <p className="text-[#8A9AB0] text-xs mb-1">ARR</p>
+                <p className="text-[#C8622A] text-xl font-bold">${arr.toLocaleString()}</p>
+              </div>
+              <div className="bg-[#1a2d45] rounded-xl p-4">
+                <p className="text-[#8A9AB0] text-xs mb-1">Active</p>
+                <p className="text-green-400 text-xl font-bold">{activeOrgs}</p>
+              </div>
+              <div className="bg-[#1a2d45] rounded-xl p-4">
+                <p className="text-[#8A9AB0] text-xs mb-1">Trial</p>
+                <p className="text-yellow-400 text-xl font-bold">{trialOrgs}</p>
+              </div>
+              {pastDueOrgs > 0 && (
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                  <p className="text-[#8A9AB0] text-xs mb-1">Past Due</p>
+                  <p className="text-red-400 text-xl font-bold">{pastDueOrgs}</p>
+                </div>
+              )}
+              <div className="bg-[#1a2d45] rounded-xl p-4">
+                <p className="text-[#8A9AB0] text-xs mb-1">Total Orgs</p>
+                <p className="text-white text-xl font-bold">{orgs.length}</p>
+              </div>
+            </div>
+          )}
+
           {/* ── Org Detail View ── */}
           {selectedOrg ? (() => {
             const org = orgs.find(o => o.id === selectedOrg) || selectedOrg
             const admin = getOrgAdmin(org.id)
             const members = getOrgProfiles(org.id)
             const health = getOrgHealth(org.id)
-            const stats = getOrgStats(org.id)
             const isEditing = editingOrg === org.id
             const status = org.status || 'active'
-            if (!orgDetail[org.id] && !loadingDetail) fetchOrgDetail(org.id)
             return (
               <div className="space-y-4">
                 {/* Header */}
@@ -951,9 +984,8 @@ export default function SuperAdmin() {
                           <h3 className="text-white font-bold text-xl">{org.name}</h3>
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getOrgTypeColor(org.org_type || 'integrator')}`}>{org.org_type || 'integrator'}</span>
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded ${status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : status === 'suspended' ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}`}>{status}</span>
-                          <span className={`text-xs ${health.labelColor}`}>{health.label}</span>
                         </div>
-                        <p className="text-[#8A9AB0] text-sm mt-1">{admin?.full_name || '—'} · {admin?.email || '—'} · {members.length} users</p>
+                        <p className="text-[#8A9AB0] text-sm mt-1">{admin?.full_name || '—'} · {admin?.email || '—'} · {members.length} user{members.length !== 1 ? 's' : ''}</p>
                       </div>
                     </div>
                     <div className="flex gap-2 flex-wrap">
@@ -962,14 +994,6 @@ export default function SuperAdmin() {
                       {status === 'suspended' && <button onClick={() => reactivateOrg(org.id)} className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-green-500/30 transition-colors">Reactivate</button>}
                       <button onClick={() => { setDeleteModal(org); setDeleteConfirmText('') }} className="bg-red-900/30 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-900/50 transition-colors">Delete</button>
                     </div>
-                  </div>
-
-                  {/* Stat cards */}
-                  <div className="grid grid-cols-4 gap-3 mt-5">
-                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Total Proposals</p><p className="text-white text-xl font-bold">{stats.total}</p></div>
-                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Won</p><p className="text-green-400 text-xl font-bold">{stats.won}</p></div>
-                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Clients</p><p className="text-white text-xl font-bold">{stats.clients}</p></div>
-                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Won Value</p><p className="text-[#C8622A] text-xl font-bold">${stats.wonValue.toLocaleString()}</p></div>
                   </div>
                 </div>
 
@@ -981,7 +1005,7 @@ export default function SuperAdmin() {
                       <div key={u.id} className="flex items-center justify-between bg-[#0F1C2E] rounded-lg px-4 py-3 border border-[#2a3d55]">
                         <div>
                           <p className="text-white text-sm font-medium">{u.full_name || '—'}</p>
-                          <p className="text-[#8A9AB0] text-xs">{u.email} · {u.role}</p>
+                          <p className="text-[#8A9AB0] text-xs">{u.email} · {u.org_role || u.role}</p>
                         </div>
                         <button onClick={() => impersonateUser(org, u)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">Impersonate</button>
                       </div>
@@ -989,53 +1013,6 @@ export default function SuperAdmin() {
                     {members.length === 0 && <p className="text-[#8A9AB0] text-sm">No users yet.</p>}
                   </div>
                 </div>
-
-                {/* Recent Proposals */}
-                {stats.recentProps.length > 0 && (
-                  <div className="bg-[#1a2d45] rounded-xl p-5">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Recent Proposals</p>
-                    <div className="bg-[#0F1C2E] rounded-lg border border-[#2a3d55] overflow-hidden">
-                      <table className="w-full text-xs">
-                        <thead><tr className="border-b border-[#2a3d55]">
-                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Name</th>
-                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Status</th>
-                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Value</th>
-                          <th className="text-[#8A9AB0] text-left py-2 px-3 font-normal">Date</th>
-                        </tr></thead>
-                        <tbody>
-                          {stats.recentProps.map(prop => (
-                            <tr key={prop.id} className="border-b border-[#2a3d55]/30 last:border-0">
-                              <td className="text-white py-2 px-3">{prop.proposal_name || '—'}</td>
-                              <td className="py-2 px-3"><span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${getProposalStatusColor(prop.status)}`}>{prop.status}</span></td>
-                              <td className="text-[#8A9AB0] py-2 px-3">{prop.proposal_value ? `$${Number(prop.proposal_value).toLocaleString()}` : '—'}</td>
-                              <td className="text-[#8A9AB0] py-2 px-3">{prop.created_at ? new Date(prop.created_at).toLocaleDateString() : '—'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {/* Recent Activity */}
-                {loadingDetail === org.id ? (
-                  <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm">Loading activity...</p></div>
-                ) : orgDetail[org.id]?.activities?.length > 0 && (
-                  <div className="bg-[#1a2d45] rounded-xl p-5">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Recent Activity</p>
-                    <div className="space-y-2">
-                      {orgDetail[org.id].activities.map(a => (
-                        <div key={a.id} className="flex gap-3 items-start">
-                          <div className="w-1.5 h-1.5 rounded-full bg-[#C8622A] mt-1.5 flex-shrink-0" />
-                          <div>
-                            <p className="text-white text-xs">{a.description || a.type}</p>
-                            <p className="text-[#8A9AB0] text-xs">{a.created_at ? new Date(a.created_at).toLocaleDateString() : ''}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 {/* Billing */}
                 <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
