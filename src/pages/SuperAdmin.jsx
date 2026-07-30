@@ -1014,7 +1014,7 @@ export default function SuperAdmin() {
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Billing</p>
                     <div className="flex gap-2">
-                      {!org.stripe_customer_id && <button onClick={() => openStripeModal(org)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">Create Stripe Sub</button>}
+                      <button onClick={() => openStripeModal(org)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">{org.stripe_customer_id ? 'Manage Subscription' : 'Create Stripe Sub'}</button>
                       <button onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">{editingBilling === org.id ? 'Cancel' : 'Edit Billing'}</button>
                     </div>
                   </div>
@@ -1439,12 +1439,16 @@ export default function SuperAdmin() {
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Base Plan</label>
                 <select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                  <option value="Early Adopter Annual">Early Adopter Annual — $1,200/yr</option>
-                  <option value="Early Adopter">Early Adopter — $100/mo</option>
-                  <option value="Designer Only">Designer Only — $49/mo</option>
-                  <option value="Small Team">Small Team — $99/mo</option>
-                  <option value="Team">Team — $149/mo</option>
-                  <option value="Business">Business — $199/mo</option>
+                  <optgroup label="Annual (Best Value)">
+                    <option value="Early Adopter Annual">Early Adopter Annual — $1,200/yr ($100/mo equivalent)</option>
+                  </optgroup>
+                  <optgroup label="Monthly">
+                    <option value="Early Adopter">Early Adopter — $100/mo</option>
+                    <option value="Designer Only">Designer Only — $49/mo</option>
+                    <option value="Small Team">Small Team — $99/mo</option>
+                    <option value="Team">Team — $149/mo</option>
+                    <option value="Business">Business — $199/mo</option>
+                  </optgroup>
                 </select>
               </div>
               <label className="flex items-center gap-3 bg-[#0F1C2E] rounded-lg px-4 py-3 cursor-pointer">
@@ -1457,7 +1461,7 @@ export default function SuperAdmin() {
               <div className="bg-[#0F1C2E] rounded-lg p-3 text-xs text-[#8A9AB0]">
                 <p className="font-semibold text-white mb-1">What this does:</p>
                 <p>• Creates or updates a Stripe customer for {stripeModal.org.name}</p>
-                <p>• {stripeModal.org.stripe_subscription_id ? 'Updates the existing' : 'Creates a'} {stripeForm.plan} subscription at ${{ 'Early Adopter Annual': 1200, 'Early Adopter': 100, 'Designer Only': 49, 'Small Team': 99, 'Team': 149, 'Business': 199 }[stripeForm.plan]}{ stripeForm.plan.includes('Annual') ? '/yr' : '/mo' }{stripeForm.qboAddon ? ' + $25/mo QBO' : ''}</p>
+                <p>• {stripeModal.org.stripe_subscription_id ? 'Updates the existing' : 'Creates a'} {stripeForm.plan} subscription — <span className="text-white font-semibold">${{ 'Early Adopter Annual': 1200, 'Early Adopter': 100, 'Designer Only': 49, 'Small Team': 99, 'Team': 149, 'Business': 199 }[stripeForm.plan]}{stripeForm.plan.includes('Annual') ? '/yr' : '/mo'}{stripeForm.qboAddon ? ' + $25/mo QBO' : ''}</span></p>
                 <p>• Stripe auto-sends invoices each cycle once a payment method is added</p>
                 <p>• Updates billing status in ForgePt.</p>
                 <p className="mt-2 text-yellow-400">Note: Customer will need to add a payment method before charges begin.</p>
