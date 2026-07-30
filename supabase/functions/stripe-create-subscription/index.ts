@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { orgId, orgName, adminEmail, plan, qboAddon, address } = await req.json()
+    const { orgId, orgName, adminEmail, plan, qboAddon, daysUntilDue, address } = await req.json()
     console.log('stripe-create-subscription: plan=', plan, 'orgId=', orgId)
 
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
@@ -174,9 +174,8 @@ Deno.serve(async (req) => {
         body: new URLSearchParams([
           ['customer', customerId],
           ...items,
-          ['payment_behavior', 'default_incomplete'],
-          ['payment_settings[save_default_payment_method]', 'on_subscription'],
-          ['expand[]', 'latest_invoice.payment_intent'],
+          ['collection_method', 'send_invoice'],
+          ['days_until_due', String(daysUntilDue ?? 30)],
           ['metadata[org_id]', orgId],
           ['metadata[plan]', plan],
         ]),
@@ -187,19 +186,6 @@ Deno.serve(async (req) => {
       if (subscription.error) throw new Error(`Stripe subscription error: ${subscription.error.message} (code: ${subscription.error.code})`)
       subscriptionId     = subscription.id
       subscriptionStatus = subscription.status
-
-      // Auto-send the invoice email to the customer
-      const invoiceId = subscription.latest_invoice?.id
-      if (invoiceId) {
-        const sendRes = await fetch(`https://api.stripe.com/v1/invoices/${invoiceId}/send`, {
-          method: 'POST',
-          headers: stripeHeaders,
-        })
-        const sendData = await sendRes.json()
-        console.log('Invoice send result:', JSON.stringify(sendData))
-      } else {
-        console.log('No invoiceId found on subscription.latest_invoice:', JSON.stringify(subscription.latest_invoice))
-      }
     }
 
     // Update org in Supabase
@@ -211,7 +197,7 @@ Deno.serve(async (req) => {
         stripe_subscription_id: subscriptionId,
         plan,
         quickbooks_addon: qboAddon ?? false,
-        billing_status: subscriptionStatus === 'active' ? 'active' : 'pending',
+        billing_status: subscriptionStatus === 'active' ? 'active' : subscriptionStatus === 'trialing' ? 'trial' : 'pending',
         monthly_rate: monthlyRate,
       }),
     })

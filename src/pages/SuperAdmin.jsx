@@ -658,7 +658,7 @@ export default function SuperAdmin() {
   const openStripeModal = (org) => {
     const admin = getOrgAdmin(org.id)
     setStripeModal({ org, admin })
-    setStripeForm({ plan: org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter', qboAddon: org.quickbooks_addon || false, email: admin?.email || '', address_line1: '', address_city: '', address_state: '', address_zip: '', address_country: 'US' })
+    setStripeForm({ plan: org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter', qboAddon: org.quickbooks_addon || false, email: admin?.email || '', address_line1: '', address_city: '', address_state: '', address_zip: '', address_country: 'US', days_until_due: 30 })
     setStripeResult(null)
   }
 
@@ -669,7 +669,7 @@ export default function SuperAdmin() {
     setStripeResult(null)
     try {
       const { data: result, error } = await supabase.functions.invoke('stripe-create-subscription', {
-        body: { orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeForm.email || '', plan: stripeForm.plan, qboAddon: stripeForm.qboAddon, address: { line1: stripeForm.address_line1 || '', city: stripeForm.address_city || '', state: stripeForm.address_state || '', postal_code: stripeForm.address_zip || '', country: stripeForm.address_country || 'US' } }
+        body: { orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeForm.email || '', plan: stripeForm.plan, qboAddon: stripeForm.qboAddon, daysUntilDue: stripeForm.days_until_due ?? 30, address: { line1: stripeForm.address_line1 || '', city: stripeForm.address_city || '', state: stripeForm.address_state || '', postal_code: stripeForm.address_zip || '', country: stripeForm.address_country || 'US' } }
       })
       if (error) setStripeResult({ success: false, message: error.message })
       else if (result?.error) setStripeResult({ success: false, message: result.error })
@@ -1630,6 +1630,15 @@ export default function SuperAdmin() {
                     placeholder="60601"
                     className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Payment Terms</label>
+                <select value={stripeForm.days_until_due ?? 30} onChange={e => setStripeForm(p => ({ ...p, days_until_due: parseInt(e.target.value) }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                  <option value={15}>Net 15</option>
+                  <option value={30}>Net 30</option>
+                  <option value={45}>Net 45</option>
+                  <option value={60}>Net 60</option>
+                </select>
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Base Plan</label>
