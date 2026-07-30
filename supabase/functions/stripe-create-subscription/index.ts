@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
-import { validateUser } from "../_shared/auth.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,19 +29,25 @@ const PLAN_RATES: Record<string, number> = {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const { profile, error: authError } = await validateUser(req)
-  if (authError) return new Response(JSON.stringify({ error: authError }), { status: 401, headers: corsHeaders })
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const supabaseUrl  = Deno.env.get('SUPABASE_URL') ?? ''
+  const supabaseKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const anonKey      = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 
-  if (profile.role !== 'superadmin') {
-    return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders })
+  // Verify caller is superadmin
+  const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } })
+  const { data: { user }, error: authError } = await userClient.auth.getUser()
+  if (authError || !user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
+
+  const { data: callerProfile } = await userClient.from('profiles').select('role').eq('id', user.id).single()
+  if (callerProfile?.role !== 'superadmin') {
+    return new Response(JSON.stringify({ error: 'Forbidden', role: callerProfile?.role }), { status: 403, headers: corsHeaders })
   }
 
   try {
     const { orgId, orgName, adminEmail, plan, qboAddon } = await req.json()
 
     const stripeKey    = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
-    const supabaseUrl  = Deno.env.get('SUPABASE_URL') ?? ''
-    const supabaseKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
     const dbHeaders = {
       'apikey': supabaseKey,
