@@ -317,6 +317,8 @@ export default function SuperAdmin() {
   const [orgForm, setOrgForm] = useState({})
   const [unauthorized, setUnauthorized] = useState(false)
   const [stripeModal, setStripeModal] = useState(null)
+  const [stripeData, setStripeData] = useState(null)
+  const [stripeDataLoading, setStripeDataLoading] = useState(false)
   const [stripeForm, setStripeForm] = useState({ plan: 'Early Adopter', qboAddon: false })
   const [creatingSubscription, setCreatingSubscription] = useState(false)
   const [stripeResult, setStripeResult] = useState(null)
@@ -431,6 +433,14 @@ export default function SuperAdmin() {
       .limit(8)
     setOrgDetail(prev => ({ ...prev, [orgId]: { activities: activities || [] } }))
     setLoadingDetail(null)
+  }
+
+  const fetchStripeData = async (orgId) => {
+    setStripeDataLoading(true)
+    setStripeData(null)
+    const { data, error } = await supabase.functions.invoke('stripe-get-subscription', { body: { orgId } })
+    if (!error) setStripeData(data)
+    setStripeDataLoading(false)
   }
 
   const toggleExpandedOrg = (orgId) => {
@@ -1010,16 +1020,97 @@ export default function SuperAdmin() {
                 )}
 
                 {/* Billing */}
-                <div className="bg-[#1a2d45] rounded-xl p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Billing</p>
+                <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Billing & Subscription</p>
                     <div className="flex gap-2">
-                      <button onClick={() => openStripeModal(org)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">{org.stripe_customer_id ? 'Manage Subscription' : 'Create Stripe Sub'}</button>
-                      <button onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">{editingBilling === org.id ? 'Cancel' : 'Edit Billing'}</button>
+                      <button onClick={() => fetchStripeData(org.id)} disabled={stripeDataLoading}
+                        className="bg-[#2a3d55] text-[#8A9AB0] hover:text-white px-3 py-1 rounded text-xs transition-colors disabled:opacity-50">
+                        {stripeDataLoading ? '↻ Syncing…' : '↻ Sync Stripe'}
+                      </button>
+                      <button onClick={() => openStripeModal(org)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">
+                        {org.stripe_customer_id ? 'Manage Subscription' : 'Create Stripe Sub'}
+                      </button>
+                      <button onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">
+                        {editingBilling === org.id ? 'Cancel' : 'Edit Manual'}
+                      </button>
                     </div>
                   </div>
-                  {editingBilling === org.id ? (
-                    <div className="space-y-3">
+
+                  {/* Status row */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                      <p className="text-[#8A9AB0] text-xs mb-1">Plan</p>
+                      <p className="text-white text-sm font-semibold">{org.plan || 'Trial'}</p>
+                    </div>
+                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                      <p className="text-[#8A9AB0] text-xs mb-1">Status</p>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getBillingStatusColor(org.billing_status || 'trial')}`}>{org.billing_status || 'trial'}</span>
+                    </div>
+                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                      <p className="text-[#8A9AB0] text-xs mb-1">Rate</p>
+                      <p className="text-white text-sm font-semibold">${org.monthly_rate || 0}/mo</p>
+                    </div>
+                  </div>
+
+                  {/* Live Stripe data */}
+                  {stripeData && stripeData.connected && (
+                    <div className="border border-[#2a3d55] rounded-lg p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-green-400" />
+                        <p className="text-green-400 text-xs font-semibold">Stripe Connected</p>
+                        <p className="text-[#8A9AB0] text-xs ml-auto font-mono">{stripeData.customerId}</p>
+                      </div>
+                      {stripeData.subscription ? (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-[#8A9AB0] text-xs mb-0.5">Stripe Status</p>
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                              stripeData.subscription.status === 'active' ? 'bg-green-500/20 text-green-400' :
+                              stripeData.subscription.status === 'past_due' ? 'bg-red-500/20 text-red-400' :
+                              stripeData.subscription.status === 'incomplete' ? 'bg-yellow-500/20 text-yellow-400' :
+                              'bg-[#2a3d55] text-[#8A9AB0]'
+                            }`}>{stripeData.subscription.status}</span>
+                          </div>
+                          <div>
+                            <p className="text-[#8A9AB0] text-xs mb-0.5">Amount</p>
+                            <p className="text-white text-sm font-semibold">
+                              ${((stripeData.subscription.amount || 0) / 100).toLocaleString()}/{stripeData.subscription.interval || 'mo'}
+                            </p>
+                          </div>
+                          {stripeData.subscription.current_period_end && (
+                            <div>
+                              <p className="text-[#8A9AB0] text-xs mb-0.5">Next Billing Date</p>
+                              <p className="text-white text-sm">{new Date(stripeData.subscription.current_period_end * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-[#8A9AB0] text-xs mb-0.5">Subscription ID</p>
+                            <p className="text-[#8A9AB0] text-xs font-mono truncate">{stripeData.subscription.id}</p>
+                          </div>
+                          {stripeData.invoiceUrl && (
+                            <div className="col-span-2">
+                              <a href={stripeData.invoiceUrl} target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 bg-yellow-500/20 text-yellow-400 px-3 py-1.5 rounded text-xs font-semibold hover:bg-yellow-500/30 transition-colors">
+                                ⚠ Payment Pending — Copy Payment Link
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[#8A9AB0] text-xs">No active subscription — click Manage Subscription to create one.</p>
+                      )}
+                    </div>
+                  )}
+                  {stripeData && !stripeData.connected && (
+                    <p className="text-[#8A9AB0] text-xs">No Stripe customer linked to this org yet.</p>
+                  )}
+
+                  {/* Manual edit form */}
+                  {editingBilling === org.id && (
+                    <div className="space-y-3 pt-2 border-t border-[#2a3d55]">
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Manual Override</p>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label>
@@ -1043,12 +1134,6 @@ export default function SuperAdmin() {
                         </div>
                       </div>
                       <button onClick={() => updateBilling(org.id)} className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save Billing</button>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Plan</p><p className="text-white text-sm font-semibold">{org.plan || 'Trial'}</p></div>
-                      <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Status</p><span className={`text-xs font-semibold px-2 py-0.5 rounded ${getBillingStatusColor(org.billing_status || 'trial')}`}>{org.billing_status || 'trial'}</span></div>
-                      <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]"><p className="text-[#8A9AB0] text-xs mb-1">Rate</p><p className="text-white text-sm font-semibold">${org.monthly_rate || 0}/mo</p></div>
                     </div>
                   )}
                 </div>
@@ -1181,7 +1266,7 @@ export default function SuperAdmin() {
                   const stats = getOrgStats(org.id)
 
                   return (
-                    <div key={org.id} onClick={() => { setSelectedOrg(org.id); setEditingOrg(null); fetchOrgDetail(org.id) }}
+                    <div key={org.id} onClick={() => { setSelectedOrg(org.id); setEditingOrg(null); fetchOrgDetail(org.id); setStripeData(null); fetchStripeData(org.id) }}
                       className="bg-[#0F1C2E] border border-[#2a3d55] rounded-xl p-4 cursor-pointer hover:border-[#C8622A]/40 transition-all">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${health.dot}`} />
