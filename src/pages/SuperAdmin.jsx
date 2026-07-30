@@ -320,6 +320,7 @@ export default function SuperAdmin() {
   const [stripeModal, setStripeModal] = useState(null)
   const [stripeData, setStripeData] = useState(null)
   const [stripeDataLoading, setStripeDataLoading] = useState(false)
+  const [stripeDataError, setStripeDataError] = useState(null)
   const [stripeForm, setStripeForm] = useState({ plan: 'Early Adopter', qboAddon: false })
   const [creatingSubscription, setCreatingSubscription] = useState(false)
   const [stripeResult, setStripeResult] = useState(null)
@@ -439,8 +440,16 @@ export default function SuperAdmin() {
   const fetchStripeData = async (orgId) => {
     setStripeDataLoading(true)
     setStripeData(null)
+    setStripeDataError(null)
     const { data, error } = await supabase.functions.invoke('stripe-get-subscription', { body: { orgId } })
-    if (!error) setStripeData(data)
+    if (error) {
+      console.error('stripe-get-subscription error:', error)
+      setStripeDataError(error.message || 'Failed to load Stripe data')
+    } else if (data?.error) {
+      setStripeDataError(data.error)
+    } else {
+      setStripeData(data)
+    }
     setStripeDataLoading(false)
   }
 
@@ -663,7 +672,11 @@ export default function SuperAdmin() {
       })
       if (error) setStripeResult({ success: false, message: error.message })
       else if (result?.error) setStripeResult({ success: false, message: result.error })
-      else { setStripeResult({ success: true, message: `Subscription created! Status: ${result?.status}` }); fetchData() }
+      else {
+        setStripeResult({ success: true, message: `Subscription created! Status: ${result?.status}` })
+        fetchData()
+        fetchStripeData(stripeModal.org.id)
+      }
     } catch (err) {
       setStripeResult({ success: false, message: err.message })
     }
@@ -1031,7 +1044,7 @@ export default function SuperAdmin() {
                       <div className="flex items-center justify-between">
                         <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Subscription</p>
                         <div className="flex gap-2">
-                          <button onClick={() => fetchStripeData(org.id)} disabled={stripeDataLoading}
+                          <button onClick={() => { setStripeDataError(null); fetchStripeData(org.id) }} disabled={stripeDataLoading}
                             className="bg-[#2a3d55] text-[#8A9AB0] hover:text-white px-3 py-1 rounded text-xs transition-colors disabled:opacity-50">
                             {stripeDataLoading ? '↻ Syncing…' : '↻ Sync'}
                           </button>
@@ -1041,8 +1054,19 @@ export default function SuperAdmin() {
                         </div>
                       </div>
 
-                      {stripeDataLoading && !stripeData && (
+                      {stripeDataLoading && (
                         <p className="text-[#8A9AB0] text-xs animate-pulse">Fetching Stripe data…</p>
+                      )}
+
+                      {stripeDataError && !stripeDataLoading && (
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 flex items-center justify-between">
+                          <p className="text-red-400 text-xs">{stripeDataError}</p>
+                          <button onClick={() => fetchStripeData(org.id)} className="text-[#8A9AB0] hover:text-white text-xs ml-3 flex-shrink-0">Retry</button>
+                        </div>
+                      )}
+
+                      {!stripeData && !stripeDataLoading && !stripeDataError && (
+                        <p className="text-[#8A9AB0] text-xs">Click Sync to load live data from Stripe.</p>
                       )}
 
                       {stripeData?.connected && stripeData?.subscription && (
@@ -1311,7 +1335,7 @@ export default function SuperAdmin() {
                   const stats = getOrgStats(org.id)
 
                   return (
-                    <div key={org.id} onClick={() => { setSelectedOrg(org.id); setEditingOrg(null); fetchOrgDetail(org.id); setStripeData(null); fetchStripeData(org.id) }}
+                    <div key={org.id} onClick={() => { setSelectedOrg(org.id); setEditingOrg(null); fetchOrgDetail(org.id); setStripeData(null); setStripeDataError(null); fetchStripeData(org.id) }}
                       className="bg-[#0F1C2E] border border-[#2a3d55] rounded-xl p-4 cursor-pointer hover:border-[#C8622A]/40 transition-all">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${health.dot}`} />
