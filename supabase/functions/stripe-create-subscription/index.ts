@@ -176,6 +176,7 @@ Deno.serve(async (req) => {
           ...items,
           ['collection_method', 'send_invoice'],
           ['days_until_due', String(daysUntilDue ?? 30)],
+          ['expand[]', 'latest_invoice'],
           ['metadata[org_id]', orgId],
           ['metadata[plan]', plan],
         ]),
@@ -186,6 +187,17 @@ Deno.serve(async (req) => {
       if (subscription.error) throw new Error(`Stripe subscription error: ${subscription.error.message} (code: ${subscription.error.code})`)
       subscriptionId     = subscription.id
       subscriptionStatus = subscription.status
+
+      // Finalize the draft invoice immediately so Stripe sends the email right away
+      const invoiceId = subscription.latest_invoice?.id
+      if (invoiceId && subscription.latest_invoice?.status === 'draft') {
+        const finalizeRes = await fetch(`https://api.stripe.com/v1/invoices/${invoiceId}/finalize`, {
+          method: 'POST',
+          headers: stripeHeaders,
+        })
+        const finalizeData = await finalizeRes.json()
+        console.log('Invoice finalize result:', finalizeData.status, finalizeData.error || '')
+      }
     }
 
     // Update org in Supabase

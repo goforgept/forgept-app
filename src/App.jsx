@@ -134,6 +134,13 @@ function App() {
       {(() => {
         const org = profile?.organizations
         const isTrialExpired = org?.billing_status === 'trial' && org?.trial_ends_at && new Date(org.trial_ends_at) < new Date()
+        const isPastDue = org?.billing_status === 'past_due'
+        if (isPastDue) return (
+          <div className="fixed top-0 left-0 right-0 z-[9998] bg-red-600 text-white text-xs flex items-center justify-center gap-3 px-4 py-2">
+            <span>⚠ Your account has an outstanding invoice. Please pay to avoid service interruption.</span>
+            <a href="mailto:hello@goforgept.com" className="underline font-semibold hover:no-underline whitespace-nowrap">Contact us →</a>
+          </div>
+        )
         if (!isTrialExpired) return null
         return (
           <div className="fixed top-0 left-0 right-0 z-[9998] bg-amber-600 text-white text-xs flex items-center justify-center gap-3 px-4 py-2">

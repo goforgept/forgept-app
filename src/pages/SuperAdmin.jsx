@@ -658,7 +658,7 @@ export default function SuperAdmin() {
   const openStripeModal = (org) => {
     const admin = getOrgAdmin(org.id)
     setStripeModal({ org, admin })
-    setStripeForm({ plan: org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter', qboAddon: org.quickbooks_addon || false, email: admin?.email || '', address_line1: '', address_city: '', address_state: '', address_zip: '', address_country: 'US', days_until_due: 30 })
+    setStripeForm({ plan: org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter', qboAddon: org.quickbooks_addon || false, email: admin?.email || '', address_line1: org.bill_to_address || org.ship_to_address || '', address_city: org.bill_to_city || org.ship_to_city || '', address_state: org.bill_to_state || org.ship_to_state || '', address_zip: org.bill_to_zip || org.ship_to_zip || '', address_country: 'US', days_until_due: 30 })
     setStripeResult(null)
   }
 
