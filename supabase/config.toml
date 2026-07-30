@@ -1,3 +1,11 @@
+[functions.stripe-create-subscription]
+enabled = true
+verify_jwt = false
+
+[functions.stripe-webhook]
+enabled = true
+verify_jwt = false
+
 [functions.generate-sow]
 enabled = true
 verify_jwt = false
