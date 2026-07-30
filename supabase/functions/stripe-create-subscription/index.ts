@@ -46,8 +46,10 @@ Deno.serve(async (req) => {
 
   try {
     const { orgId, orgName, adminEmail, plan, qboAddon } = await req.json()
+    console.log('stripe-create-subscription: plan=', plan, 'orgId=', orgId)
 
-    const stripeKey    = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
+    const stripeKey = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
+    if (!stripeKey) throw new Error('STRIPE_SECRET_KEY not set in environment')
 
     const dbHeaders = {
       'apikey': supabaseKey,
@@ -60,6 +62,7 @@ Deno.serve(async (req) => {
     }
 
     const basePriceId = PRICE_IDS[plan]
+    console.log('basePriceId=', basePriceId, 'plan=', plan)
     if (!basePriceId) throw new Error(`Unknown plan: ${plan}`)
     const qboPriceId = PRICE_IDS['QuickBooks Add-on']
 
@@ -173,7 +176,8 @@ Deno.serve(async (req) => {
       })
 
       const subscription = await subRes.json()
-      if (subscription.error) throw new Error(`Stripe subscription error: ${subscription.error.message}`)
+      console.log('Stripe subscription response:', JSON.stringify(subscription))
+      if (subscription.error) throw new Error(`Stripe subscription error: ${subscription.error.message} (code: ${subscription.error.code})`)
       subscriptionId  = subscription.id
       subscriptionStatus = subscription.status
     }
