@@ -313,6 +313,7 @@ export default function SuperAdmin() {
   const [productCount,   setProductCount]   = useState(0)
   const [editingBilling, setEditingBilling] = useState(null)
   const [billingForm, setBillingForm] = useState(emptyBillingForm)
+  const [billingSaved, setBillingSaved] = useState(null)
   const [editingOrg, setEditingOrg] = useState(null)
   const [orgForm, setOrgForm] = useState({})
   const [unauthorized, setUnauthorized] = useState(false)
@@ -631,15 +632,18 @@ export default function SuperAdmin() {
   }
 
   const updateBilling = async (orgId) => {
-    await supabase.from('organizations').update({
+    const { error } = await supabase.from('organizations').update({
       plan: billingForm.plan,
       billing_status: billingForm.billing_status,
       monthly_rate: parseFloat(billingForm.monthly_rate) || 0,
       trial_ends_at: billingForm.trial_ends_at || null
     }).eq('id', orgId)
-    setEditingBilling(null)
-    setBillingForm(emptyBillingForm)
-    fetchData()
+    if (!error) {
+      setBillingSaved(orgId)
+      setTimeout(() => setBillingSaved(null), 3000)
+      fetchData()
+      fetchOrgDetail(orgId)
+    }
   }
 
   const openStripeModal = (org) => {
@@ -1021,120 +1025,161 @@ export default function SuperAdmin() {
 
                 {/* Billing */}
                 <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
-                  {/* Header */}
-                  <div className="flex items-center justify-between">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Billing & Subscription</p>
-                    <div className="flex gap-2">
-                      <button onClick={() => fetchStripeData(org.id)} disabled={stripeDataLoading}
-                        className="bg-[#2a3d55] text-[#8A9AB0] hover:text-white px-3 py-1 rounded text-xs transition-colors disabled:opacity-50">
-                        {stripeDataLoading ? '↻ Syncing…' : '↻ Sync Stripe'}
-                      </button>
-                      <button onClick={() => openStripeModal(org)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">
-                        {org.stripe_customer_id ? 'Manage Subscription' : 'Create Stripe Sub'}
-                      </button>
-                      <button onClick={() => isEditing ? setEditingBilling(null) : startEditingBilling(org)} className="bg-[#2a3d55] text-white px-3 py-1 rounded text-xs hover:bg-[#3a4d65] transition-colors">
-                        {editingBilling === org.id ? 'Cancel' : 'Edit Manual'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Status row */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
-                      <p className="text-[#8A9AB0] text-xs mb-1">Plan</p>
-                      <p className="text-white text-sm font-semibold">{org.plan || 'Trial'}</p>
-                    </div>
-                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
-                      <p className="text-[#8A9AB0] text-xs mb-1">Status</p>
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getBillingStatusColor(org.billing_status || 'trial')}`}>{org.billing_status || 'trial'}</span>
-                    </div>
-                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
-                      <p className="text-[#8A9AB0] text-xs mb-1">Rate</p>
-                      <p className="text-white text-sm font-semibold">${org.monthly_rate || 0}/mo</p>
-                    </div>
-                  </div>
-
-                  {/* Live Stripe data */}
-                  {stripeData && stripeData.connected && (
-                    <div className="border border-[#2a3d55] rounded-lg p-4 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-green-400" />
-                        <p className="text-green-400 text-xs font-semibold">Stripe Connected</p>
-                        <p className="text-[#8A9AB0] text-xs ml-auto font-mono">{stripeData.customerId}</p>
-                      </div>
-                      {stripeData.subscription ? (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <p className="text-[#8A9AB0] text-xs mb-0.5">Stripe Status</p>
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                              stripeData.subscription.status === 'active' ? 'bg-green-500/20 text-green-400' :
-                              stripeData.subscription.status === 'past_due' ? 'bg-red-500/20 text-red-400' :
-                              stripeData.subscription.status === 'incomplete' ? 'bg-yellow-500/20 text-yellow-400' :
-                              'bg-[#2a3d55] text-[#8A9AB0]'
-                            }`}>{stripeData.subscription.status}</span>
-                          </div>
-                          <div>
-                            <p className="text-[#8A9AB0] text-xs mb-0.5">Amount</p>
-                            <p className="text-white text-sm font-semibold">
-                              ${((stripeData.subscription.amount || 0) / 100).toLocaleString()}/{stripeData.subscription.interval || 'mo'}
-                            </p>
-                          </div>
-                          {stripeData.subscription.current_period_end && (
-                            <div>
-                              <p className="text-[#8A9AB0] text-xs mb-0.5">Next Billing Date</p>
-                              <p className="text-white text-sm">{new Date(stripeData.subscription.current_period_end * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-[#8A9AB0] text-xs mb-0.5">Subscription ID</p>
-                            <p className="text-[#8A9AB0] text-xs font-mono truncate">{stripeData.subscription.id}</p>
-                          </div>
-                          {stripeData.invoiceUrl && (
-                            <div className="col-span-2">
-                              <a href={stripeData.invoiceUrl} target="_blank" rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 bg-yellow-500/20 text-yellow-400 px-3 py-1.5 rounded text-xs font-semibold hover:bg-yellow-500/30 transition-colors">
-                                ⚠ Payment Pending — Copy Payment Link
-                              </a>
-                            </div>
-                          )}
+                  {org.stripe_customer_id ? (
+                    <>
+                      {/* ── Stripe mode ── */}
+                      <div className="flex items-center justify-between">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Subscription</p>
+                        <div className="flex gap-2">
+                          <button onClick={() => fetchStripeData(org.id)} disabled={stripeDataLoading}
+                            className="bg-[#2a3d55] text-[#8A9AB0] hover:text-white px-3 py-1 rounded text-xs transition-colors disabled:opacity-50">
+                            {stripeDataLoading ? '↻ Syncing…' : '↻ Sync'}
+                          </button>
+                          <button onClick={() => openStripeModal(org)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">
+                            Change Plan
+                          </button>
                         </div>
-                      ) : (
-                        <p className="text-[#8A9AB0] text-xs">No active subscription — click Manage Subscription to create one.</p>
+                      </div>
+
+                      {stripeDataLoading && !stripeData && (
+                        <p className="text-[#8A9AB0] text-xs animate-pulse">Fetching Stripe data…</p>
                       )}
-                    </div>
-                  )}
-                  {stripeData && !stripeData.connected && (
-                    <p className="text-[#8A9AB0] text-xs">No Stripe customer linked to this org yet.</p>
-                  )}
 
-                  {/* Manual edit form */}
-                  {editingBilling === org.id && (
-                    <div className="space-y-3 pt-2 border-t border-[#2a3d55]">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Manual Override</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label>
-                          <select value={billingForm.plan} onChange={e => setBillingForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                            {PLANS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                          </select>
+                      {stripeData?.connected && stripeData?.subscription && (
+                        <>
+                          {/* Incomplete banner */}
+                          {stripeData.subscription.status === 'incomplete' && (
+                            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 flex gap-3">
+                              <div className="text-yellow-400 text-base mt-0.5 flex-shrink-0">⚠</div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-yellow-400 text-xs font-semibold mb-1">Awaiting First Payment</p>
+                                <p className="text-[#8A9AB0] text-xs mb-3">The subscription was created but the first invoice hasn't been paid yet. Send this payment link to the org admin — once they pay, the subscription activates automatically.</p>
+                                {stripeData.invoiceUrl && (
+                                  <button
+                                    onClick={() => { navigator.clipboard.writeText(stripeData.invoiceUrl); setBillingSaved('copied_' + org.id); setTimeout(() => setBillingSaved(null), 2500) }}
+                                    className="bg-yellow-500/20 text-yellow-400 px-4 py-2 rounded text-xs font-semibold hover:bg-yellow-500/30 transition-colors">
+                                    {billingSaved === 'copied_' + org.id ? '✓ Copied!' : 'Copy Payment Link'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Past due banner */}
+                          {stripeData.subscription.status === 'past_due' && (
+                            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                              <p className="text-red-400 text-xs font-semibold mb-1">Payment Past Due</p>
+                              <p className="text-[#8A9AB0] text-xs">The last charge failed. The org needs to update their payment method via Stripe Dashboard.</p>
+                            </div>
+                          )}
+
+                          {/* Details grid */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                              <p className="text-[#8A9AB0] text-xs mb-1">Plan</p>
+                              <p className="text-white text-sm font-semibold">{stripeData.subscription.plan_name || org.plan || '—'}</p>
+                            </div>
+                            <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                              <p className="text-[#8A9AB0] text-xs mb-1">Status</p>
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                                stripeData.subscription.status === 'active'     ? 'bg-green-500/20 text-green-400' :
+                                stripeData.subscription.status === 'past_due'   ? 'bg-red-500/20 text-red-400' :
+                                stripeData.subscription.status === 'incomplete' ? 'bg-yellow-500/20 text-yellow-400' :
+                                'bg-[#2a3d55] text-[#8A9AB0]'
+                              }`}>{stripeData.subscription.status}</span>
+                            </div>
+                            <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                              <p className="text-[#8A9AB0] text-xs mb-1">Amount</p>
+                              <p className="text-white text-sm font-semibold">
+                                ${((stripeData.subscription.amount || 0) / 100).toLocaleString()}/{stripeData.subscription.interval === 'year' ? 'yr' : 'mo'}
+                              </p>
+                            </div>
+                            <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                              <p className="text-[#8A9AB0] text-xs mb-1">{stripeData.subscription.status === 'incomplete' ? 'Invoice Date' : 'Next Billing'}</p>
+                              <p className="text-white text-sm">
+                                {stripeData.subscription.current_period_end
+                                  ? new Date(stripeData.subscription.current_period_end * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                  : '—'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between pt-1">
+                            <p className="text-[#8A9AB0] text-xs font-mono">{stripeData.customerId}</p>
+                            <p className="text-[#8A9AB0] text-xs font-mono">{stripeData.subscription.id}</p>
+                          </div>
+                        </>
+                      )}
+
+                      {stripeData?.connected && !stripeData?.subscription && (
+                        <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] text-center space-y-2">
+                          <p className="text-[#8A9AB0] text-xs">Customer exists in Stripe but no subscription found.</p>
+                          <button onClick={() => openStripeModal(org)} className="bg-[#C8622A] text-white px-4 py-2 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors">Create Subscription</button>
                         </div>
-                        <div>
-                          <label className="text-[#8A9AB0] text-xs mb-1 block">Status</label>
-                          <select value={billingForm.billing_status} onChange={e => setBillingForm(p => ({ ...p, billing_status: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                            {['trial', 'active', 'past_due', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
-                          </select>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* ── Trial / Manual mode ── */}
+                      <div className="flex items-center justify-between">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Billing</p>
+                        <button onClick={() => openStripeModal(org)} className="bg-[#C8622A] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors">
+                          + Set Up Stripe
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                          <p className="text-[#8A9AB0] text-xs mb-1">Plan</p>
+                          <p className="text-white text-sm font-semibold">{org.plan || 'Trial'}</p>
                         </div>
-                        <div>
-                          <label className="text-[#8A9AB0] text-xs mb-1 block">Monthly Rate ($)</label>
-                          <input type="number" value={billingForm.monthly_rate} onChange={e => setBillingForm(p => ({ ...p, monthly_rate: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                        <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                          <p className="text-[#8A9AB0] text-xs mb-1">Status</p>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${getBillingStatusColor(org.billing_status || 'trial')}`}>{org.billing_status || 'trial'}</span>
                         </div>
-                        <div>
-                          <label className="text-[#8A9AB0] text-xs mb-1 block">Trial Ends</label>
-                          <input type="date" value={billingForm.trial_ends_at} onChange={e => setBillingForm(p => ({ ...p, trial_ends_at: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                        <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                          <p className="text-[#8A9AB0] text-xs mb-1">Rate</p>
+                          <p className="text-white text-sm font-semibold">${org.monthly_rate || 0}/mo</p>
                         </div>
                       </div>
-                      <button onClick={() => updateBilling(org.id)} className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save Billing</button>
-                    </div>
+
+                      <div className="pt-1 border-t border-[#2a3d55]">
+                        <button onClick={() => editingBilling === org.id ? setEditingBilling(null) : startEditingBilling(org)}
+                          className="text-[#8A9AB0] hover:text-white text-xs transition-colors">
+                          {editingBilling === org.id ? '↑ Close' : '✎ Edit billing manually'}
+                        </button>
+                      </div>
+
+                      {editingBilling === org.id && (
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label>
+                              <select value={billingForm.plan} onChange={e => setBillingForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                                {PLANS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[#8A9AB0] text-xs mb-1 block">Status</label>
+                              <select value={billingForm.billing_status} onChange={e => setBillingForm(p => ({ ...p, billing_status: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                                {['trial', 'active', 'past_due', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-[#8A9AB0] text-xs mb-1 block">Monthly Rate ($)</label>
+                              <input type="number" value={billingForm.monthly_rate} onChange={e => setBillingForm(p => ({ ...p, monthly_rate: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                            </div>
+                            <div>
+                              <label className="text-[#8A9AB0] text-xs mb-1 block">Trial Ends</label>
+                              <input type="date" value={billingForm.trial_ends_at} onChange={e => setBillingForm(p => ({ ...p, trial_ends_at: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <button onClick={() => updateBilling(org.id)} className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save Changes</button>
+                            {billingSaved === org.id && <span className="text-green-400 text-xs">✓ Saved</span>}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 

@@ -72,16 +72,26 @@ Deno.serve(async (req) => {
           invoiceUrl = sub.latest_invoice?.hosted_invoice_url || null
         }
 
-        // Sync billing_status back to Supabase
+        // Sync billing_status, plan, and monthly_rate back to Supabase
         const billingStatus =
           sub.status === 'active'    ? 'active'    :
           sub.status === 'past_due'  ? 'past_due'  :
           sub.status === 'canceled'  ? 'cancelled' : 'pending'
 
+        const planName    = sub.metadata?.plan || null
+        const amountCents = sub.items?.data?.[0]?.price?.unit_amount || 0
+        const interval    = sub.items?.data?.[0]?.price?.recurring?.interval || 'month'
+        const monthlyRate = interval === 'year'
+          ? Math.round(amountCents / 12 / 100)
+          : Math.round(amountCents / 100)
+
+        const syncPayload: Record<string, unknown> = { billing_status: billingStatus, monthly_rate: monthlyRate }
+        if (planName) syncPayload.plan = planName
+
         await fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${orgId}`, {
           method: 'PATCH',
           headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
-          body: JSON.stringify({ billing_status: billingStatus }),
+          body: JSON.stringify(syncPayload),
         })
       }
     }
