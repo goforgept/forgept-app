@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
   const { profile, error: authError } = await validateUser(req)
   if (authError) return new Response(JSON.stringify({ error: authError }), { status: 401, headers: corsHeaders })
 
-  if (!profile.is_superadmin) {
+  if (profile.role !== 'superadmin') {
     return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders })
   }
 
