@@ -175,6 +175,7 @@ Deno.serve(async (req) => {
     let description = ''
     let qboLines: any[] = []
     let fpInvoiceId: string | null = null
+    let existingQboId: string | null = null
     let totalAmount = 0
     let taxAmount = 0
 
@@ -190,6 +191,7 @@ Deno.serve(async (req) => {
       if (!inv) return new Response(JSON.stringify({ error: invErr?.message || 'Invoice not found' }), { status: 404, headers: corsHeaders })
 
       fpInvoiceId = inv.id
+      existingQboId = inv.qbo_invoice_id || null
 
       // Resolve client info — proposal > service ticket > invoice description
       if (inv.proposals) {
@@ -391,27 +393,49 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Create invoice in QBO
-    const invoiceRes = await fetch(`${baseUrl}/invoice?minorversion=65`, {
-      method: 'POST',
-      headers: qboHeaders,
-      body: JSON.stringify({
-        Line: qboLines,
-        CustomerRef: { value: customerId },
-        DocNumber: docNumber || undefined,
-        DueDate: dueDate || undefined,
-        PrivateNote: description || undefined,
-        BillEmail: clientEmail ? { Address: clientEmail } : undefined,
-        GlobalTaxCalculation: 'NotApplicable',
-        SalesTermRef: termId ? { value: termId } : undefined,
-      })
-    })
+    const invoicePayload = {
+      Line: qboLines,
+      CustomerRef: { value: customerId },
+      DocNumber: docNumber || undefined,
+      DueDate: dueDate || undefined,
+      PrivateNote: description || undefined,
+      BillEmail: clientEmail ? { Address: clientEmail } : undefined,
+      GlobalTaxCalculation: 'NotApplicable',
+      SalesTermRef: termId ? { value: termId } : undefined,
+    }
 
-    const invoiceData = await invoiceRes.json()
-    const qboInvoice = invoiceData?.Invoice
+    let qboInvoice: any = null
+
+    // If we already have a QBO invoice ID, try to update it instead of creating a new one
+    if (existingQboId) {
+      const fetchRes = await fetch(`${baseUrl}/invoice/${existingQboId}?minorversion=65`, { headers: qboHeaders })
+      const fetchData = await fetchRes.json()
+      const existing = fetchData?.Invoice
+
+      if (existing?.Id) {
+        const updateRes = await fetch(`${baseUrl}/invoice?minorversion=65`, {
+          method: 'POST',
+          headers: qboHeaders,
+          body: JSON.stringify({ ...invoicePayload, Id: existing.Id, SyncToken: existing.SyncToken })
+        })
+        const updateData = await updateRes.json()
+        qboInvoice = updateData?.Invoice
+      }
+      // If QBO returned no invoice (was deleted), fall through to create a new one
+    }
 
     if (!qboInvoice?.Id) {
-      return new Response(JSON.stringify({ error: 'QBO invoice creation failed', detail: invoiceData }), { status: 500, headers: corsHeaders })
+      const createRes = await fetch(`${baseUrl}/invoice?minorversion=65`, {
+        method: 'POST',
+        headers: qboHeaders,
+        body: JSON.stringify(invoicePayload)
+      })
+      const createData = await createRes.json()
+      qboInvoice = createData?.Invoice
+    }
+
+    if (!qboInvoice?.Id) {
+      return new Response(JSON.stringify({ error: 'QBO invoice creation failed' }), { status: 500, headers: corsHeaders })
     }
 
     // Store QBO ID on the ForgePt invoice

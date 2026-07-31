@@ -330,13 +330,12 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     await fetchClient()
     setEditingClient(false)
     setSavingClient(false)
-    // Push to Zoho if connected (fire-and-forget)
+    // Push to Zoho and QBO if connected (fire-and-forget)
     const { data: { session } } = await supabase.auth.getSession()
-    fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ clientId: id }),
-    }).catch(() => {})
+    const pushHeaders = { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` }
+    const pushBody = JSON.stringify({ clientId: id })
+    fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
+    fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
   }
 
 const deleteMeeting = async (meetingId) => {
