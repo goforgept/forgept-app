@@ -32,7 +32,7 @@ async function refreshQBOToken(supabase: any, org: any) {
   return tokens.access_token
 }
 
-async function findOrCreateCustomer(accessToken: string, realmId: string, proposal: any) {
+async function findOrCreateCustomer(accessToken: string, realmId: string, clientName: string, companyName: string, clientEmail?: string) {
   const baseUrl = `https://quickbooks.api.intuit.com/v3/company/${realmId}`
   const headers = {
     'Authorization': `Bearer ${accessToken}`,
@@ -40,23 +40,22 @@ async function findOrCreateCustomer(accessToken: string, realmId: string, propos
     'Accept': 'application/json'
   }
 
-  // Search for existing customer
-  const query = encodeURIComponent(`SELECT * FROM Customer WHERE DisplayName = '${(proposal.company || proposal.client_name || '').replace(/'/g, "\\'")}'`)
+  const displayName = companyName || clientName || 'ForgePt Client'
+  const query = encodeURIComponent(`SELECT * FROM Customer WHERE DisplayName = '${displayName.replace(/'/g, "\\'")}'`)
   const searchRes = await fetch(`${baseUrl}/query?query=${query}&minorversion=65`, { headers })
   const searchData = await searchRes.json()
   const existing = searchData?.QueryResponse?.Customer?.[0]
   if (existing) return existing.Id
 
-  // Create new customer
   const createRes = await fetch(`${baseUrl}/customer?minorversion=65`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      DisplayName: proposal.company || proposal.client_name || 'ForgePt Client',
-      PrimaryEmailAddr: proposal.client_email ? { Address: proposal.client_email } : undefined,
-      CompanyName: proposal.company || '',
-      GivenName: (proposal.client_name || '').split(' ')[0] || '',
-      FamilyName: (proposal.client_name || '').split(' ').slice(1).join(' ') || '',
+      DisplayName: displayName,
+      PrimaryEmailAddr: clientEmail ? { Address: clientEmail } : undefined,
+      CompanyName: companyName || '',
+      GivenName: (clientName || '').split(' ')[0] || '',
+      FamilyName: (clientName || '').split(' ').slice(1).join(' ') || '',
     })
   })
   const createData = await createRes.json()
@@ -75,236 +74,281 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { proposalId } = await req.json()
+    const body = await req.json()
+    const { invoiceId, proposalId } = body
 
-    // Fetch proposal — scoped to caller's org
-    const { data: proposal } = await adminSupabase
-      .from('proposals')
-      .select('*')
-      .eq('id', proposalId)
-      .eq('org_id', profile.org_id)
-      .single()
-    if (!proposal) return new Response(JSON.stringify({ error: 'Proposal not found' }), { status: 404, headers: corsHeaders })
+    if (!invoiceId && !proposalId) {
+      return new Response(JSON.stringify({ error: 'invoiceId or proposalId required' }), { status: 400, headers: corsHeaders })
+    }
 
-    // Fetch org with QBO tokens — scoped to caller's org
+    // Fetch org with QBO tokens
     const { data: org } = await adminSupabase
       .from('organizations')
       .select('id, qbo_access_token, qbo_refresh_token, qbo_realm_id, qbo_token_expires_at, qbo_connected')
       .eq('id', profile.org_id)
       .single()
 
-    if (!org?.qbo_connected) return new Response(JSON.stringify({ error: 'QuickBooks not connected' }), { status: 400, headers: corsHeaders })
+    if (!org?.qbo_connected) {
+      return new Response(JSON.stringify({ error: 'QuickBooks not connected' }), { status: 400, headers: corsHeaders })
+    }
 
     // Refresh token if expired
     let accessToken = org.qbo_access_token
-    const expiresAt = new Date(org.qbo_token_expires_at)
-    if (expiresAt <= new Date(Date.now() + 60000)) {
+    if (new Date(org.qbo_token_expires_at) <= new Date(Date.now() + 60000)) {
       accessToken = await refreshQBOToken(adminSupabase, org)
     }
 
     const realmId = org.qbo_realm_id
     const baseUrl = `https://quickbooks.api.intuit.com/v3/company/${realmId}`
-    const headers = {
+    const qboHeaders = {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     }
 
-    // Find or create customer
-    const customerId = await findOrCreateCustomer(accessToken, realmId, proposal)
-    if (!customerId) return new Response(JSON.stringify({ error: 'Could not find or create customer' }), { status: 500, headers: corsHeaders })
+    let clientName = ''
+    let companyName = ''
+    let clientEmail = ''
+    let docNumber = ''
+    let dueDate: string | undefined
+    let description = ''
+    let qboLines: any[] = []
+    let fpInvoiceId: string | null = null
+    let totalAmount = 0
 
-    // Fetch line items
-    const { data: lineItems } = await adminSupabase
-      .from('bom_line_items')
-      .select('*')
-      .eq('proposal_id', proposalId)
+    // ── Path A: invoiceId — works for all invoice types ──────────────────────
+    if (invoiceId) {
+      const { data: inv } = await adminSupabase
+        .from('invoices')
+        .select('*, proposals(proposal_name, company, client_name, client_email, quote_number), service_tickets(title, clients(company, client_name, email))')
+        .eq('id', invoiceId)
+        .eq('org_id', profile.org_id)
+        .single()
 
-    const laborItems = proposal.labor_items || []
+      if (!inv) return new Response(JSON.stringify({ error: 'Invoice not found' }), { status: 404, headers: corsHeaders })
 
-    // Build QBO line items
-    const qboLines = []
+      fpInvoiceId = inv.id
 
-    // Materials
-    for (const item of (lineItems || [])) {
-      if (!item.customer_price_unit || !item.quantity) continue
-      qboLines.push({
-        Amount: (item.customer_price_unit || 0) * (item.quantity || 0),
-        DetailType: 'SalesItemLineDetail',
-        Description: `${item.item_name}${item.part_number_sku ? ` (${item.part_number_sku})` : ''}`,
-        SalesItemLineDetail: {
-          Qty: item.quantity,
-          UnitPrice: item.customer_price_unit,
-          ItemRef: { value: '1', name: 'Services' } // Default item
-        }
-      })
-    }
+      // Resolve client info — proposal > service ticket > invoice description
+      if (inv.proposals) {
+        companyName = inv.proposals.company || ''
+        clientName  = inv.proposals.client_name || ''
+        clientEmail = inv.proposals.client_email || ''
+        docNumber   = inv.proposals.quote_number || inv.invoice_number || ''
+      } else if (inv.service_tickets) {
+        const c = inv.service_tickets.clients
+        companyName = c?.company || ''
+        clientName  = c?.client_name || ''
+        clientEmail = c?.email || ''
+        docNumber   = inv.invoice_number || ''
+      } else {
+        // Contract invoice or standalone
+        docNumber = inv.invoice_number || ''
+      }
 
-    // Labor
-    for (const labor of laborItems) {
-      if (!labor.role || !labor.customer_price) continue
-      qboLines.push({
-        Amount: parseFloat(labor.customer_price) || 0,
-        DetailType: 'SalesItemLineDetail',
-        Description: `${labor.role} (${labor.quantity} ${labor.unit || 'hr'})`,
-        SalesItemLineDetail: {
-          Qty: 1,
-          UnitPrice: parseFloat(labor.customer_price) || 0,
-          ItemRef: { value: '1', name: 'Services' }
-        }
-      })
-    }
+      dueDate     = inv.due_date || undefined
+      description = inv.description || ''
 
-    // Tax line if applicable
-    const taxRate = parseFloat(proposal.tax_rate) || 0
-    const taxExempt = proposal.tax_exempt || false
-    const matTotal = (lineItems || []).reduce((sum: number, i: any) => sum + (i.customer_price_total || 0), 0)
-    if (!taxExempt && taxRate > 0) {
-      const taxAmount = matTotal * taxRate / 100
-      qboLines.push({
-        Amount: taxAmount,
-        DetailType: 'SalesItemLineDetail',
-        Description: `Sales Tax (${taxRate}%)`,
-        SalesItemLineDetail: {
-          Qty: 1,
-          UnitPrice: taxAmount,
-          ItemRef: { value: '1', name: 'Services' }
-        }
-      })
+      const { data: items } = await adminSupabase
+        .from('invoice_line_items')
+        .select('*')
+        .eq('invoice_id', invoiceId)
+        .order('id')
+
+      for (const item of (items || [])) {
+        if (!item.total) continue
+        qboLines.push({
+          Amount: item.total,
+          DetailType: 'SalesItemLineDetail',
+          Description: item.description || '',
+          SalesItemLineDetail: {
+            Qty: item.quantity || 1,
+            UnitPrice: item.unit_price || item.total,
+            ItemRef: { value: '1', name: 'Services' }
+          }
+        })
+        totalAmount += item.total
+      }
+
+      // Tax line
+      if (inv.tax_amount > 0) {
+        qboLines.push({
+          Amount: inv.tax_amount,
+          DetailType: 'SalesItemLineDetail',
+          Description: `Tax (${inv.tax_percent}%)`,
+          SalesItemLineDetail: {
+            Qty: 1,
+            UnitPrice: inv.tax_amount,
+            ItemRef: { value: '1', name: 'Services' }
+          }
+        })
+      }
+
+    // ── Path B: proposalId — original behavior ────────────────────────────────
+    } else {
+      const { data: proposal } = await adminSupabase
+        .from('proposals')
+        .select('*')
+        .eq('id', proposalId)
+        .eq('org_id', profile.org_id)
+        .single()
+
+      if (!proposal) return new Response(JSON.stringify({ error: 'Proposal not found' }), { status: 404, headers: corsHeaders })
+
+      companyName = proposal.company || ''
+      clientName  = proposal.client_name || ''
+      clientEmail = proposal.client_email || ''
+      docNumber   = proposal.quote_number || ''
+      dueDate     = proposal.close_date || undefined
+
+      const { data: lineItems } = await adminSupabase
+        .from('bom_line_items')
+        .select('*')
+        .eq('proposal_id', proposalId)
+
+      const laborItems = proposal.labor_items || []
+      const taxRate   = parseFloat(proposal.tax_rate) || 0
+      const taxExempt = proposal.tax_exempt || false
+      let matTotal = 0
+
+      for (const item of (lineItems || [])) {
+        if (!item.customer_price_unit || !item.quantity) continue
+        const lineTotal = (item.customer_price_unit || 0) * (item.quantity || 0)
+        matTotal += lineTotal
+        qboLines.push({
+          Amount: lineTotal,
+          DetailType: 'SalesItemLineDetail',
+          Description: `${item.item_name}${item.part_number_sku ? ` (${item.part_number_sku})` : ''}`,
+          SalesItemLineDetail: {
+            Qty: item.quantity,
+            UnitPrice: item.customer_price_unit,
+            ItemRef: { value: '1', name: 'Services' }
+          }
+        })
+      }
+
+      for (const labor of laborItems) {
+        if (!labor.role || !labor.customer_price) continue
+        const amt = parseFloat(labor.customer_price) || 0
+        qboLines.push({
+          Amount: amt,
+          DetailType: 'SalesItemLineDetail',
+          Description: `${labor.role} (${labor.quantity} ${labor.unit || 'hr'})`,
+          SalesItemLineDetail: {
+            Qty: 1,
+            UnitPrice: amt,
+            ItemRef: { value: '1', name: 'Services' }
+          }
+        })
+      }
+
+      if (!taxExempt && taxRate > 0) {
+        const taxAmount = matTotal * taxRate / 100
+        qboLines.push({
+          Amount: taxAmount,
+          DetailType: 'SalesItemLineDetail',
+          Description: `Sales Tax (${taxRate}%)`,
+          SalesItemLineDetail: {
+            Qty: 1,
+            UnitPrice: taxAmount,
+            ItemRef: { value: '1', name: 'Services' }
+          }
+        })
+      }
+
+      // Mirror to ForgePt invoices table
+      const invTotal = proposal.total_customer_value || 0
+      const taxAmt   = !taxExempt && taxRate > 0 ? matTotal * taxRate / 100 : 0
+      const fpNum    = `QBO-${Date.now()}`
+      const today    = new Date().toISOString().split('T')[0]
+
+      const { data: existingFP } = await adminSupabase.from('invoices').select('id').eq('proposal_id', proposalId).eq('org_id', profile.org_id).maybeSingle()
+      if (existingFP) {
+        fpInvoiceId = existingFP.id
+        await adminSupabase.from('invoices').update({
+          status: 'Sent', subtotal: matTotal, tax_percent: taxRate,
+          tax_amount: taxAmt, total: invTotal, balance_due: invTotal,
+          issued_date: today, due_date: dueDate || null,
+        }).eq('id', existingFP.id)
+      } else {
+        const { data: newFP } = await adminSupabase.from('invoices').insert({
+          org_id: profile.org_id, proposal_id: proposalId,
+          invoice_number: fpNum, status: 'Sent', issued_date: today,
+          due_date: dueDate || null, subtotal: matTotal,
+          tax_percent: taxRate, tax_amount: taxAmt,
+          total: invTotal, amount_paid: 0, balance_due: invTotal,
+          description: `QuickBooks invoice for ${proposal.proposal_name}`,
+        }).select('id').single()
+        fpInvoiceId = newFP?.id || null
+      }
+
+      totalAmount = invTotal
     }
 
     if (qboLines.length === 0) {
       return new Response(JSON.stringify({ error: 'No billable line items found' }), { status: 400, headers: corsHeaders })
     }
 
-    // Create invoice in QBO
-    const invoiceBody = {
-      Line: qboLines,
-      CustomerRef: { value: customerId },
-      DocNumber: proposal.quote_number || undefined,
-      PrivateNote: `ForgePt proposal: ${proposal.proposal_name}`,
-      DueDate: proposal.close_date || undefined,
-    }
+    // Find or create QBO customer
+    const customerId = await findOrCreateCustomer(accessToken, realmId, clientName, companyName, clientEmail)
+    if (!customerId) return new Response(JSON.stringify({ error: 'Could not find or create QBO customer' }), { status: 500, headers: corsHeaders })
 
+    // Create invoice in QBO
     const invoiceRes = await fetch(`${baseUrl}/invoice?minorversion=65`, {
       method: 'POST',
-      headers,
-      body: JSON.stringify(invoiceBody)
+      headers: qboHeaders,
+      body: JSON.stringify({
+        Line: qboLines,
+        CustomerRef: { value: customerId },
+        DocNumber: docNumber || undefined,
+        DueDate: dueDate || undefined,
+        PrivateNote: description || undefined,
+      })
     })
 
     const invoiceData = await invoiceRes.json()
-    const invoice = invoiceData?.Invoice
+    const qboInvoice = invoiceData?.Invoice
 
-    if (!invoice?.Id) {
+    if (!qboInvoice?.Id) {
       return new Response(JSON.stringify({ error: 'QBO invoice creation failed', detail: invoiceData }), { status: 500, headers: corsHeaders })
     }
 
-    // Store QBO invoice ID on proposal
-    await adminSupabase.from('proposals').update({
-      qbo_invoice_id: invoice.Id,
-      qbo_invoice_number: invoice.DocNumber || ''
-    }).eq('id', proposalId)
-
-    // Create or update a ForgePt invoice so it appears in the Invoices tab and reports
-    const invoiceTotal = invoice.TotalAmt || 0
-    const taxAmount = !taxExempt && taxRate > 0 ? matTotal * taxRate / 100 : 0
-    const invoiceNumber = invoice.DocNumber || `QBO-${invoice.Id}`
-    const today = new Date().toISOString().split('T')[0]
-
-    const { data: existingFPInvoice } = await adminSupabase
-      .from('invoices')
-      .select('id')
-      .eq('proposal_id', proposalId)
-      .eq('org_id', profile.org_id)
-      .maybeSingle()
-
-    let fpInvoiceId: string | null = existingFPInvoice?.id || null
-
-    if (existingFPInvoice) {
-      // Update existing ForgePt invoice to reflect latest QBO push
+    // Store QBO ID on the ForgePt invoice
+    if (fpInvoiceId) {
       await adminSupabase.from('invoices').update({
-        invoice_number: invoiceNumber,
-        status: 'Sent',
-        subtotal: matTotal,
-        tax_percent: taxRate,
-        tax_amount: taxAmount,
-        total: invoiceTotal,
-        balance_due: invoiceTotal,
-        issued_date: today,
-        due_date: proposal.close_date || null,
-        description: `QuickBooks invoice for ${proposal.proposal_name}`,
-      }).eq('id', existingFPInvoice.id)
-    } else {
-      const { data: newFPInvoice } = await adminSupabase.from('invoices').insert({
-        org_id: profile.org_id,
-        proposal_id: proposalId,
-        invoice_number: invoiceNumber,
-        status: 'Sent',
-        issued_date: today,
-        due_date: proposal.close_date || null,
-        subtotal: matTotal,
-        tax_percent: taxRate,
-        tax_amount: taxAmount,
-        total: invoiceTotal,
-        amount_paid: 0,
-        balance_due: invoiceTotal,
-        description: `QuickBooks invoice for ${proposal.proposal_name}`,
-        notes: `Pushed to QuickBooks — Invoice #${invoiceNumber}`,
-      }).select('id').single()
-
-      fpInvoiceId = newFPInvoice?.id || null
-
-      // Create line items mirroring what was pushed to QBO
-      if (fpInvoiceId) {
-        const fpLineItems = []
-        for (const item of (lineItems || [])) {
-          if (!item.customer_price_unit || !item.quantity) continue
-          fpLineItems.push({
-            invoice_id: fpInvoiceId,
-            description: `${item.item_name}${item.part_number_sku ? ` (${item.part_number_sku})` : ''}`,
-            quantity: item.quantity,
-            unit_price: item.customer_price_unit,
-            total: (item.customer_price_unit || 0) * (item.quantity || 0),
-          })
-        }
-        for (const labor of (laborItems || [])) {
-          if (!labor.role || !labor.customer_price) continue
-          fpLineItems.push({
-            invoice_id: fpInvoiceId,
-            description: `${labor.role} (${labor.quantity} ${labor.unit || 'hr'})`,
-            quantity: 1,
-            unit_price: parseFloat(labor.customer_price) || 0,
-            total: parseFloat(labor.customer_price) || 0,
-          })
-        }
-        if (fpLineItems.length > 0) {
-          await adminSupabase.from('invoice_line_items').insert(fpLineItems)
-        }
-      }
+        qbo_invoice_id: qboInvoice.Id,
+        qbo_invoice_number: qboInvoice.DocNumber || '',
+      }).eq('id', fpInvoiceId)
     }
 
-    // Log activity
-    await adminSupabase.from('activities').insert({
-      proposal_id: proposalId,
-      org_id: profile.org_id,
-      user_id: profile.id,
-      type: 'note',
-      source: 'system',
-      title: `Invoice created in QuickBooks${invoice.DocNumber ? ` — #${invoice.DocNumber}` : ''}`
-    })
+    // Also store on proposal if this was a proposal sync
+    if (proposalId) {
+      await adminSupabase.from('proposals').update({
+        qbo_invoice_id: qboInvoice.Id,
+        qbo_invoice_number: qboInvoice.DocNumber || '',
+      }).eq('id', proposalId)
+
+      await adminSupabase.from('activities').insert({
+        proposal_id: proposalId,
+        org_id: profile.org_id,
+        user_id: profile.id,
+        type: 'note',
+        source: 'system',
+        title: `Invoice pushed to QuickBooks${qboInvoice.DocNumber ? ` — #${qboInvoice.DocNumber}` : ''}`
+      })
+    }
 
     return new Response(JSON.stringify({
       success: true,
-      invoiceId: invoice.Id,
-      invoiceNumber: invoice.DocNumber,
-      totalAmt: invoice.TotalAmt,
+      invoiceId: qboInvoice.Id,
+      invoiceNumber: qboInvoice.DocNumber,
+      totalAmt: qboInvoice.TotalAmt,
       fpInvoiceId,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
-  } catch (err) {
+  } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      status: 500, headers: corsHeaders
     })
   }
 })

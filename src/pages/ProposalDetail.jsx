@@ -454,17 +454,27 @@ export default function ProposalDetail({ isAdmin }) {
     await updateStatus(newStatus, stageId)
   }
 
-  const saveRenewalModalDates = async () => {
+  const saveRenewalModalDates = async ({ frequencies = {}, autoInvoice = {} } = {}) => {
     setSavingRenewal(true)
     for (const item of pendingRenewalItems) {
       const date = pendingRenewalDates[item.id]
       if (date) {
-        await supabase.from('bom_line_items').update({ renewal_date: date }).eq('id', item.id)
+        await supabase.from('bom_line_items').update({
+          renewal_date: date,
+          billing_frequency: frequencies[item.id] || 'Annual',
+          auto_invoice: autoInvoice[item.id] || false,
+          next_invoice_date: autoInvoice[item.id] ? date : null,
+        }).eq('id', item.id)
       }
     }
     setRenewalDates(prev => ({ ...prev, ...pendingRenewalDates }))
     setLineItems(prev => prev.map(l => {
-      if (pendingRenewalDates[l.id]) return { ...l, renewal_date: pendingRenewalDates[l.id] }
+      if (pendingRenewalDates[l.id]) return {
+        ...l,
+        renewal_date: pendingRenewalDates[l.id],
+        billing_frequency: frequencies[l.id] || 'Annual',
+        auto_invoice: autoInvoice[l.id] || false,
+      }
       return l
     }))
     setShowRenewalModal(false)

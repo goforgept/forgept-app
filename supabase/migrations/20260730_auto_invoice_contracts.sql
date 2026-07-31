@@ -7,3 +7,8 @@ ALTER TABLE contracts
 -- Link invoices back to the contract that generated them
 ALTER TABLE invoices
   ADD COLUMN IF NOT EXISTS contract_id uuid REFERENCES contracts(id) ON DELETE SET NULL;
+
+-- QuickBooks sync fields on invoices
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS qbo_invoice_id text,
+  ADD COLUMN IF NOT EXISTS qbo_invoice_number text;

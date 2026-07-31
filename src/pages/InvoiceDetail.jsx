@@ -27,6 +27,9 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   const [squareConnected, setSquareConnected] = useState(false)
   const [sendingToSquare, setSendingToSquare] = useState(false)
   const [squareError, setSquareError] = useState(null)
+  const [qboConnected, setQboConnected] = useState(false)
+  const [sendingToQbo, setSendingToQbo] = useState(false)
+  const [qboError, setQboError] = useState(null)
   const [copiedLink, setCopiedLink] = useState(false)
   const [editingDueDate, setEditingDueDate] = useState(false)
   const [dueDateValue, setDueDateValue] = useState('')
@@ -72,8 +75,9 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setDescriptionValue(inv?.description || '')
     setDueDateValue(inv?.due_date || '')
     if (inv?.org_id) {
-      const { data: orgData } = await supabase.from('organizations').select('square_connected').eq('id', inv.org_id).single()
+      const { data: orgData } = await supabase.from('organizations').select('square_connected, qbo_connected').eq('id', inv.org_id).single()
       setSquareConnected(orgData?.square_connected || false)
+      setQboConnected(orgData?.qbo_connected || false)
     }
 
     const { data: items } = await supabase
@@ -405,6 +409,22 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setSendingToSquare(false)
   }
 
+  const sendToQbo = async () => {
+    setSendingToQbo(true); setQboError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-create-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ invoiceId: id }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      await fetchAll()
+    } catch (err) { setQboError(err.message) }
+    setSendingToQbo(false)
+  }
+
   const copyPaymentLink = async () => {
     if (!invoice?.square_payment_url) return
     await navigator.clipboard.writeText(invoice.square_payment_url)
@@ -556,6 +576,18 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                   {sendingToSquare ? 'Creating...' : '💳 Send to Square'}
                 </button>
               )}
+              {qboConnected && (
+                invoice?.qbo_invoice_id ? (
+                  <span className="bg-green-500/10 text-green-400 px-4 py-2 rounded-lg text-sm font-semibold border border-green-500/20">
+                    ✓ In QuickBooks{invoice.qbo_invoice_number ? ` #${invoice.qbo_invoice_number}` : ''}
+                  </span>
+                ) : (
+                  <button onClick={sendToQbo} disabled={sendingToQbo}
+                    className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
+                    {sendingToQbo ? 'Syncing...' : '📗 Push to QuickBooks'}
+                  </button>
+                )
+              )}
               <button onClick={() => {
                 setSendForm({ subject: `Invoice ${invoice.invoice_number}`, message: `Hi ${invoice.proposals?.client_name || ticketClient?.clients?.client_name || 'there'},\n\nPlease find your invoice attached. Payment instructions are included on the invoice.\n\nThank you for your business.\n\n${invoice.proposals?.rep_name || profile?.full_name || ''}` })
                 setShowSendModal(true)
@@ -575,6 +607,12 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
             <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 flex items-center justify-between">
               <p className="text-red-400 text-sm">Square error: {squareError}</p>
               <button onClick={() => setSquareError(null)} className="text-fp-muted hover:text-fp-text text-lg leading-none">×</button>
+            </div>
+          )}
+          {qboError && (
+            <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 flex items-center justify-between">
+              <p className="text-red-400 text-sm">QuickBooks error: {qboError}</p>
+              <button onClick={() => setQboError(null)} className="text-fp-muted hover:text-fp-text text-lg leading-none">×</button>
             </div>
           )}
           {invoice?.square_payment_url && (
