@@ -30,6 +30,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   const [qboConnected, setQboConnected] = useState(false)
   const [sendingToQbo, setSendingToQbo] = useState(false)
   const [qboError, setQboError] = useState(null)
+  const [sendViaQbo, setSendViaQbo] = useState(true)
   const [copiedLink, setCopiedLink] = useState(false)
   const [editingDueDate, setEditingDueDate] = useState(false)
   const [dueDateValue, setDueDateValue] = useState('')
@@ -416,7 +417,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-create-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-        body: JSON.stringify({ invoiceId: id }),
+        body: JSON.stringify({ invoiceId: id, sendEmail: sendViaQbo }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -615,10 +616,17 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                       </button>
                     </div>
                   ) : (
-                    <button onClick={sendToQbo} disabled={sendingToQbo}
-                      className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
-                      {sendingToQbo ? 'Syncing...' : '📗 QuickBooks'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={sendViaQbo} onChange={e => setSendViaQbo(e.target.checked)}
+                          className="rounded border-fp-border accent-fp-brand w-3.5 h-3.5" />
+                        <span className="text-fp-muted text-xs">Send</span>
+                      </label>
+                      <button onClick={sendToQbo} disabled={sendingToQbo}
+                        className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
+                        {sendingToQbo ? 'Syncing...' : '📗 QuickBooks'}
+                      </button>
+                    </div>
                   )
                 )}
               </div>

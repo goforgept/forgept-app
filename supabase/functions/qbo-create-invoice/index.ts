@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     )
 
     const body = await req.json()
-    const { invoiceId, proposalId } = body
+    const { invoiceId, proposalId, sendEmail = false } = body
 
     if (!invoiceId && !proposalId) {
       return new Response(JSON.stringify({ error: 'invoiceId or proposalId required' }), { status: 400, headers: corsHeaders })
@@ -372,6 +372,7 @@ Deno.serve(async (req) => {
         DocNumber: docNumber || undefined,
         DueDate: dueDate || undefined,
         PrivateNote: description || undefined,
+        BillEmail: clientEmail ? { Address: clientEmail } : undefined,
       })
     })
 
@@ -407,12 +408,23 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Send invoice via QBO email if requested and email is available
+    if (sendEmail && clientEmail) {
+      try {
+        await fetch(`${baseUrl}/invoice/${qboInvoice.Id}/send?sendTo=${encodeURIComponent(clientEmail)}&minorversion=65`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/octet-stream' }
+        })
+      } catch (_) { /* non-fatal — invoice is created even if send fails */ }
+    }
+
     return new Response(JSON.stringify({
       success: true,
       invoiceId: qboInvoice.Id,
       invoiceNumber: qboInvoice.DocNumber,
       totalAmt: qboInvoice.TotalAmt,
       fpInvoiceId,
+      emailSent: sendEmail && !!clientEmail,
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (err: any) {
