@@ -162,24 +162,46 @@ Deno.serve(async (req) => {
             const customer = custData?.Customer
             if (!customer) continue
 
-            const { data: client } = await supabase
+            const companyName = customer.CompanyName || customer.DisplayName || ''
+            const contactName = [customer.GivenName, customer.FamilyName].filter(Boolean).join(' ').trim()
+            const now = new Date().toISOString()
+
+            const clientFields = {
+              company: companyName || null,
+              client_name: contactName || null,
+              email: customer.PrimaryEmailAddr?.Address || null,
+              phone: customer.PrimaryPhone?.FreeFormNumber || null,
+              address: customer.BillAddr?.Line1 || null,
+              city: customer.BillAddr?.City || null,
+              state: customer.BillAddr?.CountrySubDivisionCode || null,
+              zip: customer.BillAddr?.PostalCode || null,
+              qbo_customer_id: String(entity.id),
+              qbo_last_sync_at: now,
+            }
+
+            // Try to find existing client by QBO ID first, then by company name
+            let { data: client } = await supabase
               .from('clients')
               .select('id')
               .eq('qbo_customer_id', String(entity.id))
               .eq('org_id', org.id)
               .maybeSingle()
 
+            if (!client && companyName) {
+              const { data: byName } = await supabase
+                .from('clients')
+                .select('id')
+                .eq('org_id', org.id)
+                .ilike('company', companyName)
+                .is('qbo_customer_id', null)
+                .maybeSingle()
+              client = byName || null
+            }
+
             if (client) {
-              await supabase.from('clients').update({
-                company: customer.CompanyName || customer.DisplayName || undefined,
-                email: customer.PrimaryEmailAddr?.Address || undefined,
-                phone: customer.PrimaryPhone?.FreeFormNumber || undefined,
-                address: customer.BillAddr?.Line1 || undefined,
-                city: customer.BillAddr?.City || undefined,
-                state: customer.BillAddr?.CountrySubDivisionCode || undefined,
-                zip: customer.BillAddr?.PostalCode || undefined,
-                qbo_last_sync_at: new Date().toISOString(),
-              }).eq('id', client.id)
+              await supabase.from('clients').update(clientFields).eq('id', client.id)
+            } else if (companyName || contactName) {
+              await supabase.from('clients').insert({ org_id: org.id, ...clientFields })
             }
           } catch (e) {
             console.error(`QBO webhook: customer ${entity.id} error:`, e)

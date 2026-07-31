@@ -55,7 +55,10 @@ Deno.serve(async (req) => {
     const { data: client } = await supabase.from('clients').select('*').eq('id', clientId).single()
     if (!client) return new Response(JSON.stringify({ error: 'Client not found' }), { status: 404, headers: corsHeaders })
 
-    const baseUrl = `https://quickbooks.api.intuit.com/v3/company/${org.qbo_realm_id}`
+    const sandbox = Deno.env.get('QBO_SANDBOX') === 'true'
+    const baseUrl = sandbox
+      ? `https://sandbox-quickbooks.api.intuit.com/v3/company/${org.qbo_realm_id}`
+      : `https://quickbooks.api.intuit.com/v3/company/${org.qbo_realm_id}`
     const headers = {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
