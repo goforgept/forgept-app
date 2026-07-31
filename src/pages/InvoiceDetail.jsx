@@ -37,6 +37,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   const [editingLineItems, setEditingLineItems] = useState(false)
   const [editableItems, setEditableItems] = useState([])
   const [ticketClient, setTicketClient] = useState(null)
+  const [clientNetTerms, setClientNetTerms] = useState('')
   const [editingInvoiceNumber, setEditingInvoiceNumber] = useState(false)
   const [invoiceNumberValue, setInvoiceNumberValue] = useState('')
   const [showBillToModal, setShowBillToModal] = useState(false)
@@ -59,19 +60,30 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
     const { data: inv } = await supabase
       .from('invoices')
-      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email)')
+      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email, client_id)')
       .eq('id', id)
       .single()
     setInvoice(inv)
 
+    // Fetch net_terms from the client record
+    let terms = ''
     if (inv?.service_ticket_id) {
       const { data: st } = await supabase
         .from('service_tickets')
-        .select('title, clients(company, client_name, email, address, city, state, zip, phone)')
+        .select('title, clients(company, client_name, email, address, city, state, zip, phone, net_terms)')
         .eq('id', inv.service_ticket_id)
         .single()
       setTicketClient(st)
+      terms = st?.clients?.net_terms || ''
+    } else if (inv?.proposals?.client_id) {
+      const { data: cl } = await supabase
+        .from('clients')
+        .select('net_terms')
+        .eq('id', inv.proposals.client_id)
+        .maybeSingle()
+      terms = cl?.net_terms || ''
     }
+    setClientNetTerms(terms)
     setNotesValue(inv?.notes || '')
     setDescriptionValue(inv?.description || '')
     setDueDateValue(inv?.due_date || '')
@@ -179,7 +191,9 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     const infoY = 48
     doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(80, 80, 80)
     doc.text(`Invoice Date: ${invoice?.issued_date ? new Date(invoice.issued_date + 'T12:00:00').toLocaleDateString() : new Date().toLocaleDateString()}`, pageWidth - 14, infoY, { align: 'right' })
-    if (invoice?.due_date) doc.text(`Due Date: ${new Date(invoice.due_date + 'T12:00:00').toLocaleDateString()}`, pageWidth - 14, infoY + 6, { align: 'right' })
+    let infoOffset = 6
+    if (invoice?.due_date) { doc.text(`Due Date: ${new Date(invoice.due_date + 'T12:00:00').toLocaleDateString()}`, pageWidth - 14, infoY + infoOffset, { align: 'right' }); infoOffset += 6 }
+    if (clientNetTerms) doc.text(`Terms: ${clientNetTerms}`, pageWidth - 14, infoY + infoOffset, { align: 'right' })
 
     // Divider
     const blockBottom = Math.max(yPos, btY) + 4
@@ -667,7 +681,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
             </div>
           )}
 
-          <div className="grid grid-cols-4 gap-4 mt-6">
+          <div className="grid grid-cols-5 gap-4 mt-6">
             <div><p className="text-fp-muted text-xs">Invoice Date</p><p className="text-fp-text text-sm font-medium">{invoice.issued_date ? new Date(invoice.issued_date).toLocaleDateString() : '—'}</p></div>
             <div>
               <p className="text-fp-muted text-xs">Due Date</p>
@@ -684,6 +698,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 </button>
               )}
             </div>
+            <div><p className="text-fp-muted text-xs">Terms</p><p className="text-fp-text text-sm font-medium">{clientNetTerms || '—'}</p></div>
             <div><p className="text-fp-muted text-xs">Total</p><p className="text-fp-text text-sm font-bold">${(invoice.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
             <div><p className="text-fp-muted text-xs">Balance Due</p><p className={`text-sm font-bold ${invoice.balance_due > 0 ? 'text-[#C8622A]' : 'text-green-400'}`}>${(invoice.balance_due || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p></div>
           </div>

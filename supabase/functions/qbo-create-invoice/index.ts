@@ -182,7 +182,7 @@ Deno.serve(async (req) => {
     if (invoiceId) {
       const { data: inv, error: invErr } = await adminSupabase
         .from('invoices')
-        .select('*, proposals(proposal_name, company, client_name, client_email, client_id, quote_number), service_tickets(title, client_id, clients(company, client_name, email, phone, address, city, state, zip))')
+        .select('*, proposals(proposal_name, company, client_name, client_email, client_id, quote_number), service_tickets(title, client_id, clients(company, client_name, email, phone, address, city, state, zip, net_terms))')
         .eq('id', invoiceId)
         .eq('org_id', profile.org_id)
         .single()
@@ -204,7 +204,7 @@ Deno.serve(async (req) => {
             .from('clients')
             .select('email, phone, address, city, state, zip, net_terms')
             .eq('id', inv.proposals.client_id)
-            .single()
+            .maybeSingle()
           if (cl) {
             clientEmail    = clientEmail || cl.email || ''
             clientPhone    = cl.phone || ''
@@ -224,8 +224,9 @@ Deno.serve(async (req) => {
         clientAddress = c?.address || ''
         clientCity    = c?.city || ''
         clientState   = c?.state || ''
-        clientZip     = c?.zip || ''
-        docNumber     = inv.invoice_number || ''
+        clientZip      = c?.zip || ''
+        clientNetTerms = c?.net_terms || ''
+        docNumber      = inv.invoice_number || ''
       } else {
         docNumber = inv.invoice_number || ''
       }
@@ -254,7 +255,7 @@ Deno.serve(async (req) => {
         totalAmount += item.total
       }
 
-      if (inv.tax_amount > 0) taxAmount = inv.tax_amount
+      if ((inv.tax_amount || 0) > 0) taxAmount = inv.tax_amount
 
     // ── Path B: proposalId — original behavior ────────────────────────────────
     } else {
@@ -272,6 +273,22 @@ Deno.serve(async (req) => {
       clientEmail = proposal.client_email || ''
       docNumber   = proposal.quote_number || ''
       dueDate     = proposal.close_date || undefined
+
+      if (proposal.client_id) {
+        const { data: cl } = await adminSupabase
+          .from('clients')
+          .select('phone, address, city, state, zip, net_terms')
+          .eq('id', proposal.client_id)
+          .maybeSingle()
+        if (cl) {
+          clientPhone    = cl.phone || ''
+          clientAddress  = cl.address || ''
+          clientCity     = cl.city || ''
+          clientState    = cl.state || ''
+          clientZip      = cl.zip || ''
+          clientNetTerms = cl.net_terms || ''
+        }
+      }
 
       const { data: lineItems } = await adminSupabase
         .from('bom_line_items')
@@ -359,6 +376,21 @@ Deno.serve(async (req) => {
     )
     if (!customerId) return new Response(JSON.stringify({ error: 'Could not find or create QBO customer' }), { status: 500, headers: corsHeaders })
 
+    // Add tax as an explicit line item so it survives QBO's AST settings
+    if (taxAmount > 0) {
+      qboLines.push({
+        Amount: Math.round(taxAmount * 100) / 100,
+        DetailType: 'SalesItemLineDetail',
+        Description: 'Sales Tax',
+        SalesItemLineDetail: {
+          Qty: 1,
+          UnitPrice: Math.round(taxAmount * 100) / 100,
+          ItemRef: { value: '1', name: 'Services' },
+          TaxCodeRef: { value: 'NON' },
+        }
+      })
+    }
+
     // Create invoice in QBO
     const invoiceRes = await fetch(`${baseUrl}/invoice?minorversion=65`, {
       method: 'POST',
@@ -371,7 +403,6 @@ Deno.serve(async (req) => {
         PrivateNote: description || undefined,
         BillEmail: clientEmail ? { Address: clientEmail } : undefined,
         GlobalTaxCalculation: 'NotApplicable',
-        TxnTaxDetail: taxAmount > 0 ? { TotalTax: taxAmount } : undefined,
         SalesTermRef: termId ? { value: termId } : undefined,
       })
     })
