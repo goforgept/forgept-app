@@ -999,13 +999,19 @@ export default function SuperAdmin() {
 
                 {/* Users */}
                 <div className="bg-[#1a2d45] rounded-xl p-5">
-                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Users</p>
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Users ({members.length})</p>
                   <div className="space-y-2">
                     {members.map(u => (
                       <div key={u.id} className="flex items-center justify-between bg-[#0F1C2E] rounded-lg px-4 py-3 border border-[#2a3d55]">
                         <div>
                           <p className="text-white text-sm font-medium">{u.full_name || '—'}</p>
                           <p className="text-[#8A9AB0] text-xs">{u.email} · {u.org_role || u.role}</p>
+                          <p className="text-[#8A9AB0] text-xs mt-0.5">
+                            {u.last_login
+                              ? <>Last login <span className="text-[#aab8c8]">{new Date(u.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></>
+                              : <span className="text-[#4a5d75]">Never logged in</span>
+                            }
+                          </p>
                         </div>
                         <button onClick={() => impersonateUser(org, u)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">Impersonate</button>
                       </div>
