@@ -115,6 +115,8 @@ export default function IntegrationsTab({
   const [zohoStatus, setZohoStatus] = useState({ crm: false, books: false })
   const [zohoSyncing, setZohoSyncing] = useState(false)
   const [zohoLastSync, setZohoLastSync] = useState(null)
+  const [qboSyncing, setQboSyncing] = useState(false)
+  const [qboSyncResult, setQboSyncResult] = useState(null)
 
   useState(() => {
     const load = async () => {
@@ -198,6 +200,23 @@ export default function IntegrationsTab({
       else setQboMessage({ type: 'error', text: data.error || 'Could not start QuickBooks connection.' })
     } catch (err) { setQboMessage({ type: 'error', text: err.message }) }
     setConnectingQBO(false)
+  }
+
+  const syncQBOCustomers = async () => {
+    setQboSyncing(true); setQboSyncResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-sync-customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setQboSyncResult(`Imported ${data.total} customers: ${data.created} new, ${data.updated} updated`)
+    } catch (err) {
+      setQboSyncResult(`Error: ${err.message}`)
+    }
+    setQboSyncing(false)
   }
 
   const disconnectQBO = async () => {
@@ -465,12 +484,31 @@ export default function IntegrationsTab({
       {selected === 'quickbooks' && (
         <div className="bg-fp-card rounded-xl p-6">
           {qboConnected ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-fp-text font-semibold">QuickBooks Online</p>
-                {qboCompanyName && <p className="text-fp-muted text-sm mt-0.5">Connected to <span className="text-fp-text">{qboCompanyName}</span></p>}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-fp-text font-semibold">QuickBooks Online</p>
+                  {qboCompanyName && <p className="text-fp-muted text-sm mt-0.5">Connected to <span className="text-fp-text">{qboCompanyName}</span></p>}
+                </div>
+                <button onClick={disconnectQBO} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
               </div>
-              <button onClick={disconnectQBO} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
+              <div className="border-t border-fp-border pt-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-fp-text text-sm font-semibold">Import Customers from QBO</p>
+                    <p className="text-fp-muted text-xs mt-0.5">Pull all active QBO customers into ForgePt as clients. Existing matches are updated, new ones are created.</p>
+                  </div>
+                  <button onClick={syncQBOCustomers} disabled={qboSyncing}
+                    className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50 whitespace-nowrap ml-4">
+                    {qboSyncing ? 'Importing...' : 'Import Customers'}
+                  </button>
+                </div>
+                {qboSyncResult && (
+                  <p className={`text-xs mt-2 ${qboSyncResult.startsWith('Error') ? 'text-red-400' : 'text-green-400'}`}>
+                    {qboSyncResult}
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <button onClick={connectQBO} disabled={connectingQBO}
