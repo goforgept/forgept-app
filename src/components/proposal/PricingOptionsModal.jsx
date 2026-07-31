@@ -1,4 +1,4 @@
-export default function PricingOptionsModal({ proposal, onToggleHideMaterialPrices, onToggleLaborBreakdown, onToggleShowMsrp, featureMsrp, onClose }) {
+export default function PricingOptionsModal({ proposal, onToggleHideMaterialPrices, onToggleLaborBreakdown, onToggleShowMsrp, featureMsrp, onToggleShowCompliance, featureComplianceFields, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
       <div className="bg-fp-card rounded-2xl p-6 w-full max-w-sm">
@@ -34,6 +34,18 @@ export default function PricingOptionsModal({ proposal, onToggleHideMaterialPric
               <button onClick={onToggleShowMsrp}
                 className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.show_msrp ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}>
                 <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.show_msrp ? 'left-6' : 'left-1'}`} />
+              </button>
+            </div>
+          )}
+          {featureComplianceFields && (
+            <div className="flex items-center justify-between bg-fp-inset rounded-xl px-4 py-3">
+              <div>
+                <p className="text-fp-text text-sm font-semibold">Show Compliance Columns</p>
+                <p className="text-fp-muted text-xs mt-0.5">Show Lead Time, COO, and Berry Amendment in BOM and on PDF</p>
+              </div>
+              <button onClick={onToggleShowCompliance}
+                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.show_compliance ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}>
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.show_compliance ? 'left-6' : 'left-1'}`} />
               </button>
             </div>
           )}

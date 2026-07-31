@@ -209,7 +209,7 @@ export default function ProposalDetail({ isAdmin }) {
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,show_msrp,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,show_msrp,show_compliance,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
       .eq('id', id)
       .single()
 
@@ -523,6 +523,12 @@ export default function ProposalDetail({ isAdmin }) {
     const newVal = !proposal?.show_msrp
     await supabase.from('proposals').update({ show_msrp: newVal }).eq('id', id)
     setProposal(prev => ({ ...prev, show_msrp: newVal }))
+  }
+
+  const toggleShowCompliance = async () => {
+    const newVal = !proposal?.show_compliance
+    await supabase.from('proposals').update({ show_compliance: newVal }).eq('id', id)
+    setProposal(prev => ({ ...prev, show_compliance: newVal }))
   }
 
   const saveProposalName = async () => {
@@ -1255,7 +1261,7 @@ export default function ProposalDetail({ isAdmin }) {
 
     const { data: freshProposal } = await supabase
       .from('proposals')
-      .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
+      .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, show_compliance, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
       .eq('id', id)
       .single()
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
@@ -1266,7 +1272,7 @@ export default function ProposalDetail({ isAdmin }) {
     const border = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
     const borders = { top: border, bottom: border, left: border, right: border }
     const isLumpSum = p?.hide_material_prices || p?.lump_sum_pricing
-    const showDocxCompliance = features.complianceFields
+    const showDocxCompliance = features.complianceFields && !!p?.show_compliance
     const complianceWidths = showDocxCompliance ? [1000, 900, 1000] : []
     const complianceHeaders = showDocxCompliance ? ['Lead Time', 'COO', 'Berry'] : []
     const colWidths = isLumpSum ? [4200, 1400, 1200, ...complianceWidths] : [2800, 1400, 800, 1000, 1000, ...complianceWidths]
@@ -2633,7 +2639,7 @@ const analyzeDrawing = async () => {
   const generatePDFDoc = async ({ forceHidePricing = false } = {}) => {
     const { data: freshProposal } = await supabase
       .from('proposals')
-      .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, show_msrp, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
+      .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, show_msrp, show_compliance, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
       .eq('id', id)
       .single()
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
@@ -2732,7 +2738,7 @@ const analyzeDrawing = async () => {
       yPos += 6
       const materialsTotal = lineItems.reduce((sum, item) => sum + (item.customer_price_total || 0), 0)
       const showMsrpCol = p?.show_msrp && features.msrp
-      const showCompliance = features.complianceFields
+      const showCompliance = features.complianceFields && !!p?.show_compliance
       const fmtMoney = (v) => `$${(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
       const complianceCols = showCompliance ? ['Lead Time', 'COO', 'Berry'] : []
       const pdfHead = isLumpSum
@@ -3210,7 +3216,7 @@ const analyzeDrawing = async () => {
           onMoveLineToSection={(i) => { setMoveLineIndex(i); setMoveType('move'); setShowMoveModal(true) }}
           fmt={fmt}
           featureMsrp={features.msrp}
-          featureComplianceFields={features.complianceFields}
+          featureComplianceFields={features.complianceFields && !!proposal?.show_compliance}
           canEdit={canEdit}
         />
 
@@ -3324,7 +3330,7 @@ const analyzeDrawing = async () => {
 
       {showSendModal && <SendProposalModal proposal={proposal} sendForm={sendForm} setSendForm={setSendForm} sendingProposal={sendingProposal} onSend={sendProposal} onClose={() => setShowSendModal(false)} />}
 
-      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onClose={() => setShowPricingModal(false)} />}
+      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onToggleShowCompliance={toggleShowCompliance} featureComplianceFields={features.complianceFields} onClose={() => setShowPricingModal(false)} />}
 
       {showMoveModal && moveLineIndex !== null && <MoveLineModal editLines={editLines} moveLineIndex={moveLineIndex} editSections={editSections} onMove={moveLineToSection} onClose={() => { setShowMoveModal(false); setMoveLineIndex(null) }} />}
 
