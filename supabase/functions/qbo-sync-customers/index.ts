@@ -96,17 +96,35 @@ Deno.serve(async (req) => {
       startPosition += pageSize
     }
 
+    // Build a map of QBO ID → company name for top-level customers (Level 0)
+    // so sub-customers can resolve their parent's company name
+    const qboIdToCompany = new Map<string, string>()
+    for (const c of allCustomers) {
+      if (!c.ParentRef) {
+        qboIdToCompany.set(String(c.Id), c.CompanyName || c.DisplayName || '')
+      }
+    }
+
     const now = new Date().toISOString()
     let created = 0, updated = 0, skipped = 0
 
     for (const customer of allCustomers) {
       const qboId = String(customer.Id)
-      const displayName = (customer.CompanyName || customer.DisplayName || '').trim()
+      const isSubCustomer = !!customer.ParentRef
       const contactName = [customer.GivenName, customer.FamilyName].filter(Boolean).join(' ').trim()
 
+      // Sub-customers are contacts — group them under the parent's company name
+      const companyName = isSubCustomer
+        ? (qboIdToCompany.get(String(customer.ParentRef?.value)) || customer.CompanyName || customer.DisplayName || '')
+        : (customer.CompanyName || customer.DisplayName || '')
+
+      const clientName = isSubCustomer
+        ? (contactName || customer.DisplayName || '')
+        : (contactName || null)
+
       const clientFields = {
-        company: customer.CompanyName || customer.DisplayName || null,
-        client_name: contactName || null,
+        company: companyName || null,
+        client_name: clientName || null,
         email: customer.PrimaryEmailAddr?.Address || null,
         phone: customer.PrimaryPhone?.FreeFormNumber || null,
         address: customer.BillAddr?.Line1 || null,
@@ -125,17 +143,34 @@ Deno.serve(async (req) => {
         continue
       }
 
-      // Match by display name (company name)
-      const nameLower = displayName.toLowerCase().trim()
-      const existingByName = nameLower ? byName.get(nameLower) : undefined
-      if (existingByName) {
-        await supabase.from('clients').update(clientFields).eq('id', existingByName.id)
-        updated++
-        continue
+      // For sub-customers, match by both company name + contact name to avoid creating duplicates
+      if (isSubCustomer && companyName && clientName) {
+        const companyLower = companyName.toLowerCase().trim()
+        const nameLower = clientName.toLowerCase().trim()
+        const existingByCompany = existingClients?.find(c =>
+          (c.company || '').toLowerCase().trim() === companyLower &&
+          (c.client_name || '').toLowerCase().trim() === nameLower
+        )
+        if (existingByCompany) {
+          await supabase.from('clients').update(clientFields).eq('id', existingByCompany.id)
+          updated++
+          continue
+        }
+      }
+
+      // For top-level customers, match by company name
+      if (!isSubCustomer) {
+        const nameLower = companyName.toLowerCase().trim()
+        const existingByName = nameLower ? byName.get(nameLower) : undefined
+        if (existingByName) {
+          await supabase.from('clients').update(clientFields).eq('id', existingByName.id)
+          updated++
+          continue
+        }
       }
 
       // Skip if no usable name
-      if (!displayName && !contactName) { skipped++; continue }
+      if (!companyName && !clientName) { skipped++; continue }
 
       // Create new ForgePt client
       await supabase.from('clients').insert({

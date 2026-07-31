@@ -306,6 +306,21 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     setSendingEmail(false)
   }
 
+  const archiveClient = async () => {
+    if (!window.confirm('Archive this client? They will be hidden from the client list but all their proposals and invoices will remain.')) return
+    await supabase.from('clients').update({ archived_at: new Date().toISOString() }).eq('id', id)
+    navigate('/clients')
+  }
+
+  const deleteClient = async () => {
+    if (!window.confirm('Permanently delete this client? This cannot be undone. Any linked proposals, invoices, or tickets will lose their client reference.')) return
+    await supabase.from('client_locations').delete().eq('client_id', id)
+    await supabase.from('client_contacts').delete().eq('client_id', id)
+    const { error } = await supabase.from('clients').delete().eq('id', id)
+    if (error) { alert('Could not delete client: ' + error.message); return }
+    navigate('/clients')
+  }
+
   const saveClient = async () => {
     setSavingClient(true)
     await supabase.from('clients').update({
@@ -565,6 +580,8 @@ const deleteMeeting = async (meetingId) => {
                 }}
                   className="bg-purple-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✍️ Draft Email</button>
               )}
+              <button onClick={archiveClient} className="text-fp-muted text-sm hover:text-yellow-400 transition-colors px-2">Archive</button>
+              <button onClick={deleteClient} className="text-fp-muted text-sm hover:text-red-400 transition-colors px-2">Delete</button>
               <button onClick={() => setEditingClient(true)} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">Edit Client</button>
               <button onClick={handleNewProposal} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ New Proposal</button>
             </div>
