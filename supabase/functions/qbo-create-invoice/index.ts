@@ -160,6 +160,7 @@ Deno.serve(async (req) => {
     let qboLines: any[] = []
     let fpInvoiceId: string | null = null
     let totalAmount = 0
+    let taxAmount = 0
 
     // ── Path A: invoiceId — works for all invoice types ──────────────────────
     if (invoiceId) {
@@ -236,19 +237,7 @@ Deno.serve(async (req) => {
         totalAmount += item.total
       }
 
-      // Tax line
-      if (inv.tax_amount > 0) {
-        qboLines.push({
-          Amount: inv.tax_amount,
-          DetailType: 'SalesItemLineDetail',
-          Description: `Tax (${inv.tax_percent}%)`,
-          SalesItemLineDetail: {
-            Qty: 1,
-            UnitPrice: inv.tax_amount,
-            ItemRef: { value: '1', name: 'Services' }
-          }
-        })
-      }
+      if (inv.tax_amount > 0) taxAmount = inv.tax_amount
 
     // ── Path B: proposalId — original behavior ────────────────────────────────
     } else {
@@ -308,19 +297,7 @@ Deno.serve(async (req) => {
         })
       }
 
-      if (!taxExempt && taxRate > 0) {
-        const taxAmount = matTotal * taxRate / 100
-        qboLines.push({
-          Amount: taxAmount,
-          DetailType: 'SalesItemLineDetail',
-          Description: `Sales Tax (${taxRate}%)`,
-          SalesItemLineDetail: {
-            Qty: 1,
-            UnitPrice: taxAmount,
-            ItemRef: { value: '1', name: 'Services' }
-          }
-        })
-      }
+      if (!taxExempt && taxRate > 0) taxAmount = matTotal * taxRate / 100
 
       // Mirror to ForgePt invoices table
       const invTotal = proposal.total_customer_value || 0
@@ -373,6 +350,8 @@ Deno.serve(async (req) => {
         DueDate: dueDate || undefined,
         PrivateNote: description || undefined,
         BillEmail: clientEmail ? { Address: clientEmail } : undefined,
+        GlobalTaxCalculation: 'NotApplicable',
+        TxnTaxDetail: taxAmount > 0 ? { TotalTax: taxAmount } : undefined,
       })
     })
 
