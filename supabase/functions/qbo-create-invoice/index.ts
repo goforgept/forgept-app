@@ -32,6 +32,21 @@ async function refreshQBOToken(supabase: any, org: any) {
   return tokens.access_token
 }
 
+async function findQBOTermId(accessToken: string, realmId: string, netTerms: string): Promise<string | undefined> {
+  if (!netTerms) return undefined
+  try {
+    const res = await fetch(
+      `${qboBase(realmId)}/query?query=${encodeURIComponent('SELECT * FROM Term')}&minorversion=65`,
+      { headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } }
+    )
+    const data = await res.json()
+    const terms: any[] = data?.QueryResponse?.Term || []
+    const normalized = netTerms.toLowerCase().replace(/\s+/g, ' ').trim()
+    const match = terms.find(t => t.Name?.toLowerCase().replace(/\s+/g, ' ').trim() === normalized)
+    return match?.Id
+  } catch { return undefined }
+}
+
 function qboBase(realmId: string) {
   const sandbox = Deno.env.get('QBO_SANDBOX') === 'true'
   return sandbox
@@ -154,6 +169,7 @@ Deno.serve(async (req) => {
     let clientCity = ''
     let clientState = ''
     let clientZip = ''
+    let clientNetTerms = ''
     let docNumber = ''
     let dueDate: string | undefined
     let description = ''
@@ -186,16 +202,17 @@ Deno.serve(async (req) => {
         if (inv.proposals.client_id) {
           const { data: cl } = await adminSupabase
             .from('clients')
-            .select('email, phone, address, city, state, zip')
+            .select('email, phone, address, city, state, zip, net_terms')
             .eq('id', inv.proposals.client_id)
             .single()
           if (cl) {
-            clientEmail   = clientEmail || cl.email || ''
-            clientPhone   = cl.phone || ''
-            clientAddress = cl.address || ''
-            clientCity    = cl.city || ''
-            clientState   = cl.state || ''
-            clientZip     = cl.zip || ''
+            clientEmail    = clientEmail || cl.email || ''
+            clientPhone    = cl.phone || ''
+            clientAddress  = cl.address || ''
+            clientCity     = cl.city || ''
+            clientState    = cl.state || ''
+            clientZip      = cl.zip || ''
+            clientNetTerms = cl.net_terms || ''
           }
         }
       } else if (inv.service_tickets) {
@@ -332,6 +349,9 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'No billable line items found' }), { status: 400, headers: corsHeaders })
     }
 
+    // Look up QBO term ID from client's net_terms
+    const termId = clientNetTerms ? await findQBOTermId(accessToken, realmId, clientNetTerms) : undefined
+
     // Find or create QBO customer
     const customerId = await findOrCreateCustomer(
       accessToken, realmId, clientName, companyName,
@@ -352,6 +372,7 @@ Deno.serve(async (req) => {
         BillEmail: clientEmail ? { Address: clientEmail } : undefined,
         GlobalTaxCalculation: 'NotApplicable',
         TxnTaxDetail: taxAmount > 0 ? { TotalTax: taxAmount } : undefined,
+        SalesTermRef: termId ? { value: termId } : undefined,
       })
     })
 
@@ -394,6 +415,10 @@ Deno.serve(async (req) => {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/octet-stream' }
         })
+        // Mark ForgePt invoice as Sent
+        if (fpInvoiceId) {
+          await adminSupabase.from('invoices').update({ status: 'Sent' }).eq('id', fpInvoiceId)
+        }
       } catch (_) { /* non-fatal — invoice is created even if send fails */ }
     }
 

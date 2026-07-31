@@ -88,7 +88,10 @@ Deno.serve(async (req) => {
         try { token = await refreshQBOToken(supabase, org) } catch { continue }
       }
 
-      const baseUrl = `https://quickbooks.api.intuit.com/v3/company/${realmId}`
+      const sandbox = Deno.env.get('QBO_SANDBOX') === 'true'
+      const baseUrl = sandbox
+        ? `https://sandbox-quickbooks.api.intuit.com/v3/company/${realmId}`
+        : `https://quickbooks.api.intuit.com/v3/company/${realmId}`
       const qboHeaders = {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
@@ -103,57 +106,48 @@ Deno.serve(async (req) => {
             const invoice = invoiceData?.Invoice
             if (!invoice) continue
 
-            const isPaid = invoice.Balance === 0 && (invoice.TotalAmt || 0) > 0
+            const isPaid    = invoice.Balance === 0 && (invoice.TotalAmt || 0) > 0
+            const isSent    = invoice.EmailStatus === 'EmailSent'
+            const newStatus = isPaid ? 'Paid' : isSent ? 'Sent' : null
 
-            // Find the ForgePt proposal that corresponds to this QBO invoice
-            const { data: proposal } = await supabase
-              .from('proposals')
-              .select('id, org_id, proposal_name')
+            // Look up ForgePt invoice directly by qbo_invoice_id
+            const { data: fpInvoice } = await supabase
+              .from('invoices')
+              .select('id, status, total, proposal_id')
               .eq('qbo_invoice_id', String(entity.id))
               .eq('org_id', org.id)
-              .single()
+              .maybeSingle()
 
-            if (!proposal) continue
+            if (!fpInvoice) continue
 
-            if (isPaid) {
-              const paidAmount = invoice.TotalAmt || 0
-              const paidDate = new Date().toISOString().split('T')[0]
+            if (newStatus && fpInvoice.status !== newStatus) {
+              const updatePayload: any = { status: newStatus }
+              if (isPaid) {
+                updatePayload.amount_paid = invoice.TotalAmt
+                updatePayload.balance_due = 0
+              }
+              await supabase.from('invoices').update(updatePayload).eq('id', fpInvoice.id)
 
-              // Update existing ForgePt invoice for this proposal if one exists
-              const { data: fpInvoice } = await supabase
-                .from('invoices')
-                .select('id, status, total')
-                .eq('proposal_id', proposal.id)
-                .eq('org_id', org.id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .maybeSingle()
-
-              if (fpInvoice && fpInvoice.status !== 'Paid') {
-                await supabase.from('invoices').update({
-                  status: 'Paid',
-                  amount_paid: paidAmount,
-                  balance_due: 0,
-                }).eq('id', fpInvoice.id)
-
-                // Record payment
+              if (isPaid) {
+                const paidDate = new Date().toISOString().split('T')[0]
                 await supabase.from('invoice_payments').insert({
                   invoice_id: fpInvoice.id,
-                  amount: paidAmount,
+                  amount: invoice.TotalAmt,
                   payment_date: paidDate,
                   method: 'QuickBooks',
                   notes: `Synced from QuickBooks — Invoice #${invoice.DocNumber || entity.id}`,
-                }).select()
-              }
+                })
 
-              // Log activity on the proposal
-              await supabase.from('activities').insert({
-                proposal_id: proposal.id,
-                org_id: org.id,
-                type: 'note',
-                source: 'system',
-                title: `Invoice paid in QuickBooks — $${paidAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}${invoice.DocNumber ? ` · #${invoice.DocNumber}` : ''}`,
-              })
+                if (fpInvoice.proposal_id) {
+                  await supabase.from('activities').insert({
+                    proposal_id: fpInvoice.proposal_id,
+                    org_id: org.id,
+                    type: 'note',
+                    source: 'system',
+                    title: `Invoice paid in QuickBooks — $${invoice.TotalAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}${invoice.DocNumber ? ` · #${invoice.DocNumber}` : ''}`,
+                  })
+                }
+              }
             }
           } catch (e) {
             console.error(`QBO webhook: invoice ${entity.id} error:`, e)
