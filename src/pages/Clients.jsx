@@ -151,9 +151,18 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
       const matchSearch = !q ||
         c.company.toLowerCase().includes(q) ||
         c.contacts.some(x => (x.client_name || '').toLowerCase().includes(q)) ||
-        c.email.toLowerCase().includes(q)
+        c.contacts.some(x => (x.email || '').toLowerCase().includes(q))
       const matchIndustry = !filterIndustry || c.industry === filterIndustry
       return matchSearch && matchIndustry
+    })
+    .map(c => {
+      const q = search.toLowerCase()
+      if (!q || c.company.toLowerCase().includes(q)) return { ...c, visibleContacts: c.contacts, navigateTo: c.contacts[0]?.id }
+      const matched = c.contacts.filter(x =>
+        (x.client_name || '').toLowerCase().includes(q) ||
+        (x.email || '').toLowerCase().includes(q)
+      )
+      return { ...c, visibleContacts: matched.length ? matched : c.contacts, navigateTo: (matched[0] || c.contacts[0])?.id }
     })
 
   return (
@@ -219,15 +228,16 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map(({ company, contacts, primary, industry, location, email, phone, isArchived }) => {
+            {filtered.map(({ company, contacts, visibleContacts, navigateTo, primary, industry, location, email, phone, isArchived }) => {
               const initials = company.slice(0, 2).toUpperCase()
               const badgeClass = industryColors[industry] || industryColors['Other']
-              const fullAddress = [primary?.address, primary?.city, primary?.state, primary?.zip].filter(Boolean).join(', ')
+              const displayPrimary = visibleContacts[0] || primary
+              const fullAddress = [displayPrimary?.address, displayPrimary?.city, displayPrimary?.state, displayPrimary?.zip].filter(Boolean).join(', ')
 
               return (
                 <div
                   key={company}
-                  onClick={() => navigate(`/client/${primary.id}`)}
+                  onClick={() => navigate(`/client/${navigateTo}`)}
                   className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover hover:border-fp-brand/40 border border-fp-border transition-all group"
                 >
                   {/* Card header */}
@@ -240,9 +250,12 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                         <p className="text-fp-text font-semibold group-hover:text-[#C8622A] transition-colors leading-tight">
                           {company}
                         </p>
-                        {contacts.length > 0 && (
+                        {visibleContacts.length > 0 && (
                           <p className="text-fp-muted text-xs mt-0.5">
-                            {contacts.map(c => c.client_name).filter(Boolean).join(', ') || 'No contact name'}
+                            {visibleContacts.map(c => c.client_name).filter(Boolean).join(', ') || 'No contact name'}
+                            {visibleContacts.length < contacts.length && (
+                              <span className="text-fp-muted/50"> +{contacts.length - visibleContacts.length} more</span>
+                            )}
                           </p>
                         )}
                       </div>
@@ -256,28 +269,28 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
 
                   {/* Contact details */}
                   <div className="space-y-1.5">
-                    {email && (
+                    {displayPrimary?.email && (
                       <div className="flex items-center gap-2">
                         <span className="text-fp-muted text-xs w-4">@</span>
-                        <span className="text-fp-muted text-xs truncate">{email}</span>
+                        <span className="text-fp-muted text-xs truncate">{displayPrimary.email}</span>
                       </div>
                     )}
-                    {phone && (
+                    {displayPrimary?.phone && (
                       <div className="flex items-center gap-2">
                         <span className="text-fp-muted text-xs w-4">#</span>
-                        <span className="text-fp-muted text-xs">{phone}</span>
+                        <span className="text-fp-muted text-xs">{displayPrimary.phone}</span>
                       </div>
                     )}
-                    {location && (
+                    {[displayPrimary?.city, displayPrimary?.state].filter(Boolean).join(', ') && (
                       <div className="flex items-center gap-2">
                         <span className="text-fp-muted text-xs w-4">⌖</span>
-                        <span className="text-fp-muted text-xs">{location}</span>
+                        <span className="text-fp-muted text-xs">{[displayPrimary?.city, displayPrimary?.state].filter(Boolean).join(', ')}</span>
                       </div>
                     )}
-                    {primary?.store_id && (
+                    {displayPrimary?.store_id && (
                       <div className="flex items-center gap-2">
                         <span className="text-fp-muted text-xs w-4">ID</span>
-                        <span className="text-fp-muted text-xs font-mono">{primary.store_id}</span>
+                        <span className="text-fp-muted text-xs font-mono">{displayPrimary.store_id}</span>
                       </div>
                     )}
                   </div>
