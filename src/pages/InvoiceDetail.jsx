@@ -425,6 +425,12 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setSendingToQbo(false)
   }
 
+  const clearQboLink = async () => {
+    await supabase.from('invoices').update({ qbo_invoice_id: null, qbo_invoice_number: null }).eq('id', id)
+    setInvoice(prev => ({ ...prev, qbo_invoice_id: null, qbo_invoice_number: null }))
+    setQboError(null)
+  }
+
   const copyPaymentLink = async () => {
     if (!invoice?.square_payment_url) return
     await navigator.clipboard.writeText(invoice.square_payment_url)
@@ -602,6 +608,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                       <button onClick={sendToQbo} disabled={sendingToQbo} title="Re-sync to QuickBooks"
                         className="text-fp-muted hover:text-fp-text text-xs transition-colors disabled:opacity-50">
                         {sendingToQbo ? '...' : '↻'}
+                      </button>
+                      <button onClick={clearQboLink} title="Disconnect from QuickBooks"
+                        className="text-fp-muted hover:text-red-400 text-xs transition-colors">
+                        ✕
                       </button>
                     </div>
                   ) : (

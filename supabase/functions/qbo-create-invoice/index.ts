@@ -163,29 +163,40 @@ Deno.serve(async (req) => {
 
     // ── Path A: invoiceId — works for all invoice types ──────────────────────
     if (invoiceId) {
-      const { data: inv } = await adminSupabase
+      const { data: inv, error: invErr } = await adminSupabase
         .from('invoices')
-        .select('*, proposals(proposal_name, company, client_name, client_email, quote_number, clients(email, phone, address, city, state, zip)), service_tickets(title, clients(company, client_name, email, phone, address, city, state, zip))')
+        .select('*, proposals(proposal_name, company, client_name, client_email, client_id, quote_number), service_tickets(title, client_id, clients(company, client_name, email, phone, address, city, state, zip))')
         .eq('id', invoiceId)
         .eq('org_id', profile.org_id)
         .single()
 
-      if (!inv) return new Response(JSON.stringify({ error: 'Invoice not found' }), { status: 404, headers: corsHeaders })
+      if (!inv) return new Response(JSON.stringify({ error: invErr?.message || 'Invoice not found' }), { status: 404, headers: corsHeaders })
 
       fpInvoiceId = inv.id
 
       // Resolve client info — proposal > service ticket > invoice description
       if (inv.proposals) {
-        const pc = inv.proposals.clients
-        companyName   = inv.proposals.company || ''
-        clientName    = inv.proposals.client_name || ''
-        clientEmail   = inv.proposals.client_email || pc?.email || ''
-        clientPhone   = pc?.phone || ''
-        clientAddress = pc?.address || ''
-        clientCity    = pc?.city || ''
-        clientState   = pc?.state || ''
-        clientZip     = pc?.zip || ''
-        docNumber     = inv.proposals.quote_number || inv.invoice_number || ''
+        companyName = inv.proposals.company || ''
+        clientName  = inv.proposals.client_name || ''
+        clientEmail = inv.proposals.client_email || ''
+        docNumber   = inv.proposals.quote_number || inv.invoice_number || ''
+
+        // Fetch client record separately for phone/address
+        if (inv.proposals.client_id) {
+          const { data: cl } = await adminSupabase
+            .from('clients')
+            .select('email, phone, address, city, state, zip')
+            .eq('id', inv.proposals.client_id)
+            .single()
+          if (cl) {
+            clientEmail   = clientEmail || cl.email || ''
+            clientPhone   = cl.phone || ''
+            clientAddress = cl.address || ''
+            clientCity    = cl.city || ''
+            clientState   = cl.state || ''
+            clientZip     = cl.zip || ''
+          }
+        }
       } else if (inv.service_tickets) {
         const c = inv.service_tickets.clients
         companyName   = c?.company || ''
