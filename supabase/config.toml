@@ -106,6 +106,9 @@ verify_jwt = false
 [functions.renewal-engine]
 verify_jwt = false
 
+[functions.auto-invoice-engine]
+verify_jwt = false
+
 [functions.submit-rfq-response]
 verify_jwt = false
 [functions.zoho-oauth-callback]

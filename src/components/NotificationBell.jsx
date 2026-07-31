@@ -71,6 +71,8 @@ export default function NotificationBell({ userId }) {
     if (type === 'task_due') return '✅'
     if (type === 'email_opened') return '✉️'
     if (type === 'proposal_sent') return '📄'
+    if (type === 'invoice_sent') return '🧾'
+    if (type === 'invoice_overdue') return '⚠️'
     return '🔔'
   }
 

@@ -17,10 +17,24 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     if (profile?.org_id) fetchContracts(profile)
   }, [profile?.org_id])
 
+  const toggleAutoInvoice = async (contract) => {
+    const newVal = !contract.auto_invoice
+    // Set next_invoice_date to today when enabling (engine runs tonight and picks it up)
+    const today = new Date().toISOString().split('T')[0]
+    await supabase
+      .from('contracts')
+      .update({
+        auto_invoice: newVal,
+        next_invoice_date: newVal ? (contract.next_invoice_date || today) : contract.next_invoice_date,
+      })
+      .eq('id', contract.id)
+    setContracts(prev => prev.map(c => c.id === contract.id ? { ...c, auto_invoice: newVal } : c))
+  }
+
   const fetchContracts = async (prof) => {
     let query = supabase
       .from('contracts')
-      .select('*, proposals(proposal_name, company, client_name)')
+      .select('*, proposals(proposal_name, company, client_name, client_email)')
       .eq('org_id', prof.org_id)
       .order('end_date', { ascending: true })
 
@@ -131,6 +145,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">End</th>
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Status</th>
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Auto-Renew</th>
+                    <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Auto Invoice</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -170,6 +185,25 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                         </td>
                         <td className="px-5 py-4 text-sm">
                           {c.auto_renew ? <span className="text-green-400 font-semibold">Yes</span> : <span className="text-fp-muted">No</span>}
+                        </td>
+                        <td className="px-5 py-4" onClick={e => e.stopPropagation()}>
+                          {c.recurring_fee > 0 ? (
+                            <div className="flex flex-col gap-1">
+                              <button
+                                onClick={() => toggleAutoInvoice(c)}
+                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${c.auto_invoice ? 'bg-green-500' : 'bg-fp-border'}`}
+                              >
+                                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${c.auto_invoice ? 'translate-x-4' : 'translate-x-1'}`} />
+                              </button>
+                              {c.auto_invoice && c.next_invoice_date && (
+                                <p className="text-fp-muted text-xs">
+                                  Next: {new Date(c.next_invoice_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-fp-muted text-xs">No fee set</span>
+                          )}
                         </td>
                       </tr>
                     )
