@@ -364,8 +364,71 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── PART 3: OVERDUE INVOICE NOTIFICATIONS ────────────────────────────────
+    let overdueInvoicesMarked = 0
+    try {
+      // Fetch invoices past due that aren't already marked Overdue or Paid
+      const overdueRes = await fetch(
+        `${supabaseUrl}/rest/v1/invoices?due_date=lt.${todayStr}&status=not.in.(Paid,Overdue,Cancelled)&balance_due=gt.0&select=id,invoice_number,total,due_date,org_id,proposal_id,proposals(user_id,company,client_name)`,
+        { headers: dbHeaders }
+      )
+      const overdueInvoices: any[] = await overdueRes.json()
+
+      for (const inv of (Array.isArray(overdueInvoices) ? overdueInvoices : [])) {
+        // Mark invoice as Overdue
+        await fetch(`${supabaseUrl}/rest/v1/invoices?id=eq.${inv.id}`, {
+          method: 'PATCH',
+          headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ status: 'Overdue' })
+        })
+        overdueInvoicesMarked++
+
+        const company = inv.proposals?.company || inv.proposals?.client_name || 'a client'
+        const amount = `$${(inv.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+        const dueDate = new Date(inv.due_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        const notifTitle = `Overdue invoice — ${company}`
+        const notifBody = `${inv.invoice_number ? `#${inv.invoice_number} · ` : ''}${amount} · was due ${dueDate}`
+        const notifLink = `/invoices/${inv.id}`
+        const dedupKey = `invoice_overdue:${inv.id}:${todayStr}`
+
+        // Notify the rep who owns the proposal
+        const repUserId = inv.proposals?.user_id
+        const recipientIds: string[] = []
+        if (repUserId) recipientIds.push(repUserId)
+
+        // Also notify org admins (deduplicated)
+        const adminsRes = await fetch(
+          `${supabaseUrl}/rest/v1/profiles?org_id=eq.${inv.org_id}&org_role=eq.admin&select=id`,
+          { headers: dbHeaders }
+        )
+        const admins: any[] = await adminsRes.json()
+        for (const a of (Array.isArray(admins) ? admins : [])) {
+          if (!recipientIds.includes(a.id)) recipientIds.push(a.id)
+        }
+
+        if (recipientIds.length > 0) {
+          await fetch(`${supabaseUrl}/rest/v1/notifications`, {
+            method: 'POST',
+            headers: { ...dbHeaders, 'Prefer': 'resolution=ignore-duplicates,return=minimal' },
+            body: JSON.stringify(recipientIds.map(uid => ({
+              org_id: inv.org_id,
+              user_id: uid,
+              type: 'invoice_overdue',
+              title: notifTitle,
+              body: notifBody,
+              link: notifLink,
+              read: false,
+              dedup_key: `${dedupKey}:${uid}`,
+            })))
+          })
+        }
+      }
+    } catch (e) {
+      console.error('Overdue invoice check failed:', e)
+    }
+
     return new Response(
-      JSON.stringify({ success: true, emailsSent, skipped, errors, taskDigestsSent }),
+      JSON.stringify({ success: true, emailsSent, skipped, errors, taskDigestsSent, overdueInvoicesMarked }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
