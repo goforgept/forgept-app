@@ -21,6 +21,7 @@ const AgeBadge = ({ days }) => {
 export default function ProductLibrary({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, isSalesManager = false, isPM = false, isTechnician = false }) {
   const { profile, features } = useProfile()
   const featureMsrp = features.msrp
+  const featureComplianceFields = features.complianceFields
   const [products, setProducts] = useState([])   // product_library rows
   const [pricing, setPricing] = useState({})      // { product_id: [pricing rows] }
   const [loading, setLoading] = useState(true)
@@ -35,7 +36,7 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [activeTab, setActiveTab] = useState('library') // 'library' | catalog slug
   // Add product form
   const [showAddForm, setShowAddForm] = useState(false)
-  const [addForm, setAddForm] = useState({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '' })
+  const [addForm, setAddForm] = useState({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '', lead_time: '', country_of_origin: '', berry_compliance: '' })
   const [saving, setSaving] = useState(false)
   // Add vendor price inline
   const [addingPriceFor, setAddingPriceFor] = useState(null) // product_id or `cat_${catalog_product_id}`
@@ -333,10 +334,13 @@ if (!finalCost) continue
       part_number: addForm.part_number || null,
       sub_category: addForm.sub_category || null,
       msrp: addForm.msrp ? parseFloat(addForm.msrp) : null,
+      lead_time: addForm.lead_time || null,
+      country_of_origin: addForm.country_of_origin || null,
+      berry_compliance: addForm.berry_compliance || null,
       active: true,
     })
     if (err) { setError(err.message); setSaving(false); return }
-    setAddForm({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '' })
+    setAddForm({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '', lead_time: '', country_of_origin: '', berry_compliance: '' })
     setShowAddForm(false); setSaving(false)
     const { data: newProd } = await supabase
       .from('product_library')
@@ -473,6 +477,9 @@ if (!finalCost) continue
               </div>
               <div><label className="text-fp-muted text-xs mb-1 block">Description</label><input type="text" value={addForm.description} onChange={e => setAddForm(p => ({ ...p, description: e.target.value }))} className={inputCls} /></div>
               {featureMsrp && <div><label className="text-fp-muted text-xs mb-1 block">MSRP</label><input type="number" placeholder="0.00" value={addForm.msrp} onChange={e => setAddForm(p => ({ ...p, msrp: e.target.value }))} className={inputCls} /></div>}
+              {featureComplianceFields && <div><label className="text-fp-muted text-xs mb-1 block">Lead Time</label><input type="text" placeholder="e.g. 4–6 weeks" value={addForm.lead_time} onChange={e => setAddForm(p => ({ ...p, lead_time: e.target.value }))} className={inputCls} /></div>}
+              {featureComplianceFields && <div><label className="text-fp-muted text-xs mb-1 block">COO</label><input type="text" placeholder="e.g. USA" value={addForm.country_of_origin} onChange={e => setAddForm(p => ({ ...p, country_of_origin: e.target.value }))} className={inputCls} /></div>}
+              {featureComplianceFields && <div><label className="text-fp-muted text-xs mb-1 block">Berry Amendment</label><input type="text" placeholder="e.g. Compliant" value={addForm.berry_compliance} onChange={e => setAddForm(p => ({ ...p, berry_compliance: e.target.value }))} className={inputCls} /></div>}
             </div>
             <p className="text-fp-muted text-xs mb-4">After saving, the vendor pricing form will open automatically so you can add costs right away.</p>
             <button onClick={handleAddProduct} disabled={saving || !addForm.item_name}
@@ -678,6 +685,21 @@ if (!finalCost) continue
               <input type="number" placeholder="0.00" value={editForm.msrp || ''} onChange={e => setEditForm(p => ({ ...p, msrp: e.target.value }))} className={inputCls} />
             </div>
           )}
+          {featureComplianceFields && (
+            <div><label className="text-fp-muted text-xs mb-1 block">Lead Time</label>
+              <input type="text" placeholder="e.g. 4–6 weeks" value={editForm.lead_time || ''} onChange={e => setEditForm(p => ({ ...p, lead_time: e.target.value }))} className={inputCls} />
+            </div>
+          )}
+          {featureComplianceFields && (
+            <div><label className="text-fp-muted text-xs mb-1 block">COO</label>
+              <input type="text" placeholder="e.g. USA" value={editForm.country_of_origin || ''} onChange={e => setEditForm(p => ({ ...p, country_of_origin: e.target.value }))} className={inputCls} />
+            </div>
+          )}
+          {featureComplianceFields && (
+            <div><label className="text-fp-muted text-xs mb-1 block">Berry Amendment</label>
+              <input type="text" placeholder="e.g. Compliant" value={editForm.berry_compliance || ''} onChange={e => setEditForm(p => ({ ...p, berry_compliance: e.target.value }))} className={inputCls} />
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button onClick={() => setEditingProductId(null)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Cancel</button>
@@ -691,6 +713,9 @@ if (!finalCost) continue
               unit: editForm.unit || 'ea',
               description: editForm.description || null,
               msrp: editForm.msrp ? parseFloat(editForm.msrp) : null,
+              lead_time: editForm.lead_time || null,
+              country_of_origin: editForm.country_of_origin || null,
+              berry_compliance: editForm.berry_compliance || null,
             }).eq('id', p.id)
             if (updErr) { setError(updErr.message); return }
             setEditingProductId(null)
@@ -701,10 +726,18 @@ if (!finalCost) continue
         </div>
       </div>
     ) : (
-      <div className="flex items-center justify-between mb-2">
-        {p.description && <p className="text-fp-muted text-xs italic">{p.description}</p>}
-        {!p.description && <span />}
-        <button onClick={() => { setEditingProductId(p.id); setEditForm({ item_name: p.item_name, manufacturer: p.manufacturer, part_number: p.part_number, category: p.category, sub_category: p.sub_category || '', unit: p.unit, description: p.description, msrp: p.msrp ?? '' }) }}
+      <div className="flex items-start justify-between mb-2">
+        <div>
+          {p.description && <p className="text-fp-muted text-xs italic mb-1">{p.description}</p>}
+          {featureComplianceFields && (p.lead_time || p.country_of_origin || p.berry_compliance) && (
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
+              {p.lead_time && <span className="text-fp-muted text-xs">Lead: <span className="text-fp-text">{p.lead_time}</span></span>}
+              {p.country_of_origin && <span className="text-fp-muted text-xs">COO: <span className="text-fp-text">{p.country_of_origin}</span></span>}
+              {p.berry_compliance && <span className="text-fp-muted text-xs">Berry: <span className="text-fp-text">{p.berry_compliance}</span></span>}
+            </div>
+          )}
+        </div>
+        <button onClick={() => { setEditingProductId(p.id); setEditForm({ item_name: p.item_name, manufacturer: p.manufacturer, part_number: p.part_number, category: p.category, sub_category: p.sub_category || '', unit: p.unit, description: p.description, msrp: p.msrp ?? '', lead_time: p.lead_time || '', country_of_origin: p.country_of_origin || '', berry_compliance: p.berry_compliance || '' }) }}
           className="text-fp-muted hover:text-fp-text text-xs transition-colors">✎ Edit</button>
       </div>
     )}
