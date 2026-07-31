@@ -565,41 +565,53 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
               </div>
               <p className="text-fp-muted text-xs mt-0.5">{invoice.proposals?.proposal_name || ticketClient?.title}</p>
             </div>
-            <div className="flex gap-2">
-              <button onClick={deleteInvoice}
-                className="bg-fp-inset text-red-400 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-red-500/10 transition-colors">
-                Delete
-              </button>
-              {squareConnected && !invoice?.square_invoice_id && (
-                <button onClick={sendToSquare} disabled={sendingToSquare}
-                  className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
-                  {sendingToSquare ? 'Creating...' : '💳 Send to Square'}
+            <div className="flex flex-col items-end gap-2">
+              {/* Primary actions */}
+              <div className="flex gap-2">
+                <button onClick={() => {
+                  setSendForm({ subject: `Invoice ${invoice.invoice_number}`, message: `Hi ${invoice.proposals?.client_name || ticketClient?.clients?.client_name || 'there'},\n\nPlease find your invoice attached. Payment instructions are included on the invoice.\n\nThank you for your business.\n\n${invoice.proposals?.rep_name || profile?.full_name || ''}` })
+                  setShowSendModal(true)
+                }} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
+                  ✉ Send Invoice
                 </button>
-              )}
-              {qboConnected && (
-                invoice?.qbo_invoice_id ? (
-                  <span className="bg-green-500/10 text-green-400 px-4 py-2 rounded-lg text-sm font-semibold border border-green-500/20">
-                    ✓ In QuickBooks{invoice.qbo_invoice_number ? ` #${invoice.qbo_invoice_number}` : ''}
-                  </span>
-                ) : (
-                  <button onClick={sendToQbo} disabled={sendingToQbo}
-                    className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
-                    {sendingToQbo ? 'Syncing...' : '📗 Push to QuickBooks'}
+                <button onClick={downloadPDF} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors">
+                  ↓ PDF
+                </button>
+                <button onClick={() => setShowPaymentModal(true)} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                  + Record Payment
+                </button>
+              </div>
+              {/* Integrations + delete */}
+              <div className="flex items-center gap-3">
+                <button onClick={deleteInvoice}
+                  className="text-red-400 text-xs hover:text-red-300 transition-colors">
+                  Delete
+                </button>
+                {squareConnected && !invoice?.square_invoice_id && (
+                  <button onClick={sendToSquare} disabled={sendingToSquare}
+                    className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
+                    {sendingToSquare ? 'Creating...' : '💳 Square'}
                   </button>
-                )
-              )}
-              <button onClick={() => {
-                setSendForm({ subject: `Invoice ${invoice.invoice_number}`, message: `Hi ${invoice.proposals?.client_name || ticketClient?.clients?.client_name || 'there'},\n\nPlease find your invoice attached. Payment instructions are included on the invoice.\n\nThank you for your business.\n\n${invoice.proposals?.rep_name || profile?.full_name || ''}` })
-                setShowSendModal(true)
-              }} className="bg-green-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
-                ✉ Send Invoice
-              </button>
-              <button onClick={downloadPDF} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors">
-                ↓ Download PDF
-              </button>
-              <button onClick={() => setShowPaymentModal(true)} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-                + Record Payment
-              </button>
+                )}
+                {qboConnected && (
+                  invoice?.qbo_invoice_id ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="bg-green-500/10 text-green-400 px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-500/20">
+                        ✓ QuickBooks{invoice.qbo_invoice_number ? ` #${invoice.qbo_invoice_number}` : ''}
+                      </span>
+                      <button onClick={sendToQbo} disabled={sendingToQbo} title="Re-sync to QuickBooks"
+                        className="text-fp-muted hover:text-fp-text text-xs transition-colors disabled:opacity-50">
+                        {sendingToQbo ? '...' : '↻'}
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={sendToQbo} disabled={sendingToQbo}
+                      className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
+                      {sendingToQbo ? 'Syncing...' : '📗 QuickBooks'}
+                    </button>
+                  )
+                )}
+              </div>
             </div>
           </div>
 

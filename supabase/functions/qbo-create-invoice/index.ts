@@ -32,8 +32,20 @@ async function refreshQBOToken(supabase: any, org: any) {
   return tokens.access_token
 }
 
-async function findOrCreateCustomer(accessToken: string, realmId: string, clientName: string, companyName: string, clientEmail?: string) {
-  const baseUrl = `https://quickbooks.api.intuit.com/v3/company/${realmId}`
+function qboBase(realmId: string) {
+  const sandbox = Deno.env.get('QBO_SANDBOX') === 'true'
+  return sandbox
+    ? `https://sandbox-quickbooks.api.intuit.com/v3/company/${realmId}`
+    : `https://quickbooks.api.intuit.com/v3/company/${realmId}`
+}
+
+async function findOrCreateCustomer(
+  accessToken: string, realmId: string,
+  clientName: string, companyName: string,
+  clientEmail?: string, phone?: string,
+  address?: string, city?: string, state?: string, zip?: string
+) {
+  const baseUrl = qboBase(realmId)
   const headers = {
     'Authorization': `Bearer ${accessToken}`,
     'Content-Type': 'application/json',
@@ -45,17 +57,45 @@ async function findOrCreateCustomer(accessToken: string, realmId: string, client
   const searchRes = await fetch(`${baseUrl}/query?query=${query}&minorversion=65`, { headers })
   const searchData = await searchRes.json()
   const existing = searchData?.QueryResponse?.Customer?.[0]
-  if (existing) return existing.Id
+
+  // If customer exists but is missing email, do a sparse update
+  if (existing) {
+    if (clientEmail && !existing.PrimaryEmailAddr?.Address) {
+      const updateBody: any = {
+        ...existing,
+        PrimaryEmailAddr: { Address: clientEmail },
+      }
+      if (phone && !existing.PrimaryPhone?.FreeFormNumber) {
+        updateBody.PrimaryPhone = { FreeFormNumber: phone }
+      }
+      await fetch(`${baseUrl}/customer?minorversion=65`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(updateBody)
+      })
+    }
+    return existing.Id
+  }
+
+  const billingAddr = (address || city || state || zip) ? {
+    Line1: address || '',
+    City: city || '',
+    CountrySubDivisionCode: state || '',
+    PostalCode: zip || '',
+    Country: 'US',
+  } : undefined
 
   const createRes = await fetch(`${baseUrl}/customer?minorversion=65`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
       DisplayName: displayName,
-      PrimaryEmailAddr: clientEmail ? { Address: clientEmail } : undefined,
       CompanyName: companyName || '',
       GivenName: (clientName || '').split(' ')[0] || '',
       FamilyName: (clientName || '').split(' ').slice(1).join(' ') || '',
+      PrimaryEmailAddr: clientEmail ? { Address: clientEmail } : undefined,
+      PrimaryPhone: phone ? { FreeFormNumber: phone } : undefined,
+      BillAddr: billingAddr,
     })
   })
   const createData = await createRes.json()
@@ -99,7 +139,7 @@ Deno.serve(async (req) => {
     }
 
     const realmId = org.qbo_realm_id
-    const baseUrl = `https://quickbooks.api.intuit.com/v3/company/${realmId}`
+    const baseUrl = qboBase(realmId)
     const qboHeaders = {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
@@ -109,6 +149,11 @@ Deno.serve(async (req) => {
     let clientName = ''
     let companyName = ''
     let clientEmail = ''
+    let clientPhone = ''
+    let clientAddress = ''
+    let clientCity = ''
+    let clientState = ''
+    let clientZip = ''
     let docNumber = ''
     let dueDate: string | undefined
     let description = ''
@@ -120,7 +165,7 @@ Deno.serve(async (req) => {
     if (invoiceId) {
       const { data: inv } = await adminSupabase
         .from('invoices')
-        .select('*, proposals(proposal_name, company, client_name, client_email, quote_number), service_tickets(title, clients(company, client_name, email))')
+        .select('*, proposals(proposal_name, company, client_name, client_email, quote_number, clients(email, phone, address, city, state, zip)), service_tickets(title, clients(company, client_name, email, phone, address, city, state, zip))')
         .eq('id', invoiceId)
         .eq('org_id', profile.org_id)
         .single()
@@ -131,18 +176,28 @@ Deno.serve(async (req) => {
 
       // Resolve client info — proposal > service ticket > invoice description
       if (inv.proposals) {
-        companyName = inv.proposals.company || ''
-        clientName  = inv.proposals.client_name || ''
-        clientEmail = inv.proposals.client_email || ''
-        docNumber   = inv.proposals.quote_number || inv.invoice_number || ''
+        const pc = inv.proposals.clients
+        companyName   = inv.proposals.company || ''
+        clientName    = inv.proposals.client_name || ''
+        clientEmail   = inv.proposals.client_email || pc?.email || ''
+        clientPhone   = pc?.phone || ''
+        clientAddress = pc?.address || ''
+        clientCity    = pc?.city || ''
+        clientState   = pc?.state || ''
+        clientZip     = pc?.zip || ''
+        docNumber     = inv.proposals.quote_number || inv.invoice_number || ''
       } else if (inv.service_tickets) {
         const c = inv.service_tickets.clients
-        companyName = c?.company || ''
-        clientName  = c?.client_name || ''
-        clientEmail = c?.email || ''
-        docNumber   = inv.invoice_number || ''
+        companyName   = c?.company || ''
+        clientName    = c?.client_name || ''
+        clientEmail   = c?.email || ''
+        clientPhone   = c?.phone || ''
+        clientAddress = c?.address || ''
+        clientCity    = c?.city || ''
+        clientState   = c?.state || ''
+        clientZip     = c?.zip || ''
+        docNumber     = inv.invoice_number || ''
       } else {
-        // Contract invoice or standalone
         docNumber = inv.invoice_number || ''
       }
 
@@ -290,7 +345,10 @@ Deno.serve(async (req) => {
     }
 
     // Find or create QBO customer
-    const customerId = await findOrCreateCustomer(accessToken, realmId, clientName, companyName, clientEmail)
+    const customerId = await findOrCreateCustomer(
+      accessToken, realmId, clientName, companyName,
+      clientEmail, clientPhone, clientAddress, clientCity, clientState, clientZip
+    )
     if (!customerId) return new Response(JSON.stringify({ error: 'Could not find or create QBO customer' }), { status: 500, headers: corsHeaders })
 
     // Create invoice in QBO

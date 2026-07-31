@@ -50,8 +50,12 @@ serve(async (req) => {
     // Fetch company name from QBO
     let companyName = ''
     try {
+      const sandbox = Deno.env.get('QBO_SANDBOX') === 'true'
+      const qboApiBase = sandbox
+        ? `https://sandbox-quickbooks.api.intuit.com/v3/company/${realmId}`
+        : `https://quickbooks.api.intuit.com/v3/company/${realmId}`
       const companyRes = await fetch(
-        `https://quickbooks.api.intuit.com/v3/company/${realmId}/companyinfo/${realmId}?minorversion=65`,
+        `${qboApiBase}/companyinfo/${realmId}?minorversion=65`,
         {
           headers: {
             'Authorization': `Bearer ${tokens.access_token}`,
