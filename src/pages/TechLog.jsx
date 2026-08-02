@@ -51,12 +51,17 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
       .order('created_at', { ascending: false })
     setJobs(jobsData || [])
 
-    const { data: logsData } = await supabase
+    let logsQuery = supabase
       .from('tech_daily_logs')
       .select('*, jobs(name, job_number, clients(company)), profiles(full_name)')
       .eq('org_id', profile.org_id)
       .order('log_date', { ascending: false })
       .order('created_at', { ascending: false })
+
+    // Techs only see their own logs
+    if (isTechnician) logsQuery = logsQuery.eq('user_id', profile.id)
+
+    const { data: logsData } = await logsQuery
     setLogs(logsData || [])
 
     setLoading(false)
@@ -288,6 +293,54 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     return logDate >= weekAgo
   }).length
 
+  const exportCSV = () => {
+    const escape = (val) => `"${String(val || '').replace(/"/g, '""')}"`
+    const header = ['Date', 'Tech', 'Job #', 'Job Name', 'Client', 'Hours', 'Work Summary', 'Issues']
+    const rows = filteredLogs.map(log => [
+      log.log_date,
+      escape(log.profiles?.full_name || ''),
+      escape(log.jobs?.job_number || ''),
+      escape(log.jobs?.name || ''),
+      escape(log.jobs?.clients?.company || ''),
+      log.hours_worked || 0,
+      escape(log.work_summary || ''),
+      escape(log.issues || ''),
+    ])
+    const csv = [header.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `tech-hours-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Weekly breakdown for tech self-view
+  const myWeek = isTechnician ? (() => {
+    const now = new Date()
+    const dow = now.getDay()
+    const mon = new Date(now)
+    mon.setDate(now.getDate() - (dow === 0 ? 6 : dow - 1))
+    mon.setHours(0, 0, 0, 0)
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(mon); d.setDate(mon.getDate() + i)
+      return d.toISOString().split('T')[0]
+    })
+    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    const hoursPerDay = Object.fromEntries(days.map(d => [d, 0]))
+    logs.forEach(log => {
+      if (Object.prototype.hasOwnProperty.call(hoursPerDay, log.log_date)) {
+        hoursPerDay[log.log_date] += parseFloat(log.hours_worked) || 0
+      }
+    })
+    const weekTotal = days.reduce((s, d) => s + hoursPerDay[d], 0)
+    const nowStr = now.toISOString().split('T')[0]
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+    const monthTotal = logs.filter(l => l.log_date >= monthStart).reduce((s, l) => s + (parseFloat(l.hours_worked) || 0), 0)
+    return { days, dayLabels, hoursPerDay, weekTotal, monthTotal, nowStr }
+  })() : null
+
   const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]"
 
   // Estimated hours for selected job
@@ -303,10 +356,18 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
             <h2 className="text-fp-text text-2xl font-bold">Tech Daily Log</h2>
             <p className="text-fp-muted text-sm mt-0.5">Track daily hours and work notes by job</p>
           </div>
-          <button onClick={() => openForm(filterJob)}
-            className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-            + Log Today's Work
-          </button>
+          <div className="flex items-center gap-3">
+            {filteredLogs.length > 0 && (
+              <button onClick={exportCSV}
+                className="border border-fp-border text-fp-muted px-4 py-2 rounded-lg text-sm font-medium hover:text-fp-text hover:border-fp-brand/50 transition-colors">
+                Export CSV
+              </button>
+            )}
+            <button onClick={() => openForm(filterJob)}
+              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+              + Log Today's Work
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-4">
@@ -322,6 +383,34 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
             </div>
           ))}
         </div>
+
+        {myWeek && (
+          <div className="bg-fp-card rounded-xl p-5">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-fp-text font-semibold text-sm">My Hours This Week</p>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-fp-muted">Week total: <span className="text-fp-text font-bold">{myWeek.weekTotal.toFixed(1)} hrs</span></span>
+                <span className="text-fp-muted">This month: <span className="text-fp-text font-bold">{myWeek.monthTotal.toFixed(1)} hrs</span></span>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {myWeek.days.map((day, i) => {
+                const hrs = myWeek.hoursPerDay[day]
+                const isToday = day === myWeek.nowStr
+                const isFuture = day > myWeek.nowStr
+                return (
+                  <div key={day} className={`rounded-lg p-3 text-center ${isToday ? 'bg-fp-brand/20 border border-fp-brand/40' : 'bg-fp-inset'}`}>
+                    <p className={`text-xs font-semibold mb-1 ${isToday ? 'text-fp-brand' : 'text-fp-muted'}`}>{myWeek.dayLabels[i]}</p>
+                    <p className={`text-lg font-bold ${isFuture ? 'text-fp-border' : hrs > 0 ? 'text-[#C8622A]' : 'text-fp-muted'}`}>
+                      {isFuture ? '—' : hrs > 0 ? hrs.toFixed(1) : '0'}
+                    </p>
+                    <p className="text-fp-muted text-xs">hrs</p>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="flex gap-3 items-center flex-wrap">
           <input type="text" placeholder="Search summary, job, tech, client..." value={search} onChange={e => setSearch(e.target.value)}
