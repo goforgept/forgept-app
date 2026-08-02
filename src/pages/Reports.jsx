@@ -121,7 +121,7 @@ function SearchSelect({ options, value, onChange, placeholder = 'Search…' }) {
 }
 
 // ── Nav config ────────────────────────────────────────────────────────────────
-const MANUFACTURER_HIDDEN = new Set(['open_jobs', 'closed_jobs', 'service_tickets', 'purchase_orders', 'vendor_spend'])
+const MANUFACTURER_HIDDEN = new Set(['open_jobs', 'closed_jobs', 'service_tickets', 'purchase_orders', 'vendor_spend', 'payroll'])
 
 const ALL_NAV_GROUPS = [
   {
@@ -145,6 +145,7 @@ const ALL_NAV_GROUPS = [
       { key: 'service_tickets', label: 'Service Tickets', icon: '🎫' },
       { key: 'invoices',        label: 'Invoices',        icon: '🧾' },
       { key: 'purchase_orders', label: 'Purchase Orders', icon: '📄' },
+      { key: 'payroll',         label: 'Payroll',         icon: '💰' },
     ]
   },
   {
@@ -180,6 +181,7 @@ const REPORT_FILTERS = {
   client_report:    [],
   vendor_spend:     [],
   user_activity:    [],
+  payroll:          ['tech'],
 }
 
 function today()    { return new Date().toISOString().slice(0, 10) }
@@ -211,11 +213,16 @@ export default function Reports(props) {
   const [expandedVendor, setExpandedVendor]   = useState(null)
   const [vendorSearch, setVendorSearch]       = useState('')
 
+  const [payrollLogs, setPayrollLogs]             = useState({}) // tech name → log entries
+  const [expandedPayrollTech, setExpandedPayrollTech] = useState(null)
+
   const [clients,    setClients]    = useState([])
   const [reps,       setReps]       = useState([])
   const [industries, setIndustries] = useState([])
   const [techs,      setTechs]      = useState([])
   const [vendors,    setVendors]    = useState([])
+  // null = no region filter; string[] = restrict to these rep names
+  const [regionRepNames, setRegionRepNames] = useState(null)
 
   useEffect(() => {
     if (!props.isAdmin) { navigate('/'); return }
@@ -231,6 +238,20 @@ export default function Reports(props) {
   useEffect(() => {
     if (!profile?.org_id) return
     const load = async () => {
+      const isRegionalVP = props.featureRegions && profile?.is_regional_vp && profile?.region_id
+
+      // If this is a regional VP, scope everything to their region's members
+      let scopedRepNames = null
+      if (isRegionalVP) {
+        const { data: regionMembers } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('org_id', profile.org_id)
+          .eq('region_id', profile.region_id)
+        scopedRepNames = (regionMembers || []).map(m => m.full_name).filter(Boolean)
+        setRegionRepNames(scopedRepNames)
+      }
+
       const [clientsRes, propsRes, techsRes, vendorsRes] = await Promise.all([
         supabase.from('clients').select('id, company').eq('org_id', profile.org_id).order('company'),
         supabase.from('proposals').select('rep_name, industry').eq('org_id', profile.org_id),
@@ -238,7 +259,11 @@ export default function Reports(props) {
         supabase.from('vendors').select('id, vendor_name').eq('org_id', profile.org_id).eq('active', true).order('vendor_name'),
       ])
       setClients((clientsRes.data || []).map(c => ({ value: c.id, label: c.company })))
-      setReps([...new Set((propsRes.data || []).map(r => r.rep_name).filter(Boolean))].sort())
+
+      const allRepNames = [...new Set((propsRes.data || []).map(r => r.rep_name).filter(Boolean))].sort()
+      // If regional VP, only show reps in their region in the dropdown
+      setReps(scopedRepNames !== null ? allRepNames.filter(r => scopedRepNames.includes(r)) : allRepNames)
+
       setIndustries([...new Set((propsRes.data || []).map(r => r.industry).filter(Boolean))].sort())
       setTechs((techsRes.data || []).map(t => ({ value: t.id, label: t.full_name })))
       setVendors((vendorsRes.data || []).map(v => ({ value: v.id, label: v.vendor_name })))
@@ -255,6 +280,8 @@ export default function Reports(props) {
     setFilters(BLANK_FILTERS)
     setVendorSearch('')
     setData([])
+    setExpandedPayrollTech(null)
+    setPayrollLogs({})
     if (key !== 'client_report') setClientReport(null)
   }
 
@@ -283,7 +310,12 @@ export default function Reports(props) {
         .order('created_at', { ascending: false })
       if (from) q = q.gte('created_at', from)
       if (to)   q = q.lte('created_at', to + 'T23:59:59')
-      if (filters.rep)      q = q.eq('rep_name', filters.rep)
+      if (filters.rep) {
+        q = q.eq('rep_name', filters.rep)
+      } else if (regionRepNames !== null && regionRepNames.length > 0) {
+        // Regional VP — auto-scope to their region's reps
+        q = q.in('rep_name', regionRepNames)
+      }
       if (filters.industry) q = q.eq('industry', filters.industry)
       if (selectedClientNames.length > 0) {
         const orStr = selectedClientNames.flatMap(n => [`company.ilike.%${n}%`, `client_name.ilike.%${n}%`]).join(',')
@@ -445,6 +477,47 @@ export default function Reports(props) {
       setData(Object.entries(byVendor).sort((a, b) => b[1].cost - a[1].cost).map(([vendor, v]) => ({
         'Vendor': vendor, 'Line Items': v.items, 'Total Units': v.units,
         'Total Cost': fmt$(v.cost), 'Total Revenue': fmt$(v.revenue),
+      })))
+    }
+
+    // ── Payroll ───────────────────────────────────────────────────────────────
+    if (activeReport === 'payroll') {
+      setExpandedPayrollTech(null)
+      let q = supabase
+        .from('tech_daily_logs')
+        .select('log_date, hours_worked, work_summary, user_id, profiles(full_name), jobs(name, job_number, clients(company))')
+        .eq('org_id', profile.org_id)
+        .order('log_date', { ascending: false })
+      if (from) q = q.gte('log_date', from)
+      if (to)   q = q.lte('log_date', to)
+      if (filters.tech) q = q.eq('user_id', filters.tech)
+      const { data: rows, error: prErr } = await q
+      if (prErr) console.error('payroll error:', prErr)
+
+      const byTech = Object.create(null)
+      const byTechLogs = Object.create(null)
+      for (const r of (rows || [])) {
+        const name = r.profiles?.full_name || 'Unknown'
+        if (!byTech[name]) byTech[name] = { hours: 0, days: new Set(), entries: 0 }
+        byTech[name].hours += parseFloat(r.hours_worked) || 0
+        byTech[name].days.add(r.log_date)
+        byTech[name].entries++
+        if (!byTechLogs[name]) byTechLogs[name] = []
+        byTechLogs[name].push({
+          date: r.log_date,
+          job: r.jobs?.job_number || '—',
+          jobName: r.jobs?.name || '—',
+          client: r.jobs?.clients?.company || '—',
+          hours: parseFloat(r.hours_worked) || 0,
+          summary: r.work_summary || '',
+        })
+      }
+      setPayrollLogs(byTechLogs)
+      setData(Object.entries(byTech).sort((a, b) => a[0].localeCompare(b[0])).map(([tech, v]) => ({
+        'Tech':        tech,
+        'Total Hours': v.hours.toFixed(1),
+        'Days Logged': v.days.size,
+        'Entries':     v.entries,
       })))
     }
 
@@ -626,6 +699,26 @@ export default function Reports(props) {
       [],
     ] : []
 
+    if (activeReport === 'payroll') {
+      const ws1 = XLSX.utils.aoa_to_sheet([
+        ...brandHeader,
+        columns,
+        ...data.map(row => columns.map(c => row[c]))
+      ])
+      XLSX.utils.book_append_sheet(wb, ws1, 'Summary')
+      const detailCols = ['Tech', 'Date', 'Job #', 'Job Name', 'Client', 'Hours', 'Work Summary']
+      const detailRows = []
+      for (const [tech, logs] of Object.entries(payrollLogs)) {
+        for (const log of logs) {
+          detailRows.push([tech, log.date, log.job, log.jobName, log.client, log.hours, log.summary])
+        }
+      }
+      const ws2 = XLSX.utils.aoa_to_sheet([detailCols, ...detailRows])
+      XLSX.utils.book_append_sheet(wb, ws2, 'Detail')
+      XLSX.writeFile(wb, filename)
+      return
+    }
+
     if (activeReport === 'vendor_spend') {
       const filtered = vendorSearch
         ? data.filter(r => r['Vendor'].toLowerCase().includes(vendorSearch.toLowerCase()))
@@ -710,6 +803,37 @@ export default function Reports(props) {
     }
 
     const accent = branded && profile?.primary_color ? hexToRgb(profile.primary_color) : [26, 45, 69]
+
+    if (activeReport === 'payroll') {
+      autoTable(doc, {
+        startY, head: [columns], body: data.map(row => columns.map(c => row[c])),
+        headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { left: 14, right: 14 },
+      })
+      const detailCols = ['Tech', 'Date', 'Job #', 'Job Name', 'Client', 'Hours', 'Work Summary']
+      const detailRows = []
+      for (const [tech, logs] of Object.entries(payrollLogs)) {
+        for (const log of logs) {
+          detailRows.push([tech, log.date, log.job, log.jobName, log.client, String(log.hours), log.summary])
+        }
+      }
+      if (detailRows.length) {
+        const afterY = doc.lastAutoTable?.finalY ?? 60
+        doc.setFontSize(11); doc.setTextColor(40, 40, 40)
+        doc.text('Detail', 14, afterY + 10)
+        autoTable(doc, {
+          startY: afterY + 15, head: [detailCols], body: detailRows,
+          headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold', fontSize: 7 },
+          bodyStyles: { fontSize: 7, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { left: 14, right: 14 },
+          columnStyles: { 6: { cellWidth: 60 } },
+        })
+      }
+      const prefix = branded && profile?.company_name ? profile.company_name.replace(/[^a-z0-9]/gi, '_') : 'ForgePt'
+      doc.save(`${prefix}_Payroll_${today()}.pdf`)
+      return
+    }
 
     if (activeReport === 'vendor_spend') {
       const filtered = vendorSearch
@@ -1004,6 +1128,63 @@ export default function Reports(props) {
                       <div className="text-center text-fp-muted py-16 text-sm">Loading…</div>
                     ) : data.length === 0 ? (
                       <div className="text-center text-fp-muted py-16 text-sm">No data for this report</div>
+                    ) : activeReport === 'payroll' ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-fp-border">
+                              <th className="text-left px-4 py-3 text-fp-muted text-xs font-semibold uppercase tracking-wide w-6" />
+                              {columns.map(col => <th key={col} className="text-left px-4 py-3 text-fp-muted text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{col}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.map((row, i) => {
+                              const tech = row['Tech']
+                              const isOpen = expandedPayrollTech === tech
+                              const logs = payrollLogs[tech] || []
+                              return (
+                                <>
+                                  <tr key={i} onClick={() => setExpandedPayrollTech(isOpen ? null : tech)}
+                                    className="border-b border-[#0F1C2E]/60 hover:bg-fp-inset/40 transition-colors cursor-pointer">
+                                    <td className="px-4 py-3 text-fp-muted text-xs">{isOpen ? '▾' : '▸'}</td>
+                                    {columns.map(col => <td key={col} className="px-4 py-3 text-fp-text whitespace-nowrap font-medium">{row[col]}</td>)}
+                                  </tr>
+                                  {isOpen && (
+                                    <tr key={`${i}-detail`} className="border-b border-[#0F1C2E]/60 bg-fp-inset/60">
+                                      <td colSpan={columns.length + 1} className="px-6 py-3">
+                                        <table className="w-full text-xs">
+                                          <thead>
+                                            <tr className="border-b border-fp-border">
+                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Date</th>
+                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Job #</th>
+                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Job Name</th>
+                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Client</th>
+                                              <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Hours</th>
+                                              <th className="text-left py-2 text-fp-muted font-semibold uppercase tracking-wide">Work Summary</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {logs.map((log, j) => (
+                                              <tr key={j} className="border-b border-fp-border/40">
+                                                <td className="py-1.5 pr-4 text-fp-muted font-mono whitespace-nowrap">{log.date}</td>
+                                                <td className="py-1.5 pr-4 text-fp-muted font-mono whitespace-nowrap">{log.job}</td>
+                                                <td className="py-1.5 pr-4 text-fp-text whitespace-nowrap">{log.jobName}</td>
+                                                <td className="py-1.5 pr-4 text-fp-text whitespace-nowrap">{log.client}</td>
+                                                <td className="py-1.5 pr-4 text-[#C8622A] font-bold text-right whitespace-nowrap">{log.hours}</td>
+                                                <td className="py-1.5 text-fp-muted max-w-xs">{log.summary}</td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     ) : activeReport === 'vendor_spend' ? (
                       /* Vendor summary — expandable rows */
                       <div>
