@@ -1302,7 +1302,56 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               <span className="text-[#8A9AB0]">{placements.length} device{placements.length !== 1 ? 's' : ''}</span>
             </div>
           ) : (
-            <span className="text-[#8A9AB0]">{placements.length} device{placements.length !== 1 ? 's' : ''} · {cableRuns.length} run{cableRuns.length !== 1 ? 's' : ''}</span>
+            <div className="flex items-center gap-1.5">
+              {copiedPlacement && (
+                <button
+                  onClick={async () => {
+                    const offset = 0.03
+                    const { data, error } = await supabase
+                      .from('drawing_placements')
+                      .insert({
+                        org_id:                copiedPlacement.org_id,
+                        drawing_sheet_id:      sheet.id,
+                        global_product_id:     copiedPlacement.global_product_id,
+                        product_id:            copiedPlacement.product_id,
+                        x:                     Math.min(copiedPlacement.x + offset, 0.99),
+                        y:                     Math.min(copiedPlacement.y + offset, 0.99),
+                        device_address:        await getNextLabel(copiedPlacement.global_products?.category, allSheetIds || [sheet.id]),
+                        rotation:              copiedPlacement.rotation,
+                        quantity:              copiedPlacement.quantity,
+                        symbol_size:           copiedPlacement.symbol_size,
+                        marker_color:          copiedPlacement.marker_color,
+                        part_number_override:  copiedPlacement.part_number_override,
+                        manufacturer_override: copiedPlacement.manufacturer_override,
+                        description_override:  copiedPlacement.description_override,
+                        notes:                 copiedPlacement.notes,
+                        fov_angle:             copiedPlacement.fov_angle,
+                        fov_range:             copiedPlacement.fov_range,
+                        site_condition:        copiedPlacement.site_condition,
+                        source:                'manual',
+                      })
+                      .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories)')
+                      .single()
+                    if (!error && data) {
+                      const { data: sourceComps } = await supabase.from('placement_components').select('*').eq('placement_id', copiedPlacement.id)
+                      if (sourceComps?.length > 0) {
+                        await supabase.from('placement_components').insert(
+                          sourceComps.map(c => ({ org_id: c.org_id, placement_id: data.id, component_type: c.component_type, name: c.name, part_number: c.part_number, manufacturer: c.manufacturer, quantity: c.quantity, notes: c.notes }))
+                        )
+                      }
+                      setPlacements(prev => [...prev, data])
+                      setSelectedId(data.id)
+                      onPlacementSelect?.(data)
+                      onPlacementChange?.()
+                    }
+                  }}
+                  className="text-xs text-[#C8622A] hover:text-[#e07030] transition-colors px-2 py-0.5 border border-[#C8622A]/30 hover:border-[#C8622A]/60 rounded"
+                  title="Paste copied device (Ctrl+V)">
+                  Paste
+                </button>
+              )}
+              <span className="text-[#8A9AB0]">{placements.length} device{placements.length !== 1 ? 's' : ''} · {cableRuns.length} run{cableRuns.length !== 1 ? 's' : ''}</span>
+            </div>
           )}
           <button
             onClick={() => setShowFOV(s => !s)}
@@ -2490,6 +2539,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               description_override: p.description_override,
               device_address: await getNextLabel(p.global_products?.category, allSheetIds || [sheet.id]),
               notes: p.notes, fov_angle: p.fov_angle, fov_range: p.fov_range,
+              site_condition: p.site_condition,
               source: 'manual',
             })
             .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories)')

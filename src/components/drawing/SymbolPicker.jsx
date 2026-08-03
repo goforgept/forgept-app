@@ -415,11 +415,14 @@ function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelec
     e.dataTransfer.effectAllowed = 'copy'
   }
 
-  // On touch devices, draggable=true intercepts touch and prevents onClick from firing.
-  // onTouchEnd forces the selection through regardless of drag interference.
-  const handleTouchEnd = (e) => {
-    e.preventDefault()
-    onSelect?.()
+  // On touch/pen devices, draggable=true causes iOS to start a drag gesture on touchstart,
+  // which suppresses touchend entirely. onPointerDown fires before drag detection,
+  // so we can call onSelect immediately for touch/pen and let mouse follow the normal click path.
+  const handlePointerDown = (e) => {
+    if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+      e.preventDefault()
+      onSelect?.()
+    }
   }
 
   return (
@@ -430,7 +433,7 @@ function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelec
     }`}>
       <button
         onClick={onSelect}
-        onTouchEnd={handleTouchEnd}
+        onPointerDown={handlePointerDown}
         draggable={true}
         onDragStart={handleDragStart}
         title={`${symbol.name}\n${symbol.part_number}\nDrag to place · or tap to select then tap canvas`}
