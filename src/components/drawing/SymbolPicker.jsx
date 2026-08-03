@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../supabase'
 
 const INDUSTRY_LABELS = {
@@ -409,13 +409,52 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
   )
 }
 
-// Detect touch support once at module level — avoids per-render checks
-const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
-
 function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelect }) {
+  const touchStartRef  = useRef(null)
+  const ghostRef       = useRef(null)
+  const isDraggingRef  = useRef(false)
+
   const handleDragStart = (e) => {
     e.dataTransfer.setData('application/json', JSON.stringify(symbol))
     e.dataTransfer.effectAllowed = 'copy'
+  }
+
+  const handleTouchStart = (e) => {
+    const t = e.touches[0]
+    touchStartRef.current = { x: t.clientX, y: t.clientY }
+    isDraggingRef.current = false
+  }
+
+  const handleTouchMove = (e) => {
+    if (!touchStartRef.current) return
+    const t = e.touches[0]
+    const dx = t.clientX - touchStartRef.current.x
+    const dy = t.clientY - touchStartRef.current.y
+    if (Math.sqrt(dx * dx + dy * dy) > 8 && !isDraggingRef.current) {
+      isDraggingRef.current = true
+      const ghost = document.createElement('div')
+      ghost.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;background:#1a2d45;border:1.5px solid #C8622A;border-radius:8px;padding:5px 10px;color:white;font-size:12px;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.6);transform:translate(-50%,-100%);'
+      ghost.textContent = symbol.name
+      document.body.appendChild(ghost)
+      ghostRef.current = ghost
+    }
+    if (ghostRef.current) {
+      ghostRef.current.style.left = `${t.clientX}px`
+      ghostRef.current.style.top  = `${t.clientY - 12}px`
+    }
+  }
+
+  const handleTouchEnd = (e) => {
+    if (ghostRef.current) { ghostRef.current.remove(); ghostRef.current = null }
+    if (isDraggingRef.current) {
+      e.preventDefault()
+      const t = e.changedTouches[0]
+      window.dispatchEvent(new CustomEvent('forgept-touch-drop', {
+        detail: { symbol, clientX: t.clientX, clientY: t.clientY },
+      }))
+    }
+    touchStartRef.current = null
+    isDraggingRef.current = false
   }
 
   return (
@@ -426,9 +465,12 @@ function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelec
     }`}>
       <button
         onClick={onSelect}
-        draggable={!isTouchDevice}
-        onDragStart={!isTouchDevice ? handleDragStart : undefined}
-        title={`${symbol.name}\n${symbol.part_number}\n${isTouchDevice ? 'Tap to select · then tap canvas to place' : 'Drag to place · or click to select then click canvas'}`}
+        draggable={true}
+        onDragStart={handleDragStart}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        title={`${symbol.name}\n${symbol.part_number}\nDrag to place · or tap to select then tap canvas`}
         className="flex flex-col items-center gap-1 w-full cursor-grab active:cursor-grabbing">
         <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${isSelected ? 'text-[#C8622A]' : 'text-[#8A9AB0]'}`}>
           <CategoryIcon category={symbol.category} />

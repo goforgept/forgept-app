@@ -456,6 +456,53 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     load()
   }, [sheet.id])
 
+  // ── Touch drag-and-drop from SymbolPicker (tablet) ────────────────────────
+  // SymbolPicker dispatches 'forgept-touch-drop' when a finger drag ends over the canvas.
+  // We use a ref to hold the latest handler so the event listener only registers once.
+  const touchDropHandlerRef = useRef(null)
+  touchDropHandlerRef.current = async ({ detail: { symbol, clientX, clientY } }) => {
+    if (!containerRef.current) return
+    const rect = containerRef.current.getBoundingClientRect()
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return
+    const dropX = clientX - rect.left
+    const dropY = clientY - rect.top
+    const imgX  = (dropX - positionRef.current.x) / scaleRef.current
+    const imgY  = (dropY - positionRef.current.y) / scaleRef.current
+    const x = Math.min(Math.max(imgX / canvasWRef.current, 0.01), 0.99)
+    const y = Math.min(Math.max(imgY / canvasHRef.current, 0.01), 0.99)
+    try {
+      const { data: catalogMatch } = await supabase
+        .from('products').select('id')
+        .eq('org_id', orgIdRef.current).eq('part_number', symbol.part_number)
+        .maybeSingle()
+      const { data: placement, error } = await supabase
+        .from('drawing_placements')
+        .insert({
+          org_id: orgIdRef.current, drawing_sheet_id: sheetIdRef.current,
+          global_product_id: symbol.id, product_id: catalogMatch?.id || null,
+          x: Math.round(x * 10000) / 10000,
+          y: Math.round(y * 10000) / 10000,
+          rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
+          device_address: await getNextLabel(symbol.category, allSheetIds || [sheetIdRef.current]),
+        })
+        .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories)')
+        .single()
+      if (!error && placement) {
+        setPlacements(prev => [...prev, placement])
+        setSelectedId(placement.id)
+        onPlacementSelect?.(placement)
+        onPlacementChange?.()
+      }
+    } catch (err) {
+      console.error('Touch drop failed:', err)
+    }
+  }
+  useEffect(() => {
+    const handler = (e) => touchDropHandlerRef.current?.(e)
+    window.addEventListener('forgept-touch-drop', handler)
+    return () => window.removeEventListener('forgept-touch-drop', handler)
+  }, [])
+
   useEffect(() => {
     if (editingCableId) {
       setEditingCable(editingCableId)
@@ -824,14 +871,26 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       return
     }
     if (t.length === 2) {
-      // Pinch zoom
+      // Pinch zoom — anchor to midpoint between fingers
       const dist = Math.sqrt((t[0].clientX - t[1].clientX) ** 2 + (t[0].clientY - t[1].clientY) ** 2)
-      if (lastDist.current) {
+      if (lastDist.current && stageRef.current) {
         const scaleBy = dist / lastDist.current
-        setScale(s => Math.min(Math.max(s * scaleBy, 0.05), 15))
+        const stage = stageRef.current
+        const rect = stage.container().getBoundingClientRect()
+        const midClientX = (t[0].clientX + t[1].clientX) / 2
+        const midClientY = (t[0].clientY + t[1].clientY) / 2
+        const midX = (midClientX - rect.left) * (stage.width() / rect.width)
+        const midY = (midClientY - rect.top)  * (stage.height() / rect.height)
+        const curScale = scaleRef.current
+        const newScale = Math.min(Math.max(curScale * scaleBy, 0.05), 15)
+        const imgX = (midX - positionRef.current.x) / curScale
+        const imgY = (midY - positionRef.current.y) / curScale
+        setScale(newScale)
+        setPosition({ x: midX - imgX * newScale, y: midY - imgY * newScale })
       }
       lastDist.current = dist
       lastTouchPos.current = null
+      touchPanStarted.current = false
     } else if (t.length === 1 && lastTouchPos.current) {
       const dx = t[0].clientX - lastTouchPos.current.x
       const dy = t[0].clientY - lastTouchPos.current.y
