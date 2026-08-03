@@ -836,9 +836,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const lastTouchPos = useRef(null)
 
   const touchPanStarted = useRef(false) // true once finger has moved enough to be a pan (not a tap)
+  const touchWasPanRef  = useRef(false)  // survives into onTap so handleStageClick can skip placement
 
   const handleTouchStart = useCallback((e) => {
     const t = e.evt.touches
+    touchWasPanRef.current = false // reset at the START of each new touch interaction
     if (annotationToolRef.current && t.length === 1) {
       const norm = clientToNorm(t[0].clientX, t[0].clientY)
       if (norm) {
@@ -887,6 +889,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         const imgY = (midY - positionRef.current.y) / curScale
         setScale(newScale)
         setPosition({ x: midX - imgX * newScale, y: midY - imgY * newScale })
+        touchWasPanRef.current = true // pinch = pan, suppress any onTap after
       }
       lastDist.current = dist
       lastTouchPos.current = null
@@ -898,6 +901,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       if (!touchPanStarted.current) {
         if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
         touchPanStarted.current = true
+        touchWasPanRef.current = true // finger moved — suppress placement on the upcoming onTap
       }
       setPosition(p => ({ x: p.x + dx, y: p.y + dy }))
       lastTouchPos.current = { x: t[0].clientX, y: t[0].clientY }
@@ -1026,6 +1030,14 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   // ── Click to place ─────────────────────────────────────────────────────────
   const handleStageClick = useCallback(async (e) => {
+    // If this event came from a touch that involved panning, skip placement entirely.
+    // touchWasPanRef is set in handleTouchMove and cleared at the start of the next touch.
+    const isTouchEvent = e.evt?.type === 'touchend' || e.evt?.pointerType === 'touch'
+    if (isTouchEvent && touchWasPanRef.current) {
+      touchWasPanRef.current = false
+      return
+    }
+
     const onBg = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
     if (onBg) setSelectedAnnotationId(null) // deselect annotation when clicking background
     if (!onBg) return
