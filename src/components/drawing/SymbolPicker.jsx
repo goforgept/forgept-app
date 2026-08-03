@@ -415,6 +415,13 @@ function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelec
     e.dataTransfer.effectAllowed = 'copy'
   }
 
+  // On touch devices, draggable=true intercepts touch and prevents onClick from firing.
+  // onTouchEnd forces the selection through regardless of drag interference.
+  const handleTouchEnd = (e) => {
+    e.preventDefault()
+    onSelect?.()
+  }
+
   return (
     <div className={`relative group flex flex-col items-center gap-1 p-2 rounded-lg border text-center transition-all ${
       isSelected
@@ -423,9 +430,10 @@ function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelec
     }`}>
       <button
         onClick={onSelect}
+        onTouchEnd={handleTouchEnd}
         draggable={true}
         onDragStart={handleDragStart}
-        title={`${symbol.name}\n${symbol.part_number}\nDrag to place on canvas`}
+        title={`${symbol.name}\n${symbol.part_number}\nDrag to place · or tap to select then tap canvas`}
         className="flex flex-col items-center gap-1 w-full cursor-grab active:cursor-grabbing">
         <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${isSelected ? 'text-[#C8622A]' : 'text-[#8A9AB0]'}`}>
           <CategoryIcon category={symbol.category} />
