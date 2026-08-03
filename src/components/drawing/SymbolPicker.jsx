@@ -31,14 +31,6 @@ export const PATHWAY_DEFS = [
   { type: 'Surface Raceway', color: '#06b6d4', label: 'Surface Raceway',  dash: [] },
 ]
 
-const FAVS_KEY = (orgId) => `designer_favorites_${orgId || 'default'}`
-
-function loadFavs(orgId) {
-  try { return new Set(JSON.parse(localStorage.getItem(FAVS_KEY(orgId)) || '[]')) } catch { return new Set() }
-}
-function saveFavs(orgId, set) {
-  localStorage.setItem(FAVS_KEY(orgId), JSON.stringify([...set]))
-}
 
 export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedManufacturers, enabledIndustries, activeTool, onToolSelect }) {
   const [tab,           setTab]           = useState('devices')
@@ -51,13 +43,33 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
   const [symbols,       setSymbols]       = useState([])
   const [loading,       setLoading]       = useState(false)
   const [allProducts,   setAllProducts]   = useState([])
-  const [favorites,     setFavorites]     = useState(() => loadFavs(orgId))
+  const [favorites,     setFavorites]     = useState(new Set())
 
-  const toggleFavorite = (symbolId) => {
+  // Load favorites from the user's profile on mount so they sync across devices
+  useEffect(() => {
+    const load = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data } = await supabase
+        .from('profiles')
+        .select('drawing_favorites')
+        .eq('id', user.id)
+        .maybeSingle()
+      if (data?.drawing_favorites?.length) {
+        setFavorites(new Set(data.drawing_favorites))
+      }
+    }
+    load()
+  }, [])
+
+  const toggleFavorite = async (symbolId) => {
     setFavorites(prev => {
       const next = new Set(prev)
       next.has(symbolId) ? next.delete(symbolId) : next.add(symbolId)
-      saveFavs(orgId, next)
+      // Persist to DB — fire-and-forget, optimistic update already applied above
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user) supabase.from('profiles').update({ drawing_favorites: [...next] }).eq('id', user.id)
+      })
       return next
     })
   }
