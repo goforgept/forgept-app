@@ -212,6 +212,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const copiedPlacement    = externalCopied
   const setCopiedPlacement = onCopyPlacement || (() => {})
   const [contextMenu,     setContextMenu]     = useState(null) // {x, y, placementId}
+  const [copiedFlash,     setCopiedFlash]     = useState(false)
 
   // ── Annotations (arrows + revision clouds) ─────────────────────────────────
   const [annotations,         setAnnotations]         = useState([])
@@ -517,7 +518,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       // Copy placement
       if ((e.key === 'c' || e.key === 'C') && (e.metaKey || e.ctrlKey) && selectedId && !isInput) {
         const p = placements.find(p => p.id === selectedId)
-        if (p) setCopiedPlacement(p)
+        if (p) { setCopiedPlacement(p); setCopiedFlash(true); setTimeout(() => setCopiedFlash(false), 1500) }
       }
 
       // Paste placement
@@ -1246,10 +1247,10 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           ) : selectedId ? (
             <div className="flex items-center gap-1.5">
               <button
-                onClick={() => { const p = placements.find(p => p.id === selectedId); if (p) setCopiedPlacement(p) }}
-                className="text-xs text-[#8A9AB0] hover:text-white transition-colors px-2 py-0.5 border border-[#2a3d55] hover:border-[#C8622A]/40 rounded"
+                onClick={() => { const p = placements.find(p => p.id === selectedId); if (p) { setCopiedPlacement(p); setCopiedFlash(true); setTimeout(() => setCopiedFlash(false), 1500) } }}
+                className={`text-xs transition-colors px-2 py-0.5 border rounded ${copiedFlash ? 'text-green-400 border-green-600/50 bg-green-900/20' : 'text-[#8A9AB0] hover:text-white border-[#2a3d55] hover:border-[#C8622A]/40'}`}
                 title="Copy selected device (Ctrl+C)">
-                Copy
+                {copiedFlash ? '✓ Copied' : 'Copy'}
               </button>
               {copiedPlacement && (
                 <button
@@ -1295,7 +1296,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   }}
                   className="text-xs text-[#C8622A] hover:text-[#e07030] transition-colors px-2 py-0.5 border border-[#C8622A]/30 hover:border-[#C8622A]/60 rounded"
                   title="Paste copied device (Ctrl+V)">
-                  Paste
+                  Paste{copiedPlacement?.device_address ? ` · ${copiedPlacement.device_address}` : copiedPlacement?.global_products?.name ? ` · ${copiedPlacement.global_products.name.split(' ').slice(0, 2).join(' ')}` : ''}
                 </button>
               )}
               <span className="text-[#2a3d55] text-xs">|</span>
@@ -1347,7 +1348,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   }}
                   className="text-xs text-[#C8622A] hover:text-[#e07030] transition-colors px-2 py-0.5 border border-[#C8622A]/30 hover:border-[#C8622A]/60 rounded"
                   title="Paste copied device (Ctrl+V)">
-                  Paste
+                  Paste{copiedPlacement?.device_address ? ` · ${copiedPlacement.device_address}` : copiedPlacement?.global_products?.name ? ` · ${copiedPlacement.global_products.name.split(' ').slice(0, 2).join(' ')}` : ''}
                 </button>
               )}
               <span className="text-[#8A9AB0]">{placements.length} device{placements.length !== 1 ? 's' : ''} · {cableRuns.length} run{cableRuns.length !== 1 ? 's' : ''}</span>
