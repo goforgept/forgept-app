@@ -409,20 +409,13 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
   )
 }
 
+// Detect touch support once at module level — avoids per-render checks
+const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+
 function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelect }) {
   const handleDragStart = (e) => {
     e.dataTransfer.setData('application/json', JSON.stringify(symbol))
     e.dataTransfer.effectAllowed = 'copy'
-  }
-
-  // On touch/pen devices, draggable=true causes iOS to start a drag gesture on touchstart,
-  // which suppresses touchend entirely. onPointerDown fires before drag detection,
-  // so we can call onSelect immediately for touch/pen and let mouse follow the normal click path.
-  const handlePointerDown = (e) => {
-    if (e.pointerType === 'touch' || e.pointerType === 'pen') {
-      e.preventDefault()
-      onSelect?.()
-    }
   }
 
   return (
@@ -433,10 +426,9 @@ function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelec
     }`}>
       <button
         onClick={onSelect}
-        onPointerDown={handlePointerDown}
-        draggable={true}
-        onDragStart={handleDragStart}
-        title={`${symbol.name}\n${symbol.part_number}\nDrag to place · or tap to select then tap canvas`}
+        draggable={!isTouchDevice}
+        onDragStart={!isTouchDevice ? handleDragStart : undefined}
+        title={`${symbol.name}\n${symbol.part_number}\n${isTouchDevice ? 'Tap to select · then tap canvas to place' : 'Drag to place · or click to select then click canvas'}`}
         className="flex flex-col items-center gap-1 w-full cursor-grab active:cursor-grabbing">
         <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${isSelected ? 'text-[#C8622A]' : 'text-[#8A9AB0]'}`}>
           <CategoryIcon category={symbol.category} />
