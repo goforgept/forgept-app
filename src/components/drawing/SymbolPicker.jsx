@@ -63,15 +63,19 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
   }, [])
 
   const toggleFavorite = async (symbolId) => {
-    setFavorites(prev => {
-      const next = new Set(prev)
-      next.has(symbolId) ? next.delete(symbolId) : next.add(symbolId)
-      // Persist to DB — fire-and-forget, optimistic update already applied above
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user) supabase.from('profiles').update({ drawing_favorites: [...next] }).eq('id', user.id)
-      })
-      return next
-    })
+    // Compute next set in function body (not inside setFavorites — no side effects in updaters)
+    const next = new Set(favorites)
+    next.has(symbolId) ? next.delete(symbolId) : next.add(symbolId)
+    setFavorites(next)
+    // Persist — must await the Supabase query builder or it never executes
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ drawing_favorites: [...next] })
+        .eq('id', user.id)
+      if (error) console.error('Failed to save drawing favorites:', error)
+    }
   }
 
   // Sync tab with active tool type
