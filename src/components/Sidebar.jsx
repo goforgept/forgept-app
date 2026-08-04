@@ -304,7 +304,6 @@ export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager =
                           : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
                       }`}
                     >
-                      <span className="text-base">{icon}</span>
                       {label}
                     </Link>
                   ))}

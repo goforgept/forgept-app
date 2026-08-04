@@ -284,7 +284,7 @@ export default function FulfillmentTab({ job, lineItems, orgId, profileId }) {
                           {available <= 0 && (
                             <p className="text-red-400/70 text-xs">Out of stock</p>
                           )}
-                          <button onClick={() => setOverrides(p => { const n = { ...p }; delete n[item.id]; return n })}
+                          <button onClick={() => setOverrides(p => ({ ...p, [item.id]: '__manual__' }))}
                             className="text-xs text-fp-muted hover:text-fp-text underline">
                             Override match
                           </button>
