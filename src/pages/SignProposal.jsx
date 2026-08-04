@@ -19,6 +19,8 @@ export default function SignProposal() {
   const [slaContracts, setSlaContracts] = useState([])
   const [monitoringContracts, setMonitoringContracts] = useState([])
   const [sections, setSections] = useState([])
+  const [slaAccepted, setSlaAccepted] = useState([])
+  const [monitoringAccepted, setMonitoringAccepted] = useState([])
 
   useEffect(() => { fetchProposal() }, [token])
 
@@ -27,7 +29,7 @@ export default function SignProposal() {
 
     const { data, error: fetchError } = await supabase
       .from('proposals')
-      .select('id, proposal_name, company, client_name, client_email, scope_of_work, proposal_value, total_gross_margin_percent, labor_items, signature_name, signature_at, signing_token, org_id, lump_sum_pricing, hide_material_prices, hide_labor_breakdown, tax_rate, tax_exempt, signed_pdf_url, sla_contracts, monitoring_contracts, sla_contract, monitoring_contract')
+      .select('id, proposal_name, company, client_name, client_email, scope_of_work, proposal_value, total_gross_margin_percent, labor_items, signature_name, signature_at, signing_token, org_id, lump_sum_pricing, hide_material_prices, hide_labor_breakdown, tax_rate, tax_exempt, signed_pdf_url, sla_contracts, monitoring_contracts, sla_contract, monitoring_contract, contract_acceptance')
       .eq('signing_token', token)
       .single()
 
@@ -42,6 +44,9 @@ export default function SignProposal() {
     const monArr = (data?.monitoring_contracts?.length > 0) ? data.monitoring_contracts : (data?.monitoring_contract ? [data.monitoring_contract] : [])
     setSlaContracts(slaArr)
     setMonitoringContracts(monArr)
+    const savedAcc = data.contract_acceptance || {}
+    setSlaAccepted(slaArr.map((_, i) => savedAcc.sla ? savedAcc.sla[i] !== false : true))
+    setMonitoringAccepted(monArr.map((_, i) => savedAcc.monitoring ? savedAcc.monitoring[i] !== false : true))
 
     const { data: items } = await supabase
       .from('bom_line_items')
@@ -72,7 +77,7 @@ export default function SignProposal() {
     return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
   }
 
-  const generateSignedPDF = async (name, timestamp, items, prop, orgProf, sectionData) => {
+  const generateSignedPDF = async (name, timestamp, items, prop, orgProf, sectionData, contractAcceptance = {}) => {
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const primaryRgb = hexToRgb(orgProf?.primary_color || '#0F1C2E')
@@ -237,13 +242,21 @@ export default function SignProposal() {
 
     // Service Agreement pages (one per agreement)
     const slaArr = (prop.sla_contracts?.length > 0) ? prop.sla_contracts : (prop.sla_contract ? [prop.sla_contract] : [])
-    for (const slaCon of slaArr) {
+    for (let slaIdx = 0; slaIdx < slaArr.length; slaIdx++) {
+      const slaCon = slaArr[slaIdx]
+      const slaIsAccepted = contractAcceptance.sla ? contractAcceptance.sla[slaIdx] !== false : true
       doc.addPage()
+      if (!slaIsAccepted) {
+        doc.setFillColor(185, 28, 28); doc.rect(0, 0, pageWidth, 12, 'F')
+        doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
+        doc.text('DECLINED BY CLIENT — This service agreement was not accepted', pageWidth / 2, 8, { align: 'center' })
+      }
+      const slaStartY = slaIsAccepted ? 20 : 22
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text(slaCon.name || 'Service Level Agreement', 14, 20)
+      doc.text(slaCon.name || 'Service Level Agreement', 14, slaStartY)
       doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.line(14, 24, pageWidth - 14, 24)
-      let slaY = 34
+      doc.line(14, slaStartY + 4, pageWidth - 14, slaStartY + 4)
+      let slaY = slaStartY + 14
       const slaDetails = [
         slaCon.response_time_hours ? ['Response Time', `${slaCon.response_time_hours} hours`] : null,
         ['Billing', slaCon.billing_frequency || 'Quarterly'],
@@ -279,24 +292,37 @@ export default function SignProposal() {
         doc.text(slaBodyLines, 14, slaY)
         slaY += slaBodyLines.length * 4.5 + 10
       } else { slaY += 10 }
-      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Service Agreement Acceptance', 14, slaY)
-      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
-      const ss1 = slaY + 14
-      doc.text('Client Signature:', 14, ss1); doc.line(50, ss1, 140, ss1)
-      doc.text('Date:', 150, ss1); doc.line(163, ss1, pageWidth - 14, ss1)
-      const ss2 = ss1 + 16; doc.text('Printed Name:', 14, ss2); doc.line(50, ss2, pageWidth - 14, ss2)
+      if (slaIsAccepted) {
+        doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+        doc.text('Service Agreement Acceptance', 14, slaY)
+        doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
+        const ss1 = slaY + 14
+        doc.text('Client Signature:', 14, ss1); doc.line(50, ss1, 140, ss1)
+        doc.text('Date:', 150, ss1); doc.line(163, ss1, pageWidth - 14, ss1)
+        const ss2 = ss1 + 16; doc.text('Printed Name:', 14, ss2); doc.line(50, ss2, pageWidth - 14, ss2)
+      } else {
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(185, 28, 28)
+        doc.text('Client declined this service agreement', 14, slaY)
+      }
     }
 
     // Monitoring Contract pages (one per contract)
     const monArr = (prop.monitoring_contracts?.length > 0) ? prop.monitoring_contracts : (prop.monitoring_contract ? [prop.monitoring_contract] : [])
-    for (const monCon of monArr) {
+    for (let monIdx = 0; monIdx < monArr.length; monIdx++) {
+      const monCon = monArr[monIdx]
+      const monIsAccepted = contractAcceptance.monitoring ? contractAcceptance.monitoring[monIdx] !== false : true
       doc.addPage()
+      if (!monIsAccepted) {
+        doc.setFillColor(185, 28, 28); doc.rect(0, 0, pageWidth, 12, 'F')
+        doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255)
+        doc.text('DECLINED BY CLIENT — This monitoring contract was not accepted', pageWidth / 2, 8, { align: 'center' })
+      }
+      const monStartY = monIsAccepted ? 20 : 22
       doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text(monCon.name || 'Monitoring Contract', 14, 20)
+      doc.text(monCon.name || 'Monitoring Contract', 14, monStartY)
       doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.line(14, 24, pageWidth - 14, 24)
-      let monY = 34
+      doc.line(14, monStartY + 4, pageWidth - 14, monStartY + 4)
+      let monY = monStartY + 14
       const monDetails = [
         ['Monthly Fee', `$${monCon.monthly_fee || 49}/mo`],
         ['Billing', monCon.billing_frequency || 'Monthly'],
@@ -326,13 +352,18 @@ export default function SignProposal() {
         doc.text(monBodyLines, 14, monY)
         monY += monBodyLines.length * 4.5 + 10
       } else { monY += 10 }
-      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Monitoring Contract Acceptance', 14, monY)
-      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
-      const ms1 = monY + 14
-      doc.text('Client Signature:', 14, ms1); doc.line(50, ms1, 140, ms1)
-      doc.text('Date:', 150, ms1); doc.line(163, ms1, pageWidth - 14, ms1)
-      const ms2 = ms1 + 16; doc.text('Printed Name:', 14, ms2); doc.line(50, ms2, pageWidth - 14, ms2)
+      if (monIsAccepted) {
+        doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+        doc.text('Monitoring Contract Acceptance', 14, monY)
+        doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60); doc.setDrawColor(180, 180, 180)
+        const ms1 = monY + 14
+        doc.text('Client Signature:', 14, ms1); doc.line(50, ms1, 140, ms1)
+        doc.text('Date:', 150, ms1); doc.line(163, ms1, pageWidth - 14, ms1)
+        const ms2 = ms1 + 16; doc.text('Printed Name:', 14, ms2); doc.line(50, ms2, pageWidth - 14, ms2)
+      } else {
+        doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(185, 28, 28)
+        doc.text('Client declined this monitoring contract', 14, monY)
+      }
     }
 
     // Signature confirmation page
@@ -352,7 +383,9 @@ export default function SignProposal() {
     doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
     doc.text(`Signed by: ${name}`, 14, 86)
     doc.text(`Date & Time: ${new Date(timestamp).toLocaleString()}`, 14, 94)
-    doc.text(`Proposal Total: $${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 14, 102)
+    const acceptedInitial = (prop.sla_contracts?.length > 0 ? prop.sla_contracts : (prop.sla_contract ? [prop.sla_contract] : [])).reduce((sum, c, i) => (contractAcceptance.sla ? contractAcceptance.sla[i] !== false : true) ? sum + (parseFloat(c.initial_fee) || 0) : sum, 0)
+    const totalAtSigning = grandTotal + acceptedInitial
+    doc.text(`Proposal Total: $${totalAtSigning.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 14, 102)
     doc.setFillColor(248, 249, 250); doc.rect(14, 114, pageWidth - 28, 36, 'F')
     doc.setDrawColor(220, 220, 220); doc.rect(14, 114, pageWidth - 28, 36, 'S')
     doc.setFontSize(22); doc.setFont('helvetica', 'italic'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -381,7 +414,8 @@ export default function SignProposal() {
       // Generate and upload signed PDF
       let signedPdfUrl = null
       try {
-        const doc = await generateSignedPDF(signerName.trim(), now, lineItems, proposal, orgProfile, sections)
+        const acceptance = { sla: slaAccepted, monitoring: monitoringAccepted }
+        const doc = await generateSignedPDF(signerName.trim(), now, lineItems, proposal, orgProfile, sections, acceptance)
         const pdfBlob = doc.output('blob')
         const fileName = `${proposal.id}/signed-${Date.now()}.pdf`
         const { uploadToR2, getR2Url, BUCKETS } = await import('../r2')
@@ -391,6 +425,7 @@ export default function SignProposal() {
 
       const { error: updateError } = await supabase.from('proposals').update({
         signature_name: signerName.trim(), signature_at: now, signature_ip: clientIp, status: 'Won',
+        contract_acceptance: { sla: slaAccepted, monitoring: monitoringAccepted },
         ...(signedPdfUrl ? { signed_pdf_url: signedPdfUrl } : {})
       }).eq('signing_token', token)
 
@@ -414,6 +449,11 @@ export default function SignProposal() {
   const taxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
   const taxAmount = Math.round(materialsTotal * (taxRate / 100) * 100) / 100
   const grandTotal = materialsTotal + laborTotal + taxAmount
+  const acceptedSlaInitialFees = slaContracts.reduce((sum, c, i) => slaAccepted[i] !== false ? sum + (parseFloat(c.initial_fee) || 0) : sum, 0)
+  const totalUpfront = grandTotal + acceptedSlaInitialFees
+  const acceptedSlaRecurring = slaContracts.filter((c, i) => slaAccepted[i] !== false && (parseFloat(c.recurring_fee) || 0) > 0)
+  const acceptedMonRecurring = monitoringContracts.filter((c, i) => monitoringAccepted[i] !== false && (parseFloat(c.monthly_fee) || 0) > 0)
+  const hasContracts = slaContracts.length > 0 || monitoringContracts.length > 0
 
   if (loading) return <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center"><div className="text-center"><h1 className="text-white text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1><p className="text-[#8A9AB0] text-sm">Loading proposal...</p></div></div>
   if (error) return <div className="min-h-screen bg-[#0F1C2E] flex items-center justify-center px-4"><div className="text-center max-w-md"><h1 className="text-white text-2xl font-bold mb-2">ForgePt<span className="text-[#C8622A]">.</span></h1><div className="bg-[#1a2d45] rounded-2xl p-8 mt-6"><p className="text-red-400 text-lg font-semibold mb-2">⚠ Link Error</p><p className="text-[#8A9AB0] text-sm">{error}</p></div></div></div>
@@ -642,9 +682,22 @@ export default function SignProposal() {
           </div>
         )}
 
-        {slaContracts.map((slaC, idx) => (
-          <div key={idx} className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">📋 {slaC.name || 'Service Level Agreement'}</h3>
+        {slaContracts.map((slaC, idx) => {
+          const accepted = slaAccepted[idx] !== false
+          return (
+          <div key={idx} className={`bg-[#1a2d45] rounded-xl p-6 transition-opacity duration-200 ${accepted ? '' : 'opacity-60'}`}>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <h3 className="text-white font-bold text-lg">📋 {slaC.name || 'Service Level Agreement'}</h3>
+              <div className="flex items-center gap-2 shrink-0">
+                {!accepted && <span className="bg-red-500/20 text-red-400 text-xs font-bold px-2 py-0.5 rounded">DECLINED</span>}
+                <div className="flex rounded-lg overflow-hidden border border-[#2a3d55] text-xs font-semibold">
+                  <button onClick={() => { const n = [...slaAccepted]; n[idx] = true; setSlaAccepted(n) }}
+                    className={`px-3 py-1.5 transition-colors ${accepted ? 'bg-green-700 text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Accept</button>
+                  <button onClick={() => { const n = [...slaAccepted]; n[idx] = false; setSlaAccepted(n) }}
+                    className={`px-3 py-1.5 transition-colors ${!accepted ? 'bg-red-700 text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Decline</button>
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3 mb-4">
               {slaC.response_time_hours && <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Response Time</p><p className="text-white text-sm font-semibold">{slaC.response_time_hours} hours</p></div>}
               <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Billing</p><p className="text-white text-sm font-semibold">{slaC.billing_frequency || 'Quarterly'}</p></div>
@@ -669,20 +722,40 @@ export default function SignProposal() {
                 .replace(/\{\{recurringFee\}\}/g, `${slaC.recurring_fee || 0}`)
               }</p>
             )}
-            <div className="mt-4 pt-4 border-t border-[#2a3d55]">
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Service Agreement Acceptance</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div><p className="text-[#8A9AB0] text-xs mb-1">Client Signature</p><div className="border-b border-[#2a3d55] h-8" /></div>
-                <div><p className="text-[#8A9AB0] text-xs mb-1">Date</p><div className="border-b border-[#2a3d55] h-8" /></div>
-                <div className="col-span-2"><p className="text-[#8A9AB0] text-xs mb-1">Printed Name</p><div className="border-b border-[#2a3d55] h-8" /></div>
+            {accepted ? (
+              <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Service Agreement Acceptance</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><p className="text-[#8A9AB0] text-xs mb-1">Client Signature</p><div className="border-b border-[#2a3d55] h-8" /></div>
+                  <div><p className="text-[#8A9AB0] text-xs mb-1">Date</p><div className="border-b border-[#2a3d55] h-8" /></div>
+                  <div className="col-span-2"><p className="text-[#8A9AB0] text-xs mb-1">Printed Name</p><div className="border-b border-[#2a3d55] h-8" /></div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 pt-4 border-t border-red-800/40">
+                <p className="text-red-400 text-xs font-semibold">This service agreement has been declined and will not be included in the signed document.</p>
+              </div>
+            )}
+          </div>
+          )
+        })}
+
+        {monitoringContracts.map((monC, idx) => {
+          const accepted = monitoringAccepted[idx] !== false
+          return (
+          <div key={idx} className={`bg-[#1a2d45] rounded-xl p-6 transition-opacity duration-200 ${accepted ? '' : 'opacity-60'}`}>
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <h3 className="text-white font-bold text-lg">📡 {monC.name || 'Monitoring Contract'}</h3>
+              <div className="flex items-center gap-2 shrink-0">
+                {!accepted && <span className="bg-red-500/20 text-red-400 text-xs font-bold px-2 py-0.5 rounded">DECLINED</span>}
+                <div className="flex rounded-lg overflow-hidden border border-[#2a3d55] text-xs font-semibold">
+                  <button onClick={() => { const n = [...monitoringAccepted]; n[idx] = true; setMonitoringAccepted(n) }}
+                    className={`px-3 py-1.5 transition-colors ${accepted ? 'bg-green-700 text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Accept</button>
+                  <button onClick={() => { const n = [...monitoringAccepted]; n[idx] = false; setMonitoringAccepted(n) }}
+                    className={`px-3 py-1.5 transition-colors ${!accepted ? 'bg-red-700 text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white'}`}>Decline</button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
-
-        {monitoringContracts.map((monC, idx) => (
-          <div key={idx} className="bg-[#1a2d45] rounded-xl p-6">
-            <h3 className="text-white font-bold text-lg mb-4">📡 {monC.name || 'Monitoring Contract'}</h3>
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Monthly Fee</p><p className="text-white text-sm font-semibold">${monC.monthly_fee || 49}/mo</p></div>
               <div className="bg-[#0F1C2E] rounded-lg p-3"><p className="text-[#8A9AB0] text-xs mb-1">Billing</p><p className="text-white text-sm font-semibold">{monC.billing_frequency || 'Monthly'}</p></div>
@@ -701,16 +774,64 @@ export default function SignProposal() {
                 .replace(/\{\{escalationContacts\}\}/g, `${monC.escalation_contacts || 2}`)
               }</p>
             )}
-            <div className="mt-4 pt-4 border-t border-[#2a3d55]">
-              <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Monitoring Contract Acceptance</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div><p className="text-[#8A9AB0] text-xs mb-1">Client Signature</p><div className="border-b border-[#2a3d55] h-8" /></div>
-                <div><p className="text-[#8A9AB0] text-xs mb-1">Date</p><div className="border-b border-[#2a3d55] h-8" /></div>
-                <div className="col-span-2"><p className="text-[#8A9AB0] text-xs mb-1">Printed Name</p><div className="border-b border-[#2a3d55] h-8" /></div>
+            {accepted ? (
+              <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Monitoring Contract Acceptance</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><p className="text-[#8A9AB0] text-xs mb-1">Client Signature</p><div className="border-b border-[#2a3d55] h-8" /></div>
+                  <div><p className="text-[#8A9AB0] text-xs mb-1">Date</p><div className="border-b border-[#2a3d55] h-8" /></div>
+                  <div className="col-span-2"><p className="text-[#8A9AB0] text-xs mb-1">Printed Name</p><div className="border-b border-[#2a3d55] h-8" /></div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 pt-4 border-t border-red-800/40">
+                <p className="text-red-400 text-xs font-semibold">This monitoring contract has been declined and will not be included in the signed document.</p>
+              </div>
+            )}
+          </div>
+          )
+        })}
+
+        {hasContracts && (
+          <div className="bg-[#1a2d45] rounded-xl p-6 border border-[#C8622A]/30">
+            <h3 className="text-white font-bold text-lg mb-4">Your Commitment Summary</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-[#8A9AB0]">Project Total</span>
+                <span className="text-white font-semibold">${fmt(grandTotal)}</span>
+              </div>
+              {slaContracts.map((c, i) => slaAccepted[i] !== false && (parseFloat(c.initial_fee) || 0) > 0 ? (
+                <div key={i} className="flex justify-between text-sm">
+                  <span className="text-[#8A9AB0]">{c.name || 'SLA'} — Setup Fee</span>
+                  <span className="text-white">+${fmt(parseFloat(c.initial_fee))}</span>
+                </div>
+              ) : null)}
+              <div className="border-t border-[#2a3d55] pt-3 flex justify-between items-baseline">
+                <span className="text-white font-bold">Total at Signing</span>
+                <span className="text-[#C8622A] font-bold text-xl">${fmt(totalUpfront)}</span>
               </div>
             </div>
+            {(acceptedSlaRecurring.length > 0 || acceptedMonRecurring.length > 0) && (
+              <div className="mt-4 pt-4 border-t border-[#2a3d55]">
+                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Recurring Commitments</p>
+                <div className="space-y-2">
+                  {acceptedSlaRecurring.map((c, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-[#8A9AB0]">{c.name || 'Service Agreement'}</span>
+                      <span className="text-white">${fmt(parseFloat(c.recurring_fee))} / {c.billing_frequency || 'Quarterly'}</span>
+                    </div>
+                  ))}
+                  {acceptedMonRecurring.map((c, i) => (
+                    <div key={i} className="flex justify-between text-sm">
+                      <span className="text-[#8A9AB0]">{c.name || 'Monitoring'}</span>
+                      <span className="text-white">${fmt(parseFloat(c.monthly_fee))} / {c.billing_frequency || 'Month'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        ))}
+        )}
 
         <div className="bg-[#1a2d45] rounded-xl p-6">
           {signed ? (
@@ -723,7 +844,7 @@ export default function SignProposal() {
               <button
                 onClick={async () => {
                   try {
-                    const doc = await generateSignedPDF(signerName, signedAt || new Date().toISOString(), lineItems, proposal, orgProfile, sections)
+                    const doc = await generateSignedPDF(signerName, signedAt || new Date().toISOString(), lineItems, proposal, orgProfile, sections, { sla: slaAccepted, monitoring: monitoringAccepted })
                     doc.save(`Signed-Proposal-${proposal?.proposal_name || 'document'}.pdf`)
                   } catch (e) { alert('Error generating PDF. Please try again.') }
                 }}
@@ -736,7 +857,7 @@ export default function SignProposal() {
             <div>
               <h3 className="text-white font-bold text-lg mb-1">Accept & Sign</h3>
               <p className="text-[#8A9AB0] text-sm mb-6">
-                By signing below, you agree to the terms of this proposal and authorize the work described above for the total amount of <span className="text-white font-semibold">${fmt(grandTotal)}</span>.
+                By signing below, you agree to the terms of this proposal and authorize the work described above for the total amount of <span className="text-white font-semibold">${fmt(totalUpfront)}</span>.
               </p>
               <div className="space-y-4">
                 <div>
