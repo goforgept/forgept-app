@@ -131,8 +131,10 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
     return { total, pct: Math.min((total / maxHours) * 100, 100), over: total > maxHours, remaining: Math.max(maxHours - total, 0) }
   }
 
-  const unassignedTickets = tickets.filter(t => !t.assigned_tech_id)
-  const unscheduled = tickets.filter(t => !t.scheduled_date && !t.assigned_tech_id)
+  // Any ticket without a scheduled date belongs in the unscheduled column,
+  // even if a tech is assigned — assigned-but-undated tickets were invisible before.
+  const unassignedTickets = tickets.filter(t => !t.scheduled_date)
+  const unscheduled = tickets.filter(t => !t.scheduled_date)
 
   const getTicketsForTechDate = (techId, date) =>
     tickets.filter(t => t.assigned_tech_id === techId && t.scheduled_date === date)
@@ -383,7 +385,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                   onDragLeave={() => setDragOver(null)}>
                   <div className="p-4 border-b border-fp-border">
                     <div className="flex items-center justify-between">
-                      <p className="text-fp-muted font-semibold text-sm">Unassigned</p>
+                      <p className="text-fp-muted font-semibold text-sm">Unscheduled</p>
                       <span className="bg-fp-inset text-fp-muted text-xs px-2 py-1 rounded font-semibold">{unassignedTickets.length}</span>
                     </div>
                   </div>
@@ -819,7 +821,9 @@ function JobBlock({ schedule, onRemove, onNavigate }) {
 }
 
 function TicketCard({ ticket, selectedDate, onDragStart, onClick }) {
+  const today = new Date().toISOString().split('T')[0]
   const isOtherDay = ticket.scheduled_date && ticket.scheduled_date !== selectedDate
+  const isPastDue = ticket.scheduled_date && ticket.scheduled_date < today
   const dateLabel = isOtherDay
     ? new Date(ticket.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : null
@@ -829,16 +833,21 @@ function TicketCard({ ticket, selectedDate, onDragStart, onClick }) {
       draggable
       onDragStart={e => onDragStart(e, ticket.id)}
       onClick={onClick}
-      className={`p-3 rounded-lg border cursor-grab active:cursor-grabbing hover:border-fp-brand/40 transition-colors ${isOtherDay ? 'border-fp-border bg-fp-inset/60 opacity-70' : STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>
+      className={`p-3 rounded-lg border cursor-grab active:cursor-grabbing hover:border-fp-brand/40 transition-colors ${isPastDue ? 'border-red-500/50 bg-red-500/5' : isOtherDay ? 'border-fp-border bg-fp-inset/60 opacity-70' : STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>
       <div className="flex items-start gap-2">
         <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${PRIORITY_DOT[ticket.priority] || PRIORITY_DOT.Normal}`} />
         <div className="flex-1 min-w-0">
-          <p className="text-fp-text text-xs font-medium leading-snug line-clamp-2">{ticket.title}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-fp-text text-xs font-medium leading-snug line-clamp-2">{ticket.title}</p>
+            {isPastDue && <span className="text-red-400 text-xs font-bold shrink-0">!</span>}
+          </div>
           {ticket.clients?.company && <p className="text-fp-muted text-xs mt-0.5 truncate">{ticket.clients.company}</p>}
           <div className="flex items-center gap-2 mt-0.5">
-            {dateLabel
-              ? <p className="text-fp-muted text-xs">📅 {dateLabel}</p>
-              : ticket.scheduled_time && <p className="text-[#C8622A] text-xs">{ticket.scheduled_time.slice(0, 5)}</p>}
+            {isPastDue
+              ? <p className="text-red-400 text-xs font-semibold">Past due · {new Date(ticket.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+              : dateLabel
+                ? <p className="text-fp-muted text-xs">📅 {dateLabel}</p>
+                : ticket.scheduled_time && <p className="text-[#C8622A] text-xs">{ticket.scheduled_time.slice(0, 5)}</p>}
             {ticket.duration_hours && <p className="text-fp-muted text-xs">{ticket.duration_hours}h</p>}
           </div>
         </div>

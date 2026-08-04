@@ -49,7 +49,7 @@ export default function ScopeSection({
               ✉ Send Proposal
             </button>
           )}
-          {canEdit && proposal?.client_email && ['Contacted', 'Sent', 'Negotiating'].includes(proposal?.status) && !proposal?.signature_name && (
+          {canEdit && proposal?.client_email && !['Won', 'Lost'].includes(proposal?.status) && !proposal?.signature_name && (
             <button onClick={requestSignature} disabled={requestingSignature}
               className="bg-blue-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50">
               {requestingSignature ? 'Sending...' : '✍️ Request Signature'}

@@ -250,6 +250,30 @@ export default function ProposalDetail({ isAdmin }) {
     setSlaContracts(slaArr)
     setMonitoringContracts(monArr)
 
+    // If proposal is Won and has contracts but no contract rows yet, create them now.
+    // Handles the case where Won was set via eSign (bypasses the ProposalDetail modal flow).
+    if (data?.status === 'Won' && (slaArr.length > 0 || monArr.length > 0)) {
+      const { data: existingContracts } = await supabase
+        .from('contracts').select('id').eq('proposal_id', data.id).limit(1)
+      if (!existingContracts?.length) {
+        const rows = [
+          ...slaArr.map(c => ({
+            org_id: data.org_id, proposal_id: data.id, client_id: data.client_id || null,
+            user_id: profile?.id, type: 'sla', name: c.name || 'Service Level Agreement',
+            status: 'Active', start_date: c.start_date || null, end_date: c.end_date || null,
+            auto_renew: c.auto_renew || false,
+          })),
+          ...monArr.map(c => ({
+            org_id: data.org_id, proposal_id: data.id, client_id: data.client_id || null,
+            user_id: profile?.id, type: 'monitoring', name: c.name || 'Monitoring Contract',
+            status: 'Active', start_date: c.start_date || null, end_date: c.end_date || null,
+            auto_renew: c.auto_renew || false,
+          })),
+        ]
+        await supabase.from('contracts').insert(rows)
+      }
+    }
+
     // Load org SLA settings and auto-attach if applicable
     if (data?.org_id) {
       const [{ data: orgSLA }, { data: ratesData }] = await Promise.all([

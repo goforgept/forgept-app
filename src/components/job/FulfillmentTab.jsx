@@ -43,7 +43,11 @@ export default function FulfillmentTab({ job, lineItems, orgId, profileId }) {
     return autoMatch(bomItem)
   }
 
-  const getAllocation = (bomItem) => allocations.find(a => a.bom_line_item_id === bomItem.id) || null
+  const getAllocation = (bomItem) => {
+    const matches = allocations.filter(a => a.bom_line_item_id === bomItem.id)
+    // Prefer an active allocation over a released one
+    return matches.find(a => a.status === 'reserved' || a.status === 'fulfilled') || matches[0] || null
+  }
 
   const getAvailable = (invItem) => {
     if (!invItem) return 0
@@ -55,19 +59,34 @@ export default function FulfillmentTab({ job, lineItems, orgId, profileId }) {
     const qty = parseFloat(reserveQtys[bomItem.id]) || parseFloat(bomItem.quantity) || 1
     const cost = parseFloat(invItem.unit_cost) || 0
 
-    // Write allocation
-    const { data: alloc } = await supabase.from('job_inventory_allocations').insert({
-      org_id: orgId,
-      job_id: job.id,
-      inventory_item_id: invItem.id,
-      bom_line_item_id: bomItem.id,
-      bom_item_description: bomItem.item_name,
-      bom_part_number: bomItem.part_number_sku || null,
-      quantity_reserved: qty,
-      quantity_fulfilled: 0,
-      unit_cost: cost,
-      status: 'reserved',
-    }).select().single()
+    // Reuse an existing released allocation rather than creating a duplicate row
+    const existingReleased = allocations.find(
+      a => a.bom_line_item_id === bomItem.id && a.status === 'released'
+    )
+    if (existingReleased) {
+      await supabase.from('job_inventory_allocations').update({
+        inventory_item_id: invItem.id,
+        quantity_reserved: qty,
+        quantity_fulfilled: 0,
+        unit_cost: cost,
+        status: 'reserved',
+        updated_at: new Date().toISOString(),
+      }).eq('id', existingReleased.id)
+    } else {
+      await supabase.from('job_inventory_allocations').insert({
+        org_id: orgId,
+        job_id: job.id,
+        inventory_item_id: invItem.id,
+        bom_line_item_id: bomItem.id,
+        bom_item_description: bomItem.item_name,
+        bom_part_number: bomItem.part_number_sku || null,
+        quantity_reserved: qty,
+        quantity_fulfilled: 0,
+        unit_cost: cost,
+        status: 'reserved',
+      })
+    }
+    // (local alloc variable no longer used below — fetchData() refreshes state)
 
     // Update inventory reserved qty
     await supabase.from('inventory_items').update({

@@ -196,14 +196,18 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map(ticket => (
+            {filtered.map(ticket => {
+              const today = new Date().toISOString().split('T')[0]
+              const isPastDue = ticket.scheduled_date && ticket.scheduled_date < today && !['Resolved', 'Cancelled'].includes(ticket.status)
+              return (
               <div key={ticket.id} onClick={() => navigate(`/service-tickets/${ticket.id}`)}
-                className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors group border border-fp-border hover:border-fp-brand/30">
+                className={`bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors group border hover:border-fp-brand/30 ${isPastDue ? 'border-red-500/40' : 'border-fp-border'}`}>
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-1 flex-wrap">
                       <h3 className="text-fp-text font-semibold group-hover:text-[#C8622A] transition-colors">{ticket.title}</h3>
                       {ticket.ticket_number && <span className="text-fp-muted text-xs font-mono bg-fp-inset px-2 py-0.5 rounded">{ticket.ticket_number}</span>}
+                      {isPastDue && <span className="text-xs px-2 py-0.5 rounded font-bold bg-red-500/20 text-red-400">Past Due</span>}
                       <span className={`text-xs px-2 py-0.5 rounded font-semibold ${PRIORITY_COLORS[ticket.priority] || PRIORITY_COLORS.Normal}`}>{ticket.priority}</span>
                       <span className={`text-xs px-2 py-0.5 rounded font-semibold ${STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>{ticket.status}</span>
                     </div>
@@ -211,7 +215,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
                       {ticket.clients?.company && <span>🏢 {ticket.clients.company}</span>}
                       {ticket.jobs?.name && <span>🔨 {ticket.jobs.job_number ? `${ticket.jobs.job_number} — ` : ''}{ticket.jobs.name}</span>}
                       {ticket.profiles?.full_name && <span>🔧 {ticket.profiles.full_name}</span>}
-                      {ticket.scheduled_date && <span>📅 {new Date(ticket.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}{ticket.scheduled_time ? ` at ${ticket.scheduled_time.slice(0, 5)}` : ''}</span>}
+                      {ticket.scheduled_date && <span className={isPastDue ? 'text-red-400 font-semibold' : ''}>📅 {new Date(ticket.scheduled_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}{ticket.scheduled_time ? ` at ${ticket.scheduled_time.slice(0, 5)}` : ''}</span>}
                     </div>
                     {ticket.description && <p className="text-fp-muted text-xs mt-1.5 line-clamp-1">{ticket.description}</p>}
                   </div>
@@ -221,7 +225,8 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
                   </div>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
