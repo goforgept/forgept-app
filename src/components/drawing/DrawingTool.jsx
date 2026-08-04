@@ -229,7 +229,7 @@ function SheetTab({ sheet, isActive, onSelect, onRename, onDelete }) {
       {editing
         ? <input autoFocus value={name} onChange={e => setName(e.target.value)} onKeyDown={handleKeyDown}
             onBlur={() => { onRename(name); setEditing(false) }} onClick={e => e.stopPropagation()}
-            className="w-24 text-xs border-b border-[#C8622A] outline-none bg-transparent text-fp-text" />
+            className="w-24 text-xs border-b border-[#C8622A] outline-none bg-[#0F1C2E] text-white px-1" />
         : <span onDoubleClick={(e) => { e.stopPropagation(); setEditing(true) }}>{sheet.name}</span>
       }
       <span className={`px-1.5 py-0.5 rounded text-xs ${statusColor}`}>{sheet.status}</span>
