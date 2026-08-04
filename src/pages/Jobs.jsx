@@ -47,6 +47,13 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
     setJobs(prev => prev.map(j => j.id === jobId ? { ...j, archived_at: null } : j))
   }
 
+  const deleteJob = async (e, job) => {
+    e.stopPropagation()
+    if (!window.confirm(`Permanently delete "${job.name}"? This cannot be undone.`)) return
+    await supabase.from('jobs').delete().eq('id', job.id)
+    setJobs(prev => prev.filter(j => j.id !== job.id))
+  }
+
   const archivedCount = jobs.filter(j => !!j.archived_at).length
   const activeJobs = jobs.filter(j => !j.archived_at)
 
@@ -170,6 +177,9 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
                         ) : (
                           <button onClick={e => archiveJob(e, job.id)} className="text-fp-muted hover:text-[#C8622A] text-xs transition-colors opacity-0 group-hover:opacity-100">Archive</button>
                         )
+                      )}
+                      {isAdmin && job.status === 'Cancelled' && (
+                        <button onClick={e => deleteJob(e, job)} className="text-red-500/50 hover:text-red-400 text-xs transition-colors opacity-0 group-hover:opacity-100">Delete</button>
                       )}
                       <span className="text-fp-muted group-hover:text-fp-text transition-colors">→</span>
                     </div>
