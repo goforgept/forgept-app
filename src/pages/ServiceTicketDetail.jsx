@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import SignaturePad from '../components/SignaturePad'
 
 const STATUS_COLORS = {
   'Open': 'bg-blue-500/20 text-blue-400',
@@ -42,6 +43,8 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const [clientContacts, setClientContacts] = useState([])
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [photoCategory, setPhotoCategory] = useState('Other')
+  const [showSignaturePad, setShowSignaturePad] = useState(false)
+  const [savingSignature,  setSavingSignature]  = useState(false)
 
   useEffect(() => { if (profile?.org_id) fetchAll() }, [id, profile?.org_id])
 
@@ -485,16 +488,28 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     const resolution = `All service work has been completed. ${profile?.company_name || 'The technician'} has diagnosed, repaired, and tested the reported issue. Please contact us if any problems persist.`
     const resLines = doc.splitTextToSize(resolution, pageWidth - 28)
     for (const line of resLines) { doc.text(line, 14, y); y += 5 }
-    y += 10
+    y += 8
 
+    // Signature block
+    if (y > doc.internal.pageSize.getHeight() - 60) { doc.addPage(); y = 20 }
+    if (ticket.completion_signature_data) {
+      doc.addImage(ticket.completion_signature_data, 'PNG', 14, y, 90, 28)
+      y += 30
+    }
     doc.setDrawColor(180, 180, 180)
-    doc.line(14, y, 100, y)
+    doc.line(14, y, 110, y)
     doc.line(120, y, pageWidth - 14, y)
     y += 5
     doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
-    doc.text('Client Signature', 14, y)
-    doc.text('Date', 120, y)
+    if (ticket.completion_signature_data) {
+      doc.text(ticket.completion_signed_by || 'Customer Signature', 14, y)
+      doc.text(ticket.completion_signed_at ? new Date(ticket.completion_signed_at).toLocaleDateString() : '', 120, y)
+    } else {
+      doc.text('Client Signature', 14, y)
+      doc.text('Date', 120, y)
+    }
 
     const photoCategories = ['Before', 'During', 'After', 'Issue/Defect', 'Equipment', 'Panel/Rack', 'Cable Run', 'Other']
     for (const category of photoCategories) {
@@ -576,7 +591,20 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
   }
 
-  const inputClass = "bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+  const handleSignatureConfirm = async (dataUrl, signerName) => {
+    setSavingSignature(true)
+    const now = new Date().toISOString()
+    await supabase.from('service_tickets').update({
+      completion_signature_data: dataUrl,
+      completion_signed_by:      signerName || null,
+      completion_signed_at:      now,
+    }).eq('id', ticket.id)
+    setTicket(prev => ({ ...prev, completion_signature_data: dataUrl, completion_signed_by: signerName || null, completion_signed_at: now }))
+    setSavingSignature(false)
+    setShowSignaturePad(false)
+  }
+
+  const inputClass = "bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-border"
   const cellInput = "bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand"
 
   const matTotal = lineItems.reduce((sum, l) => sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
@@ -588,6 +616,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const noteLines = ticket.notes ? ticket.notes.split('\n\n').filter(Boolean).reverse() : []
 
   return (
+    <>
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureInventory={featureInventory} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
@@ -641,16 +670,35 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
               </div>
             </div>
             <div>
-              <div className="flex items-center gap-2 mb-3">
-                <button onClick={() => generateServiceReport(false).catch(e => { console.error(e); alert('Error generating report: ' + e.message) })}
-                  className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
-                  📄 Download Report
-                </button>
-                {ticket.clients?.email && (
-                  <button onClick={() => generateServiceReport(true).catch(e => { console.error(e); alert('Error sending report: ' + e.message) })}
-                    className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-                    ✉️ Send to Client
+              <div className="flex flex-col gap-2 mb-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button onClick={() => generateServiceReport(false).catch(e => { console.error(e); alert('Error generating report: ' + e.message) })}
+                    className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
+                    📄 Download Report
                   </button>
+                  {ticket.clients?.email && (
+                    <button onClick={() => generateServiceReport(true).catch(e => { console.error(e); alert('Error sending report: ' + e.message) })}
+                      className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                      ✉️ Send to Client
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setShowSignaturePad(true)}
+                    className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors border"
+                    style={ticket.completion_signature_data
+                      ? { background: '#16a34a20', color: '#16a34a', borderColor: '#16a34a40' }
+                      : { background: 'transparent', color: '#C8622A', borderColor: '#C8622A60' }}>
+                    {ticket.completion_signature_data ? '✅ Re-sign' : '✍️ Get Signature'}
+                  </button>
+                </div>
+                {ticket.completion_signature_data && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <img src={ticket.completion_signature_data} alt="signature" className="h-6 w-20 object-contain" />
+                    <span className="text-xs text-green-400">
+                      Signed{ticket.completion_signed_by ? ` by ${ticket.completion_signed_by}` : ''}
+                      {ticket.completion_signed_at ? ` · ${new Date(ticket.completion_signed_at).toLocaleDateString()}` : ''}
+                    </span>
+                  </div>
                 )}
               </div>
             {confirmDelete ? (
@@ -1049,5 +1097,14 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
 
       </div>
     </div>
+
+    {showSignaturePad && (
+      <SignaturePad
+        title={`Service Ticket Sign-off${ticket.ticket_number ? ` · #${ticket.ticket_number}` : ''}`}
+        onCancel={() => setShowSignaturePad(false)}
+        onConfirm={handleSignatureConfirm}
+      />
+    )}
+    </>
   )
 }

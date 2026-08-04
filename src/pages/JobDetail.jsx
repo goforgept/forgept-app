@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import SignaturePad from '../components/SignaturePad'
 import ChecklistTab from '../components/job/ChecklistTab'
 import FulfillmentTab from '../components/job/FulfillmentTab'
 import ChangeOrdersTab from '../components/job/ChangeOrdersTab'
@@ -105,6 +106,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [showNotifyModal, setShowNotifyModal] = useState(false)
   const [notifyMessage, setNotifyMessage] = useState('')
   const [sendingNotify, setSendingNotify] = useState(false)
+
+  const [showSignaturePad, setShowSignaturePad] = useState(false)
+  const [savingSignature,  setSavingSignature]  = useState(false)
 
   // Schedule tech modal
   const [showScheduleModal, setShowScheduleModal] = useState(false)
@@ -442,6 +446,19 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const hexToRgb = (hex) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
     return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
+  }
+
+  const handleSignatureConfirm = async (dataUrl, signerName) => {
+    setSavingSignature(true)
+    const now = new Date().toISOString()
+    await supabase.from('jobs').update({
+      completion_signature_data: dataUrl,
+      completion_signed_by:      signerName || null,
+      completion_signed_at:      now,
+    }).eq('id', job.id)
+    setJob(prev => ({ ...prev, completion_signature_data: dataUrl, completion_signed_by: signerName || null, completion_signed_at: now }))
+    setSavingSignature(false)
+    setShowSignaturePad(false)
   }
 
   const generatePO = async () => {
@@ -1010,15 +1027,26 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     }
     y += 10
 
-    // Client signature line
+    // Signature block
+    if (y > doc.internal.pageSize.getHeight() - 60) { doc.addPage(); y = 20 }
+    if (job.completion_signature_data) {
+      doc.addImage(job.completion_signature_data, 'PNG', 14, y, 90, 28)
+      y += 30
+    }
     doc.setDrawColor(180, 180, 180)
-    doc.line(14, y, 100, y)
+    doc.line(14, y, 110, y)
     doc.line(120, y, pageWidth - 14, y)
     y += 5
     doc.setFontSize(8)
+    doc.setFont('helvetica', 'normal')
     doc.setTextColor(100, 100, 100)
-    doc.text('Client Signature', 14, y)
-    doc.text('Date', 120, y)
+    if (job.completion_signature_data) {
+      doc.text(job.completion_signed_by || 'Customer Signature', 14, y)
+      doc.text(job.completion_signed_at ? new Date(job.completion_signed_at).toLocaleDateString() : '', 120, y)
+    } else {
+      doc.text('Client Signature', 14, y)
+      doc.text('Date', 120, y)
+    }
 
     // Site Photos organized by category
     const photoCategories = ['Before', 'During', 'After', 'Issue/Defect', 'Equipment', 'Panel/Rack', 'Cable Run', 'Other']
@@ -1182,11 +1210,28 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
                 📄 Final Packet
               </button>
+              <button
+                onClick={() => setShowSignaturePad(true)}
+                className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors border"
+                style={job?.completion_signature_data
+                  ? { background: '#16a34a20', color: '#16a34a', borderColor: '#16a34a40' }
+                  : { background: 'transparent', color: '#C8622A', borderColor: '#C8622A60' }}>
+                {job?.completion_signature_data ? '✅ Re-sign' : '✍️ Get Signature'}
+              </button>
               <select value={job?.status || 'Active'} onChange={e => updateJobStatus(e.target.value)} disabled={savingStatus}
                 className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                 {['Active', 'On Hold', 'Completed', 'Cancelled'].map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
+            {job?.completion_signature_data && (
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg mt-2 w-fit">
+                <img src={job.completion_signature_data} alt="signature" className="h-6 w-20 object-contain" />
+                <span className="text-xs text-green-400">
+                  Signed{job.completion_signed_by ? ` by ${job.completion_signed_by}` : ''}
+                  {job.completion_signed_at ? ` · ${new Date(job.completion_signed_at).toLocaleDateString()}` : ''}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-5 gap-4">
@@ -1408,6 +1453,14 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           savingCO={savingCO}
           onSave={saveChangeOrder}
           onClose={() => { setShowCOModal(false); setCoForm({ name: '', description: '', line_items: [], labor_items: [] }) }}
+        />
+      )}
+
+      {showSignaturePad && (
+        <SignaturePad
+          title={`Job Completion Sign-off${job?.job_number ? ` · ${job.job_number}` : ''}${job?.name ? ` — ${job.name}` : ''}`}
+          onCancel={() => setShowSignaturePad(false)}
+          onConfirm={handleSignatureConfirm}
         />
       )}
     </div>
