@@ -282,14 +282,14 @@ export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager =
           const isOpen = !collapsed[group.key]
           const hasActive = group.links.some(l => isActive(l.path))
           return (
-            <div key={group.key} className="mb-1">
+            <div key={group.key} className="mb-2">
               <button
                 onClick={() => toggleGroup(group.key)}
-                className={`w-full flex items-center justify-between px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-colors ${
-                  hasActive && !isOpen ? 'text-[#C8622A]' : 'text-fp-muted hover:text-fp-text'
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
+                  hasActive && !isOpen ? 'text-[#C8622A]' : 'text-fp-text hover:text-[#C8622A]'
                 }`}
               >
-                <span>{group.label}</span>
+                <span className="text-sm font-bold tracking-wide">{group.label}</span>
                 <span className="text-fp-muted text-xs">{isOpen ? '▾' : '▸'}</span>
               </button>
               {isOpen && (
