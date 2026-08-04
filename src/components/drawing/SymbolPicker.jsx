@@ -425,6 +425,32 @@ function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelec
   const touchStartRef  = useRef(null)
   const ghostRef       = useRef(null)
   const isDraggingRef  = useRef(false)
+  const btnRef         = useRef(null)
+
+  // Remove ghost if component unmounts mid-drag (e.g., user navigates away)
+  useEffect(() => {
+    return () => {
+      if (ghostRef.current) { ghostRef.current.remove(); ghostRef.current = null }
+    }
+  }, [])
+
+  // Non-passive touchmove listener so we can preventDefault to stop page scroll.
+  // React synthetic events are passive by default and cannot call preventDefault.
+  useEffect(() => {
+    const el = btnRef.current
+    if (!el) return
+    const onMove = (e) => {
+      if (!touchStartRef.current) return
+      const t = e.touches[0]
+      const dx = t.clientX - touchStartRef.current.x
+      const dy = t.clientY - touchStartRef.current.y
+      if (isDraggingRef.current || Math.sqrt(dx * dx + dy * dy) > 8) {
+        e.preventDefault() // stop browser scroll/pan while dragging a symbol
+      }
+    }
+    el.addEventListener('touchmove', onMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onMove)
+  }, [])
 
   const handleDragStart = (e) => {
     e.dataTransfer.setData('application/json', JSON.stringify(symbol))
@@ -477,11 +503,13 @@ function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelec
     }`}>
       <button
         onClick={onSelect}
+        ref={btnRef}
         draggable={true}
         onDragStart={handleDragStart}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
         title={`${symbol.name}\n${symbol.part_number}\nDrag to place · or tap to select then tap canvas`}
         className="flex flex-col items-center gap-1 w-full cursor-grab active:cursor-grabbing">
         <div className={`w-10 h-10 flex items-center justify-center rounded-lg ${isSelected ? 'text-[#C8622A]' : 'text-[#8A9AB0]'}`}>

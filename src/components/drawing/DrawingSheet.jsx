@@ -117,15 +117,17 @@ function drawCloudPath(ctx, ax1, ay1, ax2, ay2) {
   const ny = Math.max(2, Math.round(h / (2 * bumpR)))
   const rx = w / (2 * nx)   // actual horizontal bump radius (fills edge exactly)
   const ry = h / (2 * ny)   // actual vertical bump radius
+  // anticlockwise=false (clockwise on screen) sweeps through the OUTER side of each arc.
+  // In canvas Y-down, increasing angle = clockwise on screen = outward bump.
   ctx.beginPath()
-  for (let i = 0; i < nx; i++) ctx.arc(minX + rx*(2*i+1), minY, rx, Math.PI,    0,         true)  // top — UP
-  for (let j = 0; j < ny; j++) ctx.arc(maxX, minY + ry*(2*j+1), ry, -Math.PI/2, Math.PI/2, false) // right — RIGHT
-  for (let i = nx-1; i >= 0; i--) ctx.arc(minX + rx*(2*i+1), maxY, rx, 0,       Math.PI,   false) // bottom — DOWN
-  for (let j = ny-1; j >= 0; j--) ctx.arc(minX, minY + ry*(2*j+1), ry, Math.PI/2, -Math.PI/2, true) // left — LEFT (was false = bug)
+  for (let i = 0; i < nx; i++) ctx.arc(minX + rx*(2*i+1), minY, rx, Math.PI,    0,          false) // top — UP
+  for (let j = 0; j < ny; j++) ctx.arc(maxX, minY + ry*(2*j+1), ry, -Math.PI/2, Math.PI/2,  false) // right — RIGHT
+  for (let i = nx-1; i >= 0; i--) ctx.arc(minX + rx*(2*i+1), maxY, rx, 0,       Math.PI,    false) // bottom — DOWN
+  for (let j = ny-1; j >= 0; j--) ctx.arc(minX, minY + ry*(2*j+1), ry, Math.PI/2, -Math.PI/2, false) // left — LEFT
   ctx.closePath()
 }
 
-const getNextLabel = async (category, sheetIds) => {
+const getNextLabel = async (category, sheetIds, reserved = []) => {
   const prefix = LABEL_PREFIXES[category]
   if (!prefix) return null
 
@@ -136,11 +138,11 @@ const getNextLabel = async (category, sheetIds) => {
     .not('device_address', 'is', null)
     .like('device_address', `${prefix}-%`)
 
-  if (!data || data.length === 0) return `${prefix}-01`
-
-  const nums = data
-    .map(p => parseInt((p.device_address || '').replace(`${prefix}-`, '')) || 0)
-    .filter(n => !isNaN(n))
+  const toNum = (addr) => parseInt((addr || '').replace(`${prefix}-`, '')) || 0
+  const nums = [
+    ...(data || []).map(p => toNum(p.device_address)),
+    ...reserved.filter(a => a?.startsWith?.(`${prefix}-`)).map(toNum),
+  ].filter(n => n > 0)
 
   const next = nums.length > 0 ? Math.max(...nums) + 1 : 1
   return `${prefix}-${String(next).padStart(2, '0')}`
@@ -149,6 +151,14 @@ const getNextLabel = async (category, sheetIds) => {
 export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange, activeTool, onPathwaySelect, deletedPathwayId, rooms, onRoomClick, onRoomPlace, onRoomMove }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
+  // Session-local cache of addresses assigned this session so rapid placements
+  // don't both read the same DB max before either insert lands.
+  const sessionAddressesRef = useRef([])
+  const nextLabel = useCallback(async (category, sheetIds) => {
+    const addr = await getNextLabel(category, sheetIds, sessionAddressesRef.current)
+    if (addr) sessionAddressesRef.current = [...sessionAddressesRef.current, addr]
+    return addr
+  }, [])
 
   useEffect(() => {
     if (stageRef.current) onStageReady?.(stageRef.current)
@@ -483,7 +493,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           x: Math.round(x * 10000) / 10000,
           y: Math.round(y * 10000) / 10000,
           rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
-          device_address: await getNextLabel(symbol.category, allSheetIds || [sheetIdRef.current]),
+          device_address: await nextLabel(symbol.category, allSheetIds || [sheetIdRef.current]),
         })
         .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories)')
         .single()
@@ -581,7 +591,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
             product_id:          copiedPlacement.product_id,
             x:                   Math.min(copiedPlacement.x + offset, 0.99),
             y:                   Math.min(copiedPlacement.y + offset, 0.99),
-            device_address:      await getNextLabel(copiedPlacement.global_products?.category, allSheetIds || [sheet.id]),
+            device_address:      await nextLabel(copiedPlacement.global_products?.category, allSheetIds || [sheet.id]),
             rotation:            copiedPlacement.rotation,
             quantity:            copiedPlacement.quantity,
             symbol_size:         copiedPlacement.symbol_size,
@@ -1118,7 +1128,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           global_product_id: selectedSymbol.id, product_id: catalogMatch?.id || null,
           x: Math.round(x * 10000) / 10000, y: Math.round(y * 10000) / 10000,
           rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
-          device_address: await getNextLabel(selectedSymbol.category, allSheetIds || [sheet.id]),
+          device_address: await nextLabel(selectedSymbol.category, allSheetIds || [sheet.id]),
         })
         .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories)')
         .single()
@@ -1336,7 +1346,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                         product_id:            copiedPlacement.product_id,
                         x:                     Math.min(copiedPlacement.x + offset, 0.99),
                         y:                     Math.min(copiedPlacement.y + offset, 0.99),
-                        device_address:        await getNextLabel(copiedPlacement.global_products?.category, allSheetIds || [sheet.id]),
+                        device_address:        await nextLabel(copiedPlacement.global_products?.category, allSheetIds || [sheet.id]),
                         rotation:              copiedPlacement.rotation,
                         quantity:              copiedPlacement.quantity,
                         symbol_size:           copiedPlacement.symbol_size,
@@ -1388,7 +1398,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                         product_id:            copiedPlacement.product_id,
                         x:                     Math.min(copiedPlacement.x + offset, 0.99),
                         y:                     Math.min(copiedPlacement.y + offset, 0.99),
-                        device_address:        await getNextLabel(copiedPlacement.global_products?.category, allSheetIds || [sheet.id]),
+                        device_address:        await nextLabel(copiedPlacement.global_products?.category, allSheetIds || [sheet.id]),
                         rotation:              copiedPlacement.rotation,
                         quantity:              copiedPlacement.quantity,
                         symbol_size:           copiedPlacement.symbol_size,
@@ -1655,7 +1665,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 x: Math.round(x * 10000) / 10000,
                 y: Math.round(y * 10000) / 10000,
                 rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
-                device_address: await getNextLabel(symbol.category, allSheetIds || [sheet.id]),
+                device_address: await nextLabel(symbol.category, allSheetIds || [sheet.id]),
               })
               .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories)')
               .single()
@@ -2609,7 +2619,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               part_number_override: p.part_number_override,
               manufacturer_override: p.manufacturer_override,
               description_override: p.description_override,
-              device_address: await getNextLabel(p.global_products?.category, allSheetIds || [sheet.id]),
+              device_address: await nextLabel(p.global_products?.category, allSheetIds || [sheet.id]),
               notes: p.notes, fov_angle: p.fov_angle, fov_range: p.fov_range,
               site_condition: p.site_condition,
               source: 'manual',
