@@ -108,7 +108,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
 
     const { data } = await supabase
       .from('bom_line_items')
-      .select('id, item_name, part_number_sku, customer_price_total, billing_frequency, auto_invoice, next_invoice_date, renewal_date, proposal_id, proposals(proposal_name, company, client_name, user_id)')
+      .select('id, item_name, part_number_sku, quantity, customer_price_unit, customer_price_total, billing_frequency, auto_invoice, next_invoice_date, renewal_date, proposal_id, proposals(proposal_name, company, client_name, user_id)')
       .in('proposal_id', propIds)
       .eq('recurring', true)
       .order('renewal_date', { ascending: true, nullsFirst: false })
@@ -216,23 +216,32 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     setEditRecurring(item)
     setEditRecurringForm({
       item_name: item.item_name || '',
+      part_number_sku: item.part_number_sku || '',
+      quantity: item.quantity != null ? String(item.quantity) : '1',
+      customer_price_unit: item.customer_price_unit != null ? String(item.customer_price_unit) : '',
+      customer_price_total: item.customer_price_total != null ? String(item.customer_price_total) : '',
       billing_frequency: item.billing_frequency || 'Annual',
       renewal_date: item.renewal_date || '',
       next_invoice_date: item.next_invoice_date || '',
       auto_invoice: item.auto_invoice || false,
-      customer_price_total: item.customer_price_total != null ? String(item.customer_price_total) : '',
     })
   }
 
   const saveRecurringEdit = async () => {
     setSavingRecurring(true)
+    const qty = parseFloat(editRecurringForm.quantity) || 1
+    const unitPrice = parseFloat(editRecurringForm.customer_price_unit) || 0
+    const total = editRecurringForm.customer_price_unit !== '' ? qty * unitPrice : (editRecurringForm.customer_price_total !== '' ? parseFloat(editRecurringForm.customer_price_total) : null)
     const updates = {
       item_name: editRecurringForm.item_name,
+      part_number_sku: editRecurringForm.part_number_sku || null,
+      quantity: qty,
+      customer_price_unit: unitPrice || null,
+      customer_price_total: total,
       billing_frequency: editRecurringForm.billing_frequency,
       renewal_date: editRecurringForm.renewal_date || null,
       next_invoice_date: editRecurringForm.next_invoice_date || null,
       auto_invoice: editRecurringForm.auto_invoice,
-      customer_price_total: editRecurringForm.customer_price_total !== '' ? parseFloat(editRecurringForm.customer_price_total) : null,
     }
     await supabase.from('bom_line_items').update(updates).eq('id', editRecurring.id)
     setRecurringItems(prev => prev.map(r => r.id === editRecurring.id ? { ...r, ...updates } : r))
@@ -1092,13 +1101,61 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       {/* Edit Recurring Item Modal */}
       {editRecurring && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setEditRecurring(null)}>
-          <div className="bg-fp-card rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-fp-text font-bold text-lg mb-5">Edit Recurring Item</h3>
+          <div className="bg-fp-card rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-fp-text font-bold text-lg mb-1">Edit Subscription</h3>
+            <p className="text-fp-muted text-sm mb-5">{editRecurring.proposals?.company || '—'} · {editRecurring.proposals?.proposal_name || ''}</p>
             <div className="space-y-4">
               <div>
                 <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Item Name</label>
                 <input value={editRecurringForm.item_name} onChange={e => setEditRecurringForm(p => ({ ...p, item_name: e.target.value }))}
                   className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Part Number / SKU</label>
+                <input value={editRecurringForm.part_number_sku} onChange={e => setEditRecurringForm(p => ({ ...p, part_number_sku: e.target.value }))}
+                  placeholder="Optional"
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Quantity</label>
+                  <input type="number" min="0" step="1" value={editRecurringForm.quantity}
+                    onChange={e => {
+                      const qty = e.target.value
+                      const unit = parseFloat(editRecurringForm.customer_price_unit) || 0
+                      const total = unit ? String((parseFloat(qty) || 0) * unit) : editRecurringForm.customer_price_total
+                      setEditRecurringForm(p => ({ ...p, quantity: qty, customer_price_total: total }))
+                    }}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Unit Price</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fp-muted text-sm">$</span>
+                    <input type="number" min="0" step="0.01" value={editRecurringForm.customer_price_unit}
+                      onChange={e => {
+                        const unit = e.target.value
+                        const qty = parseFloat(editRecurringForm.quantity) || 1
+                        const total = String((parseFloat(unit) || 0) * qty)
+                        setEditRecurringForm(p => ({ ...p, customer_price_unit: unit, customer_price_total: total }))
+                      }}
+                      placeholder="0.00"
+                      className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Total Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fp-muted text-sm">$</span>
+                  <input type="number" min="0" step="0.01" value={editRecurringForm.customer_price_total}
+                    onChange={e => setEditRecurringForm(p => ({ ...p, customer_price_total: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
+                {editRecurringForm.quantity && editRecurringForm.customer_price_unit && (
+                  <p className="text-fp-muted text-xs mt-1">{editRecurringForm.quantity} × ${parseFloat(editRecurringForm.customer_price_unit || 0).toFixed(2)} = auto-calculated above</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1114,16 +1171,6 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                   <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Renewal Date</label>
                   <input type="date" value={editRecurringForm.renewal_date} onChange={e => setEditRecurringForm(p => ({ ...p, renewal_date: e.target.value }))}
                     className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
-                </div>
-              </div>
-              <div>
-                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Amount</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fp-muted text-sm">$</span>
-                  <input type="number" min="0" step="0.01" value={editRecurringForm.customer_price_total}
-                    onChange={e => setEditRecurringForm(p => ({ ...p, customer_price_total: e.target.value }))}
-                    placeholder="0.00"
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                 </div>
               </div>
               <div className="flex items-center justify-between bg-fp-inset rounded-lg px-3 py-2">
