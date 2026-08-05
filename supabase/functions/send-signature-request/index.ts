@@ -27,6 +27,7 @@ Deno.serve(async (req) => {
       orgId: _orgId,
       logoUrl,
       companyName,
+      primaryColor,
     } = await req.json()
 
     if (!toEmail || !signingUrl) {
@@ -35,20 +36,21 @@ Deno.serve(async (req) => {
       })
     }
 
+    const bannerColor = primaryColor || '#0F1C2E'
     const htmlContent = `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">
         ${logoUrl
-          ? `<div style="background:#0F1C2E;padding:16px 28px;"><img src="${logoUrl}" alt="${companyName || 'ForgePt.'}" style="max-height:44px;max-width:180px;object-fit:contain;display:block;" /></div>`
-          : `<div style="background:#0F1C2E;padding:20px 28px;"><span style="color:#ffffff;font-size:20px;font-weight:bold;font-family:Arial,sans-serif;">${companyName || 'ForgePt'}<span style="color:#C8622A;">.</span></span></div>`
+          ? `<div style="background:${bannerColor};padding:16px 28px;"><img src="${logoUrl}" alt="${companyName || 'ForgePt.'}" style="max-height:44px;max-width:180px;object-fit:contain;display:block;" /></div>`
+          : `<div style="background:${bannerColor};padding:20px 28px;"><span style="color:#ffffff;font-size:20px;font-weight:bold;font-family:Arial,sans-serif;">${companyName || 'ForgePt.'}</span></div>`
         }
         <div style="padding:28px;">
-          <h2 style="color:#0F1C2E;margin-top:0;">Your Proposal is Ready to Sign</h2>
+          <h2 style="color:${bannerColor};margin-top:0;">Your Proposal is Ready to Sign</h2>
           <p>Hi ${toName || 'there'},</p>
           <p>Your proposal <strong>${proposalName || ''}</strong> is ready for your review and signature.</p>
           <p>Please click the button below to review the proposal and sign electronically:</p>
           <br/>
           <p style="text-align:center;">
-            <a href="${signingUrl}" style="background:#C8622A;color:white;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:16px;display:inline-block;">
+            <a href="${signingUrl}" style="background:${bannerColor};color:white;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-size:16px;display:inline-block;">
               Review &amp; Sign Proposal →
             </a>
           </p>

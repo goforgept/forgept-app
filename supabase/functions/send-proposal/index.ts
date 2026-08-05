@@ -21,12 +21,13 @@ Deno.serve(async (req) => {
   try {
     const {
       proposalId, clientEmail, clientName: _clientName, repName, repEmail,
-      companyName, proposalName, subject, message, logoUrl, pdfBase64
+      companyName, proposalName, subject, message, logoUrl, primaryColor, pdfBase64
     } = await req.json()
 
+    const bannerColor = primaryColor || '#0F1C2E'
     const logoHeader = logoUrl
-      ? `<div style="background:#0F1C2E;padding:20px 28px;text-align:left;"><img src="${logoUrl}" alt="${companyName}" style="max-height:48px;max-width:200px;object-fit:contain;" /></div>`
-      : `<div style="background:#0F1C2E;padding:20px 28px;"><span style="color:#ffffff;font-size:20px;font-weight:bold;font-family:Arial,sans-serif;">${companyName}</span></div>`
+      ? `<div style="background:${bannerColor};padding:20px 28px;text-align:left;"><img src="${logoUrl}" alt="${companyName}" style="max-height:48px;max-width:200px;object-fit:contain;" /></div>`
+      : `<div style="background:${bannerColor};padding:20px 28px;"><span style="color:#ffffff;font-size:20px;font-weight:bold;font-family:Arial,sans-serif;">${companyName}</span></div>`
 
     const emailFooter = `<br/><p>Best regards,<br/><strong>${repName}</strong><br/>${companyName}<br/>${repEmail}</p><br/><p style="color:#aaa;font-size:11px;">Sent via ForgePt.</p>`
 

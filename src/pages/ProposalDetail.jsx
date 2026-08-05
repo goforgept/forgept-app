@@ -666,6 +666,7 @@ export default function ProposalDetail({ isAdmin }) {
           orgId: proposal.org_id,
           logoUrl: resolvedLogoUrl || null,
           companyName: profile?.company_name || proposal.company || '',
+          primaryColor: profile?.primary_color || '#0F1C2E',
         })
       })
       const data = await res.json()
@@ -3130,7 +3131,8 @@ const analyzeDrawing = async () => {
           proposalId: id, clientEmail: proposal.client_email, clientName: proposal.client_name || 'there',
           repName: proposal.rep_name || profile?.full_name || '', repEmail: proposal.rep_email || profile?.email || '',
           companyName: profile?.company_name || proposal.company || '', proposalName: proposal.proposal_name || 'Proposal',
-          subject: sendForm.subject, message: sendForm.message, logoUrl: resolvedLogoUrl || null, pdfBase64
+          subject: sendForm.subject, message: sendForm.message, logoUrl: resolvedLogoUrl || null,
+          primaryColor: profile?.primary_color || '#0F1C2E', pdfBase64
         })
       })
       setProposal(prev => ({ ...prev, status: 'Sent' }))

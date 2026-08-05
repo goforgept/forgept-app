@@ -192,7 +192,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   }, [profile?.id])
 
   const fetchProfile = async () => {
-    const { data: extraData } = await supabase.from('profiles').select('support_pin, terms_and_conditions, email_template_early_subject, email_template_early_body, email_cadence_early, email_template_14day_subject, email_template_14day_body, email_cadence_14day, email_template_7day_subject, email_template_7day_body, email_cadence_7day, email_template_close_subject, email_template_close_body, email_template_rfq_subject, email_template_rfq_body, email_template_send_subject, email_template_send_body, payment_instructions_bank, payment_instructions_routing, payment_instructions_account, google_email, microsoft_email').eq('id', profile.id).single()
+    const { data: extraData } = await supabase.from('profiles').select('support_pin, terms_and_conditions, about_us, email_template_early_subject, email_template_early_body, email_cadence_early, email_template_14day_subject, email_template_14day_body, email_cadence_14day, email_template_7day_subject, email_template_7day_body, email_cadence_7day, email_template_close_subject, email_template_close_body, email_template_rfq_subject, email_template_rfq_body, email_template_send_subject, email_template_send_body, payment_instructions_bank, payment_instructions_routing, payment_instructions_account, google_email, microsoft_email').eq('id', profile.id).single()
     const data = { ...profile, ...extraData }
     let pin = data?.support_pin || ''
     if (!pin) {
@@ -212,7 +212,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       full_name: data?.full_name || '', email: data?.email || '', company_name: data?.company_name || '',
       phone: data?.phone || '', job_title: data?.job_title || '', license_number: data?.license_number || '',
       default_markup_percent: data?.default_markup_percent || '35', followup_days: data?.followup_days || '30,14,7,0',
-      terms_and_conditions: data?.terms_and_conditions || '', primary_color: data?.primary_color || '#0F1C2E',
+      terms_and_conditions: data?.terms_and_conditions || '', about_us: data?.about_us || '',
+      primary_color: data?.primary_color || '#0F1C2E',
       bill_to_address: data?.bill_to_address || '', bill_to_city: data?.bill_to_city || '',
       bill_to_state: data?.bill_to_state || '', bill_to_zip: data?.bill_to_zip || '',
       ship_to_address: data?.ship_to_address || '', ship_to_city: data?.ship_to_city || '',
