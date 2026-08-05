@@ -27,7 +27,7 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
 
     const { data } = await supabase
       .from('invoices')
-      .select('*, proposals(proposal_name, company, client_name), service_tickets(title, clients(company, client_name)), clients(company, contact_name)')
+      .select('*, proposals(proposal_name, company, client_name), service_tickets(title, clients(company, client_name)), clients(company, client_name)')
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
 
@@ -154,7 +154,7 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
                       {inv.status === 'Overdue' && getAgingBadge(days)}
                     </div>
                     <p className="text-fp-muted text-sm">
-                      {inv.proposals?.company || inv.service_tickets?.clients?.company || inv.clients?.company || '—'} · {inv.proposals?.client_name || inv.service_tickets?.clients?.client_name || inv.clients?.contact_name || '—'}
+                      {inv.proposals?.company || inv.service_tickets?.clients?.company || inv.clients?.company || '—'} · {inv.proposals?.client_name || inv.service_tickets?.clients?.client_name || inv.clients?.client_name || '—'}
                     </p>
                     <p className="text-fp-muted text-xs mt-0.5">
                       {inv.proposals?.proposal_name || inv.service_tickets?.title || '—'}

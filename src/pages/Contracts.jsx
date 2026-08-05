@@ -218,6 +218,8 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       item_name: item.item_name || '',
       billing_frequency: item.billing_frequency || 'Annual',
       renewal_date: item.renewal_date || '',
+      next_invoice_date: item.next_invoice_date || '',
+      auto_invoice: item.auto_invoice || false,
       customer_price_total: item.customer_price_total != null ? String(item.customer_price_total) : '',
     })
   }
@@ -228,6 +230,8 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       item_name: editRecurringForm.item_name,
       billing_frequency: editRecurringForm.billing_frequency,
       renewal_date: editRecurringForm.renewal_date || null,
+      next_invoice_date: editRecurringForm.next_invoice_date || null,
+      auto_invoice: editRecurringForm.auto_invoice,
       customer_price_total: editRecurringForm.customer_price_total !== '' ? parseFloat(editRecurringForm.customer_price_total) : null,
     }
     await supabase.from('bom_line_items').update(updates).eq('id', editRecurring.id)
@@ -241,6 +245,53 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     await supabase.from('bom_line_items').update({ recurring: false }).eq('id', editRecurring.id)
     setRecurringItems(prev => prev.filter(r => r.id !== editRecurring.id))
     setEditRecurring(null)
+  }
+
+  const createManualInvoiceFromBom = async (item) => {
+    const amount = parseFloat(item.customer_price_total)
+    if (!amount || amount <= 0) { alert('This item has no amount set.'); return }
+    const proposal = item.proposals
+    if (!proposal) { alert('No proposal linked to this item.'); return }
+
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+    const orgId = prof?.org_id
+    if (!orgId) return
+
+    const { data: invoiceNumber } = await supabase.rpc('get_next_invoice_number', { org_id_input: orgId })
+    const today = new Date().toISOString().split('T')[0]
+    const dueDate = new Date(today)
+    dueDate.setDate(dueDate.getDate() + 30)
+    const dueDateStr = dueDate.toISOString().split('T')[0]
+
+    const { data: inv, error: invErr } = await supabase.from('invoices').insert({
+      org_id: orgId,
+      proposal_id: item.proposal_id,
+      invoice_number: invoiceNumber,
+      status: 'Draft',
+      issued_date: today,
+      due_date: dueDateStr,
+      subtotal: amount,
+      tax_percent: 0,
+      tax_amount: 0,
+      total: amount,
+      amount_paid: 0,
+      balance_due: amount,
+      description: `${item.item_name} — ${item.billing_frequency || 'Recurring'}`,
+      notes: `Invoice for ${proposal.company || proposal.client_name || 'client'}.`,
+    }).select().single()
+
+    if (invErr || !inv) { alert('Error creating invoice: ' + invErr?.message); return }
+
+    await supabase.from('invoice_line_items').insert({
+      invoice_id: inv.id,
+      description: `${item.item_name} (${item.billing_frequency || 'Recurring'})`,
+      quantity: 1,
+      unit_price: amount,
+      total: amount,
+    })
+
+    navigate(`/invoices/${inv.id}`)
   }
 
   const toggleBomAutoInvoice = async (item) => {
@@ -699,10 +750,18 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                         </div>
                       </td>
                       <td className="px-3 py-4" onClick={e => e.stopPropagation()}>
-                        <button onClick={e => openEditRecurring(e, r)}
-                          className="text-fp-muted hover:text-fp-text text-xs font-medium px-3 py-1.5 rounded-lg border border-fp-border hover:border-fp-text/30 transition-colors opacity-0 group-hover:opacity-100">
-                          Edit
-                        </button>
+                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {r.customer_price_total > 0 && (
+                            <button onClick={e => { e.stopPropagation(); createManualInvoiceFromBom(r) }}
+                              className="text-blue-400 hover:text-blue-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-400/30 hover:border-blue-300/50 transition-colors">
+                              + Invoice
+                            </button>
+                          )}
+                          <button onClick={e => openEditRecurring(e, r)}
+                            className="text-fp-muted hover:text-fp-text text-xs font-medium px-3 py-1.5 rounded-lg border border-fp-border hover:border-fp-text/30 transition-colors">
+                            Edit
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1059,10 +1118,27 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                     className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                 </div>
               </div>
+              <div className="flex items-center justify-between bg-fp-inset rounded-lg px-3 py-2">
+                <div>
+                  <p className="text-fp-text text-sm font-medium">Auto-Invoice</p>
+                  <p className="text-fp-muted text-xs">Automatically create an invoice on each cycle</p>
+                </div>
+                <button onClick={() => setEditRecurringForm(p => ({ ...p, auto_invoice: !p.auto_invoice }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none flex-shrink-0 ${editRecurringForm.auto_invoice ? 'bg-blue-500' : 'bg-fp-border'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editRecurringForm.auto_invoice ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              {editRecurringForm.auto_invoice && (
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Next Invoice Date</label>
+                  <input type="date" value={editRecurringForm.next_invoice_date} onChange={e => setEditRecurringForm(p => ({ ...p, next_invoice_date: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                  <p className="text-fp-muted text-xs mt-1">Invoice will be created on this date and advance by billing frequency each cycle.</p>
+                </div>
+              )}
             </div>
             <div className="flex justify-between items-center mt-6">
-              <button onClick={deleteRecurring}
-                className="text-red-400 hover:text-red-300 text-sm transition-colors">
+              <button onClick={deleteRecurring} className="text-red-400 hover:text-red-300 text-sm transition-colors">
                 Remove Subscription
               </button>
               <div className="flex gap-3">
