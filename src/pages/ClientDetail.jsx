@@ -57,6 +57,8 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [contactPanel, setContactPanel] = useState(null) // null | 'new' | contact object
   const [panelForm, setPanelForm] = useState(emptyContact)
   const [savingContact, setSavingContact] = useState(false)
+  // Subscriptions
+  const [subscriptions, setSubscriptions] = useState([])
   // Service Tickets
   const [clientTickets, setClientTickets] = useState([])
   // Meetings
@@ -80,6 +82,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     fetchContacts()
     fetchClientTickets()
     fetchClientMeetings()
+    fetchSubscriptions()
   }, [])
 
   useEffect(() => {
@@ -116,6 +119,63 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const fetchContacts = async () => {
     const { data } = await supabase.from('client_contacts').select('*').eq('client_id', id).order('is_primary', { ascending: false }).order('full_name', { ascending: true })
     setContacts(data || [])
+  }
+
+  const fetchSubscriptions = async () => {
+    const { data: propRows } = await supabase.from('proposals').select('id').eq('client_id', id)
+    const propIds = (propRows || []).map(p => p.id)
+    if (!propIds.length) { setSubscriptions([]); return }
+    const { data } = await supabase
+      .from('bom_line_items')
+      .select('id, item_name, part_number_sku, quantity, customer_price_unit, customer_price_total, billing_frequency, auto_invoice, next_invoice_date, renewal_date, proposal_id, proposals(proposal_name, company)')
+      .in('proposal_id', propIds)
+      .eq('recurring', true)
+      .order('renewal_date', { ascending: true, nullsFirst: false })
+    setSubscriptions(data || [])
+  }
+
+  const createInvoiceForProposal = async (proposalId, proposalName, companyName) => {
+    const lines = subscriptions.filter(s => s.proposal_id === proposalId && parseFloat(s.customer_price_total) > 0)
+    if (!lines.length) { alert('No recurring items with an amount found for this proposal.'); return }
+    const subtotal = lines.reduce((sum, l) => sum + parseFloat(l.customer_price_total || 0), 0)
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+    const orgId = prof?.org_id
+    if (!orgId) return
+    const { data: invoiceNumber } = await supabase.rpc('get_next_invoice_number', { org_id_input: orgId })
+    const today = new Date().toISOString().split('T')[0]
+    const dueDate = new Date(today)
+    dueDate.setDate(dueDate.getDate() + 30)
+    const dueDateStr = dueDate.toISOString().split('T')[0]
+    const freq = lines[0].billing_frequency || 'Recurring'
+    const { data: inv, error: invErr } = await supabase.from('invoices').insert({
+      org_id: orgId,
+      proposal_id: proposalId,
+      client_id: id,
+      invoice_number: invoiceNumber,
+      status: 'Draft',
+      issued_date: today,
+      due_date: dueDateStr,
+      subtotal,
+      tax_percent: 0,
+      tax_amount: 0,
+      total: subtotal,
+      amount_paid: 0,
+      balance_due: subtotal,
+      description: `${freq} subscription — ${proposalName || companyName || ''}`.trim(),
+      notes: `Invoice for ${companyName || 'client'}.`,
+    }).select().single()
+    if (invErr || !inv) { alert('Error creating invoice: ' + invErr?.message); return }
+    await supabase.from('invoice_line_items').insert(
+      lines.map(l => {
+        const qty = parseFloat(l.quantity) || 1
+        const unitPrice = parseFloat(l.customer_price_unit) || parseFloat(l.customer_price_total) || 0
+        const total = parseFloat(l.customer_price_total) || 0
+        const label = l.part_number_sku ? `[${l.part_number_sku}] ${l.item_name}` : l.item_name
+        return { invoice_id: inv.id, description: `${label} (${l.billing_frequency || freq})`, quantity: qty, unit_price: unitPrice, total }
+      })
+    )
+    navigate(`/invoices/${inv.id}`)
   }
 
   const fetchClientMeetings = async () => {
@@ -541,6 +601,13 @@ const deleteMeeting = async (meetingId) => {
     setSavingMeeting(false)
   }
 
+  const toMonthly = (total, freq) => {
+    const t = parseFloat(total) || 0
+    if (freq === 'Annual') return t / 12
+    if (freq === 'Quarterly') return t / 3
+    return t
+  }
+
   const handleNewProposal = () => navigate(`/new?clientId=${id}`)
   const totalPipeline = proposals.filter(p => p.status !== 'Lost').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
   const wonPipeline = proposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
@@ -609,6 +676,7 @@ const deleteMeeting = async (meetingId) => {
         <div className="flex gap-2 flex-wrap">
           {[
             { key: 'proposals', label: `Proposals (${proposals.length})` },
+            { key: 'subscriptions', label: `Subscriptions (${subscriptions.length})` },
             { key: 'contacts', label: `Contacts (${contacts.length})` },
             { key: 'locations', label: `Locations (${locations.length})` },
             { key: 'tickets', label: `Service Tickets (${clientTickets.length})` },
@@ -656,6 +724,111 @@ const deleteMeeting = async (meetingId) => {
             )}
           </div>
         )}
+
+        {/* Subscriptions tab */}
+        {activeTab === 'subscriptions' && (() => {
+          const totalMrr = subscriptions.reduce((sum, s) => sum + toMonthly(s.customer_price_total, s.billing_frequency), 0)
+          const totalArr = totalMrr * 12
+          const grouped = subscriptions.reduce((acc, s) => {
+            const key = s.proposal_id
+            if (!acc[key]) acc[key] = { proposalId: key, proposalName: s.proposals?.proposal_name, company: s.proposals?.company, items: [] }
+            acc[key].items.push(s)
+            return acc
+          }, {})
+          const groups = Object.values(grouped)
+          return (
+            <div className="space-y-4">
+              {subscriptions.length > 0 && (
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-fp-card rounded-xl p-4">
+                    <p className="text-fp-muted text-xs mb-1">Monthly Recurring</p>
+                    <p className="text-fp-text text-xl font-bold">${totalMrr.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="bg-fp-card rounded-xl p-4">
+                    <p className="text-fp-muted text-xs mb-1">Annual Recurring</p>
+                    <p className="text-fp-text text-xl font-bold">${totalArr.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                  </div>
+                  <div className="bg-fp-card rounded-xl p-4">
+                    <p className="text-fp-muted text-xs mb-1">Active Sites</p>
+                    <p className="text-fp-text text-xl font-bold">{groups.length}</p>
+                  </div>
+                </div>
+              )}
+              {groups.length === 0 ? (
+                <div className="bg-fp-card rounded-xl p-12 text-center">
+                  <p className="text-fp-text font-semibold mb-2">No active subscriptions</p>
+                  <p className="text-fp-muted text-sm">Mark BOM line items as recurring on a Won proposal to see them here.</p>
+                </div>
+              ) : groups.map(group => {
+                const groupTotal = group.items.reduce((sum, i) => sum + parseFloat(i.customer_price_total || 0), 0)
+                const groupMrr = group.items.reduce((sum, i) => sum + toMonthly(i.customer_price_total, i.billing_frequency), 0)
+                const soonest = group.items.reduce((min, i) => {
+                  if (!i.renewal_date) return min
+                  return (!min || i.renewal_date < min) ? i.renewal_date : min
+                }, null)
+                return (
+                  <div key={group.proposalId} className="bg-fp-card rounded-xl overflow-hidden">
+                    <div className="flex justify-between items-center px-5 py-4 border-b border-fp-border">
+                      <div>
+                        <p className="text-fp-text font-bold">{group.proposalName || group.company || 'Unnamed Proposal'}</p>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          <p className="text-fp-muted text-xs">{group.items.length} line{group.items.length !== 1 ? 's' : ''}</p>
+                          {soonest && <p className="text-fp-muted text-xs">Next renewal: {new Date(soonest + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>}
+                          <p className="text-fp-muted text-xs">${groupMrr.toLocaleString('en-US', { minimumFractionDigits: 2 })}/mo</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => navigate(`/proposal/${group.proposalId}`)}
+                          className="text-fp-muted hover:text-fp-text text-xs transition-colors">View Proposal →</button>
+                        <button onClick={() => createInvoiceForProposal(group.proposalId, group.proposalName, group.company)}
+                          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+                          + Invoice
+                        </button>
+                      </div>
+                    </div>
+                    <div className="divide-y divide-fp-border">
+                      {group.items.map(item => {
+                        const qty = parseFloat(item.quantity) || 1
+                        const unitPrice = parseFloat(item.customer_price_unit) || 0
+                        const total = parseFloat(item.customer_price_total) || 0
+                        const daysUntil = item.renewal_date ? Math.ceil((new Date(item.renewal_date) - new Date()) / (1000 * 60 * 60 * 24)) : null
+                        return (
+                          <div key={item.id} className="flex items-center justify-between px-5 py-3 gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-fp-text text-sm font-medium">{item.item_name}</p>
+                                {item.part_number_sku && <span className="text-fp-muted text-xs font-mono bg-fp-inset px-1.5 py-0.5 rounded">{item.part_number_sku}</span>}
+                                {item.auto_invoice
+                                  ? <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-semibold">Auto-Invoice</span>
+                                  : <span className="text-xs px-1.5 py-0.5 rounded bg-fp-inset text-fp-muted">Manual</span>}
+                              </div>
+                              <div className="flex items-center gap-3 mt-0.5 text-xs text-fp-muted flex-wrap">
+                                <span>{item.billing_frequency}</span>
+                                {unitPrice > 0 && qty > 1 && <span>{qty} × ${unitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>}
+                                {item.renewal_date && (
+                                  <span className={daysUntil !== null && daysUntil <= 30 ? 'text-yellow-400' : ''}>
+                                    Renews {new Date(item.renewal_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                    {daysUntil !== null && daysUntil <= 30 && daysUntil >= 0 ? ` · ${daysUntil}d` : ''}
+                                  </span>
+                                )}
+                                {item.next_invoice_date && <span>Next invoice: {new Date(item.next_invoice_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
+                              </div>
+                            </div>
+                            <p className="text-fp-text text-sm font-bold flex-shrink-0">${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                    <div className="px-5 py-3 bg-fp-inset flex justify-between items-center">
+                      <p className="text-fp-muted text-xs">Subtotal</p>
+                      <p className="text-fp-text text-sm font-bold">${groupTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )
+        })()}
 
         {/* Contacts tab */}
         {activeTab === 'contacts' && (
