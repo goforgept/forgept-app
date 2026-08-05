@@ -325,10 +325,6 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
               <h1 className="text-fp-text text-2xl font-bold">Contracts</h1>
               <p className="text-fp-muted text-sm mt-0.5">Service agreements and recurring billing</p>
             </div>
-            <button onClick={openNewModal}
-              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-              + New Agreement
-            </button>
           </div>
 
           {/* Client filter (global — scopes RMR cards and all tabs) */}

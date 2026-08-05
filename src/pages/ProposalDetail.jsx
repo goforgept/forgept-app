@@ -2898,8 +2898,8 @@ const analyzeDrawing = async () => {
       yPos = sections.length > 0 ? yPos + 4 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : yPos + 10)
     }
 
-    // Grand total summary — hidden in installer/lump-sum mode
-    if (!isLumpSum) {
+    // Grand total summary — hidden in installer/lump-sum mode and when there are no items
+    if (!isLumpSum && (lineItems.length > 0 || allLaborTotal > 0)) {
       const pageHeight = doc.internal.pageSize.getHeight()
       const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (pdfTaxRate > 0 ? 7 : 0) + 12
       if (yPos + summaryHeight > pageHeight - 20) { doc.addPage(); yPos = 20 }
@@ -3193,7 +3193,7 @@ const analyzeDrawing = async () => {
           canEdit={canEdit}
         />
 
-        <BomSection
+        {(lineItems.length > 0 || editingBOM || canEdit) && <BomSection
           proposalId={id}
           proposal={proposal}
           orgType={orgType}
@@ -3265,7 +3265,7 @@ const analyzeDrawing = async () => {
           featureMsrp={features.msrp}
           featureComplianceFields={features.complianceFields && !!proposal?.show_compliance}
           canEdit={canEdit}
-        />
+        />}
 
         <RecurringSection proposal={proposal} lineItems={lineItems} renewalDates={renewalDates} saveRenewalDate={saveRenewalDate} />
 

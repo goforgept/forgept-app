@@ -200,7 +200,10 @@ export default function SignProposal() {
       }
     }
 
-    // Grand total summary
+    // Grand total summary — skip when there are no materials or labor (SLA-only proposals)
+    if (items.length === 0 && allLaborTotal === 0) {
+      // jump straight to terms/signature pages
+    } else {
     let summaryY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : yPos + 8
     const pageHeight = doc.internal.pageSize.getHeight()
     const summaryHeight = 16 + (allLaborTotal > 0 ? 7 : 0) + (taxRate > 0 ? 7 : 0) + 12
@@ -229,6 +232,7 @@ export default function SignProposal() {
     doc.text('Grand Total:', summaryX, summaryY + 4)
     doc.setTextColor(200, 98, 42)
     doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, summaryY + 4, { align: 'right' })
+    } // end grand total block
 
     // Terms
     if (orgProf?.terms_and_conditions) {
