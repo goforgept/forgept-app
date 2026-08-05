@@ -43,19 +43,21 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
   }
 
   const fetchRecurringItems = async (prof) => {
-    let query = supabase
+    // Get proposal IDs for this org first (handles legacy bom_line_items where org_id may be null)
+    let proposalsQuery = supabase.from('proposals').select('id').eq('org_id', prof.org_id)
+    if (prof.org_role !== 'admin') proposalsQuery = proposalsQuery.eq('user_id', prof.id)
+    const { data: propRows } = await proposalsQuery
+    const propIds = (propRows || []).map(p => p.id)
+    if (!propIds.length) { setRecurringItems([]); return }
+
+    const { data } = await supabase
       .from('bom_line_items')
       .select('id, item_name, part_number_sku, customer_price_total, billing_frequency, auto_invoice, next_invoice_date, renewal_date, proposal_id, proposals(proposal_name, company, client_name, user_id)')
-      .eq('org_id', prof.org_id)
+      .in('proposal_id', propIds)
       .eq('recurring', true)
-      .order('next_invoice_date', { ascending: true })
+      .order('renewal_date', { ascending: true, nullsFirst: false })
 
-    if (prof.org_role !== 'admin') {
-      query = query.eq('proposals.user_id', prof.id)
-    }
-
-    const { data } = await query
-    setRecurringItems((data || []).filter(r => r.proposals))
+    setRecurringItems(data || [])
   }
 
   const openEditContract = (e, contract) => {
@@ -89,6 +91,13 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     setEditContract(null)
   }
 
+  const deleteContract = async () => {
+    if (!window.confirm('Permanently delete this contract? This cannot be undone.')) return
+    await supabase.from('contracts').delete().eq('id', editContract.id)
+    setContracts(prev => prev.filter(c => c.id !== editContract.id))
+    setEditContract(null)
+  }
+
   const openEditRecurring = (e, item) => {
     e.stopPropagation()
     setEditRecurring(item)
@@ -111,6 +120,13 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     await supabase.from('bom_line_items').update(updates).eq('id', editRecurring.id)
     setRecurringItems(prev => prev.map(r => r.id === editRecurring.id ? { ...r, ...updates } : r))
     setSavingRecurring(false)
+    setEditRecurring(null)
+  }
+
+  const deleteRecurring = async () => {
+    if (!window.confirm('Remove this item from recurring subscriptions? It will stay on the proposal but will no longer be tracked here.')) return
+    await supabase.from('bom_line_items').update({ recurring: false }).eq('id', editRecurring.id)
+    setRecurringItems(prev => prev.filter(r => r.id !== editRecurring.id))
     setEditRecurring(null)
   }
 
@@ -471,12 +487,18 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                 </button>
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setEditContract(null)} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
-              <button onClick={saveContractEdit} disabled={savingEdit}
-                className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                {savingEdit ? 'Saving...' : 'Save Changes'}
+            <div className="flex justify-between items-center mt-6">
+              <button onClick={deleteContract}
+                className="text-red-400 hover:text-red-300 text-sm transition-colors">
+                Delete Contract
               </button>
+              <div className="flex gap-3">
+                <button onClick={() => setEditContract(null)} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+                <button onClick={saveContractEdit} disabled={savingEdit}
+                  className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {savingEdit ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -520,12 +542,18 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setEditRecurring(null)} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
-              <button onClick={saveRecurringEdit} disabled={savingRecurring}
-                className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                {savingRecurring ? 'Saving...' : 'Save Changes'}
+            <div className="flex justify-between items-center mt-6">
+              <button onClick={deleteRecurring}
+                className="text-red-400 hover:text-red-300 text-sm transition-colors">
+                Remove Subscription
               </button>
+              <div className="flex gap-3">
+                <button onClick={() => setEditRecurring(null)} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+                <button onClick={saveRecurringEdit} disabled={savingRecurring}
+                  className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {savingRecurring ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
