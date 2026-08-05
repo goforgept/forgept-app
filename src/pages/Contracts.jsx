@@ -181,8 +181,6 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     return true
   })
 
-  const expiringSoon = contracts.filter(c => { const d = daysUntil(c.end_date); return d !== null && d >= 0 && d <= 90 }).length
-
   const toMonthly = (amount, freq) => {
     const a = parseFloat(amount) || 0
     if (!a) return 0
@@ -192,11 +190,32 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     return a / 12
   }
 
-  const rmr = (
-    contracts.filter(c => c.status === 'Active').reduce((sum, c) => sum + toMonthly(c.recurring_fee, c.billing_frequency), 0) +
-    recurringItems.reduce((sum, r) => sum + toMonthly(r.customer_price_total, r.billing_frequency), 0)
-  )
+  const rmrSla = contracts.filter(c => c.status === 'Active' && c.type === 'sla').reduce((sum, c) => sum + toMonthly(c.recurring_fee, c.billing_frequency), 0)
+  const rmrMonitoring = contracts.filter(c => c.status === 'Active' && c.type === 'monitoring').reduce((sum, c) => sum + toMonthly(c.recurring_fee, c.billing_frequency), 0)
+  const rmrSubscriptions = recurringItems.reduce((sum, r) => sum + toMonthly(r.customer_price_total, r.billing_frequency), 0)
+  const rmr = rmrSla + rmrMonitoring + rmrSubscriptions
   const arr = rmr * 12
+
+  const fmt = (n) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+
+  const renewalAlerts = [
+    ...contracts
+      .filter(c => { const d = daysUntil(c.end_date); return c.status === 'Active' && d !== null && d >= 0 && d <= 90 })
+      .map(c => ({
+        id: c.id, name: c.name, company: c.proposals?.company || c.proposals?.client_name,
+        daysLeft: daysUntil(c.end_date), date: c.end_date,
+        autoRenew: c.auto_renew, autoInvoice: c.auto_invoice,
+        proposalId: c.proposal_id, kind: 'contract', type: c.type,
+      })),
+    ...recurringItems
+      .filter(r => { const d = daysUntil(r.renewal_date); return d !== null && d >= 0 && d <= 90 })
+      .map(r => ({
+        id: r.id, name: r.item_name, company: r.proposals?.company || r.proposals?.client_name,
+        daysLeft: daysUntil(r.renewal_date), date: r.renewal_date,
+        autoRenew: true, autoInvoice: r.auto_invoice,
+        proposalId: r.proposal_id, kind: 'recurring', type: 'subscription',
+      })),
+  ].sort((a, b) => a.daysLeft - b.daysLeft)
 
   return (
     <div className="flex min-h-screen bg-fp-inset">
@@ -205,33 +224,38 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
         <div className="max-w-6xl mx-auto">
 
           {/* Header */}
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-fp-text text-2xl font-bold">Contracts</h1>
-              <p className="text-fp-muted text-sm mt-0.5">Service agreements and recurring billing</p>
-            </div>
-            {expiringSoon > 0 && (
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-4 py-2 flex items-center gap-2">
-                <span className="text-yellow-400 text-sm font-semibold">⚠ {expiringSoon} expiring within 90 days</span>
-              </div>
-            )}
+          <div className="mb-6">
+            <h1 className="text-fp-text text-2xl font-bold">Contracts</h1>
+            <p className="text-fp-muted text-sm mt-0.5">Service agreements and recurring billing</p>
           </div>
 
-          {/* RMR / ARR highlight */}
+          {/* RMR / ARR with category breakdown */}
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="bg-fp-card rounded-xl p-5 border border-[#C8622A]/30">
               <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1">Monthly Recurring Revenue</p>
-              <p className="text-[#C8622A] text-3xl font-bold">${rmr.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-              <p className="text-fp-muted text-xs mt-1">RMR / month</p>
+              <p className="text-[#C8622A] text-3xl font-bold">{fmt(rmr)}</p>
+              <p className="text-fp-muted text-xs mt-1 mb-3">RMR / month</p>
+              <div className="space-y-1 border-t border-fp-border pt-3">
+                {rmrSla > 0 && <div className="flex justify-between text-xs"><span className="text-fp-muted">Service SLA</span><span className="text-fp-text font-semibold">{fmt(rmrSla)}</span></div>}
+                {rmrMonitoring > 0 && <div className="flex justify-between text-xs"><span className="text-fp-muted">Monitoring</span><span className="text-fp-text font-semibold">{fmt(rmrMonitoring)}</span></div>}
+                {rmrSubscriptions > 0 && <div className="flex justify-between text-xs"><span className="text-fp-muted">Subscriptions</span><span className="text-fp-text font-semibold">{fmt(rmrSubscriptions)}</span></div>}
+                {rmr === 0 && <p className="text-fp-muted text-xs">No recurring fees set</p>}
+              </div>
             </div>
             <div className="bg-fp-card rounded-xl p-5 border border-[#C8622A]/30">
               <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1">Annual Recurring Revenue</p>
-              <p className="text-[#C8622A] text-3xl font-bold">${arr.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-              <p className="text-fp-muted text-xs mt-1">ARR / year</p>
+              <p className="text-[#C8622A] text-3xl font-bold">{fmt(arr)}</p>
+              <p className="text-fp-muted text-xs mt-1 mb-3">ARR / year</p>
+              <div className="space-y-1 border-t border-fp-border pt-3">
+                {rmrSla > 0 && <div className="flex justify-between text-xs"><span className="text-fp-muted">Service SLA</span><span className="text-fp-text font-semibold">{fmt(rmrSla * 12)}</span></div>}
+                {rmrMonitoring > 0 && <div className="flex justify-between text-xs"><span className="text-fp-muted">Monitoring</span><span className="text-fp-text font-semibold">{fmt(rmrMonitoring * 12)}</span></div>}
+                {rmrSubscriptions > 0 && <div className="flex justify-between text-xs"><span className="text-fp-muted">Subscriptions</span><span className="text-fp-text font-semibold">{fmt(rmrSubscriptions * 12)}</span></div>}
+                {arr === 0 && <p className="text-fp-muted text-xs">No recurring fees set</p>}
+              </div>
             </div>
           </div>
 
-          {/* Summary cards */}
+          {/* Summary counts */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             {[
               { label: 'Contracts', value: contracts.length, color: 'text-fp-text' },
@@ -245,6 +269,64 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
               </div>
             ))}
           </div>
+
+          {/* Renewal alerts */}
+          {renewalAlerts.length > 0 && (
+            <div className="bg-fp-card rounded-xl border border-yellow-500/30 mb-6 overflow-hidden">
+              <div className="px-5 py-3 border-b border-fp-border flex items-center gap-2">
+                <span className="text-yellow-400 text-sm">⚠</span>
+                <h3 className="text-fp-text text-sm font-bold">Renewal Alerts</h3>
+                <span className="ml-auto text-fp-muted text-xs">{renewalAlerts.length} within 90 days</span>
+              </div>
+              <div className="divide-y divide-fp-border">
+                {renewalAlerts.map(alert => {
+                  const isAutoInvoice = alert.autoInvoice
+                  const isAutoRenewOnly = alert.autoRenew && !alert.autoInvoice
+                  const isManual = !alert.autoRenew
+                  return (
+                    <div key={`${alert.kind}-${alert.id}`}
+                      className="px-5 py-3 flex items-start gap-4 hover:bg-fp-inset transition-colors cursor-pointer"
+                      onClick={() => alert.proposalId && navigate(`/proposal/${alert.proposalId}`)}>
+                      <div className="flex-shrink-0 mt-0.5">
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${alert.daysLeft <= 30 ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                          {alert.daysLeft}d
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-fp-text text-sm font-semibold">{alert.company || '—'}</span>
+                          <span className="text-fp-muted text-xs">·</span>
+                          <span className="text-fp-muted text-xs truncate">{alert.name}</span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${alert.type === 'sla' ? 'bg-[#C8622A]/20 text-[#C8622A]' : alert.type === 'monitoring' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                            {alert.type === 'sla' ? 'SLA' : alert.type === 'monitoring' ? 'Monitoring' : 'Subscription'}
+                          </span>
+                        </div>
+                        <p className="text-fp-muted text-xs mt-0.5">
+                          Renews {new Date(alert.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          {' · '}
+                          {isAutoInvoice
+                            ? <span className="text-green-400 font-medium">Auto-invoice enabled — verify your amounts before renewal</span>
+                            : isAutoRenewOnly
+                            ? <span className="text-yellow-400 font-medium">Will auto-renew but no auto-invoice set — send invoice manually</span>
+                            : <span className="text-red-400 font-medium">Not set to auto-renew — send a renewal invoice and update contract dates</span>
+                          }
+                        </p>
+                      </div>
+                      {isAutoInvoice && (
+                        <span className="flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">Auto-Invoice</span>
+                      )}
+                      {isAutoRenewOnly && (
+                        <span className="flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-400">Invoice Needed</span>
+                      )}
+                      {isManual && (
+                        <span className="flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">Action Required</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Tabs */}
           <div className="flex gap-1 bg-fp-card rounded-xl p-1 w-fit mb-5">
@@ -364,9 +446,8 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                         </td>
                         <td className="px-3 py-4" onClick={e => e.stopPropagation()}>
                           <button onClick={e => openEditContract(e, c)}
-                            className="text-fp-muted hover:text-fp-text text-sm px-2 py-1 rounded hover:bg-fp-inset transition-colors opacity-0 group-hover:opacity-100"
-                            title="Edit contract">
-                            ✏
+                            className="text-fp-muted hover:text-fp-text text-xs font-medium px-3 py-1.5 rounded-lg border border-fp-border hover:border-fp-text/30 transition-colors opacity-0 group-hover:opacity-100">
+                            Edit
                           </button>
                         </td>
                       </tr>
@@ -441,9 +522,8 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                       </td>
                       <td className="px-3 py-4" onClick={e => e.stopPropagation()}>
                         <button onClick={e => openEditRecurring(e, r)}
-                          className="text-fp-muted hover:text-fp-text text-sm px-2 py-1 rounded hover:bg-fp-inset transition-colors opacity-0 group-hover:opacity-100"
-                          title="Edit item">
-                          ✏
+                          className="text-fp-muted hover:text-fp-text text-xs font-medium px-3 py-1.5 rounded-lg border border-fp-border hover:border-fp-text/30 transition-colors opacity-0 group-hover:opacity-100">
+                          Edit
                         </button>
                       </td>
                     </tr>
