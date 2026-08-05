@@ -257,8 +257,6 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
   }
 
   const createManualInvoiceFromBom = async (item) => {
-    const amount = parseFloat(item.customer_price_total)
-    if (!amount || amount <= 0) { alert('This item has no amount set.'); return }
     const proposal = item.proposals
     if (!proposal) { alert('No proposal linked to this item.'); return }
 
@@ -267,12 +265,25 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     const orgId = prof?.org_id
     if (!orgId) return
 
+    // Fetch all recurring items for this proposal so they all land on one invoice
+    const { data: allLines } = await supabase
+      .from('bom_line_items')
+      .select('id, item_name, part_number_sku, quantity, customer_price_unit, customer_price_total, billing_frequency')
+      .eq('proposal_id', item.proposal_id)
+      .eq('recurring', true)
+
+    const lines = (allLines || []).filter(l => parseFloat(l.customer_price_total) > 0)
+    if (!lines.length) { alert('No recurring items with an amount found for this proposal.'); return }
+
+    const subtotal = lines.reduce((sum, l) => sum + parseFloat(l.customer_price_total || 0), 0)
+
     const { data: invoiceNumber } = await supabase.rpc('get_next_invoice_number', { org_id_input: orgId })
     const today = new Date().toISOString().split('T')[0]
     const dueDate = new Date(today)
     dueDate.setDate(dueDate.getDate() + 30)
     const dueDateStr = dueDate.toISOString().split('T')[0]
 
+    const freq = lines[0].billing_frequency || 'Recurring'
     const { data: inv, error: invErr } = await supabase.from('invoices').insert({
       org_id: orgId,
       proposal_id: item.proposal_id,
@@ -280,25 +291,33 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       status: 'Draft',
       issued_date: today,
       due_date: dueDateStr,
-      subtotal: amount,
+      subtotal,
       tax_percent: 0,
       tax_amount: 0,
-      total: amount,
+      total: subtotal,
       amount_paid: 0,
-      balance_due: amount,
-      description: `${item.item_name} — ${item.billing_frequency || 'Recurring'}`,
+      balance_due: subtotal,
+      description: `${freq} subscription — ${proposal.proposal_name || proposal.company || ''}`.trim(),
       notes: `Invoice for ${proposal.company || proposal.client_name || 'client'}.`,
     }).select().single()
 
     if (invErr || !inv) { alert('Error creating invoice: ' + invErr?.message); return }
 
-    await supabase.from('invoice_line_items').insert({
-      invoice_id: inv.id,
-      description: `${item.item_name} (${item.billing_frequency || 'Recurring'})`,
-      quantity: 1,
-      unit_price: amount,
-      total: amount,
-    })
+    await supabase.from('invoice_line_items').insert(
+      lines.map(l => {
+        const qty = parseFloat(l.quantity) || 1
+        const unitPrice = parseFloat(l.customer_price_unit) || parseFloat(l.customer_price_total) || 0
+        const total = parseFloat(l.customer_price_total) || 0
+        const label = l.part_number_sku ? `[${l.part_number_sku}] ${l.item_name}` : l.item_name
+        return {
+          invoice_id: inv.id,
+          description: `${label} (${l.billing_frequency || freq})`,
+          quantity: qty,
+          unit_price: unitPrice,
+          total,
+        }
+      })
+    )
 
     navigate(`/invoices/${inv.id}`)
   }
