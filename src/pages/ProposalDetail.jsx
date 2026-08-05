@@ -2181,6 +2181,7 @@ export default function ProposalDetail({ isAdmin }) {
             country_of_origin: l.country_of_origin || null,
             berry_compliance: l.berry_compliance || null,
             pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing', recurring: l.recurring || false,
+            org_id: proposal?.org_id || null,
             section_id: resolvedSectionId,
           }
         })
