@@ -27,6 +27,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     recurring_fee: '', billing_frequency: 'Monthly', auto_renew: false, auto_invoice: false,
   })
   const [savingNew, setSavingNew] = useState(false)
+  const [filterClient, setFilterClient] = useState('all')
 
   useEffect(() => {
     if (profile?.org_id) {
@@ -200,7 +201,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
   const fetchContracts = async (prof) => {
     let query = supabase
       .from('contracts')
-      .select('*, proposals(proposal_name, company, client_name, client_email)')
+      .select('*, proposals(proposal_name, company, client_name, client_email), clients(company, contact_name)')
       .eq('org_id', prof.org_id)
       .order('end_date', { ascending: true })
 
@@ -229,11 +230,24 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">{days}d left</span>
   }
 
-  const filtered = contracts.filter(c => {
+  const getContractCompany = (c) => c.proposals?.company || c.clients?.company || '—'
+  const getRecurringCompany = (r) => r.proposals?.company || r.proposals?.client_name || '—'
+
+  const displayContracts = contracts.filter(c => {
     if (filterType !== 'all' && c.type !== filterType) return false
     if (filterStatus !== 'all' && c.status !== filterStatus) return false
+    if (filterClient !== 'all' && getContractCompany(c) !== filterClient) return false
     return true
   })
+
+  const displayRecurring = filterClient === 'all'
+    ? recurringItems
+    : recurringItems.filter(r => getRecurringCompany(r) === filterClient)
+
+  const allCompanies = [...new Set([
+    ...contracts.map(getContractCompany),
+    ...recurringItems.map(getRecurringCompany),
+  ].filter(s => s && s !== '—'))].sort()
 
   const toMonthly = (amount, freq) => {
     const a = parseFloat(amount) || 0
@@ -244,13 +258,37 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     return a / 12
   }
 
-  const rmrSla = contracts.filter(c => c.status === 'Active' && c.type === 'sla').reduce((sum, c) => sum + toMonthly(c.recurring_fee, c.billing_frequency), 0)
-  const rmrMonitoring = contracts.filter(c => c.status === 'Active' && c.type === 'monitoring').reduce((sum, c) => sum + toMonthly(c.recurring_fee, c.billing_frequency), 0)
-  const rmrSubscriptions = recurringItems.reduce((sum, r) => sum + toMonthly(r.customer_price_total, r.billing_frequency), 0)
+  const activeContracts = filterClient === 'all' ? contracts : contracts.filter(c => getContractCompany(c) === filterClient)
+  const activeRecurring = filterClient === 'all' ? recurringItems : recurringItems.filter(r => getRecurringCompany(r) === filterClient)
+
+  const rmrSla = activeContracts.filter(c => c.status === 'Active' && c.type === 'sla').reduce((sum, c) => sum + toMonthly(c.recurring_fee, c.billing_frequency), 0)
+  const rmrMonitoring = activeContracts.filter(c => c.status === 'Active' && c.type === 'monitoring').reduce((sum, c) => sum + toMonthly(c.recurring_fee, c.billing_frequency), 0)
+  const rmrSubscriptions = activeRecurring.reduce((sum, r) => sum + toMonthly(r.customer_price_total, r.billing_frequency), 0)
   const rmr = rmrSla + rmrMonitoring + rmrSubscriptions
   const arr = rmr * 12
 
   const fmt = (n) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+
+  const clientBreakdown = (() => {
+    const map = {}
+    contracts.filter(c => c.status === 'Active').forEach(c => {
+      const company = getContractCompany(c)
+      if (!map[company]) map[company] = { sla: 0, monitoring: 0, subscriptions: 0, contractCount: 0, nextRenewal: null }
+      if (c.type === 'sla') map[company].sla += toMonthly(c.recurring_fee, c.billing_frequency)
+      if (c.type === 'monitoring') map[company].monitoring += toMonthly(c.recurring_fee, c.billing_frequency)
+      map[company].contractCount++
+      if (c.end_date && (!map[company].nextRenewal || c.end_date < map[company].nextRenewal)) map[company].nextRenewal = c.end_date
+    })
+    recurringItems.forEach(r => {
+      const company = getRecurringCompany(r)
+      if (!map[company]) map[company] = { sla: 0, monitoring: 0, subscriptions: 0, contractCount: 0, nextRenewal: null }
+      map[company].subscriptions += toMonthly(r.customer_price_total, r.billing_frequency)
+      if (r.renewal_date && (!map[company].nextRenewal || r.renewal_date < map[company].nextRenewal)) map[company].nextRenewal = r.renewal_date
+    })
+    return Object.entries(map)
+      .map(([company, d]) => ({ company, ...d, totalRmr: d.sla + d.monitoring + d.subscriptions }))
+      .sort((a, b) => b.totalRmr - a.totalRmr)
+  })()
 
   const renewalAlerts = [
     ...contracts
@@ -289,12 +327,26 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
             </button>
           </div>
 
+          {/* Client filter (global — scopes RMR cards and all tabs) */}
+          {allCompanies.length > 0 && (
+            <div className="flex items-center gap-3 mb-5">
+              <select value={filterClient} onChange={e => setFilterClient(e.target.value)}
+                className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                <option value="all">All Clients</option>
+                {allCompanies.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+              {filterClient !== 'all' && (
+                <button onClick={() => setFilterClient('all')} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Clear</button>
+              )}
+            </div>
+          )}
+
           {/* RMR / ARR with category breakdown */}
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div className="bg-fp-card rounded-xl p-5 border border-[#C8622A]/30">
               <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1">Monthly Recurring Revenue</p>
               <p className="text-[#C8622A] text-3xl font-bold">{fmt(rmr)}</p>
-              <p className="text-fp-muted text-xs mt-1 mb-3">RMR / month</p>
+              <p className="text-fp-muted text-xs mt-1 mb-3">{filterClient !== 'all' ? filterClient : 'All clients'} · RMR / month</p>
               <div className="space-y-1 border-t border-fp-border pt-3">
                 {rmrSla > 0 && <div className="flex justify-between text-xs"><span className="text-fp-muted">Service SLA</span><span className="text-fp-text font-semibold">{fmt(rmrSla)}</span></div>}
                 {rmrMonitoring > 0 && <div className="flex justify-between text-xs"><span className="text-fp-muted">Monitoring</span><span className="text-fp-text font-semibold">{fmt(rmrMonitoring)}</span></div>}
@@ -305,7 +357,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
             <div className="bg-fp-card rounded-xl p-5 border border-[#C8622A]/30">
               <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1">Annual Recurring Revenue</p>
               <p className="text-[#C8622A] text-3xl font-bold">{fmt(arr)}</p>
-              <p className="text-fp-muted text-xs mt-1 mb-3">ARR / year</p>
+              <p className="text-fp-muted text-xs mt-1 mb-3">{filterClient !== 'all' ? filterClient : 'All clients'} · ARR / year</p>
               <div className="space-y-1 border-t border-fp-border pt-3">
                 {rmrSla > 0 && <div className="flex justify-between text-xs"><span className="text-fp-muted">Service SLA</span><span className="text-fp-text font-semibold">{fmt(rmrSla * 12)}</span></div>}
                 {rmrMonitoring > 0 && <div className="flex justify-between text-xs"><span className="text-fp-muted">Monitoring</span><span className="text-fp-text font-semibold">{fmt(rmrMonitoring * 12)}</span></div>}
@@ -398,6 +450,10 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'recurring' ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
               Recurring Items {recurringItems.length > 0 && <span className="ml-1.5 bg-fp-inset text-fp-muted text-xs px-1.5 py-0.5 rounded-full">{recurringItems.length}</span>}
             </button>
+            <button onClick={() => setActiveTab('clients')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'clients' ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
+              By Client {clientBreakdown.length > 0 && <span className="ml-1.5 bg-fp-inset text-fp-muted text-xs px-1.5 py-0.5 rounded-full">{clientBreakdown.length}</span>}
+            </button>
           </div>
 
           {/* Contract filters (contracts tab only) */}
@@ -426,7 +482,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
           {/* Service Contracts table */}
           {activeTab === 'contracts' && (loading ? (
             <div className="text-center py-16"><p className="text-fp-muted">Loading contracts...</p></div>
-          ) : filtered.length === 0 ? (
+          ) : displayContracts.length === 0 ? (
             <div className="bg-fp-card rounded-xl p-12 text-center">
               <p className="text-fp-muted text-lg mb-1">No contracts found</p>
               <p className="text-fp-muted text-sm">Contracts are created when a proposal is marked as Won.</p>
@@ -448,18 +504,18 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((c, i) => {
+                  {displayContracts.map((c, i) => {
                     const days = daysUntil(c.end_date)
                     const isExpiringSoon = days !== null && days >= 0 && days <= 90
                     return (
                       <tr
                         key={c.id}
                         onClick={() => c.proposal_id && navigate(`/proposal/${c.proposal_id}`)}
-                        className={`group border-b border-fp-border cursor-pointer transition-colors hover:bg-fp-inset ${isExpiringSoon ? 'bg-yellow-500/5' : ''} ${i === filtered.length - 1 ? 'border-0' : ''}`}
+                        className={`group border-b border-fp-border cursor-pointer transition-colors hover:bg-fp-inset ${isExpiringSoon ? 'bg-yellow-500/5' : ''} ${i === displayContracts.length - 1 ? 'border-0' : ''}`}
                       >
                         <td className="px-5 py-4">
-                          <p className="text-fp-text text-sm font-medium">{c.proposals?.company || '—'}</p>
-                          <p className="text-fp-muted text-xs">{c.proposals?.client_name || ''}</p>
+                          <p className="text-fp-text text-sm font-medium">{getContractCompany(c)}</p>
+                          <p className="text-fp-muted text-xs">{c.proposals?.client_name || c.clients?.contact_name || ''}</p>
                         </td>
                         <td className="px-5 py-4">
                           <p className="text-fp-text text-sm">{c.name || '—'}</p>
@@ -519,7 +575,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
           ))}
 
           {/* Recurring BOM Items tab */}
-          {activeTab === 'recurring' && (recurringItems.length === 0 ? (
+          {activeTab === 'recurring' && (displayRecurring.length === 0 ? (
             <div className="bg-fp-card rounded-xl p-12 text-center">
               <p className="text-fp-muted text-lg mb-1">No recurring items</p>
               <p className="text-fp-muted text-sm">Mark BOM line items as recurring when closing a deal as Won.</p>
@@ -539,11 +595,11 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                   </tr>
                 </thead>
                 <tbody>
-                  {recurringItems.map((r, i) => (
+                  {displayRecurring.map((r, i) => (
                     <tr
                       key={r.id}
                       onClick={() => r.proposal_id && navigate(`/proposal/${r.proposal_id}`)}
-                      className={`group border-b border-fp-border cursor-pointer transition-colors hover:bg-fp-inset ${i === recurringItems.length - 1 ? 'border-0' : ''}`}
+                      className={`group border-b border-fp-border cursor-pointer transition-colors hover:bg-fp-inset ${i === displayRecurring.length - 1 ? 'border-0' : ''}`}
                     >
                       <td className="px-5 py-4">
                         <p className="text-fp-text text-sm font-medium">{r.proposals?.company || '—'}</p>
@@ -592,6 +648,89 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
               </table>
             </div>
           ))}
+          {/* By Client tab */}
+          {activeTab === 'clients' && (clientBreakdown.length === 0 ? (
+            <div className="bg-fp-card rounded-xl p-12 text-center">
+              <p className="text-fp-muted text-lg mb-1">No recurring revenue data yet</p>
+              <p className="text-fp-muted text-sm">Add fees to contracts and mark BOM items as recurring to see the breakdown here.</p>
+            </div>
+          ) : (
+            <div className="bg-fp-card rounded-xl overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-fp-border">
+                    <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Client</th>
+                    <th className="text-right text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">SLA</th>
+                    <th className="text-right text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Monitoring</th>
+                    <th className="text-right text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Subscriptions</th>
+                    <th className="text-right text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Total RMR</th>
+                    <th className="text-right text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">ARR</th>
+                    <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Next Renewal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clientBreakdown.map((row, i) => {
+                    const pct = rmr > 0 ? (row.totalRmr / rmr) * 100 : 0
+                    const nextDays = row.nextRenewal ? daysUntil(row.nextRenewal) : null
+                    return (
+                      <tr key={row.company}
+                        className={`border-b border-fp-border hover:bg-fp-inset transition-colors cursor-pointer ${i === clientBreakdown.length - 1 ? 'border-0' : ''}`}
+                        onClick={() => { setFilterClient(row.company); setActiveTab('contracts') }}>
+                        <td className="px-5 py-4">
+                          <p className="text-fp-text text-sm font-semibold">{row.company}</p>
+                          <div className="mt-1.5 w-32 h-1 bg-fp-border rounded-full overflow-hidden">
+                            <div className="h-full bg-[#C8622A] rounded-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <p className="text-fp-muted text-xs mt-0.5">{pct.toFixed(0)}% of total RMR</p>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          {row.sla > 0 ? <span className="text-fp-text text-sm font-medium">{fmt(row.sla)}</span> : <span className="text-fp-muted text-sm">—</span>}
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          {row.monitoring > 0 ? <span className="text-fp-text text-sm font-medium">{fmt(row.monitoring)}</span> : <span className="text-fp-muted text-sm">—</span>}
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          {row.subscriptions > 0 ? <span className="text-fp-text text-sm font-medium">{fmt(row.subscriptions)}</span> : <span className="text-fp-muted text-sm">—</span>}
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <span className="text-[#C8622A] text-sm font-bold">{fmt(row.totalRmr)}</span>
+                          <p className="text-fp-muted text-xs">/mo</p>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <span className="text-fp-text text-sm font-semibold">{fmt(row.totalRmr * 12)}</span>
+                          <p className="text-fp-muted text-xs">/yr</p>
+                        </td>
+                        <td className="px-5 py-4">
+                          {row.nextRenewal ? (
+                            <div>
+                              <p className="text-fp-text text-sm">{new Date(row.nextRenewal + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                              {nextDays !== null && nextDays <= 90 && (
+                                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${nextDays <= 30 ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                  {nextDays}d
+                                </span>
+                              )}
+                            </div>
+                          ) : <span className="text-fp-muted text-sm">—</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-fp-border bg-fp-inset">
+                    <td className="px-5 py-3 text-fp-muted text-xs font-semibold uppercase tracking-wide">{clientBreakdown.length} clients</td>
+                    <td className="px-5 py-3 text-right text-fp-text text-sm font-bold">{rmrSla > 0 ? fmt(rmrSla) : '—'}</td>
+                    <td className="px-5 py-3 text-right text-fp-text text-sm font-bold">{rmrMonitoring > 0 ? fmt(rmrMonitoring) : '—'}</td>
+                    <td className="px-5 py-3 text-right text-fp-text text-sm font-bold">{rmrSubscriptions > 0 ? fmt(rmrSubscriptions) : '—'}</td>
+                    <td className="px-5 py-3 text-right text-[#C8622A] text-sm font-bold">{fmt(rmr)}</td>
+                    <td className="px-5 py-3 text-right text-[#C8622A] text-sm font-bold">{fmt(arr)}</td>
+                    <td className="px-5 py-3"></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          ))}
+
         </div>
       </div>
 
