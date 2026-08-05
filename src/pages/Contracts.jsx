@@ -20,11 +20,19 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
   const [editRecurring, setEditRecurring] = useState(null)
   const [editRecurringForm, setEditRecurringForm] = useState({})
   const [savingRecurring, setSavingRecurring] = useState(false)
+  const [showNewModal, setShowNewModal] = useState(false)
+  const [clients, setClients] = useState([])
+  const [newForm, setNewForm] = useState({
+    client_id: '', type: 'sla', name: '', start_date: '', end_date: '',
+    recurring_fee: '', billing_frequency: 'Monthly', auto_renew: false, auto_invoice: false,
+  })
+  const [savingNew, setSavingNew] = useState(false)
 
   useEffect(() => {
     if (profile?.org_id) {
       fetchContracts(profile)
       fetchRecurringItems(profile)
+      fetchClients(profile)
     }
   }, [profile?.org_id])
 
@@ -40,6 +48,52 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       })
       .eq('id', contract.id)
     setContracts(prev => prev.map(c => c.id === contract.id ? { ...c, auto_invoice: newVal } : c))
+  }
+
+  const fetchClients = async (prof) => {
+    const { data } = await supabase.from('clients').select('id, company, contact_name').eq('org_id', prof.org_id).order('company')
+    setClients(data || [])
+  }
+
+  const openNewModal = () => {
+    const today = new Date().toISOString().split('T')[0]
+    const oneYear = new Date(); oneYear.setFullYear(oneYear.getFullYear() + 1)
+    setNewForm({
+      client_id: '', type: featureSla ? 'sla' : 'monitoring',
+      name: featureSla ? 'Service Level Agreement' : 'Monitoring Contract',
+      start_date: today, end_date: oneYear.toISOString().split('T')[0],
+      recurring_fee: '', billing_frequency: 'Monthly', auto_renew: false, auto_invoice: false,
+    })
+    setShowNewModal(true)
+  }
+
+  const createNewContract = async () => {
+    if (!newForm.client_id) { alert('Please select a client.'); return }
+    if (!newForm.name.trim()) { alert('Please enter a contract name.'); return }
+    setSavingNew(true)
+    const client = clients.find(c => c.id === newForm.client_id)
+    const { data, error: insertErr } = await supabase.from('contracts').insert({
+      org_id: profile.org_id,
+      user_id: profile.id,
+      client_id: newForm.client_id,
+      proposal_id: null,
+      type: newForm.type,
+      name: newForm.name.trim(),
+      status: 'Active',
+      start_date: newForm.start_date || null,
+      end_date: newForm.end_date || null,
+      auto_renew: newForm.auto_renew,
+      auto_invoice: newForm.auto_invoice,
+      recurring_fee: newForm.recurring_fee !== '' ? parseFloat(newForm.recurring_fee) : null,
+      billing_frequency: newForm.billing_frequency || null,
+      next_invoice_date: newForm.auto_invoice && newForm.start_date ? newForm.start_date : null,
+    }).select('*, proposals(proposal_name, company, client_name, client_email)').single()
+    if (insertErr) { alert('Error creating contract: ' + insertErr.message); setSavingNew(false); return }
+    // Attach client info for display (no proposal)
+    const display = { ...data, proposals: { company: client?.company, client_name: client?.contact_name, proposal_name: null, client_email: null } }
+    setContracts(prev => [display, ...prev])
+    setSavingNew(false)
+    setShowNewModal(false)
   }
 
   const fetchRecurringItems = async (prof) => {
@@ -224,9 +278,15 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
         <div className="max-w-6xl mx-auto">
 
           {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-fp-text text-2xl font-bold">Contracts</h1>
-            <p className="text-fp-muted text-sm mt-0.5">Service agreements and recurring billing</p>
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-fp-text text-2xl font-bold">Contracts</h1>
+              <p className="text-fp-muted text-sm mt-0.5">Service agreements and recurring billing</p>
+            </div>
+            <button onClick={openNewModal}
+              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+              + New Agreement
+            </button>
           </div>
 
           {/* RMR / ARR with category breakdown */}
@@ -534,6 +594,101 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
           ))}
         </div>
       </div>
+
+      {/* New Agreement Modal */}
+      {showNewModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowNewModal(false)}>
+          <div className="bg-fp-card rounded-2xl shadow-2xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-fp-text font-bold text-lg mb-1">New Service Agreement</h3>
+            <p className="text-fp-muted text-sm mb-5">Create an SLA or monitoring contract directly for any client — no proposal required.</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Client</label>
+                <select value={newForm.client_id} onChange={e => setNewForm(p => ({ ...p, client_id: e.target.value }))}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                  <option value="">— Select client —</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.company}{c.contact_name ? ` · ${c.contact_name}` : ''}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Type</label>
+                  <select value={newForm.type}
+                    onChange={e => setNewForm(p => ({ ...p, type: e.target.value, name: e.target.value === 'sla' ? 'Service Level Agreement' : 'Monitoring Contract' }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                    {featureSla && <option value="sla">Service SLA</option>}
+                    {featureMonitoring && <option value="monitoring">Monitoring</option>}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Billing</label>
+                  <select value={newForm.billing_frequency} onChange={e => setNewForm(p => ({ ...p, billing_frequency: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Annual">Annual</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Contract Name</label>
+                <input value={newForm.name} onChange={e => setNewForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Start Date</label>
+                  <input type="date" value={newForm.start_date} onChange={e => setNewForm(p => ({ ...p, start_date: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">End Date</label>
+                  <input type="date" value={newForm.end_date} onChange={e => setNewForm(p => ({ ...p, end_date: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Recurring Fee</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fp-muted text-sm">$</span>
+                  <input type="number" min="0" step="0.01" value={newForm.recurring_fee}
+                    onChange={e => setNewForm(p => ({ ...p, recurring_fee: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
+              </div>
+              <div className="flex gap-6">
+                <div className="flex items-center justify-between flex-1">
+                  <span className="text-fp-text text-sm font-medium">Auto-Renew</span>
+                  <button onClick={() => setNewForm(p => ({ ...p, auto_renew: !p.auto_renew }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${newForm.auto_renew ? 'bg-green-500' : 'bg-fp-border'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${newForm.auto_renew ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between flex-1">
+                  <span className="text-fp-text text-sm font-medium">Auto-Invoice</span>
+                  <button onClick={() => setNewForm(p => ({ ...p, auto_invoice: !p.auto_invoice }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${newForm.auto_invoice ? 'bg-green-500' : 'bg-fp-border'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${newForm.auto_invoice ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              </div>
+              {newForm.auto_invoice && (
+                <p className="text-fp-muted text-xs bg-fp-inset rounded-lg px-3 py-2">
+                  Auto-invoice will send the first invoice on the start date and repeat on the billing frequency.
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setShowNewModal(false)} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+              <button onClick={createNewContract} disabled={savingNew}
+                className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                {savingNew ? 'Creating...' : 'Create Agreement'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Contract Modal */}
       {editContract && (
