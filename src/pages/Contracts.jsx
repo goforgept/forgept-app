@@ -125,6 +125,9 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       start_date: contract.start_date || '',
       end_date: contract.end_date || '',
       auto_renew: contract.auto_renew || false,
+      auto_invoice: contract.auto_invoice || false,
+      next_invoice_date: contract.next_invoice_date || '',
+      invoice_days_until_due: contract.invoice_days_until_due != null ? String(contract.invoice_days_until_due) : '30',
       recurring_fee: contract.recurring_fee != null ? String(contract.recurring_fee) : '',
       billing_frequency: contract.billing_frequency || 'Monthly',
       notes: contract.notes || '',
@@ -139,6 +142,9 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       start_date: editForm.start_date || null,
       end_date: editForm.end_date || null,
       auto_renew: editForm.auto_renew,
+      auto_invoice: editForm.auto_invoice,
+      next_invoice_date: editForm.next_invoice_date || null,
+      invoice_days_until_due: editForm.invoice_days_until_due !== '' ? parseInt(editForm.invoice_days_until_due) : 30,
       recurring_fee: editForm.recurring_fee !== '' ? parseFloat(editForm.recurring_fee) : null,
       billing_frequency: editForm.billing_frequency || null,
       notes: editForm.notes || null,
@@ -148,6 +154,54 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     setContracts(prev => prev.map(c => c.id === editContract.id ? { ...c, ...updates } : c))
     setSavingEdit(false)
     setEditContract(null)
+  }
+
+  const createManualInvoice = async (contract) => {
+    const fee = parseFloat(contract.recurring_fee)
+    if (!fee || fee <= 0) { alert('This contract has no recurring fee set.'); return }
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: prof } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+    const orgId = prof?.org_id
+    if (!orgId) return
+
+    const { data: invoiceNumber } = await supabase.rpc('get_next_invoice_number', { org_id_input: orgId })
+    const today = new Date().toISOString().split('T')[0]
+    const daysUntilDue = contract.invoice_days_until_due ?? 30
+    const dueDate = new Date(today)
+    dueDate.setDate(dueDate.getDate() + daysUntilDue)
+    const dueDateStr = dueDate.toISOString().split('T')[0]
+    const company = contract.proposals?.company || clients.find(cl => cl.id === contract.client_id)?.company || contract.name
+
+    const { data: inv, error: invErr } = await supabase.from('invoices').insert({
+      org_id: orgId,
+      proposal_id: contract.proposal_id || null,
+      client_id: contract.client_id || null,
+      contract_id: contract.id,
+      invoice_number: invoiceNumber,
+      status: 'Draft',
+      issued_date: today,
+      due_date: dueDateStr,
+      subtotal: fee,
+      tax_percent: 0,
+      tax_amount: 0,
+      total: fee,
+      amount_paid: 0,
+      balance_due: fee,
+      description: `${contract.name || 'Service Agreement'} — ${contract.billing_frequency || 'Monthly'} Fee`,
+      notes: `Invoice for ${company}.`,
+    }).select().single()
+
+    if (invErr || !inv) { alert('Error creating invoice: ' + invErr?.message); return }
+
+    await supabase.from('invoice_line_items').insert({
+      invoice_id: inv.id,
+      description: `${contract.name || 'Service Agreement'} — ${contract.billing_frequency || 'Monthly'} Fee`,
+      quantity: 1,
+      unit_price: fee,
+      total: fee,
+    })
+
+    navigate(`/invoices/${inv.id}`)
   }
 
   const deleteContract = async () => {
@@ -561,10 +615,18 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                           )}
                         </td>
                         <td className="px-3 py-4" onClick={e => e.stopPropagation()}>
-                          <button onClick={e => openEditContract(e, c)}
-                            className="text-fp-muted hover:text-fp-text text-xs font-medium px-3 py-1.5 rounded-lg border border-fp-border hover:border-fp-text/30 transition-colors opacity-0 group-hover:opacity-100">
-                            Edit
-                          </button>
+                          <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {c.recurring_fee > 0 && (
+                              <button onClick={e => { e.stopPropagation(); createManualInvoice(c) }}
+                                className="text-blue-400 hover:text-blue-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-400/30 hover:border-blue-300/50 transition-colors">
+                                + Invoice
+                              </button>
+                            )}
+                            <button onClick={e => openEditContract(e, c)}
+                              className="text-fp-muted hover:text-fp-text text-xs font-medium px-3 py-1.5 rounded-lg border border-fp-border hover:border-fp-text/30 transition-colors">
+                              Edit
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -908,6 +970,28 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editForm.auto_renew ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
+                <div className="flex items-center justify-between bg-fp-inset rounded-lg px-3 py-2">
+                  <span className="text-fp-text text-sm font-medium">Auto-Invoice</span>
+                  <button onClick={() => setEditForm(p => ({ ...p, auto_invoice: !p.auto_invoice }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editForm.auto_invoice ? 'bg-blue-500' : 'bg-fp-border'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editForm.auto_invoice ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+                {editForm.auto_invoice && (
+                  <>
+                    <div>
+                      <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">First Invoice Date</label>
+                      <input type="date" value={editForm.next_invoice_date} onChange={e => setEditForm(p => ({ ...p, next_invoice_date: e.target.value }))}
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                      <p className="text-fp-muted text-xs mt-1">Invoice will be created on this date and advance by billing frequency each cycle.</p>
+                    </div>
+                    <div>
+                      <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Days Until Due</label>
+                      <input type="number" min="0" value={editForm.invoice_days_until_due} onChange={e => setEditForm(p => ({ ...p, invoice_days_until_due: e.target.value }))}
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                    </div>
+                  </>
+                )}
               </div>
               <div>
                 <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Scope / Notes</label>
