@@ -328,6 +328,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       ship_to_state: form.ship_to_state, ship_to_zip: form.ship_to_zip,
     }).eq('id', user.id)
     if (orgId) await supabase.from('organizations').update({ timezone: orgTimezone }).eq('id', orgId)
+    refreshProfile()
     setSuccess('Settings saved successfully'); setSaving(false)
   }
 
