@@ -201,7 +201,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
   const fetchContracts = async (prof) => {
     let query = supabase
       .from('contracts')
-      .select('*, proposals(proposal_name, company, client_name, client_email), clients(company, contact_name)')
+      .select('*, proposals(proposal_name, company, client_name, client_email)')
       .eq('org_id', prof.org_id)
       .order('end_date', { ascending: true })
 
@@ -230,7 +230,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
     return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">{days}d left</span>
   }
 
-  const getContractCompany = (c) => c.proposals?.company || c.clients?.company || '—'
+  const getContractCompany = (c) => c.proposals?.company || clients.find(cl => cl.id === c.client_id)?.company || '—'
   const getRecurringCompany = (r) => r.proposals?.company || r.proposals?.client_name || '—'
 
   const displayContracts = contracts.filter(c => {
@@ -515,7 +515,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                       >
                         <td className="px-5 py-4">
                           <p className="text-fp-text text-sm font-medium">{getContractCompany(c)}</p>
-                          <p className="text-fp-muted text-xs">{c.proposals?.client_name || c.clients?.contact_name || ''}</p>
+                          <p className="text-fp-muted text-xs">{c.proposals?.client_name || clients.find(cl => cl.id === c.client_id)?.contact_name || ''}</p>
                         </td>
                         <td className="px-5 py-4">
                           <p className="text-fp-text text-sm">{c.name || '—'}</p>
