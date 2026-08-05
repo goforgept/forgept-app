@@ -14,6 +14,12 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
   const [activeTab, setActiveTab] = useState('contracts')
   const [filterType, setFilterType] = useState('all')
   const [filterStatus, setFilterStatus] = useState('all')
+  const [editContract, setEditContract] = useState(null)
+  const [editForm, setEditForm] = useState({})
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [editRecurring, setEditRecurring] = useState(null)
+  const [editRecurringForm, setEditRecurringForm] = useState({})
+  const [savingRecurring, setSavingRecurring] = useState(false)
 
   useEffect(() => {
     if (profile?.org_id) {
@@ -50,6 +56,62 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
 
     const { data } = await query
     setRecurringItems((data || []).filter(r => r.proposals))
+  }
+
+  const openEditContract = (e, contract) => {
+    e.stopPropagation()
+    setEditContract(contract)
+    setEditForm({
+      name: contract.name || '',
+      status: contract.status || 'Active',
+      start_date: contract.start_date || '',
+      end_date: contract.end_date || '',
+      auto_renew: contract.auto_renew || false,
+      recurring_fee: contract.recurring_fee != null ? String(contract.recurring_fee) : '',
+      billing_frequency: contract.billing_frequency || 'Monthly',
+    })
+  }
+
+  const saveContractEdit = async () => {
+    setSavingEdit(true)
+    const updates = {
+      name: editForm.name,
+      status: editForm.status,
+      start_date: editForm.start_date || null,
+      end_date: editForm.end_date || null,
+      auto_renew: editForm.auto_renew,
+      recurring_fee: editForm.recurring_fee !== '' ? parseFloat(editForm.recurring_fee) : null,
+      billing_frequency: editForm.billing_frequency || null,
+    }
+    await supabase.from('contracts').update(updates).eq('id', editContract.id)
+    setContracts(prev => prev.map(c => c.id === editContract.id ? { ...c, ...updates } : c))
+    setSavingEdit(false)
+    setEditContract(null)
+  }
+
+  const openEditRecurring = (e, item) => {
+    e.stopPropagation()
+    setEditRecurring(item)
+    setEditRecurringForm({
+      item_name: item.item_name || '',
+      billing_frequency: item.billing_frequency || 'Annual',
+      renewal_date: item.renewal_date || '',
+      customer_price_total: item.customer_price_total != null ? String(item.customer_price_total) : '',
+    })
+  }
+
+  const saveRecurringEdit = async () => {
+    setSavingRecurring(true)
+    const updates = {
+      item_name: editRecurringForm.item_name,
+      billing_frequency: editRecurringForm.billing_frequency,
+      renewal_date: editRecurringForm.renewal_date || null,
+      customer_price_total: editRecurringForm.customer_price_total !== '' ? parseFloat(editRecurringForm.customer_price_total) : null,
+    }
+    await supabase.from('bom_line_items').update(updates).eq('id', editRecurring.id)
+    setRecurringItems(prev => prev.map(r => r.id === editRecurring.id ? { ...r, ...updates } : r))
+    setSavingRecurring(false)
+    setEditRecurring(null)
   }
 
   const toggleBomAutoInvoice = async (item) => {
@@ -195,6 +257,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Status</th>
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Auto-Renew</th>
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Auto Invoice</th>
+                    <th className="px-5 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -205,7 +268,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                       <tr
                         key={c.id}
                         onClick={() => c.proposal_id && navigate(`/proposal/${c.proposal_id}`)}
-                        className={`border-b border-fp-border cursor-pointer transition-colors hover:bg-fp-inset ${isExpiringSoon ? 'bg-yellow-500/5' : ''} ${i === filtered.length - 1 ? 'border-0' : ''}`}
+                        className={`group border-b border-fp-border cursor-pointer transition-colors hover:bg-fp-inset ${isExpiringSoon ? 'bg-yellow-500/5' : ''} ${i === filtered.length - 1 ? 'border-0' : ''}`}
                       >
                         <td className="px-5 py-4">
                           <p className="text-fp-text text-sm font-medium">{c.proposals?.company || '—'}</p>
@@ -254,6 +317,13 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                             <span className="text-fp-muted text-xs">No fee set</span>
                           )}
                         </td>
+                        <td className="px-3 py-4" onClick={e => e.stopPropagation()}>
+                          <button onClick={e => openEditContract(e, c)}
+                            className="text-fp-muted hover:text-fp-text text-sm px-2 py-1 rounded hover:bg-fp-inset transition-colors opacity-0 group-hover:opacity-100"
+                            title="Edit contract">
+                            ✏
+                          </button>
+                        </td>
                       </tr>
                     )
                   })}
@@ -279,6 +349,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Amount</th>
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Renewal Date</th>
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Auto Invoice</th>
+                    <th className="px-5 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -286,7 +357,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                     <tr
                       key={r.id}
                       onClick={() => r.proposal_id && navigate(`/proposal/${r.proposal_id}`)}
-                      className={`border-b border-fp-border cursor-pointer transition-colors hover:bg-fp-inset ${i === recurringItems.length - 1 ? 'border-0' : ''}`}
+                      className={`group border-b border-fp-border cursor-pointer transition-colors hover:bg-fp-inset ${i === recurringItems.length - 1 ? 'border-0' : ''}`}
                     >
                       <td className="px-5 py-4">
                         <p className="text-fp-text text-sm font-medium">{r.proposals?.company || '—'}</p>
@@ -323,6 +394,13 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                           )}
                         </div>
                       </td>
+                      <td className="px-3 py-4" onClick={e => e.stopPropagation()}>
+                        <button onClick={e => openEditRecurring(e, r)}
+                          className="text-fp-muted hover:text-fp-text text-sm px-2 py-1 rounded hover:bg-fp-inset transition-colors opacity-0 group-hover:opacity-100"
+                          title="Edit item">
+                          ✏
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -331,6 +409,127 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
           ))}
         </div>
       </div>
+
+      {/* Edit Contract Modal */}
+      {editContract && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setEditContract(null)}>
+          <div className="bg-fp-card rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-fp-text font-bold text-lg mb-5">Edit Contract</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Name</label>
+                <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Status</label>
+                  <select value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                    <option>Active</option>
+                    <option>Expired</option>
+                    <option>Cancelled</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Billing</label>
+                  <select value={editForm.billing_frequency} onChange={e => setEditForm(p => ({ ...p, billing_frequency: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Annual">Annual</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Start Date</label>
+                  <input type="date" value={editForm.start_date} onChange={e => setEditForm(p => ({ ...p, start_date: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">End Date</label>
+                  <input type="date" value={editForm.end_date} onChange={e => setEditForm(p => ({ ...p, end_date: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Recurring Fee</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fp-muted text-sm">$</span>
+                  <input type="number" min="0" step="0.01" value={editForm.recurring_fee}
+                    onChange={e => setEditForm(p => ({ ...p, recurring_fee: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-fp-text text-sm font-medium">Auto-Renew</span>
+                <button onClick={() => setEditForm(p => ({ ...p, auto_renew: !p.auto_renew }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editForm.auto_renew ? 'bg-green-500' : 'bg-fp-border'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editForm.auto_renew ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setEditContract(null)} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+              <button onClick={saveContractEdit} disabled={savingEdit}
+                className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                {savingEdit ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Recurring Item Modal */}
+      {editRecurring && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setEditRecurring(null)}>
+          <div className="bg-fp-card rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-fp-text font-bold text-lg mb-5">Edit Recurring Item</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Item Name</label>
+                <input value={editRecurringForm.item_name} onChange={e => setEditRecurringForm(p => ({ ...p, item_name: e.target.value }))}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Frequency</label>
+                  <select value={editRecurringForm.billing_frequency} onChange={e => setEditRecurringForm(p => ({ ...p, billing_frequency: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Annual">Annual</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Renewal Date</label>
+                  <input type="date" value={editRecurringForm.renewal_date} onChange={e => setEditRecurringForm(p => ({ ...p, renewal_date: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fp-muted text-sm">$</span>
+                  <input type="number" min="0" step="0.01" value={editRecurringForm.customer_price_total}
+                    onChange={e => setEditRecurringForm(p => ({ ...p, customer_price_total: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setEditRecurring(null)} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+              <button onClick={saveRecurringEdit} disabled={savingRecurring}
+                className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                {savingRecurring ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

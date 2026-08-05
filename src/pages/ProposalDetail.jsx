@@ -262,12 +262,14 @@ export default function ProposalDetail({ isAdmin }) {
             user_id: profile?.id, type: 'sla', name: c.name || 'Service Level Agreement',
             status: 'Active', start_date: c.start_date || null, end_date: c.end_date || null,
             auto_renew: c.auto_renew || false,
+            recurring_fee: c.recurring_fee || null, billing_frequency: c.billing_frequency || null,
           })),
           ...monArr.map(c => ({
             org_id: data.org_id, proposal_id: data.id, client_id: data.client_id || null,
             user_id: profile?.id, type: 'monitoring', name: c.name || 'Monitoring Contract',
             status: 'Active', start_date: c.start_date || null, end_date: c.end_date || null,
             auto_renew: c.auto_renew || false,
+            recurring_fee: c.recurring_fee || null, billing_frequency: c.billing_frequency || null,
           })),
         ]
         await supabase.from('contracts').insert(rows)
@@ -505,6 +507,22 @@ export default function ProposalDetail({ isAdmin }) {
     setPendingRenewalItems([])
     setPendingRenewalDates({})
     setSavingRenewal(false)
+
+    // Continue the Won flow: check if SLA/monitoring contracts still need start dates
+    const allAgreements = [
+      ...slaContracts.map((c, i) => ({ ...c, _type: 'sla', _idx: i })),
+      ...monitoringContracts.map((c, i) => ({ ...c, _type: 'monitoring', _idx: i })),
+    ]
+    const agreementsMissingDate = allAgreements.filter(c => !c.start_date)
+    if (agreementsMissingDate.length > 0) {
+      const initialDates = {}
+      agreementsMissingDate.forEach(c => { initialDates[`${c._type}_${c._idx}`] = '' })
+      setPendingContractItems(agreementsMissingDate)
+      setPendingContractDates(initialDates)
+      setShowContractStartModal(true)
+    } else if (slaContracts.length > 0 || monitoringContracts.length > 0) {
+      await createContractRows(slaContracts, monitoringContracts)
+    }
   }
 
   const updateCloseDate = async (newDate) => {
@@ -789,18 +807,22 @@ export default function ProposalDetail({ isAdmin }) {
   }
 
   const createContractRows = async (slaArr, monArr) => {
+    const { data: existing } = await supabase.from('contracts').select('id').eq('proposal_id', id).limit(1)
+    if (existing?.length) return
     const rows = [
       ...(slaArr || []).map(c => ({
         org_id: proposal?.org_id, proposal_id: id, client_id: proposal?.client_id || null,
         user_id: profile?.id, type: 'sla', name: c.name || 'Service Level Agreement',
         status: 'Active', start_date: c.start_date || null, end_date: c.end_date || null,
         auto_renew: c.auto_renew || false,
+        recurring_fee: c.recurring_fee || null, billing_frequency: c.billing_frequency || null,
       })),
       ...(monArr || []).map(c => ({
         org_id: proposal?.org_id, proposal_id: id, client_id: proposal?.client_id || null,
         user_id: profile?.id, type: 'monitoring', name: c.name || 'Monitoring Contract',
         status: 'Active', start_date: c.start_date || null, end_date: c.end_date || null,
         auto_renew: c.auto_renew || false,
+        recurring_fee: c.recurring_fee || null, billing_frequency: c.billing_frequency || null,
       })),
     ]
     if (rows.length > 0) {
