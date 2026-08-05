@@ -503,7 +503,15 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                   return (
                     <div key={`${alert.kind}-${alert.id}`}
                       className="px-5 py-3 flex items-start gap-4 hover:bg-fp-inset transition-colors cursor-pointer"
-                      onClick={() => alert.proposalId && navigate(`/proposal/${alert.proposalId}`)}>
+                      onClick={e => {
+                        if (alert.kind === 'contract') {
+                          const contract = contracts.find(c => c.id === alert.id)
+                          if (contract) openEditContract(e, contract)
+                        } else {
+                          const item = recurringItems.find(r => r.id === alert.id)
+                          if (item) { setActiveTab('recurring'); openEditRecurring(e, item) }
+                        }
+                      }}>
                       <div className="flex-shrink-0 mt-0.5">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${alert.daysLeft <= 30 ? 'bg-red-500/20 text-red-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                           {alert.daysLeft}d
