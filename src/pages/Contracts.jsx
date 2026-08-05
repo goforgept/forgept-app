@@ -24,7 +24,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
   const [clients, setClients] = useState([])
   const [newForm, setNewForm] = useState({
     client_id: '', type: 'sla', name: '', start_date: '', end_date: '',
-    recurring_fee: '', billing_frequency: 'Monthly', auto_renew: false, auto_invoice: false,
+    recurring_fee: '', billing_frequency: 'Monthly', auto_renew: false, auto_invoice: false, notes: '',
   })
   const [savingNew, setSavingNew] = useState(false)
   const [filterClient, setFilterClient] = useState('all')
@@ -63,7 +63,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       client_id: '', type: featureSla ? 'sla' : 'monitoring',
       name: featureSla ? 'Service Level Agreement' : 'Monitoring Contract',
       start_date: today, end_date: oneYear.toISOString().split('T')[0],
-      recurring_fee: '', billing_frequency: 'Monthly', auto_renew: false, auto_invoice: false,
+      recurring_fee: '', billing_frequency: 'Monthly', auto_renew: false, auto_invoice: false, notes: '',
     })
     setShowNewModal(true)
   }
@@ -88,6 +88,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       recurring_fee: newForm.recurring_fee !== '' ? parseFloat(newForm.recurring_fee) : null,
       billing_frequency: newForm.billing_frequency || null,
       next_invoice_date: newForm.auto_invoice && newForm.start_date ? newForm.start_date : null,
+      notes: newForm.notes || null,
     }).select('*, proposals(proposal_name, company, client_name, client_email)').single()
     if (insertErr) { alert('Error creating contract: ' + insertErr.message); setSavingNew(false); return }
     // Attach client info for display (no proposal)
@@ -126,6 +127,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       auto_renew: contract.auto_renew || false,
       recurring_fee: contract.recurring_fee != null ? String(contract.recurring_fee) : '',
       billing_frequency: contract.billing_frequency || 'Monthly',
+      notes: contract.notes || '',
     })
   }
 
@@ -139,8 +141,10 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       auto_renew: editForm.auto_renew,
       recurring_fee: editForm.recurring_fee !== '' ? parseFloat(editForm.recurring_fee) : null,
       billing_frequency: editForm.billing_frequency || null,
+      notes: editForm.notes || null,
     }
-    await supabase.from('contracts').update(updates).eq('id', editContract.id)
+    const { error: saveErr } = await supabase.from('contracts').update(updates).eq('id', editContract.id)
+    if (saveErr) { alert('Error saving contract: ' + saveErr.message); setSavingEdit(false); return }
     setContracts(prev => prev.map(c => c.id === editContract.id ? { ...c, ...updates } : c))
     setSavingEdit(false)
     setEditContract(null)
@@ -519,7 +523,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                         </td>
                         <td className="px-5 py-4">
                           <p className="text-fp-text text-sm">{c.name || '—'}</p>
-                          <p className="text-fp-muted text-xs truncate max-w-[180px]">{c.proposals?.proposal_name || ''}</p>
+                          <p className="text-fp-muted text-xs truncate max-w-[240px]">{c.notes ? c.notes.split('\n')[0] : (c.proposals?.proposal_name || '')}</p>
                         </td>
                         <td className="px-5 py-4">
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${c.type === 'sla' ? 'bg-[#C8622A]/20 text-[#C8622A]' : 'bg-blue-500/20 text-blue-400'}`}>
@@ -737,7 +741,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       {/* New Agreement Modal */}
       {showNewModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setShowNewModal(false)}>
-          <div className="bg-fp-card rounded-2xl shadow-2xl w-full max-w-lg p-6" onClick={e => e.stopPropagation()}>
+          <div className="bg-fp-card rounded-2xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <h3 className="text-fp-text font-bold text-lg mb-1">New Service Agreement</h3>
             <p className="text-fp-muted text-sm mb-5">Create an SLA or monitoring contract directly for any client — no proposal required.</p>
             <div className="space-y-4">
@@ -795,6 +799,22 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                     placeholder="0.00"
                     className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                 </div>
+                {newForm.recurring_fee && (
+                  <p className="text-fp-muted text-xs mt-1">
+                    {fmt(toMonthly(newForm.recurring_fee, newForm.billing_frequency))}/mo · {fmt(toMonthly(newForm.recurring_fee, newForm.billing_frequency) * 12)}/yr
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Scope / Notes</label>
+                <p className="text-fp-muted text-xs mb-2">Describe what's covered, response times, exclusions, or any other terms.</p>
+                <textarea
+                  value={newForm.notes}
+                  onChange={e => setNewForm(p => ({ ...p, notes: e.target.value }))}
+                  rows={5}
+                  placeholder="e.g. Covers all AV equipment installed under proposal #1234. Response time: 4 business hours. On-site support Mon–Fri 8am–5pm. Excludes consumables and physical damage..."
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y placeholder-fp-muted/60"
+                />
               </div>
               <div className="flex gap-6">
                 <div className="flex items-center justify-between flex-1">
@@ -832,15 +852,16 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
       {/* Edit Contract Modal */}
       {editContract && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setEditContract(null)}>
-          <div className="bg-fp-card rounded-2xl shadow-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
-            <h3 className="text-fp-text font-bold text-lg mb-5">Edit Contract</h3>
+          <div className="bg-fp-card rounded-2xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-fp-text font-bold text-lg mb-1">Edit Contract</h3>
+            <p className="text-fp-muted text-sm mb-5">{editContract.proposals?.company || clients.find(cl => cl.id === editContract.client_id)?.company || ''}</p>
             <div className="space-y-4">
-              <div>
-                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Name</label>
-                <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
-                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
-              </div>
               <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Contract Name</label>
+                  <input value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
                 <div>
                   <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Status</label>
                   <select value={editForm.status} onChange={e => setEditForm(p => ({ ...p, status: e.target.value }))}
@@ -851,7 +872,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                   </select>
                 </div>
                 <div>
-                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Billing</label>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Billing Frequency</label>
                   <select value={editForm.billing_frequency} onChange={e => setEditForm(p => ({ ...p, billing_frequency: e.target.value }))}
                     className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
                     <option value="Monthly">Monthly</option>
@@ -859,8 +880,6 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                     <option value="Annual">Annual</option>
                   </select>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Start Date</label>
                   <input type="date" value={editForm.start_date} onChange={e => setEditForm(p => ({ ...p, start_date: e.target.value }))}
@@ -871,23 +890,39 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                   <input type="date" value={editForm.end_date} onChange={e => setEditForm(p => ({ ...p, end_date: e.target.value }))}
                     className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                 </div>
-              </div>
-              <div>
-                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Recurring Fee</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fp-muted text-sm">$</span>
-                  <input type="number" min="0" step="0.01" value={editForm.recurring_fee}
-                    onChange={e => setEditForm(p => ({ ...p, recurring_fee: e.target.value }))}
-                    placeholder="0.00"
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Recurring Fee</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fp-muted text-sm">$</span>
+                    <input type="number" min="0" step="0.01" value={editForm.recurring_fee}
+                      onChange={e => setEditForm(p => ({ ...p, recurring_fee: e.target.value }))}
+                      placeholder="0.00"
+                      className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                  </div>
+                  {editForm.recurring_fee && editForm.billing_frequency && (
+                    <p className="text-fp-muted text-xs mt-1">
+                      {fmt(toMonthly(editForm.recurring_fee, editForm.billing_frequency))}/mo · {fmt(toMonthly(editForm.recurring_fee, editForm.billing_frequency) * 12)}/yr
+                    </p>
+                  )}
+                </div>
+                <div className="flex items-center justify-between bg-fp-inset rounded-lg px-3 py-2">
+                  <span className="text-fp-text text-sm font-medium">Auto-Renew</span>
+                  <button onClick={() => setEditForm(p => ({ ...p, auto_renew: !p.auto_renew }))}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editForm.auto_renew ? 'bg-green-500' : 'bg-fp-border'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editForm.auto_renew ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-fp-text text-sm font-medium">Auto-Renew</span>
-                <button onClick={() => setEditForm(p => ({ ...p, auto_renew: !p.auto_renew }))}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${editForm.auto_renew ? 'bg-green-500' : 'bg-fp-border'}`}>
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editForm.auto_renew ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Scope / Notes</label>
+                <p className="text-fp-muted text-xs mb-2">Describe what's covered, response times, exclusions, or any other terms.</p>
+                <textarea
+                  value={editForm.notes}
+                  onChange={e => setEditForm(p => ({ ...p, notes: e.target.value }))}
+                  rows={6}
+                  placeholder="e.g. Covers all AV equipment installed under proposal #1234. Response time: 4 business hours. On-site support Mon–Fri 8am–5pm. Excludes consumables and physical damage..."
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y placeholder-fp-muted/60"
+                />
               </div>
             </div>
             <div className="flex justify-between items-center mt-6">
