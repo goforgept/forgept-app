@@ -183,6 +183,21 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
 
   const expiringSoon = contracts.filter(c => { const d = daysUntil(c.end_date); return d !== null && d >= 0 && d <= 90 }).length
 
+  const toMonthly = (amount, freq) => {
+    const a = parseFloat(amount) || 0
+    if (!a) return 0
+    const f = (freq || 'Annual').toLowerCase()
+    if (f === 'monthly') return a
+    if (f === 'quarterly') return a / 3
+    return a / 12
+  }
+
+  const rmr = (
+    contracts.filter(c => c.status === 'Active').reduce((sum, c) => sum + toMonthly(c.recurring_fee, c.billing_frequency), 0) +
+    recurringItems.reduce((sum, r) => sum + toMonthly(r.customer_price_total, r.billing_frequency), 0)
+  )
+  const arr = rmr * 12
+
   return (
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureSla={featureSla} featureMonitoring={featureMonitoring} featureInventory={featureInventory} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
@@ -200,6 +215,20 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                 <span className="text-yellow-400 text-sm font-semibold">⚠ {expiringSoon} expiring within 90 days</span>
               </div>
             )}
+          </div>
+
+          {/* RMR / ARR highlight */}
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="bg-fp-card rounded-xl p-5 border border-[#C8622A]/30">
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1">Monthly Recurring Revenue</p>
+              <p className="text-[#C8622A] text-3xl font-bold">${rmr.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+              <p className="text-fp-muted text-xs mt-1">RMR / month</p>
+            </div>
+            <div className="bg-fp-card rounded-xl p-5 border border-[#C8622A]/30">
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1">Annual Recurring Revenue</p>
+              <p className="text-[#C8622A] text-3xl font-bold">${arr.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+              <p className="text-fp-muted text-xs mt-1">ARR / year</p>
+            </div>
           </div>
 
           {/* Summary cards */}
