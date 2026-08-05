@@ -244,6 +244,19 @@ export default function GeneralTab({
         </div>
       </div>
 
+      {/* About Us */}
+      <div className="bg-fp-card rounded-xl p-6">
+        <h3 className="text-fp-text font-bold mb-1">About Us</h3>
+        <p className="text-fp-muted text-sm mb-4">Appears at the top of every proposal — before the scope of work. Use this to introduce your company, highlight certifications, years in business, service areas, or anything that builds confidence with the client.</p>
+        <textarea
+          value={form.about_us}
+          onChange={e => setForm(prev => ({ ...prev, about_us: e.target.value }))}
+          placeholder="e.g. Founded in 2010, Acme AV has been designing and installing commercial AV systems across the Southeast for over 14 years. We hold certifications from Crestron, Extron, and QSC, and our team of 12 full-time technicians has completed over 500 installations in healthcare, education, and corporate environments..."
+          rows={6}
+          className="w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y"
+        />
+      </div>
+
       {/* Terms and Conditions */}
       <div className="bg-fp-card rounded-xl p-6">
         <h3 className="text-fp-text font-bold mb-1">Terms and Conditions</h3>

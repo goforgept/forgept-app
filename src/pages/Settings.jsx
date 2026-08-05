@@ -33,7 +33,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [importClients, setImportClients] = useState([])
   const [form, setForm] = useState({
     full_name: '', email: '', company_name: '', default_markup_percent: '35', followup_days: '30,14,7,0',
-    terms_and_conditions: '', primary_color: '#0F1C2E',
+    terms_and_conditions: '', about_us: '', primary_color: '#0F1C2E',
     bill_to_address: '', bill_to_city: '', bill_to_state: '', bill_to_zip: '',
     ship_to_address: '', ship_to_city: '', ship_to_state: '', ship_to_zip: '',
   })
@@ -123,6 +123,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       default_markup_percent: profile.default_markup_percent || '35',
       followup_days: profile.followup_days || '30,14,7,0',
       terms_and_conditions: profile.terms_and_conditions || '',
+      about_us: profile.about_us || '',
       primary_color: profile.primary_color || '#0F1C2E',
       bill_to_address: profile.bill_to_address || '',
       bill_to_city: profile.bill_to_city || '',
@@ -318,7 +319,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       full_name: form.full_name, company_name: form.company_name,
       phone: form.phone || null, job_title: form.job_title || null, license_number: form.license_number || null,
       default_markup_percent: parseFloat(form.default_markup_percent) || 35,
-      followup_days: form.followup_days, terms_and_conditions: form.terms_and_conditions,
+      followup_days: form.followup_days, terms_and_conditions: form.terms_and_conditions, about_us: form.about_us || null,
       primary_color: form.primary_color,
       bill_to_address: form.bill_to_address, bill_to_city: form.bill_to_city,
       bill_to_state: form.bill_to_state, bill_to_zip: form.bill_to_zip,

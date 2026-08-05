@@ -1416,6 +1416,17 @@ export default function ProposalDetail({ isAdmin }) {
       new Paragraph({ children: [new TextRun({ text: '' })] }),
     ]
 
+    if (profile?.about_us) {
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: 'About Us', bold: true, size: 28, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        ...profile.about_us.split('\n').map(line =>
+          new Paragraph({ children: [new TextRun({ text: line, size: 20 })] })
+        ),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+      )
+    }
+
     if (p?.scope_of_work) {
       children.push(
         new Paragraph({ children: [new TextRun({ text: 'Scope of Work', bold: true, size: 28, color: primaryColor })] }),
@@ -2766,6 +2777,16 @@ const analyzeDrawing = async () => {
 
     let yPos = Math.max(92, pdfRefY + 5)
 
+    if (profile?.about_us) {
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('About Us', 14, yPos)
+      yPos += 8
+      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
+      const aboutLines = doc.splitTextToSize(profile.about_us, pageWidth - 28)
+      doc.text(aboutLines, 14, yPos)
+      yPos += aboutLines.length * 5 + 12
+    }
+
     if (p?.scope_of_work) {
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Scope of Work', 14, yPos)
@@ -3176,6 +3197,13 @@ const analyzeDrawing = async () => {
           onCreateRevision={createRevision}
           canEdit={canEdit}
         />
+
+        {profile?.about_us && (
+          <div className="bg-fp-card rounded-xl p-6 mb-6">
+            <h3 className="text-fp-text font-bold text-lg mb-3">About Us</h3>
+            <p className="text-fp-muted text-sm leading-relaxed whitespace-pre-wrap">{profile.about_us}</p>
+          </div>
+        )}
 
         <ScopeSection
           proposal={proposal} features={features} photos={photos}

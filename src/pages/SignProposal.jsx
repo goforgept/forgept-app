@@ -64,7 +64,7 @@ export default function SignProposal() {
     if (data.org_id) {
       const { data: orgProf } = await supabase
         .from('profiles')
-        .select('terms_and_conditions, company_name, logo_url, primary_color')
+        .select('terms_and_conditions, about_us, company_name, logo_url, primary_color')
         .eq('org_id', data.org_id).limit(1).single()
       if (orgProf?.terms_and_conditions) setTerms(orgProf.terms_and_conditions)
       setOrgProfile(orgProf || null)
@@ -113,6 +113,15 @@ export default function SignProposal() {
     doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 72)
 
     let yPos = 85
+
+    // About Us
+    if (orgProf?.about_us) {
+      doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('About Us', 14, yPos); yPos += 8
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+      const aboutLines = doc.splitTextToSize(orgProf.about_us, pageWidth - 28)
+      doc.text(aboutLines, 14, yPos); yPos += aboutLines.length * 4.5 + 10
+    }
 
     // Scope of Work
     if (prop.scope_of_work) {
@@ -485,6 +494,13 @@ export default function SignProposal() {
             </div>
           )}
         </div>
+
+        {orgProfile?.about_us && (
+          <div className="bg-[#1a2d45] rounded-xl p-6">
+            <h3 className="text-white font-bold text-lg mb-4">About Us</h3>
+            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{orgProfile.about_us}</p>
+          </div>
+        )}
 
         {proposal?.scope_of_work && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
