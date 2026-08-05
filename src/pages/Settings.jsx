@@ -5,6 +5,7 @@ import DataImportTab from '../components/DataImportTab'
 import { useProfile } from '../context/ProfileContext'
 import { SLA_INDUSTRIES, SLA_TIER_DEFAULTS, MONITORING_INDUSTRIES, MONITORING_DEFAULTS, _STD_BODY } from '../components/settings/slaConstants'
 import GeneralTab from '../components/settings/GeneralTab'
+import ProposalsTab from '../components/settings/ProposalsTab'
 import InvoicingTab from '../components/settings/InvoicingTab'
 import IntegrationsTab from '../components/settings/IntegrationsTab'
 import SlaTab from '../components/settings/SlaTab'
@@ -458,7 +459,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const inputClass = "w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   const navGroups = [
-    { items: [{ key: 'general', label: 'General' }] },
+    { items: [{ key: 'general', label: 'General' }, { key: 'proposals', label: 'Proposals' }] },
     ...(isAdmin && !featureDesignerOnly ? [{
       label: 'Admin',
       items: [
@@ -516,13 +517,18 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           {success && <p className="text-green-400 text-sm mb-4">{success}</p>}
 
           {activeTab === 'general' && (
-            <GeneralTab form={form} setForm={setForm} inputClass={inputClass} logoUrl={logoUrl} uploadingLogo={uploadingLogo} handleLogoUpload={handleLogoUpload}
+            <GeneralTab form={form} setForm={setForm} inputClass={inputClass}
               orgTimezone={orgTimezone} setOrgTimezone={setOrgTimezone}
               passwordForm={passwordForm} setPasswordForm={setPasswordForm} passwordError={passwordError} passwordSuccess={passwordSuccess}
               savingPassword={savingPassword} handleChangePassword={handleChangePassword}
               supportPin={supportPin} pinInput={pinInput} setPinInput={setPinInput} savingPin={savingPin} pinSaved={pinSaved} savePin={savePin} regeneratePin={regeneratePin}
               sameAsShipTo={sameAsShipTo} handleSameAsShipTo={handleSameAsShipTo} profile={profile} saving={saving} handleSave={handleSave}
-              currentTheme={currentTheme} applyTheme={applyTheme}
+              currentTheme={currentTheme} applyTheme={applyTheme} />
+          )}
+
+          {activeTab === 'proposals' && (
+            <ProposalsTab form={form} setForm={setForm} inputClass={inputClass}
+              logoUrl={logoUrl} uploadingLogo={uploadingLogo} handleLogoUpload={handleLogoUpload}
               isAdmin={isAdmin} msrpEnabled={msrpEnabled}
               onToggleMsrp={async () => {
                 const next = !msrpEnabled
@@ -540,7 +546,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                 const next = pdfTableStyle === 'striped' ? 'plain' : 'striped'
                 setPdfTableStyle(next)
                 await supabase.from('organizations').update({ pdf_table_style: next }).eq('id', orgId)
-              }} />
+              }}
+              saving={saving} handleSave={handleSave} />
           )}
 
           {activeTab === 'invoicing' && isAdmin && (
