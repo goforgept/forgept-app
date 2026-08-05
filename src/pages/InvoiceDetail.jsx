@@ -60,7 +60,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
     const { data: inv } = await supabase
       .from('invoices')
-      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email, client_id), clients(company, contact_name, email, address, city, state, zip, phone, net_terms)')
+      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email, client_id), clients(company, client_name, email, address, city, state, zip, phone, net_terms)')
       .eq('id', id)
       .single()
     setInvoice(inv)
@@ -156,7 +156,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     // FROM block (left side, below header)
     const clientData = ticketClient?.clients || null
     const clientCompany = invoice?.proposals?.company || ticketClient?.clients?.company || invoice?.clients?.company || ''
-    const clientName = invoice?.proposals?.client_name || ticketClient?.clients?.client_name || invoice?.clients?.contact_name || ''
+    const clientName = invoice?.proposals?.client_name || ticketClient?.clients?.client_name || invoice?.clients?.client_name || ''
     const clientAddr = clientData?.address || ''
     const clientCityStateZip = [clientData?.city, clientData?.state, clientData?.zip].filter(Boolean).join(', ')
     const clientPhone = clientData?.phone || ''
