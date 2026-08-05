@@ -60,7 +60,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
     const { data: inv } = await supabase
       .from('invoices')
-      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email, client_id)')
+      .select('*, proposals(proposal_name, company, client_name, client_email, rep_name, rep_email, client_id), clients(company, contact_name, email, address, city, state, zip, phone, net_terms)')
       .eq('id', id)
       .single()
     setInvoice(inv)
@@ -75,6 +75,8 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
         .single()
       setTicketClient(st)
       terms = st?.clients?.net_terms || ''
+    } else if (inv?.clients?.net_terms) {
+      terms = inv.clients.net_terms
     } else if (inv?.proposals?.client_id) {
       const { data: cl } = await supabase
         .from('clients')
@@ -153,8 +155,8 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
     // FROM block (left side, below header)
     const clientData = ticketClient?.clients || null
-    const clientCompany = invoice?.proposals?.company || ticketClient?.clients?.company || ''
-    const clientName = invoice?.proposals?.client_name || ticketClient?.clients?.client_name || ''
+    const clientCompany = invoice?.proposals?.company || ticketClient?.clients?.company || invoice?.clients?.company || ''
+    const clientName = invoice?.proposals?.client_name || ticketClient?.clients?.client_name || invoice?.clients?.contact_name || ''
     const clientAddr = clientData?.address || ''
     const clientCityStateZip = [clientData?.city, clientData?.state, clientData?.zip].filter(Boolean).join(', ')
     const clientPhone = clientData?.phone || ''
@@ -372,7 +374,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   }
 
   const sendInvoice = async () => {
-    const clientEmail = invoice?.proposals?.client_email || ticketClient?.clients?.email
+    const clientEmail = invoice?.proposals?.client_email || ticketClient?.clients?.email || invoice?.clients?.email
     if (!clientEmail) { alert('No client email found on this invoice.'); return }
     setSendingInvoice(true)
     try {
@@ -581,7 +583,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 </select>
               </div>
               <div className="flex items-center gap-2 mt-0.5">
-                <p className="text-fp-muted">{invoice.proposals?.company || ticketClient?.clients?.company || <span className="italic">No customer set</span>}{(invoice.proposals?.client_name || ticketClient?.clients?.client_name) ? ` · ${invoice.proposals?.client_name || ticketClient?.clients?.client_name}` : ''}</p>
+                <p className="text-fp-muted">{invoice.proposals?.company || ticketClient?.clients?.company || invoice.clients?.company || <span className="italic">No customer set</span>}{(invoice.proposals?.client_name || ticketClient?.clients?.client_name || invoice.clients?.contact_name) ? ` · ${invoice.proposals?.client_name || ticketClient?.clients?.client_name || invoice.clients?.contact_name}` : ''}</p>
                 <button onClick={openBillToModal} className="text-[#C8622A] text-xs hover:text-fp-text transition-colors">Change</button>
               </div>
               <p className="text-fp-muted text-xs mt-0.5">{invoice.proposals?.proposal_name || ticketClient?.title}</p>

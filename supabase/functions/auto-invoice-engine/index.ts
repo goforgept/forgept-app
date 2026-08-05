@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
 
     // Find all active contracts with auto_invoice on and next_invoice_date due today or overdue
     const contractsRes = await fetch(
-      `${supabaseUrl}/rest/v1/contracts?auto_invoice=eq.true&status=eq.Active&next_invoice_date=lte.${today}&select=*,proposals(proposal_name,company,client_name,client_email,org_id,user_id),organizations(qbo_connected,qbo_access_token,qbo_refresh_token,qbo_realm_id,qbo_token_expires_at)`,
+      `${supabaseUrl}/rest/v1/contracts?auto_invoice=eq.true&status=eq.Active&next_invoice_date=lte.${today}&select=*,proposals(proposal_name,company,client_name,client_email,org_id,user_id),clients(company,contact_name,email),organizations(qbo_connected,qbo_access_token,qbo_refresh_token,qbo_realm_id,qbo_token_expires_at)`,
       { headers: db }
     )
     const contracts = await contractsRes.json()
@@ -55,15 +55,17 @@ Deno.serve(async (req) => {
     let created = 0
 
     for (const contract of contracts) {
+      // Support both proposal-linked and standalone (no proposal) contracts
       const proposal = contract.proposals
-      if (!proposal) continue
+      const client = contract.clients
+      if (!proposal && !client) continue
 
       const orgId     = contract.org_id
       const amount    = parseFloat(contract.recurring_fee) || 0
       const frequency = contract.billing_frequency || 'Monthly'
       const daysUntilDue = contract.invoice_days_until_due ?? 30
-      const clientEmail  = proposal.client_email
-      const company      = proposal.company || contract.name || 'Client'
+      const clientEmail  = proposal?.client_email ?? client?.email ?? null
+      const company      = proposal?.company ?? client?.company ?? contract.name ?? 'Client'
 
       if (amount <= 0) continue
 
@@ -92,6 +94,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           org_id: orgId,
           proposal_id: contract.proposal_id || null,
+          client_id: contract.client_id || null,
           invoice_number: invoiceNumber,
           status: 'Sent',
           issued_date: issuedDate,
@@ -145,7 +148,7 @@ Deno.serve(async (req) => {
               </div>
               <div style="padding:28px;">
                 <h2 style="color:#0F1C2E;margin-top:0;">Invoice #${invoiceNumber}</h2>
-                <p>Hi ${proposal.client_name || company},</p>
+                <p>Hi ${proposal?.client_name ?? client?.contact_name ?? company},</p>
                 <p>Please find your invoice for <strong>${contract.name || 'Service Agreement'}</strong> below.</p>
                 <div style="background:#f5f5f5;border-radius:8px;padding:16px;margin:16px 0;">
                   <p style="margin:4px 0;"><strong>${contract.name || 'Service Agreement'} — ${frequency} Fee</strong></p>
