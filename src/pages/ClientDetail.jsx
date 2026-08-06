@@ -59,6 +59,9 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [savingContact, setSavingContact] = useState(false)
   // Subscriptions
   const [subscriptions, setSubscriptions] = useState([])
+  const [editingSub, setEditingSub] = useState(null)
+  const [editSubForm, setEditSubForm] = useState({})
+  const [savingSub, setSavingSub] = useState(false)
   // Service Tickets
   const [clientTickets, setClientTickets] = useState([])
   // Meetings
@@ -132,6 +135,43 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
       .eq('recurring', true)
       .order('renewal_date', { ascending: true, nullsFirst: false })
     setSubscriptions(data || [])
+  }
+
+  const openEditSub = (item) => {
+    setEditingSub(item)
+    setEditSubForm({
+      item_name: item.item_name || '',
+      part_number_sku: item.part_number_sku || '',
+      quantity: item.quantity != null ? String(item.quantity) : '1',
+      customer_price_unit: item.customer_price_unit != null ? String(item.customer_price_unit) : '',
+      customer_price_total: item.customer_price_total != null ? String(item.customer_price_total) : '',
+      billing_frequency: item.billing_frequency || 'Annual',
+      renewal_date: item.renewal_date || '',
+      next_invoice_date: item.next_invoice_date || '',
+      auto_invoice: item.auto_invoice || false,
+    })
+  }
+
+  const saveEditSub = async () => {
+    setSavingSub(true)
+    const qty = parseFloat(editSubForm.quantity) || 1
+    const unitPrice = parseFloat(editSubForm.customer_price_unit) || 0
+    const total = editSubForm.customer_price_unit !== '' ? qty * unitPrice : (editSubForm.customer_price_total !== '' ? parseFloat(editSubForm.customer_price_total) : null)
+    const updates = {
+      item_name: editSubForm.item_name,
+      part_number_sku: editSubForm.part_number_sku || null,
+      quantity: qty,
+      customer_price_unit: unitPrice || null,
+      customer_price_total: total,
+      billing_frequency: editSubForm.billing_frequency,
+      renewal_date: editSubForm.renewal_date || null,
+      next_invoice_date: editSubForm.next_invoice_date || null,
+      auto_invoice: editSubForm.auto_invoice,
+    }
+    await supabase.from('bom_line_items').update(updates).eq('id', editingSub.id)
+    setSubscriptions(prev => prev.map(s => s.id === editingSub.id ? { ...s, ...updates } : s))
+    setSavingSub(false)
+    setEditingSub(null)
   }
 
   const createInvoiceForProposal = async (proposalId, proposalName, companyName) => {
@@ -814,7 +854,11 @@ const deleteMeeting = async (meetingId) => {
                                 {item.next_invoice_date && <span>Next invoice: {new Date(item.next_invoice_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>}
                               </div>
                             </div>
-                            <p className="text-fp-text text-sm font-bold flex-shrink-0">${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              <p className="text-fp-text text-sm font-bold">${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                              <button onClick={() => openEditSub(item)}
+                                className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>
+                            </div>
                           </div>
                         )
                       })}
@@ -1381,6 +1425,106 @@ const deleteMeeting = async (meetingId) => {
                 <button onClick={() => { setShowEmailModal(false); setDraftedEmail(''); setEmailEditMode(false) }} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={sendEmail} disabled={sendingEmail || !draftedEmail || !emailForm.subject} className="flex-1 bg-purple-600 text-fp-text py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50">{sendingEmail ? 'Sending...' : 'Send Email →'}</button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Subscription Modal */}
+      {editingSub && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={() => setEditingSub(null)}>
+          <div className="bg-fp-card rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-fp-text font-bold text-lg mb-1">Edit Subscription</h3>
+            <p className="text-fp-muted text-sm mb-5">{editingSub.proposals?.company || '—'} · {editingSub.proposals?.proposal_name || ''}</p>
+            <div className="space-y-4">
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Item Name</label>
+                <input value={editSubForm.item_name} onChange={e => setEditSubForm(p => ({ ...p, item_name: e.target.value }))}
+                  className={inputClass} />
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Part Number / SKU</label>
+                <input value={editSubForm.part_number_sku} onChange={e => setEditSubForm(p => ({ ...p, part_number_sku: e.target.value }))}
+                  placeholder="Optional" className={inputClass} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Quantity</label>
+                  <input type="number" min="0" step="1" value={editSubForm.quantity}
+                    onChange={e => {
+                      const qty = e.target.value
+                      const unit = parseFloat(editSubForm.customer_price_unit) || 0
+                      const total = unit ? String((parseFloat(qty) || 0) * unit) : editSubForm.customer_price_total
+                      setEditSubForm(p => ({ ...p, quantity: qty, customer_price_total: total }))
+                    }}
+                    className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Unit Price</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fp-muted text-sm">$</span>
+                    <input type="number" min="0" step="0.01" value={editSubForm.customer_price_unit}
+                      onChange={e => {
+                        const unit = e.target.value
+                        const qty = parseFloat(editSubForm.quantity) || 1
+                        setEditSubForm(p => ({ ...p, customer_price_unit: unit, customer_price_total: String((parseFloat(unit) || 0) * qty) }))
+                      }}
+                      placeholder="0.00"
+                      className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Total Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-fp-muted text-sm">$</span>
+                  <input type="number" min="0" step="0.01" value={editSubForm.customer_price_total}
+                    onChange={e => setEditSubForm(p => ({ ...p, customer_price_total: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg pl-7 pr-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Frequency</label>
+                  <select value={editSubForm.billing_frequency} onChange={e => setEditSubForm(p => ({ ...p, billing_frequency: e.target.value }))}
+                    className={inputClass}>
+                    <option value="Monthly">Monthly</option>
+                    <option value="Quarterly">Quarterly</option>
+                    <option value="Annual">Annual</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Renewal Date</label>
+                  <input type="date" value={editSubForm.renewal_date} onChange={e => setEditSubForm(p => ({ ...p, renewal_date: e.target.value }))}
+                    className={inputClass} />
+                </div>
+              </div>
+              <div className="flex items-center justify-between bg-fp-inset rounded-lg px-3 py-2">
+                <div>
+                  <p className="text-fp-text text-sm font-medium">Auto-Invoice</p>
+                  <p className="text-fp-muted text-xs">Automatically create an invoice on each cycle</p>
+                </div>
+                <button onClick={() => setEditSubForm(p => ({ ...p, auto_invoice: !p.auto_invoice }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0 ${editSubForm.auto_invoice ? 'bg-blue-500' : 'bg-fp-border'}`}>
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editSubForm.auto_invoice ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+              {editSubForm.auto_invoice && (
+                <div>
+                  <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-1 block">Next Invoice Date</label>
+                  <input type="date" value={editSubForm.next_invoice_date} onChange={e => setEditSubForm(p => ({ ...p, next_invoice_date: e.target.value }))}
+                    className={inputClass} />
+                  <p className="text-fp-muted text-xs mt-1">Invoice will be created on this date and advance by billing frequency each cycle.</p>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setEditingSub(null)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+              <button onClick={saveEditSub} disabled={savingSub}
+                className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                {savingSub ? 'Saving...' : 'Save Changes'}
+              </button>
             </div>
           </div>
         </div>
