@@ -267,14 +267,17 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     setSlaMode(null)
     setSelectedSlaContractId(null)
 
-    // Always re-fetch from DB for fresh line_items / labor_items / client_id
-    const { data: freshTicket } = await supabase
+    // Re-fetch from DB without nested join (simpler query is more reliable)
+    const { data: freshTicket, error: ticketFetchErr } = await supabase
       .from('service_tickets')
-      .select('id, ticket_number, title, status, client_id, line_items, labor_items, clients(company, client_name, payment_method, net_terms)')
+      .select('id, ticket_number, title, status, client_id, line_items, labor_items')
       .eq('id', ticketId)
       .single()
+    if (ticketFetchErr) console.error('Ticket re-fetch error:', ticketFetchErr)
 
-    const ticket = freshTicket || serviceTickets.find(t => t.id === ticketId) || null
+    // Merge fresh data with cached ticket (cached has clients join for net_terms/payment_method)
+    const cachedTicket = serviceTickets.find(t => t.id === ticketId) || null
+    const ticket = freshTicket ? { ...cachedTicket, ...freshTicket } : cachedTicket
     setSelectedTicket(ticket)
 
     if (!ticket) { setLineItems([]); setClientPaymentMethod(''); return }
@@ -284,13 +287,14 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
     // Look up active SLA contracts for this client
     if (ticket.client_id) {
-      const { data: slaRows } = await supabase
+      const { data: slaRows, error: slaErr } = await supabase
         .from('contracts')
         .select('id, name, labor_rate, emergency_rate, maintenance_calls_per_year, start_date, end_date, billing_frequency')
-        .eq('org_id', profile.org_id)
         .eq('client_id', ticket.client_id)
         .eq('type', 'sla')
         .eq('status', 'Active')
+      if (slaErr) console.error('SLA contracts fetch error:', slaErr)
+      console.log('SLA lookup — client_id:', ticket.client_id, 'rows found:', slaRows?.length ?? 0)
       if (slaRows?.length) {
         setTicketSlaContracts(slaRows)
         setSelectedSlaContractId(slaRows[0].id)
