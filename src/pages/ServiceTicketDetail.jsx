@@ -45,6 +45,9 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const [photoCategory, setPhotoCategory] = useState('Other')
   const [showSignaturePad, setShowSignaturePad] = useState(false)
   const [savingSignature,  setSavingSignature]  = useState(false)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [notesDraft, setNotesDraft] = useState('')
+  const [savingNotesEdit, setSavingNotesEdit] = useState(false)
 
   useEffect(() => { if (profile?.org_id) fetchAll() }, [id, profile?.org_id])
 
@@ -208,6 +211,15 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     setTicket(prev => ({ ...prev, notes: updated }))
     setNewNote('')
     setSavingNote(false)
+  }
+
+  const saveNotesEdit = async () => {
+    setSavingNotesEdit(true)
+    const updated = notesDraft.trim() || null
+    await supabase.from('service_tickets').update({ notes: updated }).eq('id', id)
+    setTicket(prev => ({ ...prev, notes: updated }))
+    setEditingNotes(false)
+    setSavingNotesEdit(false)
   }
 
   const saveItems = async () => {
@@ -811,33 +823,63 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
             )}
 
             <div className="bg-fp-card rounded-xl p-6">
-              <h3 className="text-fp-text font-bold mb-4">Notes & Activity</h3>
-              <div className="flex gap-3 mb-5">
-                <input type="text" value={newNote} onChange={e => setNewNote(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && addNote()}
-                  placeholder="Add a note or update..."
-                  className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
-                <button onClick={addNote} disabled={savingNote || !newNote.trim()}
-                  className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {savingNote ? '...' : 'Add'}
-                </button>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-fp-text font-bold">Notes & Activity</h3>
+                {!editingNotes && noteLines.length > 0 && (
+                  <button
+                    onClick={() => { setNotesDraft(ticket?.notes || ''); setEditingNotes(true) }}
+                    className="text-fp-muted hover:text-fp-text text-xs transition-colors">
+                    Edit Notes
+                  </button>
+                )}
               </div>
-              {noteLines.length === 0 ? (
-                <p className="text-fp-muted text-sm italic">No notes yet.</p>
-              ) : (
+
+              {editingNotes ? (
                 <div className="space-y-3">
-                  {noteLines.map((note, i) => {
-                    const match = note.match(/^\[(.+?)\] (.+)$/s)
-                    const meta = match ? match[1] : null
-                    const body = match ? match[2] : note
-                    return (
-                      <div key={i} className="bg-fp-inset rounded-lg p-4 border border-fp-border">
-                        {meta && <p className="text-fp-muted text-xs mb-1.5">{meta}</p>}
-                        <p className="text-fp-text text-sm whitespace-pre-wrap">{body}</p>
-                      </div>
-                    )
-                  })}
+                  <textarea
+                    value={notesDraft}
+                    onChange={e => setNotesDraft(e.target.value)}
+                    rows={10}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y font-mono"
+                  />
+                  <div className="flex gap-3">
+                    <button onClick={() => setEditingNotes(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+                    <button onClick={saveNotesEdit} disabled={savingNotesEdit}
+                      className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                      {savingNotesEdit ? 'Saving...' : 'Save Notes'}
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <div className="flex gap-3 mb-5">
+                    <input type="text" value={newNote} onChange={e => setNewNote(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && addNote()}
+                      placeholder="Add a note or update..."
+                      className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
+                    <button onClick={addNote} disabled={savingNote || !newNote.trim()}
+                      className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                      {savingNote ? '...' : 'Add'}
+                    </button>
+                  </div>
+                  {noteLines.length === 0 ? (
+                    <p className="text-fp-muted text-sm italic">No notes yet.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {noteLines.map((note, i) => {
+                        const match = note.match(/^\[(.+?)\] (.+)$/s)
+                        const meta = match ? match[1] : null
+                        const body = match ? match[2] : note
+                        return (
+                          <div key={i} className="bg-fp-inset rounded-lg p-4 border border-fp-border">
+                            {meta && <p className="text-fp-muted text-xs mb-1.5">{meta}</p>}
+                            <p className="text-fp-text text-sm whitespace-pre-wrap">{body}</p>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

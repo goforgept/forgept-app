@@ -14,6 +14,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
   const [filterJob, setFilterJob] = useState('all')
   const [filterTech, setFilterTech] = useState('all')
   const [filterDate, setFilterDate] = useState('all')
+  const [filterType, setFilterType] = useState('all')
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
@@ -49,11 +50,14 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
   const [stMaterials, setStMaterials] = useState([])
   const [stSummary, setStSummary] = useState('')
+  const [inventoryItems, setInventoryItems] = useState([])
+  const [stInventoryPulls, setStInventoryPulls] = useState([]) // [{item, qty_used}]
+  const [inventorySearch, setInventorySearch] = useState('')
 
   useEffect(() => { if (profile?.org_id) fetchAll() }, [profile?.org_id])
 
   const fetchAll = async () => {
-    const [jobsRes, logsRes, orgRes, ticketsRes, ratesRes] = await Promise.all([
+    const [jobsRes, logsRes, orgRes, ticketsRes, ratesRes, inventoryRes] = await Promise.all([
       supabase
         .from('jobs')
         .select('id, name, job_number, status, clients(company)')
@@ -74,7 +78,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
       supabase
         .from('organizations')
-        .select('service_billing_mode, trip_fee_default, drive_time_rate_default')
+        .select('service_billing_mode, trip_fee_default, drive_time_rate_default, default_markup_percent')
         .eq('id', profile.org_id)
         .single(),
 
@@ -93,7 +97,14 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
         .from('labor_rates')
         .select('id, role, bill_rate_per_hour')
         .eq('org_id', profile.org_id)
-        .order('sort_order')
+        .order('sort_order'),
+
+      supabase
+        .from('inventory_items')
+        .select('id, part_number, description, qty_on_hand, unit_cost')
+        .eq('org_id', profile.org_id)
+        .gt('qty_on_hand', 0)
+        .order('description')
     ])
 
     setJobs(jobsRes.data || [])
@@ -101,6 +112,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     setLaborRates(ratesRes.data || [])
     setOrgServiceSettings(orgRes.data || {})
     setServiceTickets(ticketsRes.data || [])
+    setInventoryItems(inventoryRes.data || [])
     setLoading(false)
   }
 
@@ -189,6 +201,8 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
     setStMaterials([])
     setStSummary('')
+    setStInventoryPulls([])
+    setInventorySearch('')
     setShowForm(true)
     if (jobId) handleJobSelect(jobId)
   }
@@ -259,6 +273,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     const billingMode = orgServiceSettings.service_billing_mode || 'none'
     const driveRate = parseFloat(orgServiceSettings.drive_time_rate_default) || 0
     const tripFeeAmount = parseFloat(orgServiceSettings.trip_fee_default) || 0
+    const defaultMarkup = parseFloat(orgServiceSettings.default_markup_percent) || 0
 
     // Fetch current ticket state
     const { data: ticket } = await supabase
@@ -320,10 +335,45 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
         quantity: parseFloat(mat.qty) || 1,
         unit: mat.unit || 'ea',
         your_cost_unit: '',
-        markup_percent: 0,
+        markup_percent: defaultMarkup,
         customer_price_unit: ''
       })
     })
+
+    // Inventory pulls — add to line items, deduct stock, record transactions
+    const validPulls = stInventoryPulls.filter(p => parseFloat(p.qty_used) > 0)
+    for (const pull of validPulls) {
+      const qtyUsed = parseFloat(pull.qty_used)
+      const unitCost = parseFloat(pull.item.unit_cost) || 0
+      const billRate = unitCost > 0 ? +(unitCost * (1 + defaultMarkup / 100)).toFixed(2) : 0
+      newLineItems.push({
+        id: crypto.randomUUID(),
+        item_name: pull.item.part_number
+          ? `${pull.item.description} (${pull.item.part_number})`
+          : pull.item.description,
+        quantity: qtyUsed,
+        unit: 'ea',
+        your_cost_unit: unitCost > 0 ? String(unitCost) : '',
+        markup_percent: defaultMarkup,
+        customer_price_unit: billRate > 0 ? String(billRate) : ''
+      })
+      // Deduct from inventory
+      await supabase
+        .from('inventory_items')
+        .update({ qty_on_hand: pull.item.qty_on_hand - qtyUsed })
+        .eq('id', pull.item.id)
+      // Record transaction
+      await supabase.from('inventory_transactions').insert({
+        org_id: profile.org_id,
+        inventory_item_id: pull.item.id,
+        service_ticket_id: stTicketId,
+        type: 'service_ticket',
+        quantity: -qtyUsed,
+        unit_cost: unitCost || null,
+        created_by: profile.id,
+        notes: `Service ticket pull`
+      })
+    }
 
     // Build note entry
     const timestamp = new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -339,7 +389,9 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
     // Save to tech_daily_logs for time tracking
     const totalHoursLogged = laborHours + driveHours
-    const matSummary = stMaterials.filter(m => m.name.trim()).map(m => `${m.name} (${m.qty || 1} ${m.unit || 'ea'})`).join(', ')
+    const adHocSummary = stMaterials.filter(m => m.name.trim()).map(m => `${m.name} (${m.qty || 1} ${m.unit || 'ea'})`)
+    const invSummary = validPulls.map(p => `${p.item.description}${p.item.part_number ? ` [${p.item.part_number}]` : ''} (${p.qty_used} ea)`)
+    const matSummary = [...adHocSummary, ...invSummary].join(', ')
     const { data: logData } = await supabase.from('tech_daily_logs').insert({
       service_ticket_id: stTicketId,
       org_id: profile.org_id,
@@ -420,6 +472,8 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
   const [dateFrom, dateTo] = getDateBounds()
 
   const filteredLogs = logs.filter(l => {
+    if (filterType === 'job' && l.service_ticket_id) return false
+    if (filterType === 'ticket' && !l.service_ticket_id) return false
     if (filterJob !== 'all' && l.job_id !== filterJob) return false
     if (filterTech !== 'all' && l.user_id !== filterTech) return false
     if (dateFrom && l.log_date < dateFrom) return false
@@ -571,6 +625,12 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
         <div className="flex gap-3 items-center flex-wrap">
           <input type="text" placeholder="Search summary, job, ticket, tech, client..." value={search} onChange={e => setSearch(e.target.value)}
             className="flex-1 min-w-48 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-fp-muted" />
+          <select value={filterType} onChange={e => setFilterType(e.target.value)}
+            className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand cursor-pointer">
+            <option value="all">All Types</option>
+            <option value="job">Jobs</option>
+            <option value="ticket">Service Tickets</option>
+          </select>
           <select value={filterJob} onChange={e => setFilterJob(e.target.value)}
             className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand cursor-pointer">
             <option value="all">All Jobs</option>
@@ -591,8 +651,8 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
             <option value="this_month">This Month</option>
             <option value="last_month">Last Month</option>
           </select>
-          {(search || filterJob !== 'all' || filterTech !== 'all' || filterDate !== 'all') && (
-            <button onClick={() => { setSearch(''); setFilterJob('all'); setFilterTech('all'); setFilterDate('all') }}
+          {(search || filterType !== 'all' || filterJob !== 'all' || filterTech !== 'all' || filterDate !== 'all') && (
+            <button onClick={() => { setSearch(''); setFilterType('all'); setFilterJob('all'); setFilterTech('all'); setFilterDate('all') }}
               className="text-fp-muted hover:text-fp-text text-xs transition-colors">Clear</button>
           )}
         </div>
@@ -1072,44 +1132,91 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                   )}
                 </div>
 
-                {/* Materials */}
+                {/* Inventory Pull */}
+                {inventoryItems.length > 0 && (
+                  <div>
+                    <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2 block">From Inventory</label>
+                    <input
+                      type="text"
+                      value={inventorySearch}
+                      onChange={e => setInventorySearch(e.target.value)}
+                      placeholder="Search by part # or description..."
+                      className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0] mb-2"
+                    />
+                    {inventorySearch.trim() && (() => {
+                      const q = inventorySearch.toLowerCase()
+                      const results = inventoryItems.filter(item =>
+                        !stInventoryPulls.find(p => p.item.id === item.id) &&
+                        ((item.description || '').toLowerCase().includes(q) || (item.part_number || '').toLowerCase().includes(q))
+                      ).slice(0, 6)
+                      return results.length > 0 ? (
+                        <div className="bg-fp-inset border border-fp-border rounded-lg overflow-hidden mb-2">
+                          {results.map(item => (
+                            <button key={item.id} onClick={() => {
+                              setStInventoryPulls(prev => [...prev, { item, qty_used: '' }])
+                              setInventorySearch('')
+                            }} className="w-full flex items-center justify-between px-3 py-2 text-sm hover:bg-fp-card transition-colors border-b border-fp-border/50 last:border-0 text-left">
+                              <span className="text-fp-text">{item.description}{item.part_number && <span className="text-fp-muted ml-2 text-xs font-mono">{item.part_number}</span>}</span>
+                              <span className="text-fp-muted text-xs shrink-0 ml-2">{item.qty_on_hand} on hand</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : <p className="text-fp-muted text-xs mb-2">No inventory items match.</p>
+                    })()}
+                    {stInventoryPulls.length > 0 && (
+                      <div className="space-y-2">
+                        {stInventoryPulls.map((pull, i) => {
+                          const qtyUsed = parseFloat(pull.qty_used) || 0
+                          const over = qtyUsed > pull.item.qty_on_hand
+                          return (
+                            <div key={pull.item.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 border ${over ? 'bg-red-500/5 border-red-500/30' : 'bg-fp-inset border-fp-border'}`}>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-fp-text text-sm truncate">{pull.item.description}</p>
+                                {pull.item.part_number && <p className="text-fp-muted text-xs font-mono">{pull.item.part_number}</p>}
+                              </div>
+                              <span className="text-fp-muted text-xs shrink-0">{pull.item.qty_on_hand} on hand</span>
+                              <input
+                                type="number"
+                                value={pull.qty_used}
+                                onChange={e => setStInventoryPulls(prev => prev.map((p, idx) => idx === i ? { ...p, qty_used: e.target.value } : p))}
+                                placeholder="Qty"
+                                min="0"
+                                step="any"
+                                className={`w-16 bg-fp-card text-fp-text border rounded px-2 py-1 text-sm focus:outline-none text-right ${over ? 'border-red-500 focus:border-red-400' : 'border-fp-border focus:border-fp-brand'}`}
+                              />
+                              <button onClick={() => setStInventoryPulls(prev => prev.filter((_, idx) => idx !== i))} className="text-fp-muted hover:text-red-400 text-xs transition-colors shrink-0">✕</button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                    {stInventoryPulls.length === 0 && !inventorySearch.trim() && (
+                      <p className="text-fp-muted text-xs italic">Search above to pull from inventory stock.</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Ad Hoc Materials */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Materials Used</label>
-                    <button onClick={addStMaterial}
-                      className="text-fp-brand text-xs font-semibold hover:underline">
-                      + Add Item
-                    </button>
+                    <label className="text-fp-muted text-xs font-semibold uppercase tracking-wide">Other Materials</label>
+                    <button onClick={addStMaterial} className="text-fp-brand text-xs font-semibold hover:underline">+ Add Item</button>
                   </div>
                   {stMaterials.length === 0 ? (
-                    <p className="text-fp-muted text-xs italic">No materials — click Add Item if parts were used.</p>
+                    <p className="text-fp-muted text-xs italic">Add any parts not in inventory.</p>
                   ) : (
                     <div className="space-y-2">
                       {stMaterials.map(mat => (
                         <div key={mat.id} className="flex items-center gap-2 bg-fp-inset rounded-lg px-3 py-2">
-                          <input
-                            type="text"
-                            value={mat.name}
-                            onChange={e => updateStMaterial(mat.id, 'name', e.target.value)}
+                          <input type="text" value={mat.name} onChange={e => updateStMaterial(mat.id, 'name', e.target.value)}
                             placeholder="Item name"
-                            className="flex-1 bg-transparent text-fp-text text-sm focus:outline-none placeholder-[#8A9AB0]"
-                          />
-                          <input
-                            type="number"
-                            value={mat.qty}
-                            onChange={e => updateStMaterial(mat.id, 'qty', e.target.value)}
-                            placeholder="Qty"
-                            min="0"
-                            step="any"
-                            className="w-16 bg-fp-card text-fp-text border border-fp-border rounded px-2 py-1 text-sm focus:outline-none focus:border-fp-brand text-right"
-                          />
-                          <input
-                            type="text"
-                            value={mat.unit}
-                            onChange={e => updateStMaterial(mat.id, 'unit', e.target.value)}
+                            className="flex-1 bg-transparent text-fp-text text-sm focus:outline-none placeholder-[#8A9AB0]" />
+                          <input type="number" value={mat.qty} onChange={e => updateStMaterial(mat.id, 'qty', e.target.value)}
+                            placeholder="Qty" min="0" step="any"
+                            className="w-16 bg-fp-card text-fp-text border border-fp-border rounded px-2 py-1 text-sm focus:outline-none focus:border-fp-brand text-right" />
+                          <input type="text" value={mat.unit} onChange={e => updateStMaterial(mat.id, 'unit', e.target.value)}
                             placeholder="ea"
-                            className="w-14 bg-fp-card text-fp-text border border-fp-border rounded px-2 py-1 text-sm focus:outline-none focus:border-fp-brand text-center"
-                          />
+                            className="w-14 bg-fp-card text-fp-text border border-fp-border rounded px-2 py-1 text-sm focus:outline-none focus:border-fp-brand text-center" />
                           <button onClick={() => removeStMaterial(mat.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors shrink-0">✕</button>
                         </div>
                       ))}
