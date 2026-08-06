@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -37,6 +37,18 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   const [orgServiceBilling, setOrgServiceBilling] = useState({ mode: 'none', tripFee: 0, driveRate: 0 })
 
   useEffect(() => { if (profile?.org_id) fetchData() }, [profile?.org_id])
+
+  useEffect(() => {
+    if (slaMode !== 'billable') return
+    const contract = ticketSlaContracts.find(c => c.id === selectedSlaContractId)
+    if (!contract?.labor_rate) return
+    const rate = parseFloat(contract.labor_rate)
+    setLineItems(prev => prev.map(item => {
+      if (!item._isLabor) return item
+      const hours = parseFloat(item.quantity) || 1
+      return { ...item, unit_price: rate, total: Math.round(hours * rate * 100) / 100 }
+    }))
+  }, [slaMode, selectedSlaContractId])
 
   const fetchData = async () => {
     const defaultRate = profile?.organizations?.default_tax_rate ?? ''
@@ -308,17 +320,20 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     const ticketLabor = ticket.labor_items || []
     if (ticketLabor.length > 0) {
       ticketLabor.forEach(l => {
-        if (l.role) items.push({
-          description: l.role,
-          quantity: parseFloat(l.quantity) || 1,
-          unit_price: parseFloat(l.quantity) > 0
-            ? (parseFloat(l.customer_price) || 0) / parseFloat(l.quantity)
-            : parseFloat(l.customer_price) || 0,
-          total: parseFloat(l.customer_price) || 0
-        })
+        if (l.role) {
+          const hours = parseFloat(l.quantity) || 1
+          const unitPrice = hours > 0 ? (parseFloat(l.customer_price) || 0) / hours : parseFloat(l.customer_price) || 0
+          items.push({
+            description: l.role,
+            quantity: hours,
+            unit_price: unitPrice,
+            total: parseFloat(l.customer_price) || 0,
+            _isLabor: true,
+          })
+        }
       })
     } else if ((mode === 'drive_time' || mode === 'both') && driveRate > 0) {
-      items.push({ description: 'Drive Time', quantity: 1, unit_price: driveRate, total: driveRate })
+      items.push({ description: 'Drive Time', quantity: 1, unit_price: driveRate, total: driveRate, _isLabor: true })
     }
 
     setLineItems(items)
@@ -402,7 +417,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     }
     if (allItems.length > 0) {
       await supabase.from('invoice_line_items').insert(
-        allItems.map(i => ({
+        allItems.map(({ _isLabor, ...i }) => ({
           invoice_id: inv.id,
           description: i.description,
           quantity: parseFloat(i.quantity) || 1,
@@ -592,8 +607,11 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
               {lineItems.map((item, i) => (
                 <tr key={i} className="border-b border-fp-border/30">
                   <td className="pr-3 py-1">
-                    <input type="text" value={item.description} onChange={e => updateLine(i, 'description', e.target.value)}
-                      placeholder="Description" className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                    <div className="flex items-center gap-1.5">
+                      {item._isLabor && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-semibold flex-shrink-0">Labor</span>}
+                      <input type="text" value={item.description} onChange={e => updateLine(i, 'description', e.target.value)}
+                        placeholder="Description" className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                    </div>
                   </td>
                   <td className="pr-3 py-1">
                     <input type="number" value={item.quantity} onChange={e => updateLine(i, 'quantity', e.target.value)}
