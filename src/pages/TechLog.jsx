@@ -78,7 +78,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
       supabase
         .from('organizations')
-        .select('service_billing_mode, trip_fee_default, drive_time_rate_default, default_markup_percent')
+        .select('service_billing_mode, trip_fee_default, drive_time_rate_default')
         .eq('id', profile.org_id)
         .single(),
 
@@ -273,7 +273,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     const billingMode = orgServiceSettings.service_billing_mode || 'none'
     const driveRate = parseFloat(orgServiceSettings.drive_time_rate_default) || 0
     const tripFeeAmount = parseFloat(orgServiceSettings.trip_fee_default) || 0
-    const defaultMarkup = parseFloat(orgServiceSettings.default_markup_percent) || 0
+    const defaultMarkup = parseFloat(profile?.default_markup_percent) || 0
 
     // Fetch current ticket state
     const { data: ticket } = await supabase
