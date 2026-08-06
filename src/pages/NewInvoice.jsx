@@ -15,6 +15,10 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   const [selectedTicket, setSelectedTicket] = useState(null)
   const [saving, setSaving] = useState(false)
   const [orgDefaultTaxRate, setOrgDefaultTaxRate] = useState('')
+  const [ticketSlaContracts, setTicketSlaContracts] = useState([])
+  const [slaVisitsUsed, setSlaVisitsUsed] = useState({})
+  const [slaMode, setSlaMode] = useState(null) // null | 'covered' | 'billable'
+  const [selectedSlaContractId, setSelectedSlaContractId] = useState(null)
   const [form, setForm] = useState({
     proposal_id: '',
     service_ticket_id: '',
@@ -62,7 +66,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
     const { data: tickets } = await supabase
       .from('service_tickets')
-      .select('id, ticket_number, title, status, line_items, labor_items, clients(company, client_name, payment_method, net_terms)')
+      .select('id, ticket_number, title, status, client_id, line_items, labor_items, clients(company, client_name, payment_method, net_terms)')
       .eq('org_id', profile.org_id)
       .neq('status', 'Cancelled')
       .order('created_at', { ascending: false })
@@ -227,16 +231,59 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     setIncludedContractFees(initIncluded)
   }
 
-  const loadTicketItems = (ticketId) => {
+  const getContractYearStart = (startDateStr) => {
+    if (!startDateStr) return new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]
+    const now = new Date()
+    let yearStart = new Date(startDateStr)
+    while (true) {
+      const next = new Date(yearStart)
+      next.setFullYear(next.getFullYear() + 1)
+      if (next > now) break
+      yearStart = next
+    }
+    return yearStart.toISOString().split('T')[0]
+  }
+
+  const loadTicketItems = async (ticketId) => {
     const ticket = serviceTickets.find(t => t.id === ticketId)
     setSelectedTicket(ticket || null)
     setSelectedProposal(null)
     setIncludedCOs([])
+    setTicketSlaContracts([])
+    setSlaVisitsUsed({})
+    setSlaMode(null)
+    setSelectedSlaContractId(null)
 
     if (!ticket) { setLineItems([]); setClientPaymentMethod(''); return }
 
     applyClientTerms(ticket.clients)
     setForm(prev => ({ ...prev, description: ticket.title || '', tax_percent: orgDefaultTaxRate || '0' }))
+
+    // Look up active SLA contracts for this client
+    if (ticket.client_id) {
+      const { data: slaRows } = await supabase
+        .from('contracts')
+        .select('id, name, labor_rate, emergency_rate, maintenance_calls_per_year, start_date, end_date, billing_frequency')
+        .eq('client_id', ticket.client_id)
+        .eq('type', 'sla')
+        .eq('status', 'Active')
+      if (slaRows?.length) {
+        setTicketSlaContracts(slaRows)
+        setSelectedSlaContractId(slaRows[0].id)
+        const usedMap = {}
+        for (const c of slaRows) {
+          const yearStart = getContractYearStart(c.start_date)
+          const { count } = await supabase
+            .from('invoices')
+            .select('id', { count: 'exact', head: true })
+            .eq('contract_id', c.id)
+            .eq('is_sla_visit', true)
+            .gte('issued_date', yearStart)
+          usedMap[c.id] = count || 0
+        }
+        setSlaVisitsUsed(usedMap)
+      }
+    }
 
     const items = []
     const { mode, tripFee, driveRate } = orgServiceBilling
@@ -284,10 +331,10 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     else { setSelectedProposal(null); setLineItems([]); setClientPaymentMethod('') }
   }
 
-  const handleTicketChange = (ticketId) => {
+  const handleTicketChange = async (ticketId) => {
     setForm(prev => ({ ...prev, service_ticket_id: ticketId, proposal_id: '' }))
-    if (ticketId) loadTicketItems(ticketId)
-    else { setSelectedTicket(null); setLineItems([]); setClientPaymentMethod('') }
+    if (ticketId) await loadTicketItems(ticketId)
+    else { setSelectedTicket(null); setLineItems([]); setClientPaymentMethod(''); setTicketSlaContracts([]); setSlaMode(null) }
   }
 
   const updateLine = (i, field, value) => {
@@ -317,20 +364,25 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
 
     const { data: invoiceNumber } = await supabase.rpc('get_next_invoice_number', { org_id_input: profile.org_id })
 
+    const isCovered = slaMode === 'covered'
+    const invoiceTotal = isCovered ? 0 : total
+
     const { data: inv, error } = await supabase.from('invoices').insert({
       org_id: profile.org_id,
       proposal_id: form.proposal_id || null,
       service_ticket_id: form.service_ticket_id || null,
+      contract_id: isCovered ? selectedSlaContractId : null,
+      is_sla_visit: isCovered,
       invoice_number: invoiceNumber,
       status: 'Draft',
       issued_date: form.issued_date,
       due_date: form.due_date || null,
-      subtotal,
-      tax_percent: parseFloat(form.tax_percent) || 0,
-      tax_amount: taxAmount,
-      total,
+      subtotal: isCovered ? 0 : subtotal,
+      tax_percent: isCovered ? 0 : parseFloat(form.tax_percent) || 0,
+      tax_amount: isCovered ? 0 : taxAmount,
+      total: invoiceTotal,
       amount_paid: 0,
-      balance_due: total,
+      balance_due: invoiceTotal,
       description: form.description,
       notes: form.notes
     }).select().single()
@@ -341,7 +393,10 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       .filter(f => includedContractFees[f.key])
       .map(f => ({ description: f.label, quantity: 1, unit_price: f.amount, total: f.amount }))
 
-    const allItems = [...lineItems.filter(i => i.description), ...selectedFeeItems]
+    const slaContract = ticketSlaContracts.find(c => c.id === selectedSlaContractId)
+    const allItems = isCovered
+      ? [{ description: `SLA Covered Visit — ${slaContract?.name || 'Service Agreement'}`, quantity: 1, unit_price: 0, total: 0 }]
+      : [...lineItems.filter(i => i.description), ...selectedFeeItems]
     if (ccFeeAmount > 0) {
       allItems.push({ description: `Credit Card Service Fee (${ccFeePercent}%)`, quantity: 1, unit_price: ccFeeAmount, total: ccFeeAmount })
     }
@@ -441,6 +496,63 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
                     {(!selectedTicket.line_items?.length && !selectedTicket.labor_items?.length) && ' — no labor or materials logged yet on this ticket'}
                   </p>
                 )}
+                {selectedTicket && ticketSlaContracts.length > 0 && (() => {
+                  const contract = ticketSlaContracts.find(c => c.id === selectedSlaContractId) || ticketSlaContracts[0]
+                  const visitsUsed = slaVisitsUsed[contract?.id] || 0
+                  const visitsIncluded = contract?.maintenance_calls_per_year || 0
+                  const visitsRemaining = Math.max(0, visitsIncluded - visitsUsed)
+                  const isCovered = visitsRemaining > 0
+                  return (
+                    <div className="mt-3 bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <p className="text-blue-400 font-semibold text-sm">Active SLA Contract</p>
+                          {ticketSlaContracts.length > 1 ? (
+                            <select value={selectedSlaContractId || ''} onChange={e => setSelectedSlaContractId(e.target.value)}
+                              className="mt-1 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
+                              {ticketSlaContracts.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            </select>
+                          ) : (
+                            <p className="text-fp-muted text-xs mt-0.5">{contract?.name}</p>
+                          )}
+                        </div>
+                        <div className={`text-xs font-bold px-2 py-1 rounded ${visitsRemaining > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {visitsRemaining > 0 ? `${visitsRemaining} visit${visitsRemaining !== 1 ? 's' : ''} remaining` : 'No visits remaining'}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3 mb-4 text-xs">
+                        <div className="bg-fp-card rounded-lg px-3 py-2">
+                          <p className="text-fp-muted mb-0.5">Labor Rate</p>
+                          <p className="text-fp-text font-bold">{contract?.labor_rate ? `$${contract.labor_rate}/hr` : '—'}</p>
+                        </div>
+                        <div className="bg-fp-card rounded-lg px-3 py-2">
+                          <p className="text-fp-muted mb-0.5">Emergency Rate</p>
+                          <p className="text-fp-text font-bold">{contract?.emergency_rate ? `$${contract.emergency_rate}/hr` : '—'}</p>
+                        </div>
+                        <div className="bg-fp-card rounded-lg px-3 py-2">
+                          <p className="text-fp-muted mb-0.5">Visits / Year</p>
+                          <p className="text-fp-text font-bold">{visitsUsed} of {visitsIncluded} used</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setSlaMode('covered')}
+                          className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${slaMode === 'covered' ? 'bg-green-600 text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text border border-fp-border'}`}>
+                          {isCovered ? 'SLA Covered ($0)' : 'Use Remaining Visit ($0)'}
+                        </button>
+                        <button onClick={() => setSlaMode('billable')}
+                          className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${slaMode === 'billable' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text border border-fp-border'}`}>
+                          Billable Overage
+                        </button>
+                      </div>
+                      {slaMode === 'covered' && (
+                        <p className="text-green-400 text-xs mt-2">Invoice will be created at $0 and logged as a covered SLA visit.</p>
+                      )}
+                      {slaMode === 'billable' && contract?.labor_rate && (
+                        <p className="text-blue-400 text-xs mt-2">Billable at ${contract.labor_rate}/hr standard · ${contract.emergency_rate || '—'}/hr emergency per SLA terms.</p>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
             )}
 

@@ -856,6 +856,8 @@ export default function ProposalDetail({ isAdmin }) {
         status: 'Active', start_date: c.start_date || null, end_date: c.end_date || null,
         auto_renew: c.auto_renew || false,
         recurring_fee: c.recurring_fee || null, billing_frequency: c.billing_frequency || null,
+        labor_rate: c.labor_rate || null, emergency_rate: c.emergency_rate || null,
+        maintenance_calls_per_year: c.maintenance_calls_per_year || null,
       })),
       ...(monArr || []).map(c => ({
         org_id: proposal?.org_id, proposal_id: id, client_id: proposal?.client_id || null,
