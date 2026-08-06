@@ -68,12 +68,13 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       })
     }
 
-    const { data: props } = await supabase
+    const { data: props, error: propsErr } = await supabase
       .from('proposals')
-      .select('id, proposal_name, company, client_name, total_customer_value, labor_items, client_id, clients(net_terms, payment_method)')
+      .select('id, proposal_name, company, client_name, total_customer_value, labor_items, client_id')
       .eq('org_id', profile.org_id)
       .eq('status', 'Won')
       .order('created_at', { ascending: false })
+    if (propsErr) console.error('Proposals fetch error:', propsErr)
     setProposals(props || [])
 
     const { data: tickets } = await supabase
@@ -154,11 +155,10 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       setAiaWarning(jobData.billing_type === 'AIA')
 
       // Auto-set due date from client NET terms
-      if (jobData.client_id) {
-        const { data: clientData } = await supabase.from('clients').select('net_terms, payment_method').eq('id', jobData.client_id).single()
+      const clientLookupId = jobData.client_id || prop?.client_id
+      if (clientLookupId) {
+        const { data: clientData } = await supabase.from('clients').select('net_terms, payment_method').eq('id', clientLookupId).single()
         applyClientTerms(clientData)
-      } else {
-        applyClientTerms(prop?.clients)
       }
 
       const { data: coData } = await supabase
@@ -197,7 +197,10 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       })
     } else {
       setIncludedCOs([])
-      applyClientTerms(prop?.clients)
+      if (prop?.client_id) {
+        const { data: clientData } = await supabase.from('clients').select('net_terms, payment_method').eq('id', prop.client_id).single()
+        applyClientTerms(clientData)
+      }
     }
 
     setLineItems(items)
