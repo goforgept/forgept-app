@@ -81,7 +81,7 @@ export default function Login() {
           <h1 className="text-fp-text text-4xl font-bold">
             ForgePt<span className="text-[#C8622A]">.</span>
           </h1>
-          <p className="text-fp-muted mt-2">Manage. Propose. Close.</p>
+          <p className="text-fp-muted mt-2">Design it. Scope it. Close it.</p>
         </div>
 
         <div className="bg-fp-card rounded-2xl p-8">
