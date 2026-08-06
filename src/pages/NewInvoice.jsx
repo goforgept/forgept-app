@@ -257,14 +257,22 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
   }
 
   const loadTicketItems = async (ticketId) => {
-    const ticket = serviceTickets.find(t => t.id === ticketId)
-    setSelectedTicket(ticket || null)
     setSelectedProposal(null)
     setIncludedCOs([])
     setTicketSlaContracts([])
     setSlaVisitsUsed({})
     setSlaMode(null)
     setSelectedSlaContractId(null)
+
+    // Always re-fetch from DB for fresh line_items / labor_items / client_id
+    const { data: freshTicket } = await supabase
+      .from('service_tickets')
+      .select('id, ticket_number, title, status, client_id, line_items, labor_items, clients(company, client_name, payment_method, net_terms)')
+      .eq('id', ticketId)
+      .single()
+
+    const ticket = freshTicket || serviceTickets.find(t => t.id === ticketId) || null
+    setSelectedTicket(ticket)
 
     if (!ticket) { setLineItems([]); setClientPaymentMethod(''); return }
 
@@ -276,6 +284,7 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
       const { data: slaRows } = await supabase
         .from('contracts')
         .select('id, name, labor_rate, emergency_rate, maintenance_calls_per_year, start_date, end_date, billing_frequency')
+        .eq('org_id', profile.org_id)
         .eq('client_id', ticket.client_id)
         .eq('type', 'sla')
         .eq('status', 'Active')

@@ -298,7 +298,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
         unit: 'hr',
         your_cost: '',
         markup: 0,
-        customer_price: matchedRate?.bill_rate_per_hour ? String(matchedRate.bill_rate_per_hour) : ''
+        customer_price: matchedRate?.bill_rate_per_hour ? String(matchedRate.bill_rate_per_hour * laborHours) : ''
       })
     }
     const driveHours = parseFloat(stDriveHours) || 0
@@ -310,7 +310,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
         unit: 'hr',
         your_cost: '',
         markup: 0,
-        customer_price: driveRate > 0 ? String(driveRate) : ''
+        customer_price: driveRate > 0 ? String(driveRate * driveHours) : ''
       })
     }
 
