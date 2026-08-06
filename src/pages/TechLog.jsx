@@ -43,6 +43,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
   const [stTicketId, setStTicketId] = useState('')
   const [stDate, setStDate] = useState(new Date().toISOString().split('T')[0])
   const [stLaborRole, setStLaborRole] = useState('Tech Labor')
+  const [laborRates, setLaborRates] = useState([])
   const [stLaborHours, setStLaborHours] = useState('')
   const [stDriveHours, setStDriveHours] = useState('')
 
@@ -52,7 +53,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
   useEffect(() => { if (profile?.org_id) fetchAll() }, [profile?.org_id])
 
   const fetchAll = async () => {
-    const [jobsRes, logsRes, orgRes, ticketsRes] = await Promise.all([
+    const [jobsRes, logsRes, orgRes, ticketsRes, ratesRes] = await Promise.all([
       supabase
         .from('jobs')
         .select('id, name, job_number, status, clients(company)')
@@ -86,11 +87,18 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
           .order('created_at', { ascending: false })
         if (isTechnician) q = q.eq('assigned_tech_id', profile.id)
         return q
-      })()
+      })(),
+
+      supabase
+        .from('labor_rates')
+        .select('id, role, bill_rate_per_hour')
+        .eq('org_id', profile.org_id)
+        .order('sort_order')
     ])
 
     setJobs(jobsRes.data || [])
     setLogs(logsRes.data || [])
+    setLaborRates(ratesRes.data || [])
     setOrgServiceSettings(orgRes.data || {})
     setServiceTickets(ticketsRes.data || [])
     setLoading(false)
@@ -175,7 +183,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     setCoBomUsage({})
     setStTicketId('')
     setStDate(new Date().toISOString().split('T')[0])
-    setStLaborRole('Tech Labor')
+    setStLaborRole(laborRates[0]?.role || '')
     setStLaborHours('')
     setStDriveHours('')
 
@@ -267,6 +275,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     const newLaborItems = [...existingLaborItems]
     const laborHours = parseFloat(stLaborHours) || 0
     if (laborHours > 0) {
+      const matchedRate = laborRates.find(r => r.role === stLaborRole)
       newLaborItems.push({
         id: crypto.randomUUID(),
         role: stLaborRole || 'Tech Labor',
@@ -274,7 +283,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
         unit: 'hr',
         your_cost: '',
         markup: 0,
-        customer_price: ''
+        customer_price: matchedRate?.bill_rate_per_hour ? String(matchedRate.bill_rate_per_hour) : ''
       })
     }
     const driveHours = parseFloat(stDriveHours) || 0
@@ -1030,9 +1039,16 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-fp-muted text-xs mb-1 block">Role</label>
-                      <input type="text" value={stLaborRole} onChange={e => setStLaborRole(e.target.value)}
-                        placeholder="e.g. Tech Labor"
-                        className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
+                      {laborRates.length > 0 ? (
+                        <select value={stLaborRole} onChange={e => setStLaborRole(e.target.value)}
+                          className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                          {laborRates.map(r => <option key={r.id} value={r.role}>{r.role}</option>)}
+                        </select>
+                      ) : (
+                        <input type="text" value={stLaborRole} onChange={e => setStLaborRole(e.target.value)}
+                          placeholder="e.g. Tech Labor"
+                          className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
+                      )}
                     </div>
                     <div>
                       <label className="text-fp-muted text-xs mb-1 block">Hours</label>
@@ -1044,12 +1060,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
                   {showDriveTime && (
                     <div>
-                      <label className="text-fp-muted text-xs mb-1 block">
-                        Drive Time (hrs)
-                        {orgServiceSettings.drive_time_rate_default > 0 && (
-                          <span className="text-fp-muted font-normal ml-1">@ ${orgServiceSettings.drive_time_rate_default}/hr</span>
-                        )}
-                      </label>
+                      <label className="text-fp-muted text-xs mb-1 block">Drive Time (hrs)</label>
                       <input type="number" step="0.25" min="0" value={stDriveHours} onChange={e => setStDriveHours(e.target.value)}
                         placeholder="0"
                         className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
@@ -1057,7 +1068,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                   )}
 
                   {showTripFee && orgServiceSettings.trip_fee_default > 0 && (
-                    <p className="text-fp-muted text-xs">Trip fee (${orgServiceSettings.trip_fee_default}) will be added automatically.</p>
+                    <p className="text-fp-muted text-xs">Trip fee will be added automatically.</p>
                   )}
                 </div>
 
