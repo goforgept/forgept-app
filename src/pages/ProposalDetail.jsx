@@ -402,14 +402,27 @@ export default function ProposalDetail({ isAdmin }) {
   const recalcProposalValue = async (newSlaArr, newMonArr) => {
     const slaArr = newSlaArr ?? slaContracts
     const monArr = newMonArr ?? monitoringContracts
-    const bomTotal = lineItems.reduce((sum, l) => sum + (parseFloat(l.customer_price_total) || 0), 0)
-    const laborTotal = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-    const slaTotal = slaArr.reduce((sum, c) => sum + contractAnnualValue(c.initial_fee, c.recurring_fee, c.billing_frequency), 0)
-    const monTotal = monArr.reduce((sum, c) => sum + (parseFloat(c.monthly_fee) || 0) * 12, 0)
+    const bomRevenue = lineItems.reduce((sum, l) => sum + (parseFloat(l.customer_price_total) || 0), 0)
+    const bomCostTotal = lineItems.reduce((sum, l) => sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 1)), 0)
+    const laborRevenue = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+    const laborCostTotal = (proposal?.labor_items || []).reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+    const slaRevenue = slaArr.reduce((sum, c) => sum + contractAnnualValue(c.initial_fee, c.recurring_fee, c.billing_frequency), 0)
+    const slaCostTotal = slaArr.reduce((sum, c) => sum + contractAnnualValue(c.initial_cost, c.recurring_cost, c.billing_frequency), 0)
+    const monRevenue = monArr.reduce((sum, c) => sum + (parseFloat(c.monthly_fee) || 0) * 12, 0)
+    const monCostTotal = monArr.reduce((sum, c) => sum + (parseFloat(c.monthly_cost) || 0) * 12, 0)
     const taxRateVal = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
-    const taxAmt = Math.round(bomTotal * (taxRateVal / 100) * 100) / 100
-    const newValue = bomTotal + laborTotal + slaTotal + monTotal + taxAmt
-    await supabase.from('proposals').update({ proposal_value: newValue, total_customer_value: newValue }).eq('id', id)
+    const taxAmt = Math.round(bomRevenue * (taxRateVal / 100) * 100) / 100
+    const newValue = bomRevenue + laborRevenue + slaRevenue + monRevenue + taxAmt
+    const newCost = bomCostTotal + laborCostTotal + slaCostTotal + monCostTotal
+    const newMarginDollars = newValue - newCost
+    const newMarginPct = newValue > 0 ? (newMarginDollars / newValue) * 100 : 0
+    await supabase.from('proposals').update({
+      proposal_value: newValue,
+      total_customer_value: newValue,
+      total_your_cost: newCost,
+      total_gross_margin_dollars: newMarginDollars,
+      total_gross_margin_percent: newMarginPct,
+    }).eq('id', id)
   }
 
   const logActivity = async (event, type = 'note') => {
@@ -745,6 +758,7 @@ export default function ProposalDetail({ isAdmin }) {
         labor_rate: c.labor_rate || 100, emergency_rate: c.emergency_rate ?? '',
         maintenance_calls_per_year: c.maintenance_calls_per_year || 0,
         initial_fee: c.initial_fee || 0, recurring_fee: c.recurring_fee || 0,
+        initial_cost: c.initial_cost || 0, recurring_cost: c.recurring_cost || 0,
         body: c.body || '', start_date: c.start_date || '', end_date: c.end_date || '', auto_renew: c.auto_renew || false,
       })
     } else {
@@ -758,6 +772,7 @@ export default function ProposalDetail({ isAdmin }) {
         labor_rate: first.labor_rate || 100, emergency_rate: first.emergency_rate ?? '',
         maintenance_calls_per_year: first.maintenance_calls_per_year || 0,
         initial_fee: first.initial_fee || 0, recurring_fee: first.recurring_fee || 0,
+        initial_cost: first.initial_cost || 0, recurring_cost: first.recurring_cost || 0,
         body: first.body || '', start_date: '', end_date: '', auto_renew: false,
       })
     }
@@ -791,7 +806,7 @@ export default function ProposalDetail({ isAdmin }) {
     if (idx !== null) {
       const c = monitoringContracts[idx]
       setEditMonitoringForm({
-        name: c.name || 'Monitoring Contract', monthly_fee: c.monthly_fee || 49,
+        name: c.name || 'Monitoring Contract', monthly_fee: c.monthly_fee || 49, monthly_cost: c.monthly_cost || '',
         monitored_systems: c.monitored_systems || '', billing_frequency: c.billing_frequency || 'Monthly',
         escalation_contacts: c.escalation_contacts || 2, body: c.body || '',
         start_date: c.start_date || '', end_date: c.end_date || '', auto_renew: c.auto_renew || false,
@@ -800,7 +815,7 @@ export default function ProposalDetail({ isAdmin }) {
       const tmpls = allMonitoringTemplates()
       const first = tmpls[0] || {}
       setEditMonitoringForm({
-        name: first.name || 'Monitoring Contract', monthly_fee: first.monthly_fee || 49,
+        name: first.name || 'Monitoring Contract', monthly_fee: first.monthly_fee || 49, monthly_cost: first.monthly_cost || '',
         monitored_systems: first.monitored_systems || '', billing_frequency: first.billing_frequency || 'Monthly',
         escalation_contacts: first.escalation_contacts || 2, body: first.body || '',
         start_date: '', end_date: '', auto_renew: false,
@@ -2232,9 +2247,11 @@ export default function ProposalDetail({ isAdmin }) {
     const sectionLaborCustomer = editSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
     const sectionLaborCost = editSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0) : 0), 0)
     const slaCustomer = slaContracts.reduce((sum, c) => sum + contractAnnualValue(c.initial_fee, c.recurring_fee, c.billing_frequency), 0)
+    const slaCost = slaContracts.reduce((sum, c) => sum + contractAnnualValue(c.initial_cost, c.recurring_cost, c.billing_frequency), 0)
     const monCustomer = monitoringContracts.reduce((sum, c) => sum + (parseFloat(c.monthly_fee) || 0) * 12, 0)
+    const monCost = monitoringContracts.reduce((sum, c) => sum + (parseFloat(c.monthly_cost) || 0) * 12, 0)
     const totalCustomer = bomCustomer + laborCustomer + sectionLaborCustomer + slaCustomer + monCustomer
-    const totalCost = bomCost + laborCost + sectionLaborCost
+    const totalCost = bomCost + laborCost + sectionLaborCost + slaCost + monCost
     const taxRateVal = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
     const taxAmt = Math.round(bomCustomer * (taxRateVal / 100) * 100) / 100
     const grandTotalWithTax = totalCustomer + taxAmt

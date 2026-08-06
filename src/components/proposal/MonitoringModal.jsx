@@ -42,6 +42,25 @@ export default function MonitoringModal({ editMonitoringForm, setEditMonitoringF
                 className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
             </div>
             <div>
+              <label className="text-fp-muted text-xs mb-1 block">Monthly Cost ($) <span className="text-fp-muted font-normal">your cost</span></label>
+              <input type="number" value={editMonitoringForm.monthly_cost ?? ''} placeholder="0" onChange={e => setEditMonitoringForm(p => ({ ...p, monthly_cost: e.target.value }))}
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+            </div>
+            {(() => {
+              const fee = parseFloat(editMonitoringForm.monthly_fee) || 0
+              const cost = parseFloat(editMonitoringForm.monthly_cost) || 0
+              if (!fee) return null
+              const margin = ((fee - cost) / fee) * 100
+              return (
+                <div className="col-span-2 bg-fp-inset rounded-lg px-4 py-2 flex justify-between items-center">
+                  <span className="text-fp-muted text-xs">Monthly Margin</span>
+                  <span className={`text-sm font-bold ${margin >= 40 ? 'text-green-400' : margin >= 20 ? 'text-yellow-400' : 'text-red-400'}`}>
+                    {margin.toFixed(1)}% (${(fee - cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}/mo)
+                  </span>
+                </div>
+              )
+            })()}
+            <div>
               <label className="text-fp-muted text-xs mb-1 block">Escalation Contacts</label>
               <input type="number" min="1" value={editMonitoringForm.escalation_contacts || ''} onChange={e => setEditMonitoringForm(p => ({ ...p, escalation_contacts: e.target.value }))}
                 className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />

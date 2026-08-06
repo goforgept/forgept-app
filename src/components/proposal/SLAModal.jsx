@@ -68,11 +68,35 @@ export default function SLAModal({ editSLAForm, setEditSLAForm, editingAgreement
               <input type="number" min="0" value={editSLAForm.initial_fee ?? 0} onChange={e => setEditSLAForm(p => ({ ...p, initial_fee: Number(e.target.value) }))}
                 className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
             </div>
-            <div className="col-span-2">
+            <div>
+              <label className="text-fp-muted text-xs mb-1 block">Initial Cost ($) <span className="text-fp-muted font-normal">your cost</span></label>
+              <input type="number" min="0" value={editSLAForm.initial_cost ?? ''} placeholder="0" onChange={e => setEditSLAForm(p => ({ ...p, initial_cost: Number(e.target.value) }))}
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+            </div>
+            <div>
               <label className="text-fp-muted text-xs mb-1 block">Recurring Fee ($) <span className="text-fp-muted font-normal">per billing cycle</span></label>
               <input type="number" min="0" value={editSLAForm.recurring_fee ?? 0} onChange={e => setEditSLAForm(p => ({ ...p, recurring_fee: Number(e.target.value) }))}
                 className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
             </div>
+            <div>
+              <label className="text-fp-muted text-xs mb-1 block">Recurring Cost ($) <span className="text-fp-muted font-normal">your cost / cycle</span></label>
+              <input type="number" min="0" value={editSLAForm.recurring_cost ?? ''} placeholder="0" onChange={e => setEditSLAForm(p => ({ ...p, recurring_cost: Number(e.target.value) }))}
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+            </div>
+            {(() => {
+              const revenue = (parseFloat(editSLAForm.initial_fee) || 0) + (parseFloat(editSLAForm.recurring_fee) || 0)
+              const cost = (parseFloat(editSLAForm.initial_cost) || 0) + (parseFloat(editSLAForm.recurring_cost) || 0)
+              if (!revenue) return null
+              const margin = ((revenue - cost) / revenue) * 100
+              return (
+                <div className="col-span-2 bg-fp-inset rounded-lg px-4 py-2 flex justify-between items-center">
+                  <span className="text-fp-muted text-xs">Margin</span>
+                  <span className={`text-sm font-bold ${margin >= 40 ? 'text-green-400' : margin >= 20 ? 'text-yellow-400' : 'text-red-400'}`}>
+                    {margin.toFixed(1)}% (${(revenue - cost).toLocaleString('en-US', { minimumFractionDigits: 2 })})
+                  </span>
+                </div>
+              )
+            })()}
             <div>
               <label className="text-fp-muted text-xs mb-1 block">Start Date</label>
               <input type="date" value={editSLAForm.start_date || ''} onChange={e => setEditSLAForm(p => ({ ...p, start_date: e.target.value }))}
