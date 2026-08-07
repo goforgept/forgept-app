@@ -380,9 +380,13 @@ export default function IntegrationsTab({
 
   const disconnectStripe = async () => {
     if (!window.confirm('Disconnect Stripe? Existing invoices will still work, but you won\'t be able to send new ones via Stripe.')) return
-    const { data: { user } } = await supabase.auth.getUser()
-    const { data: p } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
-    await supabase.from('organizations').update({ stripe_connect_connected: false, stripe_connect_account_id: null }).eq('id', p.org_id)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-connect-disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+      })
+    } catch (_) { /* DB clear still runs */ }
     setStripeConnected(false)
     setStripeMessage({ type: 'success', text: 'Stripe disconnected.' })
   }

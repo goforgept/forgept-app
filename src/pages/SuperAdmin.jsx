@@ -22,7 +22,7 @@ const ORG_TYPES = [
   { value: 'distributor', label: 'Distributor', desc: 'Dealer management, price lists, quotes' },
 ]
 
-const emptyBillingForm = { plan: 'Trial', billing_status: 'trial', monthly_rate: 0, trial_ends_at: '' }
+const emptyBillingForm = { plan: 'Trial', billing_status: 'trial', monthly_rate: 0, trial_ends_at: '', preferred_payment_method: 'ACH' }
 
 const INDUSTRY_OPTIONS = [
   { key: 'security',    label: 'Security' },
@@ -636,7 +636,8 @@ export default function SuperAdmin() {
       plan: org.plan || 'Trial',
       billing_status: org.billing_status || 'trial',
       monthly_rate: org.monthly_rate || 0,
-      trial_ends_at: org.trial_ends_at ? new Date(org.trial_ends_at).toISOString().split('T')[0] : ''
+      trial_ends_at: org.trial_ends_at ? new Date(org.trial_ends_at).toISOString().split('T')[0] : '',
+      preferred_payment_method: org.preferred_payment_method || 'ACH',
     })
   }
 
@@ -645,7 +646,8 @@ export default function SuperAdmin() {
       plan: billingForm.plan,
       billing_status: billingForm.billing_status,
       monthly_rate: parseFloat(billingForm.monthly_rate) || 0,
-      trial_ends_at: billingForm.trial_ends_at || null
+      trial_ends_at: billingForm.trial_ends_at || null,
+      preferred_payment_method: billingForm.preferred_payment_method || 'ACH',
     }).eq('id', orgId)
     if (!error) {
       setBillingSaved(orgId)
@@ -1172,6 +1174,15 @@ export default function SuperAdmin() {
                           <p className="text-white text-sm font-semibold">${org.monthly_rate || 0}/mo</p>
                         </div>
                       </div>
+                      <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                        <p className="text-[#8A9AB0] text-xs mb-1">Payment Method Preference</p>
+                        <div className="flex items-center justify-between">
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${org.preferred_payment_method === 'Credit Card' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                            {org.preferred_payment_method || 'ACH'}
+                          </span>
+                          <button onClick={() => startEditingBilling(org)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Change</button>
+                        </div>
+                      </div>
 
                       <div className="pt-1 border-t border-[#2a3d55]">
                         <button onClick={() => editingBilling === org.id ? setEditingBilling(null) : startEditingBilling(org)}
@@ -1202,6 +1213,13 @@ export default function SuperAdmin() {
                             <div>
                               <label className="text-[#8A9AB0] text-xs mb-1 block">Trial Ends</label>
                               <input type="date" value={billingForm.trial_ends_at} onChange={e => setBillingForm(p => ({ ...p, trial_ends_at: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                            </div>
+                            <div>
+                              <label className="text-[#8A9AB0] text-xs mb-1 block">Payment Method</label>
+                              <select value={billingForm.preferred_payment_method || 'ACH'} onChange={e => setBillingForm(p => ({ ...p, preferred_payment_method: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                                <option value="ACH">ACH / Bank Transfer</option>
+                                <option value="Credit Card">Credit Card (+3% fee)</option>
+                              </select>
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
