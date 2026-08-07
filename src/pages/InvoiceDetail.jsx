@@ -31,6 +31,9 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
   const [sendingToQbo, setSendingToQbo] = useState(false)
   const [qboError, setQboError] = useState(null)
   const [sendViaQbo, setSendViaQbo] = useState(true)
+  const [stripeConnected, setStripeConnected] = useState(false)
+  const [sendingToStripe, setSendingToStripe] = useState(false)
+  const [stripeError, setStripeError] = useState(null)
   const [copiedLink, setCopiedLink] = useState(false)
   const [editingDueDate, setEditingDueDate] = useState(false)
   const [dueDateValue, setDueDateValue] = useState('')
@@ -90,9 +93,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setDescriptionValue(inv?.description || '')
     setDueDateValue(inv?.due_date || '')
     if (inv?.org_id) {
-      const { data: orgData } = await supabase.from('organizations').select('square_connected, qbo_connected').eq('id', inv.org_id).single()
+      const { data: orgData } = await supabase.from('organizations').select('square_connected, qbo_connected, stripe_connect_connected').eq('id', inv.org_id).single()
       setSquareConnected(orgData?.square_connected || false)
       setQboConnected(orgData?.qbo_connected || false)
+      setStripeConnected(orgData?.stripe_connect_connected || false)
     }
 
     const { data: items } = await supabase
@@ -454,6 +458,22 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000)
   }
 
+  const sendToStripe = async () => {
+    setSendingToStripe(true); setStripeError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-send-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ invoiceId: id }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      await fetchAll()
+    } catch (err) { setStripeError(err.message) }
+    setSendingToStripe(false)
+  }
+
   const saveDescription = async () => {
     await supabase.from('invoices').update({ description: descriptionValue }).eq('id', id)
     setInvoice(prev => ({ ...prev, description: descriptionValue }))
@@ -610,6 +630,19 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                   className="text-red-400 text-xs hover:text-red-300 transition-colors">
                   Delete
                 </button>
+                {stripeConnected && (
+                  invoice?.stripe_invoice_id ? (
+                    <a href={invoice.stripe_hosted_invoice_url} target="_blank" rel="noopener noreferrer"
+                      className="bg-[#635BFF]/10 text-[#635BFF] px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#635BFF]/20 hover:bg-[#635BFF]/20 transition-colors">
+                      ✓ Stripe ↗
+                    </a>
+                  ) : (
+                    <button onClick={sendToStripe} disabled={sendingToStripe}
+                      className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
+                      {sendingToStripe ? 'Sending...' : '🔷 Stripe'}
+                    </button>
+                  )
+                )}
                 {squareConnected && !invoice?.square_invoice_id && (
                   <button onClick={sendToSquare} disabled={sendingToSquare}
                     className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
@@ -649,6 +682,12 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
             </div>
           </div>
 
+          {stripeError && (
+            <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 flex items-center justify-between">
+              <p className="text-red-400 text-sm">Stripe error: {stripeError}</p>
+              <button onClick={() => setStripeError(null)} className="text-fp-muted hover:text-fp-text text-lg leading-none">×</button>
+            </div>
+          )}
           {squareError && (
             <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 flex items-center justify-between">
               <p className="text-red-400 text-sm">Square error: {squareError}</p>

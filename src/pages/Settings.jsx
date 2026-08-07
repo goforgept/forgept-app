@@ -94,6 +94,9 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [squareMerchantId, setSquareMerchantId] = useState('')
   const [connectingSquare, setConnectingSquare] = useState(false)
   const [squareMessage, setSquareMessage] = useState(null)
+  const [stripeConnected, setStripeConnected] = useState(false)
+  const [connectingStripe, setConnectingStripe] = useState(false)
+  const [stripeMessage, setStripeMessage] = useState(null)
   const [googleConnected, setGoogleConnected] = useState(false)
   const [googleEmail, setGoogleEmail] = useState('')
   const [connectingGoogle, setConnectingGoogle] = useState(false)
@@ -162,6 +165,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     }
     if (params.get('square_success')) setSquareMessage({ type: 'success', text: 'Square connected successfully! You can now generate payment links on invoices.' })
     if (params.get('square_error')) setSquareMessage({ type: 'error', text: `Square connection failed: ${params.get('square_error')}` })
+    if (params.get('stripe_connect_success')) { setStripeMessage({ type: 'success', text: 'Stripe connected! Open any invoice and click "Stripe" to send it.' }); setStripeConnected(true) }
+    if (params.get('stripe_connect_error')) setStripeMessage({ type: 'error', text: `Stripe connection failed: ${params.get('stripe_connect_error')}` })
     if (params.get('google_success')) setGoogleMessage({ type: 'success', text: 'Google Calendar connected successfully!' })
     if (params.get('google_error')) setGoogleMessage({ type: 'error', text: `Google connection failed: ${params.get('google_error')}` })
     if (params.get('microsoft_success')) setMicrosoftMessage({ type: 'success', text: 'Microsoft Calendar connected successfully!' })
@@ -253,12 +258,13 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     })
     if (data?.org_id) {
       try {
-        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions, feature_msrp, doc_font, pdf_table_style').eq('id', data.org_id).single()
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions, feature_msrp, doc_font, pdf_table_style, stripe_connect_connected').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
         setOrgTimezone(orgData?.timezone || 'America/Chicago')
         setOrgId(data.org_id)
         setQboConnected(orgData?.qbo_connected || false); setQboCompanyName(orgData?.qbo_company_name || '')
         setSquareConnected(orgData?.square_connected || false); setSquareMerchantId(orgData?.square_merchant_id || '')
+        setStripeConnected(orgData?.stripe_connect_connected || false)
         setInboundEnabled(orgData?.inbound_email_enabled || false); setInboundDomain(orgData?.inbound_email_domain || '')
         setInboundVerified(orgData?.inbound_email_verified || false); setInboundAutoReply(orgData?.inbound_email_auto_reply || '')
         setGoogleConnected(data?.google_calendar_connected || false); setGoogleEmail(data?.google_email || '')
@@ -564,6 +570,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
               inboundMessage={inboundMessage} setInboundMessage={setInboundMessage} inboundEnabled={inboundEnabled} setInboundEnabled={setInboundEnabled} inboundDomain={inboundDomain} setInboundDomain={setInboundDomain} inboundVerified={inboundVerified} setInboundVerified={setInboundVerified}
               inboundAutoReply={inboundAutoReply} setInboundAutoReply={setInboundAutoReply} savingInbound={savingInbound} setSavingInbound={setSavingInbound} verifyingInbound={verifyingInbound} setVerifyingInbound={setVerifyingInbound}
               squareMessage={squareMessage} setSquareMessage={setSquareMessage} squareConnected={squareConnected} setSquareConnected={setSquareConnected} squareMerchantId={squareMerchantId} setSquareMerchantId={setSquareMerchantId} connectingSquare={connectingSquare} setConnectingSquare={setConnectingSquare}
+              stripeMessage={stripeMessage} setStripeMessage={setStripeMessage} stripeConnected={stripeConnected} setStripeConnected={setStripeConnected} connectingStripe={connectingStripe} setConnectingStripe={setConnectingStripe}
               orgId={orgId} profile={profile} />
           )}
 

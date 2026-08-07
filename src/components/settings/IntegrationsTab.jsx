@@ -98,6 +98,22 @@ const INTEGRATIONS = [
       'Payment links will appear on invoices.',
     ],
   },
+  {
+    id: 'stripe',
+    name: 'Stripe Invoicing',
+    category: 'Payments',
+    description: 'Send professional Stripe invoices to your clients — Stripe handles the email, reminder, and online payment page.',
+    icon: '🔷',
+    iconBg: 'bg-[#635BFF]/10',
+    accentColor: 'bg-[#635BFF]',
+    what: ['Invoice → Stripe Invoice', 'Line items + tax', 'Stripe hosts the payment page', 'Auto-create customer in Stripe', 'Card, ACH, and more', 'Invoice marked Paid automatically when client pays'],
+    steps: [
+      'Click Connect Stripe below.',
+      'Sign in to your Stripe account and approve permissions.',
+      'You\'ll be redirected back to ForgePt automatically.',
+      'Open any invoice and click "Stripe" to send it.',
+    ],
+  },
 ]
 
 export default function IntegrationsTab({
@@ -107,6 +123,7 @@ export default function IntegrationsTab({
   inboundMessage, setInboundMessage, inboundEnabled, setInboundEnabled, inboundDomain, setInboundDomain, inboundVerified, setInboundVerified,
   inboundAutoReply, setInboundAutoReply, savingInbound, setSavingInbound, verifyingInbound, setVerifyingInbound,
   squareMessage, setSquareMessage, squareConnected, setSquareConnected, squareMerchantId, setSquareMerchantId, connectingSquare, setConnectingSquare,
+  stripeMessage, setStripeMessage, stripeConnected, setStripeConnected, connectingStripe, setConnectingStripe,
   orgId, profile,
 }) {
   const [selected, setSelected] = useState(null)
@@ -342,6 +359,34 @@ export default function IntegrationsTab({
     </div>
   ) : null
 
+  const connectStripe = async () => {
+    setConnectingStripe(true); setStripeMessage(null)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const { data: p } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      if (!p?.org_id) throw new Error('Could not find your organization.')
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-connect-oauth-start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ org_id: p.org_id }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else setStripeMessage({ type: 'error', text: data.error || 'Could not start Stripe connection.' })
+    } catch (err) { setStripeMessage({ type: 'error', text: err.message }) }
+    setConnectingStripe(false)
+  }
+
+  const disconnectStripe = async () => {
+    if (!window.confirm('Disconnect Stripe? Existing invoices will still work, but you won\'t be able to send new ones via Stripe.')) return
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: p } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+    await supabase.from('organizations').update({ stripe_connect_connected: false, stripe_connect_account_id: null }).eq('id', p.org_id)
+    setStripeConnected(false)
+    setStripeMessage({ type: 'success', text: 'Stripe disconnected.' })
+  }
+
   const isConnected = (id) => {
     if (id === 'quickbooks') return qboConnected
     if (id === 'google') return googleConnected
@@ -349,6 +394,7 @@ export default function IntegrationsTab({
     if (id === 'inbound') return inboundVerified && inboundEnabled
     if (id === 'zoho') return zohoStatus.crm || zohoStatus.books
     if (id === 'square') return squareConnected
+    if (id === 'stripe') return stripeConnected
     return false
   }
 
@@ -362,6 +408,7 @@ export default function IntegrationsTab({
       return parts.length ? `${parts.join(' + ')} connected` : null
     }
     if (id === 'square' && squareMerchantId) return `Merchant ${squareMerchantId}`
+    if (id === 'stripe' && stripeConnected) return 'Stripe account connected'
     return null
   }
 
@@ -423,6 +470,7 @@ export default function IntegrationsTab({
     if (selected === 'inbound') return inboundMessage
     if (selected === 'zoho') return zohoMessage
     if (selected === 'square') return squareMessage
+    if (selected === 'stripe') return stripeMessage
     return null
   }
 
@@ -669,6 +717,25 @@ export default function IntegrationsTab({
             <button onClick={connectSquare} disabled={connectingSquare}
               className="w-full bg-[#3E4348] text-fp-text py-2.5 rounded-lg text-sm font-semibold hover:bg-[#4E5358] transition-colors disabled:opacity-50">
               {connectingSquare ? 'Connecting...' : 'Connect Square'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {selected === 'stripe' && (
+        <div className="bg-fp-card rounded-xl p-6">
+          {stripeConnected ? (
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-fp-text font-semibold">Stripe Invoicing</p>
+                <p className="text-fp-muted text-sm mt-0.5">Your Stripe account is connected. Open any invoice and click "Stripe" to send.</p>
+              </div>
+              <button onClick={disconnectStripe} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
+            </div>
+          ) : (
+            <button onClick={connectStripe} disabled={connectingStripe}
+              className="w-full bg-[#635BFF] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#4f49e0] transition-colors disabled:opacity-50">
+              {connectingStripe ? 'Connecting...' : 'Connect Stripe'}
             </button>
           )}
         </div>

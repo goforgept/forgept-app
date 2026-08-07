@@ -3,8 +3,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { sendEmail } from "../_shared/email.ts"
 
 const STRIPE_WEBHOOK_SECRET = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? ''
+const STRIPE_SECRET_KEY     = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
 const SUPABASE_URL          = Deno.env.get('SUPABASE_URL') ?? ''
 const SUPABASE_SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+
+const stripeHeaders = {
+  'Authorization': `Bearer ${STRIPE_SECRET_KEY}`,
+  'Content-Type': 'application/x-www-form-urlencoded',
+}
 
 const dbHeaders = {
   'apikey': SUPABASE_SERVICE_KEY,
@@ -23,9 +29,9 @@ async function updateOrg(orgId: string, patch: Record<string, unknown>) {
   })
 }
 
-async function getOrgByCustomerId(customerId: string): Promise<{ id: string; name: string } | null> {
+async function getOrgByCustomerId(customerId: string): Promise<{ id: string; name: string; preferred_payment_method?: string } | null> {
   const res = await fetch(
-    `${SUPABASE_URL}/rest/v1/organizations?stripe_customer_id=eq.${customerId}&select=id,name`,
+    `${SUPABASE_URL}/rest/v1/organizations?stripe_customer_id=eq.${customerId}&select=id,name,preferred_payment_method`,
     { headers: dbHeaders }
   )
   const rows = await res.json()
@@ -129,14 +135,89 @@ Deno.serve(async (req) => {
 
   switch (event.type) {
 
-    // ── Payment succeeded — mark org active ──────────────────────────────────
-    case 'invoice.paid': {
+    // ── Recurring invoice created (draft) — add CC surcharge then finalize ───
+    case 'invoice.created': {
+      // Only handle platform events (not connected account events)
+      // Only handle recurring subscription invoices — subscription_create is handled
+      // in stripe-create-subscription when we first set up the subscription
+      if (event.account) break
+      if (obj.billing_reason !== 'subscription_cycle' && obj.billing_reason !== 'subscription_update') break
+      if (obj.status !== 'draft') break
+
       const org = await getOrgByCustomerId(obj.customer)
-      if (org) {
-        await updateOrg(org.id, {
-          billing_status: 'active',
-          stripe_subscription_id: obj.subscription ?? undefined,
+      if (!org) break
+
+      const isCC = org.preferred_payment_method === 'Credit Card'
+
+      // For CC orgs, add a 3% surcharge before finalizing
+      if (isCC && obj.amount_due > 0) {
+        const surchargeCents = Math.round(obj.amount_due * 0.03)
+        await fetch('https://api.stripe.com/v1/invoiceitems', {
+          method: 'POST',
+          headers: stripeHeaders,
+          body: new URLSearchParams({
+            customer: obj.customer,
+            invoice: obj.id,
+            description: 'Credit Card Processing Fee (3%)',
+            amount: String(surchargeCents),
+            currency: 'usd',
+          }),
         })
+      }
+
+      // Finalize the invoice so Stripe sends it
+      const finalizeRes = await fetch(`https://api.stripe.com/v1/invoices/${obj.id}/finalize`, {
+        method: 'POST',
+        headers: stripeHeaders,
+        body: new URLSearchParams({}),
+      })
+      const finalized = await finalizeRes.json()
+      console.log('Finalized recurring invoice:', obj.id, finalized.status, finalized.error?.message || '')
+
+      // Send the invoice email
+      if (finalized.status === 'open') {
+        const sendRes = await fetch(`https://api.stripe.com/v1/invoices/${obj.id}/send`, {
+          method: 'POST',
+          headers: stripeHeaders,
+          body: new URLSearchParams({}),
+        })
+        const sent = await sendRes.json()
+        console.log('Sent recurring invoice:', obj.id, sent.status, sent.error?.message || '')
+      }
+      break
+    }
+
+    // ── Payment succeeded ────────────────────────────────────────────────────
+    case 'invoice.paid': {
+      if (event.account) {
+        // Connected account event — a ForgePt org's client paid their invoice
+        const forgeptInvoiceId = obj.metadata?.forgept_invoice_id
+        if (forgeptInvoiceId) {
+          const totalPaid = (obj.amount_paid || 0) / 100
+          const { data: inv } = await supabase.from('invoices').select('total').eq('id', forgeptInvoiceId).single()
+          const balance = Math.max(0, (inv?.total || 0) - totalPaid)
+          await supabase.from('invoices').update({
+            status: balance <= 0 ? 'Paid' : 'Partially Paid',
+            amount_paid: totalPaid,
+            balance_due: balance,
+          }).eq('id', forgeptInvoiceId)
+          await supabase.from('invoice_payments').insert({
+            invoice_id: forgeptInvoiceId,
+            amount: totalPaid,
+            payment_date: new Date().toISOString().split('T')[0],
+            method: 'Stripe',
+            notes: `Stripe Invoice ${obj.id}`,
+          })
+        }
+      } else {
+        // Platform event — org paid their ForgePt subscription
+        const org = await getOrgByCustomerId(obj.customer)
+        if (org) {
+          await updateOrg(org.id, {
+            billing_status: 'active',
+            stripe_subscription_id: obj.subscription ?? undefined,
+          })
+        }
       }
       break
     }

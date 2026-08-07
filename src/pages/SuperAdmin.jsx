@@ -658,7 +658,7 @@ export default function SuperAdmin() {
   const openStripeModal = (org) => {
     const admin = getOrgAdmin(org.id)
     setStripeModal({ org, admin })
-    setStripeForm({ plan: org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter', qboAddon: org.quickbooks_addon || false, email: admin?.email || '', address_line1: admin?.bill_to_address || admin?.ship_to_address || '', address_city: admin?.bill_to_city || admin?.ship_to_city || '', address_state: admin?.bill_to_state || admin?.ship_to_state || '', address_zip: admin?.bill_to_zip || admin?.ship_to_zip || '', address_country: 'US', days_until_due: 30 })
+    setStripeForm({ plan: org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter', qboAddon: org.quickbooks_addon || false, email: admin?.email || '', address_line1: admin?.bill_to_address || admin?.ship_to_address || '', address_city: admin?.bill_to_city || admin?.ship_to_city || '', address_state: admin?.bill_to_state || admin?.ship_to_state || '', address_zip: admin?.bill_to_zip || admin?.ship_to_zip || '', address_country: 'US', days_until_due: 30, preferred_payment_method: org.preferred_payment_method || 'ACH' })
     setStripeResult(null)
   }
 
@@ -669,7 +669,7 @@ export default function SuperAdmin() {
     setStripeResult(null)
     try {
       const { data: result, error } = await supabase.functions.invoke('stripe-create-subscription', {
-        body: { orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeForm.email || '', plan: stripeForm.plan, qboAddon: stripeForm.qboAddon, daysUntilDue: stripeForm.days_until_due ?? 30, address: { line1: stripeForm.address_line1 || '', city: stripeForm.address_city || '', state: stripeForm.address_state || '', postal_code: stripeForm.address_zip || '', country: stripeForm.address_country || 'US' } }
+        body: { orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeForm.email || '', plan: stripeForm.plan, qboAddon: stripeForm.qboAddon, daysUntilDue: stripeForm.days_until_due ?? 30, preferredPaymentMethod: stripeForm.preferred_payment_method || 'ACH', address: { line1: stripeForm.address_line1 || '', city: stripeForm.address_city || '', state: stripeForm.address_state || '', postal_code: stripeForm.address_zip || '', country: stripeForm.address_country || 'US' } }
       })
       if (error) setStripeResult({ success: false, message: error.message })
       else if (result?.error) setStripeResult({ success: false, message: result.error })
@@ -1125,6 +1125,15 @@ export default function SuperAdmin() {
                               )}
                             </div>
                           </div>
+                          <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                            <p className="text-[#8A9AB0] text-xs mb-1">Payment Method</p>
+                            <div className="flex items-center justify-between">
+                              <span className={`text-xs font-semibold px-2 py-0.5 rounded ${org.preferred_payment_method === 'Credit Card' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                                {org.preferred_payment_method || 'ACH'}
+                              </span>
+                              <button onClick={() => openStripeModal(org)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Change</button>
+                            </div>
+                          </div>
                           <div className="flex items-center justify-between pt-1">
                             <p className="text-[#8A9AB0] text-xs font-mono">{stripeData.customerId}</p>
                             <p className="text-[#8A9AB0] text-xs font-mono">{stripeData.subscription.id}</p>
@@ -1562,14 +1571,23 @@ export default function SuperAdmin() {
                     className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                 </div>
               </div>
-              <div>
-                <label className="text-[#8A9AB0] text-xs mb-1 block">Payment Terms</label>
-                <select value={stripeForm.days_until_due ?? 30} onChange={e => setStripeForm(p => ({ ...p, days_until_due: parseInt(e.target.value) }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                  <option value={15}>Net 15</option>
-                  <option value={30}>Net 30</option>
-                  <option value={45}>Net 45</option>
-                  <option value={60}>Net 60</option>
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Payment Terms</label>
+                  <select value={stripeForm.days_until_due ?? 30} onChange={e => setStripeForm(p => ({ ...p, days_until_due: parseInt(e.target.value) }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                    <option value={15}>Net 15</option>
+                    <option value={30}>Net 30</option>
+                    <option value={45}>Net 45</option>
+                    <option value={60}>Net 60</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[#8A9AB0] text-xs mb-1 block">Payment Method</label>
+                  <select value={stripeForm.preferred_payment_method || 'ACH'} onChange={e => setStripeForm(p => ({ ...p, preferred_payment_method: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                    <option value="ACH">ACH / Bank Transfer</option>
+                    <option value="Credit Card">Credit Card (+3% fee)</option>
+                  </select>
+                </div>
               </div>
               <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Base Plan</label>
