@@ -859,6 +859,7 @@ export default function SuperAdmin() {
           {[
             { key: 'requests', label: `Access Requests${pendingRequests.length > 0 ? ` (${pendingRequests.length})` : ''}` },
             { key: 'orgs',     label: 'Organizations' },
+            { key: 'billing',  label: `Billing${pastDueOrgs > 0 ? ` (${pastDueOrgs} past due)` : ''}` },
             { key: 'platform', label: 'Platform' },
             { key: 'admin',    label: 'Admin' },
           ].map(t => (
@@ -1136,6 +1137,20 @@ export default function SuperAdmin() {
                               <button onClick={() => openStripeModal(org)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Change</button>
                             </div>
                           </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                              <p className="text-[#8A9AB0] text-xs mb-1">Customer Since</p>
+                              <p className="text-white text-xs font-semibold">
+                                {org.created_at ? new Date(org.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
+                              </p>
+                            </div>
+                            <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                              <p className="text-[#8A9AB0] text-xs mb-1">QBO Add-on</p>
+                              {org.quickbooks_addon
+                                ? <span className="text-[#2CA01C] text-xs font-semibold">✓ Active (+$25/mo)</span>
+                                : <span className="text-[#8A9AB0] text-xs">Not included</span>}
+                            </div>
+                          </div>
                           <div className="flex items-center justify-between pt-1">
                             <p className="text-[#8A9AB0] text-xs font-mono">{stripeData.customerId}</p>
                             <p className="text-[#8A9AB0] text-xs font-mono">{stripeData.subscription.id}</p>
@@ -1174,13 +1189,38 @@ export default function SuperAdmin() {
                           <p className="text-white text-sm font-semibold">${org.monthly_rate || 0}/mo</p>
                         </div>
                       </div>
-                      <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
-                        <p className="text-[#8A9AB0] text-xs mb-1">Payment Method Preference</p>
-                        <div className="flex items-center justify-between">
-                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${org.preferred_payment_method === 'Credit Card' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                            {org.preferred_payment_method || 'ACH'}
-                          </span>
-                          <button onClick={() => startEditingBilling(org)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Change</button>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                          <p className="text-[#8A9AB0] text-xs mb-1">Payment Method</p>
+                          <div className="flex items-center justify-between">
+                            <span className={`text-xs font-semibold px-2 py-0.5 rounded ${org.preferred_payment_method === 'Credit Card' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                              {org.preferred_payment_method || 'ACH'}
+                            </span>
+                            <button onClick={() => startEditingBilling(org)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Change</button>
+                          </div>
+                        </div>
+                        <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                          <p className="text-[#8A9AB0] text-xs mb-1">Customer Since</p>
+                          <p className="text-white text-xs font-semibold">
+                            {org.created_at ? new Date(org.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                          <p className="text-[#8A9AB0] text-xs mb-1">QBO Add-on</p>
+                          {org.quickbooks_addon
+                            ? <span className="text-[#2CA01C] text-xs font-semibold">✓ Active</span>
+                            : <span className="text-[#8A9AB0] text-xs">Not included</span>}
+                        </div>
+                        <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                          <p className="text-[#8A9AB0] text-xs mb-1">Trial Ends</p>
+                          {org.trial_ends_at ? (
+                            <p className={`text-xs font-semibold ${Math.ceil((new Date(org.trial_ends_at) - new Date()) / 86400000) <= 7 ? 'text-red-400' : 'text-yellow-400'}`}>
+                              {new Date(org.trial_ends_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              {' '}({Math.ceil((new Date(org.trial_ends_at) - new Date()) / 86400000)}d)
+                            </p>
+                          ) : <span className="text-[#8A9AB0] text-xs">Not set</span>}
                         </div>
                       </div>
 
@@ -1390,6 +1430,202 @@ export default function SuperAdmin() {
           )}
           </div>
         )}
+
+        {/* Billing Tab */}
+        {activeTab === 'billing' && (() => {
+          const cancelledOrgs = orgs.filter(o => o.billing_status === 'cancelled').length
+          const planBreakdown = Object.entries(
+            orgs.reduce((acc, org) => {
+              const plan = org.plan || 'Trial'
+              if (!acc[plan]) acc[plan] = { count: 0, revenue: 0, active: 0 }
+              acc[plan].count++
+              if (org.billing_status === 'active') { acc[plan].active++; acc[plan].revenue += org.monthly_rate || 0 }
+              return acc
+            }, {})
+          ).sort((a, b) => b[1].revenue - a[1].revenue)
+
+          const achActive = orgs.filter(o => o.billing_status === 'active' && (o.preferred_payment_method || 'ACH') === 'ACH')
+          const ccActive  = orgs.filter(o => o.billing_status === 'active' && o.preferred_payment_method === 'Credit Card')
+          const achMRR    = achActive.reduce((s, o) => s + (o.monthly_rate || 0), 0)
+          const ccMRR     = ccActive.reduce((s, o) => s + (o.monthly_rate || 0), 0)
+
+          const pastDueList = orgs.filter(o => o.billing_status === 'past_due').sort((a, b) => (a.monthly_rate || 0) < (b.monthly_rate || 0) ? 1 : -1)
+          const trialsExpiring = orgs
+            .filter(o => o.billing_status === 'trial' && o.trial_ends_at)
+            .map(o => ({ ...o, daysLeft: Math.ceil((new Date(o.trial_ends_at) - new Date()) / 86400000) }))
+            .filter(o => o.daysLeft <= 30)
+            .sort((a, b) => a.daysLeft - b.daysLeft)
+
+          const activeTable = orgs
+            .filter(o => o.billing_status === 'active')
+            .sort((a, b) => (b.monthly_rate || 0) - (a.monthly_rate || 0))
+
+          const customerSince = (createdAt) => {
+            const months = Math.floor((Date.now() - new Date(createdAt)) / (30 * 24 * 60 * 60 * 1000))
+            return months < 1 ? 'New' : months === 1 ? '1 mo' : `${months} mo`
+          }
+
+          return (
+            <div className="space-y-5">
+              {/* Revenue summary */}
+              <div className="grid grid-cols-6 gap-4">
+                {[
+                  { label: 'MRR',         value: `$${mrr.toLocaleString()}`,         color: 'text-[#C8622A]' },
+                  { label: 'ARR',         value: `$${arr.toLocaleString()}`,         color: 'text-[#C8622A]' },
+                  { label: 'Active',      value: activeOrgs,                          color: 'text-green-400' },
+                  { label: 'Past Due',    value: pastDueOrgs,                         color: pastDueOrgs > 0 ? 'text-red-400' : 'text-[#8A9AB0]' },
+                  { label: 'Trials',      value: trialOrgs,                           color: 'text-yellow-400' },
+                  { label: 'Cancelled',   value: cancelledOrgs,                       color: 'text-[#8A9AB0]' },
+                ].map(s => (
+                  <div key={s.label} className="bg-[#1a2d45] rounded-xl p-4">
+                    <p className="text-[#8A9AB0] text-xs mb-1">{s.label}</p>
+                    <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Plan breakdown + Payment method split */}
+              <div className="grid grid-cols-2 gap-5">
+                <div className="bg-[#1a2d45] rounded-xl p-5">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Revenue by Plan</p>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[#2a3d55]">
+                        {['Plan', 'Active', 'MRR'].map(h => <th key={h} className="text-[#8A9AB0] text-left py-1.5 pr-3 font-normal text-xs">{h}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {planBreakdown.map(([plan, data]) => (
+                        <tr key={plan} className="border-b border-[#2a3d55]/50">
+                          <td className="py-2 pr-3 text-white text-xs font-medium">{plan}</td>
+                          <td className="py-2 pr-3 text-[#8A9AB0] text-xs">{data.active}/{data.count}</td>
+                          <td className="py-2 text-[#C8622A] text-xs font-semibold font-mono">{data.revenue > 0 ? `$${data.revenue.toLocaleString()}` : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Payment Method Split</p>
+                  <div className="space-y-3">
+                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-blue-400 text-xs font-semibold">ACH / Bank Transfer</span>
+                        <span className="text-white text-xs font-mono font-semibold">${achMRR.toLocaleString()}/mo</span>
+                      </div>
+                      <p className="text-[#8A9AB0] text-xs">{achActive.length} active org{achActive.length !== 1 ? 's' : ''} · no surcharge</p>
+                    </div>
+                    <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-yellow-400 text-xs font-semibold">Credit Card</span>
+                        <span className="text-white text-xs font-mono font-semibold">${ccMRR.toLocaleString()}/mo</span>
+                      </div>
+                      <p className="text-[#8A9AB0] text-xs">{ccActive.length} active org{ccActive.length !== 1 ? 's' : ''} · +3% surcharge on invoices</p>
+                    </div>
+                    {ccMRR > 0 && (
+                      <div className="text-[#8A9AB0] text-xs pt-1 border-t border-[#2a3d55]">
+                        Est. surcharge collected: <span className="text-[#C8622A] font-semibold">${Math.round(ccMRR * 0.03).toLocaleString()}/mo</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Action items */}
+              {(pastDueList.length > 0 || trialsExpiring.length > 0) && (
+                <div className="grid grid-cols-2 gap-5">
+                  {pastDueList.length > 0 && (
+                    <div className="bg-[#1a2d45] rounded-xl p-5">
+                      <p className="text-red-400 text-xs font-semibold uppercase tracking-wide mb-3">Past Due — Needs Attention</p>
+                      <div className="space-y-2">
+                        {pastDueList.map(org => (
+                          <div key={org.id} className="flex items-center justify-between bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2.5">
+                            <div>
+                              <p className="text-white text-sm font-medium">{org.name}</p>
+                              <p className="text-[#8A9AB0] text-xs">{org.plan} · ${org.monthly_rate || 0}/mo</p>
+                            </div>
+                            <button onClick={() => { setActiveTab('orgs'); setExpandedOrg(org.id); fetchOrgDetail(org.id) }}
+                              className="text-[#C8622A] text-xs hover:text-white transition-colors">View →</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {trialsExpiring.length > 0 && (
+                    <div className="bg-[#1a2d45] rounded-xl p-5">
+                      <p className="text-yellow-400 text-xs font-semibold uppercase tracking-wide mb-3">Trials Expiring Soon</p>
+                      <div className="space-y-2">
+                        {trialsExpiring.map(org => (
+                          <div key={org.id} className="flex items-center justify-between bg-yellow-500/5 border border-yellow-500/20 rounded-lg px-3 py-2.5">
+                            <div>
+                              <p className="text-white text-sm font-medium">{org.name}</p>
+                              <p className="text-[#8A9AB0] text-xs">{org.plan}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className={`text-xs font-semibold ${org.daysLeft <= 7 ? 'text-red-400' : 'text-yellow-400'}`}>
+                                {org.daysLeft <= 0 ? 'Expired' : `${org.daysLeft}d left`}
+                              </p>
+                              <button onClick={() => { setActiveTab('orgs'); setExpandedOrg(org.id); fetchOrgDetail(org.id) }}
+                                className="text-[#8A9AB0] text-xs hover:text-white transition-colors">View →</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Active accounts table */}
+              <div className="bg-[#1a2d45] rounded-xl p-5">
+                <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Active Accounts — Sorted by Revenue</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[#2a3d55]">
+                        {['Org', 'Plan', 'Rate/mo', 'Payment', 'QBO', 'Tenure', 'Stripe'].map(h => (
+                          <th key={h} className="text-[#8A9AB0] text-left py-2 pr-4 font-normal text-xs whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeTable.map(org => (
+                        <tr key={org.id} className="border-b border-[#2a3d55]/50 hover:bg-[#2a3d55]/20 cursor-pointer transition-colors"
+                          onClick={() => { setActiveTab('orgs'); setExpandedOrg(org.id); fetchOrgDetail(org.id) }}>
+                          <td className="py-2.5 pr-4">
+                            <p className="text-white text-xs font-medium">{org.name}</p>
+                          </td>
+                          <td className="py-2.5 pr-4 text-[#8A9AB0] text-xs whitespace-nowrap">{org.plan}</td>
+                          <td className="py-2.5 pr-4 text-[#C8622A] text-xs font-semibold font-mono">${(org.monthly_rate || 0).toLocaleString()}</td>
+                          <td className="py-2.5 pr-4">
+                            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${org.preferred_payment_method === 'Credit Card' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                              {org.preferred_payment_method === 'Credit Card' ? 'CC' : 'ACH'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 pr-4">
+                            {org.quickbooks_addon
+                              ? <span className="text-[#2CA01C] text-xs font-semibold">✓</span>
+                              : <span className="text-[#8A9AB0] text-xs">—</span>}
+                          </td>
+                          <td className="py-2.5 pr-4 text-[#8A9AB0] text-xs">{org.created_at ? customerSince(org.created_at) : '—'}</td>
+                          <td className="py-2.5 pr-4">
+                            {org.stripe_subscription_id
+                              ? <span className="text-green-400 text-xs">✓</span>
+                              : <span className="text-[#8A9AB0] text-xs">—</span>}
+                          </td>
+                        </tr>
+                      ))}
+                      {activeTable.length === 0 && (
+                        <tr><td colSpan={7} className="py-6 text-[#8A9AB0] text-xs text-center">No active accounts yet.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Metrics Tab */}
         {activeTab === 'platform' && (
