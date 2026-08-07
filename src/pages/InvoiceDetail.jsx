@@ -452,6 +452,30 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setQboError(null)
   }
 
+  const syncSquarePayment = async () => {
+    setSendingToSquare(true); setSquareError(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/square-sync-invoice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ invoiceId: id }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      if (!data.updated) setSquareError(`Square status is "${data.square_status}" — not paid yet.`)
+      await fetchAll()
+    } catch (err) { setSquareError(err.message) }
+    setSendingToSquare(false)
+  }
+
+  const resetSquareInvoice = async () => {
+    if (!window.confirm('This will unlink the Square invoice so you can send a fresh one. The old invoice will remain in your Square account — you should cancel it there manually. Continue?')) return
+    await supabase.from('invoices').update({ square_invoice_id: null, square_payment_url: null, square_payment_status: null }).eq('id', id)
+    await fetchAll()
+    setSquareError(null)
+  }
+
   const copyPaymentLink = async () => {
     if (!invoice?.square_payment_url) return
     await navigator.clipboard.writeText(invoice.square_payment_url)
@@ -680,11 +704,28 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                     </button>
                   )
                 )}
-                {squareConnected && !invoice?.square_invoice_id && (
-                  <button onClick={sendToSquare} disabled={sendingToSquare}
-                    className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
-                    {sendingToSquare ? 'Creating...' : '💳 Square'}
-                  </button>
+                {squareConnected && (
+                  invoice?.square_invoice_id ? (
+                    <div className="flex items-center gap-1.5">
+                      <a href={invoice.square_payment_url} target="_blank" rel="noopener noreferrer"
+                        className="bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-semibold border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors">
+                        ✓ Square ↗
+                      </a>
+                      <button onClick={syncSquarePayment} disabled={sendingToSquare}
+                        className="bg-fp-inset text-fp-muted px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover hover:text-fp-text transition-colors disabled:opacity-50">
+                        {sendingToSquare ? '...' : 'Sync'}
+                      </button>
+                      <button onClick={resetSquareInvoice}
+                        className="text-fp-muted hover:text-red-400 text-xs transition-colors px-1">
+                        Reset
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={sendToSquare} disabled={sendingToSquare}
+                      className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
+                      {sendingToSquare ? 'Creating...' : '💳 Square'}
+                    </button>
+                  )
                 )}
                 {qboConnected && (
                   invoice?.qbo_invoice_id ? (

@@ -76,6 +76,12 @@ Deno.serve(async (req) => {
     const clientEmail = invoice.proposals?.client_email
     const clientName = invoice.proposals?.client_name || invoice.proposals?.company
 
+    if (!clientEmail) {
+      return new Response(JSON.stringify({ error: 'No client email on this invoice — required for Square' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
     // Find or create Square customer
     let squareCustomerId: string
     const searchRes = await fetch('https://connect.squareup.com/v2/customers/search', {
@@ -86,6 +92,7 @@ Deno.serve(async (req) => {
       })
     })
     const searchData = await searchRes.json()
+    console.log('Square customer search:', JSON.stringify(searchData))
 
     if (searchData.customers?.length > 0) {
       squareCustomerId = searchData.customers[0].id
@@ -95,11 +102,15 @@ Deno.serve(async (req) => {
         headers: sqHeaders,
         body: JSON.stringify({
           email_address: clientEmail,
-          display_name: clientName,
+          company_name: clientName || 'Client',
           reference_id: invoice.org_id,
         })
       })
       const createData = await createRes.json()
+      console.log('Square customer create:', JSON.stringify(createData))
+      if (createData.errors?.length > 0) {
+        throw new Error(`Square customer error: ${createData.errors[0].detail || createData.errors[0].code}`)
+      }
       squareCustomerId = createData.customer?.id
     }
 
@@ -131,6 +142,7 @@ Deno.serve(async (req) => {
       })
     })
     const orderData = await orderRes.json()
+    console.log('Square order create:', JSON.stringify(orderData))
     const orderId = orderData.order?.id
 
     if (!orderId) {
