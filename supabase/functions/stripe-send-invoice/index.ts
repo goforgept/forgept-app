@@ -180,7 +180,6 @@ Deno.serve(async (req) => {
         description: item.description || 'Service',
         amount: String(amountCents),
         currency: 'usd',
-        quantity: '1',
       })
 
       const itemRes = await fetch('https://api.stripe.com/v1/invoiceitems', {
@@ -201,7 +200,6 @@ Deno.serve(async (req) => {
         description: `Tax (${invoice.tax_percent || 0}%)`,
         amount: String(taxCents),
         currency: 'usd',
-        quantity: '1',
       })
       await fetch('https://api.stripe.com/v1/invoiceitems', {
         method: 'POST',

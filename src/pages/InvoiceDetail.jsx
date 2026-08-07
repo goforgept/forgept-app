@@ -458,6 +458,12 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
     setCopiedLink(true); setTimeout(() => setCopiedLink(false), 2000)
   }
 
+  const resetStripeInvoice = async () => {
+    if (!window.confirm('This will unlink the Stripe invoice so you can send a fresh one. The old invoice will remain in your Stripe account — you should void it there manually. Continue?')) return
+    await supabase.from('invoices').update({ stripe_invoice_id: null, stripe_hosted_invoice_url: null }).eq('id', id)
+    await fetchAll()
+  }
+
   const sendToStripe = async () => {
     setSendingToStripe(true); setStripeError(null)
     try {
@@ -640,6 +646,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                       <button onClick={sendToStripe} disabled={sendingToStripe}
                         className="bg-fp-inset text-fp-muted px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover hover:text-fp-text transition-colors disabled:opacity-50">
                         {sendingToStripe ? 'Sending...' : 'Resend'}
+                      </button>
+                      <button onClick={resetStripeInvoice}
+                        className="text-fp-muted hover:text-red-400 text-xs transition-colors px-1">
+                        Reset
                       </button>
                     </div>
                   ) : (
