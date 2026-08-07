@@ -127,6 +127,8 @@ export default function IntegrationsTab({
   orgId, profile,
 }) {
   const [selected, setSelected] = useState(null)
+  const [squareTestToken, setSquareTestToken] = useState('')
+  const [savingSquareToken, setSavingSquareToken] = useState(false)
   const [zohoConnecting, setZohoConnecting] = useState(null)
   const [zohoMessage, setZohoMessage] = useState(null)
   const [zohoStatus, setZohoStatus] = useState({ crm: false, books: false })
@@ -312,6 +314,25 @@ export default function IntegrationsTab({
       else setSquareMessage({ type: 'error', text: data.error || 'Could not start Square connection.' })
     } catch (err) { setSquareMessage({ type: 'error', text: err.message }) }
     setConnectingSquare(false)
+  }
+
+  const saveSquareToken = async () => {
+    if (!squareTestToken.trim()) return
+    setSavingSquareToken(true)
+    try {
+      const { error } = await supabase.from('organizations').update({
+        square_connected: true,
+        square_access_token: squareTestToken.trim(),
+        square_location_id: null,
+      }).eq('id', orgId)
+      if (error) throw error
+      setSquareConnected(true)
+      setSquareTestToken('')
+      setSquareMessage({ type: 'success', text: 'Square connected with test token.' })
+    } catch (err) {
+      setSquareMessage({ type: 'error', text: err.message })
+    }
+    setSavingSquareToken(false)
   }
 
   const disconnectSquare = async () => {
@@ -718,10 +739,30 @@ export default function IntegrationsTab({
               <button onClick={disconnectSquare} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
             </div>
           ) : (
-            <button onClick={connectSquare} disabled={connectingSquare}
-              className="w-full bg-[#3E4348] text-fp-text py-2.5 rounded-lg text-sm font-semibold hover:bg-[#4E5358] transition-colors disabled:opacity-50">
-              {connectingSquare ? 'Connecting...' : 'Connect Square'}
-            </button>
+            <div className="space-y-3">
+              <button onClick={connectSquare} disabled={connectingSquare}
+                className="w-full bg-[#3E4348] text-fp-text py-2.5 rounded-lg text-sm font-semibold hover:bg-[#4E5358] transition-colors disabled:opacity-50">
+                {connectingSquare ? 'Connecting...' : 'Connect Square'}
+              </button>
+              <div className="flex items-center gap-2 pt-1">
+                <div className="h-px flex-1 bg-fp-border" />
+                <span className="text-fp-muted text-xs">or paste sandbox token</span>
+                <div className="h-px flex-1 bg-fp-border" />
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={squareTestToken}
+                  onChange={e => setSquareTestToken(e.target.value)}
+                  placeholder="EAAA..."
+                  className="flex-1 bg-fp-inset border border-fp-border rounded-lg px-3 py-2 text-fp-text text-xs font-mono placeholder:text-fp-muted focus:outline-none focus:border-fp-brand"
+                />
+                <button onClick={saveSquareToken} disabled={savingSquareToken || !squareTestToken.trim()}
+                  className="bg-fp-brand text-white px-4 py-2 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {savingSquareToken ? '...' : 'Save'}
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}

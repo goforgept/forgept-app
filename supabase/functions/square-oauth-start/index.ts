@@ -50,9 +50,7 @@ Deno.serve(async (req) => {
       redirect_uri: redirectUri,
     })
 
-    const isSandbox = appId.startsWith('sandbox-')
-    const baseUrl = isSandbox ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com'
-    const url = `${baseUrl}/oauth2/authorize?${params}`
+    const url = `https://connect.squareup.com/oauth2/authorize?${params}`
 
     return new Response(JSON.stringify({ url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
