@@ -8,8 +8,10 @@ Deno.serve(async (req) => {
 
   const appUrl = Deno.env.get('APP_URL') || 'https://app.goforgept.com'
 
+  console.log('callback params:', { hasCode: !!code, hasState: !!state, error })
+
   if (error || !code || !state) {
-    return Response.redirect(`${appUrl}/settings?tab=integrations&square_error=${error || 'missing_params'}`)
+    return Response.redirect(`${appUrl}/settings?tab=integrations&square_error=${encodeURIComponent(error || 'missing_params')}`)
   }
 
   // Decode and validate state
@@ -29,15 +31,19 @@ Deno.serve(async (req) => {
     return Response.redirect(`${appUrl}/settings?tab=integrations&square_error=invalid_state`)
   }
 
-  const appId = Deno.env.get('SQUARE_APP_ID')
-  const appSecret = Deno.env.get('SQUARE_APP_SECRET')
-  const redirectUri = Deno.env.get('SQUARE_REDIRECT_URI')
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const appId = (Deno.env.get('SQUARE_APP_ID') ?? '').trim()
+  const appSecret = (Deno.env.get('SQUARE_APP_SECRET') ?? '').trim()
+  const redirectUri = (Deno.env.get('SQUARE_REDIRECT_URI') ?? '').trim()
+  const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim()
+  const serviceKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim()
 
   try {
     // Exchange code for token — server to server, secret never exposed to client
-    const tokenRes = await fetch('https://connect.squareup.com/oauth2/token', {
+    const isSandbox = appId.startsWith('sandbox-')
+    const sqBaseUrl = isSandbox ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com'
+    console.log('token exchange:', { appId, redirectUri, isSandbox, codePrefix: code?.slice(0, 8) })
+
+    const tokenRes = await fetch(`${sqBaseUrl}/oauth2/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Square-Version': '2024-01-18' },
       body: JSON.stringify({
@@ -50,15 +56,17 @@ Deno.serve(async (req) => {
     })
 
     const tokenData = await tokenRes.json()
+    console.log('token response:', JSON.stringify(tokenData))
 
     if (!tokenData.access_token) {
-      return Response.redirect(`${appUrl}/settings?tab=integrations&square_error=token_exchange_failed`)
+      const detail = tokenData.message || tokenData.type || tokenData.error || 'token_exchange_failed'
+      return Response.redirect(`${appUrl}/settings?tab=integrations&square_error=${encodeURIComponent(detail)}`)
     }
 
     // Get merchant's default location
     let locationId = null
     try {
-      const locRes = await fetch('https://connect.squareup.com/v2/locations', {
+      const locRes = await fetch(`${sqBaseUrl}/v2/locations`, {
         headers: { 'Authorization': `Bearer ${tokenData.access_token}`, 'Square-Version': '2024-01-18' }
       })
       const locData = await locRes.json()

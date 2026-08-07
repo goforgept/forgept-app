@@ -46,7 +46,6 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Verify invoice belongs to caller's org
     if (invoice.org_id !== profile.org_id) {
       return new Response(JSON.stringify({ error: 'Forbidden' }), {
         status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -67,6 +66,11 @@ Deno.serve(async (req) => {
       })
     }
 
+    const squareAppId = (Deno.env.get('SQUARE_APP_ID') ?? '').trim()
+    const sqBase = squareAppId.startsWith('sandbox-')
+      ? 'https://connect.squareupsandbox.com'
+      : 'https://connect.squareup.com'
+
     const sqHeaders = {
       'Authorization': `Bearer ${org.square_access_token}`,
       'Square-Version': '2024-01-18',
@@ -75,12 +79,12 @@ Deno.serve(async (req) => {
 
     // Auto-fetch and save location_id if missing
     if (!org.square_location_id) {
-      const locRes = await fetch('https://connect.squareup.com/v2/locations', { headers: sqHeaders })
+      const locRes = await fetch(`${sqBase}/v2/locations`, { headers: sqHeaders })
       const locData = await locRes.json()
-      console.log('Square locations:', JSON.stringify(locData))
       const locationId = locData.locations?.[0]?.id
       if (!locationId) {
-        return new Response(JSON.stringify({ error: `Square locations: ${JSON.stringify(locData)}` }), {
+        const sqErr = locData.errors?.[0]?.detail || locData.errors?.[0]?.code || 'no locations returned'
+        return new Response(JSON.stringify({ error: `Could not retrieve Square location: ${sqErr}` }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         })
       }
@@ -97,56 +101,17 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Find or create Square customer
-    let squareCustomerId: string
-    const searchRes = await fetch('https://connect.squareup.com/v2/customers/search', {
-      method: 'POST',
-      headers: sqHeaders,
-      body: JSON.stringify({
-        query: { filter: { email_address: { exact: clientEmail } } }
-      })
-    })
-    const searchData = await searchRes.json()
-    console.log('Square customer search:', JSON.stringify(searchData))
-
-    if (searchData.customers?.length > 0) {
-      squareCustomerId = searchData.customers[0].id
-    } else {
-      const createRes = await fetch('https://connect.squareup.com/v2/customers', {
-        method: 'POST',
-        headers: sqHeaders,
-        body: JSON.stringify({
-          email_address: clientEmail,
-          company_name: clientName || 'Client',
-          reference_id: invoice.org_id,
-        })
-      })
-      const createData = await createRes.json()
-      console.log('Square customer create:', JSON.stringify(createData))
-      if (createData.errors?.length > 0) {
-        throw new Error(`Square customer error: ${createData.errors[0].detail || createData.errors[0].code}`)
-      }
-      squareCustomerId = createData.customer?.id
-    }
-
-    if (!squareCustomerId) {
-      return new Response(JSON.stringify({ error: 'Could not find or create Square customer' }), {
-        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
-    }
-
-    // Create Square order
+    // Create Square order (no customer_id needed — email goes on the invoice directly)
     const idempotencyKey = `forgept-inv-${invoiceId}-${Date.now()}`
     const amountCents = Math.round((invoice.total_amount || 0) * 100)
 
-    const orderRes = await fetch('https://connect.squareup.com/v2/orders', {
+    const orderRes = await fetch('${sqBase}/v2/orders', {
       method: 'POST',
       headers: sqHeaders,
       body: JSON.stringify({
         idempotency_key: idempotencyKey,
         order: {
           location_id: org.square_location_id,
-          customer_id: squareCustomerId,
           reference_id: invoice.invoice_number || invoiceId,
           line_items: [{
             name: invoice.proposals?.proposal_name || 'Services',
@@ -166,12 +131,12 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Create Square invoice
+    // Create Square invoice — use email directly, no customer lookup needed
     const dueDate = invoice.due_date
       ? new Date(invoice.due_date).toISOString().split('T')[0]
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-    const sqInvRes = await fetch('https://connect.squareup.com/v2/invoices', {
+    const sqInvRes = await fetch('${sqBase}/v2/invoices', {
       method: 'POST',
       headers: sqHeaders,
       body: JSON.stringify({
@@ -179,7 +144,10 @@ Deno.serve(async (req) => {
         invoice: {
           location_id: org.square_location_id,
           order_id: orderId,
-          primary_recipient: { customer_id: squareCustomerId },
+          primary_recipient: {
+            email_address: clientEmail,
+            given_name: clientName || 'Client',
+          },
           payment_requests: [{
             request_type: 'BALANCE',
             due_date: dueDate,
@@ -198,6 +166,7 @@ Deno.serve(async (req) => {
       })
     })
     const sqInvData = await sqInvRes.json()
+    console.log('Square invoice create:', JSON.stringify(sqInvData))
     const sqInvoiceId = sqInvData.invoice?.id
 
     if (!sqInvoiceId) {
@@ -207,7 +176,7 @@ Deno.serve(async (req) => {
     }
 
     // Publish invoice to get payment URL
-    const publishRes = await fetch(`https://connect.squareup.com/v2/invoices/${sqInvoiceId}/publish`, {
+    const publishRes = await fetch(`${sqBase}/v2/invoices/${sqInvoiceId}/publish`, {
       method: 'POST',
       headers: sqHeaders,
       body: JSON.stringify({
@@ -216,6 +185,7 @@ Deno.serve(async (req) => {
       })
     })
     const publishData = await publishRes.json()
+    console.log('Square invoice publish:', JSON.stringify(publishData))
     const paymentUrl = publishData.invoice?.public_url
 
     // Save Square invoice ID and payment URL back to ForgePt invoice

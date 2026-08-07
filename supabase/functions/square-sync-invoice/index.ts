@@ -52,7 +52,12 @@ Deno.serve(async (req) => {
       })
     }
 
-    const sqRes = await fetch(`https://connect.squareup.com/v2/invoices/${invoice.square_invoice_id}`, {
+    const squareAppId = (Deno.env.get('SQUARE_APP_ID') ?? '').trim()
+    const sqBase = squareAppId.startsWith('sandbox-')
+      ? 'https://connect.squareupsandbox.com'
+      : 'https://connect.squareup.com'
+
+    const sqRes = await fetch(`${sqBase}/v2/invoices/${invoice.square_invoice_id}`, {
       headers: {
         'Authorization': `Bearer ${org.square_access_token}`,
         'Square-Version': '2024-01-18',

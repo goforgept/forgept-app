@@ -29,8 +29,9 @@ Deno.serve(async (req) => {
       })
     }
 
-    const appId = Deno.env.get('SQUARE_APP_ID')
-    const redirectUri = Deno.env.get('SQUARE_REDIRECT_URI')
+    const appId = (Deno.env.get('SQUARE_APP_ID') ?? '').trim()
+    const redirectUri = (Deno.env.get('SQUARE_REDIRECT_URI') ?? '').trim()
+    console.log('oauth start:', { appId, redirectUri })
 
     if (!appId || !redirectUri) {
       return new Response(JSON.stringify({ error: 'Square not configured' }), {
@@ -43,13 +44,15 @@ Deno.serve(async (req) => {
 
     const params = new URLSearchParams({
       client_id: appId,
-      scope: 'INVOICES_READ INVOICES_WRITE CUSTOMERS_READ CUSTOMERS_WRITE ORDERS_READ ORDERS_WRITE PAYMENTS_READ',
+      scope: 'INVOICES_READ INVOICES_WRITE CUSTOMERS_READ CUSTOMERS_WRITE ORDERS_READ ORDERS_WRITE PAYMENTS_READ MERCHANT_PROFILE_READ',
       session: 'false',
       state,
       redirect_uri: redirectUri,
     })
 
-    const url = `https://connect.squareup.com/oauth2/authorize?${params}`
+    const isSandbox = appId.startsWith('sandbox-')
+    const baseUrl = isSandbox ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com'
+    const url = `${baseUrl}/oauth2/authorize?${params}`
 
     return new Response(JSON.stringify({ url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
