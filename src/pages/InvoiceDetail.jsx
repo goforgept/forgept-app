@@ -632,10 +632,16 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 </button>
                 {stripeConnected && (
                   invoice?.stripe_invoice_id ? (
-                    <a href={invoice.stripe_hosted_invoice_url} target="_blank" rel="noopener noreferrer"
-                      className="bg-[#635BFF]/10 text-[#635BFF] px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#635BFF]/20 hover:bg-[#635BFF]/20 transition-colors">
-                      ✓ Stripe ↗
-                    </a>
+                    <div className="flex items-center gap-1.5">
+                      <a href={invoice.stripe_hosted_invoice_url} target="_blank" rel="noopener noreferrer"
+                        className="bg-[#635BFF]/10 text-[#635BFF] px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#635BFF]/20 hover:bg-[#635BFF]/20 transition-colors">
+                        ✓ Stripe ↗
+                      </a>
+                      <button onClick={sendToStripe} disabled={sendingToStripe}
+                        className="bg-fp-inset text-fp-muted px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover hover:text-fp-text transition-colors disabled:opacity-50">
+                        {sendingToStripe ? 'Sending...' : 'Resend'}
+                      </button>
+                    </div>
                   ) : (
                     <button onClick={sendToStripe} disabled={sendingToStripe}
                       className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">

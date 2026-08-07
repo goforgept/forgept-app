@@ -27,9 +27,9 @@ Deno.serve(async (req) => {
     return Response.redirect(`${appUrl}/settings?tab=integrations&stripe_connect_error=invalid_state`)
   }
 
-  const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const stripeSecretKey = (Deno.env.get('STRIPE_SECRET_KEY') ?? '').trim()
+  const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').trim()
+  const serviceKey = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').trim()
 
   try {
     const tokenRes = await fetch('https://connect.stripe.com/oauth/token', {
@@ -46,7 +46,8 @@ Deno.serve(async (req) => {
 
     const tokenData = await tokenRes.json()
     if (tokenData.error || !tokenData.stripe_user_id) {
-      return Response.redirect(`${appUrl}/settings?tab=integrations&stripe_connect_error=token_exchange_failed`)
+      const detail = tokenData.error_description || tokenData.error || 'no stripe_user_id'
+      return Response.redirect(`${appUrl}/settings?tab=integrations&stripe_connect_error=${encodeURIComponent(detail)}`)
     }
 
     await fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${org_id}`, {

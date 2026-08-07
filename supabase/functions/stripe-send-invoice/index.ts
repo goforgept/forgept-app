@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
 
     if (!org?.stripe_connect_connected || !org?.stripe_connect_account_id) {
       return new Response(JSON.stringify({ error: 'Stripe not connected for this organization' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -68,6 +68,22 @@ Deno.serve(async (req) => {
       'Authorization': `Bearer ${stripeKey}`,
       'Content-Type': 'application/x-www-form-urlencoded',
       'Stripe-Account': org.stripe_connect_account_id,
+    }
+
+    // If already sent to Stripe, just resend the existing invoice
+    if (invoice.stripe_invoice_id) {
+      const sendRes = await fetch(`https://api.stripe.com/v1/invoices/${invoice.stripe_invoice_id}/send`, {
+        method: 'POST',
+        headers: stripeHeaders,
+        body: new URLSearchParams({}),
+      })
+      const sent = await sendRes.json()
+      if (sent.error) throw new Error(`Stripe resend error: ${sent.error.message}`)
+      const hostedUrl = sent.hosted_invoice_url || invoice.stripe_hosted_invoice_url
+      await adminSupabase.from('invoices').update({ stripe_hosted_invoice_url: hostedUrl, status: 'Sent' }).eq('id', invoiceId)
+      return new Response(JSON.stringify({ success: true, resent: true, stripe_invoice_id: invoice.stripe_invoice_id, hosted_invoice_url: hostedUrl }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
     // Resolve client info
@@ -117,11 +133,13 @@ Deno.serve(async (req) => {
     }
 
     // Fetch line items
-    const { data: lineItems } = await adminSupabase
+    const { data: lineItems, error: lineItemsError } = await adminSupabase
       .from('invoice_line_items')
       .select('*')
       .eq('invoice_id', invoiceId)
       .order('id')
+
+    console.log('line_items fetch:', { count: lineItems?.length ?? 0, error: lineItemsError?.message, ids: lineItems?.map(i => ({ id: i.id, total: i.total, unit_price: i.unit_price })) })
 
     // Create the Stripe Invoice
     const dueDate = invoice.due_date
@@ -171,7 +189,7 @@ Deno.serve(async (req) => {
         body: itemParams,
       })
       const itemData = await itemRes.json()
-      if (itemData.error) console.error('Invoice item error:', itemData.error.message)
+      if (itemData.error) throw new Error(`Stripe item error (${item.description}): ${itemData.error.message}`)
     }
 
     // Add tax as a separate line if applicable

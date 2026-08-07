@@ -17,8 +17,8 @@ Deno.serve(async (req) => {
       })
     }
 
-    const clientId = Deno.env.get('STRIPE_CONNECT_CLIENT_ID')
-    const redirectUri = Deno.env.get('STRIPE_CONNECT_REDIRECT_URI')
+    const clientId = Deno.env.get('STRIPE_CONNECT_CLIENT_ID')?.trim()
+    const redirectUri = Deno.env.get('STRIPE_CONNECT_REDIRECT_URI')?.trim()
 
     if (!clientId || !redirectUri) {
       return new Response(JSON.stringify({ error: 'Stripe Connect not configured' }), {
