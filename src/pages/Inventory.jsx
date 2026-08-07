@@ -14,11 +14,13 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
   const [showManageWarehouses, setShowManageWarehouses] = useState(false)
   const [showAdjust, setShowAdjust] = useState(null) // inventory item
   const [showDetail, setShowDetail] = useState(null) // inventory item
+  const [showEditItem, setShowEditItem] = useState(null) // inventory item being edited
   const [transactions, setTransactions] = useState([])
   const [saving, setSaving] = useState(false)
 
   const emptyItem = { part_number: '', description: '', warehouse_id: '', qty_on_hand: '', unit_cost: '', min_stock_level: '' }
   const [itemForm, setItemForm] = useState(emptyItem)
+  const [editItemForm, setEditItemForm] = useState(emptyItem)
   const [adjustForm, setAdjustForm] = useState({ type: 'receipt', quantity: '', notes: '' })
   const [warehouseForm, setWarehouseForm] = useState({ name: '', address: '', notes: '' })
   const [editingWarehouse, setEditingWarehouse] = useState(null)
@@ -113,11 +115,33 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
   const openDetail = async (item) => {
     setShowDetail(item)
     const { data } = await supabase.from('inventory_transactions')
-      .select('*, jobs(proposal_name)')
+      .select('*, jobs(proposal_name), service_tickets(ticket_number, title)')
       .eq('inventory_item_id', item.id)
       .order('created_at', { ascending: false })
       .limit(50)
     setTransactions(data || [])
+  }
+
+  const handleEditItem = async () => {
+    if (!editItemForm.description || !showEditItem) return
+    setSaving(true)
+    await supabase.from('inventory_items').update({
+      description: editItemForm.description,
+      part_number: editItemForm.part_number || null,
+      warehouse_id: editItemForm.warehouse_id || null,
+      unit_cost: parseFloat(editItemForm.unit_cost) || 0,
+      min_stock_level: parseFloat(editItemForm.min_stock_level) || 0,
+    }).eq('id', showEditItem.id)
+    setShowEditItem(null)
+    setSaving(false)
+    fetchAll()
+  }
+
+  const handleDeleteItem = async (item) => {
+    if (!confirm(`Delete "${item.description}"? This cannot be undone.`)) return
+    await supabase.from('inventory_transactions').delete().eq('inventory_item_id', item.id)
+    await supabase.from('inventory_items').delete().eq('id', item.id)
+    fetchAll()
   }
 
   const filtered = items.filter(i => {
@@ -218,10 +242,20 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
                       </td>
                       <td className="px-4 py-3 text-fp-muted tabular-nums">${(parseFloat(item.unit_cost) || 0).toFixed(2)}</td>
                       <td className="px-4 py-3">
-                        <button onClick={() => setShowAdjust(item)}
-                          className="text-xs text-fp-muted hover:text-fp-brand transition-colors px-2 py-1 border border-fp-border rounded-lg">
-                          Adjust
-                        </button>
+                        <div className="flex gap-1">
+                          <button onClick={() => setShowAdjust(item)}
+                            className="text-xs text-fp-muted hover:text-fp-brand transition-colors px-2 py-1 border border-fp-border rounded-lg">
+                            Adjust
+                          </button>
+                          <button onClick={() => { setShowEditItem(item); setEditItemForm({ part_number: item.part_number || '', description: item.description, warehouse_id: item.warehouse_id || '', unit_cost: item.unit_cost || '', min_stock_level: item.min_stock_level || '' }) }}
+                            className="text-xs text-fp-muted hover:text-fp-text transition-colors px-2 py-1 border border-fp-border rounded-lg">
+                            Edit
+                          </button>
+                          <button onClick={() => handleDeleteItem(item)}
+                            className="text-xs text-fp-muted hover:text-red-400 transition-colors px-2 py-1 border border-fp-border rounded-lg">
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -356,24 +390,69 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
             ) : (
               <div className="space-y-2">
                 {transactions.map(t => {
-                  const typeLabel = { receipt: 'Receipt', reservation: 'Reserved', fulfillment: 'Fulfilled', release: 'Released', adjustment: 'Adjustment' }[t.type] || t.type
-                  const isPositive = t.quantity > 0
+                  const typeLabel = { receipt: 'Receipt', reservation: 'Reserved', fulfillment: 'Fulfilled', release: 'Released', adjustment: 'Adjustment', service_ticket: 'Service Ticket Pull' }[t.type] || t.type
+                  const isPositive = parseFloat(t.quantity) > 0
                   return (
                     <div key={t.id} className="flex items-start justify-between bg-fp-inset rounded-lg px-3 py-2">
                       <div>
                         <p className="text-fp-text text-xs font-semibold">{typeLabel}</p>
                         {t.jobs?.proposal_name && <p className="text-fp-muted text-xs">Job: {t.jobs.proposal_name}</p>}
-                        {t.notes && <p className="text-fp-muted text-xs italic">{t.notes}</p>}
+                        {t.service_tickets && <p className="text-fp-muted text-xs">Ticket: {t.service_tickets.ticket_number ? `${t.service_tickets.ticket_number} — ` : ''}{t.service_tickets.title}</p>}
+                        {t.notes && t.type !== 'service_ticket' && <p className="text-fp-muted text-xs italic">{t.notes}</p>}
                         <p className="text-fp-muted text-xs">{new Date(t.created_at).toLocaleDateString()}</p>
                       </div>
                       <span className={`text-sm font-bold tabular-nums ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-                        {isPositive ? '+' : ''}{t.quantity}
+                        {isPositive ? '+' : ''}{parseFloat(t.quantity)}
                       </span>
                     </div>
                   )
                 })}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Item Modal */}
+      {showEditItem && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-fp-text font-bold text-lg mb-5">Edit Item</h3>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-fp-muted text-xs mb-1 block">Description <span className="text-fp-brand">*</span></label>
+                  <input type="text" value={editItemForm.description} onChange={e => setEditItemForm(p => ({ ...p, description: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Part Number</label>
+                  <input type="text" value={editItemForm.part_number} onChange={e => setEditItemForm(p => ({ ...p, part_number: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Warehouse</label>
+                  <select value={editItemForm.warehouse_id} onChange={e => setEditItemForm(p => ({ ...p, warehouse_id: e.target.value }))} className={inputClass}>
+                    <option value="">— None —</option>
+                    {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Unit Cost ($)</label>
+                  <input type="number" min="0" step="0.01" value={editItemForm.unit_cost} onChange={e => setEditItemForm(p => ({ ...p, unit_cost: e.target.value }))} className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Min Stock Level</label>
+                  <input type="number" min="0" step="1" value={editItemForm.min_stock_level} onChange={e => setEditItemForm(p => ({ ...p, min_stock_level: e.target.value }))} className={inputClass} />
+                </div>
+              </div>
+              <p className="text-fp-muted text-xs">To change quantity, use the Adjust button on the main list.</p>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowEditItem(null)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
+                <button onClick={handleEditItem} disabled={saving || !editItemForm.description}
+                  className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
