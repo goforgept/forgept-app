@@ -73,6 +73,21 @@ Deno.serve(async (req) => {
       'Content-Type': 'application/json',
     }
 
+    // Auto-fetch and save location_id if missing
+    if (!org.square_location_id) {
+      const locRes = await fetch('https://connect.squareup.com/v2/locations', { headers: sqHeaders })
+      const locData = await locRes.json()
+      console.log('Square locations:', JSON.stringify(locData))
+      const locationId = locData.locations?.[0]?.id
+      if (!locationId) {
+        return new Response(JSON.stringify({ error: `Square locations: ${JSON.stringify(locData)}` }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      org.square_location_id = locationId
+      await adminSupabase.from('organizations').update({ square_location_id: locationId }).eq('id', invoice.org_id)
+    }
+
     const clientEmail = invoice.proposals?.client_email
     const clientName = invoice.proposals?.client_name || invoice.proposals?.company
 
