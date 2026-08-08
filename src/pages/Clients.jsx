@@ -105,6 +105,8 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
       const pushBody = JSON.stringify({ clientId: newClient.id })
       fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
       fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
+      fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
+      fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/square-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
     }
   }
 

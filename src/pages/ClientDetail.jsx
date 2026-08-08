@@ -436,6 +436,8 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     const pushBody = JSON.stringify({ clientId: id })
     fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/zoho-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
     fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
+    fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
+    fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/square-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
   }
 
 const deleteMeeting = async (meetingId) => {

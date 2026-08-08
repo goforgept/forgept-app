@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
 
     // Fetch invoice + proposal
     const invRes = await fetch(
-      `${supabaseUrl}/rest/v1/invoices?id=eq.${invoiceId}&select=*,proposals(proposal_name,company,client_name,client_email,rep_name,rep_email)`,
+      `${supabaseUrl}/rest/v1/invoices?id=eq.${invoiceId}&select=*,proposals(proposal_name,company,client_name,client_email,rep_name,rep_email),clients(square_customer_id,stripe_customer_id,email)`,
       { headers: dbHeaders }
     )
     const invData = await invRes.json()
@@ -101,17 +101,52 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Create Square order (no customer_id needed — email goes on the invoice directly)
-    const idempotencyKey = `forgept-inv-${invoiceId}-${Date.now()}`
-    const amountCents = Math.round((invoice.total_amount || 0) * 100)
+    // Find or create Square customer (use saved ID if available)
+    let squareCustomerId: string = invoice.clients?.square_customer_id || ''
 
-    const orderRes = await fetch('${sqBase}/v2/orders', {
+    if (!squareCustomerId) {
+      const searchRes = await fetch(`${sqBase}/v2/customers/search`, {
+        method: 'POST',
+        headers: sqHeaders,
+        body: JSON.stringify({ query: { filter: { email_address: { exact: clientEmail } } } })
+      })
+      const searchData = await searchRes.json()
+
+      if (searchData.customers?.length > 0) {
+        squareCustomerId = searchData.customers[0].id
+      } else {
+        const createRes = await fetch(`${sqBase}/v2/customers`, {
+          method: 'POST',
+          headers: sqHeaders,
+          body: JSON.stringify({ email_address: clientEmail, company_name: clientName || 'Client' })
+        })
+        const createData = await createRes.json()
+        if (createData.errors?.length > 0) {
+          throw new Error(`Square customer error: ${createData.errors[0].detail || createData.errors[0].code}`)
+        }
+        squareCustomerId = createData.customer?.id
+      }
+    }
+
+    if (!squareCustomerId) throw new Error('Could not find or create Square customer')
+
+    // Create Square order
+    const idempotencyKey = `forgept-inv-${invoiceId}-${Date.now()}`
+    const amountCents = Math.round((invoice.total || invoice.total_amount || 0) * 100)
+    if (amountCents < 1) {
+      return new Response(JSON.stringify({ error: 'Invoice total is $0 — add line items before sending to Square' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    const orderRes = await fetch(`${sqBase}/v2/orders`, {
       method: 'POST',
       headers: sqHeaders,
       body: JSON.stringify({
         idempotency_key: idempotencyKey,
         order: {
           location_id: org.square_location_id,
+          customer_id: squareCustomerId,
           reference_id: invoice.invoice_number || invoiceId,
           line_items: [{
             name: invoice.proposals?.proposal_name || 'Services',
@@ -136,7 +171,7 @@ Deno.serve(async (req) => {
       ? new Date(invoice.due_date).toISOString().split('T')[0]
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-    const sqInvRes = await fetch('${sqBase}/v2/invoices', {
+    const sqInvRes = await fetch(`${sqBase}/v2/invoices`, {
       method: 'POST',
       headers: sqHeaders,
       body: JSON.stringify({
@@ -144,16 +179,13 @@ Deno.serve(async (req) => {
         invoice: {
           location_id: org.square_location_id,
           order_id: orderId,
-          primary_recipient: {
-            email_address: clientEmail,
-            given_name: clientName || 'Client',
-          },
+          primary_recipient: { customer_id: squareCustomerId },
           payment_requests: [{
             request_type: 'BALANCE',
             due_date: dueDate,
             automatic_payment_source: 'NONE',
           }],
-          delivery_method: 'SHARE_MANUALLY',
+          delivery_method: 'EMAIL',
           title: invoice.proposals?.proposal_name || 'Invoice',
           description: `Invoice ${invoice.invoice_number || ''}`.trim(),
           accepted_payment_methods: {
@@ -170,7 +202,8 @@ Deno.serve(async (req) => {
     const sqInvoiceId = sqInvData.invoice?.id
 
     if (!sqInvoiceId) {
-      return new Response(JSON.stringify({ error: 'Could not create Square invoice', details: sqInvData }), {
+      const sqErr = sqInvData.errors?.[0]?.detail || sqInvData.errors?.[0]?.code || JSON.stringify(sqInvData)
+      return new Response(JSON.stringify({ error: `Square invoice error: ${sqErr}` }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
@@ -186,6 +219,9 @@ Deno.serve(async (req) => {
     })
     const publishData = await publishRes.json()
     console.log('Square invoice publish:', JSON.stringify(publishData))
+    if (publishData.errors?.length > 0) {
+      throw new Error(`Square publish error: ${publishData.errors[0].detail || publishData.errors[0].code}`)
+    }
     const paymentUrl = publishData.invoice?.public_url
 
     // Save Square invoice ID and payment URL back to ForgePt invoice
