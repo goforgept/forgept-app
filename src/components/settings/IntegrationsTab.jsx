@@ -129,6 +129,10 @@ export default function IntegrationsTab({
   const [selected, setSelected] = useState(null)
   const [squareTestToken, setSquareTestToken] = useState('')
   const [savingSquareToken, setSavingSquareToken] = useState(false)
+  const [squareSyncing, setSquareSyncing] = useState(false)
+  const [squareSyncResult, setSquareSyncResult] = useState(null)
+  const [stripeSyncing, setStripeSyncing] = useState(false)
+  const [stripeSyncResult, setStripeSyncResult] = useState(null)
   const [zohoConnecting, setZohoConnecting] = useState(null)
   const [zohoMessage, setZohoMessage] = useState(null)
   const [zohoStatus, setZohoStatus] = useState({ crm: false, books: false })
@@ -333,6 +337,36 @@ export default function IntegrationsTab({
       setSquareMessage({ type: 'error', text: err.message })
     }
     setSavingSquareToken(false)
+  }
+
+  const syncSquareClients = async () => {
+    setSquareSyncing(true); setSquareSyncResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/square-sync-clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setSquareSyncResult(`Imported ${data.total} customers: ${data.created} new, ${data.updated} updated`)
+    } catch (err) { setSquareSyncResult(`Error: ${err.message}`) }
+    setSquareSyncing(false)
+  }
+
+  const syncStripeClients = async () => {
+    setStripeSyncing(true); setStripeSyncResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-sync-clients', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setStripeSyncResult(`Imported ${data.total} customers: ${data.created} new, ${data.updated} updated`)
+    } catch (err) { setStripeSyncResult(`Error: ${err.message}`) }
+    setStripeSyncing(false)
   }
 
   const disconnectSquare = async () => {
@@ -731,12 +765,23 @@ export default function IntegrationsTab({
       {selected === 'square' && (
         <div className="bg-fp-card rounded-xl p-6">
           {squareConnected ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-fp-text font-semibold">Square Payments</p>
-                {squareMerchantId && <p className="text-fp-muted text-sm mt-0.5">Merchant <span className="text-fp-text font-mono">{squareMerchantId}</span></p>}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-fp-text font-semibold">Square Payments</p>
+                  {squareMerchantId && <p className="text-fp-muted text-sm mt-0.5">Merchant <span className="text-fp-text font-mono">{squareMerchantId}</span></p>}
+                </div>
+                <button onClick={disconnectSquare} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
               </div>
-              <button onClick={disconnectSquare} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
+              <div className="border-t border-fp-border pt-4">
+                <p className="text-fp-text text-sm font-semibold mb-0.5">Import Customers</p>
+                <p className="text-fp-muted text-xs mb-3">Pull all Square customers into ForgePt as clients. Existing matches by email are updated, new ones are created.</p>
+                <button onClick={syncSquareClients} disabled={squareSyncing}
+                  className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
+                  {squareSyncing ? 'Importing...' : 'Import Customers'}
+                </button>
+                {squareSyncResult && <p className="text-fp-muted text-xs mt-2">{squareSyncResult}</p>}
+              </div>
             </div>
           ) : (
             <div className="space-y-3">
@@ -770,12 +815,23 @@ export default function IntegrationsTab({
       {selected === 'stripe' && (
         <div className="bg-fp-card rounded-xl p-6">
           {stripeConnected ? (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-fp-text font-semibold">Stripe Invoicing</p>
-                <p className="text-fp-muted text-sm mt-0.5">Your Stripe account is connected. Open any invoice and click "Stripe" to send.</p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-fp-text font-semibold">Stripe Invoicing</p>
+                  <p className="text-fp-muted text-sm mt-0.5">Your Stripe account is connected. Open any invoice and click "Stripe" to send.</p>
+                </div>
+                <button onClick={disconnectStripe} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
               </div>
-              <button onClick={disconnectStripe} className="text-fp-muted hover:text-red-400 text-sm transition-colors">Disconnect</button>
+              <div className="border-t border-fp-border pt-4">
+                <p className="text-fp-text text-sm font-semibold mb-0.5">Import Customers</p>
+                <p className="text-fp-muted text-xs mb-3">Pull all Stripe customers into ForgePt as clients. Existing matches by email are updated, new ones are created.</p>
+                <button onClick={syncStripeClients} disabled={stripeSyncing}
+                  className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors disabled:opacity-50">
+                  {stripeSyncing ? 'Importing...' : 'Import Customers'}
+                </button>
+                {stripeSyncResult && <p className="text-fp-muted text-xs mt-2">{stripeSyncResult}</p>}
+              </div>
             </div>
           ) : (
             <button onClick={connectStripe} disabled={connectingStripe}
