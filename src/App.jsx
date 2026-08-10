@@ -47,6 +47,7 @@ import DrawingReview from './pages/DrawingReview'
 import EmbedDesigner from './pages/EmbedDesigner'
 import Roadmap from './pages/Roadmap'
 import Inventory from './pages/Inventory'
+import AIAgent from './components/AIAgent'
 
 function App() {
   const { session, profile, features, loading } = useProfile()
@@ -118,6 +119,7 @@ function App() {
     featureApi:            features.api,
     featureRegions:        features.regions,
     featureInventory:      features.inventory,
+    featureAiAgent:        features.aiAgent,
   }
 
   return (
@@ -215,6 +217,7 @@ function App() {
           </>
         )}
       </Routes>
+      {session && features.aiAgent && <AIAgent />}
     </>
   )
 }

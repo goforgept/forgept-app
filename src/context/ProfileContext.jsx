@@ -123,6 +123,7 @@ export function ProfileProvider({ children }) {
     msrp:              profile?.organizations?.feature_msrp || false,
     complianceFields:  profile?.organizations?.feature_compliance_fields || false,
     inventory:         profile?.organizations?.feature_inventory || false,
+    aiAgent:           profile?.organizations?.feature_ai_agent || false,
   }
 
   return (
