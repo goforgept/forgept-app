@@ -187,6 +187,25 @@ Deno.serve(async (req) => {
       break
     }
 
+    // ── Invoice sent (open, awaiting payment) ───────────────────────────────
+    case 'invoice.sent': {
+      // Platform event only — ForgePt billing our own customers
+      if (event.account) break
+      const org = await getOrgByCustomerId(obj.customer)
+      if (org) {
+        // Only move to pending if they're still on trial (don't downgrade active orgs mid-cycle)
+        const orgRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/organizations?id=eq.${org.id}&select=billing_status`,
+          { headers: dbHeaders }
+        )
+        const orgData = await orgRes.json()
+        if (orgData?.[0]?.billing_status === 'trial') {
+          await updateOrg(org.id, { billing_status: 'pending' })
+        }
+      }
+      break
+    }
+
     // ── Payment succeeded ────────────────────────────────────────────────────
     case 'invoice.paid': {
       if (event.account) {

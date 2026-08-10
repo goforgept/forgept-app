@@ -668,7 +668,10 @@ export default function SuperAdmin() {
   const openStripeModal = (org) => {
     const admin = getOrgAdmin(org.id)
     setStripeModal({ org, admin })
-    setStripeForm({ plan: org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter', qboAddon: org.quickbooks_addon || false, email: admin?.email || '', address_line1: admin?.bill_to_address || admin?.ship_to_address || '', address_city: admin?.bill_to_city || admin?.ship_to_city || '', address_state: admin?.bill_to_state || admin?.ship_to_state || '', address_zip: admin?.bill_to_zip || admin?.ship_to_zip || '', address_country: 'US', days_until_due: 30, preferred_payment_method: org.preferred_payment_method || 'ACH' })
+    const defaultStartDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const currentPlan = org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter'
+    const isAnnual = currentPlan.includes('Annual')
+    setStripeForm({ plan: isAnnual ? currentPlan.replace(' Annual', '') : currentPlan, billing_interval: isAnnual ? 'annual' : 'monthly', qboAddon: org.quickbooks_addon || false, email: admin?.email || '', address_line1: admin?.bill_to_address || admin?.ship_to_address || '', address_city: admin?.bill_to_city || admin?.ship_to_city || '', address_state: admin?.bill_to_state || admin?.ship_to_state || '', address_zip: admin?.bill_to_zip || admin?.ship_to_zip || '', address_country: 'US', days_until_due: 30, preferred_payment_method: org.preferred_payment_method || 'ACH', service_start_date: defaultStartDate })
     setStripeResult(null)
   }
 
@@ -679,7 +682,7 @@ export default function SuperAdmin() {
     setStripeResult(null)
     try {
       const { data: result, error } = await supabase.functions.invoke('stripe-create-subscription', {
-        body: { orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeForm.email || '', plan: stripeForm.plan, qboAddon: stripeForm.qboAddon, daysUntilDue: stripeForm.days_until_due ?? 30, preferredPaymentMethod: stripeForm.preferred_payment_method || 'ACH', address: { line1: stripeForm.address_line1 || '', city: stripeForm.address_city || '', state: stripeForm.address_state || '', postal_code: stripeForm.address_zip || '', country: stripeForm.address_country || 'US' } }
+        body: { orgId: stripeModal.org.id, orgName: stripeModal.org.name, adminEmail: stripeForm.email || '', plan: stripeForm.billing_interval === 'annual' ? `${stripeForm.plan} Annual` : stripeForm.plan, billingInterval: stripeForm.billing_interval || 'monthly', serviceStartDate: stripeForm.service_start_date || null, qboAddon: stripeForm.qboAddon, daysUntilDue: stripeForm.days_until_due ?? 30, preferredPaymentMethod: stripeForm.preferred_payment_method || 'ACH', address: { line1: stripeForm.address_line1 || '', city: stripeForm.address_city || '', state: stripeForm.address_state || '', postal_code: stripeForm.address_zip || '', country: stripeForm.address_country || 'US' } }
       })
       if (error) setStripeResult({ success: false, message: error.message })
       else if (result?.error) setStripeResult({ success: false, message: result.error })
@@ -699,6 +702,7 @@ export default function SuperAdmin() {
   const getBillingStatusColor = (status) => {
     if (status === 'active') return 'bg-green-500/20 text-green-400'
     if (status === 'trial') return 'bg-yellow-500/20 text-yellow-400'
+    if (status === 'pending') return 'bg-blue-500/20 text-blue-400'
     if (status === 'past_due') return 'bg-red-500/20 text-red-400'
     if (status === 'cancelled') return 'bg-[#2a3d55] text-[#8A9AB0]'
     return 'bg-[#2a3d55] text-[#8A9AB0]'
@@ -749,6 +753,7 @@ export default function SuperAdmin() {
   const arr = mrr * 12
   const activeOrgs = orgs.filter(o => o.billing_status === 'active').length
   const trialOrgs = orgs.filter(o => o.billing_status === 'trial').length
+  const pendingOrgs = orgs.filter(o => o.billing_status === 'pending').length
   const pastDueOrgs = orgs.filter(o => o.billing_status === 'past_due').length
 
   if (!unlocked) return (
@@ -961,6 +966,12 @@ export default function SuperAdmin() {
                 <p className="text-[#8A9AB0] text-xs mb-1">Trial</p>
                 <p className="text-yellow-400 text-xl font-bold">{trialOrgs}</p>
               </div>
+              {pendingOrgs > 0 && (
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+                  <p className="text-[#8A9AB0] text-xs mb-1">Pending</p>
+                  <p className="text-blue-400 text-xl font-bold">{pendingOrgs}</p>
+                </div>
+              )}
               {pastDueOrgs > 0 && (
                 <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
                   <p className="text-[#8A9AB0] text-xs mb-1">Past Due</p>
@@ -1251,7 +1262,7 @@ export default function SuperAdmin() {
                             <div>
                               <label className="text-[#8A9AB0] text-xs mb-1 block">Status</label>
                               <select value={billingForm.billing_status} onChange={e => setBillingForm(p => ({ ...p, billing_status: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                                {['trial', 'active', 'past_due', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
+                                {['trial', 'pending', 'active', 'past_due', 'cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
                               </select>
                             </div>
                             <div>
@@ -1479,11 +1490,12 @@ export default function SuperAdmin() {
           return (
             <div className="space-y-5">
               {/* Revenue summary */}
-              <div className="grid grid-cols-6 gap-4">
+              <div className="grid grid-cols-7 gap-4">
                 {[
                   { label: 'MRR',         value: `$${mrr.toLocaleString()}`,         color: 'text-[#C8622A]' },
                   { label: 'ARR',         value: `$${arr.toLocaleString()}`,         color: 'text-[#C8622A]' },
                   { label: 'Active',      value: activeOrgs,                          color: 'text-green-400' },
+                  { label: 'Pending',     value: pendingOrgs,                         color: pendingOrgs > 0 ? 'text-blue-400' : 'text-[#8A9AB0]' },
                   { label: 'Past Due',    value: pastDueOrgs,                         color: pastDueOrgs > 0 ? 'text-red-400' : 'text-[#8A9AB0]' },
                   { label: 'Trials',      value: trialOrgs,                           color: 'text-yellow-400' },
                   { label: 'Cancelled',   value: cancelledOrgs,                       color: 'text-[#8A9AB0]' },
@@ -1855,19 +1867,40 @@ export default function SuperAdmin() {
                 </div>
               </div>
               <div>
+                <label className="text-[#8A9AB0] text-xs mb-2 block">Billing Interval</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['monthly', 'annual'].map(interval => (
+                    <button key={interval} type="button"
+                      onClick={() => setStripeForm(p => ({ ...p, billing_interval: interval, plan: interval === 'annual' ? 'Early Adopter' : p.plan }))}
+                      className={`py-2 rounded-lg text-sm font-semibold border transition-colors ${stripeForm.billing_interval === interval ? 'border-[#C8622A] bg-[#C8622A]/10 text-[#C8622A]' : 'border-[#2a3d55] bg-[#0F1C2E] text-[#8A9AB0] hover:border-[#3a4d65]'}`}>
+                      {interval === 'monthly' ? 'Monthly' : 'Annual'}
+                      {interval === 'annual' && <span className="ml-1 text-xs text-green-400">Save ~17%</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
                 <label className="text-[#8A9AB0] text-xs mb-1 block">Base Plan</label>
-                <select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
-                  <optgroup label="Annual (Best Value)">
-                    <option value="Early Adopter Annual">Early Adopter Annual — $1,200/yr ($100/mo equivalent)</option>
-                  </optgroup>
-                  <optgroup label="Monthly">
+                {stripeForm.billing_interval === 'annual' ? (
+                  <select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                    <option value="Early Adopter">Early Adopter — $1,200/yr ($100/mo equivalent)</option>
+                  </select>
+                ) : (
+                  <select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
                     <option value="Early Adopter">Early Adopter — $100/mo</option>
                     <option value="Designer Only">Designer Only — $49/mo</option>
                     <option value="Small Team">Small Team — $99/mo</option>
                     <option value="Team">Team — $149/mo</option>
                     <option value="Business">Business — $199/mo</option>
-                  </optgroup>
-                </select>
+                  </select>
+                )}
+              </div>
+              <div>
+                <label className="text-[#8A9AB0] text-xs mb-1 block">Service Start Date</label>
+                <input type="date" value={stripeForm.service_start_date || ''}
+                  onChange={e => setStripeForm(p => ({ ...p, service_start_date: e.target.value }))}
+                  className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                <p className="text-[#8A9AB0] text-xs mt-1">Shown on the invoice. Defaults to 14 days from today.</p>
               </div>
               <label className="flex items-center gap-3 bg-[#0F1C2E] rounded-lg px-4 py-3 cursor-pointer">
                 <input type="checkbox" checked={stripeForm.qboAddon} onChange={e => setStripeForm(p => ({ ...p, qboAddon: e.target.checked }))} className="w-4 h-4 rounded accent-[#C8622A]" />
@@ -1879,10 +1912,10 @@ export default function SuperAdmin() {
               <div className="bg-[#0F1C2E] rounded-lg p-3 text-xs text-[#8A9AB0]">
                 <p className="font-semibold text-white mb-1">What this does:</p>
                 <p>• Creates or updates a Stripe customer for {stripeModal.org.name}</p>
-                <p>• {stripeModal.org.stripe_subscription_id ? 'Updates the existing' : 'Creates a'} {stripeForm.plan} subscription — <span className="text-white font-semibold">${{ 'Early Adopter Annual': 1200, 'Early Adopter': 100, 'Designer Only': 49, 'Small Team': 99, 'Team': 149, 'Business': 199 }[stripeForm.plan]}{stripeForm.plan.includes('Annual') ? '/yr' : '/mo'}{stripeForm.qboAddon ? ' + $25/mo QBO' : ''}</span></p>
-                <p>• Stripe auto-sends invoices each cycle once a payment method is added</p>
-                <p>• Updates billing status in ForgePt.</p>
-                <p className="mt-2 text-yellow-400">Note: Customer will need to add a payment method before charges begin.</p>
+                <p>• {stripeModal.org.stripe_subscription_id ? 'Updates the existing' : 'Creates a'} <span className="text-white font-semibold">{stripeForm.plan} {stripeForm.billing_interval === 'annual' ? '(annual)' : '(monthly)'}</span> subscription</p>
+                <p>• Invoice will note service starts <span className="text-white font-semibold">{stripeForm.service_start_date ? new Date(stripeForm.service_start_date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '14 days from today'}</span></p>
+                <p>• Stripe auto-sends invoices each billing cycle</p>
+                <p>• Sets billing status to <span className="text-blue-400 font-semibold">pending</span> until payment is received</p>
               </div>
               {stripeResult && <div className={`rounded-lg px-4 py-3 text-sm font-semibold ${stripeResult.success ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>{stripeResult.message}</div>}
               <div className="flex gap-3 pt-2">

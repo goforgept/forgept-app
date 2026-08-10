@@ -45,9 +45,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { orgId, orgName, adminEmail, plan, qboAddon, daysUntilDue, preferredPaymentMethod, address } = await req.json()
+    const { orgId, orgName, adminEmail, plan, billingInterval, serviceStartDate, qboAddon, daysUntilDue, preferredPaymentMethod, address } = await req.json()
     const useACH = preferredPaymentMethod !== 'Credit Card'
-    console.log('stripe-create-subscription: plan=', plan, 'orgId=', orgId, 'paymentMethod=', preferredPaymentMethod)
+    console.log('stripe-create-subscription: plan=', plan, 'interval=', billingInterval, 'serviceStart=', serviceStartDate, 'orgId=', orgId)
 
     const stripeKey = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
     if (!stripeKey) throw new Error('STRIPE_SECRET_KEY not set in environment')
@@ -169,6 +169,11 @@ Deno.serve(async (req) => {
       ]
       if (qboAddon) items.push(['items[1][price]', qboPriceId])
 
+      // Format service start date for display on the invoice
+      const startDateFormatted = serviceStartDate
+        ? new Date(serviceStartDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        : null
+
       const subParams: [string, string][] = [
         ['customer', customerId],
         ...items,
@@ -176,6 +181,8 @@ Deno.serve(async (req) => {
         ['days_until_due', String(daysUntilDue ?? 30)],
         ['metadata[org_id]', orgId],
         ['metadata[plan]', plan],
+        ['metadata[billing_interval]', billingInterval || 'monthly'],
+        ...(serviceStartDate ? [['metadata[service_start_date]', serviceStartDate] as [string, string]] : []),
         // Restrict payment methods based on org preference
         ['payment_settings[payment_method_types][0]', useACH ? 'us_bank_account' : 'card'],
         ['payment_settings[save_default_payment_method]', 'on_subscription'],
@@ -200,6 +207,18 @@ Deno.serve(async (req) => {
       )
       const draftData = await draftRes.json()
       for (const inv of draftData?.data || []) {
+        // Stamp the service start date onto the invoice footer so the customer sees it
+        if (startDateFormatted) {
+          await fetch(`https://api.stripe.com/v1/invoices/${inv.id}`, {
+            method: 'POST',
+            headers: stripeHeaders,
+            body: new URLSearchParams({
+              footer: `Service Start Date: ${startDateFormatted}`,
+              description: `ForgePt ${plan} Subscription — Service begins ${startDateFormatted}`,
+            }),
+          })
+        }
+
         // For CC customers, add a 3% surcharge item before finalizing
         if (!useACH && inv.amount_due > 0) {
           const surchargeCents = Math.round(inv.amount_due * 0.03)
@@ -237,17 +256,19 @@ Deno.serve(async (req) => {
 
     // Update org in Supabase
     const monthlyRate = (PLAN_RATES[plan] ?? 0) + (qboAddon ? 25 : 0)
+    const orgPatch: Record<string, unknown> = {
+      stripe_subscription_id: subscriptionId,
+      plan,
+      quickbooks_addon: qboAddon ?? false,
+      billing_status: subscriptionStatus === 'active' ? 'active' : subscriptionStatus === 'trialing' ? 'trial' : 'pending',
+      monthly_rate: monthlyRate,
+      preferred_payment_method: preferredPaymentMethod ?? 'ACH',
+    }
+    if (serviceStartDate) orgPatch.service_start_date = serviceStartDate
     await fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${orgId}`, {
       method: 'PATCH',
       headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({
-        stripe_subscription_id: subscriptionId,
-        plan,
-        quickbooks_addon: qboAddon ?? false,
-        billing_status: subscriptionStatus === 'active' ? 'active' : subscriptionStatus === 'trialing' ? 'trial' : 'pending',
-        monthly_rate: monthlyRate,
-        preferred_payment_method: preferredPaymentMethod ?? 'ACH',
-      }),
+      body: JSON.stringify(orgPatch),
     })
 
     return new Response(JSON.stringify({
