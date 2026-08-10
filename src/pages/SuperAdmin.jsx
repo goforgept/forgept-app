@@ -632,6 +632,12 @@ export default function SuperAdmin() {
     fetchData()
   }
 
+  const toggleFeatureFlag = async (orgId, key, currentValue) => {
+    const newValue = !currentValue
+    await supabase.from('organizations').update({ [key]: newValue }).eq('id', orgId)
+    setOrgs(prev => prev.map(o => o.id === orgId ? { ...o, [key]: newValue } : o))
+  }
+
   const startEditingBilling = (org) => {
     setEditingBilling(org.id)
     setBillingForm({
@@ -1275,9 +1281,57 @@ export default function SuperAdmin() {
                 </div>
 
                 {/* Feature Settings */}
+                {/* Feature Flags — always visible, instant save */}
+                <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Features</p>
+                  {Object.entries(
+                    [
+                      { key: 'feature_proposals', label: 'Proposals', group: 'Core' },
+                      { key: 'feature_crm', label: 'CRM', group: 'Core' },
+                      { key: 'feature_send_proposal', label: 'Send Proposal', group: 'Core' },
+                      { key: 'feature_purchase_orders', label: 'Purchase Orders', group: 'Core' },
+                      { key: 'feature_invoices', label: 'Invoices', group: 'Core' },
+                      { key: 'feature_site_photos', label: 'Site Photos', group: 'Core' },
+                      { key: 'feature_ai_email', label: 'AI Email', group: 'AI Tools' },
+                      { key: 'feature_ai_bom', label: 'AI BOM', group: 'AI Tools' },
+                      { key: 'feature_ai_agent', label: 'AI Agent', group: 'AI Tools' },
+                      { key: 'feature_drawing_reader', label: 'Drawing Reader', group: 'AI Tools' },
+                      { key: 'feature_spec_reader', label: 'Spec Reader', group: 'AI Tools' },
+                      { key: 'feature_drawing_tool', label: 'Designer', group: 'Designer' },
+                      { key: 'feature_designer_only', label: 'Designer Only Mode', group: 'Designer' },
+                      { key: 'feature_api', label: 'API Access', group: 'Other' },
+                      { key: 'feature_embed', label: 'Embedded Designer', group: 'Other', sub: true, requires: 'feature_api' },
+                      { key: 'feature_regions', label: 'Regions', group: 'Other' },
+                      { key: 'feature_compliance_fields', label: 'Compliance Fields', group: 'Other' },
+                      { key: 'feature_inventory', label: 'Inventory Management', group: 'Other' },
+                    ].reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc }, {})
+                  ).map(([group, flags]) => (
+                    <div key={group}>
+                      <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">{group}</p>
+                      <div className="divide-y divide-[#2a3d55] border border-[#2a3d55] rounded-lg overflow-hidden">
+                        {flags.map(flag => {
+                          const locked = flag.requires && !org[flag.requires]
+                          const enabled = !!org[flag.key]
+                          return (
+                            <div key={flag.key} className={`flex items-center justify-between py-2.5 bg-[#0F1C2E] ${flag.sub ? 'pl-7 pr-3 border-l-2 border-[#C8622A]/20' : 'px-3'}`}>
+                              <span className={`text-sm ${locked ? 'text-[#4a5d75]' : 'text-white'}`}>{flag.label}</span>
+                              <button disabled={locked}
+                                onClick={() => toggleFeatureFlag(org.id, flag.key, enabled)}
+                                className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${enabled ? 'bg-[#C8622A]' : 'bg-[#4B5563]'}`}>
+                                <span className={`inline-block w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Org Type + Designer/Catalog (Edit Settings) */}
                 {isEditing && (
                   <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Feature Settings</p>
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Advanced Settings</p>
                     <div>
                       <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">Org Type</label>
                       <div className="grid grid-cols-3 gap-2">
@@ -1290,52 +1344,6 @@ export default function SuperAdmin() {
                         ))}
                       </div>
                     </div>
-                    {Object.entries(
-                      [
-                        { key: 'feature_proposals', label: 'Proposals', group: 'Core' },
-                        { key: 'feature_crm', label: 'CRM', group: 'Core' },
-                        { key: 'feature_send_proposal', label: 'Send Proposal', group: 'Core' },
-                        { key: 'feature_purchase_orders', label: 'Purchase Orders', group: 'Core' },
-                        { key: 'feature_invoices', label: 'Invoices', group: 'Core' },
-                        { key: 'feature_site_photos', label: 'Site Photos', group: 'Core' },
-                        { key: 'feature_ai_email', label: 'AI Email', group: 'AI Tools' },
-                        { key: 'feature_ai_bom', label: 'AI BOM', group: 'AI Tools' },
-                        { key: 'feature_ai_agent', label: 'AI Agent', group: 'AI Tools' },
-                        { key: 'feature_drawing_reader', label: 'Drawing Reader', group: 'AI Tools' },
-                        { key: 'feature_spec_reader', label: 'Spec Reader', group: 'AI Tools' },
-                        { key: 'feature_drawing_tool', label: 'Designer', group: 'Designer' },
-                        { key: 'feature_designer_only', label: 'Designer Only Mode', group: 'Designer' },
-                        { key: 'feature_api', label: 'API Access', group: 'Other' },
-                        { key: 'feature_embed', label: 'Embedded Designer', group: 'Other', sub: true, requires: 'feature_api' },
-                        { key: 'feature_regions', label: 'Regions', group: 'Other' },
-                        { key: 'feature_compliance_fields', label: 'Compliance Fields', group: 'Other' },
-                        { key: 'feature_inventory', label: 'Inventory Management', group: 'Other' },
-                      ].reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc }, {})
-                    ).map(([group, flags]) => (
-                      <div key={group}>
-                        <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">{group}</p>
-                        <div className="divide-y divide-[#2a3d55] border border-[#2a3d55] rounded-lg overflow-hidden">
-                          {flags.map(flag => {
-                            const locked = flag.requires && !orgForm[flag.requires]
-                            return (
-                              <div key={flag.key} className={`flex items-center justify-between py-2.5 bg-[#0F1C2E] ${flag.sub ? 'pl-7 pr-3 border-l-2 border-[#C8622A]/20' : 'px-3'}`}>
-                                <span className={`text-sm ${locked ? 'text-[#4a5d75]' : 'text-white'}`}>{flag.label}</span>
-                                <button disabled={locked}
-                                  onClick={() => setOrgForm(p => {
-                                    const next = { ...p, [flag.key]: !p[flag.key] }
-                                    if (flag.key === 'feature_designer_only' && !p.feature_designer_only) next.feature_drawing_tool = true
-                                    if (flag.key === 'feature_api' && p.feature_api) next.feature_embed = false
-                                    return next
-                                  })}
-                                  className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed ${orgForm[flag.key] ? 'bg-[#C8622A]' : 'bg-[#4B5563]'}`}>
-                                  <span className={`inline-block w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${orgForm[flag.key] ? 'translate-x-6' : 'translate-x-1'}`} />
-                                </button>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    ))}
                     {orgForm.feature_drawing_tool && (
                       <div>
                         <p className="text-[#8A9AB0] text-xs font-semibold mb-1.5">Designer — Allowed Manufacturers</p>
