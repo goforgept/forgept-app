@@ -186,26 +186,23 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
             </select>
           </div>
           {!showArchived && (
-            <div className="flex gap-2 flex-wrap">
-              {['All', 'Active', 'Draft', 'Sent', 'Won', 'Lost'].map(s => (
-                <button
-                  key={s}
-                  onClick={() => setStatusFilter(s)}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                    statusFilter === s ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-              <button
-                onClick={() => setClosingSoon(v => !v)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                  closingSoon || isClosingFilter ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
-                }`}
+            <div className="flex gap-2">
+              <select
+                value={closingSoon ? 'Closing Soon' : statusFilter}
+                onChange={e => {
+                  if (e.target.value === 'Closing Soon') { setClosingSoon(true); setStatusFilter('All') }
+                  else { setClosingSoon(false); setStatusFilter(e.target.value) }
+                }}
+                className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
               >
-                Closing Soon
-              </button>
+                <option value="All">All Statuses</option>
+                <option value="Active">Active</option>
+                <option value="Draft">Draft</option>
+                <option value="Sent">Sent</option>
+                <option value="Won">Won</option>
+                <option value="Lost">Lost</option>
+                <option value="Closing Soon">Closing Soon</option>
+              </select>
             </div>
           )}
         </div>
