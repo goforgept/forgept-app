@@ -22,6 +22,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
   const [showAddStage, setShowAddStage] = useState(false)
   const [newStageName, setNewStageName] = useState('')
   const [search, setSearch] = useState('')
+  const [dateRange, setDateRange] = useState(90)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -72,9 +73,15 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
     setLoading(false)
   }
 
+  const dateThreshold = dateRange === 0 ? null : new Date(Date.now() - dateRange * 24 * 60 * 60 * 1000).toISOString()
+
+  const filteredProposals = dateThreshold
+    ? proposals.filter(p => p.created_at >= dateThreshold)
+    : proposals
+
   const getProposalsForStage = (stage) => {
     const q = search.toLowerCase()
-    return proposals.filter(p => {
+    return filteredProposals.filter(p => {
       if (p.pipeline_stage_id) { if (p.pipeline_stage_id !== stage.id) return false }
       else {
         if (stage.name === 'Proposal Sent' && p.status !== 'Sent') return false
@@ -135,11 +142,11 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
     fetchData()
   }
 
-  const totalPipeline = proposals
+  const totalPipeline = filteredProposals
     .filter(p => p.status !== 'Won' && p.status !== 'Lost')
     .reduce((sum, p) => sum + (p.proposal_value || 0), 0)
 
-  const wonPipeline = proposals
+  const wonPipeline = filteredProposals
     .filter(p => p.status === 'Won')
     .reduce((sum, p) => sum + (p.proposal_value || 0), 0)
 
@@ -161,6 +168,18 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
             </p>
           </div>
           <div className="flex gap-2">
+            <select
+              value={dateRange}
+              onChange={e => setDateRange(Number(e.target.value))}
+              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+            >
+              <option value={30}>Last 30 days</option>
+              <option value={60}>Last 60 days</option>
+              <option value={90}>Last 90 days</option>
+              <option value={180}>Last 180 days</option>
+              <option value={365}>Last year</option>
+              <option value={0}>All time</option>
+            </select>
             <input
               type="text"
               placeholder="Search deals..."
