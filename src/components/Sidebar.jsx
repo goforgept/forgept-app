@@ -3,6 +3,40 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import NotificationBell from './NotificationBell'
 
+const GROUP_ICONS = {
+  sales: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
+    </svg>
+  ),
+  operations: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+    </svg>
+  ),
+  manage: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+      <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+      <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
+      <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+    </svg>
+  ),
+  roadmap: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+      <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+    </svg>
+  ),
+  designer: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+      <path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/>
+    </svg>
+  ),
+}
+
 const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool, featureInventory) => [
   {
     key: 'sales',
@@ -285,11 +319,12 @@ export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager =
             <div key={group.key} className="mb-2">
               <button
                 onClick={() => toggleGroup(group.key)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors ${
-                  hasActive && !isOpen ? 'text-[#C8622A]' : 'text-fp-text hover:text-[#C8622A]'
-                }`}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors hover:bg-fp-inset group"
               >
-                <span className="text-sm font-bold tracking-wide">{group.label}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-[#C8622A]">{GROUP_ICONS[group.key]}</span>
+                  <span className="text-xs font-semibold tracking-widest uppercase text-fp-muted group-hover:text-fp-text transition-colors">{group.label}</span>
+                </span>
                 <span className="text-fp-muted text-xs">{isOpen ? '▾' : '▸'}</span>
               </button>
               {isOpen && (

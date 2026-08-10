@@ -32,8 +32,10 @@ async function fetchAll(token: string, module: string, apiBase: string) {
       `${apiBase}/crm/v2/${module}?page=${page}&per_page=200`,
       { headers: { Authorization: `Zoho-oauthtoken ${token}` } }
     )
+    console.log(`fetchAll ${module} page ${page} status:`, res.status)
     if (res.status === 204) break // no records
     const body = await res.json()
+    console.log(`fetchAll ${module} page ${page} body:`, JSON.stringify(body).slice(0, 300))
     // Surface Zoho API errors instead of silently returning 0 records
     if (body.status === 'error' || body.code) {
       throw new Error(`Zoho ${module} API error: ${body.message || body.code || JSON.stringify(body)}`)
@@ -49,8 +51,13 @@ async function fetchAll(token: string, module: string, apiBase: string) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
+  console.log('zoho-sync-crm invoked', req.method)
   const { profile, error: authError } = await validateUser(req)
-  if (authError) return new Response(JSON.stringify({ error: authError }), { status: 401, headers: corsHeaders })
+  if (authError) {
+    console.log('auth failed:', authError)
+    return new Response(JSON.stringify({ error: authError }), { status: 401, headers: corsHeaders })
+  }
+  console.log('auth OK, org_id:', profile.org_id)
 
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
@@ -76,14 +83,18 @@ Deno.serve(async (req) => {
     let token: string
     try {
       token = await refreshToken(supabase, org)
+      console.log('token refresh OK')
     } catch (err: any) {
+      console.log('token refresh failed:', err.message)
       return new Response(JSON.stringify({ error: `Token refresh failed: ${err.message} — try disconnecting and reconnecting Zoho CRM.` }), { status: 401, headers: corsHeaders })
     }
 
     const apiBase = zohoApiBase(org.zoho_dc)
+    console.log('apiBase:', apiBase, 'zoho_dc:', org.zoho_dc)
 
     // ── Accounts → clients ───────────────────────────────────────────────
     const accounts = await fetchAll(token, 'Accounts', apiBase)
+    console.log('accounts fetched:', accounts.length)
     let accountsAdded = 0, accountsUpdated = 0
 
     for (const acct of accounts) {
@@ -97,7 +108,6 @@ Deno.serve(async (req) => {
         city: acct.Billing_City || null,
         state: acct.Billing_State || null,
         zip: acct.Billing_Code || null,
-        website: acct.Website || null,
         zoho_account_id: String(acct.id),
         zoho_last_sync_at: now,
       }
@@ -110,8 +120,9 @@ Deno.serve(async (req) => {
         .maybeSingle()
 
       if (byZoho) {
-        await supabase.from('clients').update(payload).eq('id', byZoho.id)
-        accountsUpdated++
+        const { error: upErr } = await supabase.from('clients').update(payload).eq('id', byZoho.id)
+        if (upErr) console.log('account update error:', upErr.message, upErr.code)
+        else accountsUpdated++
       } else {
         // Fall back: match by company name (no zoho_account_id yet)
         const { data: byName } = await supabase
@@ -122,11 +133,13 @@ Deno.serve(async (req) => {
           .maybeSingle()
 
         if (byName) {
-          await supabase.from('clients').update(payload).eq('id', byName.id)
-          accountsUpdated++
+          const { error: upErr } = await supabase.from('clients').update(payload).eq('id', byName.id)
+          if (upErr) console.log('account update-by-name error:', upErr.message, upErr.code)
+          else accountsUpdated++
         } else {
-          await supabase.from('clients').insert(payload)
-          accountsAdded++
+          const { error: insErr } = await supabase.from('clients').insert(payload)
+          if (insErr) console.log('account insert error:', insErr.message, insErr.code)
+          else accountsAdded++
         }
       }
     }
@@ -142,12 +155,14 @@ Deno.serve(async (req) => {
 
     // ── Contacts → client_contacts ────────────────────────────────────────
     const contacts = await fetchAll(token, 'Contacts', apiBase)
-    let contactsAdded = 0, contactsUpdated = 0
+    console.log('contacts fetched:', contacts.length)
+    let contactsAdded = 0, contactsUpdated = 0, skipped = 0
 
     for (const c of contacts) {
       const fullName = [c.First_Name, c.Last_Name].filter(Boolean).join(' ')
       const zohoAccountId = c.Account_Name?.id ? String(c.Account_Name.id) : null
       const clientId = zohoAccountId ? accountMap[zohoAccountId] : null
+      if (!clientId) { skipped++; continue }
       const now = new Date().toISOString()
 
       const payload = {
@@ -168,8 +183,9 @@ Deno.serve(async (req) => {
         .maybeSingle()
 
       if (byZoho) {
-        await supabase.from('client_contacts').update(payload).eq('id', byZoho.id)
-        contactsUpdated++
+        const { error: upErr } = await supabase.from('client_contacts').update(payload).eq('id', byZoho.id)
+        if (upErr) console.log('contact update error:', upErr.message, upErr.code)
+        else contactsUpdated++
       } else {
         // Fall back: match by email
         const { data: byEmail } = c.Email ? await supabase
@@ -180,11 +196,13 @@ Deno.serve(async (req) => {
           .maybeSingle() : { data: null }
 
         if (byEmail) {
-          await supabase.from('client_contacts').update(payload).eq('id', byEmail.id)
-          contactsUpdated++
+          const { error: upErr } = await supabase.from('client_contacts').update(payload).eq('id', byEmail.id)
+          if (upErr) console.log('contact update-by-email error:', upErr.message, upErr.code)
+          else contactsUpdated++
         } else {
-          await supabase.from('client_contacts').insert(payload)
-          contactsAdded++
+          const { error: insErr } = await supabase.from('client_contacts').insert(payload)
+          if (insErr) console.log('contact insert error:', insErr.message, insErr.code)
+          else contactsAdded++
         }
       }
     }

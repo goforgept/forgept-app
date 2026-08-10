@@ -46,7 +46,6 @@ Deno.serve(async (req) => {
         city: record.Billing_City || undefined,
         state: record.Billing_State || undefined,
         zip: record.Billing_Code || undefined,
-        website: record.Website || undefined,
         zoho_last_sync_at: now,
       }
       // Remove undefined keys
