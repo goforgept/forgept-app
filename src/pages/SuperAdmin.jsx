@@ -8,6 +8,7 @@ const PLANS = [
   { name: 'Trial', rate: 0, color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
   { name: 'Early Adopter Annual', rate: 1200, color: 'text-green-400', bg: 'bg-green-500/20' },
   { name: 'Early Adopter', rate: 100, color: 'text-green-400', bg: 'bg-green-500/20' },
+  { name: 'Early Adopter - CRM/Designer Solo', rate: 800, color: 'text-green-400', bg: 'bg-green-500/20' },
   { name: 'Designer Only', rate: 49, color: 'text-blue-400', bg: 'bg-blue-500/20' },
   { name: 'Small Team', rate: 99, color: 'text-purple-400', bg: 'bg-purple-500/20' },
   { name: 'Team', rate: 149, color: 'text-indigo-400', bg: 'bg-indigo-500/20' },
@@ -1884,6 +1885,7 @@ export default function SuperAdmin() {
                 {stripeForm.billing_interval === 'annual' ? (
                   <select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
                     <option value="Early Adopter">Early Adopter — $1,200/yr ($100/mo equivalent)</option>
+                    <option value="Early Adopter - CRM/Designer Solo">Early Adopter - CRM/Designer Solo — $800/yr ($67/mo equivalent)</option>
                   </select>
                 ) : (
                   <select value={stripeForm.plan} onChange={e => setStripeForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">

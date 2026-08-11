@@ -7,23 +7,25 @@ const corsHeaders = {
 }
 
 const PRICE_IDS: Record<string, string> = {
-  'Early Adopter Annual': 'price_1Tz03QLWULkmrAabjEZqA2e2',
-  'Early Adopter':        'price_1TrQ8DLWULkmrAabEB6qm1Kg',
-  'Designer Only':     'price_1TrQ5rLWULkmrAabaDRGDK06',
-  'Small Team':        'price_1TrQ4OLWULkmrAabCpzuU6wH',
-  'Team':              'price_1TD58BLWULkmrAabCUiTtFPY',
-  'Business':          'price_1TrQ5ILWULkmrAab8dAhQkKR',
-  'QuickBooks Add-on': 'price_1TrQ6kLWULkmrAabf33JNWF9',
+  'Early Adopter Annual':            'price_1Tz03QLWULkmrAabjEZqA2e2',
+  'Early Adopter':                   'price_1TrQ8DLWULkmrAabEB6qm1Kg',
+  'Early Adopter - CRM/Designer Solo': 'price_1U3OlFLWULkmrAab2CS55WZ9',
+  'Designer Only':                   'price_1TrQ5rLWULkmrAabaDRGDK06',
+  'Small Team':                      'price_1TrQ4OLWULkmrAabCpzuU6wH',
+  'Team':                            'price_1TD58BLWULkmrAabCUiTtFPY',
+  'Business':                        'price_1TrQ5ILWULkmrAab8dAhQkKR',
+  'QuickBooks Add-on':               'price_1TrQ6kLWULkmrAabf33JNWF9',
 }
 
 const PLAN_RATES: Record<string, number> = {
-  'Early Adopter Annual': 100,  // stored as monthly equivalent for MRR
-  'Early Adopter':        100,
-  'Designer Only':     49,
-  'Small Team':        99,
-  'Team':              149,
-  'Business':          199,
-  'QuickBooks Add-on': 25,
+  'Early Adopter Annual':            100,  // stored as monthly equivalent for MRR
+  'Early Adopter':                   100,
+  'Early Adopter - CRM/Designer Solo': 67, // $800/yr → ~$67/mo equivalent
+  'Designer Only':                   49,
+  'Small Team':                      99,
+  'Team':                            149,
+  'Business':                        199,
+  'QuickBooks Add-on':               25,
 }
 
 Deno.serve(async (req) => {
