@@ -1388,11 +1388,10 @@ export default function ProposalDetail({ isAdmin }) {
   const downloadDOCX = async ({ forceHidePricing = false } = {}) => {
     if (proposal?.status === 'Draft') setShowSentPrompt(true)
 
-    const { data: freshProposal } = await supabase
-      .from('proposals')
-      .select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_compliance, show_warranty, warranty_text, warranty_template_id, show_terms, terms_text, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
-      .eq('id', id)
-      .single()
+    const [{ data: freshProposal }, { data: freshDocxOrg }] = await Promise.all([
+      supabase.from('proposals').select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_compliance, show_warranty, warranty_text, warranty_template_id, show_terms, terms_text, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name').eq('id', id).single(),
+      supabase.from('organizations').select('warranty_templates').eq('id', profile?.org_id).single(),
+    ])
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
     if (forceHidePricing) p = { ...p, hide_material_prices: true, lump_sum_pricing: true, hide_labor_breakdown: true }
 
@@ -1757,7 +1756,7 @@ export default function ProposalDetail({ isAdmin }) {
       )
     }
 
-    const docxWarrantyTemplates = profile?.organizations?.warranty_templates || []
+    const docxWarrantyTemplates = freshDocxOrg?.warranty_templates || profile?.organizations?.warranty_templates || []
     const docxSelectedTemplate = docxWarrantyTemplates.find(t => t.id === p?.warranty_template_id)
     const effectiveWarranty = p?.show_warranty !== false ? (p?.warranty_text || docxSelectedTemplate?.text || null) : null
     if (effectiveWarranty) {
@@ -3191,7 +3190,7 @@ const analyzeDrawing = async () => {
     if (sigY + 70 > pageHeight) { doc.addPage(); sigY = 20 }
     renderSignatureBlock(doc, sigY)
 
-    const pdfWarrantyTemplates = freshOrg?.warranty_templates || []
+    const pdfWarrantyTemplates = freshOrg?.warranty_templates || profile?.organizations?.warranty_templates || []
     const pdfSelectedTemplate = pdfWarrantyTemplates.find(t => t.id === p?.warranty_template_id)
     const pdfEffectiveTerms = p?.show_terms !== false ? (p?.terms_text || profile?.terms_and_conditions) : null
     const pdfEffectiveWarranty = p?.show_warranty !== false ? (p?.warranty_text || pdfSelectedTemplate?.text || null) : null
