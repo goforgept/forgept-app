@@ -1601,13 +1601,13 @@ export default function ProposalDetail({ isAdmin }) {
     if (p?.lump_sum_labor && docxAllLaborForLumpSum > 0) {
       const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
       const lbs = { top: lb, bottom: lb, left: lb, right: lb }
-      const lcw = [3800, 1600, 2400]
-      const lumpHeaderRow = new TableRow({
-        children: ['Description', 'Total Hours', 'Total'].map((h, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, shading: { fill: primaryColor, type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })] })] }))
-      })
+      const lcw = [5400, 2400]
       const hoursStr = docxAllLaborHours % 1 === 0 ? String(docxAllLaborHours) : docxAllLaborHours.toFixed(2)
+      const lumpHeaderRow = new TableRow({
+        children: ['Description', 'Total'].map((h, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, shading: { fill: primaryColor, type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })] })] }))
+      })
       const lumpRow = new TableRow({
-        children: ['Labor', hoursStr, `$${docxAllLaborForLumpSum.toLocaleString('en-US', { minimumFractionDigits: 2 })}`].map((val, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
+        children: [`Labor (${hoursStr} hrs)`, `$${docxAllLaborForLumpSum.toLocaleString('en-US', { minimumFractionDigits: 2 })}`].map((val, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
       })
       children.push(
         new Paragraph({ children: [new TextRun({ text: '' })] }),
@@ -1918,7 +1918,7 @@ export default function ProposalDetail({ isAdmin }) {
         foot: [['', '', '', '', 'Total', `$${selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-        ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}),
+        alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] },
         styles: { fontSize: 9 }, showFoot: 'lastPage'
       })
 
@@ -2978,7 +2978,7 @@ const analyzeDrawing = async () => {
       const emptyFiller = isLumpSum ? 1 : showMsrpCol ? 4 : 3
       const pdfFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Section Total', fmtMoney(total)]]
       const pdfMatFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Materials Total', fmtMoney(total)]]
-      const tableStyles = { theme: pdfStriped ? 'striped' : 'plain', headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 }, showFoot: 'lastPage' }
+      const tableStyles = { theme: pdfStriped ? 'striped' : 'plain', headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: 'lastPage' }
 
       if (sections.length > 0) {
         // Unsectioned items first
@@ -3055,11 +3055,11 @@ const analyzeDrawing = async () => {
       autoTable(doc, {
         startY: tableEnd + 6,
         theme: pdfStriped ? 'striped' : 'plain',
-        head: [['Description', 'Total Hours', 'Total']],
-        body: [['Labor', `${allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)} hrs`, `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        head: [['Description', 'Total']],
+        body: [[`Labor (${allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)} hrs)`, `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
-        ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 },
+        columnStyles: { 1: { halign: 'right' } },
+        alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 },
       })
       yPos = doc.lastAutoTable.finalY + 8
     } else if (pdfLaborItems.length > 0 && pdfLaborItems.some(l => l.role)) {
@@ -3076,7 +3076,7 @@ const analyzeDrawing = async () => {
           body: namedLaborItems.map(l => [l.role, l.quantity, l.unit || 'hr']),
           ...(!isLumpSum ? { foot: [['', '', `Total Labor: $${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, showFoot: 'lastPage' } : {}),
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-          ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 },
+          alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 },
         })
       } else {
         autoTable(doc, {
@@ -3087,7 +3087,7 @@ const analyzeDrawing = async () => {
           foot: [['', '', 'Total Labor', `$${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
           footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-          ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 }, showFoot: 'lastPage'
+          alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
         })
       }
       yPos = doc.lastAutoTable.finalY + 8

@@ -607,7 +607,7 @@ export default function BomSection({
                         <tfoot>
                           <tr><td colSpan="6" className="text-fp-muted pt-4 text-right font-semibold">Materials Total</td><td className="text-fp-text pt-4 text-right font-bold pr-4">${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
                           {lumpSumLabor ? (
-                            allLaborTotal > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">Labor ({allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)} hrs)</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
+                            allLaborTotal > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">Labor ({allLaborHours % 1 === 0 ? String(allLaborHours) : allLaborHours.toFixed(2)} hrs)</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
                           ) : (
                             <>
                               {laborTotal > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">General Labor</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}

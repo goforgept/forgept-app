@@ -542,7 +542,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
         theme: pdfStriped ? 'striped' : 'plain',
-        ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}),
+        alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] },
         styles: { fontSize: 9 }, showFoot: 'lastPage'
       })
       const { error: poInsertError } = await supabase.from('purchase_orders').insert({
@@ -683,7 +683,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           const remaining = planned - used; const cost = (item.your_cost_unit || 0) * planned; const revenue = item.customer_price_total || 0
           return [item.item_name, item.vendor || '—', `${planned} ${item.unit || ''}`, used > 0 ? `${used} ${item.unit || ''}` : '—', used > 0 ? (remaining < 0 ? `${Math.abs(remaining).toFixed(1)} over` : `${remaining.toFixed(1)} left`) : '—', `$${(item.your_cost_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(item.customer_price_unit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(revenue - cost).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
         }),
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 8 }
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 8 }
       })
       y = doc.lastAutoTable.finalY + 10
     }
@@ -694,7 +694,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       autoTable(doc, {
         startY: y, head: [['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price', 'Margin']],
         body: (proposal.labor_items || []).map(l => [l.role || '—', l.quantity || '—', l.unit || 'hr', `$${(parseFloat(l.your_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${((parseFloat(l.customer_price) || 0) - (parseFloat(l.your_cost) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 8 }
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 8 }
       })
       y = doc.lastAutoTable.finalY + 10
     }
@@ -705,7 +705,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       autoTable(doc, {
         startY: y, head: [['PO #', 'Vendor', 'Item', 'Qty', 'Unit Cost', 'Total']],
         body: freeformPOItems.map(l => [l.purchase_orders?.po_number || '—', l.purchase_orders?.vendor_name || '—', l.item_name, `${l.quantity} ${l.unit || ''}`, `$${(l.unit_cost || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(l.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 8 }
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 8 }
       })
       y = doc.lastAutoTable.finalY + 10
     }
@@ -719,7 +719,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           const coCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0) + (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
           return [co.name, co.status, `$${(co.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, coCost > 0 ? `$${coCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—']
         }),
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 8 }
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 8 }
       })
       y = doc.lastAutoTable.finalY + 10
     }
