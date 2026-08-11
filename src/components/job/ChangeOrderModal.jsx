@@ -5,7 +5,10 @@ export default function ChangeOrderModal({ coForm, setCoForm, savingCO, onSave, 
   const isEditing = !!editingId
   const matTotal = (coForm.line_items || []).reduce((sum, l) => sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
   const labTotal = (coForm.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-  const coTotal = matTotal + labTotal
+  const subtotal = matTotal + labTotal
+  const taxPct = parseFloat(coForm.tax_percent) || 0
+  const taxAmt = subtotal * taxPct / 100
+  const coTotal = subtotal + taxAmt
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
@@ -114,18 +117,27 @@ export default function ChangeOrderModal({ coForm, setCoForm, savingCO, onSave, 
             }
           </div>
 
-          {((coForm.line_items||[]).length > 0 || (coForm.labor_items||[]).length > 0) && (
-            <div className="bg-fp-inset rounded-xl p-4 flex justify-between items-center">
-              <div className="text-sm text-fp-muted space-y-0.5">
-                {(coForm.line_items||[]).length > 0 && <p>Materials: <span className="text-fp-text">${matTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></p>}
-                {(coForm.labor_items||[]).length > 0 && <p>Labor: <span className="text-fp-text">${labTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></p>}
+          <div className="bg-fp-inset rounded-xl p-4">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Tax Rate (%)</label>
+                <input
+                  type="number" min="0" max="100" step="0.1"
+                  placeholder="0.00"
+                  value={coForm.tax_percent ?? ''}
+                  onChange={e => setCoForm(p => ({ ...p, tax_percent: e.target.value }))}
+                  className="w-28 bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                />
               </div>
-              <div className="text-right">
-                <p className="text-fp-muted text-xs mb-0.5">Change Order Total</p>
+              <div className="text-right text-sm space-y-0.5">
+                {(coForm.line_items||[]).length > 0 && <p className="text-fp-muted">Materials: <span className="text-fp-text">${matTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></p>}
+                {(coForm.labor_items||[]).length > 0 && <p className="text-fp-muted">Labor: <span className="text-fp-text">${labTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></p>}
+                {taxPct > 0 && <p className="text-fp-muted">Tax ({taxPct}%): <span className="text-fp-text">${taxAmt.toLocaleString('en-US',{minimumFractionDigits:2})}</span></p>}
+                <p className="text-fp-muted text-xs mt-1">Change Order Total</p>
                 <p className="text-[#C8622A] font-bold text-xl">${coTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</p>
               </div>
             </div>
-          )}
+          </div>
 
           <div className="flex gap-3 pt-1">
             <button onClick={onClose} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>

@@ -186,9 +186,26 @@ export default function ChangeOrdersTab({ changeOrders, totalCOAmount, onOpenCOM
                     )}
 
                     <div className="flex justify-end pt-1 border-t border-fp-border">
-                      <div className="text-right">
-                        <p className="text-fp-muted text-xs">Change Order Total</p>
-                        <p className="text-[#C8622A] font-bold text-lg">${fmt(co.amount)}</p>
+                      <div className="text-right text-xs space-y-0.5">
+                        {(() => {
+                          const mat = matItems.reduce((s,l) => s+(parseFloat(l.customer_price_unit)||0)*(parseFloat(l.quantity)||0), 0)
+                          const lab = labItems.reduce((s,l) => s+(parseFloat(l.customer_price)||0), 0)
+                          const sub = mat + lab
+                          const tPct = parseFloat(co.tax_percent) || 0
+                          const tAmt = sub * tPct / 100
+                          return (
+                            <>
+                              {matItems.length > 0 && labItems.length > 0 && (
+                                <p className="text-fp-muted">Subtotal: <span className="text-fp-text">${fmt(sub)}</span></p>
+                              )}
+                              {tPct > 0 && (
+                                <p className="text-fp-muted">Tax ({tPct}%): <span className="text-fp-text">${fmt(tAmt)}</span></p>
+                              )}
+                              <p className="text-fp-muted">Change Order Total</p>
+                              <p className="text-[#C8622A] font-bold text-lg">${fmt(co.amount)}</p>
+                            </>
+                          )
+                        })()}
                       </div>
                     </div>
                   </div>

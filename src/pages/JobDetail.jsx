@@ -86,7 +86,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
   // Change order modal
   const [showCOModal, setShowCOModal] = useState(false)
-  const [coForm, setCoForm] = useState({ name: '', description: '', line_items: [], labor_items: [] })
+  const [coForm, setCoForm] = useState({ name: '', description: '', line_items: [], labor_items: [], tax_percent: 0 })
   const [savingCO, setSavingCO] = useState(false)
   const [editingCOId, setEditingCOId] = useState(null)
 
@@ -695,7 +695,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     doc.save(`Cost-Report-${job?.job_number || job?.name || 'job'}.pdf`)
   }
 
-  const emptyCoForm = { name: '', description: '', line_items: [], labor_items: [] }
+  const defaultTaxRate = parseFloat(profile?.organizations?.default_tax_rate) || 0
+  const emptyCoForm = { name: '', description: '', line_items: [], labor_items: [], tax_percent: defaultTaxRate }
 
   const openEditCO = (co) => {
     setEditingCOId(co.id)
@@ -704,6 +705,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       description: co.description || '',
       line_items: co.line_items || [],
       labor_items: co.labor_items || [],
+      tax_percent: co.tax_percent ?? defaultTaxRate,
     })
     setShowCOModal(true)
   }
@@ -719,9 +721,13 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     setSavingCO(true)
     const matTotal = (coForm.line_items || []).reduce((sum, l) => sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
     const labTotal = (coForm.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-    const total = matTotal + labTotal
+    const subtotal = matTotal + labTotal
+    const taxPct = parseFloat(coForm.tax_percent) || 0
+    const taxAmt = subtotal * taxPct / 100
+    const total = subtotal + taxAmt
     const patch = {
-      name: coForm.name, description: coForm.description || null, amount: total,
+      name: coForm.name, description: coForm.description || null,
+      amount: total, tax_percent: taxPct,
       line_items: coForm.line_items?.length > 0 ? coForm.line_items : null,
       labor_items: coForm.labor_items?.length > 0 ? coForm.labor_items : null,
     }
@@ -836,23 +842,40 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       y = doc.lastAutoTable.finalY + 6
     }
 
-    // Total box
+    // Totals breakdown
     const matTotal = matItems.reduce((s,l) => s+(parseFloat(l.customer_price_unit)||0)*(parseFloat(l.quantity)||0), 0)
     const labTotal = labItems.reduce((s,l) => s+(parseFloat(l.customer_price)||0), 0)
+    const subtotal = matTotal + labTotal
+    const taxPct = parseFloat(co.tax_percent) || 0
+    const taxAmt = subtotal * taxPct / 100
+    const grandTotal = subtotal + taxAmt
+
+    const totalsX = pageWidth - 80
+    const labelX = pageWidth - 42
+    const valueX = pageWidth - 14
+
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100,100,100)
+
+    if (matItems.length > 0 && labItems.length > 0) {
+      doc.text('Materials:', labelX, y, { align: 'right' }); doc.text(`$${fmt(matTotal)}`, valueX, y, { align: 'right' }); y += 6
+      doc.text('Labor:', labelX, y, { align: 'right' }); doc.text(`$${fmt(labTotal)}`, valueX, y, { align: 'right' }); y += 6
+    }
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(0,0,0)
+    doc.text('Subtotal:', labelX, y, { align: 'right' }); doc.text(`$${fmt(subtotal)}`, valueX, y, { align: 'right' }); y += 6
+
+    if (taxPct > 0) {
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(100,100,100)
+      doc.text(`Tax (${taxPct}%):`, labelX, y, { align: 'right' }); doc.text(`$${fmt(taxAmt)}`, valueX, y, { align: 'right' }); y += 8
+    } else { y += 2 }
+
+    // Grand total box
     doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.roundedRect(pageWidth - 80, y, 66, 14, 2, 2, 'F')
+    doc.roundedRect(totalsX, y, 66, 14, 2, 2, 'F')
     doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont('helvetica', 'bold')
     doc.text('CHANGE ORDER TOTAL', pageWidth - 47, y + 6, { align: 'center' })
     doc.setFontSize(13)
-    doc.text(`$${fmt(co.amount)}`, pageWidth - 47, y + 12.5, { align: 'center' })
+    doc.text(`$${fmt(grandTotal)}`, pageWidth - 47, y + 12.5, { align: 'center' })
     y += 22
-
-    // Subtotal breakdown if both types
-    if (matItems.length > 0 && labItems.length > 0) {
-      doc.setTextColor(100,100,100); doc.setFontSize(9); doc.setFont('helvetica', 'normal')
-      doc.text(`Materials: $${fmt(matTotal)}   Labor: $${fmt(labTotal)}`, pageWidth - 14, y, { align: 'right' })
-      y += 8
-    }
 
     // Signature block
     y += 8
