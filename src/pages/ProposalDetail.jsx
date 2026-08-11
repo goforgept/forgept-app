@@ -2128,8 +2128,14 @@ export default function ProposalDetail({ isAdmin }) {
       const qty = parseFloat(updated[index].quantity) || 0
       const cost = parseFloat(updated[index].your_cost) || 0
       const markup = parseFloat(updated[index].markup) || 0
+      const cp = parseFloat(updated[index].customer_price) || 0
       if (field === 'your_cost' || field === 'markup' || field === 'quantity') {
         if (cost > 0 && qty > 0) updated[index].customer_price = (cost * (1 + markup / 100) * qty).toFixed(2)
+      } else if (field === 'customer_price') {
+        if (cp > 0 && qty > 0) {
+          if (cost > 0) updated[index].markup = (((cp / qty) / cost - 1) * 100).toFixed(1)
+          else if (markup >= 0) updated[index].your_cost = (cp / (1 + markup / 100) / qty).toFixed(2)
+        }
       }
       return { ...s, labor_items: updated }
     }))
