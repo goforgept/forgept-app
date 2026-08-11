@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Sidebar from '../components/Sidebar'
 import { supabase } from '../supabase'
 import { useProfile } from '../context/ProfileContext'
+
+const SUPABASE_URL = 'https://qxypaepvmtmkhbssedki.supabase.co'
 
 const faqs = [
   {
@@ -179,10 +181,47 @@ const faqs = [
       { q: 'What are API scopes?', a: 'Scopes limit what a key can access. A key with only the Proposals scope cannot read client or job data. Assign the minimum scopes needed for each integration — for example, a CRM sync key gets Proposals and Clients, while a drawing export key gets Designer only. This limits exposure if a key is ever compromised.' },
       { q: 'How do I revoke an API key?', a: 'Go to Settings → API and click Revoke next to the key. It stops working immediately. Any integration using that key will get a 401 error and will need to be updated with a new key.' }
     ]
-  }
+  },
+  {
+    category: 'AI Agent',
+    items: [
+      { q: 'What is the AI Agent?', a: 'The AI Agent is a built-in assistant that lets you create and find things in ForgePt using plain language. It appears as an orange chat button in the bottom-right corner of every page. Type something like "Create a client named Acme Corp" or "Show me the pipeline summary" and it handles the rest.' },
+      { q: 'What can the AI Agent do?', a: 'The AI Agent can create clients, service tickets, tasks, and proposals — and can search for existing clients or pull a pipeline summary. Just describe what you need in plain English. Example commands: "Create a service ticket — AC unit down, high priority", "Create a proposal for Acme Corp worth $15,000", "Find clients named Smith", "What does my pipeline look like this month?"' },
+      { q: 'How do I enable the AI Agent?', a: 'The AI Agent is a feature that must be enabled by your ForgePt account manager. If you do not see the orange chat button, contact support at hello@goforgept.com to have it turned on for your organization.' },
+      { q: 'Does the AI Agent see my data?', a: 'Yes — the agent is scoped to your organization only. It can only read and create records within your account. No data is shared across organizations. Conversations are not stored and are only used in-session to complete your request.' },
+      { q: 'Can the AI Agent answer questions about ForgePt?', a: 'Yes — in addition to taking action, the agent can answer how-to questions about ForgePt features. For help questions you can also use the "Ask AI" panel at the top of this Help page, which is optimized for answering questions rather than creating records.' },
+    ]
+  },
+  {
+    category: 'Notifications',
+    items: [
+      { q: 'What triggers a notification?', a: 'The bell icon in the sidebar shows notifications for: tasks that are due today or overdue, invoices that have passed their due date unpaid, and invoices sent by the auto-invoice engine. When a client signs a proposal, the rep who created it also receives a notification.' },
+      { q: 'How do I mark notifications as read?', a: 'Click the bell icon to open the notification panel. Clicking on any individual notification marks it as read and navigates you to the related record. You can also click "Mark all read" at the top of the panel to clear all unread notifications at once.' },
+      { q: 'Why am I getting task notifications every day?', a: 'If a task is overdue and still not completed, you will receive a daily notification reminding you it is outstanding. Complete or reassign the task to stop the daily reminders. Notifications are deduplicated so you only get one per task per day.' },
+      { q: 'Can I get notified when an invoice is paid?', a: 'Yes — if you have Stripe or QuickBooks connected and a client pays their invoice through one of those integrations, a notification is sent to the rep linked to that invoice.' },
+    ]
+  },
+  {
+    category: 'Inventory',
+    items: [
+      { q: 'What is Inventory Management?', a: 'Inventory Management lets you track stock levels for products your organization holds on hand. You can see current quantities, record receiving and usage adjustments, and keep your inventory in sync with what is physically in your warehouse or van stock.' },
+      { q: 'How do I add inventory items?', a: 'Go to the Inventory page and click Add Item. You can link an item directly to a product in your Product Library so pricing and part numbers stay consistent. Set an initial quantity and the system will track adjustments from there.' },
+      { q: 'How do I record a stock adjustment?', a: 'Open any inventory item and click Adjust. Enter the quantity change — positive to add stock (receiving a shipment), negative to reduce it (usage on a job). Each adjustment is logged with a timestamp and optional note so you have a full audit trail.' },
+      { q: 'Is inventory linked to proposals or jobs?', a: 'Inventory is currently tracked separately from proposals and jobs — it is a standalone ledger for your stock. Use the notes field on adjustments to reference a job or proposal number if you want to tie usage back to a specific project.' },
+    ]
+  },
+  {
+    category: 'Reports',
+    items: [
+      { q: 'What reports are available in ForgePt?', a: 'The Reports page (admin only) includes: revenue by rep, proposal win/loss rates, pipeline value by stage, invoice aging summary, and client activity. Filters let you narrow by date range, rep, and status.' },
+      { q: 'Who can access Reports?', a: 'Reports are available to organization admins and sales managers only. Standard reps see their own data through the Dashboard and Pipeline pages but do not have access to the full Reports page.' },
+      { q: 'Can I export report data?', a: 'Yes — most report tables have a Download CSV button that exports the filtered data. You can then open it in Excel, import it into your BI tool, or share it with stakeholders.' },
+      { q: 'How current is the data in Reports?', a: 'Report data is live — it pulls directly from your current proposal, invoice, and client records every time you load or refresh the page. There is no delayed sync or caching.' },
+    ]
+  },
 ]
 
-export default function FAQ({ isAdmin, featureProposals = true, featureCRM = false }) {
+export default function FAQ({ isAdmin, featureProposals = true, featureCRM = false, featureAiAgent = false }) {
   const { profile } = useProfile()
   const [openItem, setOpenItem] = useState(null)
   const [search, setSearch] = useState('')
@@ -190,6 +229,39 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [submitError, setSubmitError] = useState(null)
+
+  // Embedded help chat
+  const [chatMessages, setChatMessages] = useState([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatLoading, setChatLoading] = useState(false)
+  const chatBottomRef = useRef(null)
+
+  useEffect(() => {
+    chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [chatMessages, chatLoading])
+
+  const sendHelpMessage = async (text) => {
+    const msg = text || chatInput.trim()
+    if (!msg || chatLoading) return
+    const newMessages = [...chatMessages, { role: 'user', content: msg }]
+    setChatMessages(newMessages)
+    setChatInput('')
+    setChatLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ messages: newMessages, helpMode: true }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setChatMessages(prev => [...prev, { role: 'assistant', content: data.reply }])
+    } catch (err) {
+      setChatMessages(prev => [...prev, { role: 'assistant', content: `Sorry, something went wrong: ${err.message}` }])
+    }
+    setChatLoading(false)
+  }
 
   const submitRequest = async () => {
     if (!reqForm.title.trim() || !profile?.org_id) return
@@ -227,7 +299,84 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
           <p className="text-fp-muted mt-1">Everything you need to know about using ForgePt.</p>
         </div>
 
-        <input type="text" placeholder="Search for help..." value={search} onChange={e => setSearch(e.target.value)}
+        {/* Embedded AI Help Chat */}
+        <div className="bg-fp-card rounded-xl border border-fp-border overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-fp-border">
+            <div className="w-2 h-2 rounded-full bg-[#C8622A]" />
+            <span className="text-fp-text text-sm font-semibold">Ask AI</span>
+            <span className="text-[10px] text-fp-muted bg-fp-inset px-1.5 py-0.5 rounded-full">ForgePt Help</span>
+            {chatMessages.length > 0 && (
+              <button onClick={() => setChatMessages([])} className="ml-auto text-fp-muted hover:text-fp-text text-xs transition-colors">Clear</button>
+            )}
+          </div>
+
+          {/* Messages */}
+          {chatMessages.length > 0 && (
+            <div className="px-4 py-3 space-y-3 max-h-72 overflow-y-auto">
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] text-sm rounded-xl px-3 py-2 ${
+                    msg.role === 'user'
+                      ? 'bg-[#C8622A] text-white rounded-tr-sm'
+                      : 'bg-fp-inset text-fp-text rounded-tl-sm'
+                  }`}>
+                    <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                  </div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-fp-inset rounded-xl rounded-tl-sm px-3 py-2">
+                    <div className="flex gap-1 items-center h-4">
+                      <span className="w-1.5 h-1.5 bg-fp-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 bg-fp-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 bg-fp-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={chatBottomRef} />
+            </div>
+          )}
+
+          {/* Prompts when empty */}
+          {chatMessages.length === 0 && (
+            <div className="px-4 py-3">
+              <p className="text-fp-muted text-xs mb-2">Ask anything about ForgePt — or try one of these:</p>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  'How do I send a proposal to a client?',
+                  'How does auto-invoicing work?',
+                  'What can the AI Agent do?',
+                  'How do I connect QuickBooks?',
+                ].map(q => (
+                  <button key={q} onClick={() => sendHelpMessage(q)}
+                    className="text-xs text-fp-muted hover:text-fp-text bg-fp-inset hover:bg-fp-hover px-3 py-1.5 rounded-full border border-fp-border transition-colors">
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Input */}
+          <div className="px-4 py-3 border-t border-fp-border flex gap-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && sendHelpMessage()}
+              placeholder="Ask a question about ForgePt..."
+              className="flex-1 bg-fp-inset text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-[#C8622A]/40 placeholder-fp-muted border border-fp-border"
+            />
+            <button onClick={() => sendHelpMessage()} disabled={!chatInput.trim() || chatLoading}
+              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40">
+              Ask
+            </button>
+          </div>
+        </div>
+
+        <input type="text" placeholder="Search FAQ..." value={search} onChange={e => setSearch(e.target.value)}
           className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
 
         {filtered.length === 0 ? (

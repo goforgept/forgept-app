@@ -251,15 +251,61 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json()
+    const { messages, helpMode } = await req.json()
     if (!messages?.length) return new Response(JSON.stringify({ error: "messages required" }), {
       status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" }
     })
 
     const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY")!
-    const systemPrompt = `You are a helpful assistant built into ForgePt, a field service and sales management platform. You help users manage their business by creating and retrieving data through natural language.
 
-You have access to tools to create clients, service tickets, tasks, and proposals, search clients, and view pipeline summaries.
+    const helpContext = `
+ForgePt is a field service and sales management platform for integrators, contractors, and field service companies. Here is what it can do:
+
+PROPOSALS: Create, edit, and send proposals with a BOM (bill of materials), scope of work (AI-generated or manual), labor items, tax, and markup. Export to PDF or DOCX. Send to clients with e-signature support. Pipeline view (Kanban board) tracks stages. Forecast page shows weighted revenue projections.
+
+CLIENTS & CRM: Store clients with contacts, addresses, and linked proposals. Tasks and follow-ups can be linked to clients. Zoho CRM and QBO customer sync available.
+
+INVOICES: Create invoices from proposals or standalone. Track status (Draft, Sent, Partially Paid, Paid, Overdue). Connect to QuickBooks Online or Stripe for payment. Auto-invoice engine bills recurring line items automatically.
+
+PURCHASE ORDERS: Generate POs from proposal line items, grouped by vendor. Track PO status (Sent, Partial, Received, Cancelled).
+
+JOBS: Track field installations linked to proposals. Assign technicians, set checklists, track progress. Technicians see their own jobs.
+
+SERVICE TICKETS: Help-desk style ticketing. Assign to techs, set priority (Low/Normal/High/Urgent). Clients can submit via inbound email. Dispatch board for visual scheduling.
+
+TASKS: CRM tasks with due dates, linked to clients/proposals. Daily reminders via email and bell notifications. Calendar view available.
+
+CONTRACTS: Track service agreements and maintenance contracts. Alert on expiring contracts. Recurring Items tab shows items set for auto-invoicing.
+
+DESIGNER: Floor plan design tool — upload drawings, place security/AV symbols, assign products from catalog. Approve & Push to BOM writes all devices + labor to the proposal automatically.
+
+PRODUCT LIBRARY: Org-wide product catalog. Import from Excel or QuickBooks. Used in proposals and Designer placements.
+
+REPORTS: Revenue by rep, proposal win rates, pipeline analytics. Admin-only.
+
+INVENTORY: Track stock levels for products. Add items, set quantities, record adjustments.
+
+AI AGENT: The floating orange chat button (bottom-right). Can create clients, tickets, tasks, and proposals, search clients, and show pipeline summary — all via natural language.
+
+NOTIFICATIONS: Bell icon in sidebar. Fires for: tasks due today or overdue, overdue invoices, auto-sent invoices. Proposal signed notification and invoice paid notification are also tracked.
+
+SETTINGS: Upload logo, set brand color, terms and conditions. Rate Card sets labor roles and rates. Calendar integrations (Google, Microsoft). API keys for external integrations.
+
+INTEGRATIONS: QuickBooks Online (invoices, customers, payments), Zoho CRM (accounts, contacts), Square (payments), Stripe (subscriptions and client payments), REST API for custom integrations.`
+
+    const systemPrompt = helpMode
+      ? `You are the ForgePt Help Assistant, embedded in the Help & FAQ page of ForgePt — a field service and sales management platform for integrators and contractors.
+
+Your job is to answer questions about how ForgePt works. Be clear, helpful, and specific. When explaining where to find something, name the exact page or button. Keep answers concise — 2–4 sentences for simple questions, a short numbered list for multi-step processes.
+
+If a user wants to DO something (create a client, ticket, etc.) rather than learn about it, let them know they can use the orange chat button in the bottom-right corner of any page to take action directly.
+${helpContext}
+
+Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`
+      : `You are a helpful assistant built into ForgePt, a field service and sales management platform. You help users manage their business by creating and retrieving data through natural language.
+
+You have access to tools to create clients, service tickets, tasks, and proposals, search clients, and view pipeline summaries. You can also answer questions about how ForgePt features work.
+${helpContext}
 
 Guidelines:
 - Be concise and action-oriented. When a user asks you to create something, do it immediately — don't ask for confirmation unless critical info is missing.
@@ -284,7 +330,7 @@ Guidelines:
           model: "claude-haiku-4-5-20251001",
           max_tokens: 1024,
           system: systemPrompt,
-          tools: TOOLS,
+          ...(helpMode ? {} : { tools: TOOLS }),
           messages: currentMessages,
         }),
       })
