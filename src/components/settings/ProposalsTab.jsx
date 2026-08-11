@@ -4,6 +4,7 @@ export default function ProposalsTab({
   isAdmin, msrpEnabled, onToggleMsrp,
   docFont, onChangeDocFont,
   pdfTableStyle, onChangePdfTableStyle,
+  pdfHeaderStyle, onChangePdfHeaderStyle,
   saving, handleSave,
 }) {
   return (
@@ -110,6 +111,22 @@ export default function ProposalsTab({
                 className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${pdfTableStyle === 'striped' ? 'bg-fp-brand' : 'bg-fp-border'}`}>
                 <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${pdfTableStyle === 'striped' ? 'left-6' : 'left-1'}`} />
               </button>
+            </div>
+            <div>
+              <p className="text-fp-text text-sm font-semibold mb-1">PDF Logo Size</p>
+              <p className="text-fp-muted text-xs mb-3">Controls how much space your logo gets in PDF document headers.</p>
+              <div className="flex gap-2">
+                {[
+                  { value: 'compact', label: 'Compact', desc: 'Small logo, slim header' },
+                  { value: 'large', label: 'Large', desc: 'Bigger logo, taller header' },
+                ].map(opt => (
+                  <button key={opt.value} onClick={() => onChangePdfHeaderStyle?.(opt.value)}
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors border text-left ${pdfHeaderStyle === opt.value ? 'bg-fp-brand text-white border-fp-brand' : 'bg-fp-bg text-fp-muted hover:text-fp-text border-fp-border'}`}>
+                    <span className="block font-semibold">{opt.label}</span>
+                    <span className={`block text-xs mt-0.5 ${pdfHeaderStyle === opt.value ? 'text-white/70' : 'text-fp-muted'}`}>{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

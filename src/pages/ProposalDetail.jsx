@@ -1833,45 +1833,49 @@ export default function ProposalDetail({ isAdmin }) {
       const doc = new jsPDF()
       const pageWidth = doc.internal.pageSize.getWidth()
 
+      const isPoLarge = (profile?.organizations?.pdf_header_style || 'compact') === 'large'
+      const poHdrH = isPoLarge ? 60 : 40
+      const poLogoMaxW = isPoLarge ? 80 : 50
+      const poLogoMaxH = isPoLarge ? 44 : 26
       doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.rect(0, 0, pageWidth, 40, 'F')
+      doc.rect(0, 0, pageWidth, poHdrH, 'F')
 
       if (resolvedLogoUrl) {
         const img = new Image()
         img.src = resolvedLogoUrl
         await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
-        const maxW = 50, maxH = 26
-        const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+        const ratio = Math.min(poLogoMaxW / img.naturalWidth, poLogoMaxH / img.naturalHeight)
         const logoW = img.naturalWidth * ratio
         const logoH = img.naturalHeight * ratio
-        const logoY = 8 + (maxH - logoH) / 2
+        const logoY = 8 + (poLogoMaxH - logoH) / 2
         doc.addImage(img, 'PNG', 14, logoY, logoW, logoH)
       } else {
         doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont(pdfFont, 'bold')
-        doc.text(profile?.company_name || 'ForgePt.', 14, 22)
+        doc.text(profile?.company_name || 'ForgePt.', 14, poHdrH / 2 + 3)
       }
 
       doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont(pdfFont, 'bold')
-      doc.text('PURCHASE ORDER', pageWidth - 14, 18, { align: 'right' })
+      doc.text('PURCHASE ORDER', pageWidth - 14, poHdrH / 2 - 4, { align: 'right' })
       doc.setFontSize(10); doc.setFont(pdfFont, 'normal')
-      doc.text(finalPONumber, pageWidth - 14, 28, { align: 'right' })
+      doc.text(finalPONumber, pageWidth - 14, poHdrH / 2 + 6, { align: 'right' })
 
       const billToLines = [profile?.company_name || '', profile?.bill_to_address || '', [profile?.bill_to_city, profile?.bill_to_state, profile?.bill_to_zip].filter(Boolean).join(', ')].filter(Boolean)
       const shipToLines = [profile?.company_name || '', profile?.ship_to_address || '', [profile?.ship_to_city, profile?.ship_to_state, profile?.ship_to_zip].filter(Boolean).join(', ')].filter(Boolean)
 
       doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont(pdfFont, 'normal')
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52)
-      doc.text(`Project: ${proposal?.proposal_name || ''}`, 14, 60)
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, poHdrH + 12)
+      doc.text(`Project: ${proposal?.proposal_name || ''}`, 14, poHdrH + 20)
 
       const col1 = 14, col2 = pageWidth / 2 - 10, col3 = pageWidth / 2 + 30
+      const poAddrY = poHdrH + 34
       doc.setFontSize(9); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('VENDOR', col1, 74); doc.text('BILL TO', col2, 74); doc.text('SHIP TO', col3, 74)
+      doc.text('VENDOR', col1, poAddrY); doc.text('BILL TO', col2, poAddrY); doc.text('SHIP TO', col3, poAddrY)
       doc.setFont(pdfFont, 'normal'); doc.setTextColor(40, 40, 40); doc.setFontSize(9)
-      doc.text(vendorNames || poVendorEmail || '—', col1, 81)
-      billToLines.forEach((line, i) => doc.text(line, col2, 81 + i * 6))
-      shipToLines.forEach((line, i) => doc.text(line, col3, 81 + i * 6))
+      doc.text(vendorNames || poVendorEmail || '—', col1, poAddrY + 7)
+      billToLines.forEach((line, i) => doc.text(line, col2, poAddrY + 7 + i * 6))
+      shipToLines.forEach((line, i) => doc.text(line, col3, poAddrY + 7 + i * 6))
 
-      const tableStart = 81 + Math.max(billToLines.length, shipToLines.length) * 6 + 6
+      const tableStart = poAddrY + 7 + Math.max(billToLines.length, shipToLines.length) * 6 + 6
       doc.setDrawColor(220, 220, 220)
       doc.line(14, tableStart - 2, pageWidth - 14, tableStart - 2)
 
@@ -2752,8 +2756,12 @@ const analyzeDrawing = async () => {
     const pageWidth = doc.internal.pageSize.getWidth()
     const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
 
+    const isPropLarge = (profile?.organizations?.pdf_header_style || 'compact') === 'large'
+    const propHdrH = isPropLarge ? 60 : 40
+    const propLogoMaxW = isPropLarge ? 80 : 50
+    const propLogoMaxH = isPropLarge ? 44 : 26
     doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.rect(0, 0, pageWidth, 40, 'F')
+    doc.rect(0, 0, pageWidth, propHdrH, 'F')
 
     if (resolvedLogoUrl) {
       const img = new Image()
@@ -2762,25 +2770,24 @@ const analyzeDrawing = async () => {
       await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
       if (img.naturalWidth > 0) {
         try {
-          const maxW = 50, maxH = 26
-          const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+          const ratio = Math.min(propLogoMaxW / img.naturalWidth, propLogoMaxH / img.naturalHeight)
           const logoW = img.naturalWidth * ratio
           const logoH = img.naturalHeight * ratio
-          const logoY = 8 + (maxH - logoH) / 2
+          const logoY = 8 + (propLogoMaxH - logoH) / 2
           doc.addImage(img, 'PNG', 14, logoY, logoW, logoH)
         } catch {
           doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
-          doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
+          doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, propHdrH / 2 + 4)
         }
       } else {
         doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
-        doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
+        doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, propHdrH / 2 + 4)
       }
     } else {
       doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
-      doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, 20)
+      doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, propHdrH / 2)
       doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(200, 98, 42)
-      doc.text('Scope it. Send it. Close it.', 14, 30)
+      doc.text('Scope it. Send it. Close it.', 14, propHdrH / 2 + 10)
     }
 
     // Company address + license on right side of banner
@@ -2792,17 +2799,18 @@ const analyzeDrawing = async () => {
       if (profile?.license_number) bannerLines.push(`Lic #: ${profile.license_number}`)
       if (bannerLines.length > 0) {
         doc.setFontSize(8); doc.setFont(pdfFont, 'normal'); doc.setTextColor(255, 255, 255)
-        const bStartY = 22 - (bannerLines.length - 1) * 2.5
+        const bStartY = propHdrH / 2 - (bannerLines.length - 1) * 2.5
         bannerLines.forEach((ln, i) => doc.text(ln, pageWidth - 14, bStartY + i * 5, { align: 'right' }))
       }
     }
 
+    const propBodyY = propHdrH + 15
     doc.setTextColor(0, 0, 0); doc.setFontSize(18); doc.setFont(pdfFont, 'bold')
-    doc.text(proposal?.proposal_name || 'Proposal', 14, 55)
+    doc.text(proposal?.proposal_name || 'Proposal', 14, propBodyY)
     doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100)
-    doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, 65)
-    if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, 72)
-    let pdfRefY = clientAddress ? 79 : 72
+    doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, propBodyY + 10)
+    if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, propBodyY + 17)
+    let pdfRefY = propBodyY + (clientAddress ? 24 : 17)
     doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, pdfRefY)
     pdfRefY += 7
     if (proposal?.quote_number) { doc.text(`Quote #: ${proposal.quote_number}`, 14, pdfRefY); pdfRefY += 7 }
@@ -2817,11 +2825,11 @@ const analyzeDrawing = async () => {
       if (proposal?.rep_phone) repLines.push(proposal.rep_phone)
       if (repLines.length > 0) {
         doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100)
-        repLines.forEach((ln, i) => doc.text(ln, pageWidth - 14, 65 + i * 7, { align: 'right' }))
+        repLines.forEach((ln, i) => doc.text(ln, pageWidth - 14, propBodyY + 10 + i * 7, { align: 'right' }))
       }
     }
 
-    let yPos = Math.max(92, pdfRefY + 5)
+    let yPos = Math.max(propBodyY + 37, pdfRefY + 5)
 
     if (profile?.about_us) {
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])

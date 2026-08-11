@@ -80,6 +80,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [msrpEnabled, setMsrpEnabled] = useState(false)
   const [docFont, setDocFont] = useState('helvetica')
   const [pdfTableStyle, setPdfTableStyle] = useState('striped')
+  const [pdfHeaderStyle, setPdfHeaderStyle] = useState('compact')
   const [slaEnabled, setSlaEnabled] = useState(false)
   const [slaAutoAttach, setSlaAutoAttach] = useState(false)
   const [monitoringEnabled, setMonitoringEnabled] = useState(false)
@@ -258,7 +259,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     })
     if (data?.org_id) {
       try {
-        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions, feature_msrp, doc_font, pdf_table_style, stripe_connect_connected').eq('id', data.org_id).single()
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions, feature_msrp, doc_font, pdf_table_style, pdf_header_style, stripe_connect_connected').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
         setOrgTimezone(orgData?.timezone || 'America/Chicago')
         setOrgId(data.org_id)
@@ -273,6 +274,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         setMsrpEnabled(orgData?.feature_msrp || false)
         setDocFont(orgData?.doc_font || 'helvetica')
         setPdfTableStyle(orgData?.pdf_table_style || 'striped')
+        setPdfHeaderStyle(orgData?.pdf_header_style || 'compact')
         setSlaEnabled(orgData?.feature_sla || false); setSlaAutoAttach(orgData?.sla_auto_attach || false)
         setMonitoringEnabled(orgData?.feature_monitoring || false); setMonitoringAutoAttach(orgData?.monitoring_auto_attach || false)
         const savedSLA = orgData?.sla_templates || {}
@@ -554,6 +556,12 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                 const next = pdfTableStyle === 'striped' ? 'plain' : 'striped'
                 setPdfTableStyle(next)
                 await supabase.from('organizations').update({ pdf_table_style: next }).eq('id', orgId)
+              }}
+              pdfHeaderStyle={pdfHeaderStyle}
+              onChangePdfHeaderStyle={async (val) => {
+                setPdfHeaderStyle(val)
+                await supabase.from('organizations').update({ pdf_header_style: val }).eq('id', orgId)
+                refreshProfile()
               }}
               saving={saving} handleSave={handleSave} />
           )}

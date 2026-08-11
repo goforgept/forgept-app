@@ -484,8 +484,13 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       const primaryRgb = hexToRgb(profileData?.primary_color || '#0F1C2E')
       const doc = new jsPDF()
       const pageWidth = doc.internal.pageSize.getWidth()
+      const isLargeHeader = (profile?.organizations?.pdf_header_style || 'compact') === 'large'
+      const headerH = isLargeHeader ? 60 : 40
+      const logoMaxW = isLargeHeader ? 80 : 50
+      const logoMaxH = isLargeHeader ? 44 : 26
+      const logopadY = isLargeHeader ? 8 : 8
       doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.rect(0, 0, pageWidth, 40, 'F')
+      doc.rect(0, 0, pageWidth, headerH, 'F')
       if (profileData?.logo_url) {
         try {
           const img = new Image()
@@ -497,35 +502,35 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             canvas.width = img.naturalWidth; canvas.height = img.naturalHeight
             canvas.getContext('2d').drawImage(img, 0, 0)
             const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
-            const maxW = 50, maxH = 26
-            const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
-            doc.addImage(dataUrl, 'JPEG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+            const ratio = Math.min(logoMaxW / img.naturalWidth, logoMaxH / img.naturalHeight)
+            doc.addImage(dataUrl, 'JPEG', 14, logopadY + (logoMaxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
           } else { throw new Error('load failed') }
         } catch {
           doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
-          doc.text(profileData?.company_name || 'ForgePt.', 14, 22)
+          doc.text(profileData?.company_name || 'ForgePt.', 14, headerH / 2 + 3)
         }
       } else {
         doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
-        doc.text(profileData?.company_name || 'ForgePt.', 14, 22)
+        doc.text(profileData?.company_name || 'ForgePt.', 14, headerH / 2 + 3)
       }
       doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-      doc.text('PURCHASE ORDER', pageWidth - 14, 18, { align: 'right' })
+      doc.text('PURCHASE ORDER', pageWidth - 14, headerH / 2 - 4, { align: 'right' })
       doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-      doc.text(finalPONumber, pageWidth - 14, 28, { align: 'right' })
+      doc.text(finalPONumber, pageWidth - 14, headerH / 2 + 6, { align: 'right' })
+      const poContentY = headerH + 12
       doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52)
-      doc.text(`Project: ${job?.name || ''}`, 14, 60)
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, poContentY)
+      doc.text(`Project: ${job?.name || ''}`, 14, poContentY + 8)
       const billLines = [profileData?.company_name || '', profileData?.bill_to_address || '', [profileData?.bill_to_city, profileData?.bill_to_state, profileData?.bill_to_zip].filter(Boolean).join(', ')].filter(Boolean)
       const shipLines = [profileData?.company_name || '', profileData?.ship_to_address || '', [profileData?.ship_to_city, profileData?.ship_to_state, profileData?.ship_to_zip].filter(Boolean).join(', ')].filter(Boolean)
       const col2 = pageWidth / 2 - 10, col3 = pageWidth / 2 + 30
       doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('VENDOR', 14, 74); doc.text('BILL TO', col2, 74); doc.text('SHIP TO', col3, 74)
+      doc.text('VENDOR', 14, poContentY + 22); doc.text('BILL TO', col2, poContentY + 22); doc.text('SHIP TO', col3, poContentY + 22)
       doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40); doc.setFontSize(9)
-      doc.text(vendorNames || '—', 14, 81)
-      billLines.forEach((line, i) => doc.text(line, col2, 81 + i * 6))
-      shipLines.forEach((line, i) => doc.text(line, col3, 81 + i * 6))
-      const tableStart = 81 + Math.max(billLines.length, shipLines.length) * 6 + 6
+      doc.text(vendorNames || '—', 14, poContentY + 29)
+      billLines.forEach((line, i) => doc.text(line, col2, poContentY + 29 + i * 6))
+      shipLines.forEach((line, i) => doc.text(line, col3, poContentY + 29 + i * 6))
+      const tableStart = poContentY + 29 + Math.max(billLines.length, shipLines.length) * 6 + 6
       doc.setDrawColor(220, 220, 220)
       doc.line(14, tableStart - 2, pageWidth - 14, tableStart - 2)
       autoTable(doc, {
@@ -562,21 +567,49 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
 
+    const isCrLarge = (profile?.organizations?.pdf_header_style || 'compact') === 'large'
+    const crHdrH = isCrLarge ? 60 : 38
+    const crLogoMaxW = isCrLarge ? 80 : 50
+    const crLogoMaxH = isCrLarge ? 44 : 26
     doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.rect(0, 0, pageWidth, 36, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(18); doc.setFont('helvetica', 'bold')
-    doc.text('Job Cost Report', 14, 16)
-    doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-    doc.text(`Generated ${new Date().toLocaleDateString()}`, 14, 26)
-    doc.text(profileData?.company_name || '', pageWidth - 14, 16, { align: 'right' })
+    doc.rect(0, 0, pageWidth, crHdrH, 'F')
+    if (profileData?.logo_url) {
+      try {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.src = profileData.logo_url
+        await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+        if (img.naturalWidth > 0) {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.naturalWidth; canvas.height = img.naturalHeight
+          canvas.getContext('2d').drawImage(img, 0, 0)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+          const ratio = Math.min(crLogoMaxW / img.naturalWidth, crLogoMaxH / img.naturalHeight)
+          doc.addImage(dataUrl, 'JPEG', 14, 8 + (crLogoMaxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+        } else { throw new Error() }
+      } catch {
+        doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.setFont('helvetica', 'bold')
+        doc.text('Job Cost Report', 14, crHdrH / 2 - 3)
+        doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+        doc.text(`Generated ${new Date().toLocaleDateString()}`, 14, crHdrH / 2 + 6)
+      }
+    } else {
+      doc.setTextColor(255, 255, 255); doc.setFontSize(18); doc.setFont('helvetica', 'bold')
+      doc.text('Job Cost Report', 14, crHdrH / 2 - 3)
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+      doc.text(`Generated ${new Date().toLocaleDateString()}`, 14, crHdrH / 2 + 6)
+    }
+    doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+    doc.text('Job Cost Report', pageWidth - 14, crHdrH / 2 - 3, { align: 'right' })
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal')
+    doc.text(`Generated ${new Date().toLocaleDateString()}`, pageWidth - 14, crHdrH / 2 + 6, { align: 'right' })
 
     doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-    doc.text(`Job: ${job?.name || ''}`, 14, 48)
-    if (job?.job_number) doc.text(`Job #: ${job.job_number}`, 14, 55)
-    if (job?.clients?.company) doc.text(`Client: ${job.clients.company}`, 14, 62)
-    if (proposal?.quote_number) doc.text(`Quote #: ${proposal.quote_number}`, pageWidth / 2, 48)
-    if (job?.start_date) doc.text(`Start: ${new Date(job.start_date).toLocaleDateString()}`, pageWidth / 2, 55)
+    doc.text(`Job: ${job?.name || ''}`, 14, crHdrH + 10)
+    if (job?.job_number) doc.text(`Job #: ${job.job_number}`, 14, crHdrH + 17)
+    if (job?.clients?.company) doc.text(`Client: ${job.clients.company}`, 14, crHdrH + 24)
+    if (proposal?.quote_number) doc.text(`Quote #: ${proposal.quote_number}`, pageWidth / 2, crHdrH + 10)
+    if (job?.start_date) doc.text(`Start: ${new Date(job.start_date).toLocaleDateString()}`, pageWidth / 2, crHdrH + 17)
 
     const usedByItemId = {}
     techLogs.forEach(log => {
@@ -606,7 +639,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     const hoursLogged = techLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0)
     const estimatedHours = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.quantity) || 0), 0)
 
-    let y = 74
+    let y = crHdrH + 32
     const boxW = (pageWidth - 28 - 9) / 4
     const summaryBoxes = [
       { label: 'Contract Value', value: `$${totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}` },
@@ -758,21 +791,47 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const coLabel = `CO-${String(coNumber).padStart(3, '0')}`
+    const isCoLarge = (profile?.organizations?.pdf_header_style || 'compact') === 'large'
+    const coHdrH = isCoLarge ? 60 : 40
+    const coLogoMaxW = isCoLarge ? 80 : 50
+    const coLogoMaxH = isCoLarge ? 44 : 26
 
     // Header bar
     doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.rect(0, 0, pageWidth, 38, 'F')
+    doc.rect(0, 0, pageWidth, coHdrH, 'F')
+
+    if (profileData?.logo_url) {
+      try {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.src = profileData.logo_url
+        await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+        if (img.naturalWidth > 0) {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.naturalWidth; canvas.height = img.naturalHeight
+          canvas.getContext('2d').drawImage(img, 0, 0)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+          const ratio = Math.min(coLogoMaxW / img.naturalWidth, coLogoMaxH / img.naturalHeight)
+          doc.addImage(dataUrl, 'JPEG', 14, 8 + (coLogoMaxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+        } else { throw new Error() }
+      } catch {
+        doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont('helvetica', 'bold')
+        doc.text(profileData?.company_name || '', 14, coHdrH / 2 + 3)
+      }
+    } else {
+      doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont('helvetica', 'bold')
+      doc.text(profileData?.company_name || '', 14, coHdrH / 2 + 3)
+    }
+
     doc.setTextColor(255, 255, 255)
-    doc.setFontSize(20); doc.setFont('helvetica', 'bold')
-    doc.text('CHANGE ORDER', 14, 16)
+    doc.setFontSize(18); doc.setFont('helvetica', 'bold')
+    doc.text('CHANGE ORDER', pageWidth - 14, coHdrH / 2 - 4, { align: 'right' })
     doc.setFontSize(11); doc.setFont('helvetica', 'normal')
-    doc.text(coLabel, 14, 26)
-    doc.text(profileData?.company_name || '', pageWidth - 14, 16, { align: 'right' })
-    doc.text(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), pageWidth - 14, 26, { align: 'right' })
+    doc.text(`${coLabel} · ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`, pageWidth - 14, coHdrH / 2 + 6, { align: 'right' })
 
     // Job + client info
     doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-    let y = 50
+    let y = coHdrH + 12
     if (job?.name) { doc.setFont('helvetica', 'bold'); doc.text('Job:', 14, y); doc.setFont('helvetica', 'normal'); doc.text(job.name, 40, y); y += 7 }
     if (job?.job_number) { doc.setFont('helvetica', 'bold'); doc.text('Job #:', 14, y); doc.setFont('helvetica', 'normal'); doc.text(job.job_number, 40, y); y += 7 }
     if (job?.clients?.company) { doc.setFont('helvetica', 'bold'); doc.text('Client:', 14, y); doc.setFont('helvetica', 'normal'); doc.text(job.clients.company, 40, y); y += 7 }
@@ -780,9 +839,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
     // Status badge (right column)
     doc.setFillColor(co.status === 'Approved' ? 34 : co.status === 'Rejected' ? 220 : 234, co.status === 'Approved' ? 197 : co.status === 'Rejected' ? 38 : 179, co.status === 'Approved' ? 94 : co.status === 'Rejected' ? 38 : 8)
-    doc.roundedRect(pageWidth - 50, 47, 36, 10, 2, 2, 'F')
+    doc.roundedRect(pageWidth - 50, coHdrH + 7, 36, 10, 2, 2, 'F')
     doc.setTextColor(255, 255, 255); doc.setFontSize(9); doc.setFont('helvetica', 'bold')
-    doc.text(co.status.toUpperCase(), pageWidth - 32, 53.5, { align: 'center' })
+    doc.text(co.status.toUpperCase(), pageWidth - 32, coHdrH + 13.5, { align: 'center' })
 
     // Change order name
     y += 4
@@ -1063,10 +1122,14 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
+    const isLargeHdr = (profile?.organizations?.pdf_header_style || 'compact') === 'large'
+    const hdrH = isLargeHdr ? 60 : 40
+    const hdrLogoMaxW = isLargeHdr ? 80 : 50
+    const hdrLogoMaxH = isLargeHdr ? 44 : 26
 
     // Header
     doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.rect(0, 0, pageWidth, 40, 'F')
+    doc.rect(0, 0, pageWidth, hdrH, 'F')
 
     if (profile?.logo_url) {
       try {
@@ -1079,33 +1142,25 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           canvas.width = img.naturalWidth; canvas.height = img.naturalHeight
           canvas.getContext('2d').drawImage(img, 0, 0)
           const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
-          const maxW = 50, maxH = 26
-          const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
-          doc.addImage(dataUrl, 'JPEG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+          const ratio = Math.min(hdrLogoMaxW / img.naturalWidth, hdrLogoMaxH / img.naturalHeight)
+          doc.addImage(dataUrl, 'JPEG', 14, 8 + (hdrLogoMaxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
         } else { throw new Error('load failed') }
       } catch {
-        doc.setTextColor(255, 255, 255)
-        doc.setFontSize(20)
-        doc.setFont('helvetica', 'bold')
-        doc.text(profile?.company_name || 'ForgePt.', 14, 24)
+        doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+        doc.text(profile?.company_name || 'ForgePt.', 14, hdrH / 2 + 3)
       }
     } else {
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(20)
-      doc.setFont('helvetica', 'bold')
-      doc.text(profile?.company_name || 'ForgePt.', 14, 24)
+      doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+      doc.text(profile?.company_name || 'ForgePt.', 14, hdrH / 2 + 3)
     }
 
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(14)
-    doc.setFont('helvetica', 'bold')
-    doc.text('Job Completion Packet', pageWidth - 14, 20, { align: 'right' })
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.text(new Date().toLocaleDateString(), pageWidth - 14, 30, { align: 'right' })
+    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont('helvetica', 'bold')
+    doc.text('Job Completion Packet', pageWidth - 14, hdrH / 2 - 4, { align: 'right' })
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal')
+    doc.text(new Date().toLocaleDateString(), pageWidth - 14, hdrH / 2 + 6, { align: 'right' })
 
     // Job details
-    let y = 52
+    let y = hdrH + 12
     doc.setTextColor(0, 0, 0)
     doc.setFontSize(16)
     doc.setFont('helvetica', 'bold')
