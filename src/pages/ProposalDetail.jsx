@@ -2830,26 +2830,32 @@ const analyzeDrawing = async () => {
     }
 
     let yPos = Math.max(propBodyY + 37, pdfRefY + 5)
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const lineH = 5
+    const textMargin = 20
 
-    if (profile?.about_us) {
+    const renderTextSection = (title, text) => {
+      if (yPos + 24 > pageHeight - textMargin) { doc.addPage(); yPos = 20 }
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('About Us', 14, yPos)
+      doc.text(title, 14, yPos)
       yPos += 8
       doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
-      const aboutLines = doc.splitTextToSize(profile.about_us, pageWidth - 28)
-      doc.text(aboutLines, 14, yPos)
-      yPos += aboutLines.length * 5 + 12
+      const lines = doc.splitTextToSize(text, pageWidth - 28)
+      for (const line of lines) {
+        if (yPos + lineH > pageHeight - textMargin) { doc.addPage(); yPos = 20 }
+        doc.text(line, 14, yPos)
+        yPos += lineH
+      }
+      yPos += 10
+    }
+
+    if (profile?.about_us) {
+      renderTextSection('About Us', profile.about_us)
     }
 
     if (p?.scope_of_work) {
-      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Scope of Work', 14, yPos)
-      yPos += 8
-      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
       const cleanSOW = p.scope_of_work.replace(/^\*\*Scope of Work\*\*\s*/i, '').replace(/\*\*(.*?)\*\*/g, '$1').trim()
-      const sowLines = doc.splitTextToSize(cleanSOW, pageWidth - 28)
-      doc.text(sowLines, 14, yPos)
-      yPos += sowLines.length * 5 + 12
+      renderTextSection('Scope of Work', cleanSOW)
     }
 
     const isLumpSum = p?.hide_material_prices || p?.lump_sum_pricing
