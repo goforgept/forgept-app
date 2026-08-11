@@ -2978,7 +2978,7 @@ const analyzeDrawing = async () => {
       const emptyFiller = isLumpSum ? 1 : showMsrpCol ? 4 : 3
       const pdfFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Section Total', fmtMoney(total)]]
       const pdfMatFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Materials Total', fmtMoney(total)]]
-      const tableStyles = { headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 }, showFoot: 'lastPage' }
+      const tableStyles = { theme: pdfStriped ? 'striped' : 'plain', headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 }, showFoot: 'lastPage' }
 
       if (sections.length > 0) {
         // Unsectioned items first
@@ -3054,8 +3054,9 @@ const analyzeDrawing = async () => {
       doc.text('Labor', 14, tableEnd)
       autoTable(doc, {
         startY: tableEnd + 6,
+        theme: pdfStriped ? 'striped' : 'plain',
         head: [['Description', 'Total Hours', 'Total']],
-        body: [['Labor', String(allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)), `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        body: [['Labor', `${allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)} hrs`, `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
         ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 },
@@ -3070,6 +3071,7 @@ const analyzeDrawing = async () => {
       if (p?.hide_labor_breakdown) {
         autoTable(doc, {
           startY: tableEnd + 6,
+          theme: pdfStriped ? 'striped' : 'plain',
           head: [['Role', 'Qty', 'Unit']],
           body: namedLaborItems.map(l => [l.role, l.quantity, l.unit || 'hr']),
           ...(!isLumpSum ? { foot: [['', '', `Total Labor: $${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, showFoot: 'lastPage' } : {}),
@@ -3079,6 +3081,7 @@ const analyzeDrawing = async () => {
       } else {
         autoTable(doc, {
           startY: tableEnd + 6,
+          theme: pdfStriped ? 'striped' : 'plain',
           head: [['Role', 'Qty', 'Unit', 'Total Labor']],
           body: namedLaborItems.map(l => [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
           foot: [['', '', 'Total Labor', `$${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
