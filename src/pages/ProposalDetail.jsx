@@ -1601,13 +1601,13 @@ export default function ProposalDetail({ isAdmin }) {
     if (p?.lump_sum_labor && docxAllLaborForLumpSum > 0) {
       const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
       const lbs = { top: lb, bottom: lb, left: lb, right: lb }
-      const lcw = [5400, 2400]
+      const lcw = [4200, 1400, 2200]
       const hoursStr = docxAllLaborHours % 1 === 0 ? String(docxAllLaborHours) : docxAllLaborHours.toFixed(2)
       const lumpHeaderRow = new TableRow({
-        children: ['Description', 'Total'].map((h, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, shading: { fill: primaryColor, type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })] })] }))
+        children: ['Description', 'Quantity', 'Total'].map((h, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, shading: { fill: primaryColor, type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })] })] }))
       })
       const lumpRow = new TableRow({
-        children: [`Labor (${hoursStr} hrs)`, `$${docxAllLaborForLumpSum.toLocaleString('en-US', { minimumFractionDigits: 2 })}`].map((val, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
+        children: ['Labor', `${hoursStr} hrs`, `$${docxAllLaborForLumpSum.toLocaleString('en-US', { minimumFractionDigits: 2 })}`].map((val, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
       })
       children.push(
         new Paragraph({ children: [new TextRun({ text: '' })] }),
@@ -3055,10 +3055,10 @@ const analyzeDrawing = async () => {
       autoTable(doc, {
         startY: tableEnd + 6,
         theme: pdfStriped ? 'striped' : 'plain',
-        head: [['Description', 'Total']],
-        body: [[`Labor (${allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)} hrs)`, `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        head: [['Description', 'Quantity', 'Total']],
+        body: [['Labor', `${allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)} hrs`, `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        columnStyles: { 1: { halign: 'right' } },
+        columnStyles: { 0: { cellWidth: 110 }, 1: { cellWidth: 30, halign: 'right' }, 2: { cellWidth: 42, halign: 'right' } },
         alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 },
       })
       yPos = doc.lastAutoTable.finalY + 8

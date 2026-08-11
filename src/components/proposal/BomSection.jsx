@@ -763,7 +763,7 @@ export default function BomSection({
                                 className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
                             </td>
                             <td className="pr-2 py-1">
-                              <input type="number" placeholder="35" value={line.markup_percent || ''} onChange={e => onUpdateEditLine(i, 'markup_percent', e.target.value)}
+                              <input type="number" placeholder={String(defaultMarkup)} value={line.markup_percent || ''} onChange={e => onUpdateEditLine(i, 'markup_percent', e.target.value)}
                                 className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
                             </td>
                             <td className="pr-2 py-1">
@@ -813,7 +813,7 @@ export default function BomSection({
                   </table>
                   <button onClick={() => setEditLines(prev => [...prev, {
                     proposal_id: proposalId, item_name: '', part_number_sku: '', quantity: '', unit: 'ea', category: '',
-                    vendor: '', your_cost_unit: '', markup_percent: '35', customer_price_unit: '', customer_price_total: '', msrp_unit: '',
+                    vendor: '', your_cost_unit: '', markup_percent: String(defaultMarkup), customer_price_unit: '', customer_price_total: '', msrp_unit: '',
                     lead_time: '', country_of_origin: '', berry_compliance: '',
                     pricing_status: 'Needs Pricing', section_id: sectionId === 'general' ? null : sectionId
                   }])} className="mt-2 text-[#C8622A] hover:text-fp-text text-xs transition-colors">
