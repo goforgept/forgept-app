@@ -2838,18 +2838,18 @@ const analyzeDrawing = async () => {
   }
 
   const generatePDFDoc = async ({ forceHidePricing = false } = {}) => {
-    const { data: freshProposal } = await supabase
-      .from('proposals')
-      .select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_msrp, show_compliance, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
-      .eq('id', id)
-      .single()
+    const [{ data: freshProposal }, { data: freshOrg }] = await Promise.all([
+      supabase.from('proposals').select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_msrp, show_compliance, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name').eq('id', id).single(),
+      supabase.from('organizations').select('pdf_table_style, pdf_header_style, doc_font, primary_color').eq('id', profile?.org_id).single(),
+    ])
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
     if (forceHidePricing) p = { ...p, hide_material_prices: true, lump_sum_pricing: true, hide_labor_breakdown: true }
+    const freshPdfStriped = (freshOrg?.pdf_table_style || 'striped') === 'striped'
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
-    const primaryRgb = hexToRgb(profile?.primary_color || '#0F1C2E')
+    const primaryRgb = hexToRgb(freshOrg?.primary_color || profile?.primary_color || '#0F1C2E')
 
-    const isPropLarge = (profile?.organizations?.pdf_header_style || 'compact') === 'large'
+    const isPropLarge = (freshOrg?.pdf_header_style || profile?.organizations?.pdf_header_style || 'compact') === 'large'
     const propHdrH = isPropLarge ? 60 : 40
     const propLogoMaxW = isPropLarge ? 80 : 50
     const propLogoMaxH = isPropLarge ? 44 : 26
@@ -2978,7 +2978,7 @@ const analyzeDrawing = async () => {
       const emptyFiller = isLumpSum ? 1 : showMsrpCol ? 4 : 3
       const pdfFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Section Total', fmtMoney(total)]]
       const pdfMatFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Materials Total', fmtMoney(total)]]
-      const tableStyles = { theme: pdfStriped ? 'striped' : 'plain', headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: 'lastPage' }
+      const tableStyles = { theme: freshPdfStriped ? 'striped' : 'plain', headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: freshPdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: 'lastPage' }
 
       if (sections.length > 0) {
         // Unsectioned items first
@@ -3054,12 +3054,12 @@ const analyzeDrawing = async () => {
       doc.text('Labor', 14, tableEnd)
       autoTable(doc, {
         startY: tableEnd + 6,
-        theme: pdfStriped ? 'striped' : 'plain',
+        theme: freshPdfStriped ? 'striped' : 'plain',
         head: [['Description', 'Quantity', 'Total']],
         body: [['Labor', `${allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)} hrs`, `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        columnStyles: { 0: { cellWidth: 110 }, 1: { cellWidth: 30, halign: 'right' }, 2: { cellWidth: 42, halign: 'right' } },
-        alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+        alternateRowStyles: freshPdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 },
       })
       yPos = doc.lastAutoTable.finalY + 8
     } else if (pdfLaborItems.length > 0 && pdfLaborItems.some(l => l.role)) {
@@ -3071,23 +3071,23 @@ const analyzeDrawing = async () => {
       if (p?.hide_labor_breakdown) {
         autoTable(doc, {
           startY: tableEnd + 6,
-          theme: pdfStriped ? 'striped' : 'plain',
+          theme: freshPdfStriped ? 'striped' : 'plain',
           head: [['Role', 'Qty', 'Unit']],
           body: namedLaborItems.map(l => [l.role, l.quantity, l.unit || 'hr']),
           ...(!isLumpSum ? { foot: [['', '', `Total Labor: $${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, showFoot: 'lastPage' } : {}),
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-          alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 },
+          alternateRowStyles: freshPdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 },
         })
       } else {
         autoTable(doc, {
           startY: tableEnd + 6,
-          theme: pdfStriped ? 'striped' : 'plain',
+          theme: freshPdfStriped ? 'striped' : 'plain',
           head: [['Role', 'Qty', 'Unit', 'Total Labor']],
           body: namedLaborItems.map(l => [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
           foot: [['', '', 'Total Labor', `$${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
           headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
           footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-          alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
+          alternateRowStyles: freshPdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
         })
       }
       yPos = doc.lastAutoTable.finalY + 8
