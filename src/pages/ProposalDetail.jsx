@@ -3059,6 +3059,7 @@ const analyzeDrawing = async () => {
         body: [['Labor', `${allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)} hrs`, `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
+        didParseCell: (data) => { if (data.section === 'head' && data.column.index > 0) data.cell.styles.halign = 'right' },
         alternateRowStyles: freshPdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 },
       })
       yPos = doc.lastAutoTable.finalY + 8
