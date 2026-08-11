@@ -1596,16 +1596,18 @@ export default function ProposalDetail({ isAdmin }) {
     }
 
     const docxAllLaborForLumpSum = docxLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0) + sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+    const docxAllLaborHours = docxLaborItems.filter(l => l.role).reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0) + sections.reduce((s, sec) => s + (sec.include_labor ? (sec.labor_items || []).filter(l => l.role).reduce((ss, l) => ss + (parseFloat(l.quantity) || 0), 0) : 0), 0)
 
     if (p?.lump_sum_labor && docxAllLaborForLumpSum > 0) {
       const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
       const lbs = { top: lb, bottom: lb, left: lb, right: lb }
-      const lcw = [5400, 2400]
+      const lcw = [3800, 1600, 2400]
       const lumpHeaderRow = new TableRow({
-        children: ['Description', 'Total'].map((h, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, shading: { fill: primaryColor, type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })] })] }))
+        children: ['Description', 'Total Hours', 'Total'].map((h, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, shading: { fill: primaryColor, type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })] })] }))
       })
+      const hoursStr = docxAllLaborHours % 1 === 0 ? String(docxAllLaborHours) : docxAllLaborHours.toFixed(2)
       const lumpRow = new TableRow({
-        children: ['Labor', `$${docxAllLaborForLumpSum.toLocaleString('en-US', { minimumFractionDigits: 2 })}`].map((val, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
+        children: ['Labor', hoursStr, `$${docxAllLaborForLumpSum.toLocaleString('en-US', { minimumFractionDigits: 2 })}`].map((val, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
       })
       children.push(
         new Paragraph({ children: [new TextRun({ text: '' })] }),
@@ -2164,6 +2166,10 @@ export default function ProposalDetail({ isAdmin }) {
         const cost = parseFloat(updated[index].your_cost_unit) || 0
         const markup = parseFloat(updated[index].markup_percent) || 0
         updated[index].customer_price_unit = (cost * (1 + markup / 100)).toFixed(2)
+      } else if (field === 'customer_price_unit') {
+        const cost = parseFloat(updated[index].your_cost_unit) || 0
+        const cp = parseFloat(updated[index].customer_price_unit) || 0
+        if (cost > 0 && cp > 0) updated[index].markup_percent = ((cp / cost - 1) * 100).toFixed(1)
       }
       const price = parseFloat(updated[index].customer_price_unit) || 0
       const qty = parseFloat(updated[index].quantity) || 0
@@ -3041,15 +3047,17 @@ const analyzeDrawing = async () => {
     const grandTotal = pdfMaterialsTotal + allLaborTotal + pdfTaxAmount
 
     if (p?.lump_sum_labor && allLaborTotal > 0) {
+      const allLaborHours = pdfLaborItems.filter(l => l.role).reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0)
+        + sections.reduce((s, sec) => s + (sec.include_labor ? (sec.labor_items || []).filter(l => l.role).reduce((ss, l) => ss + (parseFloat(l.quantity) || 0), 0) : 0), 0)
       const tableEnd = sections.length > 0 ? yPos + 6 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12)
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Labor', 14, tableEnd)
       autoTable(doc, {
         startY: tableEnd + 6,
-        head: [['Description', 'Total']],
-        body: [['Labor', `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        head: [['Description', 'Total Hours', 'Total']],
+        body: [['Labor', String(allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)), `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        columnStyles: { 1: { halign: 'right' } },
+        columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
         ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 },
       })
       yPos = doc.lastAutoTable.finalY + 8
