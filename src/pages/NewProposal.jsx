@@ -24,6 +24,7 @@ export default function NewProposal() {
   const [taxExempt, setTaxExempt] = useState(false)
   const [errors, setErrors] = useState({})
 
+  const [dealAmount, setDealAmount] = useState('')
   const [form, setForm] = useState(() => {
     const d = new Date()
     d.setDate(d.getDate() + 45)
@@ -191,8 +192,8 @@ export default function NewProposal() {
       tax_rate: taxRateVal,
       tax_exempt: taxExempt,
       labor_items: [],
-      proposal_value: 0,
-      total_customer_value: 0,
+      proposal_value: parseFloat(dealAmount) || 0,
+      total_customer_value: parseFloat(dealAmount) || 0,
       total_your_cost: 0,
       total_gross_margin_dollars: 0,
       total_gross_margin_percent: 0,
@@ -409,6 +410,22 @@ export default function NewProposal() {
                   onChange={e => setForm(prev => ({ ...prev, close_date: e.target.value }))}
                   className={inputClass('close_date')}
                 />
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Deal Amount <span className="text-fp-muted/60 font-normal normal-case">(optional)</span></label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-fp-muted text-sm">$</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={dealAmount}
+                    onChange={e => setDealAmount(e.target.value)}
+                    placeholder="0.00"
+                    className={`${inputClass('dealAmount')} pl-7`}
+                  />
+                </div>
+                <p className="text-fp-muted/60 text-[11px] mt-1">Auto-updates when you build a BOM</p>
               </div>
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Tax Rate %</label>

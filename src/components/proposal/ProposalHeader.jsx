@@ -21,20 +21,23 @@ export default function ProposalHeader({
   saveQuoteNumber, setEditingQuoteNumber,
   saveContractNumber, setEditingContractNumber,
   updateCloseDate, updateTaxExempt, updateTaxRate,
+  onSaveDealAmount,
   setShowDealSummaryModal, setDealSummary,
   setShowShareModal, setDeleteConfirmText, setShowDeleteModal,
   onArchive, onRestore, onCreateRevision,
   canEdit = true,
 }) {
   // Local draft state — keeps inputs always controlled without depending on parent editing flags
-  const [quoteDraft,    setQuoteDraft]    = useState(proposal?.quote_number    ?? '')
-  const [contractDraft, setContractDraft] = useState(proposal?.contract_number ?? '')
-  const [taxRateDraft,  setTaxRateDraft]  = useState(proposal?.tax_rate        ?? '')
+  const [quoteDraft,      setQuoteDraft]      = useState(proposal?.quote_number    ?? '')
+  const [contractDraft,   setContractDraft]   = useState(proposal?.contract_number ?? '')
+  const [taxRateDraft,    setTaxRateDraft]    = useState(proposal?.tax_rate        ?? '')
+  const [dealAmountDraft, setDealAmountDraft] = useState(proposal?.proposal_value != null ? String(proposal.proposal_value) : '')
 
   // Sync from parent when proposal data changes externally (e.g. after save)
   useEffect(() => { setQuoteDraft(proposal?.quote_number    ?? '') }, [proposal?.quote_number])
   useEffect(() => { setContractDraft(proposal?.contract_number ?? '') }, [proposal?.contract_number])
   useEffect(() => { setTaxRateDraft(proposal?.tax_rate        ?? '') }, [proposal?.tax_rate])
+  useEffect(() => { setDealAmountDraft(proposal?.proposal_value != null ? String(proposal.proposal_value) : '') }, [proposal?.proposal_value])
 
   const inputCls = "bg-transparent text-fp-text text-sm font-medium focus:outline-none placeholder-fp-muted/30 w-full"
 
@@ -240,6 +243,36 @@ export default function ProposalHeader({
             />
           ) : (
             <span className="text-fp-text text-sm font-medium">{proposal?.close_date || '—'}</span>
+          )}
+        </Cell>
+
+        {/* Deal Amount */}
+        <Cell label="Deal Amount" className="min-w-[130px]">
+          {canEdit ? (
+            <div className="flex items-center gap-0.5">
+              <span className="text-fp-muted text-sm">$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={dealAmountDraft}
+                placeholder="0.00"
+                onChange={e => setDealAmountDraft(e.target.value)}
+                onBlur={e => {
+                  const val = parseFloat(e.target.value) || 0
+                  onSaveDealAmount?.(val)
+                }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') e.currentTarget.blur()
+                  if (e.key === 'Escape') { setDealAmountDraft(proposal?.proposal_value != null ? String(proposal.proposal_value) : ''); e.currentTarget.blur() }
+                }}
+                className={inputCls}
+              />
+            </div>
+          ) : (
+            <span className="text-fp-text text-sm font-bold text-[#C8622A]">
+              {proposal?.proposal_value != null ? `$${Number(proposal.proposal_value).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
+            </span>
           )}
         </Cell>
 

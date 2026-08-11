@@ -672,6 +672,12 @@ export default function ProposalDetail({ isAdmin }) {
     if (trimmed) logActivity(`Contract number set to ${trimmed}`)
   }
 
+  const saveDealAmount = async (val) => {
+    const amount = parseFloat(val) || 0
+    await supabase.from('proposals').update({ proposal_value: amount, total_customer_value: amount }).eq('id', id)
+    setProposal(prev => ({ ...prev, proposal_value: amount, total_customer_value: amount }))
+  }
+
   const saveSOW = async () => {
     await supabase.from('proposals').update({ scope_of_work: sowDraft }).eq('id', id)
     setProposal(prev => ({ ...prev, scope_of_work: sowDraft }))
@@ -1886,7 +1892,7 @@ export default function ProposalDetail({ isAdmin }) {
         foot: [['', '', '', '', 'Total', `$${selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
         footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
+        ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}),
         styles: { fontSize: 9 }, showFoot: 'lastPage'
       })
 
@@ -2333,6 +2339,57 @@ export default function ProposalDetail({ isAdmin }) {
     const hasAny = updatedItems.some(l => l.recurring)
     await supabase.from('proposals').update({ has_recurring: hasAny }).eq('id', id)
     setProposal(prev => ({ ...prev, has_recurring: hasAny }))
+  }
+
+  const saveLinePrice = async (lineId, newUnitPrice, quantity) => {
+    const price = parseFloat(newUnitPrice) || 0
+    const qty = parseFloat(quantity) || 0
+    const total = price * qty
+    await supabase.from('bom_line_items').update({ customer_price_unit: price, customer_price_total: total }).eq('id', lineId)
+    const updatedItems = lineItems.map(l => l.id === lineId ? { ...l, customer_price_unit: price, customer_price_total: total } : l)
+    setLineItems(updatedItems)
+    const matTotal = updatedItems.reduce((s, l) => s + (l.customer_price_total || 0), 0)
+    const labTotal = (proposal?.labor_items || []).reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+    const taxRate = parseFloat(proposal?.tax_rate) || 0
+    const newTotal = matTotal + labTotal + (matTotal * taxRate / 100)
+    await supabase.from('proposals').update({ proposal_value: newTotal, total_customer_value: newTotal }).eq('id', id)
+    setProposal(prev => ({ ...prev, proposal_value: newTotal, total_customer_value: newTotal }))
+  }
+
+  const saveLaborPrice = async (laborKey, newPrice) => {
+    const price = parseFloat(newPrice) || 0
+    const newLaborItems = [...(proposal?.labor_items || [])]
+    // laborKey format: 'gen-{index}' for general, 'sec-{sectionId}-{index}' for section
+    const parts = laborKey.split('-')
+    if (parts[0] === 'gen') {
+      const namedItems = newLaborItems.filter(l => l.role)
+      const namedIdx = parseInt(parts[1])
+      const allIdx = newLaborItems.indexOf(namedItems[namedIdx])
+      if (allIdx >= 0) newLaborItems[allIdx] = { ...newLaborItems[allIdx], customer_price: price }
+      await supabase.from('proposals').update({ labor_items: newLaborItems }).eq('id', id)
+      setProposal(prev => ({ ...prev, labor_items: newLaborItems }))
+    } else if (parts[0] === 'sec') {
+      const sectionId = parts[1]
+      const secIdx = parseInt(parts[2])
+      const updatedSections = sections.map(s => {
+        if (s.id !== sectionId) return s
+        const newLabor = [...(s.labor_items || [])]
+        const named = newLabor.filter(l => l.role)
+        const realIdx = newLabor.indexOf(named[secIdx])
+        if (realIdx >= 0) newLabor[realIdx] = { ...newLabor[realIdx], customer_price: price }
+        return { ...s, labor_items: newLabor }
+      })
+      const sec = updatedSections.find(s => s.id === sectionId)
+      await supabase.from('proposal_sections').update({ labor_items: sec?.labor_items }).eq('id', sectionId)
+      setSections(updatedSections)
+    }
+    // Recalc proposal total
+    const matTotal = lineItems.reduce((s, l) => s + (l.customer_price_total || 0), 0)
+    const labTotal = newLaborItems.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+    const taxRate = parseFloat(proposal?.tax_rate) || 0
+    const newTotal = matTotal + labTotal + (matTotal * taxRate / 100)
+    await supabase.from('proposals').update({ proposal_value: newTotal, total_customer_value: newTotal }).eq('id', id)
+    setProposal(prev => ({ ...prev, proposal_value: newTotal, total_customer_value: newTotal }))
   }
 
   const saveRenewalDate = async (itemId, date) => {
@@ -2861,6 +2918,8 @@ const analyzeDrawing = async () => {
     const isLumpSum = p?.hide_material_prices || p?.lump_sum_pricing
 
     if (lineItems.length > 0) {
+      // Start pricing on a new page if we're past the halfway point — avoids orphaned headings
+      if (yPos > pageHeight * 0.55) { doc.addPage(); yPos = 20 }
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Materials & Pricing', 14, yPos)
       yPos += 6
@@ -2889,6 +2948,7 @@ const analyzeDrawing = async () => {
         // Unsectioned items first
         const unsectioned = lineItems.filter(l => !l.section_id)
         if (unsectioned.length > 0) {
+          if (yPos + 40 > pageHeight - 20) { doc.addPage(); yPos = 20 }
           doc.setFontSize(10); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
           doc.text('General', 14, yPos + 4)
           doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
@@ -2906,7 +2966,8 @@ const analyzeDrawing = async () => {
           const secMatTotal = secItems.reduce((s, i) => s + (i.customer_price_total || 0), 0)
           const secLaborTotal = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
           const secTotal = secMatTotal + secLaborTotal
-          // Section header bar
+          // Section header bar — ensure enough room for the bar + at least a few rows
+          if (yPos + 40 > pageHeight - 20) { doc.addPage(); yPos = 20 }
           doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
           doc.rect(14, yPos, pageWidth - 28, 8, 'F')
           doc.setFontSize(10); doc.setFont(pdfFont, 'bold'); doc.setTextColor(255, 255, 255)
@@ -3251,6 +3312,7 @@ const analyzeDrawing = async () => {
           setContractNumberDraft={setContractNumberDraft} saveContractNumber={saveContractNumber}
           setEditingContractNumber={setEditingContractNumber}
           updateCloseDate={updateCloseDate} updateTaxExempt={updateTaxExempt} updateTaxRate={updateTaxRate}
+          onSaveDealAmount={saveDealAmount}
           setShowDealSummaryModal={setShowDealSummaryModal} setDealSummary={setDealSummary}
           setShowShareModal={setShowShareModal}
           setDeleteConfirmText={setDeleteConfirmText} setShowDeleteModal={setShowDeleteModal}
@@ -3354,6 +3416,8 @@ const analyzeDrawing = async () => {
           featureMsrp={features.msrp}
           featureComplianceFields={features.complianceFields && !!proposal?.show_compliance}
           canEdit={canEdit}
+          onSaveLinePrice={saveLinePrice}
+          onSaveLaborPrice={saveLaborPrice}
         />}
 
         <RecurringSection proposal={proposal} lineItems={lineItems} renewalDates={renewalDates} saveRenewalDate={saveRenewalDate} />

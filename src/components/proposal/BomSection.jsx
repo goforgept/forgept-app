@@ -60,9 +60,12 @@ export default function BomSection({
   canEdit = true,
   laborRates = [],
   defaultMarkup = 35,
+  onSaveLinePrice,
+  onSaveLaborPrice,
 }) {
   const [aiOpen, setAiOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [editingPrice, setEditingPrice] = useState(null) // { type: 'bom'|'labor', id: itemId|index, value: string }
   const aiRef = useRef(null)
   const moreRef = useRef(null)
 
@@ -416,7 +419,24 @@ export default function BomSection({
                             <td className="text-fp-muted py-3 pr-4">{item.category}</td>
                             <td className="text-fp-muted py-3 pr-4">{item.vendor}</td>
                             <td className="text-fp-text py-3 pr-4 text-right">{item.quantity}</td>
-                            <td className="text-fp-text py-3 pr-4 text-right">${fmt(item.customer_price_unit)}</td>
+                            <td className="py-2 pr-4 text-right">
+                              {canEdit && onSaveLinePrice && editingPrice?.type === 'bom' && editingPrice?.id === item.id ? (
+                                <input
+                                  type="number" min="0" step="0.01" autoFocus
+                                  value={editingPrice.value}
+                                  onChange={e => setEditingPrice(p => ({ ...p, value: e.target.value }))}
+                                  onBlur={() => { onSaveLinePrice(item.id, editingPrice.value, item.quantity); setEditingPrice(null) }}
+                                  onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingPrice(null) }}
+                                  className="w-24 bg-fp-inset text-fp-text border border-fp-brand rounded px-2 py-0.5 text-xs text-right focus:outline-none"
+                                />
+                              ) : (
+                                <span
+                                  onClick={() => canEdit && onSaveLinePrice && setEditingPrice({ type: 'bom', id: item.id, value: String(item.customer_price_unit || 0) })}
+                                  className={`text-fp-text text-sm ${canEdit && onSaveLinePrice ? 'cursor-text hover:bg-fp-inset rounded px-1 -mx-1 transition-colors' : ''}`}
+                                  title={canEdit && onSaveLinePrice ? 'Click to edit price' : undefined}
+                                >${fmt(item.customer_price_unit)}</span>
+                              )}
+                            </td>
                             {featureMsrp && <td className="text-fp-muted py-3 pr-4 text-right">{item.msrp_unit ? `$${fmt(item.msrp_unit)}` : '—'}</td>}
                             <td className="text-fp-text py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>
                             {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.lead_time || '—'}</td>}
@@ -494,14 +514,32 @@ export default function BomSection({
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {(section.labor_items || []).filter(l => l.role).map((l, i) => (
+                                  {(section.labor_items || []).filter(l => l.role).map((l, i) => {
+                                    const laborKey = `sec-${section.id}-${i}`
+                                    return (
                                     <tr key={i} className="border-b border-fp-border/30">
                                       <td className="text-fp-text py-2 pr-4">{l.role}</td>
                                       <td className="text-fp-muted py-2 pr-4">{l.quantity}</td>
                                       <td className="text-fp-muted py-2 pr-4">{l.unit || 'hr'}</td>
-                                      <td className="text-fp-text py-2 pr-4">${fmt(parseFloat(l.customer_price) || 0)}</td>
+                                      <td className="py-2 pr-4">
+                                        {canEdit && onSaveLaborPrice && editingPrice?.type === 'labor' && editingPrice?.id === laborKey ? (
+                                          <input type="number" min="0" step="0.01" autoFocus
+                                            value={editingPrice.value}
+                                            onChange={e => setEditingPrice(p => ({ ...p, value: e.target.value }))}
+                                            onBlur={() => { onSaveLaborPrice(laborKey, editingPrice.value); setEditingPrice(null) }}
+                                            onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingPrice(null) }}
+                                            className="w-24 bg-fp-inset text-fp-text border border-fp-brand rounded px-2 py-0.5 text-xs text-right focus:outline-none"
+                                          />
+                                        ) : (
+                                          <span
+                                            onClick={() => canEdit && onSaveLaborPrice && setEditingPrice({ type: 'labor', id: laborKey, value: String(parseFloat(l.customer_price) || 0) })}
+                                            className={`text-fp-text text-sm ${canEdit && onSaveLaborPrice ? 'cursor-text hover:bg-fp-inset rounded px-1 -mx-1 transition-colors' : ''}`}
+                                          >${fmt(parseFloat(l.customer_price) || 0)}</span>
+                                        )}
+                                      </td>
                                     </tr>
-                                  ))}
+                                    )
+                                  })}
                                 </tbody>
                               </table>
                             </div>
@@ -524,14 +562,32 @@ export default function BomSection({
                             </tr>
                           </thead>
                           <tbody>
-                            {proposal.labor_items.filter(l => l.role).map((l, i) => (
+                            {proposal.labor_items.filter(l => l.role).map((l, i) => {
+                              const laborKey = `gen-${i}`
+                              return (
                               <tr key={i} className="border-b border-fp-border/30">
                                 <td className="text-fp-text py-2 pr-4">{l.role}</td>
                                 <td className="text-fp-muted py-2 pr-4">{l.quantity}</td>
                                 <td className="text-fp-muted py-2 pr-4">{l.unit || 'hr'}</td>
-                                <td className="text-fp-text py-2 pr-4">${fmt(parseFloat(l.customer_price) || 0)}</td>
+                                <td className="py-2 pr-4">
+                                  {canEdit && onSaveLaborPrice && editingPrice?.type === 'labor' && editingPrice?.id === laborKey ? (
+                                    <input type="number" min="0" step="0.01" autoFocus
+                                      value={editingPrice.value}
+                                      onChange={e => setEditingPrice(p => ({ ...p, value: e.target.value }))}
+                                      onBlur={() => { onSaveLaborPrice(laborKey, editingPrice.value); setEditingPrice(null) }}
+                                      onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') setEditingPrice(null) }}
+                                      className="w-24 bg-fp-inset text-fp-text border border-fp-brand rounded px-2 py-0.5 text-xs text-right focus:outline-none"
+                                    />
+                                  ) : (
+                                    <span
+                                      onClick={() => canEdit && onSaveLaborPrice && setEditingPrice({ type: 'labor', id: laborKey, value: String(parseFloat(l.customer_price) || 0) })}
+                                      className={`text-fp-text text-sm ${canEdit && onSaveLaborPrice ? 'cursor-text hover:bg-fp-inset rounded px-1 -mx-1 transition-colors' : ''}`}
+                                    >${fmt(parseFloat(l.customer_price) || 0)}</span>
+                                  )}
+                                </td>
                               </tr>
-                            ))}
+                              )
+                            })}
                           </tbody>
                         </table>
                       </div>
