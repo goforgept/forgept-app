@@ -1,4 +1,4 @@
-export default function PricingOptionsModal({ proposal, onToggleHideMaterialPrices, onToggleLaborBreakdown, onToggleShowMsrp, featureMsrp, onToggleShowCompliance, featureComplianceFields, onClose }) {
+export default function PricingOptionsModal({ proposal, onToggleHideMaterialPrices, onToggleLaborBreakdown, onToggleLumpSumLabor, onToggleShowMsrp, featureMsrp, onToggleShowCompliance, featureComplianceFields, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
       <div className="bg-fp-card rounded-2xl p-6 w-full max-w-sm">
@@ -23,6 +23,16 @@ export default function PricingOptionsModal({ proposal, onToggleHideMaterialPric
             <button onClick={onToggleLaborBreakdown}
               className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.hide_labor_breakdown ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}>
               <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.hide_labor_breakdown ? 'left-6' : 'left-1'}`} />
+            </button>
+          </div>
+          <div className="flex items-center justify-between bg-fp-inset rounded-xl px-4 py-3">
+            <div>
+              <p className="text-fp-text text-sm font-semibold">Lump Sum Labor</p>
+              <p className="text-fp-muted text-xs mt-0.5">Collapse all labor into a single line with the combined total</p>
+            </div>
+            <button onClick={onToggleLumpSumLabor}
+              className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.lump_sum_labor ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}>
+              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.lump_sum_labor ? 'left-6' : 'left-1'}`} />
             </button>
           </div>
           {featureMsrp && (

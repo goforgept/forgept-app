@@ -504,7 +504,7 @@ export default function BomSection({
                         </div>
                         <div className="p-4">
                           {secItems.length > 0 && <ViewTable items={secItems} />}
-                          {section.include_labor && (section.labor_items || []).filter(l => l.role).length > 0 && (
+                          {section.include_labor && (section.labor_items || []).filter(l => l.role).length > 0 && !proposal?.lump_sum_labor && (
                             <div className="mt-4 pt-4 border-t border-fp-border">
                               <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Section Labor</p>
                               <table className="w-full text-sm">
@@ -550,6 +550,7 @@ export default function BomSection({
                   })}
 
                   {proposal?.labor_items?.filter(l => l.role).length > 0 && (
+                    proposal?.lump_sum_labor ? null : (
                     <div className="border border-fp-border rounded-xl overflow-hidden">
                       <div className="px-4 py-3 bg-fp-inset border-b border-fp-border">
                         <span className="text-fp-text font-semibold text-sm">Labor</span>
@@ -592,17 +593,26 @@ export default function BomSection({
                         </table>
                       </div>
                     </div>
+                    )
                   )}
 
                   {(() => {
                     const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
-                    const adjustedGrandTotal = materialsTotal + laborTotal + sectionLaborTotal + taxAmount
+                    const allLaborTotal = laborTotal + sectionLaborTotal
+                    const adjustedGrandTotal = materialsTotal + allLaborTotal + taxAmount
+                    const lumpSumLabor = proposal?.lump_sum_labor
                     return (
                       <table className="w-full text-sm">
                         <tfoot>
                           <tr><td colSpan="6" className="text-fp-muted pt-4 text-right font-semibold">Materials Total</td><td className="text-fp-text pt-4 text-right font-bold pr-4">${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
-                          {laborTotal > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">General Labor</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
-                          {sectionLaborTotal > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">Section Labor</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${sectionLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
+                          {lumpSumLabor ? (
+                            allLaborTotal > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">Labor</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
+                          ) : (
+                            <>
+                              {laborTotal > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">General Labor</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
+                              {sectionLaborTotal > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">Section Labor</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${sectionLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
+                            </>
+                          )}
                           {taxRate > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">Tax ({taxRate}% on materials)</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
                           <tr className="border-t border-fp-border"><td colSpan="6" className="text-fp-muted pt-3 text-right font-semibold">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg pr-4">${adjustedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
                         </tfoot>

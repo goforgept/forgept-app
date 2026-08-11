@@ -209,7 +209,7 @@ export default function ProposalDetail({ isAdmin }) {
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,show_msrp,show_compliance,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,lump_sum_labor,show_msrp,show_compliance,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
       .eq('id', id)
       .single()
 
@@ -592,6 +592,12 @@ export default function ProposalDetail({ isAdmin }) {
     const newVal = !proposal?.hide_labor_breakdown
     await supabase.from('proposals').update({ hide_labor_breakdown: newVal }).eq('id', id)
     setProposal(prev => ({ ...prev, hide_labor_breakdown: newVal }))
+  }
+
+  const toggleLumpSumLabor = async () => {
+    const newVal = !proposal?.lump_sum_labor
+    await supabase.from('proposals').update({ lump_sum_labor: newVal }).eq('id', id)
+    setProposal(prev => ({ ...prev, lump_sum_labor: newVal }))
   }
 
   const toggleShowMsrp = async () => {
@@ -1355,7 +1361,7 @@ export default function ProposalDetail({ isAdmin }) {
 
     const { data: freshProposal } = await supabase
       .from('proposals')
-      .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, show_compliance, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
+      .select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_compliance, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
       .eq('id', id)
       .single()
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
@@ -1552,7 +1558,7 @@ export default function ProposalDetail({ isAdmin }) {
           )
 
           // Section labor
-          if (secLabor.length > 0) {
+          if (secLabor.length > 0 && !p?.lump_sum_labor) {
             const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
             const lbs = { top: lb, bottom: lb, left: lb, right: lb }
             const hideLabor = p?.hide_labor_breakdown
@@ -1572,8 +1578,9 @@ export default function ProposalDetail({ isAdmin }) {
             )
           }
           if (!isLumpSum) {
+            const displaySecTotal = p?.lump_sum_labor ? secMatTotal : secTotal
             children.push(
-              new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 18, color: primaryColor })] }),
+              new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: `${section.name || 'Section'} Total: $${displaySecTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, bold: true, size: 18, color: primaryColor })] }),
               new Paragraph({ children: [new TextRun({ text: '' })] }),
             )
           }
@@ -1588,7 +1595,26 @@ export default function ProposalDetail({ isAdmin }) {
       }
     }
 
-    if (docxLaborItems.length > 0 && docxLaborItems.some(l => l.role)) {
+    const docxAllLaborForLumpSum = docxLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0) + sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+
+    if (p?.lump_sum_labor && docxAllLaborForLumpSum > 0) {
+      const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
+      const lbs = { top: lb, bottom: lb, left: lb, right: lb }
+      const lcw = [5400, 2400]
+      const lumpHeaderRow = new TableRow({
+        children: ['Description', 'Total'].map((h, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, shading: { fill: primaryColor, type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })] })] }))
+      })
+      const lumpRow = new TableRow({
+        children: ['Labor', `$${docxAllLaborForLumpSum.toLocaleString('en-US', { minimumFractionDigits: 2 })}`].map((val, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
+      })
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Labor', bold: true, size: 28, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Table({ width: { size: 7800, type: WidthType.DXA }, columnWidths: lcw, rows: [lumpHeaderRow, lumpRow] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+      )
+    } else if (docxLaborItems.length > 0 && docxLaborItems.some(l => l.role)) {
       const lb = { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC' }
       const lbs = { top: lb, bottom: lb, left: lb, right: lb }
 
@@ -1652,9 +1678,7 @@ export default function ProposalDetail({ isAdmin }) {
 
     // Unified summary — hidden in installer/lump-sum mode
     if (!isLumpSum) {
-      const docxProposalLaborTotal = docxLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
-      const docxSectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
-      const docxAllLaborTotal = docxProposalLaborTotal + docxSectionLaborTotal
+      const docxAllLaborTotal = docxAllLaborForLumpSum
       const docxGrandTotal = docxMatTotal + docxAllLaborTotal + docxTaxAmt
       children.push(
         new Paragraph({ children: [new TextRun({ text: `Materials Total: $${docxMatTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, size: 20, color: '444444' })] }),
@@ -2804,7 +2828,7 @@ const analyzeDrawing = async () => {
   const generatePDFDoc = async ({ forceHidePricing = false } = {}) => {
     const { data: freshProposal } = await supabase
       .from('proposals')
-      .select('hide_material_prices, hide_labor_breakdown, lump_sum_pricing, show_msrp, show_compliance, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
+      .select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_msrp, show_compliance, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
       .eq('id', id)
       .single()
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
@@ -2977,7 +3001,7 @@ const analyzeDrawing = async () => {
             autoTable(doc, { startY: yPos, head: pdfHead, body: secItems.map(pdfRow), ...tableStyles, showFoot: false })
             yPos = doc.lastAutoTable.finalY + 4
           }
-          if (secLabor.length > 0) {
+          if (secLabor.length > 0 && !p?.lump_sum_labor) {
             doc.setFontSize(8); doc.setFont(pdfFont, 'bold'); doc.setTextColor(100, 100, 100)
             doc.text('Section Labor', 14, yPos + 4); yPos += 6
             const lHead = p?.hide_labor_breakdown ? [['Role', 'Qty', 'Unit']] : [['Role', 'Qty', 'Unit', 'Total Labor']]
@@ -2989,8 +3013,9 @@ const analyzeDrawing = async () => {
           }
           // Section subtotal line — hidden in installer/lump-sum mode
           if (!isLumpSum) {
+            const displaySecTotal = p?.lump_sum_labor ? secMatTotal : secTotal
             doc.setFontSize(9); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-            doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+            doc.text(`${section.name || 'Section'} Total: $${displaySecTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
             yPos += 8
           }
         }
@@ -3009,7 +3034,20 @@ const analyzeDrawing = async () => {
     const allLaborTotal = proposalLaborTotal + sectionLaborTotal
     const grandTotal = pdfMaterialsTotal + allLaborTotal + pdfTaxAmount
 
-    if (pdfLaborItems.length > 0 && pdfLaborItems.some(l => l.role)) {
+    if (p?.lump_sum_labor && allLaborTotal > 0) {
+      const tableEnd = sections.length > 0 ? yPos + 6 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12)
+      doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Labor', 14, tableEnd)
+      autoTable(doc, {
+        startY: tableEnd + 6,
+        head: [['Description', 'Total']],
+        body: [['Labor', `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        columnStyles: { 1: { halign: 'right' } },
+        ...(pdfStriped ? { alternateRowStyles: { fillColor: [245, 245, 245] } } : {}), styles: { fontSize: 9 },
+      })
+      yPos = doc.lastAutoTable.finalY + 8
+    } else if (pdfLaborItems.length > 0 && pdfLaborItems.some(l => l.role)) {
       const tableEnd = sections.length > 0 ? yPos + 6 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12)
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Labor', 14, tableEnd)
@@ -3530,7 +3568,7 @@ const analyzeDrawing = async () => {
 
       {showSendModal && <SendProposalModal proposal={proposal} sendForm={sendForm} setSendForm={setSendForm} sendingProposal={sendingProposal} onSend={sendProposal} onClose={() => setShowSendModal(false)} />}
 
-      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onToggleShowCompliance={toggleShowCompliance} featureComplianceFields={features.complianceFields} onClose={() => setShowPricingModal(false)} />}
+      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleLumpSumLabor={toggleLumpSumLabor} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onToggleShowCompliance={toggleShowCompliance} featureComplianceFields={features.complianceFields} onClose={() => setShowPricingModal(false)} />}
 
       {showMoveModal && moveLineIndex !== null && <MoveLineModal editLines={editLines} moveLineIndex={moveLineIndex} editSections={editSections} onMove={moveLineToSection} onClose={() => { setShowMoveModal(false); setMoveLineIndex(null) }} />}
 
