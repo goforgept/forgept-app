@@ -1,6 +1,7 @@
 export default function ProposalsTab({
   form, setForm, inputClass,
   logoUrl, uploadingLogo, handleLogoUpload,
+  warrantyTemplates, setWarrantyTemplates,
   defaultHideMaterialPrices, setDefaultHideMaterialPrices,
   defaultHideLaborBreakdown, setDefaultHideLaborBreakdown,
   defaultLumpSumLabor, setDefaultLumpSumLabor,
@@ -72,6 +73,46 @@ export default function ProposalsTab({
           rows={8}
           className="w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none"
         />
+      </div>
+
+      {/* Warranty Templates */}
+      <div className="bg-fp-card rounded-xl p-6">
+        <h3 className="text-fp-text font-bold mb-1">Warranty Templates</h3>
+        <p className="text-fp-muted text-sm mb-4">Create reusable warranty statements. On each proposal you can select which one to use and edit it as needed.</p>
+        <div className="space-y-4">
+          {(warrantyTemplates || []).map((tmpl, i) => (
+            <div key={tmpl.id} className="bg-fp-bg rounded-xl p-4 space-y-3 border border-fp-border">
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={tmpl.name}
+                  onChange={e => setWarrantyTemplates(prev => prev.map((t, j) => j === i ? { ...t, name: e.target.value } : t))}
+                  placeholder="Template name (e.g. Standard, Extended)"
+                  className="flex-1 bg-transparent text-fp-text text-sm font-semibold focus:outline-none border-b border-fp-border focus:border-fp-brand pb-1"
+                />
+                <button
+                  onClick={() => setWarrantyTemplates(prev => prev.filter((_, j) => j !== i))}
+                  className="text-fp-muted hover:text-red-400 text-xs transition-colors flex-shrink-0"
+                >
+                  Remove
+                </button>
+              </div>
+              <textarea
+                value={tmpl.text}
+                onChange={e => setWarrantyTemplates(prev => prev.map((t, j) => j === i ? { ...t, text: e.target.value } : t))}
+                placeholder="Warranty text..."
+                rows={4}
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y"
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => setWarrantyTemplates(prev => [...(prev || []), { id: crypto.randomUUID(), name: '', text: '' }])}
+            className="text-fp-muted hover:text-fp-text text-sm transition-colors"
+          >
+            + Add Warranty Template
+          </button>
+        </div>
       </div>
 
       {/* Proposal Defaults */}

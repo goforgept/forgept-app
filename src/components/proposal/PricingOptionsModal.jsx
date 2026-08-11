@@ -1,4 +1,4 @@
-export default function PricingOptionsModal({ proposal, onToggleHideMaterialPrices, onToggleLaborBreakdown, onToggleLumpSumLabor, onToggleShowMsrp, featureMsrp, onToggleShowCompliance, featureComplianceFields, onClose }) {
+export default function PricingOptionsModal({ proposal, onToggleHideMaterialPrices, onToggleLaborBreakdown, onToggleLumpSumLabor, onToggleShowMsrp, featureMsrp, onToggleShowCompliance, featureComplianceFields, onToggleShowWarranty, hasWarranty, onToggleShowTerms, hasTerms, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
       <div className="bg-fp-card rounded-2xl p-6 w-full max-w-sm">
@@ -56,6 +56,30 @@ export default function PricingOptionsModal({ proposal, onToggleHideMaterialPric
               <button onClick={onToggleShowCompliance}
                 className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.show_compliance ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}>
                 <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.show_compliance ? 'left-6' : 'left-1'}`} />
+              </button>
+            </div>
+          )}
+          {hasTerms && (
+            <div className="flex items-center justify-between bg-fp-inset rounded-xl px-4 py-3">
+              <div>
+                <p className="text-fp-text text-sm font-semibold">Show Terms & Conditions</p>
+                <p className="text-fp-muted text-xs mt-0.5">Include T&C page on PDF and DOCX</p>
+              </div>
+              <button onClick={onToggleShowTerms}
+                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.show_terms !== false ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}>
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.show_terms !== false ? 'left-6' : 'left-1'}`} />
+              </button>
+            </div>
+          )}
+          {hasWarranty && (
+            <div className="flex items-center justify-between bg-fp-inset rounded-xl px-4 py-3">
+              <div>
+                <p className="text-fp-text text-sm font-semibold">Show Warranty</p>
+                <p className="text-fp-muted text-xs mt-0.5">Include warranty section on PDF, DOCX, and proposal view</p>
+              </div>
+              <button onClick={onToggleShowWarranty}
+                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.show_warranty !== false ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}>
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.show_warranty !== false ? 'left-6' : 'left-1'}`} />
               </button>
             </div>
           )}

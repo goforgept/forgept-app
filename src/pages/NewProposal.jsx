@@ -195,6 +195,7 @@ export default function NewProposal() {
       lump_sum_pricing: profile?.organizations?.default_hide_material_prices || false,
       hide_labor_breakdown: profile?.organizations?.default_hide_labor_breakdown || false,
       lump_sum_labor: profile?.organizations?.default_lump_sum_labor || false,
+      show_warranty: true,
       labor_items: [],
       proposal_value: parseFloat(dealAmount) || 0,
       total_customer_value: parseFloat(dealAmount) || 0,

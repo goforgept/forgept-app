@@ -36,6 +36,7 @@ import RecurringSection from '../components/proposal/RecurringSection'
 import ServiceAgreementSection from '../components/proposal/ServiceAgreementSection'
 import MonitoringSection from '../components/proposal/MonitoringSection'
 import BomSection from '../components/proposal/BomSection'
+import WarrantySection from '../components/proposal/WarrantySection'
 import CatalogSearch from '../components/CatalogSearch'
 
 export default function ProposalDetail({ isAdmin }) {
@@ -209,7 +210,7 @@ export default function ProposalDetail({ isAdmin }) {
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,lump_sum_labor,show_msrp,show_compliance,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,lump_sum_labor,show_msrp,show_compliance,show_warranty,warranty_text,warranty_template_id,show_terms,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
       .eq('id', id)
       .single()
 
@@ -610,6 +611,28 @@ export default function ProposalDetail({ isAdmin }) {
     const newVal = !proposal?.show_compliance
     await supabase.from('proposals').update({ show_compliance: newVal }).eq('id', id)
     setProposal(prev => ({ ...prev, show_compliance: newVal }))
+  }
+
+  const toggleShowWarranty = async () => {
+    const newVal = !(proposal?.show_warranty !== false)
+    await supabase.from('proposals').update({ show_warranty: newVal }).eq('id', id)
+    setProposal(prev => ({ ...prev, show_warranty: newVal }))
+  }
+
+  const toggleShowTerms = async () => {
+    const newVal = !(proposal?.show_terms !== false)
+    await supabase.from('proposals').update({ show_terms: newVal }).eq('id', id)
+    setProposal(prev => ({ ...prev, show_terms: newVal }))
+  }
+
+  const saveWarrantyText = async (text) => {
+    await supabase.from('proposals').update({ warranty_text: text || null }).eq('id', id)
+    setProposal(prev => ({ ...prev, warranty_text: text || null }))
+  }
+
+  const saveWarrantyTemplateId = async (templateId) => {
+    await supabase.from('proposals').update({ warranty_template_id: templateId || null, warranty_text: null }).eq('id', id)
+    setProposal(prev => ({ ...prev, warranty_template_id: templateId || null, warranty_text: null }))
   }
 
   const saveProposalName = async () => {
@@ -1361,7 +1384,7 @@ export default function ProposalDetail({ isAdmin }) {
 
     const { data: freshProposal } = await supabase
       .from('proposals')
-      .select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_compliance, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
+      .select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_compliance, show_warranty, warranty_text, warranty_template_id, show_terms, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name')
       .eq('id', id)
       .single()
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
@@ -1691,16 +1714,7 @@ export default function ProposalDetail({ isAdmin }) {
       )
     }
 
-    if (profile?.terms_and_conditions) {
-      children.push(
-        new Paragraph({ children: [new TextRun({ text: 'Terms and Conditions', bold: true, size: 28, color: primaryColor })] }),
-        new Paragraph({ children: [new TextRun({ text: '' })] }),
-        ...profile.terms_and_conditions.split('\n').map(line =>
-          new Paragraph({ children: [new TextRun({ text: line, size: 18, color: '444444' })] })
-        )
-      )
-    }
-
+    // Signature appears before T&C and Warranty
     const sigLine = () => new Paragraph({
       border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: 'AAAAAA' } },
       children: [new TextRun({ text: ' ', size: 24 })]
@@ -1723,6 +1737,33 @@ export default function ProposalDetail({ isAdmin }) {
       new Paragraph({ children: [new TextRun({ text: 'Title', size: 18, color: '888888' })] }),
       sigLine(),
     )
+
+    if (p?.show_terms !== false && profile?.terms_and_conditions) {
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Terms and Conditions', bold: true, size: 28, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        ...profile.terms_and_conditions.split('\n').map(line =>
+          new Paragraph({ children: [new TextRun({ text: line, size: 18, color: '444444' })] })
+        )
+      )
+    }
+
+    const docxWarrantyTemplates = profile?.organizations?.warranty_templates || []
+    const docxSelectedTemplate = docxWarrantyTemplates.find(t => t.id === p?.warranty_template_id)
+    const effectiveWarranty = p?.show_warranty !== false ? (p?.warranty_text || docxSelectedTemplate?.text || null) : null
+    if (effectiveWarranty) {
+      children.push(
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        new Paragraph({ children: [new TextRun({ text: 'Warranty', bold: true, size: 28, color: primaryColor })] }),
+        new Paragraph({ children: [new TextRun({ text: '' })] }),
+        ...effectiveWarranty.split('\n').map(line =>
+          new Paragraph({ children: [new TextRun({ text: line, size: 18, color: '444444' })] })
+        )
+      )
+    }
 
     for (const slaC of slaContracts) {
       const resolvedSLABody = (slaC.body || '')
@@ -2839,8 +2880,8 @@ const analyzeDrawing = async () => {
 
   const generatePDFDoc = async ({ forceHidePricing = false } = {}) => {
     const [{ data: freshProposal }, { data: freshOrg }] = await Promise.all([
-      supabase.from('proposals').select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_msrp, show_compliance, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name').eq('id', id).single(),
-      supabase.from('organizations').select('pdf_table_style, pdf_header_style, doc_font, primary_color').eq('id', profile?.org_id).single(),
+      supabase.from('proposals').select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_msrp, show_compliance, show_warranty, warranty_text, warranty_template_id, show_terms, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name').eq('id', id).single(),
+      supabase.from('organizations').select('pdf_table_style, pdf_header_style, doc_font, primary_color, warranty_templates').eq('id', profile?.org_id).single(),
     ])
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
     if (forceHidePricing) p = { ...p, hide_material_prices: true, lump_sum_pricing: true, hide_labor_breakdown: true }
@@ -3138,27 +3179,41 @@ const analyzeDrawing = async () => {
       const s3 = s2 + 20; doc.text('Title:', 14, s3); doc.line(30, s3, pageWidth - 14, s3)
     }
 
-    if (profile?.terms_and_conditions) {
-      doc.addPage()
+    // Signature always appears right after pricing — before T&C and Warranty
+    let sigY = yPos + 20
+    if (sigY + 70 > pageHeight) { doc.addPage(); sigY = 20 }
+    renderSignatureBlock(doc, sigY)
+
+    const showPdfTerms = p?.show_terms !== false
+    const pdfWarrantyTemplates = freshOrg?.warranty_templates || []
+    const pdfSelectedTemplate = pdfWarrantyTemplates.find(t => t.id === p?.warranty_template_id)
+    const pdfEffectiveWarranty = p?.show_warranty !== false ? (p?.warranty_text || pdfSelectedTemplate?.text || null) : null
+    const pdfLineH = 4.5
+
+    const renderTextBlock = (title, text, startY) => {
+      let ty = startY
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Terms and Conditions', 14, 20)
+      doc.text(title, 14, ty); ty += 12
       doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
-      const termsLines = doc.splitTextToSize(profile.terms_and_conditions, pageWidth - 28)
-      const lineH = 4.5
-      const pageH = doc.internal.pageSize.getHeight()
-      let ty = 32
-      for (const line of termsLines) {
-        if (ty + lineH > pageH - 20) { doc.addPage(); ty = 20 }
-        doc.text(line, 14, ty)
-        ty += lineH
+      const lines = doc.splitTextToSize(text, pageWidth - 28)
+      for (const line of lines) {
+        if (ty + pdfLineH > pageHeight - 20) { doc.addPage(); ty = 20 }
+        doc.text(line, 14, ty); ty += pdfLineH
       }
-      ty += 16
-      if (ty + 70 > pageH) { doc.addPage(); ty = 20 }
-      renderSignatureBlock(doc, ty)
-    } else {
-      let afterY = yPos + 20
-      if (afterY + 70 > pageHeight) { doc.addPage(); afterY = 20 }
-      renderSignatureBlock(doc, afterY)
+      return ty
+    }
+
+    if ((showPdfTerms && profile?.terms_and_conditions) || pdfEffectiveWarranty) {
+      doc.addPage()
+      let ty = 20
+      if (showPdfTerms && profile?.terms_and_conditions) {
+        ty = renderTextBlock('Terms and Conditions', profile.terms_and_conditions, ty)
+        ty += 10
+      }
+      if (pdfEffectiveWarranty) {
+        if (ty > 30 && ty + 40 > pageHeight) { doc.addPage(); ty = 20 }
+        renderTextBlock('Warranty', pdfEffectiveWarranty, ty)
+      }
     }
 
     for (const slaC of slaContracts) {
@@ -3484,6 +3539,15 @@ const analyzeDrawing = async () => {
 
         <DrawingToolSummary proposalId={id} featureEnabled={features.drawingTool} />
 
+        <WarrantySection
+          proposal={proposal}
+          warrantyTemplates={profile?.organizations?.warranty_templates || []}
+          onToggle={toggleShowWarranty}
+          onSave={saveWarrantyText}
+          onSaveTemplateId={saveWarrantyTemplateId}
+          canEdit={canEdit}
+        />
+
         {revisions.length > 1 && (
           <>
             {/* Superseded banner — show when viewing an old revision */}
@@ -3586,7 +3650,7 @@ const analyzeDrawing = async () => {
 
       {showSendModal && <SendProposalModal proposal={proposal} sendForm={sendForm} setSendForm={setSendForm} sendingProposal={sendingProposal} onSend={sendProposal} onClose={() => setShowSendModal(false)} />}
 
-      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleLumpSumLabor={toggleLumpSumLabor} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onToggleShowCompliance={toggleShowCompliance} featureComplianceFields={features.complianceFields} onClose={() => setShowPricingModal(false)} />}
+      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleLumpSumLabor={toggleLumpSumLabor} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onToggleShowCompliance={toggleShowCompliance} featureComplianceFields={features.complianceFields} onToggleShowWarranty={toggleShowWarranty} hasWarranty={!!(proposal?.warranty_text || (profile?.organizations?.warranty_templates || []).length > 0)} onToggleShowTerms={toggleShowTerms} hasTerms={!!profile?.terms_and_conditions} onClose={() => setShowPricingModal(false)} />}
 
       {showMoveModal && moveLineIndex !== null && <MoveLineModal editLines={editLines} moveLineIndex={moveLineIndex} editSections={editSections} onMove={moveLineToSection} onClose={() => { setShowMoveModal(false); setMoveLineIndex(null) }} />}
 

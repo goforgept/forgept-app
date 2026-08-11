@@ -84,6 +84,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [defaultHideMaterialPrices, setDefaultHideMaterialPrices] = useState(false)
   const [defaultHideLaborBreakdown, setDefaultHideLaborBreakdown] = useState(false)
   const [defaultLumpSumLabor, setDefaultLumpSumLabor] = useState(false)
+  const [warrantyTemplates, setWarrantyTemplates] = useState([])
   const [slaEnabled, setSlaEnabled] = useState(false)
   const [slaAutoAttach, setSlaAutoAttach] = useState(false)
   const [monitoringEnabled, setMonitoringEnabled] = useState(false)
@@ -262,7 +263,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     })
     if (data?.org_id) {
       try {
-        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions, feature_msrp, doc_font, pdf_table_style, pdf_header_style, stripe_connect_connected, default_hide_material_prices, default_hide_labor_breakdown, default_lump_sum_labor').eq('id', data.org_id).single()
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions, feature_msrp, doc_font, pdf_table_style, pdf_header_style, stripe_connect_connected, default_hide_material_prices, default_hide_labor_breakdown, default_lump_sum_labor, warranty_templates, warranty_text').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
         setOrgTimezone(orgData?.timezone || 'America/Chicago')
         setOrgId(data.org_id)
@@ -280,6 +281,15 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         setDefaultHideMaterialPrices(orgData?.default_hide_material_prices || false)
         setDefaultHideLaborBreakdown(orgData?.default_hide_labor_breakdown || false)
         setDefaultLumpSumLabor(orgData?.default_lump_sum_labor || false)
+        // Migrate from old single warranty_text field if templates not yet set
+        const existingTemplates = orgData?.warranty_templates
+        if (existingTemplates?.length) {
+          setWarrantyTemplates(existingTemplates)
+        } else if (orgData?.warranty_text) {
+          setWarrantyTemplates([{ id: crypto.randomUUID(), name: 'Warranty', text: orgData.warranty_text }])
+        } else {
+          setWarrantyTemplates([])
+        }
         setPdfHeaderStyle(orgData?.pdf_header_style || 'compact')
         setSlaEnabled(orgData?.feature_sla || false); setSlaAutoAttach(orgData?.sla_auto_attach || false)
         setMonitoringEnabled(orgData?.feature_monitoring || false); setMonitoringAutoAttach(orgData?.monitoring_auto_attach || false)
@@ -342,7 +352,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       ship_to_address: form.ship_to_address, ship_to_city: form.ship_to_city,
       ship_to_state: form.ship_to_state, ship_to_zip: form.ship_to_zip,
     }).eq('id', user.id)
-    if (orgId) await supabase.from('organizations').update({ timezone: orgTimezone, default_hide_material_prices: defaultHideMaterialPrices, default_hide_labor_breakdown: defaultHideLaborBreakdown, default_lump_sum_labor: defaultLumpSumLabor }).eq('id', orgId)
+    if (orgId) await supabase.from('organizations').update({ timezone: orgTimezone, default_hide_material_prices: defaultHideMaterialPrices, default_hide_labor_breakdown: defaultHideLaborBreakdown, default_lump_sum_labor: defaultLumpSumLabor, warranty_templates: warrantyTemplates.filter(t => t.name || t.text) }).eq('id', orgId)
     refreshProfile()
     setSuccess('Settings saved successfully'); setSaving(false)
   }
@@ -545,6 +555,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           {activeTab === 'proposals' && (
             <ProposalsTab form={form} setForm={setForm} inputClass={inputClass}
               logoUrl={logoUrl} uploadingLogo={uploadingLogo} handleLogoUpload={handleLogoUpload}
+              warrantyTemplates={warrantyTemplates} setWarrantyTemplates={setWarrantyTemplates}
               defaultHideMaterialPrices={defaultHideMaterialPrices} setDefaultHideMaterialPrices={setDefaultHideMaterialPrices}
               defaultHideLaborBreakdown={defaultHideLaborBreakdown} setDefaultHideLaborBreakdown={setDefaultHideLaborBreakdown}
               defaultLumpSumLabor={defaultLumpSumLabor} setDefaultLumpSumLabor={setDefaultLumpSumLabor}
