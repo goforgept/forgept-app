@@ -1,6 +1,10 @@
 export default function ProposalsTab({
   form, setForm, inputClass,
   logoUrl, uploadingLogo, handleLogoUpload,
+  orgTaxRate, setOrgTaxRate,
+  defaultHideMaterialPrices, setDefaultHideMaterialPrices,
+  defaultHideLaborBreakdown, setDefaultHideLaborBreakdown,
+  defaultLumpSumLabor, setDefaultLumpSumLabor,
   isAdmin, msrpEnabled, onToggleMsrp,
   docFont, onChangeDocFont,
   pdfTableStyle, onChangePdfTableStyle,
@@ -75,8 +79,50 @@ export default function ProposalsTab({
       {isAdmin && (
         <div className="bg-fp-card rounded-xl p-6">
           <h3 className="text-fp-text font-bold mb-1">Proposal Defaults</h3>
-          <p className="text-fp-muted text-sm mb-4">Default features applied to all proposals. Markup % and tax rate are set in the Rate Card tab.</p>
+          <p className="text-fp-muted text-sm mb-4">Default values and features applied to all new proposals.</p>
           <div className="space-y-4">
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="text-fp-muted text-xs mb-1 block">Default Markup %</label>
+                <input type="number" min="0" max="999" step="0.1"
+                  value={form.default_markup_percent || ''}
+                  onChange={e => setForm(prev => ({ ...prev, default_markup_percent: e.target.value }))}
+                  placeholder="35"
+                  className={inputClass} />
+                <p className="text-fp-muted text-xs mt-1">Applied to new BOM and labor line items.</p>
+              </div>
+              <div className="flex-1">
+                <label className="text-fp-muted text-xs mb-1 block">Default Tax Rate %</label>
+                <input type="number" min="0" max="100" step="0.001"
+                  value={orgTaxRate ?? ''}
+                  onChange={e => setOrgTaxRate(e.target.value)}
+                  placeholder="e.g. 8.5"
+                  className={inputClass} />
+                <p className="text-fp-muted text-xs mt-1">Applied to new proposals. Can be overridden per proposal.</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-fp-text text-sm font-semibold mb-1">Default Pricing Options</p>
+              <p className="text-fp-muted text-xs mb-3">These settings will be pre-applied to every new proposal. Can still be changed per proposal.</p>
+              <div className="space-y-2">
+                {[
+                  { label: 'Hide Material Unit Prices', desc: 'Show item names and qty only — no unit price or line total', val: defaultHideMaterialPrices, set: setDefaultHideMaterialPrices },
+                  { label: 'Hide Labor Breakdown', desc: 'Show Role, Qty, Total only — no hourly rate', val: defaultHideLaborBreakdown, set: setDefaultHideLaborBreakdown },
+                  { label: 'Lump Sum Labor', desc: 'Collapse all labor into a single line with the combined total', val: defaultLumpSumLabor, set: setDefaultLumpSumLabor },
+                ].map(opt => (
+                  <div key={opt.label} className="flex items-center justify-between bg-fp-bg rounded-xl px-4 py-3">
+                    <div>
+                      <p className="text-fp-text text-sm font-semibold">{opt.label}</p>
+                      <p className="text-fp-muted text-xs mt-0.5">{opt.desc}</p>
+                    </div>
+                    <button onClick={() => opt.set(v => !v)}
+                      className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${opt.val ? 'bg-fp-brand' : 'bg-fp-border'}`}>
+                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${opt.val ? 'left-6' : 'left-1'}`} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div className="flex items-center justify-between bg-fp-bg rounded-xl px-4 py-3">
               <div>
                 <p className="text-fp-text text-sm font-semibold">Enable MSRP</p>
