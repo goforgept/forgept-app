@@ -9,6 +9,7 @@ const PLANS = [
   { name: 'Early Adopter Annual', rate: 1200, color: 'text-green-400', bg: 'bg-green-500/20' },
   { name: 'Early Adopter', rate: 100, color: 'text-green-400', bg: 'bg-green-500/20' },
   { name: 'Early Adopter - CRM/Designer Solo', rate: 800, color: 'text-green-400', bg: 'bg-green-500/20' },
+  { name: 'Early Adopter - CRM/Designer Solo Annual', rate: 800, color: 'text-green-400', bg: 'bg-green-500/20' },
   { name: 'Designer Only', rate: 49, color: 'text-blue-400', bg: 'bg-blue-500/20' },
   { name: 'Small Team', rate: 99, color: 'text-purple-400', bg: 'bg-purple-500/20' },
   { name: 'Team', rate: 149, color: 'text-indigo-400', bg: 'bg-indigo-500/20' },
