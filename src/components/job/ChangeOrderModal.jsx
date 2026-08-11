@@ -1,7 +1,8 @@
 const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const inputClass = "bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand"
 
-export default function ChangeOrderModal({ coForm, setCoForm, savingCO, onSave, onClose }) {
+export default function ChangeOrderModal({ coForm, setCoForm, savingCO, onSave, onClose, editingId }) {
+  const isEditing = !!editingId
   const matTotal = (coForm.line_items || []).reduce((sum, l) => sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
   const labTotal = (coForm.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
   const coTotal = matTotal + labTotal
@@ -9,19 +10,24 @@ export default function ChangeOrderModal({ coForm, setCoForm, savingCO, onSave, 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
       <div className="bg-fp-card rounded-2xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-        <h3 className="text-fp-text font-bold text-lg mb-5">New Change Order</h3>
+        <h3 className="text-fp-text font-bold text-lg mb-5">{isEditing ? 'Edit Change Order' : 'New Change Order'}</h3>
         <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-fp-muted text-xs mb-1 block">Name <span className="text-[#C8622A]">*</span></label>
-              <input type="text" value={coForm.name} onChange={e => setCoForm(p => ({ ...p, name: e.target.value }))}
-                placeholder="e.g. Additional camera location" className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
-            </div>
-            <div>
-              <label className="text-fp-muted text-xs mb-1 block">Description</label>
-              <input type="text" value={coForm.description} onChange={e => setCoForm(p => ({ ...p, description: e.target.value }))}
-                placeholder="Brief description..." className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
-            </div>
+          <div>
+            <label className="text-fp-muted text-xs mb-1 block">Name <span className="text-[#C8622A]">*</span></label>
+            <input type="text" value={coForm.name} onChange={e => setCoForm(p => ({ ...p, name: e.target.value }))}
+              placeholder="e.g. Additional camera location"
+              className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+          </div>
+
+          <div>
+            <label className="text-fp-muted text-xs mb-1 block">Description of Work</label>
+            <textarea
+              value={coForm.description || ''}
+              onChange={e => setCoForm(p => ({ ...p, description: e.target.value }))}
+              placeholder="Describe the work, reason for the change, and any relevant details that will appear on the customer approval document..."
+              rows={4}
+              className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none"
+            />
           </div>
 
           <div>
@@ -125,7 +131,7 @@ export default function ChangeOrderModal({ coForm, setCoForm, savingCO, onSave, 
             <button onClick={onClose} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
             <button onClick={onSave} disabled={savingCO || !coForm.name.trim()}
               className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-              {savingCO ? 'Saving...' : 'Create Change Order'}
+              {savingCO ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Change Order'}
             </button>
           </div>
         </div>

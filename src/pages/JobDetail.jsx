@@ -88,6 +88,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [showCOModal, setShowCOModal] = useState(false)
   const [coForm, setCoForm] = useState({ name: '', description: '', line_items: [], labor_items: [] })
   const [savingCO, setSavingCO] = useState(false)
+  const [editingCOId, setEditingCOId] = useState(null)
 
   // Checklist add
   const [newCheckItem, setNewCheckItem] = useState('')
@@ -694,28 +695,179 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     doc.save(`Cost-Report-${job?.job_number || job?.name || 'job'}.pdf`)
   }
 
+  const emptyCoForm = { name: '', description: '', line_items: [], labor_items: [] }
+
+  const openEditCO = (co) => {
+    setEditingCOId(co.id)
+    setCoForm({
+      name: co.name || '',
+      description: co.description || '',
+      line_items: co.line_items || [],
+      labor_items: co.labor_items || [],
+    })
+    setShowCOModal(true)
+  }
+
+  const closeCOModal = () => {
+    setShowCOModal(false)
+    setEditingCOId(null)
+    setCoForm(emptyCoForm)
+  }
+
   const saveChangeOrder = async () => {
     if (!coForm.name.trim()) return
     setSavingCO(true)
     const matTotal = (coForm.line_items || []).reduce((sum, l) => sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
     const labTotal = (coForm.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
     const total = matTotal + labTotal
-    const { data } = await supabase.from('change_orders').insert({
-      job_id: id, org_id: profile?.org_id, proposal_id: job?.proposal_id || null,
-      name: coForm.name, description: coForm.description, amount: total,
+    const patch = {
+      name: coForm.name, description: coForm.description || null, amount: total,
       line_items: coForm.line_items?.length > 0 ? coForm.line_items : null,
       labor_items: coForm.labor_items?.length > 0 ? coForm.labor_items : null,
-      status: 'Pending'
-    }).select().single()
-    if (data) setChangeOrders(prev => [data, ...prev])
-    setCoForm({ name: '', description: '', line_items: [], labor_items: [] })
-    setShowCOModal(false)
+    }
+    if (editingCOId) {
+      const { data } = await supabase.from('change_orders').update(patch).eq('id', editingCOId).select().single()
+      if (data) setChangeOrders(prev => prev.map(c => c.id === editingCOId ? data : c))
+    } else {
+      const { data } = await supabase.from('change_orders').insert({
+        job_id: id, org_id: profile?.org_id, proposal_id: job?.proposal_id || null,
+        ...patch, status: 'Pending'
+      }).select().single()
+      if (data) setChangeOrders(prev => [data, ...prev])
+    }
+    closeCOModal()
     setSavingCO(false)
   }
 
   const updateCOStatus = async (coId, status) => {
     await supabase.from('change_orders').update({ status }).eq('id', coId)
     setChangeOrders(prev => prev.map(c => c.id === coId ? { ...c, status } : c))
+  }
+
+  const generateCOPdf = async (co, coNumber) => {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const { data: profileData } = await supabase.from('profiles').select('company_name, logo_url, primary_color, phone, bill_to_address, bill_to_city, bill_to_state, bill_to_zip').eq('id', profile.id).single()
+    const primaryRgb = hexToRgb(profileData?.primary_color || '#C8622A')
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const coLabel = `CO-${String(coNumber).padStart(3, '0')}`
+
+    // Header bar
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.rect(0, 0, pageWidth, 38, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+    doc.text('CHANGE ORDER', 14, 16)
+    doc.setFontSize(11); doc.setFont('helvetica', 'normal')
+    doc.text(coLabel, 14, 26)
+    doc.text(profileData?.company_name || '', pageWidth - 14, 16, { align: 'right' })
+    doc.text(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), pageWidth - 14, 26, { align: 'right' })
+
+    // Job + client info
+    doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+    let y = 50
+    if (job?.name) { doc.setFont('helvetica', 'bold'); doc.text('Job:', 14, y); doc.setFont('helvetica', 'normal'); doc.text(job.name, 40, y); y += 7 }
+    if (job?.job_number) { doc.setFont('helvetica', 'bold'); doc.text('Job #:', 14, y); doc.setFont('helvetica', 'normal'); doc.text(job.job_number, 40, y); y += 7 }
+    if (job?.clients?.company) { doc.setFont('helvetica', 'bold'); doc.text('Client:', 14, y); doc.setFont('helvetica', 'normal'); doc.text(job.clients.company, 40, y); y += 7 }
+    if (proposal?.quote_number) { doc.setFont('helvetica', 'bold'); doc.text('Quote #:', 14, y); doc.setFont('helvetica', 'normal'); doc.text(String(proposal.quote_number), 40, y); y += 7 }
+
+    // Status badge (right column)
+    doc.setFillColor(co.status === 'Approved' ? 34 : co.status === 'Rejected' ? 220 : 234, co.status === 'Approved' ? 197 : co.status === 'Rejected' ? 38 : 179, co.status === 'Approved' ? 94 : co.status === 'Rejected' ? 38 : 8)
+    doc.roundedRect(pageWidth - 50, 47, 36, 10, 2, 2, 'F')
+    doc.setTextColor(255, 255, 255); doc.setFontSize(9); doc.setFont('helvetica', 'bold')
+    doc.text(co.status.toUpperCase(), pageWidth - 32, 53.5, { align: 'center' })
+
+    // Change order name
+    y += 4
+    doc.setTextColor(0, 0, 0); doc.setFontSize(13); doc.setFont('helvetica', 'bold')
+    doc.text(co.name, 14, y); y += 10
+
+    // Description of Work
+    if (co.description) {
+      doc.setFillColor(245, 245, 245)
+      const descLines = doc.splitTextToSize(co.description, pageWidth - 28)
+      const descHeight = descLines.length * 6 + 12
+      doc.roundedRect(14, y - 4, pageWidth - 28, descHeight, 2, 2, 'F')
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(120, 120, 120)
+      doc.text('DESCRIPTION OF WORK', 20, y + 2)
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(30, 30, 30)
+      doc.text(descLines, 20, y + 9)
+      y += descHeight + 6
+    }
+
+    // Materials table
+    const matItems = co.line_items || []
+    if (matItems.length > 0) {
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(0,0,0)
+      doc.text('Materials', 14, y + 6)
+      autoTable(doc, {
+        startY: y + 9,
+        head: [['Description', 'Qty', 'Unit', 'Unit Price', 'Total']],
+        body: matItems.map(l => [
+          l.item_name || '',
+          l.quantity,
+          l.unit,
+          `$${fmt(parseFloat(l.customer_price_unit) || 0)}`,
+          `$${fmt((parseFloat(l.customer_price_unit)||0)*(parseFloat(l.quantity)||0))}`,
+        ]),
+        headStyles: { fillColor: primaryRgb, textColor: [255,255,255], fontSize: 9 },
+        bodyStyles: { fontSize: 9 },
+        columnStyles: { 4: { halign: 'right' }, 3: { halign: 'right' }, 1: { halign: 'center' } },
+        margin: { left: 14, right: 14 },
+      })
+      y = doc.lastAutoTable.finalY + 6
+    }
+
+    // Labor table
+    const labItems = co.labor_items || []
+    if (labItems.length > 0) {
+      doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(0,0,0)
+      doc.text('Labor', 14, y + 6)
+      autoTable(doc, {
+        startY: y + 9,
+        head: [['Role', 'Qty', 'Unit', 'Total']],
+        body: labItems.map(l => [l.role || '', l.quantity, l.unit, `$${fmt(parseFloat(l.customer_price)||0)}`]),
+        headStyles: { fillColor: primaryRgb, textColor: [255,255,255], fontSize: 9 },
+        bodyStyles: { fontSize: 9 },
+        columnStyles: { 3: { halign: 'right' } },
+        margin: { left: 14, right: 14 },
+      })
+      y = doc.lastAutoTable.finalY + 6
+    }
+
+    // Total box
+    const matTotal = matItems.reduce((s,l) => s+(parseFloat(l.customer_price_unit)||0)*(parseFloat(l.quantity)||0), 0)
+    const labTotal = labItems.reduce((s,l) => s+(parseFloat(l.customer_price)||0), 0)
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.roundedRect(pageWidth - 80, y, 66, 14, 2, 2, 'F')
+    doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont('helvetica', 'bold')
+    doc.text('CHANGE ORDER TOTAL', pageWidth - 47, y + 6, { align: 'center' })
+    doc.setFontSize(13)
+    doc.text(`$${fmt(co.amount)}`, pageWidth - 47, y + 12.5, { align: 'center' })
+    y += 22
+
+    // Subtotal breakdown if both types
+    if (matItems.length > 0 && labItems.length > 0) {
+      doc.setTextColor(100,100,100); doc.setFontSize(9); doc.setFont('helvetica', 'normal')
+      doc.text(`Materials: $${fmt(matTotal)}   Labor: $${fmt(labTotal)}`, pageWidth - 14, y, { align: 'right' })
+      y += 8
+    }
+
+    // Signature block
+    y += 8
+    doc.setDrawColor(180,180,180)
+    doc.line(14, y, 100, y)
+    doc.line(pageWidth - 80, y, pageWidth - 14, y)
+    doc.setTextColor(120,120,120); doc.setFontSize(8); doc.setFont('helvetica', 'normal')
+    doc.text('Authorized Signature', 14, y + 5)
+    doc.text('Date', pageWidth - 14, y + 5, { align: 'right' })
+    y += 14
+    doc.line(14, y, 100, y)
+    doc.setTextColor(120,120,120)
+    doc.text('Printed Name & Title', 14, y + 5)
+
+    doc.save(`${coLabel}-${(co.name || 'change-order').replace(/[^a-z0-9]/gi, '-')}.pdf`)
   }
 
   const saveSchedule = async () => {
@@ -1330,8 +1482,10 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           <ChangeOrdersTab
             changeOrders={changeOrders}
             totalCOAmount={totalCOAmount}
-            onOpenCOModal={() => setShowCOModal(true)}
+            onOpenCOModal={() => { setEditingCOId(null); setCoForm(emptyCoForm); setShowCOModal(true) }}
             onUpdateCOStatus={updateCOStatus}
+            onEditCO={openEditCO}
+            onGeneratePDF={generateCOPdf}
           />
         )}
 
@@ -1452,7 +1606,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           setCoForm={setCoForm}
           savingCO={savingCO}
           onSave={saveChangeOrder}
-          onClose={() => { setShowCOModal(false); setCoForm({ name: '', description: '', line_items: [], labor_items: [] }) }}
+          onClose={closeCOModal}
+          editingId={editingCOId}
         />
       )}
 
