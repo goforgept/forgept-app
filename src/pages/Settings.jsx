@@ -545,7 +545,6 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           {activeTab === 'proposals' && (
             <ProposalsTab form={form} setForm={setForm} inputClass={inputClass}
               logoUrl={logoUrl} uploadingLogo={uploadingLogo} handleLogoUpload={handleLogoUpload}
-              orgTaxRate={orgTaxRate} setOrgTaxRate={setOrgTaxRate}
               defaultHideMaterialPrices={defaultHideMaterialPrices} setDefaultHideMaterialPrices={setDefaultHideMaterialPrices}
               defaultHideLaborBreakdown={defaultHideLaborBreakdown} setDefaultHideLaborBreakdown={setDefaultHideLaborBreakdown}
               defaultLumpSumLabor={defaultLumpSumLabor} setDefaultLumpSumLabor={setDefaultLumpSumLabor}

@@ -1,7 +1,6 @@
 export default function ProposalsTab({
   form, setForm, inputClass,
   logoUrl, uploadingLogo, handleLogoUpload,
-  orgTaxRate, setOrgTaxRate,
   defaultHideMaterialPrices, setDefaultHideMaterialPrices,
   defaultHideLaborBreakdown, setDefaultHideLaborBreakdown,
   defaultLumpSumLabor, setDefaultLumpSumLabor,
@@ -81,26 +80,6 @@ export default function ProposalsTab({
           <h3 className="text-fp-text font-bold mb-1">Proposal Defaults</h3>
           <p className="text-fp-muted text-sm mb-4">Default values and features applied to all new proposals.</p>
           <div className="space-y-4">
-            <div className="flex gap-4">
-              <div className="flex-1">
-                <label className="text-fp-muted text-xs mb-1 block">Default Markup %</label>
-                <input type="number" min="0" max="999" step="0.1"
-                  value={form.default_markup_percent || ''}
-                  onChange={e => setForm(prev => ({ ...prev, default_markup_percent: e.target.value }))}
-                  placeholder="35"
-                  className={inputClass} />
-                <p className="text-fp-muted text-xs mt-1">Applied to new BOM and labor line items.</p>
-              </div>
-              <div className="flex-1">
-                <label className="text-fp-muted text-xs mb-1 block">Default Tax Rate %</label>
-                <input type="number" min="0" max="100" step="0.001"
-                  value={orgTaxRate ?? ''}
-                  onChange={e => setOrgTaxRate(e.target.value)}
-                  placeholder="e.g. 8.5"
-                  className={inputClass} />
-                <p className="text-fp-muted text-xs mt-1">Applied to new proposals. Can be overridden per proposal.</p>
-              </div>
-            </div>
             <div>
               <p className="text-fp-text text-sm font-semibold mb-1">Default Pricing Options</p>
               <p className="text-fp-muted text-xs mb-3">These settings will be pre-applied to every new proposal. Can still be changed per proposal.</p>
