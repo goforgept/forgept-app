@@ -5,6 +5,7 @@ export default function ProposalsTab({
   defaultHideMaterialPrices, setDefaultHideMaterialPrices,
   defaultHideLaborBreakdown, setDefaultHideLaborBreakdown,
   defaultLumpSumLabor, setDefaultLumpSumLabor,
+  defaultTcFontSize = 9, setDefaultTcFontSize,
   isAdmin, msrpEnabled, onToggleMsrp,
   docFont, onChangeDocFont,
   pdfTableStyle, onChangePdfTableStyle,
@@ -141,6 +142,23 @@ export default function ProposalsTab({
                     </button>
                   </div>
                 ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between bg-fp-bg rounded-xl px-4 py-3">
+              <div>
+                <p className="text-fp-text text-sm font-semibold">Default T&C / Warranty Font Size</p>
+                <p className="text-fp-muted text-xs mt-0.5">Body text size for T&C and Warranty pages in PDF and DOCX exports.</p>
+              </div>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  onClick={() => setDefaultTcFontSize(s => Math.max(7, s - 1))}
+                  className="w-7 h-7 flex items-center justify-center rounded bg-fp-inset hover:bg-fp-hover text-fp-muted hover:text-fp-text text-sm transition-colors"
+                >−</button>
+                <span className="text-fp-text text-sm font-semibold w-12 text-center">{defaultTcFontSize}pt</span>
+                <button
+                  onClick={() => setDefaultTcFontSize(s => Math.min(14, s + 1))}
+                  className="w-7 h-7 flex items-center justify-center rounded bg-fp-inset hover:bg-fp-hover text-fp-muted hover:text-fp-text text-sm transition-colors"
+                >+</button>
               </div>
             </div>
             <div className="flex items-center justify-between bg-fp-bg rounded-xl px-4 py-3">
