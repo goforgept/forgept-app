@@ -346,6 +346,7 @@ export default function ProposalDetail({ isAdmin }) {
       .from('bom_line_items')
       .select('*')
       .eq('proposal_id', id)
+      .order('sort_order', { ascending: true })
 
     // Auto-apply margin to confirmed lines missing customer price
     const confirmedNeedingMargin = (data || []).filter(l =>
