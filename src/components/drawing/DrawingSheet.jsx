@@ -1288,7 +1288,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     <div className="flex flex-col h-full">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-[#2a3d55] bg-[#1a2d45] flex-shrink-0 text-xs">
-        <div className="text-[#8A9AB0]">
+        <div className="text-[#8A9AB0] min-w-0 overflow-hidden whitespace-nowrap">
           {selectedSymbol
             ? <span className="flex items-center gap-1.5 text-[#C8622A] font-medium">
                 <span className="w-2 h-2 rounded-full bg-[#C8622A] animate-pulse inline-block"/>
@@ -1661,6 +1661,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
       <div ref={containerRef} className="flex-1 overflow-hidden bg-[#060f1c] relative"
         style={{ cursor: pickingPoint || annotationTool ? 'crosshair' : selectedSymbol ? 'crosshair' : 'grab' }}
+        onContextMenu={(e) => e.preventDefault()}
         onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy' }}
         onDrop={async (e) => {
           e.preventDefault()
