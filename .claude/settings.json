@@ -8,7 +8,8 @@
       "Bash(npx vite *)",
       "Bash(grep -n \"text-white\\\\|#[0-9a-fA-F]\\\\{3,6\\\\}\" /Users/codysobas/Desktop/forgept-app/src/components/DataImportTab.jsx)",
       "Bash(grep -n \"text-white\\\\|#[0-9a-fA-F]\\\\{3,6\\\\}\" /Users/codysobas/Desktop/forgept-app/src/components/GlobalProductsImport.jsx)",
-      "Bash(npx supabase *)"
+      "Bash(npx supabase *)",
+      "Read(//Users/codysobas/.config/supabase/**)"
     ],
     "additionalDirectories": [
       "/Users/codysobas/Desktop"

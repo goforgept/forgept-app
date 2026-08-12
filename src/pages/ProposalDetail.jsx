@@ -211,7 +211,7 @@ export default function ProposalDetail({ isAdmin }) {
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,lump_sum_labor,show_msrp,show_compliance,show_warranty,warranty_text,warranty_template_id,show_terms,terms_text,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,lump_sum_labor,show_msrp,show_compliance,show_warranty,warranty_text,warranty_template_id,show_terms,terms_text,tc_font_size,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
       .eq('id', id)
       .single()
 
@@ -639,6 +639,11 @@ export default function ProposalDetail({ isAdmin }) {
   const saveTermsText = async (text) => {
     await supabase.from('proposals').update({ terms_text: text || null }).eq('id', id)
     setProposal(prev => ({ ...prev, terms_text: text || null }))
+  }
+
+  const saveTcFontSize = async (size) => {
+    await supabase.from('proposals').update({ tc_font_size: size }).eq('id', id)
+    setProposal(prev => ({ ...prev, tc_font_size: size }))
   }
 
   const saveProposalName = async () => {
@@ -1389,7 +1394,7 @@ export default function ProposalDetail({ isAdmin }) {
     if (proposal?.status === 'Draft') setShowSentPrompt(true)
 
     const [{ data: freshProposal }, { data: freshDocxOrg }] = await Promise.all([
-      supabase.from('proposals').select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_compliance, show_warranty, warranty_text, warranty_template_id, show_terms, terms_text, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name').eq('id', id).single(),
+      supabase.from('proposals').select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_compliance, show_warranty, warranty_text, warranty_template_id, show_terms, terms_text, tc_font_size, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name').eq('id', id).single(),
       supabase.from('organizations').select('warranty_templates').eq('id', profile?.org_id).single(),
     ])
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
@@ -1744,6 +1749,7 @@ export default function ProposalDetail({ isAdmin }) {
     )
 
     const effectiveTerms = p?.show_terms !== false ? (p?.terms_text || profile?.terms_and_conditions) : null
+    const docxTcHalfPts = (p?.tc_font_size || 9) * 2
     if (effectiveTerms) {
       children.push(
         new Paragraph({ children: [new TextRun({ text: '' })] }),
@@ -1751,7 +1757,7 @@ export default function ProposalDetail({ isAdmin }) {
         new Paragraph({ children: [new TextRun({ text: 'Terms and Conditions', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         ...effectiveTerms.split('\n').map(line =>
-          new Paragraph({ children: [new TextRun({ text: line, size: 18, color: '444444' })] })
+          new Paragraph({ children: [new TextRun({ text: line, size: docxTcHalfPts, color: '444444' })] })
         )
       )
     }
@@ -1766,7 +1772,7 @@ export default function ProposalDetail({ isAdmin }) {
         new Paragraph({ children: [new TextRun({ text: 'Warranty', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         ...effectiveWarranty.split('\n').map(line =>
-          new Paragraph({ children: [new TextRun({ text: line, size: 18, color: '444444' })] })
+          new Paragraph({ children: [new TextRun({ text: line, size: docxTcHalfPts, color: '444444' })] })
         )
       )
     }
@@ -2887,7 +2893,7 @@ const analyzeDrawing = async () => {
 
   const generatePDFDoc = async ({ forceHidePricing = false } = {}) => {
     const [{ data: freshProposal }, { data: freshOrg }] = await Promise.all([
-      supabase.from('proposals').select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_msrp, show_compliance, show_warranty, warranty_text, warranty_template_id, show_terms, terms_text, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name').eq('id', id).single(),
+      supabase.from('proposals').select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_msrp, show_compliance, show_warranty, warranty_text, warranty_template_id, show_terms, terms_text, tc_font_size, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name').eq('id', id).single(),
       supabase.from('organizations').select('pdf_table_style, pdf_header_style, doc_font, primary_color, warranty_templates').eq('id', profile?.org_id).single(),
     ])
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
@@ -3195,13 +3201,14 @@ const analyzeDrawing = async () => {
     const pdfSelectedTemplate = pdfWarrantyTemplates.find(t => t.id === p?.warranty_template_id)
     const pdfEffectiveTerms = p?.show_terms !== false ? (p?.terms_text || profile?.terms_and_conditions) : null
     const pdfEffectiveWarranty = p?.show_warranty !== false ? (p?.warranty_text || pdfSelectedTemplate?.text || null) : null
-    const pdfLineH = 4.5
+    const pdfTcFontSize = p?.tc_font_size || 9
+    const pdfLineH = pdfTcFontSize * 0.5
 
     const renderTextBlock = (title, text, startY) => {
       let ty = startY
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text(title, 14, ty); ty += 12
-      doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
+      doc.setFontSize(pdfTcFontSize); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
       const lines = doc.splitTextToSize(text, pageWidth - 28)
       for (const line of lines) {
         if (ty + pdfLineH > pageHeight - 20) { doc.addPage(); ty = 20 }
@@ -3552,6 +3559,8 @@ const analyzeDrawing = async () => {
           onToggle={toggleShowTerms}
           onSave={saveTermsText}
           canEdit={canEdit}
+          tcFontSize={proposal?.tc_font_size || 9}
+          onSaveFontSize={saveTcFontSize}
         />
 
         <WarrantySection
@@ -3561,6 +3570,8 @@ const analyzeDrawing = async () => {
           onSave={saveWarrantyText}
           onSaveTemplateId={saveWarrantyTemplateId}
           canEdit={canEdit}
+          tcFontSize={proposal?.tc_font_size || 9}
+          onSaveFontSize={saveTcFontSize}
         />
 
         {revisions.length > 1 && (

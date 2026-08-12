@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function WarrantySection({ proposal, warrantyTemplates = [], onSaveTemplateId, onSave, onToggle, canEdit }) {
+export default function WarrantySection({ proposal, warrantyTemplates = [], onSaveTemplateId, onSave, onToggle, canEdit, tcFontSize = 9, onSaveFontSize }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
@@ -54,6 +54,19 @@ export default function WarrantySection({ proposal, warrantyTemplates = [], onSa
               <button onClick={startEdit} className="text-fp-muted hover:text-fp-text text-xs transition-colors">
                 Edit
               </button>
+            )}
+            {onSaveFontSize && (
+              <div className="flex items-center gap-1" title="PDF font size (applies to T&C and Warranty)">
+                <button
+                  onClick={() => onSaveFontSize(Math.max(7, tcFontSize - 1))}
+                  className="w-5 h-5 flex items-center justify-center rounded bg-fp-inset hover:bg-fp-hover text-fp-muted hover:text-fp-text text-xs transition-colors"
+                >−</button>
+                <span className="text-fp-muted text-xs w-9 text-center">{tcFontSize}pt</span>
+                <button
+                  onClick={() => onSaveFontSize(Math.min(14, tcFontSize + 1))}
+                  className="w-5 h-5 flex items-center justify-center rounded bg-fp-inset hover:bg-fp-hover text-fp-muted hover:text-fp-text text-xs transition-colors"
+                >+</button>
+              </div>
             )}
             <div className="flex items-center gap-2">
               <span className="text-fp-muted text-xs">{isOn ? 'On' : 'Off'}</span>
