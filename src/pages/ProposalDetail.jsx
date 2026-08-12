@@ -2310,7 +2310,7 @@ export default function ProposalDetail({ isAdmin }) {
     const validLines = editLines.filter(l => l.item_name.trim() !== '')
     if (validLines.length > 0) {
       const { error: insertError } = await supabase.from('bom_line_items').insert(
-        validLines.map(l => {
+        validLines.map((l, sortIdx) => {
           // resolve temp section ids to real ids
           const resolvedSectionId = l.section_id
             ? (sectionIdMap[l.section_id] || l.section_id)
@@ -2329,6 +2329,7 @@ export default function ProposalDetail({ isAdmin }) {
             pricing_status: l.your_cost_unit ? 'Confirmed' : 'Needs Pricing', recurring: l.recurring || false,
             org_id: proposal?.org_id || null,
             section_id: resolvedSectionId,
+            sort_order: sortIdx,
           }
         })
       )

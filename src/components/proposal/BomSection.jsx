@@ -66,6 +66,8 @@ export default function BomSection({
   const [aiOpen, setAiOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [editingPrice, setEditingPrice] = useState(null) // { type: 'bom'|'labor', id: itemId|index, value: string }
+  const [dragRowIdx, setDragRowIdx] = useState(null)
+  const [dragOverRowIdx, setDragOverRowIdx] = useState(null)
   const aiRef = useRef(null)
   const moreRef = useRef(null)
 
@@ -693,6 +695,7 @@ export default function BomSection({
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-fp-border">
+                        <th className="w-5 py-2 pr-1" />
                         <th className="py-2 pr-2 w-8">
                           <input type="checkbox" className="accent-fp-brand"
                             checked={sectionLines.length > 0 && sectionLines.every(l => bulkSelectedLines.has(l.id || l.item_name + l.quantity))}
@@ -716,8 +719,31 @@ export default function BomSection({
                       {sectionLines.map(line => {
                         const i = line._idx
                         const rowKey = line.id || line.item_name + line.quantity
+                        const isDragging = dragRowIdx === i
+                        const isDragOver = dragOverRowIdx === i && dragRowIdx !== i
                         return (
-                          <tr key={i} className={`border-b border-fp-border/30 ${bulkSelectedLines.has(rowKey) ? 'bg-[#C8622A]/5' : ''}`}>
+                          <tr
+                            key={i}
+                            draggable
+                            onDragStart={() => setDragRowIdx(i)}
+                            onDragEnd={() => { setDragRowIdx(null); setDragOverRowIdx(null) }}
+                            onDragOver={e => { e.preventDefault(); if (dragRowIdx !== null && dragOverRowIdx !== i) setDragOverRowIdx(i) }}
+                            onDrop={e => {
+                              e.preventDefault()
+                              if (dragRowIdx !== null && dragRowIdx !== i) {
+                                setEditLines(prev => {
+                                  const next = [...prev]
+                                  const [moved] = next.splice(dragRowIdx, 1)
+                                  next.splice(dragRowIdx < i ? i - 1 : i, 0, moved)
+                                  return next
+                                })
+                              }
+                              setDragRowIdx(null)
+                              setDragOverRowIdx(null)
+                            }}
+                            className={`border-b transition-opacity ${isDragOver ? 'border-t-2 border-t-[#C8622A] border-b-fp-border/30' : 'border-fp-border/30'} ${bulkSelectedLines.has(rowKey) ? 'bg-[#C8622A]/5' : ''} ${isDragging ? 'opacity-40' : ''}`}
+                          >
+                            <td className="pr-1 py-1 cursor-grab active:cursor-grabbing text-fp-muted hover:text-fp-text select-none text-center" title="Drag to reorder">⠿</td>
                             <td className="pr-2 py-1">
                               <input type="checkbox" className="accent-fp-brand cursor-pointer"
                                 checked={bulkSelectedLines.has(rowKey)}
