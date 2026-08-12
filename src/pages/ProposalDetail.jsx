@@ -2311,10 +2311,10 @@ export default function ProposalDetail({ isAdmin }) {
       await supabase.from('proposal_sections').delete().eq('id', sid)
     }
 
-    const { error: deleteError } = await supabase.from('bom_line_items').delete().eq('proposal_id', id)
-    if (deleteError) { alert('Error clearing old line items'); setSaving(false); return }
-
+    // Insert new rows first, then delete old ones — avoids data loss if insert fails
     const validLines = editLines.filter(l => l.item_name.trim() !== '')
+    const oldLineIds = lineItems.map(l => l.id).filter(Boolean)
+
     if (validLines.length > 0) {
       const { error: insertError } = await supabase.from('bom_line_items').insert(
         validLines.map((l, sortIdx) => {
@@ -2341,6 +2341,11 @@ export default function ProposalDetail({ isAdmin }) {
         })
       )
       if (insertError) { alert('Error saving line items'); setSaving(false); return }
+    }
+
+    // Only delete old rows after new ones are safely inserted
+    if (oldLineIds.length > 0) {
+      await supabase.from('bom_line_items').delete().in('id', oldLineIds)
     }
 
     const bomCustomer = validLines.reduce((sum, l) => sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
