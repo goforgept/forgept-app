@@ -320,7 +320,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const inputClass = "w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   return (
-    <div className="flex min-h-screen bg-fp-bg">
+    <div className="flex h-screen bg-fp-bg">
       <Sidebar isAdmin={true} featureProposals={featureProposals} featureCRM={featureCRM} featureInventory={featureInventory} isSalesManager={isSalesManager} isPM={isPM} />
       <div className="flex-1 p-6 overflow-y-auto h-screen">
 

@@ -294,7 +294,7 @@ export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager =
     location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'))
 
   return (
-    <div className="w-56 min-h-screen bg-fp-card border-r border-fp-border flex flex-col">
+    <div className="w-56 h-full flex-shrink-0 bg-fp-card border-r border-fp-border flex flex-col">
       <div className="px-6 py-5 border-b border-fp-border">
         <div className="flex justify-between items-center">
           <div>

@@ -29,7 +29,7 @@ export default function SignProposal() {
 
     const { data, error: fetchError } = await supabase
       .from('proposals')
-      .select('id, proposal_name, company, client_name, client_email, scope_of_work, proposal_value, total_gross_margin_percent, labor_items, signature_name, signature_at, signing_token, org_id, lump_sum_pricing, hide_material_prices, hide_labor_breakdown, tax_rate, tax_exempt, signed_pdf_url, sla_contracts, monitoring_contracts, sla_contract, monitoring_contract, contract_acceptance')
+      .select('id, proposal_name, company, client_name, client_email, scope_of_work, proposal_value, total_gross_margin_percent, labor_items, signature_name, signature_at, signing_token, org_id, lump_sum_pricing, hide_material_prices, hide_labor_breakdown, tax_rate, tax_exempt, signed_pdf_url, sla_contracts, monitoring_contracts, sla_contract, monitoring_contract, contract_acceptance, show_warranty, warranty_text, warranty_template_id, show_terms, terms_text')
       .eq('signing_token', token)
       .single()
 
@@ -62,12 +62,13 @@ export default function SignProposal() {
     setSections(sectionData || [])
 
     if (data.org_id) {
-      const { data: orgProf } = await supabase
-        .from('profiles')
-        .select('terms_and_conditions, about_us, company_name, logo_url, primary_color')
-        .eq('org_id', data.org_id).limit(1).single()
-      if (orgProf?.terms_and_conditions) setTerms(orgProf.terms_and_conditions)
-      setOrgProfile(orgProf || null)
+      const [{ data: orgProf }, { data: orgRow }] = await Promise.all([
+        supabase.from('profiles').select('terms_and_conditions, about_us, company_name, logo_url, primary_color').eq('org_id', data.org_id).limit(1).single(),
+        supabase.from('organizations').select('warranty_templates').eq('id', data.org_id).single(),
+      ])
+      const effectiveTermsText = data.show_terms !== false ? (data.terms_text || orgProf?.terms_and_conditions || '') : ''
+      if (effectiveTermsText) setTerms(effectiveTermsText)
+      setOrgProfile({ ...(orgProf || {}), warranty_templates: orgRow?.warranty_templates || [] })
     }
     setLoading(false)
   }
@@ -243,14 +244,34 @@ export default function SignProposal() {
     doc.text(`$${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, summaryY + 4, { align: 'right' })
     } // end grand total block
 
-    // Terms
-    if (orgProf?.terms_and_conditions) {
+    // T&C and Warranty
+    const signEffectiveTerms = prop.show_terms !== false ? (prop.terms_text || orgProf?.terms_and_conditions || null) : null
+    const signWarrantyTemplates = orgProf?.warranty_templates || []
+    const signSelectedTemplate = signWarrantyTemplates.find(t => t.id === prop.warranty_template_id)
+    const signEffectiveWarranty = prop.show_warranty !== false ? (prop.warranty_text || signSelectedTemplate?.text || null) : null
+
+    if (signEffectiveTerms || signEffectiveWarranty) {
       doc.addPage()
-      doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('Terms and Conditions', 14, 20)
-      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
-      const termsLines = doc.splitTextToSize(orgProf.terms_and_conditions, pageWidth - 28)
-      doc.text(termsLines, 14, 32)
+      const pageH = doc.internal.pageSize.getHeight()
+      const lineH = 4.5
+      const renderSignTextBlock = (title, text, startY) => {
+        let ty = startY
+        doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+        doc.text(title, 14, ty); ty += 12
+        doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+        const lines = doc.splitTextToSize(text, pageWidth - 28)
+        for (const line of lines) {
+          if (ty + lineH > pageH - 20) { doc.addPage(); ty = 20 }
+          doc.text(line, 14, ty); ty += lineH
+        }
+        return ty
+      }
+      let ty = 20
+      if (signEffectiveTerms) { ty = renderSignTextBlock('Terms and Conditions', signEffectiveTerms, ty); ty += 10 }
+      if (signEffectiveWarranty) {
+        if (ty > 30 && ty + 40 > doc.internal.pageSize.getHeight()) { doc.addPage(); ty = 20 }
+        renderSignTextBlock('Warranty', signEffectiveWarranty, ty)
+      }
     }
 
     // Service Agreement pages (one per agreement)

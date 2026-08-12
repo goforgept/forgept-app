@@ -386,10 +386,10 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
   }
 
   return (
-    <div className="flex min-h-screen bg-fp-bg">
+    <div className="flex h-screen bg-fp-bg">
       <Sidebar isAdmin={false} featureProposals={featureProposals} featureCRM={featureCRM} />
 
-      <div className="flex-1 p-6 min-w-0">
+      <div className="flex-1 p-6 min-w-0 overflow-y-auto">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between mb-6">

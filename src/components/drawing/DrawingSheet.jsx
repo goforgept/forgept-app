@@ -652,6 +652,27 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedCable, selectedPathwayId, selectedId, selectedAnnotationId, copiedPlacement, cableMode, pathwayMode, placements, editingPathwayId])
 
+  // Global drag-state cleanup — fires when mouse is released anywhere outside the canvas,
+  // or when the window loses focus (Alt+Tab on Windows). Without this, isPanning stays
+  // true after dragging off-canvas and every subsequent mouse move pans indefinitely.
+  useEffect(() => {
+    const clearDragState = () => {
+      isPanning.current   = false
+      isSelecting.current = false
+      selectionStart.current = null
+      lastPointer.current = null
+      setSelectionBox(null)
+    }
+    window.addEventListener('mouseup', clearDragState)
+    window.addEventListener('pointerup', clearDragState)
+    window.addEventListener('blur', clearDragState)        // Alt+Tab / window switch
+    return () => {
+      window.removeEventListener('mouseup', clearDragState)
+      window.removeEventListener('pointerup', clearDragState)
+      window.removeEventListener('blur', clearDragState)
+    }
+  }, [])
+
   useEffect(() => {
     if (!updatedPlacement) return
     setPlacements(prev =>
