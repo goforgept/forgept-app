@@ -596,28 +596,30 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
         {myWeek && (
           <div className="bg-fp-card rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
               <p className="text-fp-text font-semibold text-sm">My Hours This Week</p>
               <div className="flex items-center gap-4 text-sm">
                 <span className="text-fp-muted">Week total: <span className="text-fp-text font-bold">{myWeek.weekTotal.toFixed(1)} hrs</span></span>
                 <span className="text-fp-muted">This month: <span className="text-fp-text font-bold">{myWeek.monthTotal.toFixed(1)} hrs</span></span>
               </div>
             </div>
-            <div className="grid grid-cols-7 gap-2">
-              {myWeek.days.map((day, i) => {
-                const hrs = myWeek.hoursPerDay[day]
-                const isToday = day === myWeek.nowStr
-                const isFuture = day > myWeek.nowStr
-                return (
-                  <div key={day} className={`rounded-lg p-3 text-center ${isToday ? 'bg-fp-brand/20 border border-fp-brand/40' : 'bg-fp-inset'}`}>
-                    <p className={`text-xs font-semibold mb-1 ${isToday ? 'text-fp-brand' : 'text-fp-muted'}`}>{myWeek.dayLabels[i]}</p>
-                    <p className={`text-lg font-bold ${isFuture ? 'text-fp-border' : hrs > 0 ? 'text-[#C8622A]' : 'text-fp-muted'}`}>
-                      {isFuture ? '—' : hrs > 0 ? hrs.toFixed(1) : '0'}
-                    </p>
-                    <p className="text-fp-muted text-xs">hrs</p>
-                  </div>
-                )
-              })}
+            <div className="overflow-x-auto">
+              <div className="grid grid-cols-7 gap-2 min-w-[280px]">
+                {myWeek.days.map((day, i) => {
+                  const hrs = myWeek.hoursPerDay[day]
+                  const isToday = day === myWeek.nowStr
+                  const isFuture = day > myWeek.nowStr
+                  return (
+                    <div key={day} className={`rounded-lg p-2 text-center ${isToday ? 'bg-fp-brand/20 border border-fp-brand/40' : 'bg-fp-inset'}`}>
+                      <p className={`text-xs font-semibold mb-1 ${isToday ? 'text-fp-brand' : 'text-fp-muted'}`}>{myWeek.dayLabels[i]}</p>
+                      <p className={`text-sm font-bold ${isFuture ? 'text-fp-border' : hrs > 0 ? 'text-[#C8622A]' : 'text-fp-muted'}`}>
+                        {isFuture ? '—' : hrs > 0 ? hrs.toFixed(1) : '0'}
+                      </p>
+                      <p className="text-fp-muted text-xs">hrs</p>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         )}

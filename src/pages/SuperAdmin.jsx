@@ -752,7 +752,7 @@ export default function SuperAdmin() {
 
   const pendingRequests = requests.filter(r => r.status === 'pending')
   const mrr = orgs.filter(o => o.billing_status === 'active').reduce((sum, o) => sum + (o.monthly_rate || 0), 0)
-  const arr = mrr * 12
+  const arr = Math.round(mrr * 12)
   const activeOrgs = orgs.filter(o => o.billing_status === 'active').length
   const trialOrgs = orgs.filter(o => o.billing_status === 'trial').length
   const pendingOrgs = orgs.filter(o => o.billing_status === 'pending').length

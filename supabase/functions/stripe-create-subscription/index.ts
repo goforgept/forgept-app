@@ -21,8 +21,8 @@ const PRICE_IDS: Record<string, string> = {
 const PLAN_RATES: Record<string, number> = {
   'Early Adopter Annual':                     100,  // stored as monthly equivalent for MRR
   'Early Adopter':                            100,
-  'Early Adopter - CRM/Designer Solo':        67,   // $800/yr → ~$67/mo equivalent
-  'Early Adopter - CRM/Designer Solo Annual': 67,
+  'Early Adopter - CRM/Designer Solo':        67,   // $804/yr monthly plan
+  'Early Adopter - CRM/Designer Solo Annual': 66.67, // $800/yr → 800/12
   'Designer Only':                   49,
   'Small Team':                      99,
   'Team':                            149,
