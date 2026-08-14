@@ -1013,7 +1013,6 @@ export default function SuperAdmin() {
                       </div>
                     </div>
                     <div className="flex gap-2 flex-wrap">
-                      <button onClick={() => isEditing ? setEditingOrg(null) : startEditingOrg(org)} className="bg-[#2a3d55] text-white px-3 py-1.5 rounded-lg text-xs hover:bg-[#3a4d65] transition-colors">{isEditing ? 'Cancel Edit' : 'Edit Settings'}</button>
                       {status === 'active' && <button onClick={() => suspendOrg(org.id)} className="bg-red-500/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-500/30 transition-colors">Suspend</button>}
                       {status === 'suspended' && <button onClick={() => reactivateOrg(org.id)} className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-green-500/30 transition-colors">Reactivate</button>}
                       <button onClick={() => { setDeleteModal(org); setDeleteConfirmText('') }} className="bg-red-900/30 text-red-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-900/50 transition-colors">Delete</button>
@@ -1341,10 +1340,9 @@ export default function SuperAdmin() {
                   ))}
                 </div>
 
-                {/* Org Type + Designer/Catalog (Edit Settings) */}
-                {isEditing && (
-                  <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
-                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Advanced Settings</p>
+                {/* Org Type + Designer/Catalog */}
+                <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Advanced Settings</p>
                     <div>
                       <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">Org Type</label>
                       <div className="grid grid-cols-3 gap-2">
@@ -1373,8 +1371,7 @@ export default function SuperAdmin() {
                     <div className="flex justify-end pt-2">
                       <button onClick={() => saveOrgSettings(org.id)} className="bg-[#C8622A] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save Settings</button>
                     </div>
-                  </div>
-                )}
+                </div>
 
                 {/* Notes */}
                 <div className="bg-[#1a2d45] rounded-xl p-5">
@@ -1424,7 +1421,7 @@ export default function SuperAdmin() {
                   const stats = getOrgStats(org.id)
 
                   return (
-                    <div key={org.id} onClick={() => { setSelectedOrg(org.id); setEditingOrg(null); fetchOrgDetail(org.id); setStripeData(null); setStripeDataError(null); fetchStripeData(org.id) }}
+                    <div key={org.id} onClick={() => { setSelectedOrg(org.id); setEditingOrg(null); startEditingOrg(org); fetchOrgDetail(org.id); setStripeData(null); setStripeDataError(null); fetchStripeData(org.id) }}
                       className="bg-[#0F1C2E] border border-[#2a3d55] rounded-xl p-4 cursor-pointer hover:border-[#C8622A]/40 transition-all">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${health.dot}`} />
