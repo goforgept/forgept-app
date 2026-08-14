@@ -59,9 +59,9 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     const [proposalsRes, lineItemsRes, clientsRes, profilesRes, targetsRes, invoicesRes, posRes, recurringRes, jobsRes, logsRes, coRes, expiredRes] = await Promise.all([
-      supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).is('archived_at', null).order('created_at', { ascending: false }),
       supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id'),
-      supabase.from('clients').select('*').eq('org_id', profile.org_id),
+      supabase.from('clients').select('*').eq('org_id', profile.org_id).is('archived_at', null),
       supabase.from('profiles').select('id, full_name, email, region_id').eq('org_id', profile.org_id),
       supabase.from('targets').select('*').eq('org_id', profile.org_id),
       supabase.from('invoices').select('*').eq('org_id', profile.org_id),
@@ -194,7 +194,8 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       if (!p.client_id) return
       if (!clientMap[p.client_id]) {
         const client = clients.find(c => c.id === p.client_id)
-        clientMap[p.client_id] = { id: p.client_id, name: client?.company || p.company || 'Unknown', pipeline: 0, won: 0, count: 0 }
+        if (!client) return
+        clientMap[p.client_id] = { id: p.client_id, name: client.company || p.company || 'Unknown', pipeline: 0, won: 0, count: 0 }
       }
       clientMap[p.client_id].pipeline += p.proposal_value || 0
       if (p.status === 'Won') clientMap[p.client_id].won += p.proposal_value || 0
