@@ -751,7 +751,7 @@ export default function SuperAdmin() {
   }
 
   const pendingRequests = requests.filter(r => r.status === 'pending')
-  const mrr = orgs.filter(o => o.billing_status === 'active').reduce((sum, o) => sum + (o.monthly_rate || 0), 0)
+  const mrr = orgs.filter(o => o.billing_status === 'active').reduce((sum, o) => sum + (parseFloat(o.monthly_rate) || 0), 0)
   const arr = Math.round(mrr * 12)
   const activeOrgs = orgs.filter(o => o.billing_status === 'active').length
   const trialOrgs = orgs.filter(o => o.billing_status === 'trial').length
@@ -954,7 +954,7 @@ export default function SuperAdmin() {
             <div className="grid grid-cols-6 gap-3 mb-4">
               <div className="bg-[#1a2d45] rounded-xl p-4">
                 <p className="text-[#8A9AB0] text-xs mb-1">MRR</p>
-                <p className="text-[#C8622A] text-xl font-bold">${mrr.toLocaleString()}</p>
+                <p className="text-[#C8622A] text-xl font-bold">${Math.round(mrr).toLocaleString()}</p>
               </div>
               <div className="bg-[#1a2d45] rounded-xl p-4">
                 <p className="text-[#8A9AB0] text-xs mb-1">ARR</p>
@@ -1460,15 +1460,15 @@ export default function SuperAdmin() {
               const plan = org.plan || 'Trial'
               if (!acc[plan]) acc[plan] = { count: 0, revenue: 0, active: 0 }
               acc[plan].count++
-              if (org.billing_status === 'active') { acc[plan].active++; acc[plan].revenue += org.monthly_rate || 0 }
+              if (org.billing_status === 'active') { acc[plan].active++; acc[plan].revenue += parseFloat(org.monthly_rate) || 0 }
               return acc
             }, {})
           ).sort((a, b) => b[1].revenue - a[1].revenue)
 
           const achActive = orgs.filter(o => o.billing_status === 'active' && (o.preferred_payment_method || 'ACH') === 'ACH')
           const ccActive  = orgs.filter(o => o.billing_status === 'active' && o.preferred_payment_method === 'Credit Card')
-          const achMRR    = achActive.reduce((s, o) => s + (o.monthly_rate || 0), 0)
-          const ccMRR     = ccActive.reduce((s, o) => s + (o.monthly_rate || 0), 0)
+          const achMRR    = achActive.reduce((s, o) => s + (parseFloat(o.monthly_rate) || 0), 0)
+          const ccMRR     = ccActive.reduce((s, o) => s + (parseFloat(o.monthly_rate) || 0), 0)
 
           const pastDueList = orgs.filter(o => o.billing_status === 'past_due').sort((a, b) => (a.monthly_rate || 0) < (b.monthly_rate || 0) ? 1 : -1)
           const trialsExpiring = orgs
