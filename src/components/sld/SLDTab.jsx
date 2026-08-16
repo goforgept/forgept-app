@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   ReactFlow,
   Background,
@@ -112,6 +112,94 @@ const WIRE_STROKE_WIDTH = {
   rs485:    1.5,
 }
 
+// ─── Draggable device button (desktop drag + tablet touch) ───────────────────
+
+function DraggableDeviceButton({ category, name, globalProductId, onClick, children }) {
+  const touchStartRef  = useRef(null)
+  const ghostRef       = useRef(null)
+  const isDraggingRef  = useRef(false)
+  const btnRef         = useRef(null)
+
+  useEffect(() => {
+    return () => { if (ghostRef.current) { ghostRef.current.remove(); ghostRef.current = null } }
+  }, [])
+
+  useEffect(() => {
+    const el = btnRef.current
+    if (!el) return
+    const onMove = (e) => {
+      if (!touchStartRef.current) return
+      const t = e.touches[0]
+      const dx = t.clientX - touchStartRef.current.x
+      const dy = t.clientY - touchStartRef.current.y
+      if (isDraggingRef.current || Math.sqrt(dx * dx + dy * dy) > 8) e.preventDefault()
+    }
+    el.addEventListener('touchmove', onMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onMove)
+  }, [])
+
+  const handleDragStart = (e) => {
+    e.dataTransfer.setData('application/sld-device', JSON.stringify({ category, name, globalProductId }))
+    e.dataTransfer.effectAllowed = 'copy'
+  }
+
+  const handleTouchStart = (e) => {
+    const t = e.touches[0]
+    touchStartRef.current = { x: t.clientX, y: t.clientY }
+    isDraggingRef.current = false
+  }
+
+  const handleTouchMove = (e) => {
+    if (!touchStartRef.current) return
+    const t = e.touches[0]
+    const dx = t.clientX - touchStartRef.current.x
+    const dy = t.clientY - touchStartRef.current.y
+    if (Math.sqrt(dx * dx + dy * dy) > 8 && !isDraggingRef.current) {
+      isDraggingRef.current = true
+      const ghost = document.createElement('div')
+      ghost.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;background:#0F1923;border:1.5px solid #C8622A;border-radius:6px;padding:4px 10px;color:white;font-size:12px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.6);transform:translate(-50%,-120%);'
+      ghost.textContent = name || category
+      document.body.appendChild(ghost)
+      ghostRef.current = ghost
+    }
+    if (ghostRef.current) {
+      ghostRef.current.style.left = `${t.clientX}px`
+      ghostRef.current.style.top  = `${t.clientY}px`
+    }
+  }
+
+  const handleTouchEnd = (e) => {
+    if (ghostRef.current) { ghostRef.current.remove(); ghostRef.current = null }
+    if (isDraggingRef.current) {
+      e.preventDefault()
+      const t = e.changedTouches[0]
+      window.dispatchEvent(new CustomEvent('forgept-sld-drop', {
+        detail: { category, name, globalProductId, clientX: t.clientX, clientY: t.clientY },
+      }))
+    } else {
+      onClick?.()
+    }
+    touchStartRef.current = null
+    isDraggingRef.current = false
+  }
+
+  return (
+    <button
+      ref={btnRef}
+      draggable
+      onDragStart={handleDragStart}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      onClick={onClick}
+      className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md text-[#8A9AB0] hover:text-white hover:bg-[#2a3d55] transition-colors text-xs cursor-grab active:cursor-grabbing"
+    >
+      {children}
+    </button>
+  )
+}
+
 // ─── Handle + canvas styles ───────────────────────────────────────────────────
 const CANVAS_STYLE = `
   /* Handles: small dark squares at node edges, orange on hover */
@@ -214,6 +302,16 @@ export default function SLDTab({ proposalId, orgId }) {
   const [edgeWireType, setEdgeWireType]     = useState('default')
   const [exporting, setExporting]           = useState(false)
   const [diagramName, setDiagramName]       = useState('Single Line Diagram')
+  const [typicals, setTypicals]             = useState([])
+  const [pickerTab, setPickerTab]           = useState('quick')   // 'quick' | 'library' | 'typicals'
+  const [selectedNodeIds, setSelectedNodeIds] = useState(new Set())
+  const [saveTypicalModal, setSaveTypicalModal] = useState(false)
+  const [typicalName, setTypicalName]       = useState('')
+  const [stampModal, setStampModal]         = useState(null)   // typical object to stamp
+  const [stampPrefix, setStampPrefix]       = useState('')
+  const [savingTypical, setSavingTypical]   = useState(false)
+  const [stamping, setStamping]             = useState(false)
+  const [rfInstance, setRfInstance]         = useState(null)
 
   useEffect(() => { init() }, [proposalId])
   useEffect(() => { if (activeSheetId) loadSheet(activeSheetId) }, [activeSheetId])
@@ -260,11 +358,136 @@ export default function SLDTab({ proposalId, orgId }) {
         .select('id, name, category, manufacturer')
         .order('category').order('name')
       setGlobalProducts(gp || [])
+
+      // Load typicals for this org
+      if (orgId) await loadTypicals(orgId)
     } catch (err) {
       console.error(err)
     } finally {
       setLoading(false)
     }
+  }
+
+  const loadTypicals = async (oid) => {
+    const { data } = await supabase
+      .from('sld_typicals')
+      .select(`
+        id, name, description,
+        sld_typical_nodes(id, label, node_type, position_x, position_y, data, global_product_id),
+        sld_typical_edges(id, source_node_id, target_node_id, label, wire_type)
+      `)
+      .eq('org_id', oid || orgId)
+      .order('name')
+    setTypicals(data || [])
+  }
+
+  const saveAsTypical = async () => {
+    if (!typicalName.trim() || selectedNodeIds.size === 0 || !orgId) return
+    setSavingTypical(true)
+    try {
+      const selNodes = nodes.filter(n => selectedNodeIds.has(n.id))
+      const selEdges = edges.filter(e => selectedNodeIds.has(e.source) && selectedNodeIds.has(e.target))
+
+      // Normalize positions to start at 0,0
+      const minX = Math.min(...selNodes.map(n => n.position.x))
+      const minY = Math.min(...selNodes.map(n => n.position.y))
+
+      const { data: typical } = await supabase
+        .from('sld_typicals')
+        .insert({ org_id: orgId, name: typicalName.trim() })
+        .select('id').single()
+      if (!typical) return
+
+      const nodeInserts = selNodes.map(n => ({
+        typical_id: typical.id,
+        global_product_id: n.data.global_product_id || null,
+        label: n.data.label,
+        node_type: 'device',
+        position_x: n.position.x - minX,
+        position_y: n.position.y - minY,
+        data: { category: n.data.category, quantity: n.data.quantity },
+      }))
+      const { data: insertedNodes } = await supabase
+        .from('sld_typical_nodes').insert(nodeInserts).select('id')
+
+      const nodeIdMap = {}
+      selNodes.forEach((n, i) => { nodeIdMap[n.id] = insertedNodes?.[i]?.id })
+
+      const edgeInserts = selEdges
+        .filter(e => nodeIdMap[e.source] && nodeIdMap[e.target])
+        .map(e => ({
+          typical_id: typical.id,
+          source_node_id: nodeIdMap[e.source],
+          target_node_id: nodeIdMap[e.target],
+          label: e.label || null,
+          wire_type: e.data?.wire_type || 'default',
+        }))
+      if (edgeInserts.length > 0) await supabase.from('sld_typical_edges').insert(edgeInserts)
+
+      setSaveTypicalModal(false)
+      setTypicalName('')
+      await loadTypicals()
+      setPickerTab('typicals')
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSavingTypical(false)
+    }
+  }
+
+  const stampTypical = async (typical, prefix) => {
+    if (!activeSheetId || stamping) return
+    setStamping(true)
+    try {
+      // Offset to the right of the rightmost existing node
+      const offsetX = nodes.length > 0
+        ? Math.max(...nodes.map(n => n.position.x + 180)) + 60
+        : 80
+      const offsetY = 80
+
+      const nodeInserts = (typical.sld_typical_nodes || []).map(tn => ({
+        sheet_id: activeSheetId,
+        global_product_id: tn.global_product_id || null,
+        label: prefix ? `${prefix} - ${tn.label}` : tn.label,
+        node_type: 'device',
+        position_x: tn.position_x + offsetX,
+        position_y: tn.position_y + offsetY,
+        data: { ...(tn.data || {}), quantity: tn.data?.quantity || 1 },
+      }))
+
+      const { data: insertedNodes } = await supabase
+        .from('sld_nodes').insert(nodeInserts).select('id, position_x, position_y, label, data')
+
+      const nodeIdMap = {}
+      ;(typical.sld_typical_nodes || []).forEach((tn, i) => {
+        nodeIdMap[tn.id] = insertedNodes?.[i]?.id
+      })
+
+      const edgeInserts = (typical.sld_typical_edges || [])
+        .filter(te => nodeIdMap[te.source_node_id] && nodeIdMap[te.target_node_id])
+        .map(te => ({
+          sheet_id: activeSheetId,
+          source_node_id: nodeIdMap[te.source_node_id],
+          target_node_id: nodeIdMap[te.target_node_id],
+          label: te.label || null,
+          wire_type: te.wire_type || 'default',
+        }))
+      if (edgeInserts.length > 0) await supabase.from('sld_edges').insert(edgeInserts)
+
+      await loadSheet(activeSheetId)
+      setStampModal(null)
+      setStampPrefix('')
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setStamping(false)
+    }
+  }
+
+  const deleteTypical = async (typicalId) => {
+    if (!confirm('Delete this typical? It will not affect diagrams already stamped from it.')) return
+    await supabase.from('sld_typicals').delete().eq('id', typicalId)
+    setTypicals(t => t.filter(t => t.id !== typicalId))
   }
 
   const loadSheet = async (sheetId) => {
@@ -326,14 +549,16 @@ export default function SLDTab({ proposalId, orgId }) {
     await supabase.from('sld_nodes').update({ position_x: node.position.x, position_y: node.position.y }).eq('id', node.id)
   }, [])
 
-  const addDevice = async (category, name, globalProductId = null) => {
+  const addDevice = async (category, name, globalProductId = null, position = null) => {
     if (!activeSheetId) return
+    const px = position?.x ?? (80 + Math.random() * 300)
+    const py = position?.y ?? (80 + Math.random() * 200)
     const { data: newNode } = await supabase.from('sld_nodes').insert({
       sheet_id: activeSheetId,
       label: name || category,
       node_type: 'device',
-      position_x: 80 + Math.random() * 300,
-      position_y: 80 + Math.random() * 200,
+      position_x: px,
+      position_y: py,
       global_product_id: globalProductId || null,
       data: { category, quantity: 1 },
     }).select('id, position_x, position_y').single()
@@ -346,6 +571,32 @@ export default function SLDTab({ proposalId, orgId }) {
       data: { label: name || category, category, quantity: 1, global_product_id: globalProductId },
     }])
   }
+
+  // ─── Canvas drop handlers (desktop drag + touch) ──────────────────────────
+
+  const onDragOver = useCallback((e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }, [])
+
+  const onDrop = useCallback((e) => {
+    e.preventDefault()
+    if (!rfInstance) return
+    const raw = e.dataTransfer.getData('application/sld-device')
+    if (!raw) return
+    try {
+      const { category, name, globalProductId } = JSON.parse(raw)
+      const position = rfInstance.screenToFlowPosition({ x: e.clientX, y: e.clientY })
+      addDevice(category, name, globalProductId, position)
+    } catch {}
+  }, [rfInstance, activeSheetId])
+
+  const onTouchDrop = useCallback((e) => {
+    if (!rfInstance) return
+    const { category, name, globalProductId, clientX, clientY } = e.detail
+    const position = rfInstance.screenToFlowPosition({ x: clientX, y: clientY })
+    addDevice(category, name, globalProductId, position)
+  }, [rfInstance, activeSheetId])
 
   const deleteSelected = useCallback(async () => {
     if (selectedNode) {
@@ -519,9 +770,9 @@ export default function SLDTab({ proposalId, orgId }) {
     try {
       const jsPDF = (await import('jspdf')).default
 
-      const NODE_W = 150
-      const NODE_H = 64
-      const PAD    = 60
+      const NODE_W = 160
+      const NODE_H = 75
+      const PAD    = 30
 
       const xs = nodes.map(n => n.position.x)
       const ys = nodes.map(n => n.position.y)
@@ -540,7 +791,7 @@ export default function SLDTab({ proposalId, orgId }) {
 
       const usableW = PW - 20
       const usableH = PH - HEADER - FOOTER
-      const scale = Math.min(usableW / diagW, usableH / diagH, 1.4)
+      const scale = Math.min(usableW / diagW, usableH / diagH, 0.45)
 
       const tx = x => 10 + (x - minX) * scale
       const ty = y => HEADER + (y - minY) * scale
@@ -691,6 +942,11 @@ export default function SLDTab({ proposalId, orgId }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [deleteSelected])
 
+  useEffect(() => {
+    window.addEventListener('forgept-sld-drop', onTouchDrop)
+    return () => window.removeEventListener('forgept-sld-drop', onTouchDrop)
+  }, [onTouchDrop])
+
   // ─── Device picker ───────────────────────────────────────────────────────────
 
   const filteredProducts = globalProducts.filter(p =>
@@ -805,6 +1061,20 @@ export default function SLDTab({ proposalId, orgId }) {
           Auto-Build
         </button>
 
+        {/* Save as Typical — visible when 2+ nodes selected */}
+        {selectedNodeIds.size >= 2 && (
+          <button
+            onClick={() => setSaveTypicalModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[#C8622A]/60 text-[#C8622A] hover:bg-[#C8622A] hover:text-white transition-colors flex-shrink-0"
+            style={{ background: '#0F1923' }}
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+            </svg>
+            Save as Typical ({selectedNodeIds.size})
+          </button>
+        )}
+
         {/* Device panel toggle */}
         <button
           onClick={() => setShowDevicePanel(v => !v)}
@@ -855,65 +1125,120 @@ export default function SLDTab({ proposalId, orgId }) {
 
         {/* Device picker */}
         {showDevicePanel && (
-          <div className="w-52 flex-shrink-0 flex flex-col overflow-hidden border-r border-[#2a3d55]" style={{ background: '#1a2d45' }}>
-            <div className="p-2 border-b border-[#2a3d55]">
-              <input
-                type="text"
-                placeholder="Search devices..."
-                value={deviceSearch}
-                onChange={e => setDeviceSearch(e.target.value)}
-                className="w-full text-xs border border-[#2a3d55] rounded px-2 py-1.5 focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
-                style={{ background: '#0F1923', color: '#E8EEF5' }}
-              />
+          <div className="w-56 flex-shrink-0 flex flex-col overflow-hidden border-r border-[#2a3d55]" style={{ background: '#1a2d45' }}>
+            {/* Picker tabs */}
+            <div className="flex border-b border-[#2a3d55] flex-shrink-0">
+              {[
+                { id: 'quick',    label: 'Devices' },
+                { id: 'typicals', label: `Typicals${typicals.length ? ` (${typicals.length})` : ''}` },
+              ].map(t => (
+                <button key={t.id} onClick={() => setPickerTab(t.id)}
+                  className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                    pickerTab === t.id ? 'border-b-2 border-[#C8622A] text-white' : 'text-[#8A9AB0] hover:text-white'
+                  }`}>
+                  {t.label}
+                </button>
+              ))}
             </div>
-            <div className="flex-1 overflow-y-auto p-2">
-              {deviceSearch === '' ? (
-                <div className="space-y-0.5">
-                  <p className="text-xs text-[#8A9AB0] font-medium uppercase tracking-wide px-1 mb-2">Quick Add</p>
-                  {QUICK_ADD_CATEGORIES.map(cat => (
-                    <button
-                      key={cat}
-                      onClick={() => addDevice(cat, cat)}
-                      className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md text-[#8A9AB0] hover:text-white hover:bg-[#2a3d55] transition-colors text-xs"
-                    >
-                      <span style={{ color: CATEGORY_COLORS[cat] || '#6B7280', flexShrink: 0 }}>
-                        <CategoryIcon category={CATEGORY_ICON_MAP[cat] || cat} size={16} />
-                      </span>
-                      <span className="truncate">{cat}</span>
-                    </button>
-                  ))}
+
+            {/* Quick Add / Library tab */}
+            {pickerTab === 'quick' && (
+              <>
+                <div className="p-2 border-b border-[#2a3d55]">
+                  <input
+                    type="text"
+                    placeholder="Search devices..."
+                    value={deviceSearch}
+                    onChange={e => setDeviceSearch(e.target.value)}
+                    className="w-full text-xs border border-[#2a3d55] rounded px-2 py-1.5 focus:outline-none focus:border-[#C8622A] placeholder-[#8A9AB0]"
+                    style={{ background: '#0F1923', color: '#E8EEF5' }}
+                  />
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {Object.entries(productsByCategory).map(([cat, products]) => (
-                    <div key={cat}>
-                      <p className="text-xs text-[#8A9AB0] font-medium uppercase tracking-wide px-1 mb-1">{cat}</p>
-                      {products.map(p => (
-                        <button
-                          key={p.id}
-                          onClick={() => addDevice(cat, p.name, p.id)}
-                          className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md text-[#8A9AB0] hover:text-white hover:bg-[#2a3d55] transition-colors text-xs"
-                        >
-                          <span style={{ color: CATEGORY_COLORS[cat] || '#6B7280', width: 16, height: 16, flexShrink: 0 }}>
-                            <CategoryIcon category={CATEGORY_ICON_MAP[cat] || cat} className="w-4 h-4" style={{ width: 16, height: 16 }} />
+                <div className="flex-1 overflow-y-auto p-2">
+                  {deviceSearch === '' ? (
+                    <div className="space-y-0.5">
+                      <p className="text-xs text-[#8A9AB0] font-medium uppercase tracking-wide px-1 mb-2">Quick Add</p>
+                      {QUICK_ADD_CATEGORIES.map(cat => (
+                        <DraggableDeviceButton key={cat} category={cat} name={cat} onClick={() => addDevice(cat, cat)}>
+                          <span style={{ color: CATEGORY_COLORS[cat] || '#6B7280', flexShrink: 0 }}>
+                            <CategoryIcon category={CATEGORY_ICON_MAP[cat] || cat} size={16} />
                           </span>
-                          <span className="truncate">{p.name}</span>
-                        </button>
+                          <span className="truncate">{cat}</span>
+                        </DraggableDeviceButton>
                       ))}
                     </div>
-                  ))}
-                  {Object.keys(productsByCategory).length === 0 && (
-                    <p className="text-xs text-[#8A9AB0] text-center py-4">No devices found</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {Object.entries(productsByCategory).map(([cat, products]) => (
+                        <div key={cat}>
+                          <p className="text-xs text-[#8A9AB0] font-medium uppercase tracking-wide px-1 mb-1">{cat}</p>
+                          {products.map(p => (
+                            <DraggableDeviceButton key={p.id} category={cat} name={p.name} globalProductId={p.id} onClick={() => addDevice(cat, p.name, p.id)}>
+                              <span style={{ color: CATEGORY_COLORS[cat] || '#6B7280', flexShrink: 0 }}>
+                                <CategoryIcon category={CATEGORY_ICON_MAP[cat] || cat} size={16} />
+                              </span>
+                              <span className="truncate">{p.name}</span>
+                            </DraggableDeviceButton>
+                          ))}
+                        </div>
+                      ))}
+                      {Object.keys(productsByCategory).length === 0 && (
+                        <p className="text-xs text-[#8A9AB0] text-center py-4">No devices found</p>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
+
+            {/* Typicals tab */}
+            {pickerTab === 'typicals' && (
+              <div className="flex-1 overflow-y-auto">
+                {typicals.length === 0 ? (
+                  <div className="p-4 text-center">
+                    <p className="text-xs text-[#8A9AB0] leading-relaxed">
+                      No typicals yet. Select 2+ nodes on the canvas and click <strong className="text-white">Save as Typical</strong>.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-2 space-y-2">
+                    {typicals.map(typ => (
+                      <div key={typ.id} className="rounded-lg border border-[#2a3d55] overflow-hidden">
+                        <div className="px-3 py-2" style={{ background: '#0F1923' }}>
+                          <p className="text-xs font-semibold text-white truncate">{typ.name}</p>
+                          <p className="text-xs text-[#8A9AB0] mt-0.5">
+                            {(typ.sld_typical_nodes || []).length} device{(typ.sld_typical_nodes || []).length !== 1 ? 's' : ''}
+                            {(typ.sld_typical_edges || []).length > 0 && `, ${(typ.sld_typical_edges || []).length} connection${(typ.sld_typical_edges || []).length !== 1 ? 's' : ''}`}
+                          </p>
+                        </div>
+                        <div className="flex border-t border-[#2a3d55]">
+                          <button
+                            onClick={() => { setStampModal(typ); setStampPrefix('') }}
+                            className="flex-1 text-xs py-1.5 text-[#C8622A] hover:bg-[#C8622A]/10 transition-colors font-medium"
+                          >
+                            Stamp
+                          </button>
+                          <div className="w-px bg-[#2a3d55]" />
+                          <button
+                            onClick={() => deleteTypical(typ.id)}
+                            className="px-3 text-xs py-1.5 text-[#8A9AB0] hover:text-red-400 transition-colors"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         {/* React Flow */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative" onDrop={onDrop} onDragOver={onDragOver}>
           <ReactFlow
+            onInit={setRfInstance}
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}
@@ -922,7 +1247,8 @@ export default function SLDTab({ proposalId, orgId }) {
             onNodeDragStop={handleNodeDragStop}
             onNodeClick={(_, node) => { setSelectedNode(node); setSelectedEdge(null) }}
             onEdgeClick={(_, edge) => { setSelectedEdge(edge); setSelectedNode(null) }}
-            onPaneClick={() => { setSelectedNode(null); setSelectedEdge(null) }}
+            onPaneClick={() => { setSelectedNode(null); setSelectedEdge(null); setSelectedNodeIds(new Set()) }}
+            onSelectionChange={({ nodes: sel }) => setSelectedNodeIds(new Set(sel.map(n => n.id)))}
             nodeTypes={nodeTypes}
             fitView
             deleteKeyCode={null}
@@ -1055,6 +1381,85 @@ export default function SLDTab({ proposalId, orgId }) {
           </div>
         )}
       </div>
+
+      {/* ── Save as Typical modal ── */}
+      {saveTypicalModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="rounded-xl border border-[#2a3d55] p-6 w-80 shadow-2xl" style={{ background: '#1a2d45' }}>
+            <h3 className="text-white font-semibold text-sm mb-1">Save as Typical</h3>
+            <p className="text-[#8A9AB0] text-xs mb-4">
+              Saving {selectedNodeIds.size} selected device{selectedNodeIds.size !== 1 ? 's' : ''} as a reusable typical.
+            </p>
+            <label className="block text-xs text-[#8A9AB0] mb-1">Typical Name</label>
+            <input
+              autoFocus
+              value={typicalName}
+              onChange={e => setTypicalName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveAsTypical()}
+              placeholder="e.g. Typical Access Control Door"
+              className="w-full text-sm border border-[#2a3d55] rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A] mb-4"
+              style={{ background: '#0F1923', color: '#E8EEF5' }}
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setSaveTypicalModal(false); setTypicalName('') }}
+                className="flex-1 py-2 text-sm text-[#8A9AB0] border border-[#2a3d55] rounded-lg hover:text-white transition-colors"
+                style={{ background: '#0F1923' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveAsTypical}
+                disabled={savingTypical || !typicalName.trim()}
+                className="flex-1 py-2 text-sm font-semibold text-white rounded-lg transition-colors disabled:opacity-50"
+                style={{ background: '#C8622A' }}
+              >
+                {savingTypical ? 'Saving…' : 'Save Typical'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Stamp typical modal ── */}
+      {stampModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="rounded-xl border border-[#2a3d55] p-6 w-80 shadow-2xl" style={{ background: '#1a2d45' }}>
+            <h3 className="text-white font-semibold text-sm mb-1">Stamp: {stampModal.name}</h3>
+            <p className="text-[#8A9AB0] text-xs mb-4">
+              {(stampModal.sld_typical_nodes || []).length} device{(stampModal.sld_typical_nodes || []).length !== 1 ? 's' : ''} will be placed on the current sheet.
+            </p>
+            <label className="block text-xs text-[#8A9AB0] mb-1">Label Prefix <span className="text-[#4A5568]">(optional)</span></label>
+            <input
+              autoFocus
+              value={stampPrefix}
+              onChange={e => setStampPrefix(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && stampTypical(stampModal, stampPrefix)}
+              placeholder="e.g. Door 101"
+              className="w-full text-sm border border-[#2a3d55] rounded-lg px-3 py-2 focus:outline-none focus:border-[#C8622A] mb-1"
+              style={{ background: '#0F1923', color: '#E8EEF5' }}
+            />
+            <p className="text-xs text-[#4A5568] mb-4">Labels will read: "Door 101 - Door Reader", "Door 101 - REX", etc.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setStampModal(null); setStampPrefix('') }}
+                className="flex-1 py-2 text-sm text-[#8A9AB0] border border-[#2a3d55] rounded-lg hover:text-white transition-colors"
+                style={{ background: '#0F1923' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => stampTypical(stampModal, stampPrefix)}
+                disabled={stamping}
+                className="flex-1 py-2 text-sm font-semibold text-white rounded-lg transition-colors disabled:opacity-50"
+                style={{ background: '#C8622A' }}
+              >
+                {stamping ? 'Placing…' : 'Stamp'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
