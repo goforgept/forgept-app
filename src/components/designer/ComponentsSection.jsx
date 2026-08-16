@@ -372,7 +372,7 @@ export default function ComponentsSection({ placementId, orgId, category, produc
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[#C8622A] text-xs font-medium">{component.component_type}</span>
                 <button onClick={() => handleDelete(component.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-fp-muted hover:text-red-400">
+                  className="text-fp-muted hover:text-red-400 transition-colors">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
                   </svg>
