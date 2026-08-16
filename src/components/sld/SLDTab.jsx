@@ -22,6 +22,10 @@ const CATEGORY_ICON_MAP = {
   'NVR':                      'NVR',
   'DVR':                      'NVR',
   'Network Switch':           'Network',
+  'Router':                   'Network',
+  'Internet / ISP':           'Point to Point',
+  'PoE Injector':             'Power Box',
+  'Patch Panel':              'Network',
   'Access Control Panel':     'Controller',
   'Access Control Enclosure': 'Cabinet System',
   'Door Reader':              'Access Reader',
@@ -48,6 +52,10 @@ const CATEGORY_COLORS = {
   'NVR':                      '#1e3a5f',
   'DVR':                      '#1e3a5f',
   'Network Switch':           '#065f46',
+  'Router':                   '#065f46',
+  'Internet / ISP':           '#1e3a5f',
+  'PoE Injector':             '#064e3b',
+  'Patch Panel':              '#374151',
   'Access Control Panel':     '#78350f',
   'Access Control Enclosure': '#78350f',
   'Door Reader':              '#92400e',
@@ -69,10 +77,14 @@ const CATEGORY_COLORS = {
 }
 
 const QUICK_ADD_CATEGORIES = [
-  'Camera', 'NVR', 'Network Switch', 'Access Control Panel',
-  'Access Control Enclosure', 'Door Reader', 'Electric Lock',
-  'Alarm Panel', 'Power Supply', 'UPS / Battery Backup',
-  'Wireless Access Point', 'Server', 'Other',
+  // Network / Infrastructure
+  'Internet / ISP', 'Router', 'Network Switch', 'Wireless Access Point', 'Patch Panel', 'PoE Injector',
+  // Video
+  'Camera', 'NVR', 'DVR', 'Server',
+  // Access Control
+  'Access Control Panel', 'Access Control Enclosure', 'Door Reader', 'Door Contact', 'Request to Exit', 'Electric Lock',
+  // Other
+  'Video Intercom', 'Alarm Panel', 'Motion Sensor', 'Power Supply', 'UPS / Battery Backup', 'Fiber Converter', 'Other',
 ]
 
 const WIRE_TYPES = [
@@ -111,6 +123,98 @@ const WIRE_STROKE_WIDTH = {
   wireless: 1.5,
   rs485:    1.5,
 }
+
+// ─── Pre-built installation typicals ─────────────────────────────────────────
+const BUILT_IN_TYPICALS = [
+  {
+    id: 'builtin-single-door',
+    name: 'Typical Single Door',
+    description: 'Card reader, REX, door contact + electric lock wired to an access control panel',
+    sld_typical_nodes: [
+      { id: 'n1', label: 'Card Reader',         node_type: 'device', position_x: 0,   position_y: 0,   data: { category: 'Door Reader',          quantity: 1 } },
+      { id: 'n2', label: 'REX',                 node_type: 'device', position_x: 200, position_y: 0,   data: { category: 'Request to Exit',      quantity: 1 } },
+      { id: 'n3', label: 'Door Contact',        node_type: 'device', position_x: 400, position_y: 0,   data: { category: 'Door Contact',         quantity: 1 } },
+      { id: 'n4', label: 'Electric Lock',       node_type: 'device', position_x: 600, position_y: 0,   data: { category: 'Electric Lock',        quantity: 1 } },
+      { id: 'n5', label: 'Access Control Panel',node_type: 'device', position_x: 200, position_y: 220, data: { category: 'Access Control Panel', quantity: 1 } },
+    ],
+    sld_typical_edges: [
+      { id: 'e1', source_node_id: 'n1', target_node_id: 'n5', wire_type: 'rs485' },
+      { id: 'e2', source_node_id: 'n2', target_node_id: 'n5', wire_type: 'rs485' },
+      { id: 'e3', source_node_id: 'n3', target_node_id: 'n5', wire_type: 'default' },
+      { id: 'e4', source_node_id: 'n4', target_node_id: 'n5', wire_type: 'power' },
+    ],
+  },
+  {
+    id: 'builtin-double-door',
+    name: 'Typical Double Door',
+    description: 'Two readers, two REX, two contacts + two locks into one access control panel',
+    sld_typical_nodes: [
+      { id: 'n1', label: 'Card Reader A',       node_type: 'device', position_x: 0,   position_y: 0,   data: { category: 'Door Reader',          quantity: 1 } },
+      { id: 'n2', label: 'REX A',               node_type: 'device', position_x: 200, position_y: 0,   data: { category: 'Request to Exit',      quantity: 1 } },
+      { id: 'n3', label: 'Door Contact A',      node_type: 'device', position_x: 400, position_y: 0,   data: { category: 'Door Contact',         quantity: 1 } },
+      { id: 'n4', label: 'Electric Lock A',     node_type: 'device', position_x: 600, position_y: 0,   data: { category: 'Electric Lock',        quantity: 1 } },
+      { id: 'n5', label: 'Card Reader B',       node_type: 'device', position_x: 0,   position_y: 200, data: { category: 'Door Reader',          quantity: 1 } },
+      { id: 'n6', label: 'REX B',               node_type: 'device', position_x: 200, position_y: 200, data: { category: 'Request to Exit',      quantity: 1 } },
+      { id: 'n7', label: 'Door Contact B',      node_type: 'device', position_x: 400, position_y: 200, data: { category: 'Door Contact',         quantity: 1 } },
+      { id: 'n8', label: 'Electric Lock B',     node_type: 'device', position_x: 600, position_y: 200, data: { category: 'Electric Lock',        quantity: 1 } },
+      { id: 'n9', label: 'Access Control Panel',node_type: 'device', position_x: 200, position_y: 420, data: { category: 'Access Control Panel', quantity: 1 } },
+    ],
+    sld_typical_edges: [
+      { id: 'e1', source_node_id: 'n1', target_node_id: 'n9', wire_type: 'rs485' },
+      { id: 'e2', source_node_id: 'n2', target_node_id: 'n9', wire_type: 'rs485' },
+      { id: 'e3', source_node_id: 'n3', target_node_id: 'n9', wire_type: 'default' },
+      { id: 'e4', source_node_id: 'n4', target_node_id: 'n9', wire_type: 'power' },
+      { id: 'e5', source_node_id: 'n5', target_node_id: 'n9', wire_type: 'rs485' },
+      { id: 'e6', source_node_id: 'n6', target_node_id: 'n9', wire_type: 'rs485' },
+      { id: 'e7', source_node_id: 'n7', target_node_id: 'n9', wire_type: 'default' },
+      { id: 'e8', source_node_id: 'n8', target_node_id: 'n9', wire_type: 'power' },
+    ],
+  },
+  {
+    id: 'builtin-ip-camera',
+    name: 'Typical IP Camera',
+    description: 'Camera on a PoE network switch, feeding an NVR',
+    sld_typical_nodes: [
+      { id: 'n1', label: 'Camera',        node_type: 'device', position_x: 0, position_y: 0,   data: { category: 'Camera',         quantity: 1 } },
+      { id: 'n2', label: 'Network Switch',node_type: 'device', position_x: 0, position_y: 220, data: { category: 'Network Switch',  quantity: 1 } },
+      { id: 'n3', label: 'NVR',           node_type: 'device', position_x: 0, position_y: 440, data: { category: 'NVR',            quantity: 1 } },
+    ],
+    sld_typical_edges: [
+      { id: 'e1', source_node_id: 'n1', target_node_id: 'n2', wire_type: 'network' },
+      { id: 'e2', source_node_id: 'n2', target_node_id: 'n3', wire_type: 'network' },
+    ],
+  },
+  {
+    id: 'builtin-network-closet',
+    name: 'Typical Network Closet',
+    description: 'Internet/ISP into router, then switch, with UPS backup power',
+    sld_typical_nodes: [
+      { id: 'n1', label: 'Internet / ISP', node_type: 'device', position_x: 0,   position_y: 0,   data: { category: 'Internet / ISP',       quantity: 1 } },
+      { id: 'n2', label: 'Router',         node_type: 'device', position_x: 0,   position_y: 220, data: { category: 'Router',               quantity: 1 } },
+      { id: 'n3', label: 'Network Switch', node_type: 'device', position_x: 0,   position_y: 440, data: { category: 'Network Switch',       quantity: 1 } },
+      { id: 'n4', label: 'UPS',            node_type: 'device', position_x: 220, position_y: 440, data: { category: 'UPS / Battery Backup', quantity: 1 } },
+    ],
+    sld_typical_edges: [
+      { id: 'e1', source_node_id: 'n1', target_node_id: 'n2', wire_type: 'network' },
+      { id: 'e2', source_node_id: 'n2', target_node_id: 'n3', wire_type: 'network' },
+      { id: 'e3', source_node_id: 'n4', target_node_id: 'n3', wire_type: 'power' },
+    ],
+  },
+  {
+    id: 'builtin-video-intercom',
+    name: 'Typical Video Intercom',
+    description: 'Video intercom at entry point wired to access control panel and network switch',
+    sld_typical_nodes: [
+      { id: 'n1', label: 'Video Intercom',      node_type: 'device', position_x: 0,   position_y: 0,   data: { category: 'Video Intercom',       quantity: 1 } },
+      { id: 'n2', label: 'Access Control Panel',node_type: 'device', position_x: 220, position_y: 0,   data: { category: 'Access Control Panel', quantity: 1 } },
+      { id: 'n3', label: 'Network Switch',      node_type: 'device', position_x: 110, position_y: 220, data: { category: 'Network Switch',       quantity: 1 } },
+    ],
+    sld_typical_edges: [
+      { id: 'e1', source_node_id: 'n1', target_node_id: 'n3', wire_type: 'network' },
+      { id: 'e2', source_node_id: 'n2', target_node_id: 'n3', wire_type: 'network' },
+    ],
+  },
+]
 
 // ─── Draggable device button (desktop drag + tablet touch) ───────────────────
 
@@ -1130,7 +1234,7 @@ export default function SLDTab({ proposalId, orgId }) {
             <div className="flex border-b border-[#2a3d55] flex-shrink-0">
               {[
                 { id: 'quick',    label: 'Devices' },
-                { id: 'typicals', label: `Typicals${typicals.length ? ` (${typicals.length})` : ''}` },
+                { id: 'typicals', label: `Typicals (${BUILT_IN_TYPICALS.length + typicals.length})` },
               ].map(t => (
                 <button key={t.id} onClick={() => setPickerTab(t.id)}
                   className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
@@ -1194,42 +1298,57 @@ export default function SLDTab({ proposalId, orgId }) {
             {/* Typicals tab */}
             {pickerTab === 'typicals' && (
               <div className="flex-1 overflow-y-auto">
-                {typicals.length === 0 ? (
-                  <div className="p-4 text-center">
-                    <p className="text-xs text-[#8A9AB0] leading-relaxed">
-                      No typicals yet. Select 2+ nodes on the canvas and click <strong className="text-white">Save as Typical</strong>.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="p-2 space-y-2">
-                    {typicals.map(typ => (
-                      <div key={typ.id} className="rounded-lg border border-[#2a3d55] overflow-hidden">
-                        <div className="px-3 py-2" style={{ background: '#0F1923' }}>
-                          <p className="text-xs font-semibold text-white truncate">{typ.name}</p>
-                          <p className="text-xs text-[#8A9AB0] mt-0.5">
-                            {(typ.sld_typical_nodes || []).length} device{(typ.sld_typical_nodes || []).length !== 1 ? 's' : ''}
-                            {(typ.sld_typical_edges || []).length > 0 && `, ${(typ.sld_typical_edges || []).length} connection${(typ.sld_typical_edges || []).length !== 1 ? 's' : ''}`}
-                          </p>
-                        </div>
-                        <div className="flex border-t border-[#2a3d55]">
-                          <button
-                            onClick={() => { setStampModal(typ); setStampPrefix('') }}
-                            className="flex-1 text-xs py-1.5 text-[#C8622A] hover:bg-[#C8622A]/10 transition-colors font-medium"
-                          >
-                            Stamp
-                          </button>
-                          <div className="w-px bg-[#2a3d55]" />
-                          <button
-                            onClick={() => deleteTypical(typ.id)}
-                            className="px-3 text-xs py-1.5 text-[#8A9AB0] hover:text-red-400 transition-colors"
-                          >
-                            ✕
-                          </button>
-                        </div>
+                <div className="p-2 space-y-2">
+                  {/* Built-in typicals */}
+                  <p className="text-xs text-[#8A9AB0] font-medium uppercase tracking-wide px-1 pt-1">Built-in</p>
+                  {BUILT_IN_TYPICALS.map(typ => (
+                    <div key={typ.id} className="rounded-lg border border-[#2a3d55] overflow-hidden">
+                      <div className="px-3 py-2" style={{ background: '#0F1923' }}>
+                        <p className="text-xs font-semibold text-white truncate">{typ.name}</p>
+                        <p className="text-xs text-[#8A9AB0] mt-0.5 leading-relaxed">{typ.description}</p>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <div className="flex border-t border-[#2a3d55]">
+                        <button
+                          onClick={() => { setStampModal(typ); setStampPrefix('') }}
+                          className="flex-1 text-xs py-1.5 text-[#C8622A] hover:bg-[#C8622A]/10 transition-colors font-medium"
+                        >
+                          Stamp
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* User-saved typicals */}
+                  <p className="text-xs text-[#8A9AB0] font-medium uppercase tracking-wide px-1 pt-2">Custom</p>
+                  {typicals.length === 0 ? (
+                    <p className="text-xs text-[#8A9AB0] px-1 pb-2 leading-relaxed">
+                      Select 2+ nodes and click <strong className="text-white">Save as Typical</strong> to save a custom template.
+                    </p>
+                  ) : typicals.map(typ => (
+                    <div key={typ.id} className="rounded-lg border border-[#2a3d55] overflow-hidden">
+                      <div className="px-3 py-2" style={{ background: '#0F1923' }}>
+                        <p className="text-xs font-semibold text-white truncate">{typ.name}</p>
+                        <p className="text-xs text-[#8A9AB0] mt-0.5">
+                          {(typ.sld_typical_nodes || []).length} device{(typ.sld_typical_nodes || []).length !== 1 ? 's' : ''}
+                          {(typ.sld_typical_edges || []).length > 0 && `, ${(typ.sld_typical_edges || []).length} wire${(typ.sld_typical_edges || []).length !== 1 ? 's' : ''}`}
+                        </p>
+                      </div>
+                      <div className="flex border-t border-[#2a3d55]">
+                        <button
+                          onClick={() => { setStampModal(typ); setStampPrefix('') }}
+                          className="flex-1 text-xs py-1.5 text-[#C8622A] hover:bg-[#C8622A]/10 transition-colors font-medium"
+                        >
+                          Stamp
+                        </button>
+                        <div className="w-px bg-[#2a3d55]" />
+                        <button
+                          onClick={() => deleteTypical(typ.id)}
+                          className="px-3 text-xs py-1.5 text-[#8A9AB0] hover:text-red-400 transition-colors"
+                        >✕</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
