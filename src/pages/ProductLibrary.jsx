@@ -626,6 +626,7 @@ if (!finalCost) continue
                             {p.category && <span className="text-fp-muted text-xs">{p.category}</span>}
                             {p.sub_category && <span className="text-fp-muted text-xs bg-fp-card px-1.5 py-0.5 rounded">{p.sub_category}</span>}
                             {p.unit !== 'ea' && <span className="text-fp-muted text-xs">/ {p.unit}</span>}
+                            {p.is_component && <span className="text-xs px-1.5 py-0.5 rounded bg-fp-brand/15 text-fp-brand font-medium">Component</span>}
                           </div>
                         </div>
                       </div>
@@ -680,6 +681,15 @@ if (!finalCost) continue
           <div><label className="text-fp-muted text-xs mb-1 block">Description</label>
             <input type="text" value={editForm.description || ''} onChange={e => setEditForm(p => ({ ...p, description: e.target.value }))} className={inputCls} />
           </div>
+          <div className="flex items-center gap-2 pt-1">
+            <button type="button" onClick={() => setEditForm(p => ({ ...p, is_component: !p.is_component }))}
+              className={`relative inline-flex items-center w-9 h-5 rounded-full transition-colors ${editForm.is_component ? 'bg-fp-brand' : 'bg-fp-border'}`}>
+              <span className={`inline-block w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${editForm.is_component ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            </button>
+            <label className="text-fp-muted text-xs cursor-pointer" onClick={() => setEditForm(p => ({ ...p, is_component: !p.is_component }))}>
+              Available as component in Designer
+            </label>
+          </div>
           {featureMsrp && (
             <div><label className="text-fp-muted text-xs mb-1 block">MSRP</label>
               <input type="number" placeholder="0.00" value={editForm.msrp || ''} onChange={e => setEditForm(p => ({ ...p, msrp: e.target.value }))} className={inputCls} />
@@ -716,6 +726,7 @@ if (!finalCost) continue
               lead_time: editForm.lead_time || null,
               country_of_origin: editForm.country_of_origin || null,
               berry_compliance: editForm.berry_compliance || null,
+              is_component: editForm.is_component || false,
             }).eq('id', p.id)
             if (updErr) { setError(updErr.message); return }
             setEditingProductId(null)
@@ -737,7 +748,7 @@ if (!finalCost) continue
             </div>
           )}
         </div>
-        <button onClick={() => { setEditingProductId(p.id); setEditForm({ item_name: p.item_name, manufacturer: p.manufacturer, part_number: p.part_number, category: p.category, sub_category: p.sub_category || '', unit: p.unit, description: p.description, msrp: p.msrp ?? '', lead_time: p.lead_time || '', country_of_origin: p.country_of_origin || '', berry_compliance: p.berry_compliance || '' }) }}
+        <button onClick={() => { setEditingProductId(p.id); setEditForm({ item_name: p.item_name, manufacturer: p.manufacturer, part_number: p.part_number, category: p.category, sub_category: p.sub_category || '', unit: p.unit, description: p.description, msrp: p.msrp ?? '', lead_time: p.lead_time || '', country_of_origin: p.country_of_origin || '', berry_compliance: p.berry_compliance || '', is_component: p.is_component || false }) }}
           className="text-fp-muted hover:text-fp-text text-xs transition-colors">✎ Edit</button>
       </div>
     )}

@@ -63,10 +63,13 @@ const DEFAULT_COMPONENTS = {
 }
 
 export default function ComponentsSection({ placementId, orgId, category, product }) {
-  const [components,   setComponents]   = useState([])
-  const [accessories,  setAccessories]  = useState(null) // from global_products
-  const [loading,      setLoading]      = useState(true)
-  const [adding,       setAdding]       = useState(false)
+  const [components,      setComponents]      = useState([])
+  const [accessories,     setAccessories]     = useState(null) // from global_products
+  const [loading,         setLoading]         = useState(true)
+  const [adding,          setAdding]          = useState(false)
+  const [addTab,          setAddTab]          = useState('quick') // 'quick' | 'library'
+  const [libraryItems,    setLibraryItems]    = useState(null)
+  const [librarySearch,   setLibrarySearch]   = useState('')
 
   useEffect(() => {
     setAccessories(null) // reset on placement change
@@ -129,6 +132,41 @@ export default function ComponentsSection({ placementId, orgId, category, produc
   const handleDelete = async (id) => {
     await supabase.from('placement_components').delete().eq('id', id)
     setComponents(prev => prev.filter(c => c.id !== id))
+  }
+
+  const loadLibrary = async () => {
+    if (libraryItems !== null) return
+    const { data } = await supabase
+      .from('product_library')
+      .select('id, item_name, part_number, manufacturer, category')
+      .eq('org_id', orgId)
+      .eq('is_component', true)
+      .eq('is_active', true)
+      .order('item_name')
+    setLibraryItems(data || [])
+  }
+
+  const handleAddFromLibrary = async (item) => {
+    const { data, error } = await supabase
+      .from('placement_components')
+      .insert({
+        org_id:         orgId,
+        placement_id:   placementId,
+        component_type: item.category || 'Component',
+        name:           item.item_name,
+        part_number:    item.part_number || null,
+        manufacturer:   item.manufacturer || null,
+        quantity:       1,
+      })
+      .select()
+      .single()
+    if (!error && data) setComponents(prev => [...prev, data])
+  }
+
+  const openAdd = () => {
+    setAdding(s => !s)
+    setAddTab('quick')
+    setLibrarySearch('')
   }
 
   const defaultTypes = DEFAULT_COMPONENTS[category] || ['Mount', 'Housing', 'Power Supply', 'Surge Protector']
@@ -238,7 +276,7 @@ export default function ComponentsSection({ placementId, orgId, category, produc
       <div className="flex items-center justify-between mb-2">
         <p className="text-[#C8622A] text-xs font-semibold uppercase tracking-wide">Components</p>
         <button
-          onClick={() => setAdding(s => !s)}
+          onClick={openAdd}
           className="text-xs text-[#C8622A] hover:text-fp-text transition-colors flex items-center gap-1"
         >
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -251,30 +289,74 @@ export default function ComponentsSection({ placementId, orgId, category, produc
       {/* Add component picker */}
       {adding && (
         <div className="mb-3 bg-fp-card rounded-lg p-2 border border-fp-border">
-          <p className="text-fp-muted text-xs mb-2">Select component type:</p>
-          <div className="flex flex-wrap gap-1 mb-2">
-            {defaultTypes.map(type => (
-              <button key={type} onClick={() => handleAdd(type)}
-                className="px-2 py-1 text-xs bg-fp-inset text-fp-muted hover:text-[#C8622A] hover:border-fp-brand border border-fp-border rounded transition-colors">
-                {type}
-              </button>
-            ))}
+          {/* Tabs */}
+          <div className="flex gap-1 mb-2">
+            <button onClick={() => setAddTab('quick')}
+              className={`px-2 py-1 text-xs rounded transition-colors ${addTab === 'quick' ? 'bg-[#C8622A] text-white' : 'text-fp-muted hover:text-fp-text'}`}>
+              Quick Add
+            </button>
+            <button onClick={() => { setAddTab('library'); loadLibrary() }}
+              className={`px-2 py-1 text-xs rounded transition-colors ${addTab === 'library' ? 'bg-[#C8622A] text-white' : 'text-fp-muted hover:text-fp-text'}`}>
+              From Library
+            </button>
+            <button onClick={() => setAdding(false)} className="ml-auto text-fp-muted hover:text-fp-text text-xs px-1">✕</button>
           </div>
-          <div className="flex gap-1">
-            <input
-              type="text"
-              placeholder="Custom type..."
-              className={inputClass}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && e.target.value.trim()) {
-                  handleAdd(e.target.value.trim())
-                  e.target.value = ''
-                }
-              }}
-            />
-            <button onClick={() => setAdding(false)}
-              className="text-fp-muted hover:text-fp-text text-xs px-2">✕</button>
-          </div>
+
+          {addTab === 'quick' && (
+            <>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {defaultTypes.map(type => (
+                  <button key={type} onClick={() => handleAdd(type)}
+                    className="px-2 py-1 text-xs bg-fp-inset text-fp-muted hover:text-[#C8622A] hover:border-fp-brand border border-fp-border rounded transition-colors">
+                    {type}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                placeholder="Custom type… (press Enter)"
+                className={inputClass}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && e.target.value.trim()) {
+                    handleAdd(e.target.value.trim())
+                    e.target.value = ''
+                  }
+                }}
+              />
+            </>
+          )}
+
+          {addTab === 'library' && (
+            <div>
+              <input
+                type="text"
+                placeholder="Search library components…"
+                value={librarySearch}
+                onChange={e => setLibrarySearch(e.target.value)}
+                className={`${inputClass} mb-2`}
+              />
+              {libraryItems === null ? (
+                <p className="text-fp-muted text-xs">Loading…</p>
+              ) : libraryItems.length === 0 ? (
+                <p className="text-fp-muted text-xs">No products marked as components yet. Edit a product in the Product Library and enable "Available as component".</p>
+              ) : (
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {libraryItems
+                    .filter(i => !librarySearch || i.item_name.toLowerCase().includes(librarySearch.toLowerCase()) || (i.part_number || '').toLowerCase().includes(librarySearch.toLowerCase()))
+                    .map(item => (
+                      <button key={item.id} onClick={() => handleAddFromLibrary(item)}
+                        className="w-full text-left px-2 py-1.5 rounded hover:bg-fp-inset transition-colors group">
+                        <p className="text-fp-text text-xs font-medium group-hover:text-[#C8622A] transition-colors">{item.item_name}</p>
+                        {(item.part_number || item.manufacturer) && (
+                          <p className="text-fp-muted text-xs">{item.manufacturer}{item.part_number ? ` · ${item.part_number}` : ''}</p>
+                        )}
+                      </button>
+                    ))
+                  }
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
