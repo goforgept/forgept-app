@@ -10,6 +10,7 @@ import PlacementPanel from '../components/designer/PlacementPanel'
 import CablePanel from '../components/designer/CablePanel'
 import PathwayPanel from '../components/designer/PathwayPanel'
 import RackBuilder from '../components/drawing/RackBuilder'
+import SLDTab from '../components/sld/SLDTab'
 
 export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const { proposalId } = useParams()
@@ -512,6 +513,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
             {[
               { id: 'canvas', label: 'Drawing' },
               { id: 'racks',  label: 'Rooms & Racks' },
+              { id: 'sld',    label: 'Single Line' },
               { id: 'bom',    label: 'BOM Preview' },
               { id: 'export', label: 'Export' },
             ].map(tab => (
@@ -876,6 +878,11 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
           <div className="flex-1 overflow-hidden">
             <RackBuilder proposalId={proposalId} orgId={orgId} />
           </div>
+        )}
+
+        {/* Single Line Diagram tab */}
+        {activeTab === 'sld' && (
+          <SLDTab proposalId={proposalId} orgId={orgId} />
         )}
 
         {/* BOM Preview tab */}
