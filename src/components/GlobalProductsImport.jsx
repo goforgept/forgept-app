@@ -9,9 +9,10 @@ const ELEMENT_TYPE_MAP = {
   'Bullet Camera Element Profile Template':  { industry: 'security', defaultCategory: 'Bullet Camera' },
   'Multi Sensor Camera Element Profile Template': { industry: 'security', defaultCategory: 'Multi Sensor Camera', preserveCategory: true },
   'Multi-Lens Camera Element Profile Template':   { industry: 'security', defaultCategory: 'Multi Sensor Camera', preserveCategory: true },
-  'Access Reader Element Profile Template':  { industry: 'security', defaultCategory: 'Access Reader' },
-  'Access Control Element Profile Template': { industry: 'security', defaultCategory: 'Access Control Door' },
-  'Controller Element Profile Template':     { industry: 'security', defaultCategory: 'Controller' },
+  'Access Reader Element Profile Template':             { industry: 'security', defaultCategory: 'Access Reader' },
+  'Access Control Element Profile Template':            { industry: 'security', defaultCategory: 'Access Control Door' },
+  'Access Control Enclosure Element Profile Template':  { industry: 'security', defaultCategory: 'Access Control Enclosure' },
+  'Controller Element Profile Template':                { industry: 'security', defaultCategory: 'Controller' },
   'Video Intercom Element Profile Template': { industry: 'security', defaultCategory: 'Intercom' },
   'Intercom Element Profile Template':       { industry: 'security', defaultCategory: 'Intercom' },
   'Motion Sensor Element Profile Template':  { industry: 'security', defaultCategory: 'Motion Sensor' },
@@ -238,6 +239,7 @@ async function parseSystemSurveyorFile(file) {
       const etLower = elementType.toLowerCase()
       if (styleKey)                                          category = STYLE_CATEGORY_MAP[styleKey]
       else if (etLower.includes('ptz'))                      category = 'PTZ Camera'
+      else if (etLower.includes('enclosure'))                 category = 'Access Control Enclosure'
       else if (etLower.includes('access control'))           category = 'Access Control Door'
       else if (etLower.includes('access reader') ||
                etLower.includes('reader'))                   category = 'Access Reader'
@@ -429,7 +431,7 @@ const ALL_CATEGORIES = [
   'Dome Camera','Bullet Camera','PTZ Camera','Fisheye Camera','Multi Sensor Camera','Indoor Camera',
   'Turret Camera','LPR Camera','Multi-Lens Camera',
   // Security — Access Control
-  'Access Reader','Access Control Door','Controller','Intercom','Wireless Lock','Door Operator',
+  'Access Control Enclosure','Access Reader','Access Control Door','Controller','Intercom','Wireless Lock','Door Operator',
   // Security — Intrusion
   'PIR Detector','Door Contact','Glass Break','Alarm Keypad','Alarm Panel','Interior Siren',
   'Exterior Siren','Panic Button','Shock Sensor','Dual Tech Detector','Motion Sensor',
@@ -673,9 +675,10 @@ export default function GlobalProductsImport({ onClose, onImported }) {
 EXAMPLE-CAM-001,Example Dome Camera,Dome Camera,Example Corp,2MP IR Dome Camera,90,98,7.5,PoE required
 EXAMPLE-CAM-002,Example Bullet Camera,Bullet Camera,Example Corp,4MP Varifocal Bullet,70,164,12,PoE or 12VDC
 # ── Access Control ────────────────────────────────────────────────────────────
-# Valid categories: Access Reader | Access Control Door | Controller | Intercom | Wireless Lock | Door Operator
+# Valid categories: Access Control Enclosure | Access Reader | Access Control Door | Controller | Intercom | Wireless Lock | Door Operator
 EXAMPLE-ACC-001,Example Card Reader,Access Reader,Example Corp,Multi-format RFID reader,,,3,
 EXAMPLE-ACC-002,Example Door Controller,Access Control Door,Example Corp,2-door access controller,,,15,
+EXAMPLE-ACC-003,Example AC Enclosure,Access Control Enclosure,Example Corp,8-door access control enclosure with power supply,,,45,
 # ── Intrusion Detection ────────────────────────────────────────────────────────
 # Valid categories: PIR Detector | Door Contact | Glass Break | Alarm Keypad | Alarm Panel | Interior Siren | Exterior Siren | Panic Button | Shock Sensor | Dual Tech Detector | Motion Sensor
 EXAMPLE-INT-001,Example PIR Detector,PIR Detector,Example Corp,Ceiling mount PIR,,,1,
