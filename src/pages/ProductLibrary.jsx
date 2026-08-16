@@ -36,7 +36,7 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [activeTab, setActiveTab] = useState('library') // 'library' | catalog slug
   // Add product form
   const [showAddForm, setShowAddForm] = useState(false)
-  const [addForm, setAddForm] = useState({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '', lead_time: '', country_of_origin: '', berry_compliance: '' })
+  const [addForm, setAddForm] = useState({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '', lead_time: '', country_of_origin: '', berry_compliance: '', is_component: false })
   const [saving, setSaving] = useState(false)
   // Add vendor price inline
   const [addingPriceFor, setAddingPriceFor] = useState(null) // product_id or `cat_${catalog_product_id}`
@@ -340,7 +340,7 @@ if (!finalCost) continue
       active: true,
     })
     if (err) { setError(err.message); setSaving(false); return }
-    setAddForm({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '', lead_time: '', country_of_origin: '', berry_compliance: '' })
+    setAddForm({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '', lead_time: '', country_of_origin: '', berry_compliance: '', is_component: false })
     setShowAddForm(false); setSaving(false)
     const { data: newProd } = await supabase
       .from('product_library')
@@ -476,6 +476,15 @@ if (!finalCost) continue
                 </select>
               </div>
               <div><label className="text-fp-muted text-xs mb-1 block">Description</label><input type="text" value={addForm.description} onChange={e => setAddForm(p => ({ ...p, description: e.target.value }))} className={inputCls} /></div>
+              <div className="flex items-center gap-2 pt-1">
+                <button type="button" onClick={() => setAddForm(p => ({ ...p, is_component: !p.is_component }))}
+                  className={`relative inline-flex items-center w-9 h-5 rounded-full transition-colors ${addForm.is_component ? 'bg-fp-brand' : 'bg-fp-border'}`}>
+                  <span className={`inline-block w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${addForm.is_component ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                </button>
+                <label className="text-fp-muted text-xs cursor-pointer" onClick={() => setAddForm(p => ({ ...p, is_component: !p.is_component }))}>
+                  Available as component in Designer
+                </label>
+              </div>
               {featureMsrp && <div><label className="text-fp-muted text-xs mb-1 block">MSRP</label><input type="number" placeholder="0.00" value={addForm.msrp} onChange={e => setAddForm(p => ({ ...p, msrp: e.target.value }))} className={inputCls} /></div>}
               {featureComplianceFields && <div><label className="text-fp-muted text-xs mb-1 block">Lead Time</label><input type="text" placeholder="e.g. 4–6 weeks" value={addForm.lead_time} onChange={e => setAddForm(p => ({ ...p, lead_time: e.target.value }))} className={inputCls} /></div>}
               {featureComplianceFields && <div><label className="text-fp-muted text-xs mb-1 block">COO</label><input type="text" placeholder="e.g. USA" value={addForm.country_of_origin} onChange={e => setAddForm(p => ({ ...p, country_of_origin: e.target.value }))} className={inputCls} /></div>}
