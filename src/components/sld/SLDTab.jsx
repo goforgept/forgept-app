@@ -124,6 +124,16 @@ const WIRE_STROKE_WIDTH = {
   rs485:    1.5,
 }
 
+// Short cable-type labels shown next to each wire on the canvas and PDF
+const WIRE_LABELS = {
+  default:  'CAT6',
+  network:  'CAT6',
+  power:    'Power',
+  fiber:    'Fiber',
+  wireless: 'Wireless',
+  rs485:    'RS-485',
+}
+
 // ─── Pre-built installation typicals ─────────────────────────────────────────
 const BUILT_IN_TYPICALS = [
   {
@@ -614,7 +624,7 @@ export default function SLDTab({ proposalId, orgId }) {
           id: e.id,
           source: e.source_node_id,
           target: e.target_node_id,
-          label: e.label || undefined,
+          label: e.label || WIRE_LABELS[wt] || wt,
           type: 'smoothstep',
           style: { stroke: WIRE_COLORS[wt], strokeDasharray: WIRE_DASH[wt] || 'none', strokeWidth: WIRE_STROKE_WIDTH[wt] || 1.5 },
           data: { wire_type: wt },
@@ -642,6 +652,7 @@ export default function SLDTab({ proposalId, orgId }) {
     setEdges(eds => addEdge({
       ...params,
       id: newEdge.id,
+      label: WIRE_LABELS[wt] || wt,
       type: 'smoothstep',
       style: { stroke: WIRE_COLORS[wt], strokeDasharray: WIRE_DASH[wt] || 'none', strokeWidth: WIRE_STROKE_WIDTH[wt] || 1.5 },
       data: { wire_type: wt },
@@ -730,6 +741,7 @@ export default function SLDTab({ proposalId, orgId }) {
     if (!selectedEdge) return
     const updated = {
       ...selectedEdge,
+      label: WIRE_LABELS[wt] || wt,
       style: { stroke: WIRE_COLORS[wt], strokeDasharray: WIRE_DASH[wt] || 'none', strokeWidth: WIRE_STROKE_WIDTH[wt] || 1.5 },
       data: { ...selectedEdge.data, wire_type: wt },
       markerEnd: { type: MarkerType.ArrowClosed, color: WIRE_COLORS[wt], width: 12, height: 12 },
