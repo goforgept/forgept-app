@@ -536,8 +536,8 @@ function SymbolCard({ symbol, isSelected, isFavorited, onToggleFavorite, onSelec
   )
 }
 
-function CategoryIcon({ category }) {
-  const props = { className: 'w-10 h-10', fill: 'none', stroke: 'currentColor', viewBox: '0 0 40 40' }
+export function CategoryIcon({ category, className, size }) {
+  const props = { className: className || 'w-10 h-10', width: size, height: size, fill: 'none', stroke: 'currentColor', viewBox: '0 0 40 40' }
   switch (category) {
     case 'Dome Camera':
       return <svg {...props}><ellipse cx="20" cy="24" rx="14" ry="6" strokeWidth="1.5"/><path d="M6 24 Q6 10 20 10 Q34 10 34 24" strokeWidth="1.5" fill="none"/><circle cx="20" cy="20" r="4" strokeWidth="1.5"/></svg>

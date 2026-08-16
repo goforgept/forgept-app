@@ -14,32 +14,32 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { supabase } from '../../supabase'
+import { CategoryIcon } from '../drawing/SymbolPicker'
 
-// ─── Category config ──────────────────────────────────────────────────────────
-
-const CATEGORY_ICONS = {
-  'Camera':                   '📷',
-  'NVR':                      '🖥️',
-  'DVR':                      '🖥️',
-  'Network Switch':           '🔀',
-  'Access Control Panel':     '🔒',
-  'Access Control Enclosure': '🗄️',
-  'Door Reader':              '💳',
-  'Door Contact':             '🚪',
-  'Request to Exit':          '🚪',
-  'Electric Lock':            '⚡',
-  'Video Intercom':           '📞',
-  'Alarm Panel':              '🚨',
-  'Motion Sensor':            '👁️',
-  'Smoke Detector':           '🔥',
-  'UPS / Battery Backup':     '🔋',
-  'Power Supply':             '🔌',
-  'Wireless Access Point':    '📡',
-  'Server':                   '🖥️',
-  'Fiber Converter':          '💡',
-  'Speaker':                  '🔊',
-  'Monitor / Display':        '🖥️',
-  'Other':                    '📦',
+// Maps SLD category names → SymbolPicker CategoryIcon category names
+const CATEGORY_ICON_MAP = {
+  'Camera':                   'Dome Camera',
+  'NVR':                      'NVR',
+  'DVR':                      'NVR',
+  'Network Switch':           'Network',
+  'Access Control Panel':     'Controller',
+  'Access Control Enclosure': 'Cabinet System',
+  'Door Reader':              'Access Reader',
+  'Door Contact':             'Door Contact',
+  'Request to Exit':          'PIR Detector',
+  'Electric Lock':            'Door Operator',
+  'Video Intercom':           'Video Conference',
+  'Alarm Panel':              'Alarm Panel',
+  'Motion Sensor':            'Motion Sensor',
+  'Smoke Detector':           'Interior Siren',
+  'UPS / Battery Backup':     'UPS',
+  'Power Supply':             'Power Box',
+  'Wireless Access Point':    'Point to Point',
+  'Server':                   'Head End',
+  'Fiber Converter':          'Fiber Node',
+  'Speaker':                  'Speaker',
+  'Monitor / Display':        'Display',
+  'Other':                    'Other',
 }
 
 const CATEGORY_COLORS = {
@@ -104,8 +104,8 @@ const WIRE_DASH = {
 // ─── Custom Node ──────────────────────────────────────────────────────────────
 
 function DeviceNode({ data, selected }) {
-  const color = CATEGORY_COLORS[data.category] || '#6B7280'
-  const icon  = CATEGORY_ICONS[data.category] || '📦'
+  const color   = CATEGORY_COLORS[data.category] || '#6B7280'
+  const iconCat = CATEGORY_ICON_MAP[data.category] || data.category || 'Other'
   return (
     <div
       className="rounded-lg border-2 select-none"
@@ -113,21 +113,22 @@ function DeviceNode({ data, selected }) {
         borderColor: selected ? '#C8622A' : color,
         background: '#1a2d45',
         color: '#E8EEF5',
-        minWidth: 120,
-        maxWidth: 180,
+        minWidth: 130,
+        maxWidth: 190,
         boxShadow: selected ? '0 0 0 2px #C8622A40' : '0 2px 6px rgba(0,0,0,0.4)',
       }}
     >
       <Handle type="target" position={Position.Top}
         style={{ width: 8, height: 8, background: '#4A5568', border: '1px solid #2a3d55' }} />
 
-      <div className="px-3 pt-2 pb-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: `${color}18` }}>
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm">{icon}</span>
-          <span className="text-xs font-semibold truncate" style={{ color }}>
-            {data.category || 'Device'}
-          </span>
+      <div className="px-3 pt-2 pb-1.5 flex items-center gap-2.5"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: `${color}15` }}>
+        <div style={{ color, flexShrink: 0 }}>
+          <CategoryIcon category={iconCat} size={20} />
         </div>
+        <span className="text-xs font-semibold truncate" style={{ color }}>
+          {data.category || 'Device'}
+        </span>
       </div>
 
       <div className="px-3 py-2">
@@ -628,7 +629,9 @@ export default function SLDTab({ proposalId, orgId }) {
                       onClick={() => addDevice(cat, cat)}
                       className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md text-[#8A9AB0] hover:text-white hover:bg-[#2a3d55] transition-colors text-xs"
                     >
-                      <span>{CATEGORY_ICONS[cat] || '📦'}</span>
+                      <span style={{ color: CATEGORY_COLORS[cat] || '#6B7280', flexShrink: 0 }}>
+                        <CategoryIcon category={CATEGORY_ICON_MAP[cat] || cat} size={16} />
+                      </span>
                       <span className="truncate">{cat}</span>
                     </button>
                   ))}
@@ -644,7 +647,9 @@ export default function SLDTab({ proposalId, orgId }) {
                           onClick={() => addDevice(cat, p.name, p.id)}
                           className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md text-[#8A9AB0] hover:text-white hover:bg-[#2a3d55] transition-colors text-xs"
                         >
-                          <span>{CATEGORY_ICONS[cat] || '📦'}</span>
+                          <span style={{ color: CATEGORY_COLORS[cat] || '#6B7280', width: 16, height: 16, flexShrink: 0 }}>
+                            <CategoryIcon category={CATEGORY_ICON_MAP[cat] || cat} className="w-4 h-4" style={{ width: 16, height: 16 }} />
+                          </span>
                           <span className="truncate">{p.name}</span>
                         </button>
                       ))}
