@@ -42,29 +42,30 @@ const CATEGORY_ICON_MAP = {
   'Other':                    'Other',
 }
 
+// Traditional SLD uses muted, print-safe colors — not web UI colors
 const CATEGORY_COLORS = {
-  'Camera':                   '#3B82F6',
-  'NVR':                      '#6366F1',
-  'DVR':                      '#6366F1',
-  'Network Switch':           '#10B981',
-  'Access Control Panel':     '#F59E0B',
-  'Access Control Enclosure': '#F59E0B',
-  'Door Reader':              '#F59E0B',
-  'Door Contact':             '#EF4444',
-  'Request to Exit':          '#EF4444',
-  'Electric Lock':            '#8B5CF6',
-  'Video Intercom':           '#3B82F6',
-  'Alarm Panel':              '#EF4444',
-  'Motion Sensor':            '#EF4444',
-  'Smoke Detector':           '#EF4444',
-  'UPS / Battery Backup':     '#10B981',
-  'Power Supply':             '#10B981',
-  'Wireless Access Point':    '#3B82F6',
-  'Server':                   '#6366F1',
-  'Fiber Converter':          '#10B981',
-  'Speaker':                  '#8B5CF6',
-  'Monitor / Display':        '#6366F1',
-  'Other':                    '#6B7280',
+  'Camera':                   '#1e40af',
+  'NVR':                      '#1e3a5f',
+  'DVR':                      '#1e3a5f',
+  'Network Switch':           '#065f46',
+  'Access Control Panel':     '#78350f',
+  'Access Control Enclosure': '#78350f',
+  'Door Reader':              '#92400e',
+  'Door Contact':             '#991b1b',
+  'Request to Exit':          '#991b1b',
+  'Electric Lock':            '#4c1d95',
+  'Video Intercom':           '#1e40af',
+  'Alarm Panel':              '#7f1d1d',
+  'Motion Sensor':            '#7f1d1d',
+  'Smoke Detector':           '#7f1d1d',
+  'UPS / Battery Backup':     '#064e3b',
+  'Power Supply':             '#064e3b',
+  'Wireless Access Point':    '#1e40af',
+  'Server':                   '#1e3a5f',
+  'Fiber Converter':          '#065f46',
+  'Speaker':                  '#4c1d95',
+  'Monitor / Display':        '#1e3a5f',
+  'Other':                    '#374151',
 }
 
 const QUICK_ADD_CATEGORIES = [
@@ -83,66 +84,110 @@ const WIRE_TYPES = [
   { value: 'rs485',    label: 'RS-485' },
 ]
 
+// Traditional SLD wire colors — dark, print-safe
 const WIRE_COLORS = {
-  default:  '#9CA3AF',
-  network:  '#3B82F6',
-  power:    '#F59E0B',
-  fiber:    '#10B981',
-  wireless: '#8B5CF6',
-  rs485:    '#EF4444',
+  default:  '#111827',
+  network:  '#1e3a8a',
+  power:    '#7f1d1d',
+  fiber:    '#14532d',
+  wireless: '#4a044e',
+  rs485:    '#78350f',
 }
 
 const WIRE_DASH = {
   default:  'none',
   network:  'none',
-  power:    'none',
-  fiber:    '8 4',
-  wireless: '4 4',
-  rs485:    '2 2',
+  power:    '6 2',
+  fiber:    '10 4',
+  wireless: '3 4',
+  rs485:    '6 2 2 2',
 }
 
-// ─── Custom Node ──────────────────────────────────────────────────────────────
+const WIRE_STROKE_WIDTH = {
+  default:  1.5,
+  network:  1.5,
+  power:    2.5,
+  fiber:    1.5,
+  wireless: 1.5,
+  rs485:    1.5,
+}
+
+// ─── Handle + canvas styles ───────────────────────────────────────────────────
+const CANVAS_STYLE = `
+  /* Handles: small dark squares at node edges, orange on hover */
+  .react-flow__handle {
+    width: 12px !important;
+    height: 12px !important;
+    border-radius: 2px !important;
+    border: 1.5px solid #374151 !important;
+    background: #ffffff !important;
+    transition: background 0.12s, border-color 0.12s !important;
+    z-index: 10 !important;
+  }
+  .react-flow__handle:hover,
+  .react-flow__handle.connecting {
+    background: #C8622A !important;
+    border-color: #C8622A !important;
+    cursor: crosshair !important;
+  }
+  .react-flow__handle-top    { top: -6px !important; }
+  .react-flow__handle-bottom { bottom: -6px !important; }
+
+  /* Edge labels readable on white canvas */
+  .react-flow__edge-textwrapper text {
+    fill: #374151 !important;
+    font-size: 10px !important;
+    font-family: monospace !important;
+  }
+  .react-flow__edge-textbg { fill: #f9fafb !important; }
+
+  /* Controls sit over the light canvas */
+  .react-flow__controls { box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important; border-radius: 4px !important; }
+  .react-flow__controls-button { background: #ffffff !important; border-color: #d1d5db !important; fill: #374151 !important; }
+  .react-flow__controls-button:hover { background: #f3f4f6 !important; }
+  .react-flow__minimap { border: 1px solid #d1d5db !important; border-radius: 4px !important; }
+`
+
+// ─── Custom Node — traditional SLD style ─────────────────────────────────────
 
 function DeviceNode({ data, selected }) {
-  const color   = CATEGORY_COLORS[data.category] || '#6B7280'
+  const color   = CATEGORY_COLORS[data.category] || '#374151'
   const iconCat = CATEGORY_ICON_MAP[data.category] || data.category || 'Other'
   return (
     <div
-      className="rounded-lg border-2 select-none"
+      className="select-none"
       style={{
-        borderColor: selected ? '#C8622A' : color,
-        background: '#1a2d45',
-        color: '#E8EEF5',
-        minWidth: 130,
-        maxWidth: 190,
-        boxShadow: selected ? '0 0 0 2px #C8622A40' : '0 2px 6px rgba(0,0,0,0.4)',
+        background: '#ffffff',
+        border: selected ? '2px solid #C8622A' : '1.5px solid #374151',
+        borderTop: selected ? '2px solid #C8622A' : `3px solid ${color}`,
+        boxShadow: selected ? '0 0 0 2px rgba(200,98,42,0.25)' : '0 1px 3px rgba(0,0,0,0.12)',
+        width: 160,
+        fontFamily: 'sans-serif',
       }}
     >
-      <Handle type="target" position={Position.Top}
-        style={{ width: 8, height: 8, background: '#4A5568', border: '1px solid #2a3d55' }} />
+      <Handle type="target" position={Position.Top} title="Drop connection here" />
 
-      <div className="px-3 pt-2 pb-1.5 flex items-center gap-2.5"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', background: `${color}15` }}>
-        <div style={{ color, flexShrink: 0 }}>
-          <CategoryIcon category={iconCat} size={20} />
+      {/* Symbol + category row */}
+      <div style={{ padding: '8px 10px 4px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid #e5e7eb' }}>
+        <div style={{ color, flexShrink: 0, opacity: 0.85 }}>
+          <CategoryIcon category={iconCat} size={28} />
         </div>
-        <span className="text-xs font-semibold truncate" style={{ color }}>
+        <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', lineHeight: 1.2 }}>
           {data.category || 'Device'}
         </span>
       </div>
 
-      <div className="px-3 py-2">
-        <p className="text-xs font-semibold leading-tight" style={{ color: '#E8EEF5' }}>{data.label}</p>
-        {data.quantity > 1 && (
-          <p className="text-xs mt-0.5" style={{ color: '#8A9AB0' }}>×{data.quantity}</p>
-        )}
-        {data.notes && (
-          <p className="text-xs mt-0.5 truncate" style={{ color: '#8A9AB0' }}>{data.notes}</p>
+      {/* Device label */}
+      <div style={{ padding: '5px 10px 7px' }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: '#111827', lineHeight: 1.3, margin: 0 }}>{data.label}</p>
+        {(data.quantity > 1 || data.notes) && (
+          <p style={{ fontSize: 10, color: '#6b7280', margin: '2px 0 0', lineHeight: 1.2 }}>
+            {data.quantity > 1 && `×${data.quantity}`}{data.quantity > 1 && data.notes && '  '}{data.notes}
+          </p>
         )}
       </div>
 
-      <Handle type="source" position={Position.Bottom}
-        style={{ width: 8, height: 8, background: '#4A5568', border: '1px solid #2a3d55' }} />
+      <Handle type="source" position={Position.Bottom} title="Drag to connect" />
     </div>
   )
 }
@@ -167,6 +212,8 @@ export default function SLDTab({ proposalId, orgId }) {
   const [renaming, setRenaming]             = useState(null)
   const [newSheetName, setNewSheetName]     = useState('')
   const [edgeWireType, setEdgeWireType]     = useState('default')
+  const [exporting, setExporting]           = useState(false)
+  const [diagramName, setDiagramName]       = useState('Single Line Diagram')
 
   useEffect(() => { init() }, [proposalId])
   useEffect(() => { if (activeSheetId) loadSheet(activeSheetId) }, [activeSheetId])
@@ -202,6 +249,7 @@ export default function SLDTab({ proposalId, orgId }) {
       if (existing) {
         const sorted = (existing.sld_sheets || []).sort((a, b) => a.sort_order - b.sort_order)
         setDiagramId(existing.id)
+        setDiagramName(existing.name || 'Single Line Diagram')
         setSheets(sorted)
         if (sorted.length > 0) setActiveSheetId(sorted[0].id)
       }
@@ -239,11 +287,11 @@ export default function SLDTab({ proposalId, orgId }) {
           id: e.id,
           source: e.source_node_id,
           target: e.target_node_id,
-          label: e.label || '',
+          label: e.label || undefined,
           type: 'smoothstep',
-          style: { stroke: WIRE_COLORS[wt], strokeDasharray: WIRE_DASH[wt] || 'none' },
+          style: { stroke: WIRE_COLORS[wt], strokeDasharray: WIRE_DASH[wt] || 'none', strokeWidth: WIRE_STROKE_WIDTH[wt] || 1.5 },
           data: { wire_type: wt },
-          markerEnd: { type: MarkerType.ArrowClosed, color: WIRE_COLORS[wt] },
+          markerEnd: { type: MarkerType.ArrowClosed, color: WIRE_COLORS[wt], width: 12, height: 12 },
         }
       }))
 
@@ -268,9 +316,9 @@ export default function SLDTab({ proposalId, orgId }) {
       ...params,
       id: newEdge.id,
       type: 'smoothstep',
-      style: { stroke: WIRE_COLORS[wt], strokeDasharray: WIRE_DASH[wt] || 'none' },
+      style: { stroke: WIRE_COLORS[wt], strokeDasharray: WIRE_DASH[wt] || 'none', strokeWidth: WIRE_STROKE_WIDTH[wt] || 1.5 },
       data: { wire_type: wt },
-      markerEnd: { type: MarkerType.ArrowClosed, color: WIRE_COLORS[wt] },
+      markerEnd: { type: MarkerType.ArrowClosed, color: WIRE_COLORS[wt], width: 12, height: 12 },
     }, eds))
   }, [activeSheetId, edgeWireType])
 
@@ -327,9 +375,9 @@ export default function SLDTab({ proposalId, orgId }) {
     if (!selectedEdge) return
     const updated = {
       ...selectedEdge,
-      style: { stroke: WIRE_COLORS[wt], strokeDasharray: WIRE_DASH[wt] || 'none' },
+      style: { stroke: WIRE_COLORS[wt], strokeDasharray: WIRE_DASH[wt] || 'none', strokeWidth: WIRE_STROKE_WIDTH[wt] || 1.5 },
       data: { ...selectedEdge.data, wire_type: wt },
-      markerEnd: { type: MarkerType.ArrowClosed, color: WIRE_COLORS[wt] },
+      markerEnd: { type: MarkerType.ArrowClosed, color: WIRE_COLORS[wt], width: 12, height: 12 },
     }
     setSelectedEdge(updated)
     setEdges(es => es.map(e => e.id === selectedEdge.id ? updated : e))
@@ -463,6 +511,173 @@ export default function SLDTab({ proposalId, orgId }) {
     }
   }
 
+  // ─── PDF Export ──────────────────────────────────────────────────────────────
+
+  const exportPDF = async () => {
+    if (nodes.length === 0) { alert('Add some devices first.'); return }
+    setExporting(true)
+    try {
+      const jsPDF = (await import('jspdf')).default
+
+      const NODE_W = 150
+      const NODE_H = 64
+      const PAD    = 60
+
+      const xs = nodes.map(n => n.position.x)
+      const ys = nodes.map(n => n.position.y)
+      const minX = Math.min(...xs) - PAD
+      const minY = Math.min(...ys) - PAD
+      const maxX = Math.max(...xs) + NODE_W + PAD
+      const maxY = Math.max(...ys) + NODE_H + PAD
+
+      const diagW = maxX - minX
+      const diagH = maxY - minY
+
+      // A3 landscape gives plenty of room
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' })
+      const PW = 420, PH = 297
+      const HEADER = 18, FOOTER = 14
+
+      const usableW = PW - 20
+      const usableH = PH - HEADER - FOOTER
+      const scale = Math.min(usableW / diagW, usableH / diagH, 1.4)
+
+      const tx = x => 10 + (x - minX) * scale
+      const ty = y => HEADER + (y - minY) * scale
+      const sw = NODE_W * scale
+      const sh = NODE_H * scale
+
+      // Header
+      pdf.setFillColor(15, 28, 46)
+      pdf.rect(0, 0, PW, HEADER - 2, 'F')
+      pdf.setTextColor(200, 98, 42)
+      pdf.setFontSize(11)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('ForgePt · Single Line Diagram', 10, 8)
+      pdf.setTextColor(138, 154, 176)
+      pdf.setFontSize(8)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(diagramName, 10, 13)
+      const activeSheet = sheets.find(s => s.id === activeSheetId)
+      if (activeSheet) pdf.text(activeSheet.name, PW / 2, 13, { align: 'center' })
+      pdf.text(new Date().toLocaleDateString(), PW - 10, 13, { align: 'right' })
+
+      // Draw edges first (behind nodes)
+      edges.forEach(edge => {
+        const src = nodes.find(n => n.id === edge.source)
+        const tgt = nodes.find(n => n.id === edge.target)
+        if (!src || !tgt) return
+
+        const x1 = tx(src.position.x + NODE_W / 2)
+        const y1 = ty(src.position.y + NODE_H)
+        const x2 = tx(tgt.position.x + NODE_W / 2)
+        const y2 = ty(tgt.position.y)
+
+        const wt  = edge.data?.wire_type || 'default'
+        const hex = WIRE_COLORS[wt] || '#9CA3AF'
+        const r   = parseInt(hex.slice(1, 3), 16)
+        const g   = parseInt(hex.slice(3, 5), 16)
+        const b   = parseInt(hex.slice(5, 7), 16)
+
+        pdf.setDrawColor(r, g, b)
+        pdf.setLineWidth(0.4)
+
+        if (wt === 'fiber')    pdf.setLineDashPattern([2, 1.5], 0)
+        else if (wt === 'wireless') pdf.setLineDashPattern([1.5, 1.5], 0)
+        else if (wt === 'rs485')    pdf.setLineDashPattern([0.8, 0.8], 0)
+        else pdf.setLineDashPattern([], 0)
+
+        // Simple orthogonal: down from source, up to target
+        const midY = (y1 + y2) / 2
+        pdf.lines([[0, midY - y1], [x2 - x1, 0], [0, y2 - midY]], x1, y1)
+
+        if (edge.label) {
+          pdf.setFontSize(5)
+          pdf.setTextColor(r, g, b)
+          pdf.text(edge.label, (x1 + x2) / 2, (y1 + y2) / 2 - 1, { align: 'center' })
+        }
+      })
+
+      // Draw nodes
+      nodes.forEach(node => {
+        const x = tx(node.position.x)
+        const y = ty(node.position.y)
+        const cat   = node.data.category || 'Other'
+        const hex   = CATEGORY_COLORS[cat] || '#6B7280'
+        const r     = parseInt(hex.slice(1, 3), 16)
+        const g     = parseInt(hex.slice(3, 5), 16)
+        const b     = parseInt(hex.slice(5, 7), 16)
+
+        // Node background (white) with colored border
+        pdf.setLineDashPattern([], 0)
+        pdf.setFillColor(255, 255, 255)
+        pdf.setDrawColor(r, g, b)
+        pdf.setLineWidth(0.5)
+        pdf.roundedRect(x, y, sw, sh, 1.5, 1.5, 'FD')
+
+        // Category header strip
+        pdf.setFillColor(r, g, b)
+        pdf.setGState(pdf.GState({ opacity: 0.12 }))
+        pdf.rect(x + 0.5, y + 0.5, sw - 1, sh * 0.38, 'F')
+        pdf.setGState(pdf.GState({ opacity: 1 }))
+
+        // Category label
+        pdf.setTextColor(r, g, b)
+        pdf.setFontSize(5.5)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(cat, x + 3, y + sh * 0.22)
+
+        // Device label
+        pdf.setTextColor(30, 30, 40)
+        pdf.setFontSize(6.5)
+        pdf.setFont('helvetica', 'normal')
+        const label = node.data.label || ''
+        pdf.text(label, x + 3, y + sh * 0.58, { maxWidth: sw - 6 })
+
+        if ((node.data.quantity || 1) > 1) {
+          pdf.setFontSize(5)
+          pdf.setTextColor(100, 100, 100)
+          pdf.text(`×${node.data.quantity}`, x + sw - 4, y + sh - 3, { align: 'right' })
+        }
+      })
+
+      // Footer — wire type legend
+      const legendY = PH - FOOTER + 3
+      pdf.setLineDashPattern([], 0)
+      pdf.setDrawColor(200, 200, 210)
+      pdf.setLineWidth(0.2)
+      pdf.line(10, legendY - 2, PW - 10, legendY - 2)
+
+      const legendItems = WIRE_TYPES.filter(wt => edges.some(e => (e.data?.wire_type || 'default') === wt.value))
+      let lx = 12
+      legendItems.forEach(wt => {
+        const hex = WIRE_COLORS[wt.value] || '#9CA3AF'
+        const r = parseInt(hex.slice(1, 3), 16)
+        const g = parseInt(hex.slice(3, 5), 16)
+        const b = parseInt(hex.slice(5, 7), 16)
+        pdf.setDrawColor(r, g, b)
+        pdf.setLineWidth(0.5)
+        if (wt.value === 'fiber')    pdf.setLineDashPattern([2, 1.5], 0)
+        else if (wt.value === 'wireless') pdf.setLineDashPattern([1.5, 1.5], 0)
+        else if (wt.value === 'rs485')    pdf.setLineDashPattern([0.8, 0.8], 0)
+        else pdf.setLineDashPattern([], 0)
+        pdf.line(lx, legendY + 3, lx + 10, legendY + 3)
+        pdf.setTextColor(60, 60, 60)
+        pdf.setFontSize(6)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(wt.label, lx + 12, legendY + 4.5)
+        lx += 40
+      })
+
+      pdf.save(`${diagramName.replace(/[^a-z0-9]/gi, '_')}.pdf`)
+    } catch (err) {
+      console.error('PDF export error:', err)
+      alert('Export failed.')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   // ─── Keyboard delete ─────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -502,6 +717,7 @@ export default function SLDTab({ proposalId, orgId }) {
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden" style={{ background: '#0F1923' }}>
+      <style>{CANVAS_STYLE}</style>
 
       {/* SLD toolbar */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[#2a3d55] bg-[#1a2d45] flex-shrink-0">
@@ -601,6 +817,37 @@ export default function SLDTab({ proposalId, orgId }) {
         >
           Devices
         </button>
+
+        {/* Export PDF */}
+        <button
+          onClick={exportPDF}
+          disabled={exporting || nodes.length === 0}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-[#2a3d55] text-[#8A9AB0] hover:text-white transition-colors disabled:opacity-40 flex-shrink-0"
+          style={{ background: '#0F1923' }}
+          title="Export as PDF"
+        >
+          {exporting ? (
+            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+            </svg>
+          ) : (
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+            </svg>
+          )}
+          Export PDF
+        </button>
+      </div>
+
+      {/* Connection hint bar */}
+      <div className="flex items-center gap-2 px-3 py-1 border-b border-[#2a3d55] flex-shrink-0" style={{ background: '#1a2d45' }}>
+        <svg className="w-3 h-3 flex-shrink-0" style={{ color: '#8A9AB0' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <span className="text-xs" style={{ color: '#8A9AB0' }}>
+          To connect: hover a node → drag from the <strong style={{ color: '#C8622A' }}>bottom connector</strong> to the <strong style={{ color: '#C8622A' }}>top connector</strong> of another node. Click a line to change wire type.
+        </span>
       </div>
 
       {/* Canvas + panels */}
@@ -679,19 +926,24 @@ export default function SLDTab({ proposalId, orgId }) {
             nodeTypes={nodeTypes}
             fitView
             deleteKeyCode={null}
-            style={{ background: '#0F1923' }}
+            style={{ background: '#f8f9fa' }}
           >
-            <Background color="#1a2d45" gap={20} size={1} />
+            <Background color="#e5e7eb" gap={24} size={1} variant="dots" />
             <Controls />
-            <MiniMap nodeColor={n => CATEGORY_COLORS[n.data?.category] || '#6B7280'} style={{ background: '#1a2d45' }} />
+            <MiniMap
+              nodeColor={n => CATEGORY_COLORS[n.data?.category] || '#374151'}
+              nodeStrokeColor={() => '#374151'}
+              nodeStrokeWidth={1}
+              style={{ background: '#ffffff', border: '1px solid #d1d5db' }}
+            />
             {nodes.length === 0 && (
               <Panel position="top-center">
                 <div className="mt-10 text-center">
-                  <p className="text-sm" style={{ color: '#8A9AB0' }}>
-                    Click a device in the panel to add it, then drag connections between nodes.
+                  <p className="text-sm" style={{ color: '#6b7280' }}>
+                    Click a device type to add it, then drag from the <strong style={{ color: '#374151' }}>bottom connector</strong> to the <strong style={{ color: '#374151' }}>top connector</strong> of another device to wire them.
                   </p>
-                  <p className="text-xs mt-1" style={{ color: '#8A9AB0' }}>
-                    Or use <strong style={{ color: '#E8EEF5' }}>Auto-Build</strong> to generate from the Drawing tab.
+                  <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>
+                    Or use <strong style={{ color: '#374151' }}>Auto-Build</strong> to generate from the Drawing tab.
                   </p>
                 </div>
               </Panel>
