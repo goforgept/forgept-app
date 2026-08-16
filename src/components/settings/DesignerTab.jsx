@@ -8,6 +8,7 @@ const INDUSTRIES = ['Security', 'AV', 'IT / Networking', 'Low Voltage', 'Fire Al
 
 const ALL_CATEGORIES = [
   'Access Control Door',
+  'Access Control Enclosure',
   'Access Reader','Alarm Keypad','Alarm Panel','Amplifier','AV Receiver',
   'Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station',
   'Badging Station',
@@ -35,7 +36,7 @@ const ALL_CATEGORIES = [
 ]
 
 const CATEGORY_MAP = {
-  'Security':        ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station','Badging Station','Bullet Camera','Code Blue Light','Code Blue Panel','Code Blue Phone','Controller','Corridor Light','Doctor Light','Dome Camera','Dome Light','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','Interior Siren','KVM','Motion Sensor','Network','Nurse Call Controller','NVR','Panel','Panic Button','Patient Station','PIR Detector','PTZ Camera','Pull Cord Station','Shock Sensor','Staff Station','Thick Client','Thin Client','Workstation'],
+  'Security':        ['Access Control Enclosure','Access Reader','Accessory','Alarm Keypad','Alarm Panel','Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station','Badging Station','Bullet Camera','Code Blue Light','Code Blue Panel','Code Blue Phone','Controller','Corridor Light','Doctor Light','Dome Camera','Dome Light','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','Interior Siren','KVM','Motion Sensor','Network','Nurse Call Controller','NVR','Panel','Panic Button','Patient Station','PIR Detector','PTZ Camera','Pull Cord Station','Shock Sensor','Staff Station','Thick Client','Thin Client','Workstation'],
   'AV':              ['Accessory','AV Receiver','Ceiling Speaker','Clock','Control Processor','Digital Signage','Display','Document Camera','HDMI Extender','Media Player','Microphone','Network','Projection Screen','Projector','Speaker','Streaming Encoder','Subwoofer','Touch Panel','Video Conference','Wall Plate','Wireless Mic'],
   'IT / Networking': ['Accessory','Controller','Display','Network','Outlet','Panel','Wall Plate'],
   'Low Voltage':     ['Access Reader','Accessory','Controller','Display','Door Contact','Door Operator','Network','Outlet','Panel','Speaker','Wall Plate'],

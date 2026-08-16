@@ -12,6 +12,7 @@ const DEFAULT_COMPONENTS = {
   'LPR Camera':          ['Mount', 'IR Illuminator', 'Junction Box', 'Surge Protector'],
 
   // Security — Access Control
+  'Access Control Enclosure': ['Door Controller', 'Power Supply', 'Battery Backup', 'Fiber Interface', 'Network Switch', 'Surge Protector', 'Tamper'],
   'Access Reader':       ['Back Box', 'Surge Protector', 'REX', 'Door Contact', 'Strike', 'Lock', 'Power Supply'],
   'Access Control Door': ['Lock', 'Reader', 'REX', 'Door Contact', 'Power Supply', 'Controller', 'Push to Exit'],
   'Controller':          ['Power Supply', 'Cabinet', 'Battery Backup', 'Surge Protector'],
