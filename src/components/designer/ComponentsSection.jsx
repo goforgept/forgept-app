@@ -141,7 +141,7 @@ export default function ComponentsSection({ placementId, orgId, category, produc
       .select('id, item_name, part_number, manufacturer, category')
       .eq('org_id', orgId)
       .eq('is_component', true)
-      .eq('is_active', true)
+      .eq('active', true)
       .order('item_name')
     setLibraryItems(data || [])
   }
