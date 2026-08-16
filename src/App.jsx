@@ -43,6 +43,8 @@ import ProductLibrary from './pages/ProductLibrary'
 import Reports from './pages/Reports'
 import Designer from './pages/Designer'
 import DesignerProjects from './pages/DesignerProjects'
+import SLDProjects from './pages/SLDProjects'
+import SLD from './pages/SLD'
 import DrawingReview from './pages/DrawingReview'
 import EmbedDesigner from './pages/EmbedDesigner'
 import Roadmap from './pages/Roadmap'
@@ -218,6 +220,8 @@ function App() {
             {(features.sla || features.monitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
             <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />
             <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />
+            {features.drawingTool && <Route path="/sld" element={<SLDProjects {...sharedProps} />} />}
+            {features.drawingTool && <Route path="/sld/:id" element={<SLD {...sharedProps} />} />}
             {features.inventory && <Route path="/inventory" element={<Inventory {...sharedProps} />} />}
             {features.designerOnly && <Route path="*" element={<Navigate to="/designer" replace />} />}
             <Route path="/roadmap" element={<Roadmap {...sharedProps} />} />
