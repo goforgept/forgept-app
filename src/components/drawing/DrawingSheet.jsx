@@ -1163,7 +1163,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     } finally {
       setTimeout(() => setPlacing(false), 150)
     }
-  }, [selectedSymbol, placing, position, scale, canvasW, canvasH, sheet, orgId, onPlacementChange, onPlacementSelect])
+  }, [selectedSymbol, placing, position, scale, canvasW, canvasH, sheet, orgId, onPlacementChange, onPlacementSelect, cableMode, pathwayMode, roomMode, activePoints, activePathwayPoints, pickingPoint, snapToPlacement, onRoomPlace])
 
   // ── Delete / Rotate / Drag ─────────────────────────────────────────────────
   const handleDelete = useCallback(async (id) => {

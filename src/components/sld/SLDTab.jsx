@@ -371,6 +371,92 @@ function DraggableDeviceButton({ category, name, globalProductId, onClick, child
   )
 }
 
+function DraggableShapeButton({ shape, label, onClick, children }) {
+  const touchStartRef = useRef(null)
+  const ghostRef      = useRef(null)
+  const isDraggingRef = useRef(false)
+  const btnRef        = useRef(null)
+
+  useEffect(() => {
+    return () => { if (ghostRef.current) { ghostRef.current.remove(); ghostRef.current = null } }
+  }, [])
+
+  useEffect(() => {
+    const el = btnRef.current
+    if (!el) return
+    const onMove = (e) => {
+      if (!touchStartRef.current) return
+      const t = e.touches[0]
+      const dx = t.clientX - touchStartRef.current.x
+      const dy = t.clientY - touchStartRef.current.y
+      if (isDraggingRef.current || Math.sqrt(dx * dx + dy * dy) > 8) e.preventDefault()
+    }
+    el.addEventListener('touchmove', onMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onMove)
+  }, [])
+
+  const handleDragStart = (e) => {
+    e.dataTransfer.setData('application/sld-shape', JSON.stringify({ shape }))
+    e.dataTransfer.effectAllowed = 'copy'
+  }
+
+  const handleTouchStart = (e) => {
+    const t = e.touches[0]
+    touchStartRef.current = { x: t.clientX, y: t.clientY }
+    isDraggingRef.current = false
+  }
+
+  const handleTouchMove = (e) => {
+    if (!touchStartRef.current) return
+    const t = e.touches[0]
+    const dx = t.clientX - touchStartRef.current.x
+    const dy = t.clientY - touchStartRef.current.y
+    if (Math.sqrt(dx * dx + dy * dy) > 8 && !isDraggingRef.current) {
+      isDraggingRef.current = true
+      const ghost = document.createElement('div')
+      ghost.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;background:#0F1923;border:1.5px solid #C8622A;border-radius:6px;padding:4px 10px;color:white;font-size:12px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.6);transform:translate(-50%,-120%);'
+      ghost.textContent = label
+      document.body.appendChild(ghost)
+      ghostRef.current = ghost
+    }
+    if (ghostRef.current) {
+      ghostRef.current.style.left = `${t.clientX}px`
+      ghostRef.current.style.top  = `${t.clientY}px`
+    }
+  }
+
+  const handleTouchEnd = (e) => {
+    if (ghostRef.current) { ghostRef.current.remove(); ghostRef.current = null }
+    if (isDraggingRef.current) {
+      e.preventDefault()
+      const t = e.changedTouches[0]
+      window.dispatchEvent(new CustomEvent('forgept-sld-shape-drop', {
+        detail: { shape, clientX: t.clientX, clientY: t.clientY },
+      }))
+    } else {
+      onClick?.()
+    }
+    touchStartRef.current = null
+    isDraggingRef.current = false
+  }
+
+  return (
+    <button
+      ref={btnRef}
+      draggable
+      onDragStart={handleDragStart}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      onClick={onClick}
+      className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-md text-[#8A9AB0] hover:text-white hover:bg-[#2a3d55] transition-colors text-xs cursor-grab active:cursor-grabbing"
+    >
+      {children}
+    </button>
+  )
+}
+
 // ─── Handle + canvas styles ───────────────────────────────────────────────────
 const CANVAS_STYLE = `
   /* Handles: small dark squares at node edges, orange on hover */
@@ -1053,6 +1139,11 @@ function ShapeNode({ id, data, selected, width, height }) {
               strokeDasharray={data.dash || 'none'}
               markerEnd={data.arrow ? 'url(#arrowhead)' : undefined} />
           )}
+          {shape === 'triangle' && (
+            <polygon
+              points={`${w/2},${selSW} ${w-selSW},${h-selSW} ${selSW},${h-selSW}`}
+              fill={fill === 'none' ? 'transparent' : fill} stroke={selStroke} strokeWidth={selSW} />
+          )}
           {shape === 'arrow' && <>
             <defs>
               <marker id={`arr-${id}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
@@ -1380,14 +1471,14 @@ export default function SLDTab({ proposalId, orgId }) {
     }])
   }
 
-  const addShape = async (shape) => {
+  const addShape = async (shape, position = null) => {
     if (!activeSheetId) return
     const isLine = shape === 'line' || shape === 'arrow'
     const isText = shape === 'text'
     const w = isLine ? 160 : 160
     const h = isLine ? 24 : isText ? 36 : 100
-    const px = 80 + Math.random() * 300
-    const py = 80 + Math.random() * 200
+    const px = position?.x ?? (80 + Math.random() * 300)
+    const py = position?.y ?? (80 + Math.random() * 200)
     const shapeData = { shape, fill: isLine || isText ? 'none' : '#f3f4f6', stroke: '#374151', label: isText ? 'Text' : '', width: w, height: h }
     const { data: newNode } = await supabase.from('sld_nodes').insert({
       sheet_id: activeSheetId, label: '', node_type: 'shape', position_x: px, position_y: py, data: shapeData,
@@ -1406,6 +1497,15 @@ export default function SLDTab({ proposalId, orgId }) {
   const onDrop = useCallback((e) => {
     e.preventDefault()
     if (!rfInstance) return
+    const shapeRaw = e.dataTransfer.getData('application/sld-shape')
+    if (shapeRaw) {
+      try {
+        const { shape } = JSON.parse(shapeRaw)
+        const position = rfInstance.screenToFlowPosition({ x: e.clientX, y: e.clientY })
+        addShape(shape, position)
+      } catch {}
+      return
+    }
     const raw = e.dataTransfer.getData('application/sld-device')
     if (!raw) return
     try {
@@ -1417,6 +1517,12 @@ export default function SLDTab({ proposalId, orgId }) {
 
   const onTouchDrop = useCallback((e) => {
     if (!rfInstance) return
+    if (e.type === 'forgept-sld-shape-drop') {
+      const { shape, clientX, clientY } = e.detail
+      const position = rfInstance.screenToFlowPosition({ x: clientX, y: clientY })
+      addShape(shape, position)
+      return
+    }
     const { category, name, globalProductId, clientX, clientY } = e.detail
     const position = rfInstance.screenToFlowPosition({ x: clientX, y: clientY })
     addDevice(category, name, globalProductId, position)
@@ -1930,7 +2036,11 @@ export default function SLDTab({ proposalId, orgId }) {
 
   useEffect(() => {
     window.addEventListener('forgept-sld-drop', onTouchDrop)
-    return () => window.removeEventListener('forgept-sld-drop', onTouchDrop)
+    window.addEventListener('forgept-sld-shape-drop', onTouchDrop)
+    return () => {
+      window.removeEventListener('forgept-sld-drop', onTouchDrop)
+      window.removeEventListener('forgept-sld-shape-drop', onTouchDrop)
+    }
   }, [onTouchDrop])
 
   // ─── Device picker ───────────────────────────────────────────────────────────
@@ -2237,19 +2347,19 @@ export default function SLDTab({ proposalId, orgId }) {
 
             {pickerTab === 'shapes' && (
               <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                <p className="text-xs text-[#8A9AB0] font-medium uppercase tracking-wide px-1 py-1">Basic Shapes</p>
+                <p className="text-xs text-[#8A9AB0] font-medium uppercase tracking-wide px-1 py-1">Drag or click to place</p>
                 {[
-                  { shape: 'rect',    label: 'Rectangle',   icon: <rect x="2" y="4" width="20" height="16" rx="1" fill="none" stroke="currentColor" strokeWidth="2"/> },
-                  { shape: 'ellipse', label: 'Ellipse',     icon: <ellipse cx="12" cy="12" rx="10" ry="8" fill="none" stroke="currentColor" strokeWidth="2"/> },
-                  { shape: 'text',    label: 'Text',        icon: <text x="12" y="17" textAnchor="middle" fontSize="14" fontWeight="bold" fill="currentColor" fontFamily="serif">T</text> },
-                  { shape: 'line',    label: 'Line',        icon: <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="2"/> },
-                  { shape: 'arrow',   label: 'Arrow',       icon: <><line x1="2" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2"/><path d="M14,7 L22,12 L14,17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></> },
+                  { shape: 'rect',     label: 'Rectangle', icon: <rect x="2" y="4" width="20" height="16" rx="1" fill="none" stroke="currentColor" strokeWidth="2"/> },
+                  { shape: 'ellipse',  label: 'Ellipse',   icon: <ellipse cx="12" cy="12" rx="10" ry="8" fill="none" stroke="currentColor" strokeWidth="2"/> },
+                  { shape: 'triangle', label: 'Triangle',  icon: <polygon points="12,3 22,21 2,21" fill="none" stroke="currentColor" strokeWidth="2"/> },
+                  { shape: 'text',     label: 'Text',      icon: <text x="12" y="17" textAnchor="middle" fontSize="14" fontWeight="bold" fill="currentColor" fontFamily="serif">T</text> },
+                  { shape: 'line',     label: 'Line',      icon: <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="2"/> },
+                  { shape: 'arrow',    label: 'Arrow',     icon: <><line x1="2" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2"/><path d="M14,7 L22,12 L14,17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></> },
                 ].map(({ shape, label, icon }) => (
-                  <button key={shape} onClick={() => addShape(shape)}
-                    className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-xs text-[#E8EEF5] hover:bg-[#2a3d55] transition-colors text-left">
+                  <DraggableShapeButton key={shape} shape={shape} label={label} onClick={() => addShape(shape)}>
                     <svg width="24" height="24" viewBox="0 0 24 24" className="text-[#8A9AB0] flex-shrink-0">{icon}</svg>
-                    {label}
-                  </button>
+                    <span>{label}</span>
+                  </DraggableShapeButton>
                 ))}
               </div>
             )}
