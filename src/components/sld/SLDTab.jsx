@@ -406,10 +406,10 @@ function SvgLabel({ x, y, text, fill, fontSize = 7, bold = false }) {
   )
 }
 
-function SingleDoorSVG({ components = {} }) {
+function SingleDoorSVG({ components = {}, lockType = 'strike' }) {
   const c = { ...DEFAULT_COMPONENTS.single_door, ...components }
   return (
-    <svg width="320" height="210" viewBox="0 0 320 210" style={{ display: 'block' }}>
+    <svg width="320" height="210" viewBox="0 0 320 210" style={{ display: 'block', pointerEvents: 'none' }}>
       {/* Wall */}
       <rect x="68" y="0" width="16" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       {/* Door panel */}
@@ -434,9 +434,20 @@ function SingleDoorSVG({ components = {} }) {
       <SvgLabel x={33} y={98} text={c.reader} fill="#1e40af" fontSize={7} bold />
       <line x1="62" y1="95" x2="68" y2="95" stroke="#1e3a8a" strokeWidth="1.5"/>
 
-      {/* Electric Lock */}
-      <rect x="54" y="102" width="24" height="26" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
-      <SvgLabel x={66} y={118} text={c.lock} fill="#4c1d95" fontSize={5.5} bold />
+      {/* Lock */}
+      {lockType === 'mag' ? (
+        <>
+          {/* MAG Lock: horizontal bar at top of door panel */}
+          <rect x="86" y="24" width="50" height="10" fill="#ede9fe" stroke="#4c1d95" strokeWidth="1.5" rx="1"/>
+          <SvgLabel x={111} y={31} text={c.lock} fill="#4c1d95" fontSize={5.5} bold />
+        </>
+      ) : (
+        <>
+          {/* Electric Strike: bracket at wall/door edge, mid-height */}
+          <rect x="54" y="102" width="24" height="26" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
+          <SvgLabel x={66} y={118} text={c.lock} fill="#4c1d95" fontSize={5.5} bold />
+        </>
+      )}
 
       {/* REX */}
       <rect x="216" y="80" width="58" height="30" fill="#fff" stroke="#92400e" strokeWidth="1.5"/>
@@ -460,10 +471,10 @@ function SingleDoorSVG({ components = {} }) {
   )
 }
 
-function DoubleDoorSVG({ components = {} }) {
+function DoubleDoorSVG({ components = {}, lockType = 'strike' }) {
   const c = { ...DEFAULT_COMPONENTS.double_door, ...components }
   return (
-    <svg width="400" height="210" viewBox="0 0 400 210" style={{ display: 'block' }}>
+    <svg width="400" height="210" viewBox="0 0 400 210" style={{ display: 'block', pointerEvents: 'none' }}>
       {/* Walls */}
       <rect x="68" y="0" width="14" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       <rect x="194" y="0" width="12" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
@@ -498,10 +509,23 @@ function DoubleDoorSVG({ components = {} }) {
       <line x1="62" y1="119" x2="68" y2="119" stroke="#1e3a8a" strokeWidth="1.5"/>
 
       {/* Locks */}
-      <rect x="54" y="90" width="24" height="22" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
-      <SvgLabel x={66} y={104} text={c.lockA} fill="#4c1d95" fontSize={5.5} bold />
-      <rect x="320" y="90" width="24" height="22" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
-      <SvgLabel x={332} y={104} text={c.lockB} fill="#4c1d95" fontSize={5.5} bold />
+      {lockType === 'mag' ? (
+        <>
+          {/* MAG on door A and door B — bars at top of each door panel */}
+          <rect x="84" y="24" width="38" height="9" fill="#ede9fe" stroke="#4c1d95" strokeWidth="1.5" rx="1"/>
+          <SvgLabel x={103} y={30} text={c.lockA} fill="#4c1d95" fontSize={5} bold />
+          <rect x="208" y="24" width="38" height="9" fill="#ede9fe" stroke="#4c1d95" strokeWidth="1.5" rx="1"/>
+          <SvgLabel x={227} y={30} text={c.lockB} fill="#4c1d95" fontSize={5} bold />
+        </>
+      ) : (
+        <>
+          {/* Electric Strike — bracket at each door's wall edge */}
+          <rect x="54" y="90" width="24" height="22" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
+          <SvgLabel x={66} y={104} text={c.lockA} fill="#4c1d95" fontSize={5.5} bold />
+          <rect x="320" y="90" width="24" height="22" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
+          <SvgLabel x={332} y={104} text={c.lockB} fill="#4c1d95" fontSize={5.5} bold />
+        </>
+      )}
 
       {/* REX */}
       <rect x="334" y="70" width="52" height="26" fill="#fff" stroke="#92400e" strokeWidth="1.5"/>
@@ -528,6 +552,7 @@ function DoubleDoorSVG({ components = {} }) {
 
 function SchematicNode({ data, selected }) {
   const isDouble = data.schematicType === 'double_door'
+  const lockType = data.lockType || 'strike'
   const components = { ...(DEFAULT_COMPONENTS[data.schematicType] || {}), ...(data.components || {}) }
   return (
     <div
@@ -548,7 +573,7 @@ function SchematicNode({ data, selected }) {
         </span>
         {data.label && <span style={{ fontSize: 11, fontWeight: 700, color: '#111827' }}>{data.label}</span>}
       </div>
-      {isDouble ? <DoubleDoorSVG components={components} /> : <SingleDoorSVG components={components} />}
+      {isDouble ? <DoubleDoorSVG components={components} lockType={lockType} /> : <SingleDoorSVG components={components} lockType={lockType} />}
       <Handle type="source" position={Position.Bottom} />
     </div>
   )
@@ -729,7 +754,7 @@ export default function SLDTab({ proposalId, orgId }) {
           position_x: tn.position_x + offsetX,
           position_y: tn.position_y + offsetY,
           data: isSchematic
-            ? { schematicType: tn.data?.schematicType, components: { ...(DEFAULT_COMPONENTS[tn.data?.schematicType] || {}), ...(tn.data?.components || {}) } }
+            ? { schematicType: tn.data?.schematicType, lockType: tn.data?.lockType || 'strike', components: { ...(DEFAULT_COMPONENTS[tn.data?.schematicType] || {}), ...(tn.data?.components || {}) } }
             : { ...(tn.data || {}), quantity: tn.data?.quantity || 1 },
         }
       })
@@ -781,7 +806,7 @@ export default function SLDTab({ proposalId, orgId }) {
         type: n.node_type === 'schematic' ? 'schematic' : 'device',
         position: { x: n.position_x, y: n.position_y },
         data: n.node_type === 'schematic'
-          ? { label: n.label, schematicType: n.data?.schematicType, components: n.data?.components || {} }
+          ? { label: n.label, schematicType: n.data?.schematicType, lockType: n.data?.lockType || 'strike', components: n.data?.components || {} }
           : { label: n.label, category: n.data?.category, quantity: n.data?.quantity, notes: n.data?.notes, global_product_id: n.global_product_id },
       })))
 
@@ -1239,6 +1264,7 @@ export default function SLDTab({ proposalId, orgId }) {
           const oy = marginY + row * (panH + gapY)
           const c = { ...(DEFAULT_COMPONENTS[sn.data.schematicType] || {}), ...(sn.data.components || {}) }
           const isDouble = sn.data.schematicType === 'double_door'
+          const lockType = sn.data.lockType || 'strike'
 
           // Panel border + title
           pdf.setDrawColor(55, 65, 81)
@@ -1298,7 +1324,11 @@ export default function SLDTab({ proposalId, orgId }) {
             box(dx+80, dy+4, 36, 16, '#78350f', c.panel, '#78350f')
             box(dx+32, dy+3, 18, 6, '#991b1b', c.contact, '#991b1b')
             box(dx+1, dy+dwH/2-8, 24, 12, '#1e40af', c.reader, '#1e40af')
-            box(dx+21, dy+dwH/2, 10, 10, '#4c1d95', c.lock, '#4c1d95')
+            if (lockType === 'mag') {
+              box(dx+32, dy+8, 30, 6, '#4c1d95', c.lock, '#4c1d95')
+            } else {
+              box(dx+21, dy+dwH/2, 10, 10, '#4c1d95', c.lock, '#4c1d95')
+            }
             box(dx+84, dy+dwH/2-8, 24, 12, '#92400e', c.rex, '#92400e')
 
             // Wires
@@ -1325,8 +1355,13 @@ export default function SLDTab({ proposalId, orgId }) {
             box(dx+81, dy+3, 16, 6, '#991b1b', c.contactB, '#991b1b')
             box(dx+1, dy+dwH/2-18, 18, 10, '#1e40af', c.readerA, '#1e40af')
             box(dx+1, dy+dwH/2+2, 18, 10, '#1e40af', c.readerB, '#1e40af')
-            box(dx+15, dy+dwH/2-8, 8, 10, '#4c1d95', c.lockA, '#4c1d95')
-            box(dx+136, dy+dwH/2-8, 8, 10, '#4c1d95', c.lockB, '#4c1d95')
+            if (lockType === 'mag') {
+              box(dx+20, dy+8, 20, 5, '#4c1d95', c.lockA, '#4c1d95')
+              box(dx+76, dy+8, 20, 5, '#4c1d95', c.lockB, '#4c1d95')
+            } else {
+              box(dx+15, dy+dwH/2-8, 8, 10, '#4c1d95', c.lockA, '#4c1d95')
+              box(dx+136, dy+dwH/2-8, 8, 10, '#4c1d95', c.lockB, '#4c1d95')
+            }
             box(dx+144, dy+dwH/2-18, 18, 10, '#92400e', c.rexA, '#92400e')
             box(dx+144, dy+dwH/2+2, 18, 10, '#92400e', c.rexB, '#92400e')
 
@@ -1747,7 +1782,19 @@ export default function SLDTab({ proposalId, orgId }) {
                     style={{ background: '#0F1923', color: '#E8EEF5' }}
                   />
                 </div>
-                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#8A9AB0' }}>Components</p>
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: '#8A9AB0' }}>Lock Type</label>
+                  <select
+                    value={selectedNode.data.lockType || 'strike'}
+                    onChange={e => updateNodeData('lockType', e.target.value)}
+                    className="w-full text-xs border border-[#2a3d55] rounded px-2 py-1.5 focus:outline-none focus:border-[#C8622A]"
+                    style={{ background: '#0F1923', color: '#E8EEF5' }}
+                  >
+                    <option value="strike">Electric Strike</option>
+                    <option value="mag">Magnetic Lock (MAG)</option>
+                  </select>
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#8A9AB0' }}>Component Labels</p>
                 {Object.entries(DEFAULT_COMPONENTS[selectedNode.data.schematicType] || {}).map(([key, defaultVal]) => (
                   <div key={key}>
                     <label className="text-xs block mb-1 capitalize" style={{ color: '#8A9AB0' }}>
