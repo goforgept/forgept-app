@@ -466,6 +466,7 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
 
   const startDrag = (e, key) => {
     e.stopPropagation()
+    e.preventDefault()
     const svg  = svgRef.current
     if (!svg) return
     const rect = svg.getBoundingClientRect()
@@ -501,7 +502,7 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
     const color = COLORS[key]
     const isLockMag = key === 'lock' && isMag
     return (
-      <g key={key} onMouseDown={e => startDrag(e, key)} style={{ cursor: dragging?.key === key ? 'grabbing' : 'grab' }}>
+      <g key={key} onPointerDown={e => startDrag(e, key)} style={{ cursor: dragging?.key === key ? 'grabbing' : 'grab' }}>
         <rect x={p.x} y={p.y} width={s.w} height={s.h}
           fill={isLockMag ? '#ede9fe' : '#fff'} stroke={color} strokeWidth="1.5" rx={isLockMag ? 1 : 0}/>
         <SvgLabel x={p.x + s.w / 2} y={p.y + s.h / 2 + (s.h < 15 ? 2 : 3)}
@@ -513,7 +514,7 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
   return (
     <svg ref={svgRef} width="320" height="210" viewBox="0 0 320 210"
       style={{ display: 'block', userSelect: 'none' }}
-      onMouseMove={onSvgMove} onMouseUp={onSvgUp} onMouseLeave={onSvgUp}>
+      onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}>
       {/* Wall */}
       <rect x="68" y="0" width="16" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       {/* Door panel */}
@@ -594,7 +595,7 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
     const color = COLORS[key] || '#374151'
     const isLockMag = (key === 'lockA' || key === 'lockB') && isMag
     return (
-      <g key={key} onMouseDown={e => startDrag(e, key)} style={{ cursor: dragging?.key === key ? 'grabbing' : 'grab' }}>
+      <g key={key} onPointerDown={e => startDrag(e, key)} style={{ cursor: dragging?.key === key ? 'grabbing' : 'grab' }}>
         <rect x={p.x} y={p.y} width={s.w} height={s.h}
           fill={isLockMag ? '#ede9fe' : '#fff'} stroke={color} strokeWidth="1.5" rx={isLockMag ? 1 : 0}/>
         <SvgLabel x={p.x + s.w / 2} y={p.y + s.h / 2 + (s.h < 15 ? 2 : 3)}
@@ -608,7 +609,7 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
   return (
     <svg ref={svgRef} width="400" height="210" viewBox="0 0 400 210"
       style={{ display: 'block', userSelect: 'none' }}
-      onMouseMove={onSvgMove} onMouseUp={onSvgUp} onMouseLeave={onSvgUp}>
+      onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}>
       {/* Walls */}
       <rect x="68" y="0" width="14" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       <rect x="194" y="0" width="12" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
@@ -1422,10 +1423,10 @@ export default function SLDTab({ proposalId, orgId }) {
             pdf.setFillColor(243,244,246)
             pdf.setDrawColor(55,65,81)
             pdf.rect(dx+32, dy+8, 50, dwH-10, 'FD')
-            // Swing arc
+            // Swing arc (approximated as diagonal dashed line)
             pdf.setLineDashPattern([2,2], 0)
             pdf.setDrawColor(209,213,219)
-            pdf.lines([[0, dwH-18, 50, 0]], dx+32, dy+dwH-2, [1,1], 'S', false)
+            pdf.line(dx+32, dy+dwH-2, dx+82, dy+8)
             pdf.setLineDashPattern([], 0)
             // Door handle
             pdf.setDrawColor(156,163,175)
