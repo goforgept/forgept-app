@@ -12,6 +12,7 @@ import {
   Handle,
   Panel,
   MarkerType,
+  NodeResizer,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { supabase } from '../../supabase'
@@ -406,7 +407,7 @@ const CANVAS_STYLE = `
 
 // ─── Custom Node — traditional SLD style ─────────────────────────────────────
 
-function DeviceNode({ data, selected }) {
+function DeviceNode({ id, data, selected }) {
   const color   = CATEGORY_COLORS[data.category] || '#374151'
   const iconCat = CATEGORY_ICON_MAP[data.category] || data.category || 'Other'
   return (
@@ -417,10 +418,24 @@ function DeviceNode({ data, selected }) {
         border: selected ? '2px solid #C8622A' : '1.5px solid #374151',
         borderTop: selected ? '2px solid #C8622A' : `3px solid ${color}`,
         boxShadow: selected ? '0 0 0 2px rgba(200,98,42,0.25)' : '0 1px 3px rgba(0,0,0,0.12)',
-        width: 160,
+        width: '100%',
+        minWidth: 120,
         fontFamily: 'sans-serif',
+        overflow: 'hidden',
       }}
     >
+      <NodeResizer
+        minWidth={120}
+        minHeight={55}
+        isVisible={selected}
+        lineStyle={{ borderColor: '#C8622A' }}
+        handleStyle={{ borderColor: '#C8622A', background: '#fff' }}
+        onResizeEnd={(_, params) => {
+          supabase.from('sld_nodes').update({
+            data: { ...data, width: Math.round(params.width), height: Math.round(params.height) }
+          }).eq('id', id)
+        }}
+      />
       <Handle type="target" position={Position.Top} title="Drop connection here" />
 
       {/* Symbol + category row */}
@@ -478,6 +493,7 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
   const [liveWires, setLiveWires] = useState({})
   const [liveSizes, setLiveSizes] = useState({})
   const [selWire,   setSelWire]   = useState(null)
+  const wireInteractionRef        = useRef(false)
 
   const srcWires   = wires !== undefined ? wires : DEFAULT_WIRES.single_door
   const activeWires = srcWires.map(w => ({ ...w, ...(liveWires[w.id] || {}) }))
@@ -515,6 +531,7 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     const cx = (e.clientX - rect.left) * sx
     const cy = (e.clientY - rect.top)  * sy
     svgRef.current.setPointerCapture(e.pointerId)
+    wireInteractionRef.current = true
     setDrag({ type: 'wire-body', id: wire.id, cx0: cx, cy0: cy, wx0: wire.x1, wy0: wire.y1, wx2: wire.x2, wy2: wire.y2, sx, sy, rect })
     setSelWire(wire.id)
   }
@@ -526,6 +543,7 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     const cx = (e.clientX - rect.left) * sx
     const cy = (e.clientY - rect.top)  * sy
     svgRef.current.setPointerCapture(e.pointerId)
+    wireInteractionRef.current = true
     setDrag({ type: 'wire-end', id: wire.id, end, cx0: cx, cy0: cy, startX: end === 1 ? wire.x1 : wire.x2, startY: end === 1 ? wire.y1 : wire.y2, sx, sy, rect })
     setSelWire(wire.id)
   }
@@ -641,7 +659,7 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     <svg ref={svgRef} width="320" height="210" viewBox="0 0 320 210"
       style={{ display: 'block', userSelect: 'none' }}
       onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}
-      onClick={() => setSelWire(null)}>
+      onClick={() => { if (wireInteractionRef.current) { wireInteractionRef.current = false; return }; setSelWire(null) }}>
       {/* Wall */}
       <rect x="68" y="0" width="16" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       {/* Door panel */}
@@ -676,6 +694,7 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
   const [liveWires, setLiveWires] = useState({})
   const [liveSizes, setLiveSizes] = useState({})
   const [selWire,   setSelWire]   = useState(null)
+  const wireInteractionRef        = useRef(false)
 
   const srcWires    = wires !== undefined ? wires : DEFAULT_WIRES.double_door
   const activeWires = srcWires.map(w => ({ ...w, ...(liveWires[w.id] || {}) }))
@@ -713,6 +732,7 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     const cx = (e.clientX - rect.left) * sx
     const cy = (e.clientY - rect.top)  * sy
     svgRef.current.setPointerCapture(e.pointerId)
+    wireInteractionRef.current = true
     setDrag({ type: 'wire-body', id: wire.id, cx0: cx, cy0: cy, wx0: wire.x1, wy0: wire.y1, wx2: wire.x2, wy2: wire.y2, sx, sy, rect })
     setSelWire(wire.id)
   }
@@ -724,6 +744,7 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     const cx = (e.clientX - rect.left) * sx
     const cy = (e.clientY - rect.top)  * sy
     svgRef.current.setPointerCapture(e.pointerId)
+    wireInteractionRef.current = true
     setDrag({ type: 'wire-end', id: wire.id, end, cx0: cx, cy0: cy, startX: end === 1 ? wire.x1 : wire.x2, startY: end === 1 ? wire.y1 : wire.y2, sx, sy, rect })
     setSelWire(wire.id)
   }
@@ -847,7 +868,7 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     <svg ref={svgRef} width="400" height="210" viewBox="0 0 400 210"
       style={{ display: 'block', userSelect: 'none' }}
       onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}
-      onClick={() => setSelWire(null)}>
+      onClick={() => { if (wireInteractionRef.current) { wireInteractionRef.current = false; return }; setSelWire(null) }}>
       {/* Walls */}
       <rect x="68" y="0" width="14" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       <rect x="194" y="0" width="12" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
@@ -1152,9 +1173,10 @@ export default function SLDTab({ proposalId, orgId }) {
         id: n.id,
         type: n.node_type === 'schematic' ? 'schematic' : 'device',
         position: { x: n.position_x, y: n.position_y },
+        style: n.node_type !== 'schematic' ? { width: n.data?.width || 160, ...(n.data?.height ? { height: n.data.height } : {}) } : undefined,
         data: n.node_type === 'schematic'
           ? { label: n.label, schematicType: n.data?.schematicType, lockType: n.data?.lockType || 'strike', components: n.data?.components || {}, positions: n.data?.positions || {}, sizes: n.data?.sizes || {}, wires: n.data?.wires }
-          : { label: n.label, category: n.data?.category, quantity: n.data?.quantity, notes: n.data?.notes, global_product_id: n.global_product_id },
+          : { label: n.label, category: n.data?.category, quantity: n.data?.quantity, notes: n.data?.notes, global_product_id: n.global_product_id, width: n.data?.width, height: n.data?.height },
       })))
 
       setEdges((sldEdges || []).map(e => {
@@ -1222,6 +1244,7 @@ export default function SLDTab({ proposalId, orgId }) {
       id: newNode.id,
       type: 'device',
       position: { x: newNode.position_x, y: newNode.position_y },
+      style: { width: 160 },
       data: { label: name || category, category, quantity: 1, global_product_id: globalProductId },
     }])
   }
