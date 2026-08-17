@@ -422,9 +422,9 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           <div className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors" onClick={() => navigate('/invoices')}>
             <p className="text-fp-text font-bold mb-3">Invoicing & AR</p>
             <div className="grid grid-cols-4 gap-3">
-              <div><p className="text-fp-muted text-xs mb-1">Total Invoiced</p><p className="text-fp-text text-lg font-bold">${totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
-              <div><p className="text-fp-muted text-xs mb-1">Outstanding</p><p className="text-fp-text text-lg font-bold">${outstandingAR.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
-              <div><p className="text-fp-muted text-xs mb-1">Overdue</p><p className={`text-lg font-bold ${overdueAR > 0 ? 'text-red-400' : 'text-fp-text'}`}>${overdueAR.toLocaleString('en-US', { minimumFractionDigits: 0 })}</p></div>
+              <div><p className="text-fp-muted text-xs mb-1">Total Invoiced</p><p className="text-fp-text text-lg font-bold">${totalInvoiced.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p></div>
+              <div><p className="text-fp-muted text-xs mb-1">Outstanding</p><p className="text-fp-text text-lg font-bold">${outstandingAR.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p></div>
+              <div><p className="text-fp-muted text-xs mb-1">Overdue</p><p className={`text-lg font-bold ${overdueAR > 0 ? 'text-red-400' : 'text-fp-text'}`}>${overdueAR.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p></div>
               <div><p className="text-fp-muted text-xs mb-1">Needs Invoice</p><p className={`text-lg font-bold ${needsInvoice > 0 ? 'text-yellow-400' : 'text-fp-text'}`}>{needsInvoice}</p></div>
             </div>
           </div>
