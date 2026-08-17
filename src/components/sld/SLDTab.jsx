@@ -495,6 +495,7 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
   const [selWire,   setSelWire]   = useState(null)
   const [selComp,   setSelComp]   = useState(null)
   const wireInteractionRef        = useRef(false)
+  const compInteractionRef        = useRef(false)
 
   const srcWires   = wires !== undefined ? wires : DEFAULT_WIRES.single_door
   const activeWires = srcWires.map(w => ({ ...w, ...(liveWires[w.id] || {}) }))
@@ -588,8 +589,13 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     if (!drag) return
     if (drag.type === 'comp') {
       const fp = livePos[drag.key]
-      if (fp) onUpdate?.({ positions: { ...positions, [drag.key]: { x: Math.round(fp.x), y: Math.round(fp.y) } } })
-      setLivePos(lp => { const n = { ...lp }; delete n[drag.key]; return n })
+      if (fp) {
+        onUpdate?.({ positions: { ...positions, [drag.key]: { x: Math.round(fp.x), y: Math.round(fp.y) } } })
+        setLivePos(lp => { const n = { ...lp }; delete n[drag.key]; return n })
+      } else {
+        setSelComp(sc => sc === drag.key ? null : drag.key)
+        compInteractionRef.current = true
+      }
     } else if (drag.type === 'resize') {
       const fs = liveSizes[drag.key]
       if (fs) onUpdate?.({ sizes: { ...sizes, [drag.key]: { w: Math.round(fs.w), h: Math.round(fs.h) } } })
@@ -622,7 +628,6 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     return (
       <g key={key}>
         <g onPointerDown={e => startCompDrag(e, key)}
-          onClick={e => { e.stopPropagation(); setSelComp(isSelComp ? null : key); setSelWire(null) }}
           style={{ cursor: drag?.type === 'comp' && drag.key === key ? 'grabbing' : 'grab' }}>
           <rect x={p.x} y={p.y} width={s.w} height={s.h}
             fill={isLockMag ? '#ede9fe' : '#fff'}
@@ -672,7 +677,11 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     <svg ref={svgRef} width="320" height="210" viewBox="0 0 320 210"
       style={{ display: 'block', userSelect: 'none' }}
       onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}
-      onClick={() => { if (wireInteractionRef.current) { wireInteractionRef.current = false; return }; setSelWire(null); setSelComp(null) }}>
+      onClick={() => {
+        if (wireInteractionRef.current) { wireInteractionRef.current = false; return }
+        if (compInteractionRef.current) { compInteractionRef.current = false; return }
+        setSelWire(null); setSelComp(null)
+      }}>
       {/* Wall */}
       <rect x="68" y="0" width="16" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       {/* Door panel */}
@@ -709,6 +718,7 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
   const [selWire,   setSelWire]   = useState(null)
   const [selComp,   setSelComp]   = useState(null)
   const wireInteractionRef        = useRef(false)
+  const compInteractionRef        = useRef(false)
 
   const srcWires    = wires !== undefined ? wires : DEFAULT_WIRES.double_door
   const activeWires = srcWires.map(w => ({ ...w, ...(liveWires[w.id] || {}) }))
@@ -802,8 +812,13 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     if (!drag) return
     if (drag.type === 'comp') {
       const fp = livePos[drag.key]
-      if (fp) onUpdate?.({ positions: { ...positions, [drag.key]: { x: Math.round(fp.x), y: Math.round(fp.y) } } })
-      setLivePos(lp => { const n = { ...lp }; delete n[drag.key]; return n })
+      if (fp) {
+        onUpdate?.({ positions: { ...positions, [drag.key]: { x: Math.round(fp.x), y: Math.round(fp.y) } } })
+        setLivePos(lp => { const n = { ...lp }; delete n[drag.key]; return n })
+      } else {
+        setSelComp(sc => sc === drag.key ? null : drag.key)
+        compInteractionRef.current = true
+      }
     } else if (drag.type === 'resize') {
       const fs = liveSizes[drag.key]
       if (fs) onUpdate?.({ sizes: { ...sizes, [drag.key]: { w: Math.round(fs.w), h: Math.round(fs.h) } } })
@@ -842,7 +857,6 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     return (
       <g key={key}>
         <g onPointerDown={e => startCompDrag(e, key)}
-          onClick={e => { e.stopPropagation(); setSelComp(isSelComp ? null : key); setSelWire(null) }}
           style={{ cursor: drag?.type === 'comp' && drag.key === key ? 'grabbing' : 'grab' }}>
           <rect x={p.x} y={p.y} width={s.w} height={s.h}
             fill={isLockMag ? '#ede9fe' : '#fff'}
@@ -894,33 +908,37 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     <svg ref={svgRef} width="400" height="210" viewBox="0 0 400 210"
       style={{ display: 'block', userSelect: 'none' }}
       onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}
-      onClick={() => { if (wireInteractionRef.current) { wireInteractionRef.current = false; return }; setSelWire(null); setSelComp(null) }}>
+      onClick={() => {
+        if (wireInteractionRef.current) { wireInteractionRef.current = false; return }
+        if (compInteractionRef.current) { compInteractionRef.current = false; return }
+        setSelWire(null); setSelComp(null)
+      }}>
       {/* Left wall */}
       <rect x="0" y="0" width="14" height="196" fill="#d1d5db" stroke="#4b5563" strokeWidth="1"/>
       {/* Right wall */}
       <rect x="386" y="0" width="14" height="196" fill="#d1d5db" stroke="#4b5563" strokeWidth="1"/>
       {/* Top frame */}
       <rect x="14" y="0" width="372" height="12" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
-      {/* Center mullion */}
-      <rect x="192" y="12" width="16" height="184" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
+      {/* Center mullion — narrow astragal */}
+      <rect x="196" y="12" width="8" height="184" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
       {/* Floor line */}
       <line x1="0" y1="196" x2="400" y2="196" stroke="#4b5563" strokeWidth="1.5"/>
       {/* Door A panel */}
-      <rect x="14" y="12" width="178" height="184" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
+      <rect x="14" y="12" width="182" height="184" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
       {/* Door A glass (upper) */}
-      <rect x="22" y="20" width="162" height="80" fill="#dbeafe" stroke="#93c5fd" strokeWidth="1"/>
+      <rect x="22" y="20" width="166" height="80" fill="#dbeafe" stroke="#93c5fd" strokeWidth="1"/>
       {/* Door A lower panel */}
-      <rect x="22" y="108" width="162" height="80" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1"/>
+      <rect x="22" y="108" width="166" height="80" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1"/>
       {/* Door A hinges (left edge) */}
       <rect x="14" y="26"  width="6" height="10" fill="#6b7280" rx="1"/>
       <rect x="14" y="96"  width="6" height="10" fill="#6b7280" rx="1"/>
       <rect x="14" y="166" width="6" height="10" fill="#6b7280" rx="1"/>
       {/* Door B panel */}
-      <rect x="208" y="12" width="178" height="184" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
+      <rect x="204" y="12" width="182" height="184" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
       {/* Door B glass (upper) */}
-      <rect x="216" y="20" width="162" height="80" fill="#dbeafe" stroke="#93c5fd" strokeWidth="1"/>
+      <rect x="212" y="20" width="166" height="80" fill="#dbeafe" stroke="#93c5fd" strokeWidth="1"/>
       {/* Door B lower panel */}
-      <rect x="216" y="108" width="162" height="80" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1"/>
+      <rect x="212" y="108" width="166" height="80" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1"/>
       {/* Door B hinges (right edge) */}
       <rect x="380" y="26"  width="6" height="10" fill="#6b7280" rx="1"/>
       <rect x="380" y="96"  width="6" height="10" fill="#6b7280" rx="1"/>
