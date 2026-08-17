@@ -154,15 +154,15 @@ const COMP_DEFAULT_POS = {
     rex:     { x: 216, y: 78  },
   }[key] || { x: 20, y: 20 }),
   double_door: (key, lockType) => ({
-    panel:    { x: 336, y: 8   },
-    contactA: { x: 84,  y: 8   },
-    contactB: { x: 208, y: 8   },
-    readerA:  { x: 4,   y: 68  },
-    readerB:  { x: 4,   y: 104 },
-    lockA:    lockType === 'mag' ? { x: 84, y: 24 } : { x: 54, y: 90 },
-    lockB:    lockType === 'mag' ? { x: 208, y: 24 } : { x: 320, y: 90 },
-    rexA:     { x: 334, y: 68  },
-    rexB:     { x: 334, y: 104 },
+    panel:    { x: 316, y: 6   },
+    contactA: { x: 18,  y: 4   },
+    contactB: { x: 212, y: 4   },
+    readerA:  { x: 4,   y: 74  },
+    readerB:  { x: 4,   y: 110 },
+    lockA:    lockType === 'mag' ? { x: 18,  y: 100 } : { x: 177, y: 95 },
+    lockB:    lockType === 'mag' ? { x: 210, y: 100 } : { x: 210, y: 95 },
+    rexA:     { x: 334, y: 74  },
+    rexB:     { x: 334, y: 110 },
   }[key] || { x: 20, y: 20 }),
 }
 
@@ -178,15 +178,15 @@ const COMP_SIZE = {
   double_door: (key, lockType) => {
     const isMag = lockType === 'mag'
     return ({
-      panel:    { w: 56, h: 50 },
-      contactA: { w: 36, h: 14 },
-      contactB: { w: 36, h: 14 },
-      readerA:  { w: 58, h: 26 },
-      readerB:  { w: 58, h: 26 },
-      lockA:    isMag ? { w: 38, h: 9 } : { w: 24, h: 22 },
-      lockB:    isMag ? { w: 38, h: 9 } : { w: 24, h: 22 },
-      rexA:     { w: 52, h: 26 },
-      rexB:     { w: 52, h: 26 },
+      panel:    { w: 72, h: 50 },
+      contactA: { w: 40, h: 14 },
+      contactB: { w: 40, h: 14 },
+      readerA:  { w: 58, h: 28 },
+      readerB:  { w: 58, h: 28 },
+      lockA:    isMag ? { w: 40, h: 8 } : { w: 18, h: 22 },
+      lockB:    isMag ? { w: 40, h: 8 } : { w: 18, h: 22 },
+      rexA:     { w: 58, h: 28 },
+      rexB:     { w: 58, h: 28 },
     }[key] || { w: 44, h: 20 })
   },
 }
@@ -200,8 +200,10 @@ const DEFAULT_WIRES = {
     { id: 'lock-power', x1: 54,  y1: 128, x2: 76,  y2: 128, stroke: '#7f1d1d', dash: '3,1.5' },
   ],
   double_door: [
-    { id: 'bus-v',  x1: 76, y1: 20, x2: 76,  y2: 140, stroke: '#374151', dash: null },
-    { id: 'bus-h',  x1: 76, y1: 20, x2: 336, y2: 20,  stroke: '#374151', dash: null },
+    { id: 'bus-v',  x1: 76, y1: 8,  x2: 76,  y2: 155, stroke: '#374151', dash: null },
+    { id: 'bus-h',  x1: 76, y1: 8,  x2: 316, y2: 8,   stroke: '#374151', dash: null },
+    { id: 'lock-a', x1: 62, y1: 109, x2: 76, y2: 109, stroke: '#7f1d1d', dash: '3,1.5' },
+    { id: 'lock-b', x1: 76, y1: 125, x2: 78, y2: 125, stroke: '#7f1d1d', dash: '3,1.5' },
   ],
 }
 
@@ -421,15 +423,13 @@ function DeviceNode({ id, data, selected }) {
         width: '100%',
         minWidth: 120,
         fontFamily: 'sans-serif',
-        overflow: 'hidden',
       }}
     >
       <NodeResizer
         minWidth={120}
         minHeight={55}
         isVisible={selected}
-        lineStyle={{ borderColor: '#C8622A' }}
-        handleStyle={{ borderColor: '#C8622A', background: '#fff' }}
+        color="#C8622A"
         onResizeEnd={(_, params) => {
           supabase.from('sld_nodes').update({
             data: { ...data, width: Math.round(params.width), height: Math.round(params.height) }
@@ -483,7 +483,7 @@ function SvgLabel({ x, y, text, fill, fontSize = 7, bold = false }) {
   )
 }
 
-function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, sizes = {}, wires, onUpdate }) {
+function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, sizes = {}, wires, hiddenComponents = [], onUpdate }) {
   const c      = { ...DEFAULT_COMPONENTS.single_door, ...components }
   const svgRef = useRef(null)
   const isMag  = lockType === 'mag'
@@ -493,6 +493,7 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
   const [liveWires, setLiveWires] = useState({})
   const [liveSizes, setLiveSizes] = useState({})
   const [selWire,   setSelWire]   = useState(null)
+  const [selComp,   setSelComp]   = useState(null)
   const wireInteractionRef        = useRef(false)
 
   const srcWires   = wires !== undefined ? wires : DEFAULT_WIRES.single_door
@@ -614,19 +615,31 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
   const COLORS = { panel: '#78350f', contact: '#991b1b', reader: '#1e40af', lock: '#4c1d95', rex: '#92400e' }
 
   const renderBox = (key) => {
+    if (hiddenComponents.includes(key)) return null
     const p = getPos(key), s = getSize(key), color = COLORS[key]
     const isLockMag = key === 'lock' && isMag
+    const isSelComp = selComp === key
     return (
       <g key={key}>
-        <g onPointerDown={e => startCompDrag(e, key)} style={{ cursor: drag?.type === 'comp' && drag.key === key ? 'grabbing' : 'grab' }}>
+        <g onPointerDown={e => startCompDrag(e, key)}
+          onClick={e => { e.stopPropagation(); setSelComp(isSelComp ? null : key); setSelWire(null) }}
+          style={{ cursor: drag?.type === 'comp' && drag.key === key ? 'grabbing' : 'grab' }}>
           <rect x={p.x} y={p.y} width={s.w} height={s.h}
-            fill={isLockMag ? '#ede9fe' : '#fff'} stroke={color} strokeWidth="1.5" rx={isLockMag ? 1 : 0}/>
+            fill={isLockMag ? '#ede9fe' : '#fff'}
+            stroke={isSelComp ? '#C8622A' : color} strokeWidth={isSelComp ? 2 : 1.5} rx={isLockMag ? 1 : 0}/>
           <SvgLabel x={p.x + s.w / 2} y={p.y + s.h / 2 + (s.h < 15 ? 2 : 3)}
             text={c[key]} fill={color} fontSize={isLockMag ? 5.5 : 7} bold />
         </g>
         <rect x={p.x + s.w - 5} y={p.y + s.h - 5} width={7} height={7}
           fill="#C8622A" rx={1} style={{ cursor: 'se-resize' }}
           onPointerDown={e => startResize(e, key)} />
+        {isSelComp && (
+          <g style={{ cursor: 'pointer' }}
+            onPointerDown={e => { e.stopPropagation(); onUpdate({ hiddenComponents: [...hiddenComponents, key] }); setSelComp(null) }}>
+            <circle cx={p.x + s.w} cy={p.y} r={5.5} fill="#ef4444" stroke="#fff" strokeWidth={1} />
+            <text x={p.x + s.w} y={p.y + 3.5} textAnchor="middle" fontSize="7" fill="#fff" fontWeight="bold" pointerEvents="none">✕</text>
+          </g>
+        )}
       </g>
     )
   }
@@ -659,7 +672,7 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     <svg ref={svgRef} width="320" height="210" viewBox="0 0 320 210"
       style={{ display: 'block', userSelect: 'none' }}
       onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}
-      onClick={() => { if (wireInteractionRef.current) { wireInteractionRef.current = false; return }; setSelWire(null) }}>
+      onClick={() => { if (wireInteractionRef.current) { wireInteractionRef.current = false; return }; setSelWire(null); setSelComp(null) }}>
       {/* Wall */}
       <rect x="68" y="0" width="16" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       {/* Door panel */}
@@ -684,7 +697,7 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
   )
 }
 
-function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, sizes = {}, wires, onUpdate }) {
+function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, sizes = {}, wires, hiddenComponents = [], onUpdate }) {
   const c      = { ...DEFAULT_COMPONENTS.double_door, ...components }
   const svgRef = useRef(null)
   const isMag  = lockType === 'mag'
@@ -694,6 +707,7 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
   const [liveWires, setLiveWires] = useState({})
   const [liveSizes, setLiveSizes] = useState({})
   const [selWire,   setSelWire]   = useState(null)
+  const [selComp,   setSelComp]   = useState(null)
   const wireInteractionRef        = useRef(false)
 
   const srcWires    = wires !== undefined ? wires : DEFAULT_WIRES.double_door
@@ -821,19 +835,31 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
   }
 
   const renderBox = (key) => {
+    if (hiddenComponents.includes(key)) return null
     const p = getPos(key), s = getSize(key), color = COLORS[key] || '#374151'
     const isLockMag = (key === 'lockA' || key === 'lockB') && isMag
+    const isSelComp = selComp === key
     return (
       <g key={key}>
-        <g onPointerDown={e => startCompDrag(e, key)} style={{ cursor: drag?.type === 'comp' && drag.key === key ? 'grabbing' : 'grab' }}>
+        <g onPointerDown={e => startCompDrag(e, key)}
+          onClick={e => { e.stopPropagation(); setSelComp(isSelComp ? null : key); setSelWire(null) }}
+          style={{ cursor: drag?.type === 'comp' && drag.key === key ? 'grabbing' : 'grab' }}>
           <rect x={p.x} y={p.y} width={s.w} height={s.h}
-            fill={isLockMag ? '#ede9fe' : '#fff'} stroke={color} strokeWidth="1.5" rx={isLockMag ? 1 : 0}/>
+            fill={isLockMag ? '#ede9fe' : '#fff'}
+            stroke={isSelComp ? '#C8622A' : color} strokeWidth={isSelComp ? 2 : 1.5} rx={isLockMag ? 1 : 0}/>
           <SvgLabel x={p.x + s.w / 2} y={p.y + s.h / 2 + (s.h < 15 ? 2 : 3)}
             text={c[key]} fill={color} fontSize={isLockMag ? 5.5 : 6.5} bold />
         </g>
         <rect x={p.x + s.w - 5} y={p.y + s.h - 5} width={7} height={7}
           fill="#C8622A" rx={1} style={{ cursor: 'se-resize' }}
           onPointerDown={e => startResize(e, key)} />
+        {isSelComp && (
+          <g style={{ cursor: 'pointer' }}
+            onPointerDown={e => { e.stopPropagation(); onUpdate({ hiddenComponents: [...hiddenComponents, key] }); setSelComp(null) }}>
+            <circle cx={p.x + s.w} cy={p.y} r={5.5} fill="#ef4444" stroke="#fff" strokeWidth={1} />
+            <text x={p.x + s.w} y={p.y + 3.5} textAnchor="middle" fontSize="7" fill="#fff" fontWeight="bold" pointerEvents="none">✕</text>
+          </g>
+        )}
       </g>
     )
   }
@@ -868,30 +894,44 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
     <svg ref={svgRef} width="400" height="210" viewBox="0 0 400 210"
       style={{ display: 'block', userSelect: 'none' }}
       onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}
-      onClick={() => { if (wireInteractionRef.current) { wireInteractionRef.current = false; return }; setSelWire(null) }}>
-      {/* Walls */}
-      <rect x="68" y="0" width="14" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
-      <rect x="194" y="0" width="12" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
-      <rect x="318" y="0" width="14" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
-      {/* Door A */}
-      <rect x="82" y="22" width="112" height="166" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
-      <path d="M82,188 Q194,188 194,22" fill="none" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,3"/>
-      <rect x="82" y="28" width="6" height="12" fill="#9ca3af"/>
-      <circle cx="172" cy="105" r="4" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
-      {/* Door B */}
-      <rect x="206" y="22" width="112" height="166" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
-      <path d="M318,188 Q206,188 206,22" fill="none" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,3"/>
-      <rect x="312" y="28" width="6" height="12" fill="#9ca3af"/>
-      <circle cx="222" cy="105" r="4" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
+      onClick={() => { if (wireInteractionRef.current) { wireInteractionRef.current = false; return }; setSelWire(null); setSelComp(null) }}>
+      {/* Left wall */}
+      <rect x="0" y="0" width="14" height="196" fill="#d1d5db" stroke="#4b5563" strokeWidth="1"/>
+      {/* Right wall */}
+      <rect x="386" y="0" width="14" height="196" fill="#d1d5db" stroke="#4b5563" strokeWidth="1"/>
+      {/* Top frame */}
+      <rect x="14" y="0" width="372" height="12" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
+      {/* Center mullion */}
+      <rect x="192" y="12" width="16" height="184" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
+      {/* Floor line */}
+      <line x1="0" y1="196" x2="400" y2="196" stroke="#4b5563" strokeWidth="1.5"/>
+      {/* Door A panel */}
+      <rect x="14" y="12" width="178" height="184" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
+      {/* Door A glass (upper) */}
+      <rect x="22" y="20" width="162" height="80" fill="#dbeafe" stroke="#93c5fd" strokeWidth="1"/>
+      {/* Door A lower panel */}
+      <rect x="22" y="108" width="162" height="80" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1"/>
+      {/* Door A hinges (left edge) */}
+      <rect x="14" y="26"  width="6" height="10" fill="#6b7280" rx="1"/>
+      <rect x="14" y="96"  width="6" height="10" fill="#6b7280" rx="1"/>
+      <rect x="14" y="166" width="6" height="10" fill="#6b7280" rx="1"/>
+      {/* Door B panel */}
+      <rect x="208" y="12" width="178" height="184" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
+      {/* Door B glass (upper) */}
+      <rect x="216" y="20" width="162" height="80" fill="#dbeafe" stroke="#93c5fd" strokeWidth="1"/>
+      {/* Door B lower panel */}
+      <rect x="216" y="108" width="162" height="80" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1"/>
+      {/* Door B hinges (right edge) */}
+      <rect x="380" y="26"  width="6" height="10" fill="#6b7280" rx="1"/>
+      <rect x="380" y="96"  width="6" height="10" fill="#6b7280" rx="1"/>
+      <rect x="380" y="166" width="6" height="10" fill="#6b7280" rx="1"/>
       {/* Interactive wire runs */}
       {activeWires.map(renderWire)}
       {/* Legend */}
-      <line x1="4" y1="202" x2="18" y2="202" stroke="#374151" strokeWidth="1"/>
-      <text x="20" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">RS-485</text>
-      <line x1="62" y1="202" x2="76" y2="202" stroke="#7f1d1d" strokeWidth="1" strokeDasharray="3,1.5"/>
-      <text x="78" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Power</text>
-      <line x1="116" y1="202" x2="130" y2="202" stroke="#374151" strokeWidth="1" strokeDasharray="2,1.5"/>
-      <text x="132" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Data</text>
+      <line x1="4" y1="204" x2="18" y2="204" stroke="#374151" strokeWidth="1"/>
+      <text x="20" y="207" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">RS-485</text>
+      <line x1="62" y1="204" x2="76" y2="204" stroke="#7f1d1d" strokeWidth="1" strokeDasharray="3,1.5"/>
+      <text x="78" y="207" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Power</text>
       {/* Draggable + resizable component boxes */}
       {compKeys.map(k => renderBox(k))}
     </svg>
@@ -914,6 +954,7 @@ function SchematicNode({ id, data, selected }) {
         positions: data.positions || {},
         sizes: data.sizes || {},
         wires: data.wires,
+        hiddenComponents: data.hiddenComponents || [],
         ...updates,
       }
     }).eq('id', id)
@@ -939,8 +980,8 @@ function SchematicNode({ id, data, selected }) {
         {data.label && <span style={{ fontSize: 11, fontWeight: 700, color: '#111827' }}>{data.label}</span>}
       </div>
       {isDouble
-        ? <DoubleDoorSVG components={components} lockType={lockType} positions={data.positions || {}} sizes={data.sizes || {}} wires={data.wires} onUpdate={handleUpdate} />
-        : <SingleDoorSVG components={components} lockType={lockType} positions={data.positions || {}} sizes={data.sizes || {}} wires={data.wires} onUpdate={handleUpdate} />
+        ? <DoubleDoorSVG components={components} lockType={lockType} positions={data.positions || {}} sizes={data.sizes || {}} wires={data.wires} hiddenComponents={data.hiddenComponents || []} onUpdate={handleUpdate} />
+        : <SingleDoorSVG components={components} lockType={lockType} positions={data.positions || {}} sizes={data.sizes || {}} wires={data.wires} hiddenComponents={data.hiddenComponents || []} onUpdate={handleUpdate} />
       }
       <Handle type="source" position={Position.Bottom} />
     </div>
@@ -1122,7 +1163,7 @@ export default function SLDTab({ proposalId, orgId }) {
           position_x: tn.position_x + offsetX,
           position_y: tn.position_y + offsetY,
           data: isSchematic
-            ? { schematicType: tn.data?.schematicType, lockType: tn.data?.lockType || 'strike', components: { ...(DEFAULT_COMPONENTS[tn.data?.schematicType] || {}), ...(tn.data?.components || {}) }, positions: {}, sizes: {} }
+            ? { schematicType: tn.data?.schematicType, lockType: tn.data?.lockType || 'strike', components: { ...(DEFAULT_COMPONENTS[tn.data?.schematicType] || {}), ...(tn.data?.components || {}) }, positions: {}, sizes: {}, hiddenComponents: [] }
             : { ...(tn.data || {}), quantity: tn.data?.quantity || 1 },
         }
       })
@@ -1173,9 +1214,10 @@ export default function SLDTab({ proposalId, orgId }) {
         id: n.id,
         type: n.node_type === 'schematic' ? 'schematic' : 'device',
         position: { x: n.position_x, y: n.position_y },
-        style: n.node_type !== 'schematic' ? { width: n.data?.width || 160, ...(n.data?.height ? { height: n.data.height } : {}) } : undefined,
+        width:  n.node_type !== 'schematic' ? (n.data?.width  || 160) : undefined,
+        height: n.node_type !== 'schematic' && n.data?.height ? n.data.height : undefined,
         data: n.node_type === 'schematic'
-          ? { label: n.label, schematicType: n.data?.schematicType, lockType: n.data?.lockType || 'strike', components: n.data?.components || {}, positions: n.data?.positions || {}, sizes: n.data?.sizes || {}, wires: n.data?.wires }
+          ? { label: n.label, schematicType: n.data?.schematicType, lockType: n.data?.lockType || 'strike', components: n.data?.components || {}, positions: n.data?.positions || {}, sizes: n.data?.sizes || {}, wires: n.data?.wires, hiddenComponents: n.data?.hiddenComponents || [] }
           : { label: n.label, category: n.data?.category, quantity: n.data?.quantity, notes: n.data?.notes, global_product_id: n.global_product_id, width: n.data?.width, height: n.data?.height },
       })))
 
@@ -1244,7 +1286,7 @@ export default function SLDTab({ proposalId, orgId }) {
       id: newNode.id,
       type: 'device',
       position: { x: newNode.position_x, y: newNode.position_y },
-      style: { width: 160 },
+      width: 160,
       data: { label: name || category, category, quantity: 1, global_product_id: globalProductId },
     }])
   }
@@ -2191,6 +2233,34 @@ export default function SLDTab({ proposalId, orgId }) {
                     />
                   </div>
                 ))}
+                {(selectedNode.data.hiddenComponents || []).length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#8A9AB0' }}>Hidden Components</p>
+                    <div className="space-y-1">
+                      {(selectedNode.data.hiddenComponents || []).map(key => (
+                        <div key={key} className="flex items-center justify-between">
+                          <span className="text-xs" style={{ color: '#E8EEF5' }}>
+                            {key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const fresh = nodes.find(n => n.id === selectedNode.id) || selectedNode
+                              const newHidden = (fresh.data.hiddenComponents || []).filter(k => k !== key)
+                              const newData = { ...fresh.data, hiddenComponents: newHidden }
+                              const updated = { ...fresh, data: newData }
+                              setSelectedNode(updated)
+                              setNodes(ns => ns.map(n => n.id === selectedNode.id ? updated : n))
+                              supabase.from('sld_nodes').update({ data: newData }).eq('id', selectedNode.id)
+                            }}
+                            className="text-xs text-[#C8622A] hover:text-orange-300 transition-colors"
+                          >
+                            Restore
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-1.5">
                   <button
                     onClick={() => {
