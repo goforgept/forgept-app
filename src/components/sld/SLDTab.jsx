@@ -1006,7 +1006,76 @@ function SchematicNode({ id, data, selected }) {
   )
 }
 
-const nodeTypes = { device: DeviceNode, schematic: SchematicNode }
+const SHAPE_PRESETS = {
+  fill:   ['#ffffff', '#f3f4f6', '#dbeafe', '#dcfce7', '#fef9c3', '#fee2e2', '#ede9fe', 'none'],
+  stroke: ['#374151', '#1e40af', '#15803d', '#b45309', '#dc2626', '#7c3aed', '#C8622A', '#000000'],
+}
+
+function ShapeNode({ id, data, selected, width, height }) {
+  const shape  = data.shape  || 'rect'
+  const fill   = data.fill   ?? '#f3f4f6'
+  const stroke = data.stroke ?? '#374151'
+  const label  = data.label  || ''
+  const w = width  || 160
+  const h = height || 100
+
+  const selStroke = selected ? '#C8622A' : stroke
+  const selSW     = selected ? 2 : (data.strokeWidth || 1.5)
+
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <NodeResizer minWidth={40} minHeight={24} isVisible={selected} color="#C8622A"
+        onResizeEnd={(_, p) => supabase.from('sld_nodes').update({ data: { ...data, width: Math.round(p.width), height: Math.round(p.height) } }).eq('id', id)} />
+      {shape === 'text' ? (
+        <div style={{
+          width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: selected ? '1.5px dashed #C8622A' : '1.5px dashed #9ca3af',
+          color: stroke, fontSize: data.fontSize || 13, fontFamily: 'sans-serif',
+          padding: '4px 6px', boxSizing: 'border-box', whiteSpace: 'pre-wrap', textAlign: 'center',
+          fontWeight: data.bold ? 600 : 400, fontStyle: data.italic ? 'italic' : 'normal',
+        }}>
+          {label || 'Text'}
+        </div>
+      ) : (
+        <svg width={w} height={h} style={{ display: 'block', overflow: 'visible' }}>
+          {shape === 'rect' && (
+            <rect x={selSW / 2} y={selSW / 2} width={w - selSW} height={h - selSW}
+              fill={fill === 'none' ? 'transparent' : fill} stroke={selStroke} strokeWidth={selSW}
+              rx={data.rx || 0} />
+          )}
+          {shape === 'ellipse' && (
+            <ellipse cx={w / 2} cy={h / 2} rx={Math.max(1, w / 2 - selSW / 2)} ry={Math.max(1, h / 2 - selSW / 2)}
+              fill={fill === 'none' ? 'transparent' : fill} stroke={selStroke} strokeWidth={selSW} />
+          )}
+          {shape === 'line' && (
+            <line x1={0} y1={h / 2} x2={w} y2={h / 2}
+              stroke={selStroke} strokeWidth={selSW}
+              strokeDasharray={data.dash || 'none'}
+              markerEnd={data.arrow ? 'url(#arrowhead)' : undefined} />
+          )}
+          {shape === 'arrow' && <>
+            <defs>
+              <marker id={`arr-${id}`} markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L8,3 z" fill={selStroke} />
+              </marker>
+            </defs>
+            <line x1={4} y1={h / 2} x2={w - 4} y2={h / 2}
+              stroke={selStroke} strokeWidth={selSW} markerEnd={`url(#arr-${id})`} />
+          </>}
+          {label && shape !== 'line' && shape !== 'arrow' && (
+            <text x={w / 2} y={h / 2} textAnchor="middle" dominantBaseline="middle"
+              fontSize={data.fontSize || 12} fill={data.textColor || stroke}
+              fontFamily="sans-serif" fontWeight={data.bold ? 600 : 400}>
+              {label}
+            </text>
+          )}
+        </svg>
+      )}
+    </div>
+  )
+}
+
+const nodeTypes = { device: DeviceNode, schematic: SchematicNode, shape: ShapeNode }
 
 // ─── SLDTab ───────────────────────────────────────────────────────────────────
 
@@ -1230,12 +1299,14 @@ export default function SLDTab({ proposalId, orgId }) {
 
       setNodes((sldNodes || []).map(n => ({
         id: n.id,
-        type: n.node_type === 'schematic' ? 'schematic' : 'device',
+        type: n.node_type === 'schematic' ? 'schematic' : n.node_type === 'shape' ? 'shape' : 'device',
         position: { x: n.position_x, y: n.position_y },
-        width:  n.node_type !== 'schematic' ? (n.data?.width  || 160) : undefined,
-        height: n.node_type !== 'schematic' && n.data?.height ? n.data.height : undefined,
+        width:  n.node_type !== 'schematic' ? (n.data?.width  || (n.node_type === 'shape' ? (n.data?.shape === 'text' || n.data?.shape === 'line' || n.data?.shape === 'arrow' ? 160 : 160) : 160)) : undefined,
+        height: n.node_type !== 'schematic' ? (n.data?.height || (n.node_type === 'shape' ? (n.data?.shape === 'text' ? 36 : n.data?.shape === 'line' || n.data?.shape === 'arrow' ? 24 : 100) : undefined)) : undefined,
         data: n.node_type === 'schematic'
           ? { label: n.label, schematicType: n.data?.schematicType, lockType: n.data?.lockType || 'strike', components: n.data?.components || {}, positions: n.data?.positions || {}, sizes: n.data?.sizes || {}, wires: n.data?.wires, hiddenComponents: n.data?.hiddenComponents || [] }
+          : n.node_type === 'shape'
+          ? { ...n.data, label: n.data?.label || '' }
           : { label: n.label, category: n.data?.category, quantity: n.data?.quantity, notes: n.data?.notes, global_product_id: n.global_product_id, width: n.data?.width, height: n.data?.height },
       })))
 
@@ -1307,6 +1378,22 @@ export default function SLDTab({ proposalId, orgId }) {
       width: 160,
       data: { label: name || category, category, quantity: 1, global_product_id: globalProductId },
     }])
+  }
+
+  const addShape = async (shape) => {
+    if (!activeSheetId) return
+    const isLine = shape === 'line' || shape === 'arrow'
+    const isText = shape === 'text'
+    const w = isLine ? 160 : 160
+    const h = isLine ? 24 : isText ? 36 : 100
+    const px = 80 + Math.random() * 300
+    const py = 80 + Math.random() * 200
+    const shapeData = { shape, fill: isLine || isText ? 'none' : '#f3f4f6', stroke: '#374151', label: isText ? 'Text' : '', width: w, height: h }
+    const { data: newNode } = await supabase.from('sld_nodes').insert({
+      sheet_id: activeSheetId, label: '', node_type: 'shape', position_x: px, position_y: py, data: shapeData,
+    }).select('id, position_x, position_y').single()
+    if (!newNode) return
+    setNodes(ns => [...ns, { id: newNode.id, type: 'shape', position: { x: newNode.position_x, y: newNode.position_y }, width: w, height: h, data: shapeData }])
   }
 
   // ─── Canvas drop handlers (desktop drag + touch) ──────────────────────────
@@ -2030,6 +2117,7 @@ export default function SLDTab({ proposalId, orgId }) {
               {[
                 { id: 'quick',    label: 'Devices' },
                 { id: 'typicals', label: `Typicals (${BUILT_IN_TYPICALS.length + typicals.length})` },
+                { id: 'shapes',   label: 'Shapes' },
               ].map(t => (
                 <button key={t.id} onClick={() => setPickerTab(t.id)}
                   className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
@@ -2144,6 +2232,25 @@ export default function SLDTab({ proposalId, orgId }) {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {pickerTab === 'shapes' && (
+              <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                <p className="text-xs text-[#8A9AB0] font-medium uppercase tracking-wide px-1 py-1">Basic Shapes</p>
+                {[
+                  { shape: 'rect',    label: 'Rectangle',   icon: <rect x="2" y="4" width="20" height="16" rx="1" fill="none" stroke="currentColor" strokeWidth="2"/> },
+                  { shape: 'ellipse', label: 'Ellipse',     icon: <ellipse cx="12" cy="12" rx="10" ry="8" fill="none" stroke="currentColor" strokeWidth="2"/> },
+                  { shape: 'text',    label: 'Text',        icon: <text x="12" y="17" textAnchor="middle" fontSize="14" fontWeight="bold" fill="currentColor" fontFamily="serif">T</text> },
+                  { shape: 'line',    label: 'Line',        icon: <line x1="2" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="2"/> },
+                  { shape: 'arrow',   label: 'Arrow',       icon: <><line x1="2" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2"/><path d="M14,7 L22,12 L14,17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round"/></> },
+                ].map(({ shape, label, icon }) => (
+                  <button key={shape} onClick={() => addShape(shape)}
+                    className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg text-xs text-[#E8EEF5] hover:bg-[#2a3d55] transition-colors text-left">
+                    <svg width="24" height="24" viewBox="0 0 24 24" className="text-[#8A9AB0] flex-shrink-0">{icon}</svg>
+                    {label}
+                  </button>
+                ))}
               </div>
             )}
           </div>
@@ -2315,6 +2422,91 @@ export default function SLDTab({ proposalId, orgId }) {
                   className="w-full text-xs text-red-400 hover:text-red-300 border border-red-900/50 hover:border-red-400/50 rounded-md py-1.5 transition-colors"
                 >
                   Delete Node
+                </button>
+              </div>
+            ) : selectedNode && selectedNode.type === 'shape' ? (
+              <div className="p-3 space-y-3">
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: '#8A9AB0' }}>Label</label>
+                  <input
+                    value={selectedNode.data.label || ''}
+                    onChange={e => updateNodeData('label', e.target.value)}
+                    className="w-full text-xs border border-[#2a3d55] rounded px-2 py-1.5 focus:outline-none focus:border-[#C8622A]"
+                    style={{ background: '#0F1923', color: '#E8EEF5' }}
+                    placeholder={selectedNode.data.shape === 'text' ? 'Text content' : 'Optional label'}
+                  />
+                </div>
+                {selectedNode.data.shape !== 'line' && selectedNode.data.shape !== 'arrow' && selectedNode.data.shape !== 'text' && (
+                  <div>
+                    <label className="text-xs block mb-1" style={{ color: '#8A9AB0' }}>Fill</label>
+                    <div className="flex flex-wrap gap-1">
+                      {SHAPE_PRESETS.fill.map(c => (
+                        <button key={c} onClick={() => updateNodeData('fill', c)}
+                          title={c}
+                          style={{
+                            width: 20, height: 20, borderRadius: 3,
+                            background: c === 'none' ? 'transparent' : c,
+                            border: selectedNode.data.fill === c ? '2px solid #C8622A' : '1.5px solid #4b5563',
+                            backgroundImage: c === 'none' ? 'linear-gradient(45deg,#6b7280 25%,transparent 25%,transparent 75%,#6b7280 75%),linear-gradient(45deg,#6b7280 25%,transparent 25%,transparent 75%,#6b7280 75%)' : undefined,
+                            backgroundSize: c === 'none' ? '6px 6px' : undefined,
+                            backgroundPosition: c === 'none' ? '0 0,3px 3px' : undefined,
+                          }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: '#8A9AB0' }}>
+                    {selectedNode.data.shape === 'text' ? 'Color' : 'Stroke'}
+                  </label>
+                  <div className="flex flex-wrap gap-1">
+                    {SHAPE_PRESETS.stroke.map(c => (
+                      <button key={c} onClick={() => updateNodeData('stroke', c)}
+                        title={c}
+                        style={{
+                          width: 20, height: 20, borderRadius: 3,
+                          background: c,
+                          border: selectedNode.data.stroke === c ? '2px solid #C8622A' : '1.5px solid #4b5563',
+                        }} />
+                    ))}
+                  </div>
+                </div>
+                {(selectedNode.data.shape === 'text' || selectedNode.data.shape === 'rect' || selectedNode.data.shape === 'ellipse') && (
+                  <div>
+                    <label className="text-xs block mb-1" style={{ color: '#8A9AB0' }}>Font Size</label>
+                    <input type="number" min={6} max={72}
+                      value={selectedNode.data.fontSize || (selectedNode.data.shape === 'text' ? 13 : 12)}
+                      onChange={e => updateNodeData('fontSize', parseInt(e.target.value) || 12)}
+                      className="w-full text-xs border border-[#2a3d55] rounded px-2 py-1.5 focus:outline-none focus:border-[#C8622A]"
+                      style={{ background: '#0F1923', color: '#E8EEF5' }} />
+                  </div>
+                )}
+                {(selectedNode.data.shape === 'rect') && (
+                  <div>
+                    <label className="text-xs block mb-1" style={{ color: '#8A9AB0' }}>Corner Radius</label>
+                    <input type="number" min={0} max={80}
+                      value={selectedNode.data.rx || 0}
+                      onChange={e => updateNodeData('rx', parseInt(e.target.value) || 0)}
+                      className="w-full text-xs border border-[#2a3d55] rounded px-2 py-1.5 focus:outline-none focus:border-[#C8622A]"
+                      style={{ background: '#0F1923', color: '#E8EEF5' }} />
+                  </div>
+                )}
+                {(selectedNode.data.shape === 'line') && (
+                  <div>
+                    <label className="text-xs block mb-1" style={{ color: '#8A9AB0' }}>Style</label>
+                    <select value={selectedNode.data.dash || 'none'}
+                      onChange={e => updateNodeData('dash', e.target.value === 'none' ? null : e.target.value)}
+                      className="w-full text-xs border border-[#2a3d55] rounded px-2 py-1.5 focus:outline-none focus:border-[#C8622A]"
+                      style={{ background: '#0F1923', color: '#E8EEF5' }}>
+                      <option value="none">Solid</option>
+                      <option value="6,3">Dashed</option>
+                      <option value="2,3">Dotted</option>
+                    </select>
+                  </div>
+                )}
+                <button onClick={deleteSelected}
+                  className="w-full text-xs text-red-400 hover:text-red-300 border border-red-900/50 hover:border-red-400/50 rounded-md py-1.5 transition-colors">
+                  Delete Shape
                 </button>
               </div>
             ) : selectedNode ? (
