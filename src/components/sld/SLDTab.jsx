@@ -154,15 +154,15 @@ const COMP_DEFAULT_POS = {
     rex:     { x: 216, y: 78  },
   }[key] || { x: 20, y: 20 }),
   double_door: (key, lockType) => ({
-    panel:    { x: 316, y: 6   },
-    contactA: { x: 18,  y: 4   },
-    contactB: { x: 212, y: 4   },
-    readerA:  { x: 4,   y: 74  },
-    readerB:  { x: 4,   y: 110 },
-    lockA:    lockType === 'mag' ? { x: 18,  y: 100 } : { x: 177, y: 95 },
-    lockB:    lockType === 'mag' ? { x: 210, y: 100 } : { x: 210, y: 95 },
-    rexA:     { x: 334, y: 74  },
-    rexB:     { x: 334, y: 110 },
+    panel:    { x: 326, y: 8   },
+    contactA: { x: 82,  y: 14  },
+    contactB: { x: 204, y: 14  },
+    readerA:  { x: 4,   y: 58  },
+    readerB:  { x: 4,   y: 94  },
+    lockA:    lockType === 'mag' ? { x: 82,  y: 100 } : { x: 170, y: 90 },
+    lockB:    lockType === 'mag' ? { x: 204, y: 100 } : { x: 200, y: 90 },
+    rexA:     { x: 330, y: 58  },
+    rexB:     { x: 330, y: 94  },
   }[key] || { x: 20, y: 20 }),
 }
 
@@ -200,10 +200,10 @@ const DEFAULT_WIRES = {
     { id: 'lock-power', x1: 54,  y1: 128, x2: 76,  y2: 128, stroke: '#7f1d1d', dash: '3,1.5' },
   ],
   double_door: [
-    { id: 'bus-v',  x1: 76, y1: 8,  x2: 76,  y2: 155, stroke: '#374151', dash: null },
-    { id: 'bus-h',  x1: 76, y1: 8,  x2: 316, y2: 8,   stroke: '#374151', dash: null },
-    { id: 'lock-a', x1: 62, y1: 109, x2: 76, y2: 109, stroke: '#7f1d1d', dash: '3,1.5' },
-    { id: 'lock-b', x1: 76, y1: 125, x2: 78, y2: 125, stroke: '#7f1d1d', dash: '3,1.5' },
+    { id: 'bus-v',  x1: 64,  y1: 14, x2: 64,  y2: 140, stroke: '#374151', dash: null },
+    { id: 'bus-h',  x1: 64,  y1: 14, x2: 326, y2: 14,  stroke: '#374151', dash: null },
+    { id: 'lock-a', x1: 62,  y1: 101, x2: 76,  y2: 101, stroke: '#7f1d1d', dash: '3,1.5' },
+    { id: 'lock-b', x1: 316, y1: 101, x2: 330, y2: 101, stroke: '#7f1d1d', dash: '3,1.5' },
   ],
 }
 
@@ -913,36 +913,36 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, s
         if (compInteractionRef.current) { compInteractionRef.current = false; return }
         setSelWire(null); setSelComp(null)
       }}>
-      {/* Left wall */}
-      <rect x="0" y="0" width="14" height="196" fill="#d1d5db" stroke="#4b5563" strokeWidth="1"/>
-      {/* Right wall */}
-      <rect x="386" y="0" width="14" height="196" fill="#d1d5db" stroke="#4b5563" strokeWidth="1"/>
+      {/* Left frame */}
+      <rect x="68" y="0" width="8" height="196" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
+      {/* Right frame */}
+      <rect x="316" y="0" width="8" height="196" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
       {/* Top frame */}
-      <rect x="14" y="0" width="372" height="12" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
-      {/* Center mullion — narrow astragal */}
-      <rect x="196" y="12" width="8" height="184" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
+      <rect x="68" y="0" width="256" height="12" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
+      {/* Center mullion */}
+      <rect x="192" y="12" width="8" height="184" fill="#9ca3af" stroke="#6b7280" strokeWidth="1"/>
       {/* Floor line */}
-      <line x1="0" y1="196" x2="400" y2="196" stroke="#4b5563" strokeWidth="1.5"/>
+      <line x1="68" y1="196" x2="324" y2="196" stroke="#4b5563" strokeWidth="1.5"/>
       {/* Door A panel */}
-      <rect x="14" y="12" width="182" height="184" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
+      <rect x="76" y="12" width="116" height="184" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
       {/* Door A glass (upper) */}
-      <rect x="22" y="20" width="166" height="80" fill="#dbeafe" stroke="#93c5fd" strokeWidth="1"/>
+      <rect x="84" y="20" width="100" height="76" fill="#dbeafe" stroke="#93c5fd" strokeWidth="1"/>
       {/* Door A lower panel */}
-      <rect x="22" y="108" width="166" height="80" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1"/>
-      {/* Door A hinges (left edge) */}
-      <rect x="14" y="26"  width="6" height="10" fill="#6b7280" rx="1"/>
-      <rect x="14" y="96"  width="6" height="10" fill="#6b7280" rx="1"/>
-      <rect x="14" y="166" width="6" height="10" fill="#6b7280" rx="1"/>
+      <rect x="84" y="104" width="100" height="84" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1"/>
+      {/* Door A hinges (on left frame) */}
+      <rect x="68" y="26"  width="6" height="10" fill="#6b7280" rx="1"/>
+      <rect x="68" y="96"  width="6" height="10" fill="#6b7280" rx="1"/>
+      <rect x="68" y="166" width="6" height="10" fill="#6b7280" rx="1"/>
       {/* Door B panel */}
-      <rect x="204" y="12" width="182" height="184" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
+      <rect x="200" y="12" width="116" height="184" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
       {/* Door B glass (upper) */}
-      <rect x="212" y="20" width="166" height="80" fill="#dbeafe" stroke="#93c5fd" strokeWidth="1"/>
+      <rect x="208" y="20" width="100" height="76" fill="#dbeafe" stroke="#93c5fd" strokeWidth="1"/>
       {/* Door B lower panel */}
-      <rect x="212" y="108" width="166" height="80" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1"/>
-      {/* Door B hinges (right edge) */}
-      <rect x="380" y="26"  width="6" height="10" fill="#6b7280" rx="1"/>
-      <rect x="380" y="96"  width="6" height="10" fill="#6b7280" rx="1"/>
-      <rect x="380" y="166" width="6" height="10" fill="#6b7280" rx="1"/>
+      <rect x="208" y="104" width="100" height="84" fill="#e5e7eb" stroke="#9ca3af" strokeWidth="1"/>
+      {/* Door B hinges (on right frame) */}
+      <rect x="318" y="26"  width="6" height="10" fill="#6b7280" rx="1"/>
+      <rect x="318" y="96"  width="6" height="10" fill="#6b7280" rx="1"/>
+      <rect x="318" y="166" width="6" height="10" fill="#6b7280" rx="1"/>
       {/* Interactive wire runs */}
       {activeWires.map(renderWire)}
       {/* Legend */}
