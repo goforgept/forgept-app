@@ -7,6 +7,7 @@ import {
   addEdge,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   Position,
   Handle,
   Panel,
@@ -139,6 +140,53 @@ const DEFAULT_COMPONENTS = {
     rexA:     'REX A',     rexB:     'REX B',
     contactA: 'Door Contact A', contactB: 'Door Contact B',
     lockA:    'Lock A',    lockB:    'Lock B',
+  },
+}
+
+// Default positions of each component box within the schematic SVG (used when no override stored)
+const COMP_DEFAULT_POS = {
+  single_door: (key, lockType) => ({
+    panel:   { x: 224, y: 8   },
+    contact: { x: 84,  y: 8   },
+    reader:  { x: 4,   y: 78  },
+    lock:    lockType === 'mag' ? { x: 86, y: 24 } : { x: 54, y: 102 },
+    rex:     { x: 216, y: 78  },
+  }[key] || { x: 20, y: 20 }),
+  double_door: (key, lockType) => ({
+    panel:    { x: 336, y: 8   },
+    contactA: { x: 84,  y: 8   },
+    contactB: { x: 208, y: 8   },
+    readerA:  { x: 4,   y: 68  },
+    readerB:  { x: 4,   y: 104 },
+    lockA:    lockType === 'mag' ? { x: 84, y: 24 } : { x: 54, y: 90 },
+    lockB:    lockType === 'mag' ? { x: 208, y: 24 } : { x: 320, y: 90 },
+    rexA:     { x: 334, y: 68  },
+    rexB:     { x: 334, y: 104 },
+  }[key] || { x: 20, y: 20 }),
+}
+
+// Fixed box sizes for each component (width × height in SVG units)
+const COMP_SIZE = {
+  single_door: (key, lockType) => ({
+    panel:   { w: 88, h: 50 },
+    contact: { w: 44, h: 16 },
+    reader:  { w: 58, h: 30 },
+    lock:    lockType === 'mag' ? { w: 50, h: 10 } : { w: 24, h: 26 },
+    rex:     { w: 58, h: 30 },
+  }[key] || { w: 44, h: 20 }),
+  double_door: (key, lockType) => {
+    const isMag = lockType === 'mag'
+    return ({
+      panel:    { w: 56, h: 50 },
+      contactA: { w: 36, h: 14 },
+      contactB: { w: 36, h: 14 },
+      readerA:  { w: 58, h: 26 },
+      readerB:  { w: 58, h: 26 },
+      lockA:    isMag ? { w: 38, h: 9 } : { w: 24, h: 22 },
+      lockB:    isMag ? { w: 38, h: 9 } : { w: 24, h: 22 },
+      rexA:     { w: 52, h: 26 },
+      rexB:     { w: 52, h: 26 },
+    }[key] || { w: 44, h: 20 })
   },
 }
 
@@ -406,10 +454,66 @@ function SvgLabel({ x, y, text, fill, fontSize = 7, bold = false }) {
   )
 }
 
-function SingleDoorSVG({ components = {}, lockType = 'strike' }) {
+function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, onPositionChange }) {
   const c = { ...DEFAULT_COMPONENTS.single_door, ...components }
+  const [dragging, setDragging] = useState(null)
+  const [livePos, setLivePos]   = useState({})
+  const svgRef = useRef(null)
+  const isMag  = lockType === 'mag'
+
+  const getPos  = (key) => (dragging?.key === key && livePos[key]) || positions[key] || COMP_DEFAULT_POS.single_door(key, lockType)
+  const getSize = (key) => COMP_SIZE.single_door(key, lockType)
+
+  const startDrag = (e, key) => {
+    e.stopPropagation()
+    const svg  = svgRef.current
+    if (!svg) return
+    const rect = svg.getBoundingClientRect()
+    const sx   = 320 / rect.width
+    const sy   = 210 / rect.height
+    const cx   = (e.clientX - rect.left) * sx
+    const cy   = (e.clientY - rect.top)  * sy
+    const p    = getPos(key)
+    setDragging({ key, cx0: cx, cy0: cy, px0: p.x, py0: p.y, sx, sy, rect })
+  }
+
+  const onSvgMove = (e) => {
+    if (!dragging) return
+    const { key, cx0, cy0, px0, py0, sx, sy, rect } = dragging
+    const dx = (e.clientX - rect.left) * sx - cx0
+    const dy = (e.clientY - rect.top)  * sy - cy0
+    setLivePos(lp => ({ ...lp, [key]: { x: px0 + dx, y: py0 + dy } }))
+  }
+
+  const onSvgUp = () => {
+    if (!dragging) return
+    const fp = livePos[dragging.key]
+    if (fp) onPositionChange?.(dragging.key, Math.round(fp.x), Math.round(fp.y))
+    setDragging(null)
+    setLivePos(lp => { const n = { ...lp }; delete n[dragging.key]; return n })
+  }
+
+  const COLORS = { panel: '#78350f', contact: '#991b1b', reader: '#1e40af', lock: '#4c1d95', rex: '#92400e' }
+
+  const renderBox = (key) => {
+    const p     = getPos(key)
+    const s     = getSize(key)
+    const color = COLORS[key]
+    const isLockMag = key === 'lock' && isMag
+    return (
+      <g key={key} onMouseDown={e => startDrag(e, key)} style={{ cursor: dragging?.key === key ? 'grabbing' : 'grab' }}>
+        <rect x={p.x} y={p.y} width={s.w} height={s.h}
+          fill={isLockMag ? '#ede9fe' : '#fff'} stroke={color} strokeWidth="1.5" rx={isLockMag ? 1 : 0}/>
+        <SvgLabel x={p.x + s.w / 2} y={p.y + s.h / 2 + (s.h < 15 ? 2 : 3)}
+          text={c[key]} fill={color} fontSize={isLockMag ? 5.5 : 7} bold />
+      </g>
+    )
+  }
+
   return (
-    <svg width="320" height="210" viewBox="0 0 320 210" style={{ display: 'block', pointerEvents: 'none' }}>
+    <svg ref={svgRef} width="320" height="210" viewBox="0 0 320 210"
+      style={{ display: 'block', userSelect: 'none' }}
+      onMouseMove={onSvgMove} onMouseUp={onSvgUp} onMouseLeave={onSvgUp}>
       {/* Wall */}
       <rect x="68" y="0" width="16" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       {/* Door panel */}
@@ -419,47 +523,11 @@ function SingleDoorSVG({ components = {}, lockType = 'strike' }) {
       <rect x="84" y="160" width="6" height="12" fill="#9ca3af"/>
       <circle cx="192" cy="105" r="5" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
       <line x1="192" y1="100" x2="192" y2="90" stroke="#6b7280" strokeWidth="1.5"/>
-
-      {/* Panel */}
-      <rect x="224" y="8" width="88" height="50" fill="#fffbf5" stroke="#78350f" strokeWidth="1.5"/>
-      <SvgLabel x={268} y={36} text={c.panel} fill="#78350f" fontSize={7} bold />
-
-      {/* Door Contact */}
-      <rect x="84" y="8" width="44" height="16" fill="#fff" stroke="#991b1b" strokeWidth="1.5"/>
-      <SvgLabel x={106} y={19} text={c.contact} fill="#991b1b" fontSize={6.5} bold />
-      <line x1="128" y1="16" x2="224" y2="16" stroke="#374151" strokeWidth="0.75" strokeDasharray="2,1.5"/>
-
-      {/* Reader */}
-      <rect x="4" y="80" width="58" height="30" fill="#fff" stroke="#1e40af" strokeWidth="1.5"/>
-      <SvgLabel x={33} y={98} text={c.reader} fill="#1e40af" fontSize={7} bold />
-      <line x1="62" y1="95" x2="68" y2="95" stroke="#1e3a8a" strokeWidth="1.5"/>
-
-      {/* Lock */}
-      {lockType === 'mag' ? (
-        <>
-          {/* MAG Lock: horizontal bar at top of door panel */}
-          <rect x="86" y="24" width="50" height="10" fill="#ede9fe" stroke="#4c1d95" strokeWidth="1.5" rx="1"/>
-          <SvgLabel x={111} y={31} text={c.lock} fill="#4c1d95" fontSize={5.5} bold />
-        </>
-      ) : (
-        <>
-          {/* Electric Strike: bracket at wall/door edge, mid-height */}
-          <rect x="54" y="102" width="24" height="26" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
-          <SvgLabel x={66} y={118} text={c.lock} fill="#4c1d95" fontSize={5.5} bold />
-        </>
-      )}
-
-      {/* REX */}
-      <rect x="216" y="80" width="58" height="30" fill="#fff" stroke="#92400e" strokeWidth="1.5"/>
-      <SvgLabel x={245} y={98} text={c.rex} fill="#92400e" fontSize={7} bold />
-      <line x1="210" y1="95" x2="216" y2="95" stroke="#78350f" strokeWidth="1" strokeDasharray="3,2"/>
-
       {/* Wire bus */}
       <line x1="76" y1="22" x2="76" y2="130" stroke="#374151" strokeWidth="1"/>
       <line x1="224" y1="20" x2="76" y2="20" stroke="#374151" strokeWidth="1"/>
-      <line x1="76" y1="95" x2="68" y2="95" stroke="#1e3a8a" strokeWidth="1"/>
+      <line x1="76" y1="93" x2="68" y2="93" stroke="#1e3a8a" strokeWidth="1"/>
       <line x1="76" y1="115" x2="78" y2="115" stroke="#7f1d1d" strokeWidth="1" strokeDasharray="3,1.5"/>
-
       {/* Legend */}
       <line x1="4" y1="200" x2="22" y2="200" stroke="#374151" strokeWidth="1"/>
       <text x="24" y="203" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">RS-485</text>
@@ -467,14 +535,80 @@ function SingleDoorSVG({ components = {}, lockType = 'strike' }) {
       <text x="94" y="203" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Power</text>
       <line x1="134" y1="200" x2="152" y2="200" stroke="#374151" strokeWidth="1" strokeDasharray="2,1.5"/>
       <text x="154" y="203" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Data</text>
+      {/* Draggable component boxes — drag to reposition */}
+      {['panel', 'contact', 'reader', 'lock', 'rex'].map(k => renderBox(k))}
     </svg>
   )
 }
 
-function DoubleDoorSVG({ components = {}, lockType = 'strike' }) {
+function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, onPositionChange }) {
   const c = { ...DEFAULT_COMPONENTS.double_door, ...components }
+  const [dragging, setDragging] = useState(null)
+  const [livePos, setLivePos]   = useState({})
+  const svgRef = useRef(null)
+  const isMag  = lockType === 'mag'
+
+  const getPos  = (key) => (dragging?.key === key && livePos[key]) || positions[key] || COMP_DEFAULT_POS.double_door(key, lockType)
+  const getSize = (key) => COMP_SIZE.double_door(key, lockType)
+
+  const startDrag = (e, key) => {
+    e.stopPropagation()
+    const svg  = svgRef.current
+    if (!svg) return
+    const rect = svg.getBoundingClientRect()
+    const sx   = 400 / rect.width
+    const sy   = 210 / rect.height
+    const cx   = (e.clientX - rect.left) * sx
+    const cy   = (e.clientY - rect.top)  * sy
+    const p    = getPos(key)
+    setDragging({ key, cx0: cx, cy0: cy, px0: p.x, py0: p.y, sx, sy, rect })
+  }
+
+  const onSvgMove = (e) => {
+    if (!dragging) return
+    const { key, cx0, cy0, px0, py0, sx, sy, rect } = dragging
+    const dx = (e.clientX - rect.left) * sx - cx0
+    const dy = (e.clientY - rect.top)  * sy - cy0
+    setLivePos(lp => ({ ...lp, [key]: { x: px0 + dx, y: py0 + dy } }))
+  }
+
+  const onSvgUp = () => {
+    if (!dragging) return
+    const fp = livePos[dragging.key]
+    if (fp) onPositionChange?.(dragging.key, Math.round(fp.x), Math.round(fp.y))
+    setDragging(null)
+    setLivePos(lp => { const n = { ...lp }; delete n[dragging.key]; return n })
+  }
+
+  const COLORS = {
+    panel: '#78350f',
+    contactA: '#991b1b', contactB: '#991b1b',
+    readerA: '#1e40af',  readerB: '#1e40af',
+    lockA: '#4c1d95',    lockB: '#4c1d95',
+    rexA: '#92400e',     rexB: '#92400e',
+  }
+
+  const renderBox = (key) => {
+    const p     = getPos(key)
+    const s     = getSize(key)
+    const color = COLORS[key] || '#374151'
+    const isLockMag = (key === 'lockA' || key === 'lockB') && isMag
+    return (
+      <g key={key} onMouseDown={e => startDrag(e, key)} style={{ cursor: dragging?.key === key ? 'grabbing' : 'grab' }}>
+        <rect x={p.x} y={p.y} width={s.w} height={s.h}
+          fill={isLockMag ? '#ede9fe' : '#fff'} stroke={color} strokeWidth="1.5" rx={isLockMag ? 1 : 0}/>
+        <SvgLabel x={p.x + s.w / 2} y={p.y + s.h / 2 + (s.h < 15 ? 2 : 3)}
+          text={c[key]} fill={color} fontSize={isLockMag ? 5.5 : 6.5} bold />
+      </g>
+    )
+  }
+
+  const compKeys = ['panel', 'contactA', 'contactB', 'readerA', 'readerB', 'lockA', 'lockB', 'rexA', 'rexB']
+
   return (
-    <svg width="400" height="210" viewBox="0 0 400 210" style={{ display: 'block', pointerEvents: 'none' }}>
+    <svg ref={svgRef} width="400" height="210" viewBox="0 0 400 210"
+      style={{ display: 'block', userSelect: 'none' }}
+      onMouseMove={onSvgMove} onMouseUp={onSvgUp} onMouseLeave={onSvgUp}>
       {/* Walls */}
       <rect x="68" y="0" width="14" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       <rect x="194" y="0" width="12" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
@@ -489,56 +623,9 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike' }) {
       <path d="M318,188 Q206,188 206,22" fill="none" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,3"/>
       <rect x="312" y="28" width="6" height="12" fill="#9ca3af"/>
       <circle cx="222" cy="105" r="4" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
-
-      {/* Panel */}
-      <rect x="336" y="8" width="56" height="50" fill="#fffbf5" stroke="#78350f" strokeWidth="1.5"/>
-      <SvgLabel x={364} y={36} text={c.panel} fill="#78350f" fontSize={6.5} bold />
-
-      {/* Door Contacts */}
-      <rect x="84" y="8" width="36" height="14" fill="#fff" stroke="#991b1b" strokeWidth="1.5"/>
-      <SvgLabel x={102} y={18} text={c.contactA} fill="#991b1b" fontSize={6} bold />
-      <rect x="208" y="8" width="36" height="14" fill="#fff" stroke="#991b1b" strokeWidth="1.5"/>
-      <SvgLabel x={226} y={18} text={c.contactB} fill="#991b1b" fontSize={6} bold />
-
-      {/* Readers */}
-      <rect x="4" y="70" width="58" height="26" fill="#fff" stroke="#1e40af" strokeWidth="1.5"/>
-      <SvgLabel x={33} y={86} text={c.readerA} fill="#1e40af" fontSize={6.5} bold />
-      <line x1="62" y1="83" x2="68" y2="83" stroke="#1e3a8a" strokeWidth="1.5"/>
-      <rect x="4" y="106" width="58" height="26" fill="#fff" stroke="#1e40af" strokeWidth="1.5"/>
-      <SvgLabel x={33} y={122} text={c.readerB} fill="#1e40af" fontSize={6.5} bold />
-      <line x1="62" y1="119" x2="68" y2="119" stroke="#1e3a8a" strokeWidth="1.5"/>
-
-      {/* Locks */}
-      {lockType === 'mag' ? (
-        <>
-          {/* MAG on door A and door B — bars at top of each door panel */}
-          <rect x="84" y="24" width="38" height="9" fill="#ede9fe" stroke="#4c1d95" strokeWidth="1.5" rx="1"/>
-          <SvgLabel x={103} y={30} text={c.lockA} fill="#4c1d95" fontSize={5} bold />
-          <rect x="208" y="24" width="38" height="9" fill="#ede9fe" stroke="#4c1d95" strokeWidth="1.5" rx="1"/>
-          <SvgLabel x={227} y={30} text={c.lockB} fill="#4c1d95" fontSize={5} bold />
-        </>
-      ) : (
-        <>
-          {/* Electric Strike — bracket at each door's wall edge */}
-          <rect x="54" y="90" width="24" height="22" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
-          <SvgLabel x={66} y={104} text={c.lockA} fill="#4c1d95" fontSize={5.5} bold />
-          <rect x="320" y="90" width="24" height="22" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
-          <SvgLabel x={332} y={104} text={c.lockB} fill="#4c1d95" fontSize={5.5} bold />
-        </>
-      )}
-
-      {/* REX */}
-      <rect x="334" y="70" width="52" height="26" fill="#fff" stroke="#92400e" strokeWidth="1.5"/>
-      <SvgLabel x={360} y={86} text={c.rexA} fill="#92400e" fontSize={6.5} bold />
-      <line x1="318" y1="83" x2="334" y2="83" stroke="#78350f" strokeWidth="1" strokeDasharray="3,2"/>
-      <rect x="334" y="106" width="52" height="26" fill="#fff" stroke="#92400e" strokeWidth="1.5"/>
-      <SvgLabel x={360} y={122} text={c.rexB} fill="#92400e" fontSize={6.5} bold />
-      <line x1="318" y1="119" x2="334" y2="119" stroke="#78350f" strokeWidth="1" strokeDasharray="3,2"/>
-
       {/* Wire bus */}
       <line x1="76" y1="20" x2="76" y2="140" stroke="#374151" strokeWidth="1"/>
       <line x1="76" y1="20" x2="336" y2="20" stroke="#374151" strokeWidth="1"/>
-
       {/* Legend */}
       <line x1="4" y1="202" x2="18" y2="202" stroke="#374151" strokeWidth="1"/>
       <text x="20" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">RS-485</text>
@@ -546,14 +633,31 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike' }) {
       <text x="78" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Power</text>
       <line x1="116" y1="202" x2="130" y2="202" stroke="#374151" strokeWidth="1" strokeDasharray="2,1.5"/>
       <text x="132" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Data</text>
+      {/* Draggable component boxes — drag to reposition */}
+      {compKeys.map(k => renderBox(k))}
     </svg>
   )
 }
 
-function SchematicNode({ data, selected }) {
-  const isDouble = data.schematicType === 'double_door'
-  const lockType = data.lockType || 'strike'
+function SchematicNode({ id, data, selected }) {
+  const { updateNodeData } = useReactFlow()
+  const isDouble   = data.schematicType === 'double_door'
+  const lockType   = data.lockType || 'strike'
   const components = { ...(DEFAULT_COMPONENTS[data.schematicType] || {}), ...(data.components || {}) }
+
+  const handlePositionChange = (key, x, y) => {
+    const newPositions = { ...(data.positions || {}), [key]: { x, y } }
+    updateNodeData(id, { positions: newPositions })
+    supabase.from('sld_nodes').update({
+      data: {
+        schematicType: data.schematicType,
+        lockType,
+        components: data.components || {},
+        positions: newPositions,
+      }
+    }).eq('id', id)
+  }
+
   return (
     <div
       className="select-none"
@@ -567,13 +671,16 @@ function SchematicNode({ data, selected }) {
       }}
     >
       <Handle type="target" position={Position.Top} />
-      <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'move' }}>
         <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280' }}>
-          {isDouble ? 'Typical Double Door' : 'Typical Single Door'}
+          {isDouble ? 'Typical Double Door' : 'Typical Single Door'} · drag header to move
         </span>
         {data.label && <span style={{ fontSize: 11, fontWeight: 700, color: '#111827' }}>{data.label}</span>}
       </div>
-      {isDouble ? <DoubleDoorSVG components={components} lockType={lockType} /> : <SingleDoorSVG components={components} lockType={lockType} />}
+      {isDouble
+        ? <DoubleDoorSVG components={components} lockType={lockType} positions={data.positions || {}} onPositionChange={handlePositionChange} />
+        : <SingleDoorSVG components={components} lockType={lockType} positions={data.positions || {}} onPositionChange={handlePositionChange} />
+      }
       <Handle type="source" position={Position.Bottom} />
     </div>
   )
@@ -754,7 +861,7 @@ export default function SLDTab({ proposalId, orgId }) {
           position_x: tn.position_x + offsetX,
           position_y: tn.position_y + offsetY,
           data: isSchematic
-            ? { schematicType: tn.data?.schematicType, lockType: tn.data?.lockType || 'strike', components: { ...(DEFAULT_COMPONENTS[tn.data?.schematicType] || {}), ...(tn.data?.components || {}) } }
+            ? { schematicType: tn.data?.schematicType, lockType: tn.data?.lockType || 'strike', components: { ...(DEFAULT_COMPONENTS[tn.data?.schematicType] || {}), ...(tn.data?.components || {}) }, positions: {} }
             : { ...(tn.data || {}), quantity: tn.data?.quantity || 1 },
         }
       })
@@ -806,7 +913,7 @@ export default function SLDTab({ proposalId, orgId }) {
         type: n.node_type === 'schematic' ? 'schematic' : 'device',
         position: { x: n.position_x, y: n.position_y },
         data: n.node_type === 'schematic'
-          ? { label: n.label, schematicType: n.data?.schematicType, lockType: n.data?.lockType || 'strike', components: n.data?.components || {} }
+          ? { label: n.label, schematicType: n.data?.schematicType, lockType: n.data?.lockType || 'strike', components: n.data?.components || {}, positions: n.data?.positions || {} }
           : { label: n.label, category: n.data?.category, quantity: n.data?.quantity, notes: n.data?.notes, global_product_id: n.global_product_id },
       })))
 
@@ -921,19 +1028,23 @@ export default function SLDTab({ proposalId, orgId }) {
 
   const updateNodeData = async (field, value) => {
     if (!selectedNode) return
-    const updated = { ...selectedNode, data: { ...selectedNode.data, [field]: value } }
+    // Always read fresh data from nodes array so position drags aren't overwritten
+    const fresh = nodes.find(n => n.id === selectedNode.id) || selectedNode
+    const newData = { ...fresh.data, [field]: value }
+    const updated = { ...fresh, data: newData }
     setSelectedNode(updated)
     setNodes(ns => ns.map(n => n.id === selectedNode.id ? updated : n))
     await supabase.from('sld_nodes').update(
-      field === 'label' ? { label: value } : { data: { ...selectedNode.data, [field]: value } }
+      field === 'label' ? { label: value } : { data: newData }
     ).eq('id', selectedNode.id)
   }
 
   const updateSchematicComponent = async (key, value) => {
     if (!selectedNode) return
-    const newComponents = { ...(selectedNode.data.components || {}), [key]: value }
-    const newData = { ...selectedNode.data, components: newComponents }
-    const updated = { ...selectedNode, data: newData }
+    const fresh = nodes.find(n => n.id === selectedNode.id) || selectedNode
+    const newComponents = { ...(fresh.data.components || {}), [key]: value }
+    const newData = { ...fresh.data, components: newComponents }
+    const updated = { ...fresh, data: newData }
     setSelectedNode(updated)
     setNodes(ns => ns.map(n => n.id === selectedNode.id ? updated : n))
     await supabase.from('sld_nodes').update({ data: newData }).eq('id', selectedNode.id)
@@ -1786,7 +1897,16 @@ export default function SLDTab({ proposalId, orgId }) {
                   <label className="text-xs block mb-1" style={{ color: '#8A9AB0' }}>Lock Type</label>
                   <select
                     value={selectedNode.data.lockType || 'strike'}
-                    onChange={e => updateNodeData('lockType', e.target.value)}
+                    onChange={e => {
+                      const fresh = nodes.find(n => n.id === selectedNode.id) || selectedNode
+                      const newPositions = { ...(fresh.data.positions || {}) }
+                      delete newPositions.lock; delete newPositions.lockA; delete newPositions.lockB
+                      const newData = { ...fresh.data, lockType: e.target.value, positions: newPositions }
+                      const updated = { ...fresh, data: newData }
+                      setSelectedNode(updated)
+                      setNodes(ns => ns.map(n => n.id === selectedNode.id ? updated : n))
+                      supabase.from('sld_nodes').update({ data: newData }).eq('id', selectedNode.id)
+                    }}
                     className="w-full text-xs border border-[#2a3d55] rounded px-2 py-1.5 focus:outline-none focus:border-[#C8622A]"
                     style={{ background: '#0F1923', color: '#E8EEF5' }}
                   >
