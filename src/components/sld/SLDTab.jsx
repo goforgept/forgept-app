@@ -1754,12 +1754,13 @@ export default function SLDTab({ proposalId, orgId }) {
       const NODE_H = 75
       const PAD    = 30
 
-      const xs = nodes.map(n => n.position.x)
-      const ys = nodes.map(n => n.position.y)
-      const minX = Math.min(...xs) - PAD
-      const minY = Math.min(...ys) - PAD
-      const maxX = Math.max(...xs) + NODE_W + PAD
-      const maxY = Math.max(...ys) + NODE_H + PAD
+      const nodeW = n => n.width || n.data?.width || NODE_W
+      const nodeH = n => n.height || n.data?.height || (n.type === 'shape' ? (n.data?.shape === 'line' || n.data?.shape === 'arrow' ? 24 : n.data?.shape === 'service-loop' ? 60 : 100) : NODE_H)
+
+      const minX = Math.min(...nodes.map(n => n.position.x)) - PAD
+      const minY = Math.min(...nodes.map(n => n.position.y)) - PAD
+      const maxX = Math.max(...nodes.map(n => n.position.x + nodeW(n))) + PAD
+      const maxY = Math.max(...nodes.map(n => n.position.y + nodeH(n))) + PAD
 
       const diagW = maxX - minX
       const diagH = maxY - minY
@@ -1777,6 +1778,12 @@ export default function SLDTab({ proposalId, orgId }) {
       const ty = y => HEADER + (y - minY) * scale
       const sw = NODE_W * scale
       const sh = NODE_H * scale
+
+      // Helper: parse 6-digit hex → [r,g,b]
+      const hexRgb = h => {
+        const s = (h || '#374151').replace('#', '')
+        return [parseInt(s.slice(0,2),16), parseInt(s.slice(2,4),16), parseInt(s.slice(4,6),16)]
+      }
 
       // Header
       pdf.setFillColor(15, 28, 46)
@@ -1799,9 +1806,9 @@ export default function SLDTab({ proposalId, orgId }) {
         const tgt = nodes.find(n => n.id === edge.target)
         if (!src || !tgt) return
 
-        const x1 = tx(src.position.x + NODE_W / 2)
-        const y1 = ty(src.position.y + NODE_H)
-        const x2 = tx(tgt.position.x + NODE_W / 2)
+        const x1 = tx(src.position.x + nodeW(src) / 2)
+        const y1 = ty(src.position.y + nodeH(src))
+        const x2 = tx(tgt.position.x + nodeW(tgt) / 2)
         const y2 = ty(tgt.position.y)
 
         const wt  = edge.data?.wire_type || 'default'
@@ -1831,8 +1838,91 @@ export default function SLDTab({ proposalId, orgId }) {
 
       // Draw nodes
       nodes.forEach(node => {
-        const x = tx(node.position.x)
-        const y = ty(node.position.y)
+        const x  = tx(node.position.x)
+        const y  = ty(node.position.y)
+        const nw = nodeW(node) * scale
+        const nh = nodeH(node) * scale
+
+        // ── Shape nodes ──────────────────────────────────────────────────────
+        if (node.type === 'shape') {
+          const shape     = node.data.shape || 'rect'
+          const fillHex   = node.data.fill && node.data.fill !== 'none' ? node.data.fill : null
+          const strokeHex = node.data.stroke || '#374151'
+          const [sr, sg, sb] = hexRgb(strokeHex)
+          pdf.setDrawColor(sr, sg, sb)
+          pdf.setLineWidth(Math.max(0.2, (node.data.strokeWidth || 1.5) * scale * 0.3))
+          pdf.setLineDashPattern([], 0)
+
+          const pdfStyle = fillHex ? 'FD' : 'S'
+
+          if (fillHex) {
+            const [fr, fg, fb] = hexRgb(fillHex)
+            pdf.setFillColor(fr, fg, fb)
+          }
+
+          if (shape === 'rect') {
+            const rx = Math.min((node.data.rx || 0) * scale * 0.5, 3)
+            if (rx > 0) pdf.roundedRect(x, y, nw, nh, rx, rx, pdfStyle)
+            else        pdf.rect(x, y, nw, nh, pdfStyle)
+
+          } else if (shape === 'ellipse') {
+            pdf.ellipse(x + nw / 2, y + nh / 2, nw / 2, nh / 2, pdfStyle)
+
+          } else if (shape === 'triangle') {
+            pdf.triangle(x + nw / 2, y, x + nw, y + nh, x, y + nh, pdfStyle)
+
+          } else if (shape === 'line') {
+            if (node.data.dash === '6,3')  pdf.setLineDashPattern([1.5, 0.75], 0)
+            else if (node.data.dash === '2,3') pdf.setLineDashPattern([0.5, 0.75], 0)
+            if (node.data.orientation === 'v')
+              pdf.line(x + nw / 2, y, x + nw / 2, y + nh)
+            else
+              pdf.line(x, y + nh / 2, x + nw, y + nh / 2)
+
+          } else if (shape === 'arrow') {
+            const isV    = node.data.orientation === 'v'
+            const head   = Math.max(1.5, (isV ? nh : nw) * 0.12)
+            if (isV) {
+              pdf.line(x + nw / 2, y, x + nw / 2, y + nh - head)
+              pdf.setFillColor(sr, sg, sb)
+              pdf.triangle(x + nw/2, y + nh, x + nw/2 - head*0.5, y + nh - head, x + nw/2 + head*0.5, y + nh - head, 'F')
+            } else {
+              pdf.line(x, y + nh / 2, x + nw - head, y + nh / 2)
+              pdf.setFillColor(sr, sg, sb)
+              pdf.triangle(x + nw, y + nh/2, x + nw - head, y + nh/2 - head*0.5, x + nw - head, y + nh/2 + head*0.5, 'F')
+            }
+
+          } else if (shape === 'service-loop') {
+            const cy = y + nh / 2
+            const cx = x + nw / 2
+            const r  = Math.max(1, Math.min(nh / 2 - 0.5, nw * 0.16, 6))
+            pdf.line(x, cy, cx - r, cy)
+            pdf.circle(cx, cy, r, 'S')
+            pdf.circle(cx, cy, r * 0.5, 'S')
+            pdf.line(cx + r, cy, x + nw, cy)
+
+          } else if (shape === 'text') {
+            const [cr, cg, cb] = hexRgb(strokeHex)
+            pdf.setTextColor(cr, cg, cb)
+            pdf.setFontSize(Math.max(4, (node.data.fontSize || 13) * scale * 2.2))
+            pdf.setFont('helvetica', 'normal')
+            pdf.text(node.data.label || 'Text', x + nw / 2, y + nh / 2, { align: 'center', baseline: 'middle' })
+          }
+
+          // Label on non-text shapes
+          if (node.data.label && !['text','line','arrow','service-loop'].includes(shape)) {
+            const [cr, cg, cb] = hexRgb(strokeHex)
+            pdf.setTextColor(cr, cg, cb)
+            pdf.setFontSize(Math.max(4, (node.data.fontSize || 12) * scale * 2.2))
+            pdf.setFont('helvetica', 'normal')
+            pdf.text(node.data.label, x + nw / 2, y + nh / 2, { align: 'center', baseline: 'middle' })
+          }
+
+          return // skip device rendering below
+        }
+
+        // ── Device nodes ─────────────────────────────────────────────────────
+        if (node.type !== 'device') return
         const cat   = node.data.category || 'Other'
         const hex   = CATEGORY_COLORS[cat] || '#6B7280'
         const r     = parseInt(hex.slice(1, 3), 16)
@@ -1844,31 +1934,31 @@ export default function SLDTab({ proposalId, orgId }) {
         pdf.setFillColor(255, 255, 255)
         pdf.setDrawColor(r, g, b)
         pdf.setLineWidth(0.5)
-        pdf.roundedRect(x, y, sw, sh, 1.5, 1.5, 'FD')
+        pdf.roundedRect(x, y, nw, nh, 1.5, 1.5, 'FD')
 
         // Category header strip
         pdf.setFillColor(r, g, b)
         pdf.setGState(pdf.GState({ opacity: 0.12 }))
-        pdf.rect(x + 0.5, y + 0.5, sw - 1, sh * 0.38, 'F')
+        pdf.rect(x + 0.5, y + 0.5, nw - 1, nh * 0.38, 'F')
         pdf.setGState(pdf.GState({ opacity: 1 }))
 
         // Category label
         pdf.setTextColor(r, g, b)
         pdf.setFontSize(5.5)
         pdf.setFont('helvetica', 'bold')
-        pdf.text(cat, x + 3, y + sh * 0.22)
+        pdf.text(cat, x + 3, y + nh * 0.22)
 
         // Device label
         pdf.setTextColor(30, 30, 40)
         pdf.setFontSize(6.5)
         pdf.setFont('helvetica', 'normal')
         const label = node.data.label || ''
-        pdf.text(label, x + 3, y + sh * 0.58, { maxWidth: sw - 6 })
+        pdf.text(label, x + 3, y + nh * 0.58, { maxWidth: nw - 6 })
 
         if ((node.data.quantity || 1) > 1) {
           pdf.setFontSize(5)
           pdf.setTextColor(100, 100, 100)
-          pdf.text(`×${node.data.quantity}`, x + sw - 4, y + sh - 3, { align: 'right' })
+          pdf.text(`×${node.data.quantity}`, x + nw - 4, y + nh - 3, { align: 'right' })
         }
       })
 
