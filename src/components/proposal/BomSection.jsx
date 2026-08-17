@@ -608,13 +608,14 @@ export default function BomSection({
                       <table className="w-full text-sm">
                         <tfoot>
                           <tr><td colSpan="6" className="text-fp-muted pt-4 text-right font-semibold">Materials Total</td><td className="text-fp-text pt-4 text-right font-bold pr-4">${materialsTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
-                          {lumpSumLabor ? (
-                            allLaborTotal > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">Labor ({allLaborHours % 1 === 0 ? String(allLaborHours) : allLaborHours.toFixed(2)} hrs)</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
-                          ) : (
-                            <>
-                              {laborTotal > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">General Labor</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${laborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
-                              {sectionLaborTotal > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">Section Labor</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${sectionLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
-                            </>
+                          {allLaborTotal > 0 && (
+                            <tr>
+                              <td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">
+                                Labor Total{lumpSumLabor ? ` (${allLaborHours % 1 === 0 ? String(allLaborHours) : allLaborHours.toFixed(2)} hrs)` : ''}
+                              </td>
+                              <td className="text-fp-text pt-1 text-right font-bold pr-4">${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td></td>
+                            </tr>
                           )}
                           {taxRate > 0 && <tr><td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">Tax ({taxRate}% on materials)</td><td className="text-fp-text pt-1 text-right font-bold pr-4">${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>}
                           <tr className="border-t border-fp-border"><td colSpan="6" className="text-fp-muted pt-3 text-right font-semibold">Grand Total</td><td className="text-[#C8622A] pt-3 text-right font-bold text-lg pr-4">${adjustedGrandTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td></td></tr>
@@ -1028,13 +1029,15 @@ export default function BomSection({
           <div className="mt-6 border-t border-fp-border pt-4 space-y-2">
             {(() => {
               const liveBOMTotal = editLines.reduce((sum, l) => sum + ((parseFloat(l.customer_price_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
-              const liveLaborTotal = laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+              const liveSecLaborTotal = editSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
+              const liveLaborTotal = laborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0) + liveSecLaborTotal
               const liveTaxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
               const liveTaxAmount = liveBOMTotal * (liveTaxRate / 100)
               const liveGrandTotal = liveBOMTotal + liveLaborTotal + liveTaxAmount
               const liveRevenueForMargin = liveBOMTotal + liveLaborTotal  // exclude tax from margin calc
               const liveBOMCost = editLines.reduce((sum, l) => sum + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
-              const liveLaborCost = laborItems.reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+              const liveSecLaborCost = editSections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0) : 0), 0)
+              const liveLaborCost = laborItems.reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0) + liveSecLaborCost
               const liveTotalCost = liveBOMCost + liveLaborCost
               const liveMargin = liveRevenueForMargin > 0 ? ((liveRevenueForMargin - liveTotalCost) / liveRevenueForMargin * 100).toFixed(1) : '0.0'
               return (
