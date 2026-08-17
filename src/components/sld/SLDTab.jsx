@@ -124,6 +124,24 @@ const WIRE_STROKE_WIDTH = {
   rs485:    1.5,
 }
 
+// Default component labels for schematic nodes (user-editable)
+const DEFAULT_COMPONENTS = {
+  single_door: {
+    panel:   'Access Control Panel',
+    reader:  'Card Reader',
+    rex:     'R.E.X.',
+    contact: 'Door Contact',
+    lock:    'Electric Lock',
+  },
+  double_door: {
+    panel:    'Access Control Panel',
+    readerA:  'Reader A',  readerB:  'Reader B',
+    rexA:     'REX A',     rexB:     'REX B',
+    contactA: 'Door Contact A', contactB: 'Door Contact B',
+    lockA:    'Lock A',    lockB:    'Lock B',
+  },
+}
+
 // Short cable-type labels shown next to each wire on the canvas and PDF
 const WIRE_LABELS = {
   default:  'CAT6',
@@ -370,66 +388,68 @@ function DeviceNode({ data, selected }) {
 
 // ─── Schematic node — visual installation diagram ────────────────────────────
 
-function SingleDoorSVG() {
+// Helper: render a text label inside an SVG box, wrapping at spaces if needed
+function SvgLabel({ x, y, text, fill, fontSize = 7, bold = false }) {
+  const str = String(text || '').trim()
+  const words = str.split(/\s+/)
+  if (words.length <= 1 || str.length <= 9) {
+    return <text x={x} y={y} textAnchor="middle" fontSize={fontSize} fill={fill} fontWeight={bold ? '700' : '400'} fontFamily="sans-serif">{str}</text>
+  }
+  const mid = Math.ceil(words.length / 2)
+  const l1 = words.slice(0, mid).join(' ')
+  const l2 = words.slice(mid).join(' ')
+  return (
+    <>
+      <text x={x} y={y - 5} textAnchor="middle" fontSize={fontSize - 0.5} fill={fill} fontWeight={bold ? '700' : '400'} fontFamily="sans-serif">{l1}</text>
+      <text x={x} y={y + 4} textAnchor="middle" fontSize={fontSize - 0.5} fill={fill} fontFamily="sans-serif">{l2}</text>
+    </>
+  )
+}
+
+function SingleDoorSVG({ components = {} }) {
+  const c = { ...DEFAULT_COMPONENTS.single_door, ...components }
   return (
     <svg width="320" height="210" viewBox="0 0 320 210" style={{ display: 'block' }}>
-      {/* Wall section */}
+      {/* Wall */}
       <rect x="68" y="0" width="16" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
-
       {/* Door panel */}
       <rect x="84" y="22" width="126" height="166" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
-      {/* Door swing arc */}
       <path d="M84,188 Q210,188 210,22" fill="none" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,3"/>
-      {/* Door hinge stubs */}
       <rect x="84" y="28" width="6" height="12" fill="#9ca3af"/>
       <rect x="84" y="160" width="6" height="12" fill="#9ca3af"/>
-      {/* Door handle */}
       <circle cx="192" cy="105" r="5" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
       <line x1="192" y1="100" x2="192" y2="90" stroke="#6b7280" strokeWidth="1.5"/>
 
-      {/* ── ACCESS CONTROL PANEL ── top-right */}
+      {/* Panel */}
       <rect x="224" y="8" width="88" height="50" fill="#fffbf5" stroke="#78350f" strokeWidth="1.5"/>
-      <text x="268" y="24" textAnchor="middle" fontSize="7" fill="#78350f" fontWeight="700" fontFamily="sans-serif">ACCESS CONTROL</text>
-      <text x="268" y="36" textAnchor="middle" fontSize="7" fill="#78350f" fontWeight="700" fontFamily="sans-serif">PANEL</text>
-      <text x="268" y="48" textAnchor="middle" fontSize="6.5" fill="#78350f" fontFamily="sans-serif">(ACP)</text>
+      <SvgLabel x={268} y={36} text={c.panel} fill="#78350f" fontSize={7} bold />
 
-      {/* ── DOOR CONTACT ── top of frame */}
+      {/* Door Contact */}
       <rect x="84" y="8" width="44" height="16" fill="#fff" stroke="#991b1b" strokeWidth="1.5"/>
-      <text x="106" y="19" textAnchor="middle" fontSize="6.5" fill="#991b1b" fontWeight="700" fontFamily="sans-serif">DOOR CONTACT</text>
-      {/* wire: DC to panel */}
+      <SvgLabel x={106} y={19} text={c.contact} fill="#991b1b" fontSize={6.5} bold />
       <line x1="128" y1="16" x2="224" y2="16" stroke="#374151" strokeWidth="0.75" strokeDasharray="2,1.5"/>
 
-      {/* ── CARD READER ── left (exterior) */}
+      {/* Reader */}
       <rect x="4" y="80" width="58" height="30" fill="#fff" stroke="#1e40af" strokeWidth="1.5"/>
-      <text x="33" y="93" textAnchor="middle" fontSize="7" fill="#1e40af" fontWeight="700" fontFamily="sans-serif">CARD</text>
-      <text x="33" y="104" textAnchor="middle" fontSize="7" fill="#1e40af" fontWeight="700" fontFamily="sans-serif">READER</text>
-      {/* wire: Reader into wall */}
+      <SvgLabel x={33} y={98} text={c.reader} fill="#1e40af" fontSize={7} bold />
       <line x1="62" y1="95" x2="68" y2="95" stroke="#1e3a8a" strokeWidth="1.5"/>
 
-      {/* ── ELECTRIC LOCK ── in frame at mid-height */}
+      {/* Electric Lock */}
       <rect x="54" y="102" width="24" height="26" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
-      <text x="66" y="114" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontWeight="700" fontFamily="sans-serif">ELEC</text>
-      <text x="66" y="123" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontWeight="700" fontFamily="sans-serif">LOCK</text>
+      <SvgLabel x={66} y={118} text={c.lock} fill="#4c1d95" fontSize={5.5} bold />
 
-      {/* ── REX ── right (interior) */}
+      {/* REX */}
       <rect x="216" y="80" width="58" height="30" fill="#fff" stroke="#92400e" strokeWidth="1.5"/>
-      <text x="245" y="93" textAnchor="middle" fontSize="7" fill="#92400e" fontWeight="700" fontFamily="sans-serif">R.E.X.</text>
-      <text x="245" y="104" textAnchor="middle" fontSize="6" fill="#92400e" fontFamily="sans-serif">(Motion Exit)</text>
-      {/* wire: REX through door (dashed) */}
+      <SvgLabel x={245} y={98} text={c.rex} fill="#92400e" fontSize={7} bold />
       <line x1="210" y1="95" x2="216" y2="95" stroke="#78350f" strokeWidth="1" strokeDasharray="3,2"/>
 
-      {/* ── Main wire bus inside wall ── */}
-      {/* Vertical run down wall from top */}
+      {/* Wire bus */}
       <line x1="76" y1="22" x2="76" y2="130" stroke="#374151" strokeWidth="1"/>
-      {/* From panel top-left corner down to bus */}
       <line x1="224" y1="20" x2="76" y2="20" stroke="#374151" strokeWidth="1"/>
-      {/* Reader tap from bus */}
       <line x1="76" y1="95" x2="68" y2="95" stroke="#1e3a8a" strokeWidth="1"/>
-      {/* Lock tap from bus (power - red dashed) */}
       <line x1="76" y1="115" x2="78" y2="115" stroke="#7f1d1d" strokeWidth="1" strokeDasharray="3,1.5"/>
-      <line x1="76" y1="115" x2="76" y2="115" stroke="#7f1d1d" strokeWidth="1"/>
 
-      {/* Wire type legend at bottom */}
+      {/* Legend */}
       <line x1="4" y1="200" x2="22" y2="200" stroke="#374151" strokeWidth="1"/>
       <text x="24" y="203" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">RS-485</text>
       <line x1="74" y1="200" x2="92" y2="200" stroke="#7f1d1d" strokeWidth="1" strokeDasharray="3,1.5"/>
@@ -440,73 +460,58 @@ function SingleDoorSVG() {
   )
 }
 
-function DoubleDoorSVG() {
+function DoubleDoorSVG({ components = {} }) {
+  const c = { ...DEFAULT_COMPONENTS.double_door, ...components }
   return (
     <svg width="400" height="210" viewBox="0 0 400 210" style={{ display: 'block' }}>
-      {/* Left wall */}
+      {/* Walls */}
       <rect x="68" y="0" width="14" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
-      {/* Center post */}
       <rect x="194" y="0" width="12" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
-      {/* Right wall */}
       <rect x="318" y="0" width="14" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
-
-      {/* Door A (left leaf) */}
+      {/* Door A */}
       <rect x="82" y="22" width="112" height="166" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
       <path d="M82,188 Q194,188 194,22" fill="none" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,3"/>
       <rect x="82" y="28" width="6" height="12" fill="#9ca3af"/>
       <circle cx="172" cy="105" r="4" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
-
-      {/* Door B (right leaf) */}
+      {/* Door B */}
       <rect x="206" y="22" width="112" height="166" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
       <path d="M318,188 Q206,188 206,22" fill="none" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,3"/>
       <rect x="312" y="28" width="6" height="12" fill="#9ca3af"/>
       <circle cx="222" cy="105" r="4" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
 
-      {/* ── ACCESS CONTROL PANEL ── top-right */}
+      {/* Panel */}
       <rect x="336" y="8" width="56" height="50" fill="#fffbf5" stroke="#78350f" strokeWidth="1.5"/>
-      <text x="364" y="24" textAnchor="middle" fontSize="6.5" fill="#78350f" fontWeight="700" fontFamily="sans-serif">ACCESS</text>
-      <text x="364" y="34" textAnchor="middle" fontSize="6.5" fill="#78350f" fontWeight="700" fontFamily="sans-serif">CONTROL</text>
-      <text x="364" y="44" textAnchor="middle" fontSize="6.5" fill="#78350f" fontWeight="700" fontFamily="sans-serif">PANEL</text>
-      <text x="364" y="53" textAnchor="middle" fontSize="6" fill="#78350f" fontFamily="sans-serif">(ACP)</text>
+      <SvgLabel x={364} y={36} text={c.panel} fill="#78350f" fontSize={6.5} bold />
 
-      {/* ── DOOR CONTACTS ── */}
+      {/* Door Contacts */}
       <rect x="84" y="8" width="36" height="14" fill="#fff" stroke="#991b1b" strokeWidth="1.5"/>
-      <text x="102" y="18" textAnchor="middle" fontSize="6" fill="#991b1b" fontWeight="700" fontFamily="sans-serif">DOOR CT A</text>
+      <SvgLabel x={102} y={18} text={c.contactA} fill="#991b1b" fontSize={6} bold />
       <rect x="208" y="8" width="36" height="14" fill="#fff" stroke="#991b1b" strokeWidth="1.5"/>
-      <text x="226" y="18" textAnchor="middle" fontSize="6" fill="#991b1b" fontWeight="700" fontFamily="sans-serif">DOOR CT B</text>
+      <SvgLabel x={226} y={18} text={c.contactB} fill="#991b1b" fontSize={6} bold />
 
-      {/* ── READERS (both exterior left) ── */}
+      {/* Readers */}
       <rect x="4" y="70" width="58" height="26" fill="#fff" stroke="#1e40af" strokeWidth="1.5"/>
-      <text x="33" y="82" textAnchor="middle" fontSize="6.5" fill="#1e40af" fontWeight="700" fontFamily="sans-serif">READER A</text>
-      <text x="33" y="91" textAnchor="middle" fontSize="6" fill="#1e40af" fontFamily="sans-serif">(Exterior)</text>
+      <SvgLabel x={33} y={86} text={c.readerA} fill="#1e40af" fontSize={6.5} bold />
       <line x1="62" y1="83" x2="68" y2="83" stroke="#1e3a8a" strokeWidth="1.5"/>
-
       <rect x="4" y="106" width="58" height="26" fill="#fff" stroke="#1e40af" strokeWidth="1.5"/>
-      <text x="33" y="118" textAnchor="middle" fontSize="6.5" fill="#1e40af" fontWeight="700" fontFamily="sans-serif">READER B</text>
-      <text x="33" y="127" textAnchor="middle" fontSize="6" fill="#1e40af" fontFamily="sans-serif">(Exterior)</text>
+      <SvgLabel x={33} y={122} text={c.readerB} fill="#1e40af" fontSize={6.5} bold />
       <line x1="62" y1="119" x2="68" y2="119" stroke="#1e3a8a" strokeWidth="1.5"/>
 
-      {/* ── ELECTRIC LOCKS ── */}
+      {/* Locks */}
       <rect x="54" y="90" width="24" height="22" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
-      <text x="66" y="101" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontWeight="700" fontFamily="sans-serif">LOCK A</text>
-      <text x="66" y="109" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontFamily="sans-serif">(Power)</text>
-
+      <SvgLabel x={66} y={104} text={c.lockA} fill="#4c1d95" fontSize={5.5} bold />
       <rect x="320" y="90" width="24" height="22" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
-      <text x="332" y="101" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontWeight="700" fontFamily="sans-serif">LOCK B</text>
-      <text x="332" y="109" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontFamily="sans-serif">(Power)</text>
+      <SvgLabel x={332} y={104} text={c.lockB} fill="#4c1d95" fontSize={5.5} bold />
 
-      {/* ── REX (both interior) ── */}
+      {/* REX */}
       <rect x="334" y="70" width="52" height="26" fill="#fff" stroke="#92400e" strokeWidth="1.5"/>
-      <text x="360" y="82" textAnchor="middle" fontSize="6.5" fill="#92400e" fontWeight="700" fontFamily="sans-serif">REX A</text>
-      <text x="360" y="91" textAnchor="middle" fontSize="6" fill="#92400e" fontFamily="sans-serif">(Interior)</text>
+      <SvgLabel x={360} y={86} text={c.rexA} fill="#92400e" fontSize={6.5} bold />
       <line x1="318" y1="83" x2="334" y2="83" stroke="#78350f" strokeWidth="1" strokeDasharray="3,2"/>
-
       <rect x="334" y="106" width="52" height="26" fill="#fff" stroke="#92400e" strokeWidth="1.5"/>
-      <text x="360" y="118" textAnchor="middle" fontSize="6.5" fill="#92400e" fontWeight="700" fontFamily="sans-serif">REX B</text>
-      <text x="360" y="127" textAnchor="middle" fontSize="6" fill="#92400e" fontFamily="sans-serif">(Interior)</text>
+      <SvgLabel x={360} y={122} text={c.rexB} fill="#92400e" fontSize={6.5} bold />
       <line x1="318" y1="119" x2="334" y2="119" stroke="#78350f" strokeWidth="1" strokeDasharray="3,2"/>
 
-      {/* Wire bus inside left wall */}
+      {/* Wire bus */}
       <line x1="76" y1="20" x2="76" y2="140" stroke="#374151" strokeWidth="1"/>
       <line x1="76" y1="20" x2="336" y2="20" stroke="#374151" strokeWidth="1"/>
 
@@ -523,6 +528,7 @@ function DoubleDoorSVG() {
 
 function SchematicNode({ data, selected }) {
   const isDouble = data.schematicType === 'double_door'
+  const components = { ...(DEFAULT_COMPONENTS[data.schematicType] || {}), ...(data.components || {}) }
   return (
     <div
       className="select-none"
@@ -542,7 +548,7 @@ function SchematicNode({ data, selected }) {
         </span>
         {data.label && <span style={{ fontSize: 11, fontWeight: 700, color: '#111827' }}>{data.label}</span>}
       </div>
-      {isDouble ? <DoubleDoorSVG /> : <SingleDoorSVG />}
+      {isDouble ? <DoubleDoorSVG components={components} /> : <SingleDoorSVG components={components} />}
       <Handle type="source" position={Position.Bottom} />
     </div>
   )
@@ -723,7 +729,7 @@ export default function SLDTab({ proposalId, orgId }) {
           position_x: tn.position_x + offsetX,
           position_y: tn.position_y + offsetY,
           data: isSchematic
-            ? { ...(tn.data || {}) }
+            ? { schematicType: tn.data?.schematicType, components: { ...(DEFAULT_COMPONENTS[tn.data?.schematicType] || {}), ...(tn.data?.components || {}) } }
             : { ...(tn.data || {}), quantity: tn.data?.quantity || 1 },
         }
       })
@@ -775,7 +781,7 @@ export default function SLDTab({ proposalId, orgId }) {
         type: n.node_type === 'schematic' ? 'schematic' : 'device',
         position: { x: n.position_x, y: n.position_y },
         data: n.node_type === 'schematic'
-          ? { label: n.label, schematicType: n.data?.schematicType }
+          ? { label: n.label, schematicType: n.data?.schematicType, components: n.data?.components || {} }
           : { label: n.label, category: n.data?.category, quantity: n.data?.quantity, notes: n.data?.notes, global_product_id: n.global_product_id },
       })))
 
@@ -896,6 +902,16 @@ export default function SLDTab({ proposalId, orgId }) {
     await supabase.from('sld_nodes').update(
       field === 'label' ? { label: value } : { data: { ...selectedNode.data, [field]: value } }
     ).eq('id', selectedNode.id)
+  }
+
+  const updateSchematicComponent = async (key, value) => {
+    if (!selectedNode) return
+    const newComponents = { ...(selectedNode.data.components || {}), [key]: value }
+    const newData = { ...selectedNode.data, components: newComponents }
+    const updated = { ...selectedNode, data: newData }
+    setSelectedNode(updated)
+    setNodes(ns => ns.map(n => n.id === selectedNode.id ? updated : n))
+    await supabase.from('sld_nodes').update({ data: newData }).eq('id', selectedNode.id)
   }
 
   const updateEdgeType = async (wt) => {
@@ -1196,6 +1212,143 @@ export default function SLDTab({ proposalId, orgId }) {
         pdf.text(wt.label, lx + 12, legendY + 4.5)
         lx += 40
       })
+
+      // ── Typicals detail page ──────────────────────────────────────────────
+      const schematicNodes = nodes.filter(n => n.type === 'schematic')
+      if (schematicNodes.length > 0) {
+        pdf.addPage('a3', 'landscape')
+        // Page header
+        pdf.setFillColor(15, 28, 46)
+        pdf.rect(0, 0, PW, HEADER - 2, 'F')
+        pdf.setTextColor(200, 98, 42)
+        pdf.setFontSize(11)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('ForgePt · Typical Details', 10, 8)
+        pdf.setTextColor(138, 154, 176)
+        pdf.setFontSize(8)
+        pdf.setFont('helvetica', 'normal')
+        pdf.text(diagramName, 10, 13)
+        pdf.text(new Date().toLocaleDateString(), PW - 10, 13, { align: 'right' })
+
+        // Draw each schematic as a detail panel, 2 per row
+        const panW = 190, panH = 120, marginX = 10, marginY = HEADER + 4, gapX = 10, gapY = 8
+        schematicNodes.forEach((sn, idx) => {
+          const col = idx % 2
+          const row = Math.floor(idx / 2)
+          const ox = marginX + col * (panW + gapX)
+          const oy = marginY + row * (panH + gapY)
+          const c = { ...(DEFAULT_COMPONENTS[sn.data.schematicType] || {}), ...(sn.data.components || {}) }
+          const isDouble = sn.data.schematicType === 'double_door'
+
+          // Panel border + title
+          pdf.setDrawColor(55, 65, 81)
+          pdf.setLineWidth(0.4)
+          pdf.rect(ox, oy, panW, panH)
+          pdf.setFillColor(248, 249, 250)
+          pdf.rect(ox, oy, panW, 8, 'F')
+          pdf.setFont('helvetica', 'bold')
+          pdf.setFontSize(7)
+          pdf.setTextColor(30, 30, 40)
+          pdf.text(isDouble ? 'TYPICAL DOUBLE DOOR' : 'TYPICAL SINGLE DOOR', ox + 3, oy + 5.5)
+          if (sn.data.label) {
+            pdf.setTextColor(200, 98, 42)
+            pdf.text(sn.data.label, ox + panW - 3, oy + 5.5, { align: 'right' })
+          }
+
+          // Drawing area
+          const dx = ox + 2, dy = oy + 10
+          const dwH = panH - 14
+
+          const hexToRgb = (hex) => {
+            const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16)
+            return [r,g,b]
+          }
+          const setColor = (hex) => { const [r,g,b] = hexToRgb(hex); pdf.setDrawColor(r,g,b); pdf.setTextColor(r,g,b) }
+          const box = (bx, by, bw, bh, strokeHex, label, labelHex) => {
+            setColor(strokeHex)
+            pdf.setLineWidth(0.4)
+            pdf.rect(bx, by, bw, bh)
+            if (label) {
+              setColor(labelHex || strokeHex)
+              pdf.setFont('helvetica', 'bold')
+              pdf.setFontSize(5)
+              const lines = label.length > 12 ? [label.substring(0,12), label.substring(12)] : [label]
+              lines.forEach((ln, li) => pdf.text(ln, bx + bw/2, by + bh/2 - (lines.length-1)*2 + li*4, { align: 'center' }))
+            }
+          }
+
+          if (!isDouble) {
+            // Wall
+            pdf.setFillColor(209,213,219)
+            pdf.rect(dx+26, dy, 6, dwH, 'FD')
+            // Door
+            pdf.setFillColor(243,244,246)
+            pdf.setDrawColor(55,65,81)
+            pdf.rect(dx+32, dy+8, 50, dwH-10, 'FD')
+            // Swing arc
+            pdf.setLineDashPattern([2,2], 0)
+            pdf.setDrawColor(209,213,219)
+            pdf.lines([[0, dwH-18, 50, 0]], dx+32, dy+dwH-2, [1,1], 'S', false)
+            pdf.setLineDashPattern([], 0)
+            // Door handle
+            pdf.setDrawColor(156,163,175)
+            pdf.circle(dx+74, dy+dwH/2, 2, 'S')
+
+            // Components
+            box(dx+80, dy+4, 36, 16, '#78350f', c.panel, '#78350f')
+            box(dx+32, dy+3, 18, 6, '#991b1b', c.contact, '#991b1b')
+            box(dx+1, dy+dwH/2-8, 24, 12, '#1e40af', c.reader, '#1e40af')
+            box(dx+21, dy+dwH/2, 10, 10, '#4c1d95', c.lock, '#4c1d95')
+            box(dx+84, dy+dwH/2-8, 24, 12, '#92400e', c.rex, '#92400e')
+
+            // Wires
+            pdf.setDrawColor(55,65,81); pdf.setLineWidth(0.3)
+            pdf.line(dx+116, dy+10, dx+32, dy+10)  // panel to frame top
+            pdf.line(dx+32, dy+10, dx+32, dy+dwH-4) // down wall
+            pdf.line(dx+32, dy+dwH/2-2, dx+25, dy+dwH/2-2) // to reader
+            pdf.setLineDashPattern([1.5,1], 0)
+            pdf.setDrawColor(127,29,29)
+            pdf.line(dx+32, dy+dwH/2+5, dx+31, dy+dwH/2+5) // lock power
+            pdf.setLineDashPattern([], 0)
+          } else {
+            // Double door — simplified layout
+            pdf.setFillColor(209,213,219)
+            pdf.rect(dx+20, dy, 6, dwH, 'FD')  // left wall
+            pdf.rect(dx+76, dy, 5, dwH, 'FD')  // center post
+            pdf.rect(dx+132, dy, 6, dwH, 'FD') // right wall
+            pdf.setFillColor(243,244,246); pdf.setDrawColor(55,65,81)
+            pdf.rect(dx+26, dy+8, 50, dwH-10, 'FD') // door A
+            pdf.rect(dx+81, dy+8, 50, dwH-10, 'FD') // door B
+
+            box(dx+142, dy+4, 30, 18, '#78350f', c.panel, '#78350f')
+            box(dx+26, dy+3, 16, 6, '#991b1b', c.contactA, '#991b1b')
+            box(dx+81, dy+3, 16, 6, '#991b1b', c.contactB, '#991b1b')
+            box(dx+1, dy+dwH/2-18, 18, 10, '#1e40af', c.readerA, '#1e40af')
+            box(dx+1, dy+dwH/2+2, 18, 10, '#1e40af', c.readerB, '#1e40af')
+            box(dx+15, dy+dwH/2-8, 8, 10, '#4c1d95', c.lockA, '#4c1d95')
+            box(dx+136, dy+dwH/2-8, 8, 10, '#4c1d95', c.lockB, '#4c1d95')
+            box(dx+144, dy+dwH/2-18, 18, 10, '#92400e', c.rexA, '#92400e')
+            box(dx+144, dy+dwH/2+2, 18, 10, '#92400e', c.rexB, '#92400e')
+
+            pdf.setDrawColor(55,65,81); pdf.setLineWidth(0.3)
+            pdf.line(dx+142, dy+10, dx+26, dy+10)
+            pdf.line(dx+26, dy+10, dx+26, dy+dwH-4)
+          }
+
+          // Callout legend
+          pdf.setFont('helvetica', 'normal')
+          pdf.setFontSize(4.5)
+          pdf.setDrawColor(55,65,81); pdf.setTextColor(107,114,128)
+          pdf.line(dx, dy+dwH+3, dx+12, dy+dwH+3)
+          pdf.text('RS-485', dx+13, dy+dwH+4)
+          pdf.setLineDashPattern([1.5,1], 0)
+          pdf.setDrawColor(127,29,29)
+          pdf.line(dx+30, dy+dwH+3, dx+42, dy+dwH+3)
+          pdf.setTextColor(107,114,128)
+          pdf.text('Power', dx+43, dy+dwH+4)
+          pdf.setLineDashPattern([], 0)
+        })
+      }
 
       pdf.save(`${diagramName.replace(/[^a-z0-9]/gi, '_')}.pdf`)
     } catch (err) {
@@ -1583,7 +1736,39 @@ export default function SLDTab({ proposalId, orgId }) {
               </button>
             </div>
 
-            {selectedNode && (
+            {selectedNode && selectedNode.type === 'schematic' ? (
+              <div className="p-3 space-y-3">
+                <div>
+                  <label className="text-xs block mb-1" style={{ color: '#8A9AB0' }}>Door Name</label>
+                  <input
+                    value={selectedNode.data.label || ''}
+                    onChange={e => updateNodeData('label', e.target.value)}
+                    className="w-full text-xs border border-[#2a3d55] rounded px-2 py-1.5 focus:outline-none focus:border-[#C8622A]"
+                    style={{ background: '#0F1923', color: '#E8EEF5' }}
+                  />
+                </div>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#8A9AB0' }}>Components</p>
+                {Object.entries(DEFAULT_COMPONENTS[selectedNode.data.schematicType] || {}).map(([key, defaultVal]) => (
+                  <div key={key}>
+                    <label className="text-xs block mb-1 capitalize" style={{ color: '#8A9AB0' }}>
+                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}
+                    </label>
+                    <input
+                      value={(selectedNode.data.components || {})[key] ?? defaultVal}
+                      onChange={e => updateSchematicComponent(key, e.target.value)}
+                      className="w-full text-xs border border-[#2a3d55] rounded px-2 py-1.5 focus:outline-none focus:border-[#C8622A]"
+                      style={{ background: '#0F1923', color: '#E8EEF5' }}
+                    />
+                  </div>
+                ))}
+                <button
+                  onClick={deleteSelected}
+                  className="w-full text-xs text-red-400 hover:text-red-300 border border-red-900/50 hover:border-red-400/50 rounded-md py-1.5 transition-colors"
+                >
+                  Delete Node
+                </button>
+              </div>
+            ) : selectedNode ? (
               <div className="p-3 space-y-3">
                 <div>
                   <label className="text-xs block mb-1" style={{ color: '#8A9AB0' }}>Label</label>
@@ -1632,7 +1817,7 @@ export default function SLDTab({ proposalId, orgId }) {
                   Delete Node
                 </button>
               </div>
-            )}
+            ) : null}
 
             {selectedEdge && (
               <div className="p-3 space-y-3">
