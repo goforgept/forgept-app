@@ -139,46 +139,20 @@ const BUILT_IN_TYPICALS = [
   {
     id: 'builtin-single-door',
     name: 'Typical Single Door',
-    description: 'Card reader, REX, door contact + electric lock wired to an access control panel',
+    description: 'Reader, REX, door contact + electric lock — schematic installation diagram',
     sld_typical_nodes: [
-      { id: 'n1', label: 'Card Reader',         node_type: 'device', position_x: 0,   position_y: 0,   data: { category: 'Door Reader',          quantity: 1 } },
-      { id: 'n2', label: 'REX',                 node_type: 'device', position_x: 200, position_y: 0,   data: { category: 'Request to Exit',      quantity: 1 } },
-      { id: 'n3', label: 'Door Contact',        node_type: 'device', position_x: 400, position_y: 0,   data: { category: 'Door Contact',         quantity: 1 } },
-      { id: 'n4', label: 'Electric Lock',       node_type: 'device', position_x: 600, position_y: 0,   data: { category: 'Electric Lock',        quantity: 1 } },
-      { id: 'n5', label: 'Access Control Panel',node_type: 'device', position_x: 200, position_y: 220, data: { category: 'Access Control Panel', quantity: 1 } },
+      { id: 'n1', label: 'Single Door', node_type: 'schematic', position_x: 0, position_y: 0, data: { schematicType: 'single_door' } },
     ],
-    sld_typical_edges: [
-      { id: 'e1', source_node_id: 'n1', target_node_id: 'n5', wire_type: 'rs485' },
-      { id: 'e2', source_node_id: 'n2', target_node_id: 'n5', wire_type: 'rs485' },
-      { id: 'e3', source_node_id: 'n3', target_node_id: 'n5', wire_type: 'default' },
-      { id: 'e4', source_node_id: 'n4', target_node_id: 'n5', wire_type: 'power' },
-    ],
+    sld_typical_edges: [],
   },
   {
     id: 'builtin-double-door',
     name: 'Typical Double Door',
-    description: 'Two readers, two REX, two contacts + two locks into one access control panel',
+    description: 'Two readers, two REX, two contacts + two locks — schematic installation diagram',
     sld_typical_nodes: [
-      { id: 'n1', label: 'Card Reader A',       node_type: 'device', position_x: 0,   position_y: 0,   data: { category: 'Door Reader',          quantity: 1 } },
-      { id: 'n2', label: 'REX A',               node_type: 'device', position_x: 200, position_y: 0,   data: { category: 'Request to Exit',      quantity: 1 } },
-      { id: 'n3', label: 'Door Contact A',      node_type: 'device', position_x: 400, position_y: 0,   data: { category: 'Door Contact',         quantity: 1 } },
-      { id: 'n4', label: 'Electric Lock A',     node_type: 'device', position_x: 600, position_y: 0,   data: { category: 'Electric Lock',        quantity: 1 } },
-      { id: 'n5', label: 'Card Reader B',       node_type: 'device', position_x: 0,   position_y: 200, data: { category: 'Door Reader',          quantity: 1 } },
-      { id: 'n6', label: 'REX B',               node_type: 'device', position_x: 200, position_y: 200, data: { category: 'Request to Exit',      quantity: 1 } },
-      { id: 'n7', label: 'Door Contact B',      node_type: 'device', position_x: 400, position_y: 200, data: { category: 'Door Contact',         quantity: 1 } },
-      { id: 'n8', label: 'Electric Lock B',     node_type: 'device', position_x: 600, position_y: 200, data: { category: 'Electric Lock',        quantity: 1 } },
-      { id: 'n9', label: 'Access Control Panel',node_type: 'device', position_x: 200, position_y: 420, data: { category: 'Access Control Panel', quantity: 1 } },
+      { id: 'n1', label: 'Double Door', node_type: 'schematic', position_x: 0, position_y: 0, data: { schematicType: 'double_door' } },
     ],
-    sld_typical_edges: [
-      { id: 'e1', source_node_id: 'n1', target_node_id: 'n9', wire_type: 'rs485' },
-      { id: 'e2', source_node_id: 'n2', target_node_id: 'n9', wire_type: 'rs485' },
-      { id: 'e3', source_node_id: 'n3', target_node_id: 'n9', wire_type: 'default' },
-      { id: 'e4', source_node_id: 'n4', target_node_id: 'n9', wire_type: 'power' },
-      { id: 'e5', source_node_id: 'n5', target_node_id: 'n9', wire_type: 'rs485' },
-      { id: 'e6', source_node_id: 'n6', target_node_id: 'n9', wire_type: 'rs485' },
-      { id: 'e7', source_node_id: 'n7', target_node_id: 'n9', wire_type: 'default' },
-      { id: 'e8', source_node_id: 'n8', target_node_id: 'n9', wire_type: 'power' },
-    ],
+    sld_typical_edges: [],
   },
   {
     id: 'builtin-ip-camera',
@@ -394,7 +368,187 @@ function DeviceNode({ data, selected }) {
   )
 }
 
-const nodeTypes = { device: DeviceNode }
+// ─── Schematic node — visual installation diagram ────────────────────────────
+
+function SingleDoorSVG() {
+  return (
+    <svg width="320" height="210" viewBox="0 0 320 210" style={{ display: 'block' }}>
+      {/* Wall section */}
+      <rect x="68" y="0" width="16" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
+
+      {/* Door panel */}
+      <rect x="84" y="22" width="126" height="166" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
+      {/* Door swing arc */}
+      <path d="M84,188 Q210,188 210,22" fill="none" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,3"/>
+      {/* Door hinge stubs */}
+      <rect x="84" y="28" width="6" height="12" fill="#9ca3af"/>
+      <rect x="84" y="160" width="6" height="12" fill="#9ca3af"/>
+      {/* Door handle */}
+      <circle cx="192" cy="105" r="5" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
+      <line x1="192" y1="100" x2="192" y2="90" stroke="#6b7280" strokeWidth="1.5"/>
+
+      {/* ── ACCESS CONTROL PANEL ── top-right */}
+      <rect x="224" y="8" width="88" height="50" fill="#fffbf5" stroke="#78350f" strokeWidth="1.5"/>
+      <text x="268" y="24" textAnchor="middle" fontSize="7" fill="#78350f" fontWeight="700" fontFamily="sans-serif">ACCESS CONTROL</text>
+      <text x="268" y="36" textAnchor="middle" fontSize="7" fill="#78350f" fontWeight="700" fontFamily="sans-serif">PANEL</text>
+      <text x="268" y="48" textAnchor="middle" fontSize="6.5" fill="#78350f" fontFamily="sans-serif">(ACP)</text>
+
+      {/* ── DOOR CONTACT ── top of frame */}
+      <rect x="84" y="8" width="44" height="16" fill="#fff" stroke="#991b1b" strokeWidth="1.5"/>
+      <text x="106" y="19" textAnchor="middle" fontSize="6.5" fill="#991b1b" fontWeight="700" fontFamily="sans-serif">DOOR CONTACT</text>
+      {/* wire: DC to panel */}
+      <line x1="128" y1="16" x2="224" y2="16" stroke="#374151" strokeWidth="0.75" strokeDasharray="2,1.5"/>
+
+      {/* ── CARD READER ── left (exterior) */}
+      <rect x="4" y="80" width="58" height="30" fill="#fff" stroke="#1e40af" strokeWidth="1.5"/>
+      <text x="33" y="93" textAnchor="middle" fontSize="7" fill="#1e40af" fontWeight="700" fontFamily="sans-serif">CARD</text>
+      <text x="33" y="104" textAnchor="middle" fontSize="7" fill="#1e40af" fontWeight="700" fontFamily="sans-serif">READER</text>
+      {/* wire: Reader into wall */}
+      <line x1="62" y1="95" x2="68" y2="95" stroke="#1e3a8a" strokeWidth="1.5"/>
+
+      {/* ── ELECTRIC LOCK ── in frame at mid-height */}
+      <rect x="54" y="102" width="24" height="26" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
+      <text x="66" y="114" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontWeight="700" fontFamily="sans-serif">ELEC</text>
+      <text x="66" y="123" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontWeight="700" fontFamily="sans-serif">LOCK</text>
+
+      {/* ── REX ── right (interior) */}
+      <rect x="216" y="80" width="58" height="30" fill="#fff" stroke="#92400e" strokeWidth="1.5"/>
+      <text x="245" y="93" textAnchor="middle" fontSize="7" fill="#92400e" fontWeight="700" fontFamily="sans-serif">R.E.X.</text>
+      <text x="245" y="104" textAnchor="middle" fontSize="6" fill="#92400e" fontFamily="sans-serif">(Motion Exit)</text>
+      {/* wire: REX through door (dashed) */}
+      <line x1="210" y1="95" x2="216" y2="95" stroke="#78350f" strokeWidth="1" strokeDasharray="3,2"/>
+
+      {/* ── Main wire bus inside wall ── */}
+      {/* Vertical run down wall from top */}
+      <line x1="76" y1="22" x2="76" y2="130" stroke="#374151" strokeWidth="1"/>
+      {/* From panel top-left corner down to bus */}
+      <line x1="224" y1="20" x2="76" y2="20" stroke="#374151" strokeWidth="1"/>
+      {/* Reader tap from bus */}
+      <line x1="76" y1="95" x2="68" y2="95" stroke="#1e3a8a" strokeWidth="1"/>
+      {/* Lock tap from bus (power - red dashed) */}
+      <line x1="76" y1="115" x2="78" y2="115" stroke="#7f1d1d" strokeWidth="1" strokeDasharray="3,1.5"/>
+      <line x1="76" y1="115" x2="76" y2="115" stroke="#7f1d1d" strokeWidth="1"/>
+
+      {/* Wire type legend at bottom */}
+      <line x1="4" y1="200" x2="22" y2="200" stroke="#374151" strokeWidth="1"/>
+      <text x="24" y="203" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">RS-485</text>
+      <line x1="74" y1="200" x2="92" y2="200" stroke="#7f1d1d" strokeWidth="1" strokeDasharray="3,1.5"/>
+      <text x="94" y="203" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Power</text>
+      <line x1="134" y1="200" x2="152" y2="200" stroke="#374151" strokeWidth="1" strokeDasharray="2,1.5"/>
+      <text x="154" y="203" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Data</text>
+    </svg>
+  )
+}
+
+function DoubleDoorSVG() {
+  return (
+    <svg width="400" height="210" viewBox="0 0 400 210" style={{ display: 'block' }}>
+      {/* Left wall */}
+      <rect x="68" y="0" width="14" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
+      {/* Center post */}
+      <rect x="194" y="0" width="12" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
+      {/* Right wall */}
+      <rect x="318" y="0" width="14" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
+
+      {/* Door A (left leaf) */}
+      <rect x="82" y="22" width="112" height="166" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
+      <path d="M82,188 Q194,188 194,22" fill="none" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,3"/>
+      <rect x="82" y="28" width="6" height="12" fill="#9ca3af"/>
+      <circle cx="172" cy="105" r="4" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
+
+      {/* Door B (right leaf) */}
+      <rect x="206" y="22" width="112" height="166" fill="#f3f4f6" stroke="#374151" strokeWidth="1.5"/>
+      <path d="M318,188 Q206,188 206,22" fill="none" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,3"/>
+      <rect x="312" y="28" width="6" height="12" fill="#9ca3af"/>
+      <circle cx="222" cy="105" r="4" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
+
+      {/* ── ACCESS CONTROL PANEL ── top-right */}
+      <rect x="336" y="8" width="56" height="50" fill="#fffbf5" stroke="#78350f" strokeWidth="1.5"/>
+      <text x="364" y="24" textAnchor="middle" fontSize="6.5" fill="#78350f" fontWeight="700" fontFamily="sans-serif">ACCESS</text>
+      <text x="364" y="34" textAnchor="middle" fontSize="6.5" fill="#78350f" fontWeight="700" fontFamily="sans-serif">CONTROL</text>
+      <text x="364" y="44" textAnchor="middle" fontSize="6.5" fill="#78350f" fontWeight="700" fontFamily="sans-serif">PANEL</text>
+      <text x="364" y="53" textAnchor="middle" fontSize="6" fill="#78350f" fontFamily="sans-serif">(ACP)</text>
+
+      {/* ── DOOR CONTACTS ── */}
+      <rect x="84" y="8" width="36" height="14" fill="#fff" stroke="#991b1b" strokeWidth="1.5"/>
+      <text x="102" y="18" textAnchor="middle" fontSize="6" fill="#991b1b" fontWeight="700" fontFamily="sans-serif">DOOR CT A</text>
+      <rect x="208" y="8" width="36" height="14" fill="#fff" stroke="#991b1b" strokeWidth="1.5"/>
+      <text x="226" y="18" textAnchor="middle" fontSize="6" fill="#991b1b" fontWeight="700" fontFamily="sans-serif">DOOR CT B</text>
+
+      {/* ── READERS (both exterior left) ── */}
+      <rect x="4" y="70" width="58" height="26" fill="#fff" stroke="#1e40af" strokeWidth="1.5"/>
+      <text x="33" y="82" textAnchor="middle" fontSize="6.5" fill="#1e40af" fontWeight="700" fontFamily="sans-serif">READER A</text>
+      <text x="33" y="91" textAnchor="middle" fontSize="6" fill="#1e40af" fontFamily="sans-serif">(Exterior)</text>
+      <line x1="62" y1="83" x2="68" y2="83" stroke="#1e3a8a" strokeWidth="1.5"/>
+
+      <rect x="4" y="106" width="58" height="26" fill="#fff" stroke="#1e40af" strokeWidth="1.5"/>
+      <text x="33" y="118" textAnchor="middle" fontSize="6.5" fill="#1e40af" fontWeight="700" fontFamily="sans-serif">READER B</text>
+      <text x="33" y="127" textAnchor="middle" fontSize="6" fill="#1e40af" fontFamily="sans-serif">(Exterior)</text>
+      <line x1="62" y1="119" x2="68" y2="119" stroke="#1e3a8a" strokeWidth="1.5"/>
+
+      {/* ── ELECTRIC LOCKS ── */}
+      <rect x="54" y="90" width="24" height="22" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
+      <text x="66" y="101" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontWeight="700" fontFamily="sans-serif">LOCK A</text>
+      <text x="66" y="109" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontFamily="sans-serif">(Power)</text>
+
+      <rect x="320" y="90" width="24" height="22" fill="#fff" stroke="#4c1d95" strokeWidth="1.5"/>
+      <text x="332" y="101" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontWeight="700" fontFamily="sans-serif">LOCK B</text>
+      <text x="332" y="109" textAnchor="middle" fontSize="5.5" fill="#4c1d95" fontFamily="sans-serif">(Power)</text>
+
+      {/* ── REX (both interior) ── */}
+      <rect x="334" y="70" width="52" height="26" fill="#fff" stroke="#92400e" strokeWidth="1.5"/>
+      <text x="360" y="82" textAnchor="middle" fontSize="6.5" fill="#92400e" fontWeight="700" fontFamily="sans-serif">REX A</text>
+      <text x="360" y="91" textAnchor="middle" fontSize="6" fill="#92400e" fontFamily="sans-serif">(Interior)</text>
+      <line x1="318" y1="83" x2="334" y2="83" stroke="#78350f" strokeWidth="1" strokeDasharray="3,2"/>
+
+      <rect x="334" y="106" width="52" height="26" fill="#fff" stroke="#92400e" strokeWidth="1.5"/>
+      <text x="360" y="118" textAnchor="middle" fontSize="6.5" fill="#92400e" fontWeight="700" fontFamily="sans-serif">REX B</text>
+      <text x="360" y="127" textAnchor="middle" fontSize="6" fill="#92400e" fontFamily="sans-serif">(Interior)</text>
+      <line x1="318" y1="119" x2="334" y2="119" stroke="#78350f" strokeWidth="1" strokeDasharray="3,2"/>
+
+      {/* Wire bus inside left wall */}
+      <line x1="76" y1="20" x2="76" y2="140" stroke="#374151" strokeWidth="1"/>
+      <line x1="76" y1="20" x2="336" y2="20" stroke="#374151" strokeWidth="1"/>
+
+      {/* Legend */}
+      <line x1="4" y1="202" x2="18" y2="202" stroke="#374151" strokeWidth="1"/>
+      <text x="20" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">RS-485</text>
+      <line x1="62" y1="202" x2="76" y2="202" stroke="#7f1d1d" strokeWidth="1" strokeDasharray="3,1.5"/>
+      <text x="78" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Power</text>
+      <line x1="116" y1="202" x2="130" y2="202" stroke="#374151" strokeWidth="1" strokeDasharray="2,1.5"/>
+      <text x="132" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Data</text>
+    </svg>
+  )
+}
+
+function SchematicNode({ data, selected }) {
+  const isDouble = data.schematicType === 'double_door'
+  return (
+    <div
+      className="select-none"
+      style={{
+        background: '#ffffff',
+        border: selected ? '2px solid #C8622A' : '1.5px solid #374151',
+        borderTop: selected ? '2px solid #C8622A' : '3px solid #374151',
+        boxShadow: selected ? '0 0 0 2px rgba(200,98,42,0.25)' : '0 1px 3px rgba(0,0,0,0.12)',
+        width: isDouble ? 400 : 320,
+        fontFamily: 'sans-serif',
+      }}
+    >
+      <Handle type="target" position={Position.Top} />
+      <div style={{ padding: '5px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: 9, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#6b7280' }}>
+          {isDouble ? 'Typical Double Door' : 'Typical Single Door'}
+        </span>
+        {data.label && <span style={{ fontSize: 11, fontWeight: 700, color: '#111827' }}>{data.label}</span>}
+      </div>
+      {isDouble ? <DoubleDoorSVG /> : <SingleDoorSVG />}
+      <Handle type="source" position={Position.Bottom} />
+    </div>
+  )
+}
+
+const nodeTypes = { device: DeviceNode, schematic: SchematicNode }
 
 // ─── SLDTab ───────────────────────────────────────────────────────────────────
 
@@ -559,15 +713,20 @@ export default function SLDTab({ proposalId, orgId }) {
         : 80
       const offsetY = 80
 
-      const nodeInserts = (typical.sld_typical_nodes || []).map(tn => ({
-        sheet_id: activeSheetId,
-        global_product_id: tn.global_product_id || null,
-        label: prefix ? `${prefix} - ${tn.label}` : tn.label,
-        node_type: 'device',
-        position_x: tn.position_x + offsetX,
-        position_y: tn.position_y + offsetY,
-        data: { ...(tn.data || {}), quantity: tn.data?.quantity || 1 },
-      }))
+      const nodeInserts = (typical.sld_typical_nodes || []).map(tn => {
+        const isSchematic = tn.node_type === 'schematic'
+        return {
+          sheet_id: activeSheetId,
+          global_product_id: tn.global_product_id || null,
+          label: prefix ? `${prefix}` : tn.label,
+          node_type: tn.node_type || 'device',
+          position_x: tn.position_x + offsetX,
+          position_y: tn.position_y + offsetY,
+          data: isSchematic
+            ? { ...(tn.data || {}) }
+            : { ...(tn.data || {}), quantity: tn.data?.quantity || 1 },
+        }
+      })
 
       const { data: insertedNodes } = await supabase
         .from('sld_nodes').insert(nodeInserts).select('id, position_x, position_y, label, data')
@@ -613,9 +772,11 @@ export default function SLDTab({ proposalId, orgId }) {
 
       setNodes((sldNodes || []).map(n => ({
         id: n.id,
-        type: 'device',
+        type: n.node_type === 'schematic' ? 'schematic' : 'device',
         position: { x: n.position_x, y: n.position_y },
-        data: { label: n.label, category: n.data?.category, quantity: n.data?.quantity, notes: n.data?.notes, global_product_id: n.global_product_id },
+        data: n.node_type === 'schematic'
+          ? { label: n.label, schematicType: n.data?.schematicType }
+          : { label: n.label, category: n.data?.category, quantity: n.data?.quantity, notes: n.data?.notes, global_product_id: n.global_product_id },
       })))
 
       setEdges((sldEdges || []).map(e => {
