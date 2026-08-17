@@ -190,6 +190,20 @@ const COMP_SIZE = {
   },
 }
 
+// Default wire runs shown in each schematic (stored in data.wires; undefined = use these defaults)
+const DEFAULT_WIRES = {
+  single_door: [
+    { id: 'bus-v',      x1: 76,  y1: 22,  x2: 76,  y2: 130, stroke: '#374151', dash: null },
+    { id: 'bus-h',      x1: 76,  y1: 20,  x2: 224, y2: 20,  stroke: '#374151', dash: null },
+    { id: 'reader-run', x1: 62,  y1: 93,  x2: 76,  y2: 93,  stroke: '#1e3a8a', dash: null },
+    { id: 'lock-power', x1: 54,  y1: 128, x2: 76,  y2: 128, stroke: '#7f1d1d', dash: '3,1.5' },
+  ],
+  double_door: [
+    { id: 'bus-v',  x1: 76, y1: 20, x2: 76,  y2: 140, stroke: '#374151', dash: null },
+    { id: 'bus-h',  x1: 76, y1: 20, x2: 336, y2: 20,  stroke: '#374151', dash: null },
+  ],
+}
+
 // Short cable-type labels shown next to each wire on the canvas and PDF
 const WIRE_LABELS = {
   default:  'CAT6',
@@ -454,59 +468,171 @@ function SvgLabel({ x, y, text, fill, fontSize = 7, bold = false }) {
   )
 }
 
-function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, onPositionChange }) {
-  const c = { ...DEFAULT_COMPONENTS.single_door, ...components }
-  const [dragging, setDragging] = useState(null)
-  const [livePos, setLivePos]   = useState({})
+function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, sizes = {}, wires, onUpdate }) {
+  const c      = { ...DEFAULT_COMPONENTS.single_door, ...components }
   const svgRef = useRef(null)
   const isMag  = lockType === 'mag'
 
-  const getPos  = (key) => (dragging?.key === key && livePos[key]) || positions[key] || COMP_DEFAULT_POS.single_door(key, lockType)
-  const getSize = (key) => COMP_SIZE.single_door(key, lockType)
+  const [drag,      setDrag]      = useState(null)
+  const [livePos,   setLivePos]   = useState({})
+  const [liveWires, setLiveWires] = useState({})
+  const [liveSizes, setLiveSizes] = useState({})
+  const [selWire,   setSelWire]   = useState(null)
 
-  const startDrag = (e, key) => {
-    e.stopPropagation()
-    e.preventDefault()
-    const svg  = svgRef.current
-    if (!svg) return
+  const srcWires   = wires !== undefined ? wires : DEFAULT_WIRES.single_door
+  const activeWires = srcWires.map(w => ({ ...w, ...(liveWires[w.id] || {}) }))
+
+  const getPos  = (key) => livePos[key] || positions[key] || COMP_DEFAULT_POS.single_door(key, lockType)
+  const getSize = (key) => {
+    const ov  = liveSizes[key] || sizes[key]
+    const def = COMP_SIZE.single_door(key, lockType)
+    return ov ? { w: ov.w ?? def.w, h: ov.h ?? def.h } : def
+  }
+
+  const getSvgScale = () => {
+    const svg = svgRef.current
+    if (!svg) return null
     const rect = svg.getBoundingClientRect()
-    const sx   = 320 / rect.width
-    const sy   = 210 / rect.height
-    const cx   = (e.clientX - rect.left) * sx
-    const cy   = (e.clientY - rect.top)  * sy
-    const p    = getPos(key)
-    setDragging({ key, cx0: cx, cy0: cy, px0: p.x, py0: p.y, sx, sy, rect })
+    return { sx: 320 / rect.width, sy: 210 / rect.height, rect }
+  }
+
+  const startCompDrag = (e, key) => {
+    e.stopPropagation(); e.preventDefault()
+    const sc = getSvgScale(); if (!sc) return
+    const { sx, sy, rect } = sc
+    const cx = (e.clientX - rect.left) * sx
+    const cy = (e.clientY - rect.top)  * sy
+    const p  = getPos(key)
+    svgRef.current.setPointerCapture(e.pointerId)
+    setDrag({ type: 'comp', key, cx0: cx, cy0: cy, px0: p.x, py0: p.y, sx, sy, rect })
+    setSelWire(null)
+  }
+
+  const startWireBodyDrag = (e, wire) => {
+    e.stopPropagation(); e.preventDefault()
+    const sc = getSvgScale(); if (!sc) return
+    const { sx, sy, rect } = sc
+    const cx = (e.clientX - rect.left) * sx
+    const cy = (e.clientY - rect.top)  * sy
+    svgRef.current.setPointerCapture(e.pointerId)
+    setDrag({ type: 'wire-body', id: wire.id, cx0: cx, cy0: cy, wx0: wire.x1, wy0: wire.y1, wx2: wire.x2, wy2: wire.y2, sx, sy, rect })
+    setSelWire(wire.id)
+  }
+
+  const startWireEndDrag = (e, wire, end) => {
+    e.stopPropagation(); e.preventDefault()
+    const sc = getSvgScale(); if (!sc) return
+    const { sx, sy, rect } = sc
+    const cx = (e.clientX - rect.left) * sx
+    const cy = (e.clientY - rect.top)  * sy
+    svgRef.current.setPointerCapture(e.pointerId)
+    setDrag({ type: 'wire-end', id: wire.id, end, cx0: cx, cy0: cy, startX: end === 1 ? wire.x1 : wire.x2, startY: end === 1 ? wire.y1 : wire.y2, sx, sy, rect })
+    setSelWire(wire.id)
+  }
+
+  const startResize = (e, key) => {
+    e.stopPropagation(); e.preventDefault()
+    const sc = getSvgScale(); if (!sc) return
+    const { sx, sy, rect } = sc
+    const cx = (e.clientX - rect.left) * sx
+    const cy = (e.clientY - rect.top)  * sy
+    const s  = getSize(key)
+    svgRef.current.setPointerCapture(e.pointerId)
+    setDrag({ type: 'resize', key, cx0: cx, cy0: cy, w0: s.w, h0: s.h, sx, sy, rect })
+    setSelWire(null)
   }
 
   const onSvgMove = (e) => {
-    if (!dragging) return
-    const { key, cx0, cy0, px0, py0, sx, sy, rect } = dragging
-    const dx = (e.clientX - rect.left) * sx - cx0
-    const dy = (e.clientY - rect.top)  * sy - cy0
-    setLivePos(lp => ({ ...lp, [key]: { x: px0 + dx, y: py0 + dy } }))
+    if (!drag) return
+    const { sx, sy, rect } = drag
+    const ddx = (e.clientX - rect.left) * sx - drag.cx0
+    const ddy = (e.clientY - rect.top)  * sy - drag.cy0
+
+    if (drag.type === 'comp') {
+      setLivePos(lp => ({ ...lp, [drag.key]: { x: drag.px0 + ddx, y: drag.py0 + ddy } }))
+    } else if (drag.type === 'resize') {
+      setLiveSizes(ls => ({ ...ls, [drag.key]: { w: Math.max(10, drag.w0 + ddx), h: Math.max(10, drag.h0 + ddy) } }))
+    } else if (drag.type === 'wire-body') {
+      setLiveWires(lws => ({ ...lws, [drag.id]: { x1: drag.wx0 + ddx, y1: drag.wy0 + ddy, x2: drag.wx2 + ddx, y2: drag.wy2 + ddy } }))
+    } else if (drag.type === 'wire-end') {
+      const nx = drag.startX + ddx, ny = drag.startY + ddy
+      setLiveWires(lws => {
+        const prev = lws[drag.id] || {}, base = activeWires.find(w => w.id === drag.id) || {}
+        return drag.end === 1
+          ? { ...lws, [drag.id]: { ...prev, x1: nx, y1: ny, x2: prev.x2 ?? base.x2, y2: prev.y2 ?? base.y2 } }
+          : { ...lws, [drag.id]: { ...prev, x1: prev.x1 ?? base.x1, y1: prev.y1 ?? base.y1, x2: nx, y2: ny } }
+      })
+    }
   }
 
   const onSvgUp = () => {
-    if (!dragging) return
-    const fp = livePos[dragging.key]
-    if (fp) onPositionChange?.(dragging.key, Math.round(fp.x), Math.round(fp.y))
-    setDragging(null)
-    setLivePos(lp => { const n = { ...lp }; delete n[dragging.key]; return n })
+    if (!drag) return
+    if (drag.type === 'comp') {
+      const fp = livePos[drag.key]
+      if (fp) onUpdate?.({ positions: { ...positions, [drag.key]: { x: Math.round(fp.x), y: Math.round(fp.y) } } })
+      setLivePos(lp => { const n = { ...lp }; delete n[drag.key]; return n })
+    } else if (drag.type === 'resize') {
+      const fs = liveSizes[drag.key]
+      if (fs) onUpdate?.({ sizes: { ...sizes, [drag.key]: { w: Math.round(fs.w), h: Math.round(fs.h) } } })
+      setLiveSizes(ls => { const n = { ...ls }; delete n[drag.key]; return n })
+    } else if (drag.type === 'wire-body' || drag.type === 'wire-end') {
+      const lw = liveWires[drag.id]
+      if (lw) {
+        const base = srcWires.find(w => w.id === drag.id) || {}
+        const newWires = srcWires.map(w => w.id === drag.id ? { ...base, ...lw } : w)
+        onUpdate?.({ wires: newWires })
+      }
+      setLiveWires(lws => { const n = { ...lws }; delete n[drag.id]; return n })
+    }
+    setDrag(null)
+  }
+
+  const deleteWire = (e, wireId) => {
+    e.stopPropagation()
+    setSelWire(null)
+    onUpdate?.({ wires: activeWires.filter(w => w.id !== wireId) })
   }
 
   const COLORS = { panel: '#78350f', contact: '#991b1b', reader: '#1e40af', lock: '#4c1d95', rex: '#92400e' }
 
   const renderBox = (key) => {
-    const p     = getPos(key)
-    const s     = getSize(key)
-    const color = COLORS[key]
+    const p = getPos(key), s = getSize(key), color = COLORS[key]
     const isLockMag = key === 'lock' && isMag
     return (
-      <g key={key} onPointerDown={e => startDrag(e, key)} style={{ cursor: dragging?.key === key ? 'grabbing' : 'grab' }}>
-        <rect x={p.x} y={p.y} width={s.w} height={s.h}
-          fill={isLockMag ? '#ede9fe' : '#fff'} stroke={color} strokeWidth="1.5" rx={isLockMag ? 1 : 0}/>
-        <SvgLabel x={p.x + s.w / 2} y={p.y + s.h / 2 + (s.h < 15 ? 2 : 3)}
-          text={c[key]} fill={color} fontSize={isLockMag ? 5.5 : 7} bold />
+      <g key={key}>
+        <g onPointerDown={e => startCompDrag(e, key)} style={{ cursor: drag?.type === 'comp' && drag.key === key ? 'grabbing' : 'grab' }}>
+          <rect x={p.x} y={p.y} width={s.w} height={s.h}
+            fill={isLockMag ? '#ede9fe' : '#fff'} stroke={color} strokeWidth="1.5" rx={isLockMag ? 1 : 0}/>
+          <SvgLabel x={p.x + s.w / 2} y={p.y + s.h / 2 + (s.h < 15 ? 2 : 3)}
+            text={c[key]} fill={color} fontSize={isLockMag ? 5.5 : 7} bold />
+        </g>
+        <rect x={p.x + s.w - 5} y={p.y + s.h - 5} width={7} height={7}
+          fill="#C8622A" rx={1} style={{ cursor: 'se-resize' }}
+          onPointerDown={e => startResize(e, key)} />
+      </g>
+    )
+  }
+
+  const renderWire = (wire) => {
+    const isSel = selWire === wire.id
+    const mx = (wire.x1 + wire.x2) / 2, my = (wire.y1 + wire.y2) / 2
+    return (
+      <g key={wire.id}>
+        <line x1={wire.x1} y1={wire.y1} x2={wire.x2} y2={wire.y2}
+          stroke="transparent" strokeWidth={8} style={{ cursor: 'move' }}
+          onPointerDown={e => startWireBodyDrag(e, wire)} />
+        <line x1={wire.x1} y1={wire.y1} x2={wire.x2} y2={wire.y2}
+          stroke={isSel ? '#C8622A' : wire.stroke} strokeWidth={isSel ? 1.5 : 1}
+          strokeDasharray={wire.dash || 'none'} pointerEvents="none" />
+        {isSel && <>
+          <circle cx={wire.x1} cy={wire.y1} r={4} fill="#fff" stroke="#C8622A" strokeWidth={1.5}
+            style={{ cursor: 'crosshair' }} onPointerDown={e => startWireEndDrag(e, wire, 1)} />
+          <circle cx={wire.x2} cy={wire.y2} r={4} fill="#fff" stroke="#C8622A" strokeWidth={1.5}
+            style={{ cursor: 'crosshair' }} onPointerDown={e => startWireEndDrag(e, wire, 2)} />
+          <circle cx={mx} cy={my} r={5} fill="#ef4444" stroke="#fff" strokeWidth={1}
+            style={{ cursor: 'pointer' }} onPointerDown={e => deleteWire(e, wire.id)} />
+          <text x={mx} y={my + 3.5} textAnchor="middle" fontSize="7" fill="#fff" fontWeight="bold" pointerEvents="none">✕</text>
+        </>}
       </g>
     )
   }
@@ -514,7 +640,8 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
   return (
     <svg ref={svgRef} width="320" height="210" viewBox="0 0 320 210"
       style={{ display: 'block', userSelect: 'none' }}
-      onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}>
+      onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}
+      onClick={() => setSelWire(null)}>
       {/* Wall */}
       <rect x="68" y="0" width="16" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       {/* Door panel */}
@@ -524,11 +651,8 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
       <rect x="84" y="160" width="6" height="12" fill="#9ca3af"/>
       <circle cx="192" cy="105" r="5" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
       <line x1="192" y1="100" x2="192" y2="90" stroke="#6b7280" strokeWidth="1.5"/>
-      {/* Wire bus */}
-      <line x1="76" y1="22" x2="76" y2="130" stroke="#374151" strokeWidth="1"/>
-      <line x1="224" y1="20" x2="76" y2="20" stroke="#374151" strokeWidth="1"/>
-      <line x1="76" y1="93" x2="68" y2="93" stroke="#1e3a8a" strokeWidth="1"/>
-      <line x1="76" y1="115" x2="78" y2="115" stroke="#7f1d1d" strokeWidth="1" strokeDasharray="3,1.5"/>
+      {/* Interactive wire runs — click to select, drag to move, drag endpoints, click ✕ to delete */}
+      {activeWires.map(renderWire)}
       {/* Legend */}
       <line x1="4" y1="200" x2="22" y2="200" stroke="#374151" strokeWidth="1"/>
       <text x="24" y="203" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">RS-485</text>
@@ -536,49 +660,135 @@ function SingleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
       <text x="94" y="203" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Power</text>
       <line x1="134" y1="200" x2="152" y2="200" stroke="#374151" strokeWidth="1" strokeDasharray="2,1.5"/>
       <text x="154" y="203" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Data</text>
-      {/* Draggable component boxes — drag to reposition */}
+      {/* Draggable + resizable component boxes */}
       {['panel', 'contact', 'reader', 'lock', 'rex'].map(k => renderBox(k))}
     </svg>
   )
 }
 
-function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, onPositionChange }) {
-  const c = { ...DEFAULT_COMPONENTS.double_door, ...components }
-  const [dragging, setDragging] = useState(null)
-  const [livePos, setLivePos]   = useState({})
+function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, sizes = {}, wires, onUpdate }) {
+  const c      = { ...DEFAULT_COMPONENTS.double_door, ...components }
   const svgRef = useRef(null)
   const isMag  = lockType === 'mag'
 
-  const getPos  = (key) => (dragging?.key === key && livePos[key]) || positions[key] || COMP_DEFAULT_POS.double_door(key, lockType)
-  const getSize = (key) => COMP_SIZE.double_door(key, lockType)
+  const [drag,      setDrag]      = useState(null)
+  const [livePos,   setLivePos]   = useState({})
+  const [liveWires, setLiveWires] = useState({})
+  const [liveSizes, setLiveSizes] = useState({})
+  const [selWire,   setSelWire]   = useState(null)
 
-  const startDrag = (e, key) => {
-    e.stopPropagation()
-    const svg  = svgRef.current
-    if (!svg) return
+  const srcWires    = wires !== undefined ? wires : DEFAULT_WIRES.double_door
+  const activeWires = srcWires.map(w => ({ ...w, ...(liveWires[w.id] || {}) }))
+
+  const getPos  = (key) => livePos[key] || positions[key] || COMP_DEFAULT_POS.double_door(key, lockType)
+  const getSize = (key) => {
+    const ov  = liveSizes[key] || sizes[key]
+    const def = COMP_SIZE.double_door(key, lockType)
+    return ov ? { w: ov.w ?? def.w, h: ov.h ?? def.h } : def
+  }
+
+  const getSvgScale = () => {
+    const svg = svgRef.current
+    if (!svg) return null
     const rect = svg.getBoundingClientRect()
-    const sx   = 400 / rect.width
-    const sy   = 210 / rect.height
-    const cx   = (e.clientX - rect.left) * sx
-    const cy   = (e.clientY - rect.top)  * sy
-    const p    = getPos(key)
-    setDragging({ key, cx0: cx, cy0: cy, px0: p.x, py0: p.y, sx, sy, rect })
+    return { sx: 400 / rect.width, sy: 210 / rect.height, rect }
+  }
+
+  const startCompDrag = (e, key) => {
+    e.stopPropagation(); e.preventDefault()
+    const sc = getSvgScale(); if (!sc) return
+    const { sx, sy, rect } = sc
+    const cx = (e.clientX - rect.left) * sx
+    const cy = (e.clientY - rect.top)  * sy
+    const p  = getPos(key)
+    svgRef.current.setPointerCapture(e.pointerId)
+    setDrag({ type: 'comp', key, cx0: cx, cy0: cy, px0: p.x, py0: p.y, sx, sy, rect })
+    setSelWire(null)
+  }
+
+  const startWireBodyDrag = (e, wire) => {
+    e.stopPropagation(); e.preventDefault()
+    const sc = getSvgScale(); if (!sc) return
+    const { sx, sy, rect } = sc
+    const cx = (e.clientX - rect.left) * sx
+    const cy = (e.clientY - rect.top)  * sy
+    svgRef.current.setPointerCapture(e.pointerId)
+    setDrag({ type: 'wire-body', id: wire.id, cx0: cx, cy0: cy, wx0: wire.x1, wy0: wire.y1, wx2: wire.x2, wy2: wire.y2, sx, sy, rect })
+    setSelWire(wire.id)
+  }
+
+  const startWireEndDrag = (e, wire, end) => {
+    e.stopPropagation(); e.preventDefault()
+    const sc = getSvgScale(); if (!sc) return
+    const { sx, sy, rect } = sc
+    const cx = (e.clientX - rect.left) * sx
+    const cy = (e.clientY - rect.top)  * sy
+    svgRef.current.setPointerCapture(e.pointerId)
+    setDrag({ type: 'wire-end', id: wire.id, end, cx0: cx, cy0: cy, startX: end === 1 ? wire.x1 : wire.x2, startY: end === 1 ? wire.y1 : wire.y2, sx, sy, rect })
+    setSelWire(wire.id)
+  }
+
+  const startResize = (e, key) => {
+    e.stopPropagation(); e.preventDefault()
+    const sc = getSvgScale(); if (!sc) return
+    const { sx, sy, rect } = sc
+    const cx = (e.clientX - rect.left) * sx
+    const cy = (e.clientY - rect.top)  * sy
+    const s  = getSize(key)
+    svgRef.current.setPointerCapture(e.pointerId)
+    setDrag({ type: 'resize', key, cx0: cx, cy0: cy, w0: s.w, h0: s.h, sx, sy, rect })
+    setSelWire(null)
   }
 
   const onSvgMove = (e) => {
-    if (!dragging) return
-    const { key, cx0, cy0, px0, py0, sx, sy, rect } = dragging
-    const dx = (e.clientX - rect.left) * sx - cx0
-    const dy = (e.clientY - rect.top)  * sy - cy0
-    setLivePos(lp => ({ ...lp, [key]: { x: px0 + dx, y: py0 + dy } }))
+    if (!drag) return
+    const { sx, sy, rect } = drag
+    const ddx = (e.clientX - rect.left) * sx - drag.cx0
+    const ddy = (e.clientY - rect.top)  * sy - drag.cy0
+
+    if (drag.type === 'comp') {
+      setLivePos(lp => ({ ...lp, [drag.key]: { x: drag.px0 + ddx, y: drag.py0 + ddy } }))
+    } else if (drag.type === 'resize') {
+      setLiveSizes(ls => ({ ...ls, [drag.key]: { w: Math.max(10, drag.w0 + ddx), h: Math.max(10, drag.h0 + ddy) } }))
+    } else if (drag.type === 'wire-body') {
+      setLiveWires(lws => ({ ...lws, [drag.id]: { x1: drag.wx0 + ddx, y1: drag.wy0 + ddy, x2: drag.wx2 + ddx, y2: drag.wy2 + ddy } }))
+    } else if (drag.type === 'wire-end') {
+      const nx = drag.startX + ddx, ny = drag.startY + ddy
+      setLiveWires(lws => {
+        const prev = lws[drag.id] || {}, base = activeWires.find(w => w.id === drag.id) || {}
+        return drag.end === 1
+          ? { ...lws, [drag.id]: { ...prev, x1: nx, y1: ny, x2: prev.x2 ?? base.x2, y2: prev.y2 ?? base.y2 } }
+          : { ...lws, [drag.id]: { ...prev, x1: prev.x1 ?? base.x1, y1: prev.y1 ?? base.y1, x2: nx, y2: ny } }
+      })
+    }
   }
 
   const onSvgUp = () => {
-    if (!dragging) return
-    const fp = livePos[dragging.key]
-    if (fp) onPositionChange?.(dragging.key, Math.round(fp.x), Math.round(fp.y))
-    setDragging(null)
-    setLivePos(lp => { const n = { ...lp }; delete n[dragging.key]; return n })
+    if (!drag) return
+    if (drag.type === 'comp') {
+      const fp = livePos[drag.key]
+      if (fp) onUpdate?.({ positions: { ...positions, [drag.key]: { x: Math.round(fp.x), y: Math.round(fp.y) } } })
+      setLivePos(lp => { const n = { ...lp }; delete n[drag.key]; return n })
+    } else if (drag.type === 'resize') {
+      const fs = liveSizes[drag.key]
+      if (fs) onUpdate?.({ sizes: { ...sizes, [drag.key]: { w: Math.round(fs.w), h: Math.round(fs.h) } } })
+      setLiveSizes(ls => { const n = { ...ls }; delete n[drag.key]; return n })
+    } else if (drag.type === 'wire-body' || drag.type === 'wire-end') {
+      const lw = liveWires[drag.id]
+      if (lw) {
+        const base = srcWires.find(w => w.id === drag.id) || {}
+        const newWires = srcWires.map(w => w.id === drag.id ? { ...base, ...lw } : w)
+        onUpdate?.({ wires: newWires })
+      }
+      setLiveWires(lws => { const n = { ...lws }; delete n[drag.id]; return n })
+    }
+    setDrag(null)
+  }
+
+  const deleteWire = (e, wireId) => {
+    e.stopPropagation()
+    setSelWire(null)
+    onUpdate?.({ wires: activeWires.filter(w => w.id !== wireId) })
   }
 
   const COLORS = {
@@ -590,16 +800,43 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
   }
 
   const renderBox = (key) => {
-    const p     = getPos(key)
-    const s     = getSize(key)
-    const color = COLORS[key] || '#374151'
+    const p = getPos(key), s = getSize(key), color = COLORS[key] || '#374151'
     const isLockMag = (key === 'lockA' || key === 'lockB') && isMag
     return (
-      <g key={key} onPointerDown={e => startDrag(e, key)} style={{ cursor: dragging?.key === key ? 'grabbing' : 'grab' }}>
-        <rect x={p.x} y={p.y} width={s.w} height={s.h}
-          fill={isLockMag ? '#ede9fe' : '#fff'} stroke={color} strokeWidth="1.5" rx={isLockMag ? 1 : 0}/>
-        <SvgLabel x={p.x + s.w / 2} y={p.y + s.h / 2 + (s.h < 15 ? 2 : 3)}
-          text={c[key]} fill={color} fontSize={isLockMag ? 5.5 : 6.5} bold />
+      <g key={key}>
+        <g onPointerDown={e => startCompDrag(e, key)} style={{ cursor: drag?.type === 'comp' && drag.key === key ? 'grabbing' : 'grab' }}>
+          <rect x={p.x} y={p.y} width={s.w} height={s.h}
+            fill={isLockMag ? '#ede9fe' : '#fff'} stroke={color} strokeWidth="1.5" rx={isLockMag ? 1 : 0}/>
+          <SvgLabel x={p.x + s.w / 2} y={p.y + s.h / 2 + (s.h < 15 ? 2 : 3)}
+            text={c[key]} fill={color} fontSize={isLockMag ? 5.5 : 6.5} bold />
+        </g>
+        <rect x={p.x + s.w - 5} y={p.y + s.h - 5} width={7} height={7}
+          fill="#C8622A" rx={1} style={{ cursor: 'se-resize' }}
+          onPointerDown={e => startResize(e, key)} />
+      </g>
+    )
+  }
+
+  const renderWire = (wire) => {
+    const isSel = selWire === wire.id
+    const mx = (wire.x1 + wire.x2) / 2, my = (wire.y1 + wire.y2) / 2
+    return (
+      <g key={wire.id}>
+        <line x1={wire.x1} y1={wire.y1} x2={wire.x2} y2={wire.y2}
+          stroke="transparent" strokeWidth={8} style={{ cursor: 'move' }}
+          onPointerDown={e => startWireBodyDrag(e, wire)} />
+        <line x1={wire.x1} y1={wire.y1} x2={wire.x2} y2={wire.y2}
+          stroke={isSel ? '#C8622A' : wire.stroke} strokeWidth={isSel ? 1.5 : 1}
+          strokeDasharray={wire.dash || 'none'} pointerEvents="none" />
+        {isSel && <>
+          <circle cx={wire.x1} cy={wire.y1} r={4} fill="#fff" stroke="#C8622A" strokeWidth={1.5}
+            style={{ cursor: 'crosshair' }} onPointerDown={e => startWireEndDrag(e, wire, 1)} />
+          <circle cx={wire.x2} cy={wire.y2} r={4} fill="#fff" stroke="#C8622A" strokeWidth={1.5}
+            style={{ cursor: 'crosshair' }} onPointerDown={e => startWireEndDrag(e, wire, 2)} />
+          <circle cx={mx} cy={my} r={5} fill="#ef4444" stroke="#fff" strokeWidth={1}
+            style={{ cursor: 'pointer' }} onPointerDown={e => deleteWire(e, wire.id)} />
+          <text x={mx} y={my + 3.5} textAnchor="middle" fontSize="7" fill="#fff" fontWeight="bold" pointerEvents="none">✕</text>
+        </>}
       </g>
     )
   }
@@ -609,7 +846,8 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
   return (
     <svg ref={svgRef} width="400" height="210" viewBox="0 0 400 210"
       style={{ display: 'block', userSelect: 'none' }}
-      onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}>
+      onPointerMove={onSvgMove} onPointerUp={onSvgUp} onPointerLeave={onSvgUp}
+      onClick={() => setSelWire(null)}>
       {/* Walls */}
       <rect x="68" y="0" width="14" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
       <rect x="194" y="0" width="12" height="210" fill="#d1d5db" stroke="#4b5563" strokeWidth="1.5"/>
@@ -624,9 +862,8 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
       <path d="M318,188 Q206,188 206,22" fill="none" stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,3"/>
       <rect x="312" y="28" width="6" height="12" fill="#9ca3af"/>
       <circle cx="222" cy="105" r="4" fill="none" stroke="#6b7280" strokeWidth="1.5"/>
-      {/* Wire bus */}
-      <line x1="76" y1="20" x2="76" y2="140" stroke="#374151" strokeWidth="1"/>
-      <line x1="76" y1="20" x2="336" y2="20" stroke="#374151" strokeWidth="1"/>
+      {/* Interactive wire runs */}
+      {activeWires.map(renderWire)}
       {/* Legend */}
       <line x1="4" y1="202" x2="18" y2="202" stroke="#374151" strokeWidth="1"/>
       <text x="20" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">RS-485</text>
@@ -634,7 +871,7 @@ function DoubleDoorSVG({ components = {}, lockType = 'strike', positions = {}, o
       <text x="78" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Power</text>
       <line x1="116" y1="202" x2="130" y2="202" stroke="#374151" strokeWidth="1" strokeDasharray="2,1.5"/>
       <text x="132" y="205" fontSize="5.5" fill="#6b7280" fontFamily="sans-serif">Data</text>
-      {/* Draggable component boxes — drag to reposition */}
+      {/* Draggable + resizable component boxes */}
       {compKeys.map(k => renderBox(k))}
     </svg>
   )
@@ -646,15 +883,17 @@ function SchematicNode({ id, data, selected }) {
   const lockType   = data.lockType || 'strike'
   const components = { ...(DEFAULT_COMPONENTS[data.schematicType] || {}), ...(data.components || {}) }
 
-  const handlePositionChange = (key, x, y) => {
-    const newPositions = { ...(data.positions || {}), [key]: { x, y } }
-    updateNodeData(id, { positions: newPositions })
+  const handleUpdate = (updates) => {
+    updateNodeData(id, updates)
     supabase.from('sld_nodes').update({
       data: {
         schematicType: data.schematicType,
         lockType,
         components: data.components || {},
-        positions: newPositions,
+        positions: data.positions || {},
+        sizes: data.sizes || {},
+        wires: data.wires,
+        ...updates,
       }
     }).eq('id', id)
   }
@@ -679,8 +918,8 @@ function SchematicNode({ id, data, selected }) {
         {data.label && <span style={{ fontSize: 11, fontWeight: 700, color: '#111827' }}>{data.label}</span>}
       </div>
       {isDouble
-        ? <DoubleDoorSVG components={components} lockType={lockType} positions={data.positions || {}} onPositionChange={handlePositionChange} />
-        : <SingleDoorSVG components={components} lockType={lockType} positions={data.positions || {}} onPositionChange={handlePositionChange} />
+        ? <DoubleDoorSVG components={components} lockType={lockType} positions={data.positions || {}} sizes={data.sizes || {}} wires={data.wires} onUpdate={handleUpdate} />
+        : <SingleDoorSVG components={components} lockType={lockType} positions={data.positions || {}} sizes={data.sizes || {}} wires={data.wires} onUpdate={handleUpdate} />
       }
       <Handle type="source" position={Position.Bottom} />
     </div>
@@ -862,7 +1101,7 @@ export default function SLDTab({ proposalId, orgId }) {
           position_x: tn.position_x + offsetX,
           position_y: tn.position_y + offsetY,
           data: isSchematic
-            ? { schematicType: tn.data?.schematicType, lockType: tn.data?.lockType || 'strike', components: { ...(DEFAULT_COMPONENTS[tn.data?.schematicType] || {}), ...(tn.data?.components || {}) }, positions: {} }
+            ? { schematicType: tn.data?.schematicType, lockType: tn.data?.lockType || 'strike', components: { ...(DEFAULT_COMPONENTS[tn.data?.schematicType] || {}), ...(tn.data?.components || {}) }, positions: {}, sizes: {} }
             : { ...(tn.data || {}), quantity: tn.data?.quantity || 1 },
         }
       })
@@ -914,7 +1153,7 @@ export default function SLDTab({ proposalId, orgId }) {
         type: n.node_type === 'schematic' ? 'schematic' : 'device',
         position: { x: n.position_x, y: n.position_y },
         data: n.node_type === 'schematic'
-          ? { label: n.label, schematicType: n.data?.schematicType, lockType: n.data?.lockType || 'strike', components: n.data?.components || {}, positions: n.data?.positions || {} }
+          ? { label: n.label, schematicType: n.data?.schematicType, lockType: n.data?.lockType || 'strike', components: n.data?.components || {}, positions: n.data?.positions || {}, sizes: n.data?.sizes || {}, wires: n.data?.wires }
           : { label: n.label, category: n.data?.category, quantity: n.data?.quantity, notes: n.data?.notes, global_product_id: n.global_product_id },
       })))
 
@@ -1929,6 +2168,37 @@ export default function SLDTab({ proposalId, orgId }) {
                     />
                   </div>
                 ))}
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => {
+                      const fresh = nodes.find(n => n.id === selectedNode.id) || selectedNode
+                      const newData = { ...fresh.data, positions: {}, sizes: {} }
+                      const updated = { ...fresh, data: newData }
+                      setSelectedNode(updated)
+                      setNodes(ns => ns.map(n => n.id === selectedNode.id ? updated : n))
+                      supabase.from('sld_nodes').update({ data: newData }).eq('id', selectedNode.id)
+                    }}
+                    className="flex-1 text-xs text-[#8A9AB0] hover:text-white border border-[#2a3d55] rounded-md py-1.5 transition-colors"
+                    title="Reset component positions and sizes to defaults"
+                  >
+                    Reset Layout
+                  </button>
+                  <button
+                    onClick={() => {
+                      const fresh = nodes.find(n => n.id === selectedNode.id) || selectedNode
+                      const { wires: _w, ...rest } = fresh.data
+                      const newData = { ...rest }
+                      const updated = { ...fresh, data: newData }
+                      setSelectedNode(updated)
+                      setNodes(ns => ns.map(n => n.id === selectedNode.id ? updated : n))
+                      supabase.from('sld_nodes').update({ data: newData }).eq('id', selectedNode.id)
+                    }}
+                    className="flex-1 text-xs text-[#8A9AB0] hover:text-white border border-[#2a3d55] rounded-md py-1.5 transition-colors"
+                    title="Restore default wire runs"
+                  >
+                    Reset Wires
+                  </button>
+                </div>
                 <button
                   onClick={deleteSelected}
                   className="w-full text-xs text-red-400 hover:text-red-300 border border-red-900/50 hover:border-red-400/50 rounded-md py-1.5 transition-colors"
