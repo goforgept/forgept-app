@@ -496,7 +496,6 @@ const CANVAS_STYLE = `
 // ─── Custom Node — traditional SLD style ─────────────────────────────────────
 
 function DeviceNode({ id, data, selected }) {
-  const { setNodes } = useReactFlow()
   const color   = CATEGORY_COLORS[data.category] || '#374151'
   const iconCat = CATEGORY_ICON_MAP[data.category] || data.category || 'Other'
   return (
@@ -519,11 +518,6 @@ function DeviceNode({ id, data, selected }) {
         minHeight={55}
         isVisible={selected}
         color="#C8622A"
-        onResizeEnd={(_, params) => {
-          const nd = { ...data, width: Math.round(params.width), height: Math.round(params.height) }
-          setNodes(ns => ns.map(n => n.id === id ? { ...n, data: nd } : n))
-          supabase.from('sld_nodes').update({ data: nd }).eq('id', id)
-        }}
       />
       <Handle type="target" position={Position.Top} title="Drop connection here" />
 
@@ -1101,7 +1095,6 @@ const SHAPE_PRESETS = {
 }
 
 function ShapeNode({ id, data, selected, width, height }) {
-  const { setNodes } = useReactFlow()
   const shape  = data.shape  || 'rect'
   const fill   = data.fill   ?? '#f3f4f6'
   const stroke = data.stroke ?? '#374151'
@@ -1113,16 +1106,9 @@ function ShapeNode({ id, data, selected, width, height }) {
   const selStroke = selected ? '#C8622A' : stroke
   const selSW     = selected ? 2 : (data.strokeWidth || 1.5)
 
-  const handleResizeEnd = (_, p) => {
-    const nd = { ...data, width: Math.round(p.width), height: Math.round(p.height) }
-    setNodes(ns => ns.map(n => n.id === id ? { ...n, data: nd } : n))
-    supabase.from('sld_nodes').update({ data: nd }).eq('id', id)
-  }
-
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
-      <NodeResizer minWidth={40} minHeight={24} isVisible={selected} color="#C8622A"
-        onResizeEnd={handleResizeEnd} />
+      <NodeResizer minWidth={40} minHeight={24} isVisible={selected} color="#C8622A" />
       <div style={{
         width: '100%', height: '100%',
         transform: data.rotation ? `rotate(${data.rotation}deg)` : undefined,
@@ -1210,6 +1196,23 @@ export default function SLDTab({ proposalId, orgId }) {
   const [activeSheetId, setActiveSheetId]   = useState(null)
   const [nodes, setNodes, onNodesChange]    = useNodesState([])
   const [edges, setEdges, onEdgesChange]    = useEdgesState([])
+
+  // Intercept dimension changes from NodeResizer to persist sizes
+  const handleNodesChange = useCallback((changes) => {
+    onNodesChange(changes)
+    const resizeDone = changes.filter(c => c.type === 'dimensions' && c.resizing === false && c.dimensions)
+    if (resizeDone.length === 0) return
+    setNodes(current => {
+      const updated = current.map(n => {
+        const change = resizeDone.find(c => c.id === n.id)
+        if (!change || n.type === 'schematic') return n
+        const newData = { ...(n.data || {}), width: Math.round(change.dimensions.width), height: Math.round(change.dimensions.height) }
+        supabase.from('sld_nodes').update({ data: newData }).eq('id', n.id)
+        return { ...n, data: newData }
+      })
+      return updated
+    })
+  }, [onNodesChange, setNodes])
   const [loading, setLoading]               = useState(true)
   const [selectedNode, setSelectedNode]     = useState(null)
   const [selectedEdge, setSelectedEdge]     = useState(null)
@@ -2498,7 +2501,7 @@ export default function SLDTab({ proposalId, orgId }) {
             onInit={setRfInstance}
             nodes={nodes}
             edges={edges}
-            onNodesChange={onNodesChange}
+            onNodesChange={handleNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onNodeDragStop={handleNodeDragStop}

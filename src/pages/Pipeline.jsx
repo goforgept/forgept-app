@@ -269,9 +269,16 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
                       </p>
                       <p className="text-fp-muted text-xs mt-1">{proposal.company}</p>
                       <div className="flex justify-between items-center mt-2">
-                        <span className="text-fp-text text-sm font-bold">
-                          ${(proposal.proposal_value || 0).toLocaleString()}
-                        </span>
+                        <div>
+                          <span className="text-fp-text text-sm font-bold">
+                            ${(proposal.proposal_value || 0).toLocaleString()}
+                          </span>
+                          {proposal.total_gross_margin_percent > 0 && (
+                            <p className="text-green-500 text-xs font-semibold leading-tight">
+                              +${Math.round((proposal.proposal_value || 0) * proposal.total_gross_margin_percent / 100).toLocaleString()}
+                            </p>
+                          )}
+                        </div>
                         {proposal.total_gross_margin_percent > 0 && (
                           <span className="text-[#C8622A] text-xs font-semibold">
                             {proposal.total_gross_margin_percent.toFixed(1)}%
