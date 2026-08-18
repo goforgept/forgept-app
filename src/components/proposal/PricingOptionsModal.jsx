@@ -1,7 +1,7 @@
 export default function PricingOptionsModal({ proposal, onToggleHideMaterialPrices, onToggleLaborBreakdown, onToggleLumpSumLabor, onToggleShowMsrp, featureMsrp, onToggleShowCompliance, featureComplianceFields, onToggleShowWarranty, hasWarranty, onToggleCoverPage, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-      <div className="bg-fp-card rounded-2xl p-6 w-full max-w-sm">
+      <div className="bg-fp-card rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
         <h3 className="text-fp-text font-bold text-lg mb-1">⚙ Proposal Options</h3>
         <p className="text-fp-muted text-sm mb-5">Controls what clients see on PDF, DOCX, and the signing page. Internal view always shows full detail.</p>
         <div className="space-y-3">
