@@ -71,16 +71,6 @@ export default function PricingOptionsModal({ proposal, onToggleHideMaterialPric
               </button>
             </div>
           )}
-          <div className="flex items-center justify-between bg-fp-inset rounded-xl px-4 py-3">
-            <div>
-              <p className="text-fp-text text-sm font-semibold">Cover Page</p>
-              <p className="text-fp-muted text-xs mt-0.5">Adds a title page before the proposal with client and rep info</p>
-            </div>
-            <button onClick={onToggleCoverPage}
-              className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.show_cover_page ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}>
-              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.show_cover_page ? 'left-6' : 'left-1'}`} />
-            </button>
-          </div>
         </div>
         <button onClick={onClose} className="mt-5 w-full py-2 bg-fp-brand text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Done</button>
       </div>

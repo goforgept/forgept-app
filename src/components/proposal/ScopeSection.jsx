@@ -11,6 +11,7 @@ export default function ScopeSection({
   uploadingSignedPDF, uploadSignedPDF,
   qboConnected, qboInvoiceId, sendingToQBO, sendToQBO,
   setShowPricingModal, downloadPDF, downloadDOCX, downloadSignedCopy, downloadInstallerPDF, downloadInstallerDOCX,
+  onToggleCoverPage,
   setShowPhotosModal,
   canEdit = true,
 }) {
@@ -95,7 +96,14 @@ export default function ScopeSection({
               <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
             </button>
             {dlOpen && (
-              <div className="absolute right-0 top-full mt-1 z-50 bg-fp-card border border-fp-border rounded-xl shadow-2xl min-w-[190px] py-1 overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 z-50 bg-fp-card border border-fp-border rounded-xl shadow-2xl min-w-[220px] py-1 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-fp-border">
+                  <span className="text-sm text-fp-text font-semibold">Cover Page</span>
+                  <button onClick={onToggleCoverPage}
+                    className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.show_cover_page ? 'bg-fp-brand' : 'bg-fp-border'}`}>
+                    <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.show_cover_page ? 'left-6' : 'left-1'}`} />
+                  </button>
+                </div>
                 <p className="px-4 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-fp-muted/60">Standard</p>
                 <button onClick={() => { setDlOpen(false); downloadPDF() }}
                   className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors flex items-center gap-2">

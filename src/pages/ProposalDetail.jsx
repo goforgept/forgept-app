@@ -3557,6 +3557,7 @@ const analyzeDrawing = async () => {
           uploadingSignedPDF={uploadingSignedPDF} uploadSignedPDF={uploadSignedPDF}
           qboConnected={qboConnected} qboInvoiceId={qboInvoiceId} sendingToQBO={sendingToQBO} sendToQBO={sendToQBO}
           setShowPricingModal={setShowPricingModal} downloadPDF={downloadPDF} downloadDOCX={downloadDOCX} downloadSignedCopy={downloadSignedCopy} downloadInstallerPDF={downloadInstallerPDF} downloadInstallerDOCX={downloadInstallerDOCX}
+          onToggleCoverPage={toggleCoverPage}
           setShowPhotosModal={setShowPhotosModal}
           canEdit={canEdit}
         />
