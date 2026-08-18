@@ -11,6 +11,7 @@ export default function ScopeSection({
   uploadingSignedPDF, uploadSignedPDF,
   qboConnected, qboInvoiceId, sendingToQBO, sendToQBO,
   setShowPricingModal, downloadPDF, downloadDOCX, downloadSignedCopy, downloadInstallerPDF, downloadInstallerDOCX,
+  downloadBundle,
   onToggleCoverPage,
   setShowPhotosModal,
   canEdit = true,
@@ -126,6 +127,16 @@ export default function ScopeSection({
                     className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors flex items-center gap-2">
                     <span className="text-fp-muted text-xs font-mono">DOCX</span> Installer Copy
                   </button>
+                )}
+                {downloadBundle && (
+                  <>
+                    <div className="border-t border-fp-border my-1" />
+                    <p className="px-4 pt-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-fp-muted/60">Full Bundle</p>
+                    <button onClick={() => { setDlOpen(false); downloadBundle() }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors flex items-center gap-2">
+                      <span className="text-fp-muted text-xs font-mono">PDF</span> Proposal + Drawings
+                    </button>
+                  </>
                 )}
               </div>
             )}

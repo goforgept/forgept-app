@@ -47,6 +47,7 @@ export default function ProposalDetail({ isAdmin }) {
   const pdfFont = profile?.organizations?.doc_font || 'helvetica'
   const pdfStriped = (profile?.organizations?.pdf_table_style || 'striped') === 'striped'
   const [proposal, setProposal] = useState(null)
+  const [drawingSheets, setDrawingSheets] = useState([])
   const [lineItems, setLineItems] = useState([])
   const [laborItems, setLaborItems] = useState([
     { role: '', quantity: '', unit: 'hr', your_cost: '', markup: 35, customer_price: 0 }
@@ -185,6 +186,7 @@ export default function ProposalDetail({ isAdmin }) {
     fetchProposal()
     fetchLineItems()
     fetchSections()
+    fetchDrawingSheets()
     fetchRFQRequests()
     fetchPhotos()
     fetchVendors()
@@ -385,6 +387,11 @@ export default function ProposalDetail({ isAdmin }) {
       .eq('proposal_id', id)
       .order('sort_order', { ascending: true })
     setSections(data || [])
+  }
+
+  const fetchDrawingSheets = async () => {
+    const { data } = await supabase.from('drawing_sheets').select('id, name, storage_path, sort_order').eq('proposal_id', id).neq('storage_path', 'blank').neq('storage_path', 'pending').order('sort_order', { ascending: true })
+    setDrawingSheets(data || [])
   }
 
   const fetchVendors = async () => {
@@ -1351,6 +1358,94 @@ export default function ProposalDetail({ isAdmin }) {
     if (proposal?.status === 'Draft') setShowSentPrompt(true)
     const doc = await generatePDFDoc()
     doc.save(`${proposal?.proposal_name || 'Proposal'}.pdf`)
+  }
+
+  const downloadBundle = async () => {
+    if (proposal?.status === 'Draft') setShowSentPrompt(true)
+    const { PDFDocument } = await import('pdf-lib')
+    const { getR2Url } = await import('../r2')
+    const { default: jsPDF } = await import('jspdf')
+
+    // Generate proposal PDF
+    const proposalDoc = await generatePDFDoc()
+    const proposalBytes = proposalDoc.output('arraybuffer')
+
+    // Build drawings appendix
+    const drawDoc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
+    const pageW = drawDoc.internal.pageSize.getWidth()
+    const pageH = drawDoc.internal.pageSize.getHeight()
+    const primaryRgbDraw = hexToRgb(profile?.primary_color || '#0F1C2E')
+    const [dr, dg, db] = primaryRgbDraw
+
+    // Cover page for drawings appendix
+    drawDoc.setFillColor(255, 255, 255); drawDoc.rect(0, 0, pageW, pageH, 'F')
+    drawDoc.setFillColor(dr, dg, db); drawDoc.rect(0, 0, 5, pageH, 'F')
+    const midY = pageH * 0.44
+    drawDoc.setDrawColor(dr, dg, db); drawDoc.setLineWidth(0.6); drawDoc.line(14, midY, pageW - 14, midY); drawDoc.setLineWidth(0.2)
+    drawDoc.setFontSize(8); drawDoc.setFont('helvetica', 'normal'); drawDoc.setTextColor(dr, dg, db)
+    drawDoc.setCharSpace(2); drawDoc.text('DRAWINGS APPENDIX', 14, midY - 36); drawDoc.setCharSpace(0)
+    drawDoc.setFontSize(22); drawDoc.setFont('helvetica', 'bold'); drawDoc.setTextColor(20, 20, 20)
+    drawDoc.text(proposal?.proposal_name || 'Drawings', 14, midY - 25)
+    if (proposal?.company) {
+      drawDoc.setFontSize(13); drawDoc.setFont('helvetica', 'bold'); drawDoc.setTextColor(30, 30, 30)
+      drawDoc.text(proposal.company, 14, midY + 14)
+    }
+    drawDoc.setFontSize(9); drawDoc.setFont('helvetica', 'normal'); drawDoc.setTextColor(90, 100, 110)
+    drawDoc.text(`${drawingSheets.length} sheet${drawingSheets.length !== 1 ? 's' : ''}  ·  ${new Date().toLocaleDateString()}`, 14, midY + (proposal?.company ? 24 : 14))
+
+    // One page per sheet
+    for (const sheet of drawingSheets) {
+      const signedUrl = await getR2Url(sheet.storage_path, 3600)
+      if (!signedUrl) continue
+      let imgData = null
+      try {
+        if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
+          const pdfjsLib = await import('pdfjs-dist')
+          pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
+          const arrayBuf = await (await fetch(signedUrl)).arrayBuffer()
+          const pdfDoc2 = await pdfjsLib.getDocument({ data: arrayBuf }).promise
+          const page = await pdfDoc2.getPage(1)
+          const viewport = page.getViewport({ scale: 2 })
+          const canvas = document.createElement('canvas')
+          canvas.width = viewport.width; canvas.height = viewport.height
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+          imgData = canvas.toDataURL('image/png')
+        } else {
+          const blob = await (await fetch(signedUrl)).blob()
+          imgData = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob) })
+        }
+      } catch { /* skip sheet */ }
+
+      drawDoc.addPage()
+      drawDoc.setFillColor(255, 255, 255); drawDoc.rect(0, 0, pageW, pageH, 'F')
+      // Header bar
+      drawDoc.setFillColor(dr, dg, db); drawDoc.rect(0, 0, pageW, 10, 'F')
+      drawDoc.setTextColor(255, 255, 255); drawDoc.setFontSize(9); drawDoc.setFont('helvetica', 'bold')
+      drawDoc.text(sheet.name || 'Sheet', 14, 7)
+      drawDoc.setFont('helvetica', 'normal')
+      drawDoc.text(`${proposal?.proposal_name || ''}`, pageW - 14, 7, { align: 'right' })
+      if (imgData) {
+        drawDoc.addImage(imgData, 'PNG', 0, 12, pageW, pageH - 12, undefined, 'FAST')
+      }
+    }
+
+    const drawBytes = drawDoc.output('arraybuffer')
+
+    // Merge with pdf-lib
+    const merged = await PDFDocument.create()
+    const propDoc = await PDFDocument.load(proposalBytes)
+    const drwDoc = await PDFDocument.load(drawBytes)
+    const propPages = await merged.copyPages(propDoc, propDoc.getPageIndices())
+    propPages.forEach(p => merged.addPage(p))
+    const drwPages = await merged.copyPages(drwDoc, drwDoc.getPageIndices())
+    drwPages.forEach(p => merged.addPage(p))
+
+    const mergedBytes = await merged.save()
+    const blob = new Blob([mergedBytes], { type: 'application/pdf' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `${proposal?.proposal_name || 'Bundle'} - Full Bundle.pdf`; a.click()
+    URL.revokeObjectURL(url)
   }
 
   const downloadInstallerPDF = async () => {
@@ -2910,8 +3005,8 @@ const analyzeDrawing = async () => {
     ])
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
     if (forceHidePricing) p = { ...p, hide_material_prices: true, lump_sum_pricing: true, hide_labor_breakdown: true }
-    const freshPdfStriped = (freshOrg?.pdf_table_style || 'striped') === 'striped'
     const freshColorHeaders = freshOrg?.pdf_color_headers !== false
+    const freshPdfStriped = freshColorHeaders
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
     const pageHeight = doc.internal.pageSize.getHeight()
@@ -3568,6 +3663,7 @@ const analyzeDrawing = async () => {
           uploadingSignedPDF={uploadingSignedPDF} uploadSignedPDF={uploadSignedPDF}
           qboConnected={qboConnected} qboInvoiceId={qboInvoiceId} sendingToQBO={sendingToQBO} sendToQBO={sendToQBO}
           setShowPricingModal={setShowPricingModal} downloadPDF={downloadPDF} downloadDOCX={downloadDOCX} downloadSignedCopy={downloadSignedCopy} downloadInstallerPDF={downloadInstallerPDF} downloadInstallerDOCX={downloadInstallerDOCX}
+          downloadBundle={drawingSheets.length > 0 ? downloadBundle : null}
           onToggleCoverPage={toggleCoverPage}
           setShowPhotosModal={setShowPhotosModal}
           canEdit={canEdit}

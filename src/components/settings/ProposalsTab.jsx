@@ -8,7 +8,6 @@ export default function ProposalsTab({
   defaultTcFontSize = 9, setDefaultTcFontSize,
   isAdmin, msrpEnabled, onToggleMsrp,
   docFont, onChangeDocFont,
-  pdfTableStyle, onChangePdfTableStyle,
   pdfHeaderStyle, onChangePdfHeaderStyle,
   pdfColorHeaders, onChangePdfColorHeaders,
   saving, handleSave,
@@ -189,18 +188,8 @@ export default function ProposalsTab({
             </div>
             <div className="flex items-center justify-between bg-fp-bg rounded-xl px-4 py-3">
               <div>
-                <p className="text-fp-text text-sm font-semibold">Striped Table Rows</p>
-                <p className="text-fp-muted text-xs mt-0.5">Alternates row shading in PDF tables. Turn off for a plain white table.</p>
-              </div>
-              <button onClick={onChangePdfTableStyle}
-                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${pdfTableStyle === 'striped' ? 'bg-fp-brand' : 'bg-fp-border'}`}>
-                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${pdfTableStyle === 'striped' ? 'left-6' : 'left-1'}`} />
-              </button>
-            </div>
-            <div className="flex items-center justify-between bg-fp-bg rounded-xl px-4 py-3">
-              <div>
-                <p className="text-fp-text text-sm font-semibold">Colored Table Headers</p>
-                <p className="text-fp-muted text-xs mt-0.5">Use your brand color for table header rows and section bars. Turn off for a clean grey look.</p>
+                <p className="text-fp-text text-sm font-semibold">Color Bands</p>
+                <p className="text-fp-muted text-xs mt-0.5">Applies your brand color to table headers and alternating row shading. Turn off for a plain grey and white look.</p>
               </div>
               <button onClick={onChangePdfColorHeaders}
                 className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${pdfColorHeaders ? 'bg-fp-brand' : 'bg-fp-border'}`}>

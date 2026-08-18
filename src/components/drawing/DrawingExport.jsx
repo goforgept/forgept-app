@@ -413,6 +413,71 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     return img
   }
 
+  const hexToRgbArr = (hex) => {
+    const n = parseInt((hex || '#0F1C2E').replace('#', ''), 16)
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+  }
+
+  // ── Clean cover page — shared across all export types ─────────────────────
+  const drawDocCover = (pdf, { eyebrow, title, subtitle, meta = [], logoImg }) => {
+    const pageW = pdf.internal.pageSize.getWidth()
+    const pageH = pdf.internal.pageSize.getHeight()
+    const [r, g, b] = hexToRgbArr(orgProfile?.primary_color)
+    const margin = 14
+
+    pdf.setFillColor(255, 255, 255)
+    pdf.rect(0, 0, pageW, pageH, 'F')
+
+    // Left accent bar
+    pdf.setFillColor(r, g, b)
+    pdf.rect(0, 0, 5, pageH, 'F')
+
+    // Logo or company name — top left
+    let logoBottom = 36
+    if (logoImg) {
+      try {
+        const maxW = 80, maxH = 40
+        const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+        const lw = logoImg.naturalWidth * ratio
+        const lh = logoImg.naturalHeight * ratio
+        pdf.addImage(logoImg, 'PNG', margin, 20, lw, lh)
+        logoBottom = 20 + lh + 4
+      } catch { /* ignore */ }
+    } else if (orgProfile?.company_name) {
+      pdf.setFontSize(14); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 30, 30)
+      pdf.text(orgProfile.company_name, margin, 32)
+      logoBottom = 38
+    }
+
+    // Eyebrow
+    const midY = pageH * 0.44
+    pdf.setDrawColor(r, g, b)
+    pdf.setLineWidth(0.6)
+    pdf.line(margin, midY, pageW - margin, midY)
+    pdf.setLineWidth(0.2)
+
+    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(r, g, b)
+    const charSpacePrev = 2
+    pdf.setCharSpace(charSpacePrev)
+    pdf.text((eyebrow || '').toUpperCase(), margin, midY - 36)
+    pdf.setCharSpace(0)
+
+    // Large title
+    pdf.setFontSize(24); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(20, 20, 20)
+    const titleLines = pdf.splitTextToSize(title || '', pageW - margin * 2 - 5)
+    pdf.text(titleLines, margin, midY - 25)
+
+    // Subtitle (client company)
+    if (subtitle) {
+      pdf.setFontSize(13); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 30, 30)
+      pdf.text(subtitle, margin, midY + 14)
+    }
+
+    // Meta lines (date, sheets, etc.)
+    pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(90, 100, 110)
+    meta.forEach((line, i) => pdf.text(line, margin, midY + (subtitle ? 24 : 14) + i * 7))
+  }
+
   // ── DORI Report PDF ────────────────────────────────────────────────────────
   const handleDoriExport = async () => {
     const CAMERA_CATS = ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera']
@@ -624,57 +689,33 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       const logoImg = await loadOrgLogo()
 
+      // ── Cover page ───────────────────────────────────────────────────────
+      drawDocCover(pdf, {
+        eyebrow: 'Customer Overview',
+        title: proposal?.proposal_name || 'Floor Plan Drawing',
+        subtitle: proposal?.company || '',
+        meta: [
+          `Date: ${new Date().toLocaleDateString()}`,
+          `Sheets: ${sheets.length}   ·   Devices: ${placements.length}`,
+        ],
+        logoImg,
+      })
+
       // ── Legend page ──────────────────────────────────────────────────────
-      // Title
+      pdf.addPage()
       pdf.setFillColor(255, 255, 255)
       pdf.rect(0, 0, pageW, pageH, 'F')
 
-      // Company logo or name
-      if (logoImg) {
-        try {
-          const maxW = 50, maxH = 18
-          const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
-          pdf.addImage(logoImg, 'PNG', margin, 8, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
-        } catch {
-          pdf.setTextColor(30, 30, 30); pdf.setFontSize(22); pdf.setFont('helvetica', 'bold')
-          pdf.text(orgProfile?.company_name || 'ForgePt', margin, 20)
-        }
-      } else {
-        pdf.setTextColor(30, 30, 30)
-        pdf.setFontSize(22)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(orgProfile?.company_name || 'ForgePt', margin, 20)
-      }
+      const [lr, lg, lb] = hexToRgbArr(orgProfile?.primary_color)
+      pdf.setFillColor(lr, lg, lb)
+      pdf.rect(0, 0, pageW, 10, 'F')
+      pdf.setTextColor(255, 255, 255); pdf.setFontSize(9); pdf.setFont('helvetica', 'bold')
+      pdf.text('SYMBOL LEGEND', margin, 7)
+      pdf.setTextColor(255, 255, 255); pdf.setFont('helvetica', 'normal')
+      pdf.text(`${orgProfile?.company_name || ''}  ·  ${proposal?.proposal_name || ''}`, pageW - margin, 7, { align: 'right' })
 
-      // Project name
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'normal')
-      pdf.setTextColor(200, 98, 42)
-      pdf.text(proposal?.proposal_name || 'Floor Plan Drawing', margin, 30)
-
-      // Client
-      if (proposal?.company) {
-        pdf.setTextColor(90, 100, 110)
-        pdf.setFontSize(10)
-        pdf.text(`Client: ${proposal.company}`, margin, 38)
-      }
-
-      // Date
-      pdf.setTextColor(90, 100, 110)
-      pdf.setFontSize(9)
-      pdf.text(`Date: ${new Date().toLocaleDateString()}`, margin, 44)
-      pdf.text(`Sheets: ${sheets.length}`, margin + 40, 44)
-      pdf.text(`Devices: ${placements.length}`, margin + 80, 44)
-
-      // Legend title
-      pdf.setTextColor(200, 98, 42)
-      pdf.setFontSize(11)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('SYMBOL LEGEND', margin, 58)
-
-      // Draw legend items
       let lx = margin
-      let ly = 65
+      // Draw legend items
       const colW   = 55
       const rowH   = 14
       const perRow = Math.floor((pageW - margin * 2) / colW)
@@ -890,41 +931,16 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const logoImg = await loadOrgLogo()
 
       // ── Title sheet ──────────────────────────────────────────────────────
-      pdf.setFillColor(255, 255, 255)
-      pdf.rect(0, 0, pageW, pageH, 'F')
-
-      // Logo or company name top-left
-      if (logoImg) {
-        try {
-          const maxW = 55, maxH = 22
-          const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
-          pdf.addImage(logoImg, 'PNG', margin, margin, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
-        } catch {
-          pdf.setTextColor(200, 98, 42); pdf.setFontSize(12); pdf.setFont('helvetica', 'bold')
-          pdf.text(orgProfile?.company_name || '', margin, margin + 8)
-        }
-      } else if (orgProfile?.company_name) {
-        pdf.setTextColor(200, 98, 42); pdf.setFontSize(12); pdf.setFont('helvetica', 'bold')
-        pdf.text(orgProfile.company_name, margin, margin + 8)
-      }
-
-      pdf.setTextColor(200, 98, 42)
-      pdf.setFontSize(28)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('SHOP DRAWINGS', pageW / 2, 40, { align: 'center' })
-
-      pdf.setTextColor(30, 30, 30)
-      pdf.setFontSize(16)
-      pdf.setFont('helvetica', 'normal')
-      pdf.text(proposal?.proposal_name || '', pageW / 2, 55, { align: 'center' })
-
-      pdf.setTextColor(90, 100, 110)
-      pdf.setFontSize(11)
-      pdf.text(proposal?.company || '', pageW / 2, 65, { align: 'center' })
-      pdf.text(`Prepared by: ${orgProfile?.company_name || ''}`, pageW / 2, 75, { align: 'center' })
-      pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW / 2, 83, { align: 'center' })
-      pdf.text(`Total Sheets: ${sheets.length}`, pageW / 2, 91, { align: 'center' })
-
+      drawDocCover(pdf, {
+        eyebrow: 'Shop Drawings',
+        title: proposal?.proposal_name || 'Shop Drawings',
+        subtitle: proposal?.company || '',
+        meta: [
+          `Prepared by: ${orgProfile?.company_name || ''}`,
+          `Date: ${new Date().toLocaleDateString()}   ·   Total Sheets: ${sheets.length}`,
+        ],
+        logoImg,
+      })
       drawTitleBlock('Title Sheet', 1)
 
       // ── Legend sheet ─────────────────────────────────────────────────────
@@ -1111,37 +1127,14 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       const logoImg = await loadOrgLogo()
 
-      // Title
-      pdf.setFillColor(255,255,255)
-      pdf.rect(0,0,pageW,pageH,'F')
-
-      // Logo or company name top-left
-      if (logoImg) {
-        try {
-          const maxW = 55, maxH = 22
-          const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
-          pdf.addImage(logoImg, 'PNG', margin, margin, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
-        } catch {
-          pdf.setTextColor(200,98,42); pdf.setFontSize(12); pdf.setFont('helvetica','bold')
-          pdf.text(orgProfile?.company_name || '', margin, margin + 8)
-        }
-      } else if (orgProfile?.company_name) {
-        pdf.setTextColor(200,98,42); pdf.setFontSize(12); pdf.setFont('helvetica','bold')
-        pdf.text(orgProfile.company_name, margin, margin + 8)
-      }
-
-      pdf.setTextColor(200,98,42)
-      pdf.setFontSize(28)
-      pdf.setFont('helvetica','bold')
-      pdf.text('AS-BUILT DRAWINGS', pageW/2, 40, { align: 'center' })
-      pdf.setTextColor(30,30,30)
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica','normal')
-      pdf.text(proposal?.proposal_name || '', pageW/2, 54, { align: 'center' })
-      pdf.setTextColor(90,100,110)
-      pdf.setFontSize(10)
-      pdf.text(proposal?.company || '', pageW/2, 63, { align: 'center' })
-      pdf.text(`As-Built Date: ${new Date().toLocaleDateString()}`, pageW/2, 71, { align: 'center' })
+      // ── Cover page ───────────────────────────────────────────────────────
+      drawDocCover(pdf, {
+        eyebrow: 'As-Built Drawings',
+        title: proposal?.proposal_name || 'As-Built Drawings',
+        subtitle: proposal?.company || '',
+        meta: [`As-Built Date: ${new Date().toLocaleDateString()}`],
+        logoImg,
+      })
 
       // As-built device schedule
       pdf.addPage()
@@ -1259,33 +1252,17 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       const logoImg = await loadOrgLogo()
 
-      // ── Title page ───────────────────────────────────────────────────────
-      pdf.setFillColor(255, 255, 255)
-      pdf.rect(0, 0, pageW, pageH, 'F')
-
-      if (logoImg) {
-        try {
-          const maxW = 50, maxH = 18
-          const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
-          pdf.addImage(logoImg, 'PNG', margin, margin, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
-        } catch { /* skip */ }
-      } else if (orgProfile?.company_name) {
-        pdf.setTextColor(200, 98, 42); pdf.setFontSize(11); pdf.setFont('helvetica', 'bold')
-        pdf.text(orgProfile.company_name, margin, margin + 8)
-      }
-
-      // Orange accent bar under logo
-      pdf.setFillColor(200, 98, 42)
-      pdf.rect(0, 36, pageW, 1.5, 'F')
-
-      pdf.setTextColor(200, 98, 42); pdf.setFontSize(26); pdf.setFont('helvetica', 'bold')
-      pdf.text('RACK SCHEDULE', pageW / 2, 58, { align: 'center' })
-      pdf.setTextColor(30, 30, 30); pdf.setFontSize(14); pdf.setFont('helvetica', 'normal')
-      pdf.text(proposal?.proposal_name || '', pageW / 2, 71, { align: 'center' })
-      pdf.setTextColor(90, 100, 110); pdf.setFontSize(10)
-      if (proposal?.company) pdf.text(proposal.company, pageW / 2, 81, { align: 'center' })
-      pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW / 2, 91, { align: 'center' })
-      pdf.text(`${rooms.length} room${rooms.length !== 1 ? 's' : ''} · ${rackList.length} rack${rackList.length !== 1 ? 's' : ''} · ${rackItemsData.length} device${rackItemsData.length !== 1 ? 's' : ''}`, pageW / 2, 100, { align: 'center' })
+      // ── Cover page ───────────────────────────────────────────────────────
+      drawDocCover(pdf, {
+        eyebrow: 'Rack Schedule',
+        title: proposal?.proposal_name || 'Rack Schedule',
+        subtitle: proposal?.company || '',
+        meta: [
+          `Date: ${new Date().toLocaleDateString()}`,
+          `${rooms.length} room${rooms.length !== 1 ? 's' : ''}  ·  ${rackList.length} rack${rackList.length !== 1 ? 's' : ''}  ·  ${rackItemsData.length} device${rackItemsData.length !== 1 ? 's' : ''}`,
+        ],
+        logoImg,
+      })
 
       // ── One page per room ────────────────────────────────────────────────
       for (const room of rooms) {
