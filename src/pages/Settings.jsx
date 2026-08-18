@@ -81,6 +81,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [docFont, setDocFont] = useState('helvetica')
   const [pdfTableStyle, setPdfTableStyle] = useState('striped')
   const [pdfHeaderStyle, setPdfHeaderStyle] = useState('compact')
+  const [pdfColorHeaders, setPdfColorHeaders] = useState(true)
   const [defaultHideMaterialPrices, setDefaultHideMaterialPrices] = useState(false)
   const [defaultHideLaborBreakdown, setDefaultHideLaborBreakdown] = useState(false)
   const [defaultLumpSumLabor, setDefaultLumpSumLabor] = useState(false)
@@ -264,7 +265,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     })
     if (data?.org_id) {
       try {
-        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions, feature_msrp, doc_font, pdf_table_style, pdf_header_style, stripe_connect_connected, default_hide_material_prices, default_hide_labor_breakdown, default_lump_sum_labor, default_tc_font_size, warranty_templates, warranty_text').eq('id', data.org_id).single()
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions, feature_msrp, doc_font, pdf_table_style, pdf_header_style, pdf_color_headers, stripe_connect_connected, default_hide_material_prices, default_hide_labor_breakdown, default_lump_sum_labor, default_tc_font_size, warranty_templates, warranty_text').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
         setOrgTimezone(orgData?.timezone || 'America/Chicago')
         setOrgId(data.org_id)
@@ -293,6 +294,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           setWarrantyTemplates([])
         }
         setPdfHeaderStyle(orgData?.pdf_header_style || 'compact')
+        setPdfColorHeaders(orgData?.pdf_color_headers !== false)
         setSlaEnabled(orgData?.feature_sla || false); setSlaAutoAttach(orgData?.sla_auto_attach || false)
         setMonitoringEnabled(orgData?.feature_monitoring || false); setMonitoringAutoAttach(orgData?.monitoring_auto_attach || false)
         const savedSLA = orgData?.sla_templates || {}
@@ -585,6 +587,12 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                 setPdfHeaderStyle(val)
                 await supabase.from('organizations').update({ pdf_header_style: val }).eq('id', orgId)
                 refreshProfile()
+              }}
+              pdfColorHeaders={pdfColorHeaders}
+              onChangePdfColorHeaders={async () => {
+                const next = !pdfColorHeaders
+                setPdfColorHeaders(next)
+                await supabase.from('organizations').update({ pdf_color_headers: next }).eq('id', orgId)
               }}
               saving={saving} handleSave={handleSave} />
           )}

@@ -603,6 +603,12 @@ export default function ProposalDetail({ isAdmin }) {
     setProposal(prev => ({ ...prev, lump_sum_labor: newVal }))
   }
 
+  const toggleCoverPage = async () => {
+    const newVal = !proposal?.show_cover_page
+    await supabase.from('proposals').update({ show_cover_page: newVal }).eq('id', id)
+    setProposal(prev => ({ ...prev, show_cover_page: newVal }))
+  }
+
   const toggleShowMsrp = async () => {
     const newVal = !proposal?.show_msrp
     await supabase.from('proposals').update({ show_msrp: newVal }).eq('id', id)
@@ -2899,16 +2905,105 @@ const analyzeDrawing = async () => {
 
   const generatePDFDoc = async ({ forceHidePricing = false } = {}) => {
     const [{ data: freshProposal }, { data: freshOrg }] = await Promise.all([
-      supabase.from('proposals').select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_msrp, show_compliance, show_warranty, warranty_text, warranty_template_id, show_terms, terms_text, tc_font_size, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name').eq('id', id).single(),
-      supabase.from('organizations').select('pdf_table_style, pdf_header_style, doc_font, primary_color, warranty_templates').eq('id', profile?.org_id).single(),
+      supabase.from('proposals').select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_msrp, show_compliance, show_warranty, warranty_text, warranty_template_id, show_terms, terms_text, tc_font_size, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name, show_cover_page').eq('id', id).single(),
+      supabase.from('organizations').select('pdf_table_style, pdf_header_style, doc_font, primary_color, warranty_templates, pdf_color_headers').eq('id', profile?.org_id).single(),
     ])
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
     if (forceHidePricing) p = { ...p, hide_material_prices: true, lump_sum_pricing: true, hide_labor_breakdown: true }
     const freshPdfStriped = (freshOrg?.pdf_table_style || 'striped') === 'striped'
+    const freshColorHeaders = freshOrg?.pdf_color_headers !== false
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
     const primaryRgb = hexToRgb(freshOrg?.primary_color || profile?.primary_color || '#0F1C2E')
+    const hdrFill = freshColorHeaders ? primaryRgb : [225, 225, 225]
+    const hdrText = freshColorHeaders ? [255, 255, 255] : [30, 30, 30]
 
+    // Load logo once — reused for cover page and header banner
+    let logoImg = null
+    if (resolvedLogoUrl) {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.src = resolvedLogoUrl
+      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+      if (img.naturalWidth > 0) logoImg = img
+    }
+
+    // Cover page (optional)
+    if (p?.show_cover_page) {
+      // Left accent bar
+      doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.rect(0, 0, 5, pageHeight, 'F')
+
+      // Logo / company name — top left
+      let cpLogoBottom = 36
+      if (logoImg) {
+        try {
+          const maxW = 72, maxH = 36
+          const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+          doc.addImage(logoImg, 'PNG', 16, 28, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
+          cpLogoBottom = 28 + logoImg.naturalHeight * ratio + 4
+        } catch { /* ignore */ }
+      }
+      doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(140, 140, 140)
+      doc.text(profile?.company_name || '', 16, cpLogoBottom + 6)
+
+      // Horizontal rule near middle of page
+      const midY = pageHeight * 0.44
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setLineWidth(0.6)
+      doc.line(16, midY, pageWidth - 16, midY)
+      doc.setLineWidth(0.2)
+
+      // "PROPOSAL" eyebrow
+      doc.setFontSize(8); doc.setFont(pdfFont, 'normal'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setCharSpace(2)
+      doc.text('PROPOSAL', 16, midY - 36)
+      doc.setCharSpace(0)
+
+      // Proposal name — large
+      doc.setFontSize(26); doc.setFont(pdfFont, 'bold'); doc.setTextColor(20, 20, 20)
+      const cpNameLines = doc.splitTextToSize(proposal?.proposal_name || 'Proposal', pageWidth - 32)
+      doc.text(cpNameLines, 16, midY - 24)
+
+      // Client info below rule
+      let cpY = midY + 14
+      doc.setFontSize(15); doc.setFont(pdfFont, 'bold'); doc.setTextColor(30, 30, 30)
+      doc.text(proposal?.company || '', 16, cpY)
+      cpY += 9
+      if (proposal?.client_name) {
+        doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(80, 80, 80)
+        doc.text(proposal.client_name, 16, cpY)
+        cpY += 7
+      }
+      if (clientAddress) {
+        doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(130, 130, 130)
+        doc.text(clientAddress, 16, cpY)
+      }
+
+      // Footer — date + ref numbers left, rep info right
+      const ftY = pageHeight - 32
+      doc.setDrawColor(210, 210, 210); doc.setLineWidth(0.3)
+      doc.line(16, ftY - 6, pageWidth - 16, ftY - 6)
+      doc.setFontSize(8); doc.setFont(pdfFont, 'normal'); doc.setTextColor(110, 110, 110)
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 16, ftY)
+      const refParts = []
+      if (proposal?.quote_number) refParts.push(`Quote #: ${proposal.quote_number}`)
+      if (proposal?.contract_number) refParts.push(`Contract #: ${proposal.contract_number}`)
+      if (refParts.length > 0) doc.text(refParts.join('    '), 16, ftY + 6)
+      if (proposal?.rep_name) {
+        doc.setFont(pdfFont, 'bold'); doc.setTextColor(60, 60, 60)
+        doc.text(proposal.rep_name, pageWidth - 16, ftY, { align: 'right' })
+        const repSub = [proposal.rep_title, proposal.rep_email, proposal.rep_phone].filter(Boolean)
+        repSub.forEach((ln, i) => {
+          doc.setFont(pdfFont, 'normal'); doc.setTextColor(130, 130, 130)
+          doc.text(ln, pageWidth - 16, ftY + 6 + i * 5, { align: 'right' })
+        })
+      }
+      doc.addPage()
+    }
+
+    // Header banner (all pages start with this)
     const isPropLarge = (freshOrg?.pdf_header_style || profile?.organizations?.pdf_header_style || 'compact') === 'large'
     const propHdrH = isPropLarge ? 60 : 40
     const propLogoMaxW = isPropLarge ? 80 : 50
@@ -2916,23 +3011,14 @@ const analyzeDrawing = async () => {
     doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
     doc.rect(0, 0, pageWidth, propHdrH, 'F')
 
-    if (resolvedLogoUrl) {
-      const img = new Image()
-      img.crossOrigin = 'anonymous'
-      img.src = resolvedLogoUrl
-      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
-      if (img.naturalWidth > 0) {
-        try {
-          const ratio = Math.min(propLogoMaxW / img.naturalWidth, propLogoMaxH / img.naturalHeight)
-          const logoW = img.naturalWidth * ratio
-          const logoH = img.naturalHeight * ratio
-          const logoY = 8 + (propLogoMaxH - logoH) / 2
-          doc.addImage(img, 'PNG', 14, logoY, logoW, logoH)
-        } catch {
-          doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
-          doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, propHdrH / 2 + 4)
-        }
-      } else {
+    if (logoImg) {
+      try {
+        const ratio = Math.min(propLogoMaxW / logoImg.naturalWidth, propLogoMaxH / logoImg.naturalHeight)
+        const logoW = logoImg.naturalWidth * ratio
+        const logoH = logoImg.naturalHeight * ratio
+        const logoY = 8 + (propLogoMaxH - logoH) / 2
+        doc.addImage(logoImg, 'PNG', 14, logoY, logoW, logoH)
+      } catch {
         doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
         doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, propHdrH / 2 + 4)
       }
@@ -3038,7 +3124,7 @@ const analyzeDrawing = async () => {
       const emptyFiller = isLumpSum ? 1 : showMsrpCol ? 4 : 3
       const pdfFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Section Total', fmtMoney(total)]]
       const pdfMatFoot = (total) => [['', ...Array(emptyFiller - 1).fill(''), 'Materials Total', fmtMoney(total)]]
-      const tableStyles = { theme: freshPdfStriped ? 'striped' : 'plain', headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, alternateRowStyles: freshPdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: 'lastPage' }
+      const tableStyles = { theme: freshPdfStriped ? 'striped' : 'plain', headStyles: { fillColor: hdrFill, textColor: hdrText }, footStyles: { fillColor: hdrFill, textColor: hdrText, fontStyle: 'bold' }, alternateRowStyles: freshPdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: 'lastPage' }
 
       if (sections.length > 0) {
         // Unsectioned items first
@@ -3064,9 +3150,9 @@ const analyzeDrawing = async () => {
           const secTotal = secMatTotal + secLaborTotal
           // Section header bar — ensure enough room for the bar + at least a few rows
           if (yPos + 40 > pageHeight - 20) { doc.addPage(); yPos = 20 }
-          doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+          doc.setFillColor(hdrFill[0], hdrFill[1], hdrFill[2])
           doc.rect(14, yPos, pageWidth - 28, 8, 'F')
-          doc.setFontSize(10); doc.setFont(pdfFont, 'bold'); doc.setTextColor(255, 255, 255)
+          doc.setFontSize(10); doc.setFont(pdfFont, 'bold'); doc.setTextColor(hdrText[0], hdrText[1], hdrText[2])
           doc.text(section.name || 'Untitled Section', 17, yPos + 5.5)
           yPos += 10
           if (secItems.length > 0) {
@@ -3117,7 +3203,7 @@ const analyzeDrawing = async () => {
         theme: freshPdfStriped ? 'striped' : 'plain',
         head: [['Description', 'Quantity', 'Total']],
         body: [['Labor', `${allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)} hrs`, `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+        headStyles: { fillColor: hdrFill, textColor: hdrText },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
         didParseCell: (data) => { if (data.section === 'head' && data.column.index > 0) data.cell.styles.halign = 'right' },
         alternateRowStyles: freshPdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 },
@@ -3135,8 +3221,8 @@ const analyzeDrawing = async () => {
           theme: freshPdfStriped ? 'striped' : 'plain',
           head: [['Role', 'Qty', 'Unit']],
           body: namedLaborItems.map(l => [l.role, l.quantity, l.unit || 'hr']),
-          ...(!isLumpSum ? { foot: [['', '', `Total Labor: $${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' }, showFoot: 'lastPage' } : {}),
-          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+          ...(!isLumpSum ? { foot: [['', '', `Total Labor: $${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], footStyles: { fillColor: hdrFill, textColor: hdrText, fontStyle: 'bold' }, showFoot: 'lastPage' } : {}),
+          headStyles: { fillColor: hdrFill, textColor: hdrText },
           alternateRowStyles: freshPdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 },
         })
       } else {
@@ -3146,8 +3232,8 @@ const analyzeDrawing = async () => {
           head: [['Role', 'Qty', 'Unit', 'Total Labor']],
           body: namedLaborItems.map(l => [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
           foot: [['', '', 'Total Labor', `$${namedLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
-          headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-          footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+          headStyles: { fillColor: hdrFill, textColor: hdrText },
+          footStyles: { fillColor: hdrFill, textColor: hdrText, fontStyle: 'bold' },
           alternateRowStyles: freshPdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: 'lastPage'
         })
       }
@@ -3682,7 +3768,7 @@ const analyzeDrawing = async () => {
 
       {showSendModal && <SendProposalModal proposal={proposal} sendForm={sendForm} setSendForm={setSendForm} sendingProposal={sendingProposal} onSend={sendProposal} onClose={() => setShowSendModal(false)} />}
 
-      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleLumpSumLabor={toggleLumpSumLabor} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onToggleShowCompliance={toggleShowCompliance} featureComplianceFields={features.complianceFields} onToggleShowWarranty={toggleShowWarranty} hasWarranty={!!(proposal?.warranty_text || (profile?.organizations?.warranty_templates || []).length > 0)} onClose={() => setShowPricingModal(false)} />}
+      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleLumpSumLabor={toggleLumpSumLabor} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onToggleShowCompliance={toggleShowCompliance} featureComplianceFields={features.complianceFields} onToggleShowWarranty={toggleShowWarranty} hasWarranty={!!(proposal?.warranty_text || (profile?.organizations?.warranty_templates || []).length > 0)} onToggleCoverPage={toggleCoverPage} onClose={() => setShowPricingModal(false)} />}
 
       {showMoveModal && moveLineIndex !== null && <MoveLineModal editLines={editLines} moveLineIndex={moveLineIndex} editSections={editSections} onMove={moveLineToSection} onClose={() => { setShowMoveModal(false); setMoveLineIndex(null) }} />}
 
