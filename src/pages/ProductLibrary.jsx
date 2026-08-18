@@ -29,6 +29,9 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [search, setSearch] = useState('')
   const [filterCategory, setFilterCategory] = useState('')
   const [filterVendor, setFilterVendor] = useState('')
+  const [filterManufacturer, setFilterManufacturer] = useState('')
+  const [filterSubCategory, setFilterSubCategory] = useState('')
+  const [filterPricing, setFilterPricing] = useState('') // '' | 'with' | 'none' | 'stale'
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState(null) // { added, updated, vendors }
   const [error, setError] = useState(null)
@@ -386,6 +389,11 @@ if (!finalCost) continue
   // ─── Filters ──────────────────────────────────────────────────────────────
   const allVendors = [...new Set(Object.values(pricing).flat().map(p => p.vendor).filter(Boolean))].sort()
   const categories = [...new Set(products.map(p => p.category).filter(Boolean))].sort()
+  const allManufacturers = [...new Set(products.map(p => p.manufacturer).filter(Boolean))].sort()
+  const allSubCategories = [...new Set(products.map(p => p.sub_category).filter(Boolean))].sort()
+
+  const hasActiveFilters = filterCategory || filterVendor || filterManufacturer || filterSubCategory || filterPricing
+  const clearFilters = () => { setFilterCategory(''); setFilterVendor(''); setFilterManufacturer(''); setFilterSubCategory(''); setFilterPricing(''); setSearch('') }
 
   const filtered = products.filter(p => {
     const q = search.toLowerCase()
@@ -393,10 +401,23 @@ if (!finalCost) continue
       p.item_name.toLowerCase().includes(q) ||
       (p.part_number || '').toLowerCase().includes(q) ||
       (p.manufacturer || '').toLowerCase().includes(q) ||
-      (p.category || '').toLowerCase().includes(q)
+      (p.category || '').toLowerCase().includes(q) ||
+      (p.sub_category || '').toLowerCase().includes(q) ||
+      (p.description || '').toLowerCase().includes(q)
     const matchCategory = !filterCategory || p.category === filterCategory
     const matchVendor = !filterVendor || (pricing[p.id] || []).some(pr => pr.vendor === filterVendor)
-    return matchSearch && matchCategory && matchVendor
+    const matchManufacturer = !filterManufacturer || p.manufacturer === filterManufacturer
+    const matchSubCategory = !filterSubCategory || p.sub_category === filterSubCategory
+    const matchPricing = (() => {
+      if (!filterPricing) return true
+      const vp = pricing[p.id] || []
+      if (filterPricing === 'with') return vp.length > 0
+      if (filterPricing === 'none') return vp.length === 0
+      if (filterPricing === 'stale') return vp.some(v => pricingAge(v.pricing_date) > 120)
+      if (filterPricing === 'current') return vp.some(v => pricingAge(v.pricing_date) <= 30)
+      return true
+    })()
+    return matchSearch && matchCategory && matchVendor && matchManufacturer && matchSubCategory && matchPricing
   })
 
   const filteredCatalog = activeTab !== 'library'
@@ -515,21 +536,68 @@ if (!finalCost) continue
         )}
 
         {/* Search + filters */}
-        <div className="flex gap-3">
-          <input type="text" placeholder="Search by name, part #, manufacturer..." value={search} onChange={e => setSearch(e.target.value)}
-            className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
-          {activeTab === 'library' && <>
-            <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
-              <option value="">All Categories</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <select value={filterVendor} onChange={e => setFilterVendor(e.target.value)}
-              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
-              <option value="">All Vendors</option>
-              {allVendors.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-          </>}
+        <div className="bg-fp-card rounded-xl p-4 space-y-3">
+          {/* Search row */}
+          <div className="flex gap-3">
+            <input type="text" placeholder="Search by name, part #, manufacturer, description..." value={search} onChange={e => setSearch(e.target.value)}
+              className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
+            {hasActiveFilters && (
+              <button onClick={clearFilters} className="text-fp-muted hover:text-fp-text text-sm px-3 py-2 rounded-lg border border-fp-border hover:border-fp-brand/50 transition-colors whitespace-nowrap">
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {/* Filter row (library tab only) */}
+          {activeTab === 'library' && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Category</label>
+                <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-fp-brand">
+                  <option value="">All Categories</option>
+                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Manufacturer</label>
+                <select value={filterManufacturer} onChange={e => setFilterManufacturer(e.target.value)}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-fp-brand">
+                  <option value="">All Manufacturers</option>
+                  {allManufacturers.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Vendor</label>
+                <select value={filterVendor} onChange={e => setFilterVendor(e.target.value)}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-fp-brand">
+                  <option value="">All Vendors</option>
+                  {allVendors.map(v => <option key={v} value={v}>{v}</option>)}
+                </select>
+              </div>
+              {allSubCategories.length > 0 && (
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Sub-Category</label>
+                  <select value={filterSubCategory} onChange={e => setFilterSubCategory(e.target.value)}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-fp-brand">
+                    <option value="">All Sub-Categories</option>
+                    {allSubCategories.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Pricing Status</label>
+                <select value={filterPricing} onChange={e => setFilterPricing(e.target.value)}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-fp-brand">
+                  <option value="">Any</option>
+                  <option value="with">Has Pricing</option>
+                  <option value="none">No Pricing</option>
+                  <option value="current">Current (&lt;30d)</option>
+                  <option value="stale">Stale (120d+)</option>
+                </select>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Pricing freshness legend (library tab only) */}
