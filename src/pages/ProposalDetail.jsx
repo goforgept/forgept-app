@@ -1365,19 +1365,25 @@ export default function ProposalDetail({ isAdmin }) {
     const { PDFDocument } = await import('pdf-lib')
     const { generateShopDrawingsPdf } = await import('../components/drawing/DrawingExport')
 
-    // Fetch all drawing data needed for the shop drawings PDF
     const sheetIds = drawingSheets.map(s => s.id)
-    const [{ data: placementsData }, { data: cableRunsData }, { data: verticalRisesData }, { data: orgProfileData }] = await Promise.all([
+    const [{ data: placementsData }, { data: cableRunsData }, { data: verticalRisesData }, { data: orgTitleBlock }] = await Promise.all([
       supabase.from('drawing_placements').select('*, global_products(id, name, part_number, manufacturer, category, specs)').in('drawing_sheet_id', sheetIds).order('created_at', { ascending: true }),
       supabase.from('cable_runs').select('*').in('drawing_sheet_id', sheetIds),
       supabase.from('vertical_rises').select('*').eq('proposal_id', id),
-      supabase.from('profiles').select('company_name, logo_url, primary_color, organizations(title_block_engineer, title_block_license, title_block_scale)').eq('org_id', profile?.org_id).limit(1).single(),
+      supabase.from('organizations').select('title_block_engineer, title_block_license, title_block_scale').eq('id', proposal?.org_id).single(),
     ])
+
+    const orgProfile = {
+      company_name: profile?.company_name,
+      logo_url: resolvedLogoUrl || profile?.logo_url,
+      primary_color: profile?.primary_color,
+      organizations: orgTitleBlock,
+    }
 
     // Generate both PDFs in parallel
     const [proposalDoc, shopPDF] = await Promise.all([
       generatePDFDoc(),
-      generateShopDrawingsPdf({ sheets: drawingSheets, placements: placementsData || [], cableRuns: cableRunsData || [], verticalRises: verticalRisesData || [], orgProfile: orgProfileData, proposal, exportFOV: true }),
+      generateShopDrawingsPdf({ sheets: drawingSheets, placements: placementsData || [], cableRuns: cableRunsData || [], verticalRises: verticalRisesData || [], orgProfile, proposal, exportFOV: true }),
     ])
 
     const proposalBytes = proposalDoc.output('arraybuffer')
