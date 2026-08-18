@@ -213,7 +213,7 @@ export default function ProposalDetail({ isAdmin }) {
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,lump_sum_labor,show_msrp,show_compliance,show_warranty,warranty_text,warranty_template_id,show_terms,terms_text,tc_font_size,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,lump_sum_labor,show_msrp,show_compliance,show_warranty,warranty_text,warranty_template_id,show_terms,terms_text,tc_font_size,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at,show_cover_page')
       .eq('id', id)
       .single()
 
@@ -2959,7 +2959,7 @@ const analyzeDrawing = async () => {
   const generatePDFDoc = async ({ forceHidePricing = false } = {}) => {
     const [{ data: freshProposal }, { data: freshOrg }] = await Promise.all([
       supabase.from('proposals').select('hide_material_prices, hide_labor_breakdown, lump_sum_labor, lump_sum_pricing, show_msrp, show_compliance, show_warranty, warranty_text, warranty_template_id, show_terms, terms_text, tc_font_size, tax_rate, tax_exempt, scope_of_work, labor_items, proposal_name, show_cover_page').eq('id', id).single(),
-      supabase.from('organizations').select('pdf_table_style, pdf_header_style, doc_font, primary_color, warranty_templates, pdf_color_headers').eq('id', profile?.org_id).single(),
+      supabase.from('organizations').select('pdf_table_style, pdf_header_style, doc_font, primary_color, warranty_templates, pdf_color_headers').eq('id', proposal?.org_id).single(),
     ])
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
     if (forceHidePricing) p = { ...p, hide_material_prices: true, lump_sum_pricing: true, hide_labor_breakdown: true }
