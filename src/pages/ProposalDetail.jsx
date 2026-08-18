@@ -3162,20 +3162,25 @@ const analyzeDrawing = async () => {
             yPos = doc.lastAutoTable.finalY + 4
           }
           if (secLabor.length > 0) {
-            doc.setFontSize(8); doc.setFont(pdfFont, 'bold'); doc.setTextColor(100, 100, 100)
-            doc.text('Section Labor', 14, yPos + 4); yPos += 6
             if (p?.lump_sum_labor) {
               const secLaborHours = secLabor.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0)
               const secLaborAmt = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
-              autoTable(doc, { startY: yPos, head: [['Description', 'Quantity', 'Total']], body: [['Labor', `${secLaborHours % 1 === 0 ? secLaborHours : secLaborHours.toFixed(2)} hrs`, `$${secLaborAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], headStyles: { fillColor: hdrFill, textColor: hdrText }, columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } }, alternateRowStyles: { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: false })
+              const hrsLabel = `${secLaborHours % 1 === 0 ? secLaborHours : secLaborHours.toFixed(2)} hrs`
+              doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(80, 80, 80)
+              doc.text(`Labor (${hrsLabel})`, 17, yPos + 4)
+              doc.setFont(pdfFont, 'bold'); doc.setTextColor(30, 30, 30)
+              doc.text(`$${secLaborAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos + 4, { align: 'right' })
+              yPos += 8
             } else {
+              doc.setFontSize(8); doc.setFont(pdfFont, 'bold'); doc.setTextColor(100, 100, 100)
+              doc.text('Section Labor', 14, yPos + 4); yPos += 6
               const lHead = p?.hide_labor_breakdown ? [['Role', 'Qty', 'Unit']] : [['Role', 'Qty', 'Unit', 'Total Labor']]
               const lRow = (l) => p?.hide_labor_breakdown
                 ? [l.role, l.quantity, l.unit || 'hr']
                 : [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
               autoTable(doc, { startY: yPos, head: lHead, body: secLabor.map(lRow), ...tableStyles, showFoot: false })
+              yPos = doc.lastAutoTable.finalY + 4
             }
-            yPos = doc.lastAutoTable.finalY + 4
           }
           // Section subtotal line — hidden in installer/lump-sum mode
           if (!isLumpSum) {
