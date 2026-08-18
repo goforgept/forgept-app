@@ -43,6 +43,293 @@ const boxesOverlap = (a, b) =>
   !(a.x2 + 0.5 < b.x1 || b.x2 + 0.5 < a.x1 || a.y2 + 0.5 < b.y1 || b.y2 + 0.5 < a.y1)
 const conditionLabel = (c) => c === 'existing' ? 'Existing' : c === 'replace' ? 'Replace' : c === 'demo' ? 'Demo' : 'New'
 
+const hexToRgbArr = (hex) => {
+  const n = parseInt((hex || '#0F1C2E').replace('#', ''), 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+const loadOrgLogoFromProfile = async (orgProfile) => {
+  if (!orgProfile?.logo_url) return null
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  img.src = orgProfile.logo_url
+  await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+  if (img.naturalWidth === 0) return null
+  return img
+}
+
+const drawDocCoverPage = (pdf, orgProfile, { eyebrow, title, subtitle, meta = [], logoImg }) => {
+  const pageW = pdf.internal.pageSize.getWidth()
+  const pageH = pdf.internal.pageSize.getHeight()
+  const [r, g, b] = hexToRgbArr(orgProfile?.primary_color)
+  const margin = 14
+
+  pdf.setFillColor(255, 255, 255); pdf.rect(0, 0, pageW, pageH, 'F')
+  pdf.setFillColor(r, g, b); pdf.rect(0, 0, 5, pageH, 'F')
+
+  let logoBottom = 36
+  if (logoImg) {
+    try {
+      const maxW = 80, maxH = 40
+      const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+      pdf.addImage(logoImg, 'PNG', margin, 20, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
+      logoBottom = 20 + logoImg.naturalHeight * ratio + 4
+    } catch { /* ignore */ }
+  } else if (orgProfile?.company_name) {
+    pdf.setFontSize(14); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 30, 30)
+    pdf.text(orgProfile.company_name, margin, 32)
+    logoBottom = 38
+  }
+
+  const midY = pageH * 0.44
+  pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.6); pdf.line(margin, midY, pageW - margin, midY); pdf.setLineWidth(0.2)
+  pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(r, g, b)
+  pdf.setCharSpace(2); pdf.text((eyebrow || '').toUpperCase(), margin, midY - 36); pdf.setCharSpace(0)
+  pdf.setFontSize(24); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(20, 20, 20)
+  pdf.text(pdf.splitTextToSize(title || '', pageW - margin * 2 - 5), margin, midY - 25)
+  if (subtitle) {
+    pdf.setFontSize(13); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 30, 30)
+    pdf.text(subtitle, margin, midY + 14)
+  }
+  pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(90, 100, 110)
+  meta.forEach((line, i) => pdf.text(line, margin, midY + (subtitle ? 24 : 14) + i * 7))
+}
+
+// Draws device icons + FOV overlays onto a rendered floor plan page
+const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, imgH, placementsBySheet, showFOV = true) => {
+  pdf.setFillColor(255, 255, 255); pdf.rect(imgX, imgY, imgW, imgH, 'F')
+  let imgNaturalW = null
+  if (imgData) {
+    try {
+      let format = 'PNG'
+      if (imgData.includes('data:image/jpeg') || imgData.includes('data:image/jpg')) format = 'JPEG'
+      else if (imgData.includes('data:image/webp')) format = 'WEBP'
+      const base64 = imgData.split(',')[1]
+      const tempImg = await new Promise(resolve => {
+        const img = new Image(); img.onload = () => resolve(img); img.onerror = () => resolve(img); img.src = imgData
+      })
+      const naturalW = tempImg.naturalWidth || imgW
+      const naturalH = tempImg.naturalHeight || imgH
+      imgNaturalW = naturalW
+      const ratio = Math.min(imgW / naturalW, imgH / naturalH)
+      const drawW = naturalW * ratio, drawH = naturalH * ratio
+      const drawX = imgX + (imgW - drawW) / 2, drawY = imgY + (imgH - drawH) / 2
+      pdf.addImage(base64, format, drawX, drawY, drawW, drawH, undefined, 'FAST')
+      imgX = drawX; imgY = drawY; imgW = drawW; imgH = drawH
+    } catch (err) { console.warn('Image add failed:', err.message) }
+  }
+  const sheetPlacements = placementsBySheet[sheet.id] || []
+  const placedLabels = []
+  for (const p of sheetPlacements) {
+    const px = imgX + p.x * imgW, py = imgY + p.y * imgH
+    if (!isFinite(px) || !isFinite(py)) continue
+    const col = p.marker_color || '#C8622A'
+    const r = parseInt(col.slice(1,3),16), g = parseInt(col.slice(3,5),16), b = parseInt(col.slice(5,7),16)
+    const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera']
+    const category = p.global_products?.category || ''
+    if (showFOV && fovCategories.includes(category) && isFinite(px) && isFinite(py)) {
+      const fovAngle = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
+      const rangeInFeet = p.fov_range || p.global_products?.specs?.ir_range || 30
+      const fallbackMM = Math.min(imgW, imgH) * 0.08
+      const computed = imgNaturalW && sheet.scale_ratio ? (imgW / (imgNaturalW * sheet.scale_ratio)) * rangeInFeet : null
+      const rangeInMM = (computed && isFinite(computed) && computed > 0) ? computed : fallbackMM
+      pdf.saveGraphicsState()
+      pdf.setGState(pdf.GState({ opacity: 0.12, 'stroke-opacity': 0.4 }))
+      pdf.setFillColor(r, g, b); pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.3)
+      if (category === 'PTZ Camera' || fovAngle >= 355) {
+        pdf.circle(px, py, rangeInMM, 'FD')
+      } else {
+        const startAngle = ((p.rotation || 0) - fovAngle / 2) * Math.PI / 180
+        const endAngle = ((p.rotation || 0) + fovAngle / 2) * Math.PI / 180
+        const steps = Math.max(16, Math.floor(fovAngle / 5))
+        const pts = [[px, py]]
+        for (let i = 0; i <= steps; i++) {
+          const angle = startAngle + (endAngle - startAngle) * (i / steps)
+          pts.push([px + Math.cos(angle) * rangeInMM, py + Math.sin(angle) * rangeInMM])
+        }
+        pts.push([px, py])
+        const deltas = pts.slice(1).map((pt, i) => [pt[0] - pts[i][0], pt[1] - pts[i][1]])
+        if (deltas.every(d => isFinite(d[0]) && isFinite(d[1]))) pdf.lines(deltas, pts[0][0], pts[0][1], [1,1], 'FD')
+      }
+      pdf.restoreGraphicsState()
+    }
+    const symbolSizeMM = imgNaturalW ? Math.max((p.symbol_size || 32) * (imgW / imgNaturalW), 2) : 4
+    const iconSize = symbolSizeMM * 0.65
+    pdf.setFillColor(r, g, b); pdf.circle(px, py, symbolSizeMM / 2, 'F')
+    const iconPng = await getIconPng(p.global_products?.category || 'default', '#ffffff', 32)
+    if (iconPng) pdf.addImage(iconPng, 'PNG', px - iconSize/2, py - iconSize/2, iconSize, iconSize)
+    if (p.site_condition && p.site_condition !== 'new') {
+      const badgeR = Math.max(symbolSizeMM * 0.24, 1.2)
+      const bx = px + symbolSizeMM * 0.28, by = py - symbolSizeMM * 0.52
+      const badgeCol = p.site_condition === 'existing' ? [34,197,94] : p.site_condition === 'demo' ? [168,85,247] : [239,68,68]
+      const letter = p.site_condition === 'existing' ? 'E' : p.site_condition === 'demo' ? 'D' : 'R'
+      pdf.setFillColor(...badgeCol); pdf.setDrawColor(255,255,255); pdf.setLineWidth(0.4); pdf.circle(bx, by, badgeR, 'FD')
+      pdf.setTextColor(255,255,255); pdf.setFontSize(Math.max(badgeR*3.5,4)); pdf.setFont('helvetica','bold')
+      pdf.text(letter, bx, by + badgeR * 0.38, { align: 'center' })
+    }
+    if (p.device_address) {
+      const fs = Math.max(symbolSizeMM * 0.7, 3), fsMm = ptToMm(fs), rad = symbolSizeMM / 2, gap = rad + 0.5
+      const label = p.device_address
+      const candidates = [[px, py + gap + fsMm],[px, py - gap],[px + gap, py + fsMm * 0.4],[px - gap, py + fsMm * 0.4]]
+      let lx = candidates[0][0], ly = candidates[0][1]
+      for (const [cx, cy] of candidates) {
+        const box = mkLabelBox(cx, cy, label, fsMm)
+        if (!placedLabels.some(b => boxesOverlap(box, b))) { lx = cx; ly = cy; placedLabels.push(box); break }
+      }
+      if (!placedLabels.some(b => boxesOverlap(mkLabelBox(lx, ly, label, fsMm), b))) placedLabels.push(mkLabelBox(lx, ly, label, fsMm))
+      pdf.setTextColor(r, g, b); pdf.setFontSize(fs); pdf.setFont('helvetica', 'bold')
+      pdf.text(label, lx, ly, { align: 'center' })
+    }
+  }
+}
+
+const getFloorPlanImageFromR2 = async (sheetId, sheets) => {
+  const sheet = sheets.find(s => s.id === sheetId)
+  if (!sheet || ['blank', 'pending'].includes(sheet.storage_path)) return null
+  try {
+    const { getR2Url } = await import('../../r2')
+    const signedUrl = await getR2Url(sheet.storage_path, 3600)
+    if (!signedUrl) return null
+    if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
+      const pdfjsLib = await import('pdfjs-dist')
+      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
+      const arrayBuf = await (await fetch(signedUrl)).arrayBuffer()
+      const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuf }).promise
+      const page = await pdfDoc.getPage(sheet.page_number || 1)
+      const viewport = page.getViewport({ scale: 2 })
+      const canvas = document.createElement('canvas')
+      canvas.width = viewport.width; canvas.height = viewport.height
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
+      return canvas.toDataURL('image/png')
+    } else {
+      const blob = await (await fetch(signedUrl)).blob()
+      return await new Promise(resolve => { const r = new FileReader(); r.onload = () => resolve(r.result); r.readAsDataURL(blob) })
+    }
+  } catch { return null }
+}
+
+// Exported so ProposalDetail can call it for the bundle download
+export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, orgProfile, proposal, exportFOV = true }) {
+  const { default: jsPDF } = await import('jspdf')
+  const { default: autoTable } = await import('jspdf-autotable')
+  const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
+  const pageW = pdf.internal.pageSize.getWidth()
+  const pageH = pdf.internal.pageSize.getHeight()
+  const margin = 10
+  const titleBlockH = 18
+
+  const placementsBySheet = {}
+  placements.forEach(p => {
+    if (!placementsBySheet[p.drawing_sheet_id]) placementsBySheet[p.drawing_sheet_id] = []
+    placementsBySheet[p.drawing_sheet_id].push(p)
+  })
+
+  const cableByType = Object.create(null)
+  cableRuns.forEach(r => {
+    const t = r.cable_type || 'Unknown'
+    if (!cableByType[t]) cableByType[t] = { footage: 0, total_footage: 0, runs: 0 }
+    cableByType[t].footage += r.footage || 0; cableByType[t].total_footage += r.total_footage || 0; cableByType[t].runs += 1
+  })
+  verticalRises.forEach(r => {
+    const t = r.cable_type || 'Unknown'
+    if (!cableByType[t]) cableByType[t] = { footage: 0, total_footage: 0, runs: 0 }
+    cableByType[t].total_footage += r.total_footage || 0
+  })
+
+  const usedCategories = [...new Set(placements.map(p => p.global_products?.category).filter(Boolean))].sort()
+
+  const drawTitleBlock = (sheetName, sheetNum) => {
+    pdf.setDrawColor(210,210,210); pdf.setLineWidth(0.3)
+    pdf.rect(margin, pageH - titleBlockH - margin, pageW - margin*2, titleBlockH)
+    pdf.setFontSize(8); pdf.setFont('helvetica','bold'); pdf.setTextColor(200,98,42)
+    pdf.text(orgProfile?.company_name || '', margin+2, pageH - titleBlockH - margin+6)
+    pdf.setTextColor(30,30,30); pdf.setFontSize(7); pdf.setFont('helvetica','normal')
+    pdf.text(proposal?.proposal_name || '', margin+2, pageH - titleBlockH - margin+11)
+    pdf.text(proposal?.company || '', margin+2, pageH - titleBlockH - margin+15)
+    const org = orgProfile?.organizations
+    if (org?.title_block_engineer) pdf.text(`Engineer: ${org.title_block_engineer}`, pageW/2, pageH - titleBlockH - margin+6, { align: 'center' })
+    if (org?.title_block_license) pdf.text(`License: ${org.title_block_license}`, pageW/2, pageH - titleBlockH - margin+11, { align: 'center' })
+    if (org?.title_block_scale) pdf.text(`Scale: ${org.title_block_scale}`, pageW/2, pageH - titleBlockH - margin+15, { align: 'center' })
+    pdf.setFont('helvetica','bold'); pdf.text(sheetName, pageW - margin-2, pageH - titleBlockH - margin+6, { align: 'right' })
+    pdf.setFont('helvetica','normal')
+    pdf.text(`Sheet ${sheetNum} of ${sheets.length + 3}`, pageW - margin-2, pageH - titleBlockH - margin+11, { align: 'right' })
+    pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW - margin-2, pageH - titleBlockH - margin+15, { align: 'right' })
+  }
+
+  const logoImg = await loadOrgLogoFromProfile(orgProfile)
+
+  // Cover
+  drawDocCoverPage(pdf, orgProfile, {
+    eyebrow: 'Shop Drawings',
+    title: proposal?.proposal_name || 'Shop Drawings',
+    subtitle: proposal?.company || '',
+    meta: [`Prepared by: ${orgProfile?.company_name || ''}`, `Date: ${new Date().toLocaleDateString()}   ·   Total Sheets: ${sheets.length}`],
+    logoImg,
+  })
+  drawTitleBlock('Title Sheet', 1)
+
+  // Legend
+  pdf.addPage(); pdf.setFillColor(255,255,255); pdf.rect(0,0,pageW,pageH,'F')
+  pdf.setTextColor(200,98,42); pdf.setFontSize(14); pdf.setFont('helvetica','bold')
+  pdf.text('SYMBOL LEGEND', margin, margin+8)
+  let lx = margin, ly = margin+18, col = 0
+  const colW = 60, perRow = Math.floor((pageW - margin*2) / colW)
+  for (const category of usedCategories) {
+    const legendIcon = await getIconPng(category, '#C8622A', 32)
+    if (legendIcon) pdf.addImage(legendIcon, 'PNG', lx, ly-2, 7, 7)
+    else { pdf.setFillColor(200,98,42); pdf.circle(lx+3.5, ly+3, 3.5, 'F') }
+    pdf.setTextColor(30,30,30); pdf.setFontSize(8); pdf.setFont('helvetica','bold')
+    pdf.text(category, lx+11, ly+4)
+    pdf.setFont('helvetica','normal'); pdf.setTextColor(90,100,110)
+    pdf.text(`Count: ${placements.filter(p => p.global_products?.category === category).length}`, lx+11, ly+9)
+    col++
+    if (col >= perRow) { col = 0; lx = margin; ly += 16 } else lx += colW
+  }
+  drawTitleBlock('Legend', 2)
+
+  // Device schedule
+  pdf.addPage(); pdf.setFillColor(255,255,255); pdf.rect(0,0,pageW,pageH,'F')
+  pdf.setTextColor(200,98,42); pdf.setFontSize(12); pdf.setFont('helvetica','bold')
+  pdf.text('DEVICE SCHEDULE', margin, margin+8)
+  const scheduleRows = placements.map((p, idx) => {
+    const gp = p.global_products, sheet = sheets.find(s => s.id === p.drawing_sheet_id)
+    return [idx+1, p.device_address||'—', p.part_number_override||gp?.part_number||'—', p.description_override||gp?.name||'—', p.manufacturer_override||gp?.manufacturer||'—', gp?.category||'—', p.quantity||1, conditionLabel(p.site_condition), sheet?.name||'—', p.runs_to_label||'—']
+  })
+  autoTable(pdf, { startY: margin+14, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['#','Address','Part Number','Description','Manufacturer','Category','Qty','Condition','Sheet','Runs To']], body: scheduleRows, theme: 'grid', styles: { fontSize: 7, cellPadding: 2, textColor: [40,40,40], fillColor: [255,255,255], lineColor: [200,200,200] }, headStyles: { fillColor: [26,45,69], textColor: [200,98,42], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245,247,250] } })
+  drawTitleBlock('Device Schedule', 3)
+
+  // Floor plan sheets
+  for (let i = 0; i < sheets.length; i++) {
+    const sheet = sheets[i]
+    pdf.addPage(); pdf.setFillColor(255,255,255); pdf.rect(0,0,pageW,pageH,'F')
+    pdf.setFillColor(26,45,69); pdf.rect(0,0,pageW,10,'F')
+    pdf.setTextColor(255,255,255); pdf.setFontSize(8); pdf.setFont('helvetica','bold')
+    pdf.text(sheet.name, margin, 7)
+    const imgY = 12, imgH = pageH - imgY - titleBlockH - margin - 5, imgW = pageW - margin*2
+    const imgData = await getFloorPlanImageFromR2(sheet.id, sheets)
+    await drawSheetOnPDFStandalone(pdf, sheet, imgData, margin, imgY, imgW, imgH, placementsBySheet, exportFOV)
+    drawTitleBlock(sheet.name, i+4)
+  }
+
+  // Cable schedule
+  if (cableRuns.length > 0 || verticalRises.length > 0) {
+    pdf.addPage(); pdf.setFillColor(255,255,255); pdf.rect(0,0,pageW,pageH,'F')
+    pdf.setTextColor(200,98,42); pdf.setFontSize(12); pdf.setFont('helvetica','bold')
+    pdf.text('CABLE SCHEDULE', margin, margin+8)
+    const cableRows = Object.entries(cableByType).map(([type, data]) => [type, data.runs||'—', `${Math.round(data.footage)}ft`, `${Math.round(data.total_footage)}ft`])
+    autoTable(pdf, { startY: margin+14, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['Cable Type','Runs','Measured','With Waste']], body: cableRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] }, headStyles: { fillColor: [26,45,69], textColor: [200,98,42], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [20,35,55] } })
+    if (verticalRises.length > 0) {
+      const riseY = pdf.lastAutoTable.finalY + 10
+      pdf.setTextColor(200,98,42); pdf.setFontSize(10); pdf.text('VERTICAL RISES', margin, riseY)
+      const riseRows = verticalRises.map(r => { const from = sheets.find(s => s.id === r.from_sheet_id), to = sheets.find(s => s.id === r.to_sheet_id); return [from?.name||'—', to?.name||'—', r.label||'—', r.cable_type, `${r.rise_height}ft`, r.quantity, `${Math.round(r.total_footage)}ft`] })
+      autoTable(pdf, { startY: riseY+4, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['From','To','Label','Cable','Height','Qty','Total']], body: riseRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] }, headStyles: { fillColor: [26,45,69], textColor: [200,98,42], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [20,35,55] } })
+    }
+    drawTitleBlock('Cable Schedule', sheets.length+4)
+  }
+
+  return pdf
+}
+
 // ─── DrawingExport ────────────────────────────────────────────────────────────
 // Export tab — Client Overview, Shop Drawings, As-Builts, CSV BOM
 export default function DrawingExport({ proposalId, orgId, sheets, proposal, stageRefs }) {
@@ -413,70 +700,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     return img
   }
 
-  const hexToRgbArr = (hex) => {
-    const n = parseInt((hex || '#0F1C2E').replace('#', ''), 16)
-    return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
-  }
-
-  // ── Clean cover page — shared across all export types ─────────────────────
-  const drawDocCover = (pdf, { eyebrow, title, subtitle, meta = [], logoImg }) => {
-    const pageW = pdf.internal.pageSize.getWidth()
-    const pageH = pdf.internal.pageSize.getHeight()
-    const [r, g, b] = hexToRgbArr(orgProfile?.primary_color)
-    const margin = 14
-
-    pdf.setFillColor(255, 255, 255)
-    pdf.rect(0, 0, pageW, pageH, 'F')
-
-    // Left accent bar
-    pdf.setFillColor(r, g, b)
-    pdf.rect(0, 0, 5, pageH, 'F')
-
-    // Logo or company name — top left
-    let logoBottom = 36
-    if (logoImg) {
-      try {
-        const maxW = 80, maxH = 40
-        const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
-        const lw = logoImg.naturalWidth * ratio
-        const lh = logoImg.naturalHeight * ratio
-        pdf.addImage(logoImg, 'PNG', margin, 20, lw, lh)
-        logoBottom = 20 + lh + 4
-      } catch { /* ignore */ }
-    } else if (orgProfile?.company_name) {
-      pdf.setFontSize(14); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 30, 30)
-      pdf.text(orgProfile.company_name, margin, 32)
-      logoBottom = 38
-    }
-
-    // Eyebrow
-    const midY = pageH * 0.44
-    pdf.setDrawColor(r, g, b)
-    pdf.setLineWidth(0.6)
-    pdf.line(margin, midY, pageW - margin, midY)
-    pdf.setLineWidth(0.2)
-
-    pdf.setFontSize(8); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(r, g, b)
-    const charSpacePrev = 2
-    pdf.setCharSpace(charSpacePrev)
-    pdf.text((eyebrow || '').toUpperCase(), margin, midY - 36)
-    pdf.setCharSpace(0)
-
-    // Large title
-    pdf.setFontSize(24); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(20, 20, 20)
-    const titleLines = pdf.splitTextToSize(title || '', pageW - margin * 2 - 5)
-    pdf.text(titleLines, margin, midY - 25)
-
-    // Subtitle (client company)
-    if (subtitle) {
-      pdf.setFontSize(13); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(30, 30, 30)
-      pdf.text(subtitle, margin, midY + 14)
-    }
-
-    // Meta lines (date, sheets, etc.)
-    pdf.setFontSize(9); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(90, 100, 110)
-    meta.forEach((line, i) => pdf.text(line, margin, midY + (subtitle ? 24 : 14) + i * 7))
-  }
+  const drawDocCover = (pdf, opts) => drawDocCoverPage(pdf, orgProfile, opts)
 
   // ── DORI Report PDF ────────────────────────────────────────────────────────
   const handleDoriExport = async () => {
@@ -880,230 +1104,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const handleShopDrawing = async () => {
     setGenerating(true)
     try {
-      const { default: jsPDF }      = await import('jspdf')
-      const { default: autoTable }  = await import('jspdf-autotable')
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
-
-      const pageW  = pdf.internal.pageSize.getWidth()
-      const pageH  = pdf.internal.pageSize.getHeight()
-      const margin = 10
-      const titleBlockH = 18
-
-      const drawTitleBlock = (sheetName, sheetNum) => {
-        // Title block border
-        pdf.setDrawColor(210, 210, 210)
-        pdf.setLineWidth(0.3)
-        pdf.rect(margin, pageH - titleBlockH - margin, pageW - margin * 2, titleBlockH)
-
-        // Company
-        pdf.setFontSize(8)
-        pdf.setFont('helvetica', 'bold')
-        pdf.setTextColor(200, 98, 42)
-        pdf.text(orgProfile?.company_name || 'ForgePt', margin + 2, pageH - titleBlockH - margin + 6)
-
-        // Project
-        pdf.setTextColor(30, 30, 30)
-        pdf.setFontSize(7)
-        pdf.setFont('helvetica', 'normal')
-        pdf.text(proposal?.proposal_name || '', margin + 2, pageH - titleBlockH - margin + 11)
-        pdf.text(proposal?.company || '', margin + 2, pageH - titleBlockH - margin + 15)
-
-        // Engineer
-        const org = orgProfile?.organizations
-        if (org?.title_block_engineer) {
-          pdf.text(`Engineer: ${org.title_block_engineer}`, pageW / 2, pageH - titleBlockH - margin + 6, { align: 'center' })
-        }
-        if (org?.title_block_license) {
-          pdf.text(`License: ${org.title_block_license}`, pageW / 2, pageH - titleBlockH - margin + 11, { align: 'center' })
-        }
-        if (org?.title_block_scale) {
-          pdf.text(`Scale: ${org.title_block_scale}`, pageW / 2, pageH - titleBlockH - margin + 15, { align: 'center' })
-        }
-
-        // Sheet info
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(sheetName, pageW - margin - 2, pageH - titleBlockH - margin + 6, { align: 'right' })
-        pdf.setFont('helvetica', 'normal')
-        pdf.text(`Sheet ${sheetNum} of ${sheets.length + 3}`, pageW - margin - 2, pageH - titleBlockH - margin + 11, { align: 'right' })
-        pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW - margin - 2, pageH - titleBlockH - margin + 15, { align: 'right' })
-      }
-
-      const logoImg = await loadOrgLogo()
-
-      // ── Title sheet ──────────────────────────────────────────────────────
-      drawDocCover(pdf, {
-        eyebrow: 'Shop Drawings',
-        title: proposal?.proposal_name || 'Shop Drawings',
-        subtitle: proposal?.company || '',
-        meta: [
-          `Prepared by: ${orgProfile?.company_name || ''}`,
-          `Date: ${new Date().toLocaleDateString()}   ·   Total Sheets: ${sheets.length}`,
-        ],
-        logoImg,
-      })
-      drawTitleBlock('Title Sheet', 1)
-
-      // ── Legend sheet ─────────────────────────────────────────────────────
-      pdf.addPage()
-      pdf.setFillColor(255, 255, 255)
-      pdf.rect(0, 0, pageW, pageH, 'F')
-
-      pdf.setTextColor(200, 98, 42)
-      pdf.setFontSize(14)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('SYMBOL LEGEND', margin, margin + 8)
-
-      let lx = margin
-      let ly = margin + 18
-      const colW   = 60
-      const perRow = Math.floor((pageW - margin * 2) / colW)
-      let col = 0
-
-      for (const category of usedCategories) {
-        const legendIcon = await getIconPng(category, '#C8622A', 32)
-        if (legendIcon) {
-          pdf.addImage(legendIcon, 'PNG', lx, ly - 2, 7, 7)
-        } else {
-          pdf.setFillColor(200, 98, 42)
-          pdf.circle(lx + 3.5, ly + 3, 3.5, 'F')
-        }
-        pdf.setTextColor(30, 30, 30)
-        pdf.setFontSize(8)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(category, lx + 11, ly + 4)
-        const count = placements.filter(p => p.global_products?.category === category).length
-        pdf.setFont('helvetica', 'normal')
-        pdf.setTextColor(90, 100, 110)
-        pdf.text(`Count: ${count}`, lx + 11, ly + 9)
-        col++
-        if (col >= perRow) { col = 0; lx = margin; ly += 16 }
-        else lx += colW
-      }
-
-      drawTitleBlock('Legend', 2)
-
-      // ── Device schedule sheet ────────────────────────────────────────────
-      pdf.addPage()
-      pdf.setFillColor(255, 255, 255)
-      pdf.rect(0, 0, pageW, pageH, 'F')
-
-      pdf.setTextColor(200, 98, 42)
-      pdf.setFontSize(12)
-      pdf.setFont('helvetica', 'bold')
-      pdf.text('DEVICE SCHEDULE', margin, margin + 8)
-
-      const scheduleRows = placements.map((p, idx) => {
-        const gp     = p.global_products
-        const sheet  = sheets.find(s => s.id === p.drawing_sheet_id)
-        return [
-          idx + 1,
-          p.device_address || '—',
-          p.part_number_override || gp?.part_number || '—',
-          p.description_override || gp?.name || '—',
-          p.manufacturer_override || gp?.manufacturer || '—',
-          gp?.category || '—',
-          p.quantity || 1,
-          conditionLabel(p.site_condition),
-          sheet?.name || '—',
-          p.runs_to_label || '—',
-        ]
-      })
-
-      autoTable(pdf, {
-        startY:     margin + 14,
-        margin:     { left: margin, right: margin, bottom: titleBlockH + margin + 5 },
-        head:       [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Category', 'Qty', 'Condition', 'Sheet', 'Runs To']],
-        body:       scheduleRows,
-        theme:      'grid',
-        styles:     { fontSize: 7, cellPadding: 2, textColor: [40, 40, 40], fillColor: [255, 255, 255], lineColor: [200, 200, 200] },
-        headStyles: { fillColor: [26, 45, 69], textColor: [200, 98, 42], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 247, 250] },
-      })
-
-      drawTitleBlock('Device Schedule', 3)
-
-      // ── Floor plan sheets ────────────────────────────────────────────────
-      for (let i = 0; i < sheets.length; i++) {
-        const sheet  = sheets[i]
-        pdf.addPage()
-        pdf.setFillColor(255, 255, 255)
-        pdf.rect(0, 0, pageW, pageH, 'F')
-
-        // Header
-        pdf.setFillColor(26, 45, 69)
-        pdf.rect(0, 0, pageW, 10, 'F')
-        pdf.setTextColor(255, 255, 255)
-        pdf.setFontSize(8)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(sheet.name, margin, 7)
-
-        // Image area
-        const imgY = 12
-        const imgH = pageH - imgY - titleBlockH - margin - 5
-        const imgW = pageW - margin * 2
-
-        const imgData = await getFloorPlanImage(sheet.id)
-        await drawSheetOnPDF(pdf, sheet, imgData, margin, imgY, imgW, imgH, exportFOV)
-
-        drawTitleBlock(sheet.name, i + 4)
-      }
-
-      // ── Cable schedule ───────────────────────────────────────────────────
-      if (cableRuns.length > 0 || verticalRises.length > 0) {
-        pdf.addPage()
-        pdf.setFillColor(255, 255, 255)
-        pdf.rect(0, 0, pageW, pageH, 'F')
-
-        pdf.setTextColor(200, 98, 42)
-        pdf.setFontSize(12)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('CABLE SCHEDULE', margin, margin + 8)
-
-        const cableRows = Object.entries(cableByType).map(([type, data]) => [
-          type,
-          data.runs || '—',
-          `${Math.round(data.footage)}ft`,
-          `${Math.round(data.total_footage)}ft`,
-        ])
-
-        autoTable(pdf, {
-          startY:     margin + 14,
-          margin:     { left: margin, right: margin, bottom: titleBlockH + margin + 5 },
-          head:       [['Cable Type', 'Runs', 'Measured', 'With Waste']],
-          body:       cableRows,
-          theme:      'grid',
-          styles:     { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] },
-          headStyles: { fillColor: [26,45,69], textColor: [200,98,42], fontStyle: 'bold' },
-          alternateRowStyles: { fillColor: [20,35,55] },
-        })
-
-        if (verticalRises.length > 0) {
-          const riseY = pdf.lastAutoTable.finalY + 10
-          pdf.setTextColor(200,98,42)
-          pdf.setFontSize(10)
-          pdf.text('VERTICAL RISES', margin, riseY)
-
-          const riseRows = verticalRises.map(r => {
-            const from = sheets.find(s => s.id === r.from_sheet_id)
-            const to   = sheets.find(s => s.id === r.to_sheet_id)
-            return [from?.name || '—', to?.name || '—', r.label || '—', r.cable_type, `${r.rise_height}ft`, r.quantity, `${Math.round(r.total_footage)}ft`]
-          })
-
-          autoTable(pdf, {
-            startY:     riseY + 4,
-            margin:     { left: margin, right: margin, bottom: titleBlockH + margin + 5 },
-            head:       [['From', 'To', 'Label', 'Cable', 'Height', 'Qty', 'Total']],
-            body:       riseRows,
-            theme:      'grid',
-            styles:     { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] },
-            headStyles: { fillColor: [26,45,69], textColor: [200,98,42], fontStyle: 'bold' },
-            alternateRowStyles: { fillColor: [20,35,55] },
-          })
-        }
-
-        drawTitleBlock('Cable Schedule', sheets.length + 4)
-      }
-
+      const pdf = await generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, orgProfile, proposal, exportFOV })
       pdf.save(`${proposal?.proposal_name || 'Drawing'}_Shop_Drawings.pdf`)
     } catch (err) {
       console.error('Shop drawing failed:', err)
@@ -1112,6 +1113,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       setGenerating(false)
     }
   }
+
 
   // ── As-Built PDF ───────────────────────────────────────────────────────────
   const handleAsBuilt = async () => {

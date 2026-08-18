@@ -1363,78 +1363,30 @@ export default function ProposalDetail({ isAdmin }) {
   const downloadBundle = async () => {
     if (proposal?.status === 'Draft') setShowSentPrompt(true)
     const { PDFDocument } = await import('pdf-lib')
-    const { getR2Url } = await import('../r2')
-    const { default: jsPDF } = await import('jspdf')
+    const { generateShopDrawingsPdf } = await import('../components/drawing/DrawingExport')
 
-    // Generate proposal PDF
-    const proposalDoc = await generatePDFDoc()
+    // Fetch all drawing data needed for the shop drawings PDF
+    const sheetIds = drawingSheets.map(s => s.id)
+    const [{ data: placementsData }, { data: cableRunsData }, { data: verticalRisesData }, { data: orgProfileData }] = await Promise.all([
+      supabase.from('drawing_placements').select('*, global_products(id, name, part_number, manufacturer, category, specs)').in('drawing_sheet_id', sheetIds).order('created_at', { ascending: true }),
+      supabase.from('cable_runs').select('*').in('drawing_sheet_id', sheetIds),
+      supabase.from('vertical_rises').select('*').eq('proposal_id', id),
+      supabase.from('profiles').select('company_name, logo_url, primary_color, organizations(title_block_engineer, title_block_license, title_block_scale)').eq('org_id', profile?.org_id).limit(1).single(),
+    ])
+
+    // Generate both PDFs in parallel
+    const [proposalDoc, shopPDF] = await Promise.all([
+      generatePDFDoc(),
+      generateShopDrawingsPdf({ sheets: drawingSheets, placements: placementsData || [], cableRuns: cableRunsData || [], verticalRises: verticalRisesData || [], orgProfile: orgProfileData, proposal, exportFOV: true }),
+    ])
+
     const proposalBytes = proposalDoc.output('arraybuffer')
-
-    // Build drawings appendix
-    const drawDoc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
-    const pageW = drawDoc.internal.pageSize.getWidth()
-    const pageH = drawDoc.internal.pageSize.getHeight()
-    const primaryRgbDraw = hexToRgb(profile?.primary_color || '#0F1C2E')
-    const [dr, dg, db] = primaryRgbDraw
-
-    // Cover page for drawings appendix
-    drawDoc.setFillColor(255, 255, 255); drawDoc.rect(0, 0, pageW, pageH, 'F')
-    drawDoc.setFillColor(dr, dg, db); drawDoc.rect(0, 0, 5, pageH, 'F')
-    const midY = pageH * 0.44
-    drawDoc.setDrawColor(dr, dg, db); drawDoc.setLineWidth(0.6); drawDoc.line(14, midY, pageW - 14, midY); drawDoc.setLineWidth(0.2)
-    drawDoc.setFontSize(8); drawDoc.setFont('helvetica', 'normal'); drawDoc.setTextColor(dr, dg, db)
-    drawDoc.setCharSpace(2); drawDoc.text('DRAWINGS APPENDIX', 14, midY - 36); drawDoc.setCharSpace(0)
-    drawDoc.setFontSize(22); drawDoc.setFont('helvetica', 'bold'); drawDoc.setTextColor(20, 20, 20)
-    drawDoc.text(proposal?.proposal_name || 'Drawings', 14, midY - 25)
-    if (proposal?.company) {
-      drawDoc.setFontSize(13); drawDoc.setFont('helvetica', 'bold'); drawDoc.setTextColor(30, 30, 30)
-      drawDoc.text(proposal.company, 14, midY + 14)
-    }
-    drawDoc.setFontSize(9); drawDoc.setFont('helvetica', 'normal'); drawDoc.setTextColor(90, 100, 110)
-    drawDoc.text(`${drawingSheets.length} sheet${drawingSheets.length !== 1 ? 's' : ''}  ·  ${new Date().toLocaleDateString()}`, 14, midY + (proposal?.company ? 24 : 14))
-
-    // One page per sheet
-    for (const sheet of drawingSheets) {
-      const signedUrl = await getR2Url(sheet.storage_path, 3600)
-      if (!signedUrl) continue
-      let imgData = null
-      try {
-        if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
-          const pdfjsLib = await import('pdfjs-dist')
-          pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
-          const arrayBuf = await (await fetch(signedUrl)).arrayBuffer()
-          const pdfDoc2 = await pdfjsLib.getDocument({ data: arrayBuf }).promise
-          const page = await pdfDoc2.getPage(1)
-          const viewport = page.getViewport({ scale: 2 })
-          const canvas = document.createElement('canvas')
-          canvas.width = viewport.width; canvas.height = viewport.height
-          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise
-          imgData = canvas.toDataURL('image/png')
-        } else {
-          const blob = await (await fetch(signedUrl)).blob()
-          imgData = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob) })
-        }
-      } catch { /* skip sheet */ }
-
-      drawDoc.addPage()
-      drawDoc.setFillColor(255, 255, 255); drawDoc.rect(0, 0, pageW, pageH, 'F')
-      // Header bar
-      drawDoc.setFillColor(dr, dg, db); drawDoc.rect(0, 0, pageW, 10, 'F')
-      drawDoc.setTextColor(255, 255, 255); drawDoc.setFontSize(9); drawDoc.setFont('helvetica', 'bold')
-      drawDoc.text(sheet.name || 'Sheet', 14, 7)
-      drawDoc.setFont('helvetica', 'normal')
-      drawDoc.text(`${proposal?.proposal_name || ''}`, pageW - 14, 7, { align: 'right' })
-      if (imgData) {
-        drawDoc.addImage(imgData, 'PNG', 0, 12, pageW, pageH - 12, undefined, 'FAST')
-      }
-    }
-
-    const drawBytes = drawDoc.output('arraybuffer')
+    const shopBytes = shopPDF.output('arraybuffer')
 
     // Merge with pdf-lib
     const merged = await PDFDocument.create()
     const propDoc = await PDFDocument.load(proposalBytes)
-    const drwDoc = await PDFDocument.load(drawBytes)
+    const drwDoc = await PDFDocument.load(shopBytes)
     const propPages = await merged.copyPages(propDoc, propDoc.getPageIndices())
     propPages.forEach(p => merged.addPage(p))
     const drwPages = await merged.copyPages(drwDoc, drwDoc.getPageIndices())
