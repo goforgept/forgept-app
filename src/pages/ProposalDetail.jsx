@@ -2963,7 +2963,8 @@ const analyzeDrawing = async () => {
     ])
     let p = freshProposal ? { ...proposal, ...freshProposal } : proposal
     if (forceHidePricing) p = { ...p, hide_material_prices: true, lump_sum_pricing: true, hide_labor_breakdown: true }
-    const freshColorHeaders = freshOrg?.pdf_color_headers !== false
+    const colorHeadersVal = freshOrg?.pdf_color_headers ?? profile?.organizations?.pdf_color_headers
+    const freshColorHeaders = colorHeadersVal !== false
     const freshPdfStriped = freshColorHeaders
     const doc = new jsPDF()
     const pageWidth = doc.internal.pageSize.getWidth()

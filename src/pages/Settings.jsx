@@ -593,6 +593,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                 const next = !pdfColorHeaders
                 setPdfColorHeaders(next)
                 await supabase.from('organizations').update({ pdf_color_headers: next }).eq('id', orgId)
+                refreshProfile()
               }}
               saving={saving} handleSave={handleSave} />
           )}
