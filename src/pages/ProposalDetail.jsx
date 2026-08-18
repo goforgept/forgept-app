@@ -3003,34 +3003,38 @@ const analyzeDrawing = async () => {
       doc.addPage()
     }
 
-    // Header banner (all pages start with this)
-    const isPropLarge = (freshOrg?.pdf_header_style || profile?.organizations?.pdf_header_style || 'compact') === 'large'
-    const propHdrH = isPropLarge ? 60 : 40
-    const propLogoMaxW = isPropLarge ? 80 : 50
-    const propLogoMaxH = isPropLarge ? 44 : 26
-    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-    doc.rect(0, 0, pageWidth, propHdrH, 'F')
-
-    if (logoImg) {
-      try {
-        const ratio = Math.min(propLogoMaxW / logoImg.naturalWidth, propLogoMaxH / logoImg.naturalHeight)
-        const logoW = logoImg.naturalWidth * ratio
-        const logoH = logoImg.naturalHeight * ratio
-        const logoY = 8 + (propLogoMaxH - logoH) / 2
-        doc.addImage(logoImg, 'PNG', 14, logoY, logoW, logoH)
-      } catch {
-        doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
-        doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, propHdrH / 2 + 4)
-      }
+    let yPos
+    if (p?.show_cover_page) {
+      // Cover page already has all branding/client info — start content clean at top of page
+      yPos = 20
     } else {
-      doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
-      doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, propHdrH / 2)
-      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(200, 98, 42)
-      doc.text('Scope it. Send it. Close it.', 14, propHdrH / 2 + 10)
-    }
+      // Header banner
+      const isPropLarge = (freshOrg?.pdf_header_style || profile?.organizations?.pdf_header_style || 'compact') === 'large'
+      const propHdrH = isPropLarge ? 60 : 40
+      const propLogoMaxW = isPropLarge ? 80 : 50
+      const propLogoMaxH = isPropLarge ? 44 : 26
+      doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.rect(0, 0, pageWidth, propHdrH, 'F')
 
-    // Company address + license on right side of banner
-    {
+      if (logoImg) {
+        try {
+          const ratio = Math.min(propLogoMaxW / logoImg.naturalWidth, propLogoMaxH / logoImg.naturalHeight)
+          const logoW = logoImg.naturalWidth * ratio
+          const logoH = logoImg.naturalHeight * ratio
+          const logoY = 8 + (propLogoMaxH - logoH) / 2
+          doc.addImage(logoImg, 'PNG', 14, logoY, logoW, logoH)
+        } catch {
+          doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
+          doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, propHdrH / 2 + 4)
+        }
+      } else {
+        doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.setFont(pdfFont, 'bold')
+        doc.text(profile?.company_name || proposal?.company || 'ForgePt.', 14, propHdrH / 2)
+        doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(200, 98, 42)
+        doc.text('Scope it. Send it. Close it.', 14, propHdrH / 2 + 10)
+      }
+
+      // Company address + license on right side of banner
       const bannerLines = []
       if (profile?.bill_to_address) bannerLines.push(profile.bill_to_address)
       const csl = [profile?.bill_to_city, profile?.bill_to_state, profile?.bill_to_zip].filter(Boolean).join(', ')
@@ -3041,22 +3045,19 @@ const analyzeDrawing = async () => {
         const bStartY = propHdrH / 2 - (bannerLines.length - 1) * 2.5
         bannerLines.forEach((ln, i) => doc.text(ln, pageWidth - 14, bStartY + i * 5, { align: 'right' }))
       }
-    }
 
-    const propBodyY = propHdrH + 15
-    doc.setTextColor(0, 0, 0); doc.setFontSize(18); doc.setFont(pdfFont, 'bold')
-    doc.text(proposal?.proposal_name || 'Proposal', 14, propBodyY)
-    doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100)
-    doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, propBodyY + 10)
-    if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, propBodyY + 17)
-    let pdfRefY = propBodyY + (clientAddress ? 24 : 17)
-    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, pdfRefY)
-    pdfRefY += 7
-    if (proposal?.quote_number) { doc.text(`Quote #: ${proposal.quote_number}`, 14, pdfRefY); pdfRefY += 7 }
-    if (proposal?.contract_number) { doc.text(`Contract #: ${proposal.contract_number}`, 14, pdfRefY); pdfRefY += 7 }
+      const propBodyY = propHdrH + 15
+      doc.setTextColor(0, 0, 0); doc.setFontSize(18); doc.setFont(pdfFont, 'bold')
+      doc.text(proposal?.proposal_name || 'Proposal', 14, propBodyY)
+      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100)
+      doc.text(`Prepared for: ${proposal?.company || ''} — ${proposal?.client_name || ''}`, 14, propBodyY + 10)
+      if (clientAddress) doc.text(`Address: ${clientAddress}`, 14, propBodyY + 17)
+      let pdfRefY = propBodyY + (clientAddress ? 24 : 17)
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, pdfRefY)
+      pdfRefY += 7
+      if (proposal?.quote_number) { doc.text(`Quote #: ${proposal.quote_number}`, 14, pdfRefY); pdfRefY += 7 }
+      if (proposal?.contract_number) { doc.text(`Contract #: ${proposal.contract_number}`, 14, pdfRefY); pdfRefY += 7 }
 
-    // Rep contact info, right-aligned in the same area
-    {
       const repLines = []
       if (proposal?.rep_name) repLines.push(`Rep: ${proposal.rep_name}`)
       if (proposal?.rep_title) repLines.push(proposal.rep_title)
@@ -3066,9 +3067,9 @@ const analyzeDrawing = async () => {
         doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100)
         repLines.forEach((ln, i) => doc.text(ln, pageWidth - 14, propBodyY + 10 + i * 7, { align: 'right' }))
       }
-    }
 
-    let yPos = Math.max(propBodyY + 37, pdfRefY + 5)
+      yPos = Math.max(propBodyY + 37, pdfRefY + 5)
+    }
     const lineH = 5
     const textMargin = 20
 
@@ -3158,21 +3159,26 @@ const analyzeDrawing = async () => {
             autoTable(doc, { startY: yPos, head: pdfHead, body: secItems.map(pdfRow), ...tableStyles, showFoot: false })
             yPos = doc.lastAutoTable.finalY + 4
           }
-          if (secLabor.length > 0 && !p?.lump_sum_labor) {
+          if (secLabor.length > 0) {
             doc.setFontSize(8); doc.setFont(pdfFont, 'bold'); doc.setTextColor(100, 100, 100)
             doc.text('Section Labor', 14, yPos + 4); yPos += 6
-            const lHead = p?.hide_labor_breakdown ? [['Role', 'Qty', 'Unit']] : [['Role', 'Qty', 'Unit', 'Total Labor']]
-            const lRow = (l) => p?.hide_labor_breakdown
-              ? [l.role, l.quantity, l.unit || 'hr']
-              : [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
-            autoTable(doc, { startY: yPos, head: lHead, body: secLabor.map(lRow), ...tableStyles, showFoot: false })
+            if (p?.lump_sum_labor) {
+              const secLaborHours = secLabor.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0)
+              const secLaborAmt = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+              autoTable(doc, { startY: yPos, head: [['Description', 'Quantity', 'Total']], body: [['Labor', `${secLaborHours % 1 === 0 ? secLaborHours : secLaborHours.toFixed(2)} hrs`, `$${secLaborAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]], headStyles: { fillColor: hdrFill, textColor: hdrText }, columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } }, alternateRowStyles: { fillColor: [255, 255, 255] }, styles: { fontSize: 9 }, showFoot: false })
+            } else {
+              const lHead = p?.hide_labor_breakdown ? [['Role', 'Qty', 'Unit']] : [['Role', 'Qty', 'Unit', 'Total Labor']]
+              const lRow = (l) => p?.hide_labor_breakdown
+                ? [l.role, l.quantity, l.unit || 'hr']
+                : [l.role, l.quantity, l.unit || 'hr', `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]
+              autoTable(doc, { startY: yPos, head: lHead, body: secLabor.map(lRow), ...tableStyles, showFoot: false })
+            }
             yPos = doc.lastAutoTable.finalY + 4
           }
           // Section subtotal line — hidden in installer/lump-sum mode
           if (!isLumpSum) {
-            const displaySecTotal = p?.lump_sum_labor ? secMatTotal : secTotal
             doc.setFontSize(9); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-            doc.text(`${section.name || 'Section'} Total: $${displaySecTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
+            doc.text(`${section.name || 'Section'} Total: $${secTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos, { align: 'right' })
             yPos += 8
           }
         }
@@ -3191,9 +3197,8 @@ const analyzeDrawing = async () => {
     const allLaborTotal = proposalLaborTotal + sectionLaborTotal
     const grandTotal = pdfMaterialsTotal + allLaborTotal + pdfTaxAmount
 
-    if (p?.lump_sum_labor && allLaborTotal > 0) {
-      const allLaborHours = pdfLaborItems.filter(l => l.role).reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0)
-        + sections.reduce((s, sec) => s + (sec.include_labor ? (sec.labor_items || []).filter(l => l.role).reduce((ss, l) => ss + (parseFloat(l.quantity) || 0), 0) : 0), 0)
+    if (p?.lump_sum_labor && proposalLaborTotal > 0 && pdfLaborItems.some(l => l.role)) {
+      const generalLaborHours = pdfLaborItems.filter(l => l.role).reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0)
       const tableEnd = sections.length > 0 ? yPos + 6 : (doc.lastAutoTable ? doc.lastAutoTable.finalY + 12 : yPos + 12)
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Labor', 14, tableEnd)
@@ -3201,7 +3206,7 @@ const analyzeDrawing = async () => {
         startY: tableEnd + 6,
         theme: freshPdfStriped ? 'striped' : 'plain',
         head: [['Description', 'Quantity', 'Total']],
-        body: [['Labor', `${allLaborHours % 1 === 0 ? allLaborHours : allLaborHours.toFixed(2)} hrs`, `$${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        body: [['Labor', `${generalLaborHours % 1 === 0 ? generalLaborHours : generalLaborHours.toFixed(2)} hrs`, `$${proposalLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: hdrFill, textColor: hdrText },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
         didParseCell: (data) => { if (data.section === 'head' && data.column.index > 0) data.cell.styles.halign = 'right' },
