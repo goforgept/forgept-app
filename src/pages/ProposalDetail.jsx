@@ -2945,8 +2945,10 @@ const analyzeDrawing = async () => {
           cpLogoBottom = 28 + logoImg.naturalHeight * ratio + 4
         } catch { /* ignore */ }
       }
-      doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(140, 140, 140)
-      doc.text(profile?.company_name || '', 16, cpLogoBottom + 6)
+      if (!logoImg) {
+        doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(40, 40, 40)
+        doc.text(profile?.company_name || '', 16, cpLogoBottom + 8)
+      }
 
       // Horizontal rule near middle of page
       const midY = pageHeight * 0.44
