@@ -3069,7 +3069,6 @@ const analyzeDrawing = async () => {
     }
 
     let yPos = Math.max(propBodyY + 37, pdfRefY + 5)
-    const pageHeight = doc.internal.pageSize.getHeight()
     const lineH = 5
     const textMargin = 20
 
