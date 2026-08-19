@@ -6,7 +6,7 @@ export default function PhotosModal({ photos, uploadingPhoto, onUpload, onUpdate
           <div><h3 className="text-fp-text font-bold text-lg">📷 Site Photos</h3><p className="text-fp-muted text-sm mt-0.5">Attach job site photos to this proposal</p></div>
           <label className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors cursor-pointer">
             {uploadingPhoto ? 'Uploading...' : '+ Upload Photo'}
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={onUpload} className="hidden" disabled={uploadingPhoto} />
+            <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={onUpload} className="hidden" disabled={uploadingPhoto} />
           </label>
         </div>
         {photos.length === 0 ? (

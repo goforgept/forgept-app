@@ -17,6 +17,7 @@ import ScheduleModal from '../components/job/ScheduleModal'
 import NotifyModal from '../components/job/NotifyModal'
 import ChangeOrderModal from '../components/job/ChangeOrderModal'
 import AIATab from '../components/job/AIATab'
+import BillingsTab from '../components/job/BillingsTab'
 
 const AUTO_CHECK_TYPES = [
   { type: 'proposal_signed', label: 'Proposal signed', icon: '✍️' },
@@ -95,6 +96,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [newCheckItem, setNewCheckItem] = useState('')
   const [savingCheck, setSavingCheck] = useState(false)
 
+  const [jobInvoices, setJobInvoices] = useState([])
+
   // Tech daily logs
   const [techLogs, setTechLogs] = useState([])
 
@@ -155,6 +158,13 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         .eq('proposal_id', jobData.proposal_id)
       setLineItems(lineData || [])
       setEditLines(lineData || [])
+
+      const { data: invData } = await supabase
+        .from('invoices')
+        .select('id, invoice_number, status, total, balance_due, amount_paid, due_date, created_at, description')
+        .eq('proposal_id', jobData.proposal_id)
+        .order('created_at', { ascending: true })
+      setJobInvoices(invData || [])
 
       if (profile?.org_id) {
         const { data: vendorData } = await supabase
@@ -448,6 +458,82 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const hexToRgb = (hex) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
     return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
+  }
+
+  const downloadInstallerPDF = async () => {
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('company_name, logo_url, primary_color')
+      .eq('id', profile.id)
+      .single()
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const rgb = hexToRgb(profileData?.primary_color || '#0F1C2E')
+    const doc = new jsPDF()
+    const pw = doc.internal.pageSize.getWidth()
+
+    // Header band
+    doc.setFillColor(rgb[0], rgb[1], rgb[2])
+    doc.rect(0, 0, pw, 38, 'F')
+
+    if (profileData?.logo_url) {
+      try {
+        const img = new Image(); img.crossOrigin = 'anonymous'; img.src = profileData.logo_url
+        await new Promise(r => { img.onload = r; img.onerror = r })
+        if (img.naturalWidth > 0) {
+          const cv = document.createElement('canvas')
+          cv.width = img.naturalWidth; cv.height = img.naturalHeight
+          cv.getContext('2d').drawImage(img, 0, 0)
+          const ratio = Math.min(50 / img.naturalWidth, 22 / img.naturalHeight)
+          doc.addImage(cv.toDataURL('image/jpeg', 0.9), 'JPEG', 14, 8, img.naturalWidth * ratio, img.naturalHeight * ratio)
+        }
+      } catch { /* fall through to text */ }
+    }
+    if (!profileData?.logo_url) {
+      doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont('helvetica', 'bold')
+      doc.text(profileData?.company_name || '', 14, 22)
+    }
+
+    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.setFont('helvetica', 'bold')
+    doc.text('FIELD INSTALLER COPY', pw - 14, 20, { align: 'right' })
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal')
+    doc.text(new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), pw - 14, 28, { align: 'right' })
+
+    let y = 50
+    doc.setTextColor(20, 20, 20); doc.setFontSize(14); doc.setFont('helvetica', 'bold')
+    doc.text(proposal?.proposal_name || job?.name || 'Installer Copy', 14, y); y += 10
+
+    if (proposal?.scope_of_work) {
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(100, 100, 100)
+      doc.text('SCOPE OF WORK', 14, y); y += 5
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40)
+      const lines = doc.splitTextToSize(proposal.scope_of_work, pw - 28)
+      doc.text(lines, 14, y); y += lines.length * 5 + 8
+    }
+
+    const tableItems = lineItems.map(i => [
+      i.quantity || 1,
+      i.item_name || '—',
+      i.part_number || '—',
+      i.manufacturer || '—',
+      i.category || '—',
+    ])
+
+    if (tableItems.length > 0) {
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(100, 100, 100)
+      doc.text('MATERIALS', 14, y); y += 4
+      autoTable(doc, {
+        startY: y,
+        head: [['Qty', 'Description', 'Part Number', 'Manufacturer', 'Category']],
+        body: tableItems,
+        styles: { fontSize: 8, cellPadding: 2.5 },
+        headStyles: { fillColor: rgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+        columnStyles: { 0: { cellWidth: 12 }, 2: { cellWidth: 34 }, 3: { cellWidth: 34 } },
+        margin: { left: 14, right: 14 },
+      })
+    }
+
+    doc.save(`${proposal?.proposal_name || job?.name || 'Job'} - Installer Copy.pdf`)
   }
 
   const handleSignatureConfirm = async (dataUrl, signerName) => {
@@ -1533,6 +1619,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             { key: 'costReport', label: 'Cost Report' },
             { key: 'techlog', label: `Tech Log (${techLogs.length})` },
             { key: 'proposal', label: 'Proposal' },
+            ...(job?.proposal_id ? [{ key: 'billings', label: `Billings (${jobInvoices.length})` }] : []),
             { key: 'photos', label: `📷 Photos (${photos.length})` },
             ...(job?.billing_type === 'AIA' ? [{ key: 'aia', label: 'AIA Applications' }] : []),
           ].map(t => (
@@ -1625,7 +1712,12 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
 
         {/* PROPOSAL TAB */}
         {activeTab === 'proposal' && (
-          <ProposalTab job={job} proposal={proposal} navigate={navigate} />
+          <ProposalTab job={job} proposal={proposal} navigate={navigate} downloadInstallerPDF={lineItems.length > 0 ? downloadInstallerPDF : undefined} />
+        )}
+
+        {/* BILLINGS TAB */}
+        {activeTab === 'billings' && (
+          <BillingsTab invoices={jobInvoices} proposalValue={proposal?.proposal_value} />
         )}
 
         {/* AIA TAB */}

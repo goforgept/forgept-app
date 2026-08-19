@@ -1,16 +1,24 @@
 const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function ProposalTab({ job, proposal, navigate }) {
+export default function ProposalTab({ job, proposal, navigate, downloadInstallerPDF }) {
   return (
     <div className="bg-fp-card rounded-xl p-6">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-fp-text font-bold text-lg">Linked Proposal</h3>
-        {job?.proposal_id && (
-          <button onClick={() => navigate(`/proposal/${job.proposal_id}`)}
-            className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
-            Open Proposal →
-          </button>
-        )}
+        <div className="flex gap-2">
+          {downloadInstallerPDF && (
+            <button onClick={downloadInstallerPDF}
+              className="bg-fp-inset text-fp-muted px-4 py-2 rounded-lg text-sm hover:bg-fp-hover hover:text-fp-text transition-colors">
+              ⬇ Installer Copy
+            </button>
+          )}
+          {job?.proposal_id && (
+            <button onClick={() => navigate(`/proposal/${job.proposal_id}`)}
+              className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
+              Open Proposal →
+            </button>
+          )}
+        </div>
       </div>
       {proposal ? (
         <div className="space-y-3">
@@ -22,7 +30,7 @@ export default function ProposalTab({ job, proposal, navigate }) {
           {proposal.scope_of_work && (
             <div className="bg-fp-inset rounded-xl p-4">
               <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Scope of Work</p>
-              <p className="text-fp-text text-sm leading-relaxed whitespace-pre-wrap line-clamp-6">{proposal.scope_of_work}</p>
+              <p className="text-fp-text text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
             </div>
           )}
         </div>
