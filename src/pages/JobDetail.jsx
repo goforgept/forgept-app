@@ -18,6 +18,7 @@ import NotifyModal from '../components/job/NotifyModal'
 import ChangeOrderModal from '../components/job/ChangeOrderModal'
 import AIATab from '../components/job/AIATab'
 import BillingsTab from '../components/job/BillingsTab'
+import { JOB_STATUSES } from './Jobs'
 
 const AUTO_CHECK_TYPES = [
   { type: 'proposal_signed', label: 'Proposal signed', icon: '✍️' },
@@ -40,10 +41,14 @@ const MANUAL_DEFAULTS = [
 ]
 
 const STATUS_COLORS = {
-  'Active': 'bg-green-500/20 text-green-400',
-  'On Hold': 'bg-yellow-500/20 text-yellow-400',
-  'Completed': 'bg-blue-500/20 text-blue-400',
-  'Cancelled': 'bg-red-500/20 text-red-400',
+  'Pending':          'bg-fp-inset text-fp-muted',
+  'Scheduled':        'bg-purple-500/20 text-purple-400',
+  'In Progress':      'bg-green-500/20 text-green-400',
+  'Waiting on Parts': 'bg-orange-500/20 text-orange-400',
+  'Punch List':       'bg-cyan-500/20 text-cyan-400',
+  'On Hold':          'bg-yellow-500/20 text-yellow-400',
+  'Completed':        'bg-blue-500/20 text-blue-400',
+  'Cancelled':        'bg-red-500/20 text-red-400',
 }
 
 const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -1536,9 +1541,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                   : { background: 'transparent', color: '#C8622A', borderColor: '#C8622A60' }}>
                 {job?.completion_signature_data ? '✅ Re-sign' : '✍️ Get Signature'}
               </button>
-              <select value={job?.status || 'Active'} onChange={e => updateJobStatus(e.target.value)} disabled={savingStatus}
+              <select value={job?.status || 'In Progress'} onChange={e => updateJobStatus(e.target.value)} disabled={savingStatus}
                 className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
-                {['Active', 'On Hold', 'Completed', 'Cancelled'].map(s => <option key={s}>{s}</option>)}
+                {JOB_STATUSES.map(s => <option key={s.key}>{s.key}</option>)}
               </select>
             </div>
             {job?.completion_signature_data && (
