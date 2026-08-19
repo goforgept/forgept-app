@@ -27,7 +27,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [showArchived, setShowArchived] = useState(false)
-  const [view, setView] = useState(() => localStorage.getItem('jobs_view') || 'list')
+  const [view, setView] = useState(() => localStorage.getItem('jobs_view') || 'board')
   const dragJob = useRef(null)
 
   const setView_ = (v) => { setView(v); localStorage.setItem('jobs_view', v) }
@@ -257,8 +257,8 @@ function KanbanBoard({ jobs, onDragStart, onDragOver, onDrop, jobUrl, navigate, 
   }))
 
   return (
-    <div className="overflow-x-auto pb-4">
-      <div className="flex gap-4" style={{ minWidth: `${JOB_STATUSES.length * 260}px` }}>
+    <div className="overflow-x-auto pb-4 w-full min-w-0">
+      <div className="flex gap-4" style={{ minWidth: `${JOB_STATUSES.length * 252}px` }}>
         {columns.map(col => (
           <div key={col.key}
             onDragOver={e => { onDragOver(e); setDragOver(col.key) }}
