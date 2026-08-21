@@ -95,7 +95,6 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
 
     setForm(emptyForm)
     setShowModal(false)
-    fetchOrgAndClients()
     setSaving(false)
 
     // Push to Zoho and QBO if connected (fire-and-forget)
@@ -107,6 +106,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
       fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
       fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
       fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/square-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
+      navigate(`/client/${newClient.id}`)
     }
   }
 
