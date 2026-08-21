@@ -413,21 +413,21 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   }
 
   const deleteClient = async () => {
-    if (!window.confirm('Permanently delete this client? This cannot be undone. Any linked proposals and jobs will lose their client reference.')) return
-    const steps = [
-      supabase.from('client_locations').delete().eq('client_id', id),
-      supabase.from('client_contacts').delete().eq('client_id', id),
-      supabase.from('client_emails').delete().eq('client_id', id),
-      supabase.from('activities').update({ client_id: null }).eq('client_id', id),
-      supabase.from('proposals').update({ client_id: null }).eq('client_id', id),
-      supabase.from('jobs').update({ client_id: null }).eq('client_id', id),
-    ]
-    const results = await Promise.all(steps)
-    const stepErr = results.find(r => r.error)
-    if (stepErr?.error) { alert('Pre-delete step failed: ' + stepErr.error.message); return }
-    const { error } = await supabase.from('clients').delete().eq('id', id)
-    if (error) { alert('Could not delete client: ' + error.message); return }
-    navigate('/clients')
+    if (!window.confirm('Permanently delete this client? This cannot be undone.')) return
+    try {
+      await supabase.from('client_locations').delete().eq('client_id', id)
+      await supabase.from('client_contacts').delete().eq('client_id', id)
+      await supabase.from('client_emails').delete().eq('client_id', id)
+      await supabase.from('activities').update({ client_id: null }).eq('client_id', id)
+      await supabase.from('tasks').update({ client_id: null }).eq('client_id', id)
+      await supabase.from('proposals').update({ client_id: null }).eq('client_id', id)
+      await supabase.from('jobs').update({ client_id: null }).eq('client_id', id)
+      const { error } = await supabase.from('clients').delete().eq('id', id)
+      if (error) { alert('Delete failed: ' + error.message); return }
+      navigate('/clients')
+    } catch (e) {
+      alert('Delete error: ' + (e?.message || String(e)))
+    }
   }
 
   const saveClient = async () => {
