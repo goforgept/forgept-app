@@ -9,7 +9,9 @@
       "Bash(grep -n \"text-white\\\\|#[0-9a-fA-F]\\\\{3,6\\\\}\" /Users/codysobas/Desktop/forgept-app/src/components/DataImportTab.jsx)",
       "Bash(grep -n \"text-white\\\\|#[0-9a-fA-F]\\\\{3,6\\\\}\" /Users/codysobas/Desktop/forgept-app/src/components/GlobalProductsImport.jsx)",
       "Bash(npx supabase *)",
-      "Read(//Users/codysobas/.config/supabase/**)"
+      "Read(//Users/codysobas/.config/supabase/**)",
+      "Bash(supabase db *)",
+      "Bash(grep -v \"Initialising\\\\|boundary\\\\|warning\\\\|^{$\\\\|^}$\\\\|rows\\\\b\")"
     ],
     "additionalDirectories": [
       "/Users/codysobas/Desktop"

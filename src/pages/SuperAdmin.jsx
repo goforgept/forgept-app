@@ -606,38 +606,23 @@ export default function SuperAdmin() {
   }
 
   const saveOrgSettings = async (orgId) => {
-    await supabase.from('organizations').update({
+    const { error } = await supabase.from('organizations').update({
       org_type: orgForm.org_type,
-      feature_proposals: orgForm.feature_proposals,
-      feature_crm: orgForm.feature_crm,
-      feature_send_proposal: orgForm.feature_send_proposal,
-      feature_ai_email: orgForm.feature_ai_email,
-      feature_purchase_orders: orgForm.feature_purchase_orders,
-      feature_invoices: orgForm.feature_invoices,
-      feature_ai_bom: orgForm.feature_ai_bom,
-      feature_ai_agent: orgForm.feature_ai_agent,
-      feature_site_photos: orgForm.feature_site_photos,
-      feature_drawing_tool:   orgForm.feature_drawing_tool,
-      feature_designer_only:  orgForm.feature_designer_only,
-      feature_spec_reader:    orgForm.feature_spec_reader,
-      feature_drawing_reader: orgForm.feature_drawing_reader,
-      feature_api:            orgForm.feature_api,
-      feature_embed:          orgForm.feature_embed,
-      feature_regions:        orgForm.feature_regions,
-      feature_compliance_fields: orgForm.feature_compliance_fields,
-      feature_inventory: orgForm.feature_inventory,
       designer_allowed_manufacturers: orgForm.designer_allowed_manufacturers?.length ? orgForm.designer_allowed_manufacturers : null,
       designer_enabled_industries: orgForm.designer_enabled_industries?.length ? orgForm.designer_enabled_industries : null,
       enabled_catalogs: orgForm.enabled_catalogs?.length ? orgForm.enabled_catalogs : [],
     }).eq('id', orgId)
+    if (error) { alert('Save failed: ' + error.message); return }
     setEditingOrg(null)
     fetchData()
   }
 
   const toggleFeatureFlag = async (orgId, key, currentValue) => {
     const newValue = !currentValue
-    await supabase.from('organizations').update({ [key]: newValue }).eq('id', orgId)
+    const { error } = await supabase.from('organizations').update({ [key]: newValue }).eq('id', orgId)
+    if (error) { alert('Save failed: ' + error.message); return }
     setOrgs(prev => prev.map(o => o.id === orgId ? { ...o, [key]: newValue } : o))
+    setOrgForm(prev => ({ ...prev, [key]: newValue }))
   }
 
   const startEditingBilling = (org) => {
