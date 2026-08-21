@@ -38,7 +38,8 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [panel, setPanel] = useState(null) // null | { clientId, company }
-  const [contactForm, setContactForm] = useState({ full_name: '', title: '', email: '', phone: '' })
+  const [contactForm, setContactForm] = useState({ full_name: '', title: '', email: '', phone: '', notes: '', location_id: null, is_primary: false })
+  const [panelLocations, setPanelLocations] = useState([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [orgId, setOrgId] = useState(null)
@@ -334,11 +335,13 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                     <div className="flex gap-2 items-center">
                       {!isArchived && (
                         <button
-                          onClick={e => {
+                          onClick={async e => {
                             e.stopPropagation()
                             setPanel({ clientId: navigateTo, company })
-                            setContactForm({ full_name: '', title: '', email: '', phone: '' })
+                            setContactForm({ full_name: '', title: '', email: '', phone: '', notes: '', location_id: null, is_primary: false })
                             setError(null)
+                            const { data: locs } = await supabase.from('client_locations').select('id, site_name').eq('client_id', navigateTo)
+                            setPanelLocations(locs || [])
                           }}
                           className="text-fp-muted hover:text-fp-text text-xs transition-colors"
                         >
@@ -578,6 +581,38 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                   className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                 />
               </div>
+
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Location</label>
+                <select value={contactForm.location_id || ''}
+                  onChange={e => setContactForm(p => ({ ...p, location_id: e.target.value || null }))}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                >
+                  <option value="">— No location —</option>
+                  {panelLocations.map(l => <option key={l.id} value={l.id}>{l.site_name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Notes</label>
+                <textarea value={contactForm.notes}
+                  onChange={e => setContactForm(p => ({ ...p, notes: e.target.value }))}
+                  placeholder="Best time to call, preferences, context..."
+                  rows={3}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setContactForm(p => ({ ...p, is_primary: !p.is_primary }))}
+                className="flex items-center gap-2 text-sm text-fp-text"
+              >
+                <span className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${contactForm.is_primary ? 'bg-[#C8622A] border-[#C8622A]' : 'border-fp-border'}`}>
+                  {contactForm.is_primary && <span className="text-white text-xs">✓</span>}
+                </span>
+                Primary contact
+              </button>
             </div>
 
             <div className="px-5 py-4 border-t border-fp-border flex gap-3">
