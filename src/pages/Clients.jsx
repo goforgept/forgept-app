@@ -36,7 +36,7 @@ const industryColors = {
 export default function Clients({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
+  const [panel, setPanel] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [orgId, setOrgId] = useState(null)
@@ -94,8 +94,9 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
     if (error) { setError(error.message); setSaving(false); return }
 
     setForm(emptyForm)
-    setShowModal(false)
+    setPanel(false)
     setSaving(false)
+    fetchOrgAndClients()
 
     // Push to Zoho and QBO if connected (fire-and-forget)
     if (newClient?.id) {
@@ -106,7 +107,6 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
       fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
       fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/stripe-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
       fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/square-push-client', { method: 'POST', headers: pushHeaders, body: pushBody }).catch(() => {})
-      navigate(`/client/${newClient.id}`)
     }
   }
 
@@ -192,7 +192,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
             )}
             {!showArchived && (
               <button
-                onClick={() => { setShowModal(true); setError(null) }}
+                onClick={() => { setPanel(true); setError(null) }}
                 className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
               >
                 + Add Client
@@ -314,7 +314,8 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                           onClick={e => {
                             e.stopPropagation()
                             setForm(prev => ({ ...prev, company }))
-                            setShowModal(true)
+                            setPanel(true)
+                            setError(null)
                           }}
                           className="text-fp-muted hover:text-fp-text text-xs transition-colors"
                         >
@@ -346,169 +347,97 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
         )}
       </div>
 
-      {/* Add Client Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <h3 className="text-fp-text font-bold text-lg mb-5">New Client</h3>
-            {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
+      {/* Add Client Panel */}
+      {panel && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => { setPanel(false); setForm(emptyForm); setError(null) }} />
+          <div className="fixed inset-y-0 right-0 w-80 bg-fp-card border-l border-fp-border z-50 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-fp-border">
+              <h3 className="text-fp-text font-semibold">
+                {form.company ? `Add Contact — ${form.company}` : 'New Client'}
+              </h3>
+              <button onClick={() => { setPanel(false); setForm(emptyForm); setError(null) }} className="text-fp-muted hover:text-fp-text text-lg leading-none">×</button>
+            </div>
 
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {error && <p className="text-red-400 text-sm">{error}</p>}
 
-                {/* Company with autocomplete */}
-                <div className="relative">
-                  <label className="text-fp-muted text-xs mb-1 block">Company <span className="text-[#C8622A]">*</span></label>
-                  <input
-                    type="text"
-                    value={form.company}
-                    onChange={e => handleCompanyInput(e.target.value)}
-                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                    placeholder="Company name"
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                  {showSuggestions && (
-                    <div className="absolute z-10 w-full mt-1 bg-fp-inset border border-fp-border rounded-lg overflow-hidden shadow-lg">
-                      {companySuggestions.map(c => (
-                        <button key={c} onClick={() => { setForm(prev => ({ ...prev, company: c })); setShowSuggestions(false) }}
-                          className="w-full text-left px-3 py-2 text-fp-text text-sm hover:bg-fp-card transition-colors">
-                          {c}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Contact Name</label>
-                  <input type="text" value={form.client_name}
-                    onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))}
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Email</label>
-                  <input type="email" value={form.email}
-                    onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Phone</label>
-                  <input type="text" value={form.phone}
-                    onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Industry</label>
-                  <select value={form.industry}
-                    onChange={e => setForm(p => ({ ...p, industry: e.target.value }))}
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  >
-                    <option value="">Select industry</option>
-                    {industries.map(i => <option key={i} value={i}>{i}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">CRM Source</label>
-                  <input type="text" value={form.crm_source}
-                    onChange={e => setForm(p => ({ ...p, crm_source: e.target.value }))}
-                    placeholder="e.g. Referral, Website"
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                </div>
+              {/* Company with autocomplete */}
+              <div className="relative">
+                <label className="text-fp-muted text-xs mb-1 block">Company <span className="text-[#C8622A]">*</span></label>
+                <input
+                  type="text"
+                  value={form.company}
+                  onChange={e => handleCompanyInput(e.target.value)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                  placeholder="Company name"
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                />
+                {showSuggestions && (
+                  <div className="absolute z-10 w-full mt-1 bg-fp-inset border border-fp-border rounded-lg overflow-hidden shadow-lg">
+                    {companySuggestions.map(c => (
+                      <button key={c} onClick={() => { setForm(prev => ({ ...prev, company: c })); setShowSuggestions(false) }}
+                        className="w-full text-left px-3 py-2 text-fp-text text-sm hover:bg-fp-card transition-colors">
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
-                <label className="text-fp-muted text-xs mb-1 block">Street Address</label>
-                <input type="text" value={form.address}
-                  onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
-                  placeholder="123 Main St"
+                <label className="text-fp-muted text-xs mb-1 block">Contact Name</label>
+                <input type="text" value={form.client_name}
+                  onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))}
                   className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                 />
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">City</label>
-                  <input type="text" value={form.city}
-                    onChange={e => setForm(p => ({ ...p, city: e.target.value }))}
-                    placeholder="Nashville"
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">State</label>
-                  <input type="text" value={form.state}
-                    onChange={e => setForm(p => ({ ...p, state: e.target.value }))}
-                    placeholder="TN"
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">ZIP</label>
-                  <input type="text" value={form.zip}
-                    onChange={e => setForm(p => ({ ...p, zip: e.target.value }))}
-                    placeholder="37201"
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Store ID</label>
-                  <input type="text" value={form.store_id}
-                    onChange={e => setForm(p => ({ ...p, store_id: e.target.value }))}
-                    placeholder="e.g. STR-001"
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                </div>
-                <div>{/* spacer */}</div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Payment Terms</label>
-                  <select value={form.net_terms} onChange={e => setForm(p => ({ ...p, net_terms: e.target.value }))}
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
-                    {['Due on Receipt', 'NET 15', 'NET 30', 'NET 45', 'NET 60', 'NET 90'].map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Payment Method</label>
-                  <select value={form.payment_method} onChange={e => setForm(p => ({ ...p, payment_method: e.target.value }))}
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
-                    {['Default', 'Check', 'ACH', 'Credit Card'].map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </div>
-              </div>
 
               <div>
-                <label className="text-fp-muted text-xs mb-1 block">Notes</label>
-                <textarea value={form.notes}
-                  onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
-                  placeholder="Any notes about this client..."
-                  rows={3}
-                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none"
+                <label className="text-fp-muted text-xs mb-1 block">Email</label>
+                <input type="email" value={form.email}
+                  onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                 />
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => { setShowModal(false); setForm(emptyForm); setError(null) }}
-                  className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors"
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Phone</label>
+                <input type="text" value={form.phone}
+                  onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                />
+              </div>
+
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Industry</label>
+                <select value={form.industry}
+                  onChange={e => setForm(p => ({ ...p, industry: e.target.value }))}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                 >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAdd}
-                  disabled={saving || !form.company}
-                  className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
-                >
-                  {saving ? 'Saving...' : 'Save Client'}
-                </button>
+                  <option value="">Select industry</option>
+                  {industries.map(i => <option key={i} value={i}>{i}</option>)}
+                </select>
               </div>
             </div>
+
+            <div className="px-5 py-4 border-t border-fp-border flex gap-3">
+              <button
+                onClick={() => { setPanel(false); setForm(emptyForm); setError(null) }}
+                className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAdd}
+                disabled={saving || !form.company}
+                className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   )
