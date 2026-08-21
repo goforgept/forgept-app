@@ -66,7 +66,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
 
     const { data } = await supabase
       .from('clients')
-      .select('*, client_locations(id)')
+      .select('*, client_locations(id), client_contacts(id)')
       .eq('org_id', profile.org_id)
       .order('company', { ascending: true })
     setClients(data || [])
@@ -325,7 +325,10 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                   <div className="flex items-center justify-between mt-4 pt-3 border-t border-fp-border">
                     <div className="flex gap-3">
                       <span className="text-fp-muted text-xs">
-                        {contacts.length} {contacts.length === 1 ? 'contact' : 'contacts'}
+                        {(() => {
+                          const ccCount = contacts.reduce((sum, c) => sum + (c.client_contacts?.length || 0), 0)
+                          return ccCount > 0 ? `${ccCount} ${ccCount === 1 ? 'contact' : 'contacts'}` : 'No contacts'
+                        })()}
                       </span>
                       {(() => {
                         const locCount = contacts.reduce((sum, c) => sum + (c.client_locations?.length || 0), 0)
