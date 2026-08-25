@@ -666,6 +666,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                         updatedPlacement={selectedPlacement}
                         openPlacementId={selectedPlacement?.id ?? null}
                         activeTool={activeTool}
+                        onToolSelect={(tool) => setActiveTool(tool)}
                         onCableSelect={(c) => { setSelectedCable(c); setSelectedPlacement(null); setEditingCableId(null); setSelectedPathway(null) }}
                         editingCableId={editingCableId}
                         onEditingCableDone={() => setEditingCableId(null)}

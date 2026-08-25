@@ -244,7 +244,7 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
             </select>
           </div>
 
-          {industry !== 'all' && categories.length > 0 && (
+          {categories.length > 0 && (
             <div className="px-3 py-2 border-b border-[#2a3d55]">
               <p className="text-xs font-medium text-[#8A9AB0] mb-2">Category</p>
               <select

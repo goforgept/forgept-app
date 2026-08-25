@@ -149,7 +149,7 @@ const getNextLabel = async (category, sheetIds, reserved = []) => {
   return `${prefix}-${String(next).padStart(2, '0')}`
 }
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange, activeTool, onPathwaySelect, deletedPathwayId, rooms, onRoomClick, onRoomPlace, onRoomMove }) {
+export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange, activeTool, onToolSelect, onPathwaySelect, deletedPathwayId, rooms, onRoomClick, onRoomPlace, onRoomMove }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
   // Session-local cache of addresses assigned this session so rapid placements
@@ -1038,6 +1038,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         onPlacementChange?.()
       }
       setActivePoints([])
+      onToolSelect?.(null)
     }
     if (pathwayMode && activePathwayPoints.length >= 2) {
       let pwPixels = 0
@@ -1057,8 +1058,9 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       }).select().single()
       if (!error && data) setPathways(prev => [...prev, data])
       setActivePathwayPoints([])
+      onToolSelect?.(null)
     }
-  }, [cableMode, pathwayMode, activePoints, activePathwayPoints, imageSize, scaleRatio, wasteFactor, cableType, pathwayType, orgId, sheet, onPlacementChange])
+  }, [cableMode, pathwayMode, activePoints, activePathwayPoints, imageSize, scaleRatio, wasteFactor, cableType, pathwayType, orgId, sheet, onPlacementChange, onToolSelect])
 
   // ── Click to place ─────────────────────────────────────────────────────────
   const handleStageClick = useCallback(async (e) => {
