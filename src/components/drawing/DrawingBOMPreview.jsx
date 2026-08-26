@@ -11,6 +11,7 @@ const CABLE_TYPES = [
 export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKey }) {
   const [rows,          setRows]          = useState([])
   const [cableRuns,     setCableRuns]     = useState([])
+  const [pathways,      setPathways]      = useState([])
   const [verticalRises, setVerticalRises] = useState([])
   const [components,    setComponents]    = useState([])
   const [loading,       setLoading]       = useState(true)
@@ -48,6 +49,12 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
         .select('*')
         .in('drawing_sheet_id', sheetIds)
         .order('cable_type')
+
+      // Load pathways (cable assignments count toward cable footage)
+      const { data: pathwayData } = await supabase
+        .from('drawing_pathways')
+        .select('id, pathway_type, cable_types, total_footage')
+        .in('drawing_sheet_id', sheetIds)
 
       // Load placement components
       const { data: rawComponents } = await supabase
@@ -187,6 +194,7 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
 
       setRows(sorted)
       setCableRuns(runs || [])
+      setPathways(pathwayData || [])
       setVerticalRises(rises || [])
       setComponents(components)
 
@@ -230,6 +238,18 @@ export default function DrawingBOMPreview({ proposalId, orgId, sheets, refreshKe
     cableByType[type].footage       += run.footage       || 0
     cableByType[type].total_footage += run.total_footage || 0
     cableByType[type].runs          += 1
+  })
+
+  // Add pathway cable footage to cable totals (pathways with cable_types assigned)
+  pathways.forEach(pw => {
+    const cables = (pw.cable_types || []).map(c => typeof c === 'string' ? { type: c, qty: 1 } : c)
+    cables.forEach(({ type, qty = 1 }) => {
+      if (!type) return
+      if (!cableByType[type]) cableByType[type] = { footage: 0, total_footage: 0, runs: 0 }
+      const footage = Math.round((pw.total_footage || 0) * qty)
+      cableByType[type].footage       += footage
+      cableByType[type].total_footage += footage
+    })
   })
 
   // Add vertical rises to cable totals

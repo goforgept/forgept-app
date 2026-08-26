@@ -380,11 +380,12 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         supabase.from('placement_components')
           .select('*, drawing_placements!inner(drawing_sheet_id)')
           .in('drawing_placements.drawing_sheet_id', sheetIds),
-        supabase.from('profiles')
-          .select('company_name, logo_url, primary_color, organizations(title_block_engineer, title_block_license, title_block_scale)')
-          .eq('org_id', orgId)
-          .limit(1)
-          .single(),
+        supabase.auth.getUser().then(({ data: { user } }) =>
+          supabase.from('profiles')
+            .select('company_name, logo_url, primary_color, organizations(title_block_engineer, title_block_license, title_block_scale)')
+            .eq('id', user.id)
+            .single()
+        ),
       ])
 
       // Sort by sheet order first, then by placement creation time within each sheet
