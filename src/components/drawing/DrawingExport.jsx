@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../supabase'
 import { getCategorySVG } from './useCategoryIcons'
+import { PATHWAY_DEFS } from './SymbolPicker'
 
 // Convert SVG string to PNG base64 for jsPDF
 const svgToPng = (svgString, size = 20) => new Promise(resolve => {
@@ -46,6 +47,26 @@ const conditionLabel = (c) => c === 'existing' ? 'Existing' : c === 'replace' ? 
 const hexToRgbArr = (hex) => {
   const n = parseInt((hex || '#0F1C2E').replace('#', ''), 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+
+const PATHWAY_DEFS_MAP = Object.fromEntries((PATHWAY_DEFS || []).map(d => [d.type, d]))
+
+// Draw a polyline on a jsPDF page using normalized {x,y} points (0–1 relative to image bounds)
+const drawPolylineOnPDF = (pdf, points, imgX, imgY, imgW, imgH, color, lineWidthMm, dashMm) => {
+  if (!points || points.length < 2) return
+  const [r, g, b] = hexToRgbArr(color || '#3b82f6')
+  pdf.setDrawColor(r, g, b)
+  pdf.setLineWidth(lineWidthMm || 0.5)
+  if (dashMm && dashMm.length) pdf.setLineDashPattern(dashMm, 0)
+  else pdf.setLineDashPattern([], 0)
+  for (let i = 1; i < points.length; i++) {
+    const x1 = imgX + points[i-1].x * imgW
+    const y1 = imgY + points[i-1].y * imgH
+    const x2 = imgX + points[i].x * imgW
+    const y2 = imgY + points[i].y * imgH
+    if (isFinite(x1) && isFinite(y1) && isFinite(x2) && isFinite(y2)) pdf.line(x1, y1, x2, y2)
+  }
+  pdf.setLineDashPattern([], 0)
 }
 
 const loadOrgLogoFromProfile = async (orgProfile) => {
@@ -95,8 +116,8 @@ const drawDocCoverPage = (pdf, orgProfile, { eyebrow, title, subtitle, meta = []
   meta.forEach((line, i) => pdf.text(line, margin, midY + (subtitle ? 24 : 14) + i * 7))
 }
 
-// Draws device icons + FOV overlays onto a rendered floor plan page
-const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, imgH, placementsBySheet, showFOV = true) => {
+// Draws device icons, FOV overlays, cable runs, and pathways onto a rendered floor plan page
+const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, imgH, placementsBySheet, showFOV = true, cableRunsBySheet = {}, pathwaysBySheet = {}, showCables = true, showPathways = true) => {
   pdf.setFillColor(255, 255, 255); pdf.rect(imgX, imgY, imgW, imgH, 'F')
   let imgNaturalW = null
   if (imgData) {
@@ -117,6 +138,20 @@ const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, i
       pdf.addImage(base64, format, drawX, drawY, drawW, drawH, undefined, 'FAST')
       imgX = drawX; imgY = drawY; imgW = drawW; imgH = drawH
     } catch (err) { console.warn('Image add failed:', err.message) }
+  }
+  // Draw cable runs under device icons
+  if (showCables) {
+    for (const run of (cableRunsBySheet[sheet.id] || [])) {
+      drawPolylineOnPDF(pdf, run.points, imgX, imgY, imgW, imgH, run.color || '#3b82f6', 0.5, [3, 1.5])
+    }
+  }
+  // Draw pathways under device icons
+  if (showPathways) {
+    for (const pw of (pathwaysBySheet[sheet.id] || [])) {
+      const def = PATHWAY_DEFS_MAP[pw.pathway_type] || PATHWAY_DEFS[0]
+      const dashMm = (def?.dash || []).length ? def.dash.map(d => d * 0.3) : []
+      drawPolylineOnPDF(pdf, pw.points, imgX, imgY, imgW, imgH, def?.color || '#4a90d9', 0.8, dashMm)
+    }
   }
   const sheetPlacements = placementsBySheet[sheet.id] || []
   const placedLabels = []
@@ -209,7 +244,7 @@ const getFloorPlanImageFromR2 = async (sheetId, sheets) => {
 }
 
 // Exported so ProposalDetail can call it for the bundle download
-export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, orgProfile, proposal, exportFOV = true }) {
+export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, pathways = [], orgProfile, proposal, exportFOV = true, exportCables = true, exportPathways = true }) {
   const { default: jsPDF } = await import('jspdf')
   const { default: autoTable } = await import('jspdf-autotable')
   const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' })
@@ -225,6 +260,18 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
   placements.forEach(p => {
     if (!placementsBySheet[p.drawing_sheet_id]) placementsBySheet[p.drawing_sheet_id] = []
     placementsBySheet[p.drawing_sheet_id].push(p)
+  })
+
+  const cableRunsBySheet = {}
+  cableRuns.forEach(r => {
+    if (!cableRunsBySheet[r.drawing_sheet_id]) cableRunsBySheet[r.drawing_sheet_id] = []
+    cableRunsBySheet[r.drawing_sheet_id].push(r)
+  })
+
+  const pathwaysBySheet = {}
+  pathways.forEach(pw => {
+    if (!pathwaysBySheet[pw.drawing_sheet_id]) pathwaysBySheet[pw.drawing_sheet_id] = []
+    pathwaysBySheet[pw.drawing_sheet_id].push(pw)
   })
 
   const cableByType = Object.create(null)
@@ -310,7 +357,7 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     pdf.text(sheet.name, margin, 7)
     const imgY = 12, imgH = pageH - imgY - titleBlockH - margin - 5, imgW = pageW - margin*2
     const imgData = await getFloorPlanImageFromR2(sheet.id, sheets)
-    await drawSheetOnPDFStandalone(pdf, sheet, imgData, margin, imgY, imgW, imgH, placementsBySheet, exportFOV)
+    await drawSheetOnPDFStandalone(pdf, sheet, imgData, margin, imgY, imgW, imgH, placementsBySheet, exportFOV, cableRunsBySheet, pathwaysBySheet, exportCables, exportPathways)
     drawTitleBlock(sheet.name, i+4)
   }
 
@@ -339,6 +386,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [activeExport,  setActiveExport]  = useState('client')
   const [placements,    setPlacements]    = useState([])
   const [cableRuns,     setCableRuns]     = useState([])
+  const [pathways,      setPathways]      = useState([])
   const [verticalRises, setVerticalRises] = useState([])
   const [components,    setComponents]    = useState([])
   const [orgProfile,    setOrgProfile]    = useState(null)
@@ -350,7 +398,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [loading,       setLoading]       = useState(true)
   const [generating,    setGenerating]    = useState(false)
   const [sharing,       setSharing]       = useState(false)
-  const [exportFOV,     setExportFOV]     = useState(true)
+  const [exportFOV,      setExportFOV]      = useState(true)
+  const [exportCables,   setExportCables]   = useState(true)
+  const [exportPathways, setExportPathways] = useState(true)
   const [packages,      setPackages]      = useState([])
   const [copiedId,      setCopiedId]      = useState(null)
   const [shareExpiry,   setShareExpiry]   = useState(() => {
@@ -370,6 +420,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         { data: riseData },
         { data: compData },
         { data: profileData },
+        { data: pathwayData },
       ] = await Promise.all([
         supabase.from('drawing_placements')
           .select('*, global_products(id, name, part_number, manufacturer, category, specs, accessories)')
@@ -386,6 +437,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             .eq('id', user.id)
             .single()
         ),
+        supabase.from('drawing_pathways').select('*').in('drawing_sheet_id', sheetIds),
       ])
 
       // Sort by sheet order first, then by placement creation time within each sheet
@@ -397,6 +449,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       })
       setPlacements(sorted)
       setCableRuns(cableData || [])
+      setPathways(pathwayData || [])
       setVerticalRises(riseData || [])
 
       // Load existing share links
@@ -572,6 +625,21 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         imgH = drawH
       } catch (err) {
         console.warn('Image add failed, skipping:', err.message)
+      }
+    }
+
+    // Cable runs (drawn below devices)
+    if (exportCables) {
+      for (const run of cableRuns.filter(r => r.drawing_sheet_id === sheet.id)) {
+        drawPolylineOnPDF(pdf, run.points, imgX, imgY, imgW, imgH, run.color || '#3b82f6', 0.5, [3, 1.5])
+      }
+    }
+    // Pathways (drawn below devices)
+    if (exportPathways) {
+      for (const pw of pathways.filter(p => p.drawing_sheet_id === sheet.id)) {
+        const def = PATHWAY_DEFS_MAP[pw.pathway_type] || PATHWAY_DEFS[0]
+        const dashMm = (def?.dash || []).length ? def.dash.map(d => d * 0.3) : []
+        drawPolylineOnPDF(pdf, pw.points, imgX, imgY, imgW, imgH, def?.color || '#4a90d9', 0.8, dashMm)
       }
     }
 
@@ -1108,7 +1176,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const handleShopDrawing = async () => {
     setGenerating(true)
     try {
-      const pdf = await generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, orgProfile, proposal, exportFOV })
+      const pdf = await generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, pathways, orgProfile, proposal, exportFOV, exportCables, exportPathways })
       pdf.save(`${proposal?.proposal_name || 'Drawing'}_Shop_Drawings.pdf`)
     } catch (err) {
       console.error('Shop drawing failed:', err)
@@ -1484,7 +1552,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     <div className="p-6 max-w-3xl mx-auto">
       <h2 className="text-white font-bold text-lg mb-1">Export</h2>
       <p className="text-[#8A9AB0] text-sm mb-6">
-        {placements.length} devices · {cableRuns.length} cable runs · {sheets.length} sheets
+        {placements.length} devices · {cableRuns.length} cable runs · {pathways.length} pathways · {sheets.length} sheets
       </p>
 
       {/* Export options */}
@@ -1494,6 +1562,16 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           <input type="checkbox" checked={exportFOV} onChange={e => setExportFOV(e.target.checked)}
             className="accent-[#C8622A] w-3.5 h-3.5" />
           <span className="text-white text-xs">Include FOV overlays</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={exportCables} onChange={e => setExportCables(e.target.checked)}
+            className="accent-[#C8622A] w-3.5 h-3.5" />
+          <span className="text-white text-xs">Include cable runs</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={exportPathways} onChange={e => setExportPathways(e.target.checked)}
+            className="accent-[#C8622A] w-3.5 h-3.5" />
+          <span className="text-white text-xs">Include pathways</span>
         </label>
       </div>
 
