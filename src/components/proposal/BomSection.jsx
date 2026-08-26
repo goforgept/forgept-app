@@ -65,16 +65,56 @@ export default function BomSection({
 }) {
   const [aiOpen, setAiOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [colMenuOpen, setColMenuOpen] = useState(false)
   const [editingPrice, setEditingPrice] = useState(null) // { type: 'bom'|'labor', id: itemId|index, value: string }
   const [dragRowIdx, setDragRowIdx] = useState(null)
   const [dragOverRowIdx, setDragOverRowIdx] = useState(null)
   const aiRef = useRef(null)
   const moreRef = useRef(null)
+  const colMenuRef = useRef(null)
+
+  const COL_DEFS = [
+    { key: 'mfr',        label: 'Manufacturer' },
+    { key: 'part_number', label: 'Part #' },
+    { key: 'category',   label: 'Category' },
+    { key: 'vendor',     label: 'Vendor' },
+    { key: 'unit_price', label: 'Unit Price' },
+    { key: 'total',      label: 'Total' },
+  ]
+  const DEFAULT_COLS = { mfr: true, part_number: true, category: true, vendor: true, unit_price: true, total: true }
+
+  const loadCols = () => {
+    try {
+      const perProposal = proposalId ? localStorage.getItem(`bom_cols_${proposalId}`) : null
+      if (perProposal) return { ...DEFAULT_COLS, ...JSON.parse(perProposal) }
+      const defaults = localStorage.getItem('bom_cols_default')
+      if (defaults) return { ...DEFAULT_COLS, ...JSON.parse(defaults) }
+    } catch {}
+    return DEFAULT_COLS
+  }
+  const [visibleCols, setVisibleCols] = useState(loadCols)
+
+  const toggleCol = (key) => {
+    setVisibleCols(prev => {
+      const next = { ...prev, [key]: !prev[key] }
+      if (proposalId) localStorage.setItem(`bom_cols_${proposalId}`, JSON.stringify(next))
+      return next
+    })
+  }
+
+  const saveAsDefault = () => {
+    localStorage.setItem('bom_cols_default', JSON.stringify(visibleCols))
+    if (proposalId) localStorage.setItem(`bom_cols_${proposalId}`, JSON.stringify(visibleCols))
+    setColMenuOpen(false)
+  }
+
+  const col = (key) => visibleCols[key] !== false
 
   useEffect(() => {
     const handler = (e) => {
       if (aiRef.current && !aiRef.current.contains(e.target)) setAiOpen(false)
       if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false)
+      if (colMenuRef.current && !colMenuRef.current.contains(e.target)) setColMenuOpen(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -384,19 +424,47 @@ export default function BomSection({
                             }} />
                         </th>
                         <th className="text-fp-muted text-left py-2 pr-4">Item</th>
-                        <th className="text-fp-muted text-left py-2 pr-4">Mfr</th>
-                        <th className="text-fp-muted text-left py-2 pr-4">Part #</th>
-                        <th className="text-fp-muted text-left py-2 pr-4">Category</th>
-                        <th className="text-fp-muted text-left py-2 pr-4">Vendor</th>
+                        {col('mfr') && <th className="text-fp-muted text-left py-2 pr-4">Mfr</th>}
+                        {col('part_number') && <th className="text-fp-muted text-left py-2 pr-4">Part #</th>}
+                        {col('category') && <th className="text-fp-muted text-left py-2 pr-4">Category</th>}
+                        {col('vendor') && <th className="text-fp-muted text-left py-2 pr-4">Vendor</th>}
                         <th className="text-fp-muted text-right py-2 pr-4">Qty</th>
-                        <th className="text-fp-muted text-right py-2 pr-4">Unit Price</th>
+                        {col('unit_price') && <th className="text-fp-muted text-right py-2 pr-4">Unit Price</th>}
                         {featureMsrp && <th className="text-fp-muted text-right py-2 pr-4">MSRP</th>}
-                        <th className="text-fp-muted text-right py-2 pr-4">Total</th>
+                        {col('total') && <th className="text-fp-muted text-right py-2 pr-4">Total</th>}
                         {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">Lead Time</th>}
                         {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">COO</th>}
                         {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">Berry</th>}
                         <th className="text-fp-muted text-left py-2">Status</th>
-                        <th className="text-fp-muted text-center py-2 pr-2">🔄</th>
+                        <th className="text-fp-muted text-center py-2 pr-2 relative" ref={colMenuRef}>
+                          <button
+                            onClick={() => setColMenuOpen(v => !v)}
+                            className="text-fp-muted hover:text-fp-text transition-colors text-xs"
+                            title="Configure columns"
+                          >⚙</button>
+                          {colMenuOpen && (
+                            <div className="absolute right-0 top-full mt-1 z-50 bg-fp-card border border-fp-border rounded-xl shadow-2xl p-4 w-52 text-left">
+                              <p className="text-fp-text text-xs font-semibold mb-3">Show / Hide Columns</p>
+                              <div className="space-y-2 mb-4">
+                                {COL_DEFS.map(({ key, label }) => (
+                                  <label key={key} className="flex items-center gap-2 cursor-pointer group">
+                                    <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${col(key) ? 'bg-fp-brand border-fp-brand' : 'border-fp-border group-hover:border-fp-muted'}`}
+                                      onClick={() => toggleCol(key)}>
+                                      {col(key) && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                                    </span>
+                                    <span className="text-fp-text text-xs" onClick={() => toggleCol(key)}>{label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                              <button
+                                onClick={saveAsDefault}
+                                className="w-full text-xs bg-fp-inset hover:bg-fp-hover text-fp-muted hover:text-fp-text py-1.5 rounded-lg transition-colors"
+                              >
+                                Save as my default
+                              </button>
+                            </div>
+                          )}
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -416,12 +484,12 @@ export default function BomSection({
                               )}
                             </td>
                             <td className="text-fp-text py-3 pr-4">{item.item_name}</td>
-                            <td className="text-fp-muted py-3 pr-4">{item.manufacturer || '—'}</td>
-                            <td className="text-fp-muted py-3 pr-4">{item.part_number_sku || '—'}</td>
-                            <td className="text-fp-muted py-3 pr-4">{item.category}</td>
-                            <td className="text-fp-muted py-3 pr-4">{item.vendor}</td>
+                            {col('mfr') && <td className="text-fp-muted py-3 pr-4">{item.manufacturer || '—'}</td>}
+                            {col('part_number') && <td className="text-fp-muted py-3 pr-4">{item.part_number_sku || '—'}</td>}
+                            {col('category') && <td className="text-fp-muted py-3 pr-4">{item.category}</td>}
+                            {col('vendor') && <td className="text-fp-muted py-3 pr-4">{item.vendor}</td>}
                             <td className="text-fp-text py-3 pr-4 text-right">{item.quantity}</td>
-                            <td className="py-2 pr-4 text-right">
+                            {col('unit_price') && <td className="py-2 pr-4 text-right">
                               {canEdit && onSaveLinePrice && editingPrice?.type === 'bom' && editingPrice?.id === item.id ? (
                                 <input
                                   type="number" min="0" step="0.01" autoFocus
@@ -438,9 +506,9 @@ export default function BomSection({
                                   title={canEdit && onSaveLinePrice ? 'Click to edit price' : undefined}
                                 >${fmt(item.customer_price_unit)}</span>
                               )}
-                            </td>
+                            </td>}
                             {featureMsrp && <td className="text-fp-muted py-3 pr-4 text-right">{item.msrp_unit ? `$${fmt(item.msrp_unit)}` : '—'}</td>}
-                            <td className="text-fp-text py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>
+                            {col('total') && <td className="text-fp-text py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>}
                             {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.lead_time || '—'}</td>}
                             {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.country_of_origin || '—'}</td>}
                             {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.berry_compliance || '—'}</td>}
