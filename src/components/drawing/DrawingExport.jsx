@@ -285,6 +285,16 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     if (!cableByType[t]) cableByType[t] = { footage: 0, total_footage: 0, runs: 0 }
     cableByType[t].total_footage += r.total_footage || 0
   })
+  pathways.forEach(pw => {
+    const cables = (pw.cable_types || []).map(c => typeof c === 'string' ? { type: c, qty: 1 } : c)
+    cables.forEach(({ type, qty = 1 }) => {
+      if (!type) return
+      if (!cableByType[type]) cableByType[type] = { footage: 0, total_footage: 0, runs: 0 }
+      const ft = Math.round((pw.total_footage || 0) * qty)
+      cableByType[type].footage += ft
+      cableByType[type].total_footage += ft
+    })
+  })
 
   const usedCategories = [...new Set(placements.map(p => p.global_products?.category).filter(Boolean))].sort()
 
@@ -335,6 +345,48 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     col++
     if (col >= perRow) { col = 0; lx = margin; ly += 16 } else lx += colW
   }
+
+  // Cable & pathway type legend
+  const usedCableTypes = [...new Set(cableRuns.map(r => r.cable_type).filter(Boolean))]
+  const usedPathwayTypes = [...new Set(pathways.map(pw => pw.pathway_type).filter(Boolean))]
+  if (usedCableTypes.length > 0 || usedPathwayTypes.length > 0) {
+    if (col > 0) { lx = margin; ly += 16; col = 0 }
+    ly += 4
+    pdf.setDrawColor(200,210,220); pdf.setLineWidth(0.2); pdf.line(margin, ly, pageW-margin, ly)
+    ly += 6
+    pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(9); pdf.setFont('helvetica','bold')
+    pdf.text('CABLE & PATHWAY TYPES', margin, ly)
+    ly += 8; lx = margin; col = 0
+    for (const cType of usedCableTypes) {
+      const runColor = cableRuns.find(r => r.cable_type === cType)?.color || '#3b82f6'
+      const [cr, cg, cb] = hexToRgbArr(runColor)
+      pdf.setDrawColor(cr, cg, cb); pdf.setLineWidth(0.6); pdf.setLineDashPattern([3, 1.5], 0)
+      pdf.line(lx, ly+1.5, lx+14, ly+1.5)
+      pdf.setLineDashPattern([], 0)
+      pdf.setTextColor(30,30,30); pdf.setFontSize(8); pdf.setFont('helvetica','bold')
+      pdf.text(cType, lx+17, ly+4)
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(90,100,110)
+      pdf.text(`${cableRuns.filter(r => r.cable_type === cType).length} run(s)`, lx+17, ly+9)
+      col++
+      if (col >= perRow) { col = 0; lx = margin; ly += 16 } else lx += colW
+    }
+    for (const pType of usedPathwayTypes) {
+      const def = PATHWAY_DEFS_MAP[pType] || PATHWAY_DEFS[0]
+      const [pr, pg, pb] = hexToRgbArr(def?.color || '#4a90d9')
+      const dashMm = (def?.dash || []).length ? def.dash.map(d => d * 0.3) : []
+      pdf.setDrawColor(pr, pg, pb); pdf.setLineWidth(0.9)
+      if (dashMm.length) pdf.setLineDashPattern(dashMm, 0)
+      else pdf.setLineDashPattern([], 0)
+      pdf.line(lx, ly+1.5, lx+14, ly+1.5)
+      pdf.setLineDashPattern([], 0)
+      pdf.setTextColor(30,30,30); pdf.setFontSize(8); pdf.setFont('helvetica','bold')
+      pdf.text(def?.label || pType, lx+17, ly+4)
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(90,100,110)
+      pdf.text(`${pathways.filter(pw => pw.pathway_type === pType).length} pathway(s)`, lx+17, ly+9)
+      col++
+      if (col >= perRow) { col = 0; lx = margin; ly += 16 } else lx += colW
+    }
+  }
   drawTitleBlock('Legend', 2)
 
   // Device schedule
@@ -362,15 +414,29 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
   }
 
   // Cable schedule
-  if (cableRuns.length > 0 || verticalRises.length > 0) {
+  const hasCableData = cableRuns.length > 0 || verticalRises.length > 0 || pathways.some(pw => pw.cable_types?.length)
+  if (hasCableData || Object.keys(cableByType).length > 0) {
     pdf.addPage(); pdf.setFillColor(255,255,255); pdf.rect(0,0,pageW,pageH,'F')
     pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(12); pdf.setFont('helvetica','bold')
     pdf.text('CABLE SCHEDULE', margin, margin+8)
-    const cableRows = Object.entries(cableByType).map(([type, data]) => [type, data.runs||'—', `${Math.round(data.footage)}ft`, `${Math.round(data.total_footage)}ft`])
-    autoTable(pdf, { startY: margin+14, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['Cable Type','Runs','Measured','With Waste']], body: cableRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] }, headStyles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [20,35,55] } })
+    const cableRows = Object.entries(cableByType).map(([type, data]) => [type, data.runs || '—', `${Math.round(data.footage)}ft`, `${Math.round(data.total_footage)}ft`])
+    autoTable(pdf, { startY: margin+14, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['Cable Type','Runs','Measured Footage','Total w/ Waste']], body: cableRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] }, headStyles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [20,35,55] } })
+    if (pathways.length > 0) {
+      const pwY = pdf.lastAutoTable.finalY + 10
+      pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(10); pdf.setFont('helvetica','bold')
+      pdf.text('PATHWAY SCHEDULE', margin, pwY)
+      const pwRows = pathways.map(pw => {
+        const def = PATHWAY_DEFS_MAP[pw.pathway_type] || PATHWAY_DEFS[0]
+        const sheet = sheets.find(s => s.id === pw.drawing_sheet_id)
+        const cables = (pw.cable_types || []).map(c => typeof c === 'string' ? c : `${c.qty > 1 ? c.qty + '× ' : ''}${c.type}`).join(', ') || '—'
+        return [def?.label || pw.pathway_type || '—', sheet?.name || '—', `${pw.total_footage || 0}ft`, cables]
+      })
+      autoTable(pdf, { startY: pwY+4, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['Type','Sheet','Footage','Cable Types']], body: pwRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] }, headStyles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [20,35,55] } })
+    }
     if (verticalRises.length > 0) {
       const riseY = pdf.lastAutoTable.finalY + 10
-      pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(10); pdf.text('VERTICAL RISES', margin, riseY)
+      pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(10); pdf.setFont('helvetica','bold')
+      pdf.text('VERTICAL RISES', margin, riseY)
       const riseRows = verticalRises.map(r => { const from = sheets.find(s => s.id === r.from_sheet_id), to = sheets.find(s => s.id === r.to_sheet_id); return [from?.name||'—', to?.name||'—', r.label||'—', r.cable_type, `${r.rise_height}ft`, r.quantity, `${Math.round(r.total_footage)}ft`] })
       autoTable(pdf, { startY: riseY+4, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['From','To','Label','Cable','Height','Qty','Total']], body: riseRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] }, headStyles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [20,35,55] } })
     }
