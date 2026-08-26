@@ -474,7 +474,7 @@ export default function BomSection({
                         {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">COO</th>}
                         {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">Berry</th>}
                         <th className="text-fp-muted text-left py-2">Status</th>
-                        <th className="py-2 pr-2"></th>
+                        <th className="text-fp-muted text-center py-2 pr-2 text-xs">Recurring</th>
                       </tr>
                     </thead>
                     <tbody>
