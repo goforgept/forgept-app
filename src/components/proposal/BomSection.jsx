@@ -78,10 +78,12 @@ export default function BomSection({
     { key: 'part_number', label: 'Part #' },
     { key: 'category',   label: 'Category' },
     { key: 'vendor',     label: 'Vendor' },
+    { key: 'your_cost',  label: 'Your Cost' },
     { key: 'unit_price', label: 'Unit Price' },
+    { key: 'msrp',       label: 'MSRP' },
     { key: 'total',      label: 'Total' },
   ]
-  const DEFAULT_COLS = { mfr: true, part_number: true, category: true, vendor: true, unit_price: true, total: true }
+  const DEFAULT_COLS = { mfr: true, part_number: true, category: true, vendor: true, your_cost: false, unit_price: true, msrp: false, total: true }
 
   const loadCols = () => {
     try {
@@ -218,6 +220,40 @@ export default function BomSection({
 
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-fp-text font-bold text-lg">BOM Line Items ({lineItems.length})</h3>
+        <div className="flex items-center gap-2">
+          {/* Column picker — always available */}
+          <div className="relative" ref={colMenuRef}>
+            <button
+              onClick={() => setColMenuOpen(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-medium transition-colors ${colMenuOpen ? 'border-fp-brand/50 bg-fp-brand/10 text-fp-brand' : 'border-fp-border text-fp-muted hover:text-fp-text hover:border-fp-muted'}`}
+              title="Configure visible columns"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
+              Columns
+            </button>
+            {colMenuOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 bg-fp-card border border-fp-border rounded-xl shadow-2xl p-4 w-52">
+                <p className="text-fp-text text-xs font-semibold mb-3">Show / Hide Columns</p>
+                <div className="space-y-2.5 mb-4">
+                  {COL_DEFS.map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-2 cursor-pointer group" onClick={() => toggleCol(key)}>
+                      <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${col(key) ? 'bg-fp-brand border-fp-brand' : 'border-fp-border group-hover:border-fp-muted'}`}>
+                        {col(key) && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                      </span>
+                      <span className="text-fp-text text-xs">{label}</span>
+                    </label>
+                  ))}
+                </div>
+                <button
+                  onClick={saveAsDefault}
+                  className="w-full text-xs bg-fp-inset hover:bg-fp-hover text-fp-muted hover:text-fp-text py-1.5 rounded-lg transition-colors"
+                >
+                  Save as my default
+                </button>
+              </div>
+            )}
+          </div>
+
         {canEdit && (!editingBOM ? (
           <div className="flex items-center gap-2">
             {/* Edit BOM — primary action */}
@@ -320,6 +356,7 @@ export default function BomSection({
             <button onClick={onSaveBOM} disabled={saving} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{saving ? 'Saving...' : 'Save BOM'}</button>
           </div>
         ))}
+        </div>
       </div>
 
       {/* RFQ Status */}
@@ -429,42 +466,15 @@ export default function BomSection({
                         {col('category') && <th className="text-fp-muted text-left py-2 pr-4">Category</th>}
                         {col('vendor') && <th className="text-fp-muted text-left py-2 pr-4">Vendor</th>}
                         <th className="text-fp-muted text-right py-2 pr-4">Qty</th>
+                        {col('your_cost') && <th className="text-fp-muted text-right py-2 pr-4">Your Cost</th>}
                         {col('unit_price') && <th className="text-fp-muted text-right py-2 pr-4">Unit Price</th>}
-                        {featureMsrp && <th className="text-fp-muted text-right py-2 pr-4">MSRP</th>}
+                        {col('msrp') && <th className="text-fp-muted text-right py-2 pr-4">MSRP</th>}
                         {col('total') && <th className="text-fp-muted text-right py-2 pr-4">Total</th>}
                         {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">Lead Time</th>}
                         {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">COO</th>}
                         {featureComplianceFields && <th className="text-fp-muted text-left py-2 pr-4">Berry</th>}
                         <th className="text-fp-muted text-left py-2">Status</th>
-                        <th className="text-fp-muted text-center py-2 pr-2 relative" ref={colMenuRef}>
-                          <button
-                            onClick={() => setColMenuOpen(v => !v)}
-                            className="text-fp-muted hover:text-fp-text transition-colors text-xs"
-                            title="Configure columns"
-                          >⚙</button>
-                          {colMenuOpen && (
-                            <div className="absolute right-0 top-full mt-1 z-50 bg-fp-card border border-fp-border rounded-xl shadow-2xl p-4 w-52 text-left">
-                              <p className="text-fp-text text-xs font-semibold mb-3">Show / Hide Columns</p>
-                              <div className="space-y-2 mb-4">
-                                {COL_DEFS.map(({ key, label }) => (
-                                  <label key={key} className="flex items-center gap-2 cursor-pointer group">
-                                    <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${col(key) ? 'bg-fp-brand border-fp-brand' : 'border-fp-border group-hover:border-fp-muted'}`}
-                                      onClick={() => toggleCol(key)}>
-                                      {col(key) && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
-                                    </span>
-                                    <span className="text-fp-text text-xs" onClick={() => toggleCol(key)}>{label}</span>
-                                  </label>
-                                ))}
-                              </div>
-                              <button
-                                onClick={saveAsDefault}
-                                className="w-full text-xs bg-fp-inset hover:bg-fp-hover text-fp-muted hover:text-fp-text py-1.5 rounded-lg transition-colors"
-                              >
-                                Save as my default
-                              </button>
-                            </div>
-                          )}
-                        </th>
+                        <th className="py-2 pr-2"></th>
                       </tr>
                     </thead>
                     <tbody>
@@ -489,6 +499,7 @@ export default function BomSection({
                             {col('category') && <td className="text-fp-muted py-3 pr-4">{item.category}</td>}
                             {col('vendor') && <td className="text-fp-muted py-3 pr-4">{item.vendor}</td>}
                             <td className="text-fp-text py-3 pr-4 text-right">{item.quantity}</td>
+                            {col('your_cost') && <td className="text-fp-muted py-3 pr-4 text-right">{item.your_cost_unit ? `$${fmt(item.your_cost_unit)}` : '—'}</td>}
                             {col('unit_price') && <td className="py-2 pr-4 text-right">
                               {canEdit && onSaveLinePrice && editingPrice?.type === 'bom' && editingPrice?.id === item.id ? (
                                 <input
@@ -507,7 +518,7 @@ export default function BomSection({
                                 >${fmt(item.customer_price_unit)}</span>
                               )}
                             </td>}
-                            {featureMsrp && <td className="text-fp-muted py-3 pr-4 text-right">{item.msrp_unit ? `$${fmt(item.msrp_unit)}` : '—'}</td>}
+                            {col('msrp') && <td className="text-fp-muted py-3 pr-4 text-right">{item.msrp_unit ? `$${fmt(item.msrp_unit)}` : '—'}</td>}
                             {col('total') && <td className="text-fp-text py-3 pr-4 text-right">${fmt(item.customer_price_total)}</td>}
                             {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.lead_time || '—'}</td>}
                             {featureComplianceFields && <td className="text-fp-muted py-3 pr-4 text-sm">{item.country_of_origin || '—'}</td>}
