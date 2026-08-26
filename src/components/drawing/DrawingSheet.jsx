@@ -1073,7 +1073,17 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     }
 
     const onBg = e.target === stageRef.current || ['bg-image', 'bg-blank'].includes(e.target.name())
-    if (onBg) setSelectedAnnotationId(null) // deselect annotation when clicking background
+    if (onBg) {
+      setSelectedAnnotationId(null)
+      if (!cableMode && !pathwayMode) {
+        setSelectedCable(null)
+        setEditingCable(null)
+        setSelectedPathwayId(null)
+        setEditingPathwayId(null)
+        onPathwaySelect?.(null)
+        onCableSelect?.(null)
+      }
+    }
     if (!onBg) return
 
     // Handle two-point calibration picking
