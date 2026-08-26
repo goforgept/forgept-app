@@ -389,16 +389,50 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
   }
   drawTitleBlock('Legend', 2)
 
-  // Device schedule
+  // Device + Cable schedule page
+  const schedTableStyle = { theme: 'grid', styles: { fontSize: 7, cellPadding: 2, textColor: [40,40,40], fillColor: [255,255,255], lineColor: [200,200,200] }, headStyles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7 }, alternateRowStyles: { fillColor: [245,247,250] } }
   pdf.addPage(); pdf.setFillColor(255,255,255); pdf.rect(0,0,pageW,pageH,'F')
-  pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(12); pdf.setFont('helvetica','bold')
+  pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(11); pdf.setFont('helvetica','bold')
   pdf.text('DEVICE SCHEDULE', margin, margin+8)
   const scheduleRows = placements.map((p, idx) => {
     const gp = p.global_products, sheet = sheets.find(s => s.id === p.drawing_sheet_id)
     return [idx+1, p.device_address||'—', p.part_number_override||gp?.part_number||'—', p.description_override||gp?.name||'—', p.manufacturer_override||gp?.manufacturer||'—', gp?.category||'—', p.quantity||1, conditionLabel(p.site_condition), sheet?.name||'—', p.runs_to_label||'—']
   })
-  autoTable(pdf, { startY: margin+14, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['#','Address','Part Number','Description','Manufacturer','Category','Qty','Condition','Sheet','Runs To']], body: scheduleRows, theme: 'grid', styles: { fontSize: 7, cellPadding: 2, textColor: [40,40,40], fillColor: [255,255,255], lineColor: [200,200,200] }, headStyles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [245,247,250] } })
-  drawTitleBlock('Device Schedule', 3)
+  autoTable(pdf, { ...schedTableStyle, startY: margin+12, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['#','Address','Part Number','Description','Manufacturer','Category','Qty','Condition','Sheet','Runs To']], body: scheduleRows })
+
+  // Cable schedule — inline below device schedule, same style
+  const cableRows = Object.entries(cableByType).map(([type, data]) => [type, data.runs || '—', `${Math.round(data.footage)}ft`, `${Math.round(data.total_footage)}ft`])
+  if (cableRows.length > 0) {
+    const cableY = pdf.lastAutoTable.finalY + 8
+    pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(10); pdf.setFont('helvetica','bold')
+    pdf.text('CABLE SCHEDULE', margin, cableY)
+    autoTable(pdf, { ...schedTableStyle, startY: cableY+4, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['Cable Type','Runs','Measured Footage','Total w/ Waste']], body: cableRows })
+  }
+
+  // Pathway schedule — inline below cable schedule
+  if (pathways.length > 0) {
+    const pwY = pdf.lastAutoTable.finalY + 8
+    pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(10); pdf.setFont('helvetica','bold')
+    pdf.text('PATHWAY SCHEDULE', margin, pwY)
+    const pwRows = pathways.map(pw => {
+      const def = PATHWAY_DEFS_MAP[pw.pathway_type] || PATHWAY_DEFS[0]
+      const sheet = sheets.find(s => s.id === pw.drawing_sheet_id)
+      const cables = (pw.cable_types || []).map(c => typeof c === 'string' ? c : `${c.qty > 1 ? c.qty + '× ' : ''}${c.type}`).join(', ') || '—'
+      return [def?.label || pw.pathway_type || '—', sheet?.name || '—', `${pw.total_footage || 0}ft`, cables]
+    })
+    autoTable(pdf, { ...schedTableStyle, startY: pwY+4, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['Type','Sheet','Footage','Cable Types']], body: pwRows })
+  }
+
+  // Vertical rises — inline below pathway schedule
+  if (verticalRises.length > 0) {
+    const riseY = pdf.lastAutoTable.finalY + 8
+    pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(10); pdf.setFont('helvetica','bold')
+    pdf.text('VERTICAL RISES', margin, riseY)
+    const riseRows = verticalRises.map(r => { const from = sheets.find(s => s.id === r.from_sheet_id), to = sheets.find(s => s.id === r.to_sheet_id); return [from?.name||'—', to?.name||'—', r.label||'—', r.cable_type||'—', `${r.rise_height}ft`, r.quantity, `${Math.round(r.total_footage)}ft`] })
+    autoTable(pdf, { ...schedTableStyle, startY: riseY+4, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['From','To','Label','Cable','Height','Qty','Total']], body: riseRows })
+  }
+
+  drawTitleBlock('Schedules', 3)
 
   // Floor plan sheets
   for (let i = 0; i < sheets.length; i++) {
@@ -411,36 +445,6 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
     const imgData = await getFloorPlanImageFromR2(sheet.id, sheets)
     await drawSheetOnPDFStandalone(pdf, sheet, imgData, margin, imgY, imgW, imgH, placementsBySheet, exportFOV, cableRunsBySheet, pathwaysBySheet, exportCables, exportPathways)
     drawTitleBlock(sheet.name, i+4)
-  }
-
-  // Cable schedule
-  const hasCableData = cableRuns.length > 0 || verticalRises.length > 0 || pathways.some(pw => pw.cable_types?.length)
-  if (hasCableData || Object.keys(cableByType).length > 0) {
-    pdf.addPage(); pdf.setFillColor(255,255,255); pdf.rect(0,0,pageW,pageH,'F')
-    pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(12); pdf.setFont('helvetica','bold')
-    pdf.text('CABLE SCHEDULE', margin, margin+8)
-    const cableRows = Object.entries(cableByType).map(([type, data]) => [type, data.runs || '—', `${Math.round(data.footage)}ft`, `${Math.round(data.total_footage)}ft`])
-    autoTable(pdf, { startY: margin+14, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['Cable Type','Runs','Measured Footage','Total w/ Waste']], body: cableRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] }, headStyles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [20,35,55] } })
-    if (pathways.length > 0) {
-      const pwY = pdf.lastAutoTable.finalY + 10
-      pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(10); pdf.setFont('helvetica','bold')
-      pdf.text('PATHWAY SCHEDULE', margin, pwY)
-      const pwRows = pathways.map(pw => {
-        const def = PATHWAY_DEFS_MAP[pw.pathway_type] || PATHWAY_DEFS[0]
-        const sheet = sheets.find(s => s.id === pw.drawing_sheet_id)
-        const cables = (pw.cable_types || []).map(c => typeof c === 'string' ? c : `${c.qty > 1 ? c.qty + '× ' : ''}${c.type}`).join(', ') || '—'
-        return [def?.label || pw.pathway_type || '—', sheet?.name || '—', `${pw.total_footage || 0}ft`, cables]
-      })
-      autoTable(pdf, { startY: pwY+4, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['Type','Sheet','Footage','Cable Types']], body: pwRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] }, headStyles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [20,35,55] } })
-    }
-    if (verticalRises.length > 0) {
-      const riseY = pdf.lastAutoTable.finalY + 10
-      pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(10); pdf.setFont('helvetica','bold')
-      pdf.text('VERTICAL RISES', margin, riseY)
-      const riseRows = verticalRises.map(r => { const from = sheets.find(s => s.id === r.from_sheet_id), to = sheets.find(s => s.id === r.to_sheet_id); return [from?.name||'—', to?.name||'—', r.label||'—', r.cable_type, `${r.rise_height}ft`, r.quantity, `${Math.round(r.total_footage)}ft`] })
-      autoTable(pdf, { startY: riseY+4, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['From','To','Label','Cable','Height','Qty','Total']], body: riseRows, theme: 'grid', styles: { fontSize: 8, cellPadding: 3, textColor: [255,255,255], fillColor: [15,28,46], lineColor: [42,61,85] }, headStyles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold' }, alternateRowStyles: { fillColor: [20,35,55] } })
-    }
-    drawTitleBlock('Cable Schedule', sheets.length+4)
   }
 
   return pdf
