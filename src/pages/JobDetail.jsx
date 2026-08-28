@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { savePdf, nativeDownload } from '../nativeDownload'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -538,7 +539,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       })
     }
 
-    doc.save(`${proposal?.proposal_name || job?.name || 'Job'} - Installer Copy.pdf`)
+    await savePdf(doc, `${proposal?.proposal_name || job?.name || 'Job'} - Installer Copy.pdf`)
   }
 
   const handleSignatureConfirm = async (dataUrl, signerName) => {
@@ -647,7 +648,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       setLineItems(prev => prev.map(l => selectedForPO.has(l.id) ? { ...l, po_number: finalPONumber, po_status: 'PO Sent' } : l))
       setSelectedForPO(new Set())
       setShowPOModal(false)
-      doc.save(`${finalPONumber}.pdf`)
+      await savePdf(doc, `${finalPONumber}.pdf`)
     } catch (err) { alert('Error generating PO: ' + err.message) }
     setGeneratingPO(false)
   }
@@ -818,7 +819,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     const pageHeight = doc.internal.pageSize.getHeight()
     doc.setFontSize(8); doc.setTextColor(150, 150, 150); doc.setFont('helvetica', 'normal')
     doc.text(`${profileData?.company_name || 'ForgePt.'} · Confidential`, pageWidth / 2, pageHeight - 10, { align: 'center' })
-    doc.save(`Cost-Report-${job?.job_number || job?.name || 'job'}.pdf`)
+    await savePdf(doc, `Cost-Report-${job?.job_number || job?.name || 'job'}.pdf`)
   }
 
   const defaultTaxRate = parseFloat(profile?.organizations?.default_tax_rate) || 0
@@ -1042,7 +1043,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     doc.setTextColor(120,120,120)
     doc.text('Printed Name & Title', 14, y + 5)
 
-    doc.save(`${coLabel}-${(co.name || 'change-order').replace(/[^a-z0-9]/gi, '-')}.pdf`)
+    await savePdf(doc, `${coLabel}-${(co.name || 'change-order').replace(/[^a-z0-9]/gi, '-')}.pdf`)
   }
 
   const saveSchedule = async () => {
@@ -1200,12 +1201,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     }
 
     const content = await zip.generateAsync({ type: 'blob' })
-    const url = URL.createObjectURL(content)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${job?.name || 'Job'}-Photos.zip`
-    a.click()
-    URL.revokeObjectURL(url)
+    await nativeDownload(`${job?.name || 'Job'}-Photos.zip`, content, 'application/zip')
   }
 
   const generateFinalJobPacket = async () => {
@@ -1399,7 +1395,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           const blob = await response.blob()
           const base64 = await new Promise(resolve => {
             const img2 = new Image()
+            const _jdUrl = URL.createObjectURL(blob)
             img2.onload = () => {
+              URL.revokeObjectURL(_jdUrl)
               const canvas = document.createElement('canvas')
               canvas.width = img2.naturalWidth
               canvas.height = img2.naturalHeight
@@ -1407,7 +1405,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
               ctx.drawImage(img2, 0, 0)
               resolve(canvas.toDataURL('image/jpeg', 0.85))
             }
-            img2.src = URL.createObjectURL(blob)
+            img2.onerror = () => { URL.revokeObjectURL(_jdUrl); resolve(null) }
+            img2.src = _jdUrl
           })
 
           if (y + photoHeight + 10 > pageHeight - 20) {
@@ -1440,7 +1439,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     doc.setTextColor(150, 150, 150)
     doc.text(`${profile?.company_name || 'ForgePt.'} · Job Completion Packet`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' })
 
-    doc.save(`${job?.name || 'Job'}-Completion-Packet.pdf`)
+    await savePdf(doc, `${job?.name || 'Job'}-Completion-Packet.pdf`)
   } catch (err) { console.error('Error generating final job packet:', err); alert('Error generating packet: ' + err.message) }
   }
 

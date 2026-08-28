@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { App as CapApp } from '@capacitor/app'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabase'
 import { useProfile } from './context/ProfileContext'
@@ -54,6 +56,15 @@ import AIAgent from './components/AIAgent'
 function App() {
   const { session, profile, features, loading } = useProfile()
   const location = useLocation()
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    const cleanup = CapApp.addListener('backButton', ({ canGoBack }) => {
+      if (canGoBack) window.history.back()
+      else CapApp.exitApp()
+    })
+    return () => { cleanup.then(l => l.remove()) }
+  }, [])
 
   if (loading) return (
     <div className="min-h-screen bg-fp-inset flex items-center justify-center">

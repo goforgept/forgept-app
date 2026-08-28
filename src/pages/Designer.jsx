@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import PDFWorkerConstructor from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import DrawingSheet from '../components/drawing/DrawingSheet'
@@ -142,8 +143,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
       // Check page count for PDFs
       if (isPDF) {
         const pdfjsLib  = await import('pdfjs-dist')
-        const workerUrl = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
-        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl.default
+        if (!pdfjsLib.GlobalWorkerOptions.workerPort) pdfjsLib.GlobalWorkerOptions.workerPort = new PDFWorkerConstructor()
         const arrayBuffer = await file.arrayBuffer()
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
         numPages = pdf.numPages

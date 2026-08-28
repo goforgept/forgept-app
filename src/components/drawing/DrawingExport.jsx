@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../supabase'
 import { getCategorySVG } from './useCategoryIcons'
 import { PATHWAY_DEFS } from './SymbolPicker'
+import { APP_BASE_URL } from '../../config'
+import { savePdf, nativeDownload } from '../../nativeDownload'
+import PDFWorkerConstructor from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
 
 // Convert SVG string to PNG base64 for jsPDF
 const svgToPng = (svgString, size = 20) => new Promise(resolve => {
@@ -227,7 +230,7 @@ const getFloorPlanImageFromR2 = async (sheetId, sheets) => {
     if (!signedUrl) return null
     if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
       const pdfjsLib = await import('pdfjs-dist')
-      pdfjsLib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
+      if (!pdfjsLib.GlobalWorkerOptions.workerPort) pdfjsLib.GlobalWorkerOptions.workerPort = new PDFWorkerConstructor()
       const arrayBuf = await (await fetch(signedUrl)).arrayBuffer()
       const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuf }).promise
       const page = await pdfDoc.getPage(sheet.page_number || 1)
@@ -626,9 +629,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       if (isPDF) {
         // Render PDF page to canvas using pdfjs
         const pdfjsLib = await import('pdfjs-dist')
-        pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-          'pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url
-        ).toString()
+        if (!pdfjsLib.GlobalWorkerOptions.workerPort) pdfjsLib.GlobalWorkerOptions.workerPort = new PDFWorkerConstructor()
 
         const response  = await fetch(signedUrl)
         const arrayBuf  = await response.arrayBuffer()
@@ -948,11 +949,11 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       },
     })
 
-    pdf.save(`DORI-Report-${projName.replace(/\s+/g, '-')}.pdf`)
+    await savePdf(pdf, `DORI-Report-${projName.replace(/\s+/g, '-')}.pdf`)
   }
 
   // ── CSV BOM Export ─────────────────────────────────────────────────────────
-  const handleCSVExport = () => {
+  const handleCSVExport = async () => {
     const rows = []
 
     // Header
@@ -1034,12 +1035,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     ).join('\n')
 
     const blob = new Blob([csv], { type: 'text/csv' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href     = url
-    a.download = `${proposal?.proposal_name || 'Drawing'}_BOM.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    await nativeDownload(`${proposal?.proposal_name || 'Drawing'}_BOM.csv`, blob, 'text/csv')
   }
 
   // ── Client Overview PDF ────────────────────────────────────────────────────
@@ -1233,7 +1229,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.text(`Date: ${new Date().toLocaleDateString()}`, pageW - margin, tbY + 11, { align: 'right' })
       }
 
-      pdf.save(`${proposal?.proposal_name || 'Drawing'}_Client_Overview.pdf`)
+      await savePdf(pdf, `${proposal?.proposal_name || 'Drawing'}_Client_Overview.pdf`)
     } catch (err) {
       console.error('PDF generation failed:', err)
       alert('PDF generation failed. Please try again.')
@@ -1247,7 +1243,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     setGenerating(true)
     try {
       const pdf = await generateShopDrawingsPdf({ sheets, placements, cableRuns, verticalRises, pathways, orgProfile, proposal, exportFOV, exportCables, exportPathways })
-      pdf.save(`${proposal?.proposal_name || 'Drawing'}_Shop_Drawings.pdf`)
+      await savePdf(pdf, `${proposal?.proposal_name || 'Drawing'}_Shop_Drawings.pdf`)
     } catch (err) {
       console.error('Shop drawing failed:', err)
       alert('PDF generation failed. Please try again.')
@@ -1321,7 +1317,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         alternateRowStyles: { fillColor: [248,249,250] },
       })
 
-      pdf.save(`${proposal?.proposal_name || 'Drawing'}_As_Built.pdf`)
+      await savePdf(pdf, `${proposal?.proposal_name || 'Drawing'}_As_Built.pdf`)
     } catch (err) {
       console.error('As-built failed:', err)
       alert('PDF generation failed.')
@@ -1360,7 +1356,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   }
 
   const handleCopyLink = (token, id) => {
-    const link = `${window.location.origin}/designer/review/${token}`
+    const link = `${APP_BASE_URL}/designer/review/${token}`
     navigator.clipboard.writeText(link)
     setCopiedId(id)
     setTimeout(() => setCopiedId(null), 2000)
@@ -1553,7 +1549,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.text(`Rack Schedule · Page ${i} of ${total}`, pageW - margin, pageH - 4, { align: 'right' })
       }
 
-      pdf.save(`${proposal?.proposal_name || 'Drawing'}_Rack_Schedule.pdf`)
+      await savePdf(pdf, `${proposal?.proposal_name || 'Drawing'}_Rack_Schedule.pdf`)
     } catch (err) {
       console.error('Rack schedule failed:', err)
       alert('PDF generation failed: ' + err.message)
@@ -1690,7 +1686,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             <div className="divide-y divide-[#2a3d55]">
               {packages.map(pkg => {
                 const expired = pkg.share_expires_at && new Date(pkg.share_expires_at) < new Date()
-                const link    = `${window.location.origin}/designer/review/${pkg.share_token}`
+                const link    = `${APP_BASE_URL}/designer/review/${pkg.share_token}`
                 return (
                   <div key={pkg.id} className="px-5 py-3 flex items-center gap-3">
                     <div className="flex-1 min-w-0">

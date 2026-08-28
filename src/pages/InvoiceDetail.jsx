@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { savePdf } from '../nativeDownload'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -333,7 +334,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
 
   const downloadPDF = async () => {
     const doc = await generateInvoicePDF(descriptionValue)
-    doc.save(`${invoice?.invoice_number || 'Invoice'}.pdf`)
+    await savePdf(doc, `${invoice?.invoice_number || 'Invoice'}.pdf`)
   }
 
   const updateStatus = async (status) => {

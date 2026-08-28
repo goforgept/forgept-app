@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
+import { savePdf, nativeDownload } from '../nativeDownload'
+import { Capacitor } from '@capacitor/core'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
@@ -241,10 +243,10 @@ async function exportGanttPDF(items, getAssignees) {
     lx += 70
   })
 
-  doc.save(`roadmap-gantt-${now.toISOString().slice(0, 10)}.pdf`)
+  await savePdf(doc, `roadmap-gantt-${now.toISOString().slice(0, 10)}.pdf`)
 }
 
-function exportTableCSV(items, getAssignees) {
+async function exportTableCSV(items, getAssignees) {
   const headers = ['Title', 'Status', 'Category', 'Assignees', 'Target', 'Requested By', 'Description']
   const rows = items.map(i => [
     `"${(i.title || '').replace(/"/g, '""')}"`,
@@ -257,12 +259,7 @@ function exportTableCSV(items, getAssignees) {
   ])
   const csv  = [headers, ...rows].map(r => r.join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv' })
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href = url
-  a.download = `roadmap-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+  await nativeDownload(`roadmap-${new Date().toISOString().slice(0, 10)}.csv`, blob, 'text/csv')
 }
 
 export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices }) {
@@ -493,7 +490,7 @@ export default function Roadmap({ isAdmin, isDevTeam, isProductManager, featureP
                 + Add Item
               </button>
             )}
-            {view === 'report' && (
+            {view === 'report' && !Capacitor.isNativePlatform() && (
               <button onClick={() => window.print()}
                 className="bg-fp-card text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-fp-border">
                 Print / Export

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { savePdf } from '../../nativeDownload'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../supabase'
 
@@ -397,7 +398,7 @@ export default function AIATab({ job, profile, lineItems: jobLineItems = [], pro
       const pageHeight = doc.internal.pageSize.getHeight()
       doc.setFontSize(7); doc.setTextColor(160, 160, 160); doc.setFont('helvetica', 'normal')
       doc.text(`${profileData?.company_name || 'ForgePt.'} · AIA Application No. ${appForm.application_number} · Confidential`, pageWidth / 2, pageHeight - 8, { align: 'center' })
-      doc.save(`AIA-App-${appForm.application_number}-${(job?.name || 'Job').replace(/[^a-z0-9]/gi, '-')}.pdf`)
+      await savePdf(doc, `AIA-App-${appForm.application_number}-${(job?.name || 'Job').replace(/[^a-z0-9]/gi, '-')}.pdf`)
     } catch (err) { alert('Error exporting PDF: ' + err.message) }
     setExportingPDF(false)
   }

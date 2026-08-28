@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { savePdf } from '../nativeDownload'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -679,7 +680,7 @@ export default function Reports(props) {
     }
 
     const prefix = branded && profile?.company_name ? profile.company_name.replace(/[^a-z0-9]/gi, '_') : 'ForgePt'
-    doc.save(`${prefix}_Client_Report_${selectedClient.label.replace(/[^a-z0-9]/gi,'_')}_${today()}.pdf`)
+    await savePdf(doc, `${prefix}_Client_Report_${selectedClient.label.replace(/[^a-z0-9]/gi,'_')}_${today()}.pdf`)
   }
 
   const reportLabel   = ALL_REPORTS.find(r => r.key === activeReport)?.label || ''
@@ -831,7 +832,7 @@ export default function Reports(props) {
         })
       }
       const prefix = branded && profile?.company_name ? profile.company_name.replace(/[^a-z0-9]/gi, '_') : 'ForgePt'
-      doc.save(`${prefix}_Payroll_${today()}.pdf`)
+      await savePdf(doc, `${prefix}_Payroll_${today()}.pdf`)
       return
     }
 
@@ -872,7 +873,7 @@ export default function Reports(props) {
       })
     }
     const prefix = branded && profile?.company_name ? profile.company_name.replace(/[^a-z0-9]/gi, '_') : 'ForgePt'
-    doc.save(`${prefix}_${reportLabel.replace(/ /g, '_')}_${today()}.pdf`)
+    await savePdf(doc, `${prefix}_${reportLabel.replace(/ /g, '_')}_${today()}.pdf`)
   }
 
   const selClass = "bg-fp-inset border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand"

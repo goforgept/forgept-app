@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { savePdf } from '../nativeDownload'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -555,8 +556,10 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
               ctx.drawImage(img2, 0, 0)
               resolve(canvas.toDataURL('image/jpeg', 0.85))
             }
-            img2.onerror = () => reject(new Error('Image decode failed'))
-            img2.src = URL.createObjectURL(blob)
+            img2.onerror = () => { URL.revokeObjectURL(img2.src); reject(new Error('Image decode failed')) }
+            const _stUrl = URL.createObjectURL(blob)
+            img2.onload = () => { URL.revokeObjectURL(_stUrl); ctx.drawImage(img2, 0, 0); resolve(canvas.toDataURL('image/jpeg', 0.85)) }
+            img2.src = _stUrl
           })
           if (y + photoHeight + 10 > pageHeight - 20) { doc.addPage(); y = 20; photoX = 14 }
           doc.addImage(base64, 'JPEG', photoX, y, photoWidth, photoHeight)
@@ -594,7 +597,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
       })
       alert('Service report sent to client!')
     } else {
-      doc.save(`Service-Report-${ticket.ticket_number || ticket.id}.pdf`)
+      await savePdf(doc, `Service-Report-${ticket.ticket_number || ticket.id}.pdf`)
     }
   }
 

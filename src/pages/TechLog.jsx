@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { nativeDownload } from '../nativeDownload'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -502,7 +503,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     return logDate >= weekAgo
   }).length
 
-  const exportCSV = () => {
+  const exportCSV = async () => {
     const escape = (val) => `"${String(val || '').replace(/"/g, '""')}"`
     const header = ['Date', 'Tech', 'Type', 'Job # / Ticket #', 'Name', 'Client', 'Hours', 'Work Summary', 'Issues']
     const rows = filteredLogs.map(log => [
@@ -518,12 +519,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     ])
     const csv = [header.join(','), ...rows.map(r => r.join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `tech-hours-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    await nativeDownload(`tech-hours-${new Date().toISOString().split('T')[0]}.csv`, blob, 'text/csv')
   }
 
   const myWeek = isTechnician ? (() => {

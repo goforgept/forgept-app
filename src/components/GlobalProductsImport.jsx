@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
+import { nativeDownload } from '../nativeDownload'
 import { supabase } from '../supabase'
 
 // ─── Element type → ForgePt category mapping ──────────────────────────────────
@@ -666,8 +667,7 @@ export default function GlobalProductsImport({ onClose, onImported }) {
                       href="/forgept_manufacturer_import_template.csv"
                       download="forgept_manufacturer_import_template.csv"
                       className="flex items-center gap-1.5 px-3 py-2 bg-fp-inset text-fp-muted text-xs font-medium rounded-lg hover:text-fp-text transition-colors"
-                      onClick={(e) => {
-                        // Generate and download the template
+                      onClick={async (e) => {
                         e.preventDefault()
                         const csv = `Part Number,Product Name,Category,Manufacturer,Description,FOV Angle (degrees),IR Range (feet),Watts,Installation Notes
 # ── Security Cameras ──────────────────────────────────────────────────────────
@@ -698,12 +698,7 @@ EXAMPLE-ENC-001,Example 4ch Encoder,Video Encoder,Example Corp,4-channel IP enco
 EXAMPLE-FA-001,Example Smoke Detector,Smoke Detector,Example Corp,Addressable smoke detector,,,1,
 EXAMPLE-FA-002,Example Horn Strobe,Horn Strobe,Example Corp,Wall mount horn strobe,,,0.5,`
                         const blob = new Blob([csv], { type: 'text/csv' })
-                        const url  = URL.createObjectURL(blob)
-                        const a    = document.createElement('a')
-                        a.href     = url
-                        a.download = 'forgept_manufacturer_import_template.csv'
-                        a.click()
-                        URL.revokeObjectURL(url)
+                        await nativeDownload('forgept_manufacturer_import_template.csv', blob, 'text/csv')
                       }}
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

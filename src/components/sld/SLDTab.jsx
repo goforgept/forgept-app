@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { savePdf } from '../../nativeDownload'
 import {
   ReactFlow,
   Background,
@@ -2140,7 +2141,7 @@ export default function SLDTab({ proposalId, orgId }) {
         })
       }
 
-      pdf.save(`${diagramName.replace(/[^a-z0-9]/gi, '_')}.pdf`)
+      await savePdf(pdf, `${diagramName.replace(/[^a-z0-9]/gi, '_')}.pdf`)
     } catch (err) {
       console.error('PDF export error:', err)
       alert('Export failed.')

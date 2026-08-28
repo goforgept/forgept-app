@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { savePdf } from '../nativeDownload'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -323,7 +324,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
       }
 
       // Download PDF
-      doc.save(`${finalPONumber}.pdf`)
+      await savePdf(doc, `${finalPONumber}.pdf`)
 
       // Reset and close
       setShowNewPO(false)

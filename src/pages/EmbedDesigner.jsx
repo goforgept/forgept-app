@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import PDFWorkerConstructor from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 import DrawingSheet from '../components/drawing/DrawingSheet'
@@ -184,8 +185,7 @@ export default function EmbedDesigner() {
       let numPages = 1
       if (isPDF) {
         const pdfjsLib  = await import('pdfjs-dist')
-        const workerUrl = await import('pdfjs-dist/build/pdf.worker.min.mjs?url')
-        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl.default
+        if (!pdfjsLib.GlobalWorkerOptions.workerPort) pdfjsLib.GlobalWorkerOptions.workerPort = new PDFWorkerConstructor()
         const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise
         numPages = pdf.numPages
       }

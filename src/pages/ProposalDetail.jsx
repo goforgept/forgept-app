@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { savePdf, nativeDownload } from '../nativeDownload'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { useProfile } from '../context/ProfileContext'
@@ -39,6 +40,7 @@ import BomSection from '../components/proposal/BomSection'
 import WarrantySection from '../components/proposal/WarrantySection'
 import TermsSection from '../components/proposal/TermsSection'
 import CatalogSearch from '../components/CatalogSearch'
+import { APP_BASE_URL } from '../config'
 
 export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
@@ -742,7 +744,7 @@ export default function ProposalDetail({ isAdmin }) {
   const requestSignature = async () => {
     if (!proposal?.client_email) { alert('No client email on this proposal.'); return }
     setRequestingSignature(true)
-    const signingUrl = `${window.location.origin}/sign/${proposal.signing_token}`
+    const signingUrl = `${APP_BASE_URL}/sign/${proposal.signing_token}`
     try {
       const { data: { session: currentSession } } = await supabase.auth.refreshSession()
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/send-signature-request', {
@@ -1357,7 +1359,7 @@ export default function ProposalDetail({ isAdmin }) {
   const downloadPDF = async () => {
     if (proposal?.status === 'Draft') setShowSentPrompt(true)
     const doc = await generatePDFDoc()
-    doc.save(`${proposal?.proposal_name || 'Proposal'}.pdf`)
+    await savePdf(doc, `${proposal?.proposal_name || 'Proposal'}.pdf`)
   }
 
   const downloadBundle = async () => {
@@ -1399,16 +1401,12 @@ export default function ProposalDetail({ isAdmin }) {
     drwPages.forEach(p => merged.addPage(p))
 
     const mergedBytes = await merged.save()
-    const blob = new Blob([mergedBytes], { type: 'application/pdf' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url; a.download = `${proposal?.proposal_name || 'Bundle'} - Full Bundle.pdf`; a.click()
-    URL.revokeObjectURL(url)
+    await nativeDownload(`${proposal?.proposal_name || 'Bundle'} - Full Bundle.pdf`, mergedBytes, 'application/pdf')
   }
 
   const downloadInstallerPDF = async () => {
     const doc = await generatePDFDoc({ forceHidePricing: true })
-    doc.save(`${proposal?.proposal_name || 'Proposal'} - Installer Copy.pdf`)
+    await savePdf(doc, `${proposal?.proposal_name || 'Proposal'} - Installer Copy.pdf`)
   }
 
   const downloadSignedCopy = async () => {
@@ -1447,7 +1445,7 @@ export default function ProposalDetail({ isAdmin }) {
     doc.setFontSize(8); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'normal')
     doc.text(`${profile?.company_name || 'ForgePt.'} · Signed Proposal · Confidential`, pageWidth / 2, pageHeight - 4, { align: 'center' })
 
-    doc.save(`Signed-${proposal?.proposal_name || 'Proposal'}.pdf`)
+    await savePdf(doc, `Signed-${proposal?.proposal_name || 'Proposal'}.pdf`)
   }
 
   const downloadDOCX = async ({ forceHidePricing = false } = {}) => {
@@ -1949,12 +1947,7 @@ export default function ProposalDetail({ isAdmin }) {
     })
 
     const buffer = await Packer.toBlob(doc)
-    const url = URL.createObjectURL(buffer)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${forceHidePricing ? `${proposal?.proposal_name || 'Proposal'} - Installer Copy` : (proposal?.proposal_name || 'Proposal')}.docx`
-    a.click()
-    URL.revokeObjectURL(url)
+    await nativeDownload(`${forceHidePricing ? `${proposal?.proposal_name || 'Proposal'} - Installer Copy` : (proposal?.proposal_name || 'Proposal')}.docx`, buffer, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
   }
 
   const downloadInstallerDOCX = async () => {
@@ -2043,7 +2036,7 @@ export default function ProposalDetail({ isAdmin }) {
 
       await fetchLineItems()
       logActivity(`Purchase Order ${finalPONumber} generated — ${selectedItems.length} items`)
-      doc.save(`${finalPONumber}.pdf`)
+      await savePdf(doc, `${finalPONumber}.pdf`)
       setSelectedForPO(new Set())
       setShowPOModal(false)
     } catch (err) {
@@ -3500,7 +3493,9 @@ const analyzeDrawing = async () => {
           // Use canvas to normalize EXIF orientation
           const base64 = await new Promise(resolve => {
             const img = new Image()
+            const _pdUrl = URL.createObjectURL(blob)
             img.onload = () => {
+              URL.revokeObjectURL(_pdUrl)
               const canvas = document.createElement('canvas')
               canvas.width = img.naturalWidth
               canvas.height = img.naturalHeight
@@ -3508,7 +3503,8 @@ const analyzeDrawing = async () => {
               ctx.drawImage(img, 0, 0)
               resolve(canvas.toDataURL('image/jpeg', 0.85))
             }
-            img.src = URL.createObjectURL(blob)
+            img.onerror = () => { URL.revokeObjectURL(_pdUrl); resolve(null) }
+            img.src = _pdUrl
           })
           doc.addImage(base64, 'JPEG', photoX, photoY, photoWidth, photoHeight)
           if (photos[i].caption) { doc.setFontSize(8); doc.setFont(pdfFont, 'normal'); doc.setTextColor(100, 100, 100); doc.text(photos[i].caption, photoX, photoY + photoHeight + 4, { maxWidth: photoWidth }) }
