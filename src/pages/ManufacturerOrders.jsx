@@ -87,7 +87,7 @@ export default function ManufacturerOrders({ isAdmin, featureProposals = true, f
   return (
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 min-w-0">
 
         <div className="flex justify-between items-center mb-6">
           <div>

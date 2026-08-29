@@ -87,7 +87,7 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 min-w-0">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-fp-text text-2xl font-bold">Invoices</h2>
           <button

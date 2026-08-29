@@ -365,7 +365,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureInventory={featureInventory} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
-      <div className="flex-1 p-6 space-y-6">
+      <div className="flex-1 p-6 space-y-6 min-w-0">
         <div className="flex justify-between items-center">
           <h2 className="text-fp-text text-2xl font-bold">Purchase Orders</h2>
           <button onClick={() => setShowNewPO(true)}
@@ -429,7 +429,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
               const isExpanded = expandedPO === po.id
               const progress = getReceivingProgress(po.id)
               return (
-                <div key={po.id} className="border border-fp-border rounded-xl overflow-hidden bg-fp-card">
+                <div key={po.id} className="border border-fp-border rounded-xl overflow-x-auto bg-fp-card">
                   <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-fp-hover transition-colors" onClick={() => toggleExpand(po)}>
                     <div className="flex items-center gap-4">
                       <div>

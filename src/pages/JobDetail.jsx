@@ -1462,7 +1462,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureInventory={featureInventory} role={role} isPM={isPM} isTechnician={isTechnician} />
 
-      <div className="flex-1 p-6 space-y-6">
+      <div className="flex-1 p-6 space-y-6 min-w-0">
 
         {/* Header */}
         <div className="bg-fp-card rounded-xl p-6">

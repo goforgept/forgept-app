@@ -162,7 +162,7 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
-      <div className="flex-1 p-6 space-y-5 max-w-6xl">
+      <div className="flex-1 p-6 space-y-5 min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
@@ -187,12 +187,12 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => setSelectedWarehouse('all')}
             className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${selectedWarehouse === 'all' ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text border border-fp-border'}`}>
-            All ({items.length})
+            All
           </button>
           {warehouses.map(w => (
             <button key={w.id} onClick={() => setSelectedWarehouse(w.id)}
               className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${selectedWarehouse === w.id ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text border border-fp-border'}`}>
-              {w.name} ({items.filter(i => i.warehouse_id === w.id).length})
+              {w.name}
             </button>
           ))}
         </div>
@@ -203,13 +203,13 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
           className="w-full max-w-sm bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand" />
 
         {/* Table */}
-        <div className="bg-fp-card rounded-xl overflow-hidden">
+        <div className="bg-fp-card rounded-xl overflow-x-auto">
           {loading ? (
             <div className="p-8 text-center text-fp-muted text-sm">Loading inventory...</div>
           ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-fp-muted text-sm">No items found. Add your first inventory item.</div>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="border-b border-fp-border">
                   {['Part #', 'Description', 'Warehouse', 'On Hand', 'Reserved', 'Available', 'Unit Cost', ''].map(h => (

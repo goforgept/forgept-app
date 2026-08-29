@@ -157,7 +157,7 @@ export default function ManageReps({ isAdmin, featureProposals = true, featureCR
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
-      <div className="flex-1 p-6 space-y-6">
+      <div className="flex-1 p-6 space-y-6 min-w-0">
         <div className="flex justify-between items-center">
           <h2 className="text-fp-text text-2xl font-bold">Team</h2>
           {isAdmin && (

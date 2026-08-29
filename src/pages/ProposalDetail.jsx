@@ -3555,7 +3555,7 @@ const analyzeDrawing = async () => {
   return (
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={features.proposals} featureCRM={features.crm} />
-      <div className="flex-1 p-6 space-y-6">
+      <div className="flex-1 p-6 space-y-6 min-w-0">
         {/* Read-only banner */}
         {!canEdit && (
           <div className="bg-yellow-900/20 border border-yellow-700/40 rounded-xl px-5 py-3 flex items-center justify-between">

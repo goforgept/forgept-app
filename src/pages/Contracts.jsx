@@ -629,8 +629,8 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
               <p className="text-fp-muted text-sm">Contracts are created when a proposal is marked as Won.</p>
             </div>
           ) : (
-            <div className="bg-fp-card rounded-xl overflow-hidden">
-              <table className="w-full">
+            <div className="bg-fp-card rounded-xl overflow-x-auto">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-fp-border">
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Client</th>
@@ -730,8 +730,8 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
               <p className="text-fp-muted text-sm">Mark BOM line items as recurring when closing a deal as Won.</p>
             </div>
           ) : (
-            <div className="bg-fp-card rounded-xl overflow-hidden">
-              <table className="w-full">
+            <div className="bg-fp-card rounded-xl overflow-x-auto">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-fp-border">
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Client</th>
@@ -812,8 +812,8 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
               <p className="text-fp-muted text-sm">Add fees to contracts and mark BOM items as recurring to see the breakdown here.</p>
             </div>
           ) : (
-            <div className="bg-fp-card rounded-xl overflow-hidden">
-              <table className="w-full">
+            <div className="bg-fp-card rounded-xl overflow-x-auto">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-fp-border">
                     <th className="text-left text-fp-muted text-xs font-semibold uppercase tracking-wide px-5 py-3">Client</th>

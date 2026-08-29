@@ -647,7 +647,7 @@ export default function Templates({ isAdmin }) {
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={true} featureCRM={true} />
 
-      <div className="flex-1 p-6 space-y-6">
+      <div className="flex-1 p-6 space-y-6 min-w-0">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-fp-text text-2xl font-bold">Proposal Templates</h2>

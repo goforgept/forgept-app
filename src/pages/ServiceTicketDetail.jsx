@@ -635,7 +635,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureInventory={featureInventory} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
-      <div className="flex-1 p-6 space-y-6 max-w-5xl">
+      <div className="flex-1 p-6 space-y-6 max-w-5xl min-w-0">
 
         {/* Header */}
         <div className="bg-fp-card rounded-xl p-6">
