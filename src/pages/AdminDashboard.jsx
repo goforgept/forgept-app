@@ -467,11 +467,11 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
         {/* PM Dashboard */}
         {dashboardMode === 'pm' && !loading && (() => {
-          const activeJobs = jobs.filter(j => j.status === 'Active')
+          const activeJobs = jobs.filter(j => !['Completed', 'Cancelled', 'On Hold'].includes(j.status))
           const hoursThisWeek = techLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0)
-          const overdueJobs = jobs.filter(j => j.status === 'Active' && j.end_date && new Date(j.end_date) < new Date())
+          const overdueJobs = jobs.filter(j => !['Completed', 'Cancelled', 'On Hold'].includes(j.status) && j.end_date && new Date(j.end_date) < new Date())
           const pendingPOsCount = purchaseOrders.filter(p => p.status === 'Sent' || p.status === 'Partial').length
-          const totalContractValue = jobs.filter(j => j.status === 'Active').reduce((sum, j) => {
+          const totalContractValue = jobs.filter(j => !['Completed', 'Cancelled'].includes(j.status)).reduce((sum, j) => {
             const prop = proposals.find(p => p.id === j.proposal_id)
             return sum + (prop?.proposal_value || 0)
           }, 0)
@@ -700,7 +700,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               <h3 className="text-fp-text font-bold mb-4">Upcoming Deadlines</h3>
               {(() => {
                 const upcoming = jobs
-                  .filter(j => (j.status === 'Active' || j.status === 'On Hold') && j.end_date)
+                  .filter(j => !['Completed', 'Cancelled'].includes(j.status) && j.end_date)
                   .sort((a, b) => new Date(a.end_date) - new Date(b.end_date))
                   .slice(0, 6)
                 if (upcoming.length === 0) return <p className="text-fp-muted text-sm">No jobs with end dates set.</p>

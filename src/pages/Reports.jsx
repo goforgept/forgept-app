@@ -340,7 +340,7 @@ export default function Reports(props) {
 
     // ── Jobs ──────────────────────────────────────────────────────────────────
     if (['open_jobs', 'closed_jobs'].includes(activeReport)) {
-      const statusMap = { open_jobs: ['Active', 'On Hold'], closed_jobs: ['Completed', 'Cancelled'] }
+      const statusMap = { open_jobs: ['Pending', 'Scheduled', 'In Progress', 'Waiting on Parts', 'Punch List', 'On Hold'], closed_jobs: ['Completed', 'Cancelled'] }
       let q = supabase
         .from('jobs')
         .select('name, job_number, status, created_at, clients(company)')
@@ -584,7 +584,7 @@ export default function Reports(props) {
         wonDeals: won.length, totalWonValue,
         openQuotes: open.length, totalOpenValue,
         avgMargin,
-        openJobs:    jobs.filter(j => ['Active','On Hold'].includes(j.status)).length,
+        openJobs:    jobs.filter(j => !['Completed','Cancelled'].includes(j.status)).length,
         closedJobs:  jobs.filter(j => ['Completed','Cancelled'].includes(j.status)).length,
         openTickets: tickets.filter(t => !['Resolved','Cancelled'].includes(t.status)).length,
         totalOutstanding,
