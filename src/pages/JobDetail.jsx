@@ -1623,14 +1623,14 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         {/* Tabs */}
         {(() => {
           const primaryTabs = [
-            { key: 'checklist', label: 'Checklist',       countLabel: `${completedCount}/${checklist.length}` },
-            { key: 'pos',       label: 'Purchase Orders',  countLabel: null },
-            { key: 'techlog',   label: 'Tech Log',         countLabel: techLogs.length > 0 ? String(techLogs.length) : null },
-            { key: 'photos',    label: 'Photos',           countLabel: photos.length > 0 ? String(photos.length) : null },
+            { key: 'checklist',  label: 'Checklist',       countLabel: `${completedCount}/${checklist.length}` },
+            { key: 'pos',        label: 'Purchase Orders',  countLabel: null },
+            { key: 'techlog',    label: 'Tech Log',         countLabel: techLogs.length > 0 ? String(techLogs.length) : null },
+            { key: 'costReport', label: 'Cost Report',      countLabel: null },
           ]
           const overflowTabs = [
             { key: 'changeorders', label: 'Change Orders',    countLabel: changeOrders.length > 0 ? String(changeOrders.length) : null },
-            { key: 'costReport',   label: 'Cost Report',      countLabel: null },
+            { key: 'photos',       label: 'Photos',           countLabel: photos.length > 0 ? String(photos.length) : null },
             { key: 'proposal',     label: 'Proposal',         countLabel: null },
             ...(job?.proposal_id ? [{ key: 'billings', label: 'Billings', countLabel: jobInvoices.length > 0 ? String(jobInvoices.length) : null }] : []),
             ...(featureInventory  ? [{ key: 'fulfillment', label: 'Fulfillment', countLabel: null }] : []),
