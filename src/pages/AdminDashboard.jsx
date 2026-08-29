@@ -418,7 +418,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
 
         {/* AR + PO Summary */}
-        {on('ar-summary') && <div className={`grid ${orgType === 'manufacturer' ? 'grid-cols-1' : 'grid-cols-2'} gap-4 mb-6`}>
+        {on('ar-summary') && <div className={`grid ${orgType === 'manufacturer' ? 'grid-cols-1' : 'grid-cols-1 xl:grid-cols-2'} gap-4 mb-6`}>
           <div className="bg-fp-card rounded-xl p-5 cursor-pointer hover:bg-fp-hover transition-colors" onClick={() => navigate('/invoices')}>
             <p className="text-fp-text font-bold mb-3">Invoicing & AR</p>
             <div className="grid grid-cols-4 gap-3">
