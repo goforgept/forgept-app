@@ -325,9 +325,9 @@ export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager =
 
     <div className={`
       h-full bg-fp-card border-r border-fp-border flex flex-col
-      fixed top-0 left-0 z-50 w-64
+      fixed top-0 left-10 z-50 w-64
       transition-transform duration-300 ease-in-out
-      lg:relative lg:w-56 lg:flex-shrink-0 lg:translate-x-0
+      lg:relative lg:left-auto lg:top-auto lg:w-56 lg:flex-shrink-0 lg:translate-x-0
       ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
     `}>
       <div className="px-6 py-5 border-b border-fp-border">
