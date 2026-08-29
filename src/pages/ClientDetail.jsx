@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -37,6 +37,8 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [editForm, setEditForm] = useState({})
   const [savingClient, setSavingClient] = useState(false)
   const [activeTab, setActiveTab] = useState('proposals')
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreRef = useRef(null)
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [emailForm, setEmailForm] = useState({ subject: '', context: '' })
   const [draftedEmail, setDraftedEmail] = useState('')
@@ -86,6 +88,12 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
     fetchClientTickets()
     fetchClientMeetings()
     fetchSubscriptions()
+  }, [])
+
+  useEffect(() => {
+    const handler = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
   }, [])
 
   useEffect(() => {
@@ -724,25 +732,81 @@ const deleteMeeting = async (meetingId) => {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 flex-wrap">
-          {[
-            { key: 'proposals', label: `Proposals (${proposals.length})` },
-            { key: 'subscriptions', label: `Subscriptions (${subscriptions.length})` },
-            { key: 'contacts', label: `Contacts (${contacts.length})` },
-            { key: 'locations', label: `Locations (${locations.length})` },
-            { key: 'tickets', label: `Service Tickets (${clientTickets.length})` },
-            { key: 'meetings', label: `Meetings (${clientMeetings.length})` },
-            { key: 'activity', label: 'Activity' },
-            { key: 'tasks', label: 'Tasks' },
-            { key: 'emails', label: `Emails (${clientEmails.length})` },
-            { key: 'notes', label: 'Notes' },
-          ].map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {(() => {
+          const primaryTabs = [
+            { key: 'proposals', label: 'Proposals',       count: proposals.length },
+            { key: 'contacts',  label: 'Contacts',        count: contacts.length },
+            { key: 'tickets',   label: 'Service Tickets', count: clientTickets.length },
+            { key: 'activity',  label: 'Activity',        count: null },
+          ]
+          const overflowTabs = [
+            { key: 'subscriptions', label: 'Subscriptions', count: subscriptions.length },
+            { key: 'locations',     label: 'Locations',     count: locations.length },
+            { key: 'meetings',      label: 'Meetings',      count: clientMeetings.length },
+            { key: 'emails',        label: 'Emails',        count: clientEmails.length },
+            { key: 'tasks',         label: 'Tasks',         count: null },
+            { key: 'notes',         label: 'Notes',         count: null },
+          ]
+          const overflowActive = overflowTabs.find(t => t.key === activeTab)
+
+          return (
+            <div className="flex items-center gap-2">
+              {primaryTabs.map(t => (
+                <button key={t.key} onClick={() => setActiveTab(t.key)}
+                  className={`relative px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
+                  }`}
+                >
+                  {t.label}
+                  {t.count > 0 && (
+                    <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1 leading-none ${
+                      activeTab === t.key ? 'bg-white text-fp-brand' : 'bg-fp-inset text-fp-muted'
+                    }`}>
+                      {t.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+
+              {/* More overflow dropdown */}
+              <div ref={moreRef} className="relative">
+                <button
+                  onClick={() => setMoreOpen(o => !o)}
+                  className={`relative px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+                    overflowActive ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
+                  }`}
+                >
+                  {overflowActive ? overflowActive.label : 'More'}
+                  <span className="text-[10px] opacity-70">{moreOpen ? '▴' : '▾'}</span>
+                  {overflowActive?.count > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1 leading-none bg-white text-fp-brand">
+                      {overflowActive.count}
+                    </span>
+                  )}
+                </button>
+                {moreOpen && (
+                  <div className="absolute top-full left-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[160px] py-1 overflow-hidden">
+                    {overflowTabs.map(t => (
+                      <button key={t.key}
+                        onClick={() => { setActiveTab(t.key); setMoreOpen(false) }}
+                        className={`w-full text-left px-4 py-2.5 text-sm font-medium flex items-center justify-between gap-3 transition-colors ${
+                          activeTab === t.key ? 'text-fp-brand bg-fp-inset' : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
+                        }`}
+                      >
+                        {t.label}
+                        {t.count > 0 && (
+                          <span className="min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1 leading-none bg-fp-inset text-fp-muted border border-fp-border">
+                            {t.count}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Proposals tab */}
         {activeTab === 'proposals' && (
