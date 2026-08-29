@@ -753,14 +753,14 @@ const deleteMeeting = async (meetingId) => {
             <div className="flex items-center gap-2">
               {primaryTabs.map(t => (
                 <button key={t.key} onClick={() => setActiveTab(t.key)}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors text-left ${
+                  className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                     activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
                   }`}
                 >
-                  <span className="block leading-tight">{t.label}</span>
+                  {t.label}
                   {t.count !== null && (
-                    <span className={`block text-[10px] font-normal leading-tight mt-0.5 ${activeTab === t.key ? 'opacity-75' : 'opacity-60'}`}>
-                      Count: {t.count}
+                    <span className={`text-xs font-bold tabular-nums ${activeTab === t.key ? 'opacity-75' : 'opacity-50'}`}>
+                      {t.count}
                     </span>
                   )}
                 </button>
@@ -770,32 +770,28 @@ const deleteMeeting = async (meetingId) => {
               <div ref={moreRef} className="relative">
                 <button
                   onClick={() => setMoreOpen(o => !o)}
-                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+                  className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                     overflowActive ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
                   }`}
                 >
-                  <span>
-                    <span className="block leading-tight">{overflowActive ? overflowActive.label : 'More'}</span>
-                    {overflowActive?.count !== null && overflowActive && (
-                      <span className="block text-[10px] font-normal leading-tight mt-0.5 opacity-75">
-                        Count: {overflowActive.count}
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[10px] opacity-70 self-center">{moreOpen ? '▴' : '▾'}</span>
+                  {overflowActive ? overflowActive.label : 'More'}
+                  {overflowActive?.count !== null && overflowActive && (
+                    <span className="text-xs font-bold tabular-nums opacity-75">{overflowActive.count}</span>
+                  )}
+                  <span className="text-[10px] opacity-60">{moreOpen ? '▴' : '▾'}</span>
                 </button>
                 {moreOpen && (
-                  <div className="absolute top-full left-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[180px] py-1 overflow-hidden">
+                  <div className="absolute top-full left-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-hidden">
                     {overflowTabs.map(t => (
                       <button key={t.key}
                         onClick={() => { setActiveTab(t.key); setMoreOpen(false) }}
-                        className={`w-full text-left px-4 py-2.5 text-sm font-medium flex items-center justify-between gap-3 transition-colors ${
+                        className={`w-full text-left px-4 py-2.5 text-sm font-medium flex items-center justify-between gap-4 transition-colors ${
                           activeTab === t.key ? 'text-fp-brand bg-fp-inset' : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
                         }`}
                       >
                         <span>{t.label}</span>
                         {t.count !== null && (
-                          <span className="text-[10px] opacity-60 shrink-0">Count: {t.count}</span>
+                          <span className="text-xs font-bold tabular-nums opacity-50 shrink-0">{t.count}</span>
                         )}
                       </button>
                     ))}
