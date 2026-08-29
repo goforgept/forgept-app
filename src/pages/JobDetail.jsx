@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { savePdf, nativeDownload } from '../nativeDownload'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
@@ -69,6 +69,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [changeOrders, setChangeOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('checklist')
+  const [moreOpen, setMoreOpen] = useState(false)
+  const moreRef = useRef(null)
   const [savingStatus, setSavingStatus] = useState(false)
   const [orgProfiles, setOrgProfiles] = useState([])
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago')
@@ -130,6 +132,11 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [jobSchedules, setJobSchedules] = useState([])
 
   useEffect(() => { if (profile?.org_id) fetchAll() }, [id, profile?.org_id])
+  useEffect(() => {
+    const handler = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const fetchAll = async () => {
     const { data: jobData } = await supabase
@@ -1614,25 +1621,76 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 flex-wrap">
-          {[
-            { key: 'checklist', label: `Checklist (${completedCount}/${checklist.length})` },
-            { key: 'pos', label: 'Purchase Orders' },
-            ...(featureInventory ? [{ key: 'fulfillment', label: 'Fulfillment' }] : []),
-            { key: 'changeorders', label: `Change Orders (${changeOrders.length})` },
-            { key: 'costReport', label: 'Cost Report' },
-            { key: 'techlog', label: `Tech Log (${techLogs.length})` },
-            { key: 'proposal', label: 'Proposal' },
-            ...(job?.proposal_id ? [{ key: 'billings', label: `Billings (${jobInvoices.length})` }] : []),
-            { key: 'photos', label: `📷 Photos (${photos.length})` },
-            ...(job?.billing_type === 'AIA' ? [{ key: 'aia', label: 'AIA Applications' }] : []),
-          ].map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {(() => {
+          const primaryTabs = [
+            { key: 'checklist', label: 'Checklist',       countLabel: `${completedCount}/${checklist.length}` },
+            { key: 'pos',       label: 'Purchase Orders',  countLabel: null },
+            { key: 'techlog',   label: 'Tech Log',         countLabel: techLogs.length > 0 ? String(techLogs.length) : null },
+            { key: 'photos',    label: 'Photos',           countLabel: photos.length > 0 ? String(photos.length) : null },
+          ]
+          const overflowTabs = [
+            { key: 'changeorders', label: 'Change Orders',    countLabel: changeOrders.length > 0 ? String(changeOrders.length) : null },
+            { key: 'costReport',   label: 'Cost Report',      countLabel: null },
+            { key: 'proposal',     label: 'Proposal',         countLabel: null },
+            ...(job?.proposal_id ? [{ key: 'billings', label: 'Billings', countLabel: jobInvoices.length > 0 ? String(jobInvoices.length) : null }] : []),
+            ...(featureInventory  ? [{ key: 'fulfillment', label: 'Fulfillment', countLabel: null }] : []),
+            ...(job?.billing_type === 'AIA' ? [{ key: 'aia', label: 'AIA Applications', countLabel: null }] : []),
+          ]
+          const allTabs = [...primaryTabs, ...overflowTabs]
+          const overflowActive = overflowTabs.find(t => t.key === activeTab)
+          const activeTabData = allTabs.find(t => t.key === activeTab)
+
+          return (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {primaryTabs.map(t => (
+                  <button key={t.key} onClick={() => setActiveTab(t.key)}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+
+                <div ref={moreRef} className="relative">
+                  <button
+                    onClick={() => setMoreOpen(o => !o)}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                      overflowActive ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
+                    }`}
+                  >
+                    {overflowActive ? overflowActive.label : 'More'}
+                    <span className="text-[10px] opacity-60">{moreOpen ? '▴' : '▾'}</span>
+                  </button>
+                  {moreOpen && (
+                    <div className="absolute top-full left-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-hidden">
+                      {overflowTabs.map(t => (
+                        <button key={t.key}
+                          onClick={() => { setActiveTab(t.key); setMoreOpen(false) }}
+                          className={`w-full text-left px-4 py-2.5 text-sm font-medium flex items-center justify-between gap-4 transition-colors ${
+                            activeTab === t.key ? 'text-fp-brand bg-fp-inset' : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
+                          }`}
+                        >
+                          <span>{t.label}</span>
+                          {t.countLabel && (
+                            <span className="text-xs font-bold tabular-nums opacity-50 shrink-0">{t.countLabel}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {activeTabData?.countLabel && (
+                <span className="text-fp-muted text-sm tabular-nums">
+                  Count: <span className="text-fp-text font-semibold">{activeTabData.countLabel}</span>
+                </span>
+              )}
+            </div>
+          )
+        })()}
 
         {/* CHECKLIST TAB */}
         {activeTab === 'checklist' && (
