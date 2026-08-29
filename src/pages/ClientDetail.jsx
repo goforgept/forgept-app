@@ -734,18 +734,18 @@ const deleteMeeting = async (meetingId) => {
         {/* Tabs */}
         {(() => {
           const primaryTabs = [
-            { key: 'proposals', label: 'Proposals',       count: proposals.length },
-            { key: 'contacts',  label: 'Contacts',        count: contacts.length },
-            { key: 'tickets',   label: 'Service Tickets', count: clientTickets.length },
-            { key: 'activity',  label: 'Activity',        count: null },
+            { key: 'proposals', label: 'Proposals',  count: proposals.length },
+            { key: 'contacts',  label: 'Contacts',   count: contacts.length },
+            { key: 'locations', label: 'Locations',  count: locations.length },
+            { key: 'activity',  label: 'Activity',   count: null },
           ]
           const overflowTabs = [
-            { key: 'subscriptions', label: 'Subscriptions', count: subscriptions.length },
-            { key: 'locations',     label: 'Locations',     count: locations.length },
-            { key: 'meetings',      label: 'Meetings',      count: clientMeetings.length },
-            { key: 'emails',        label: 'Emails',        count: clientEmails.length },
-            { key: 'tasks',         label: 'Tasks',         count: null },
-            { key: 'notes',         label: 'Notes',         count: null },
+            { key: 'subscriptions', label: 'Subscriptions',  count: subscriptions.length },
+            { key: 'tickets',       label: 'Service Tickets', count: clientTickets.length },
+            { key: 'meetings',      label: 'Meetings',        count: clientMeetings.length },
+            { key: 'emails',        label: 'Emails',          count: clientEmails.length },
+            { key: 'tasks',         label: 'Tasks',           count: null },
+            { key: 'notes',         label: 'Notes',           count: null },
           ]
           const overflowActive = overflowTabs.find(t => t.key === activeTab)
 
@@ -753,16 +753,14 @@ const deleteMeeting = async (meetingId) => {
             <div className="flex items-center gap-2">
               {primaryTabs.map(t => (
                 <button key={t.key} onClick={() => setActiveTab(t.key)}
-                  className={`relative px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors text-left ${
                     activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
                   }`}
                 >
-                  {t.label}
-                  {t.count > 0 && (
-                    <span className={`absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1 leading-none ${
-                      activeTab === t.key ? 'bg-white text-fp-brand' : 'bg-fp-inset text-fp-muted'
-                    }`}>
-                      {t.count}
+                  <span className="block leading-tight">{t.label}</span>
+                  {t.count !== null && (
+                    <span className={`block text-[10px] font-normal leading-tight mt-0.5 ${activeTab === t.key ? 'opacity-75' : 'opacity-60'}`}>
+                      Count: {t.count}
                     </span>
                   )}
                 </button>
@@ -772,20 +770,22 @@ const deleteMeeting = async (meetingId) => {
               <div ref={moreRef} className="relative">
                 <button
                   onClick={() => setMoreOpen(o => !o)}
-                  className={`relative px-4 py-2 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+                  className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors flex items-center gap-1.5 ${
                     overflowActive ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
                   }`}
                 >
-                  {overflowActive ? overflowActive.label : 'More'}
-                  <span className="text-[10px] opacity-70">{moreOpen ? '▴' : '▾'}</span>
-                  {overflowActive?.count > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1 leading-none bg-white text-fp-brand">
-                      {overflowActive.count}
-                    </span>
-                  )}
+                  <span>
+                    <span className="block leading-tight">{overflowActive ? overflowActive.label : 'More'}</span>
+                    {overflowActive?.count !== null && overflowActive && (
+                      <span className="block text-[10px] font-normal leading-tight mt-0.5 opacity-75">
+                        Count: {overflowActive.count}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[10px] opacity-70 self-center">{moreOpen ? '▴' : '▾'}</span>
                 </button>
                 {moreOpen && (
-                  <div className="absolute top-full left-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[160px] py-1 overflow-hidden">
+                  <div className="absolute top-full left-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[180px] py-1 overflow-hidden">
                     {overflowTabs.map(t => (
                       <button key={t.key}
                         onClick={() => { setActiveTab(t.key); setMoreOpen(false) }}
@@ -793,11 +793,9 @@ const deleteMeeting = async (meetingId) => {
                           activeTab === t.key ? 'text-fp-brand bg-fp-inset' : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
                         }`}
                       >
-                        {t.label}
-                        {t.count > 0 && (
-                          <span className="min-w-[18px] h-[18px] rounded-full text-[10px] font-bold flex items-center justify-center px-1 leading-none bg-fp-inset text-fp-muted border border-fp-border">
-                            {t.count}
-                          </span>
+                        <span>{t.label}</span>
+                        {t.count !== null && (
+                          <span className="text-[10px] opacity-60 shrink-0">Count: {t.count}</span>
                         )}
                       </button>
                     ))}
