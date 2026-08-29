@@ -32,6 +32,27 @@ export async function getR2Url(path, expiresIn = 3600, bucket = BUCKETS.FLOOR_PL
   }
 }
 
+// Fetch file bytes via edge-function proxy — for native apps where R2 CORS blocks capacitor://localhost
+export async function getR2Bytes(path, bucket = BUCKETS.FLOOR_PLANS) {
+  if (!path || path === 'blank' || path === 'pending') return null
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch(R2_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${session?.access_token}`,
+      },
+      body: JSON.stringify({ path, bucket, download: true }),
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return await res.arrayBuffer()
+  } catch (err) {
+    console.error('R2 bytes error:', err)
+    return null
+  }
+}
+
 // Get presigned URL using public token (no auth)
 export async function getR2UrlPublic(path, publicToken, expiresIn = 3600, bucket = BUCKETS.DOCUMENTS) {
   if (!path || !publicToken) return null

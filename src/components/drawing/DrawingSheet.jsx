@@ -300,16 +300,33 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     setLoadStep('Connecting…')
 
     const run = async () => {
-      setLoadStep('Getting file URL…')
-      const { getR2Url } = await import('../../r2')
-      const signedUrl = await getR2Url(sheet.storage_path, 3600)
-      if (!signedUrl) {
-        throw new Error('File not found in storage. Try re-uploading this sheet.')
-      }
+      const { Capacitor } = await import('@capacitor/core')
+      const isNative = Capacitor.isNativePlatform()
+
       if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
+        let pdfData
+        if (isNative) {
+          setLoadStep('Downloading PDF…')
+          const { getR2Bytes } = await import('../../r2')
+          pdfData = await getR2Bytes(sheet.storage_path)
+          if (!pdfData) throw new Error('File not found in storage. Try re-uploading this sheet.')
+        } else {
+          setLoadStep('Getting file URL…')
+          const { getR2Url } = await import('../../r2')
+          const signedUrl = await getR2Url(sheet.storage_path, 3600)
+          if (!signedUrl) throw new Error('File not found in storage. Try re-uploading this sheet.')
+          setLoadStep('Downloading PDF…')
+          const fetchResp = await fetch(signedUrl)
+          if (!fetchResp.ok) throw new Error(`Failed to download PDF (HTTP ${fetchResp.status}) — try re-uploading the file.`)
+          pdfData = await fetchResp.arrayBuffer()
+        }
         setLoadStep('Loading PDF…')
-        await renderPDF(signedUrl, sheet.page_number || 1)
+        await renderPDF(pdfData, sheet.page_number || 1)
       } else {
+        setLoadStep('Getting file URL…')
+        const { getR2Url } = await import('../../r2')
+        const signedUrl = await getR2Url(sheet.storage_path, 3600)
+        if (!signedUrl) throw new Error('File not found in storage. Try re-uploading this sheet.')
         setLoadStep('Loading image…')
         await loadImageFromUrl(signedUrl)
       }
@@ -331,18 +348,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     }
   }
 
-  const renderPDF = async (url, pageNum = 1) => {
+  const renderPDF = async (pdfData, pageNum = 1) => {
     // Polyfill URL.parse for iOS < 18 — pdfjs-dist uses it internally
     if (!URL.parse) {
       URL.parse = (u, base) => { try { return new URL(u, base) } catch { return null } }
     }
-
-    // Fetch PDF bytes on the main thread so the worker never needs to make network requests.
-    // This avoids CORS / fetch-inside-module-worker failures on iOS WebKit.
-    setLoadStep('Downloading PDF…')
-    const fetchResp = await fetch(url)
-    if (!fetchResp.ok) throw new Error(`Failed to download PDF (HTTP ${fetchResp.status}) — try re-uploading the file.`)
-    const pdfData = await fetchResp.arrayBuffer()
 
     setLoadStep('Rendering PDF…')
     const pdfjsLib = await import('pdfjs-dist')

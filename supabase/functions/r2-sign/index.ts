@@ -93,6 +93,7 @@ Deno.serve(async (req) => {
     let path: string
     let bucketKey: string
     let expiresIn = 3600
+    let download  = false
 
     if (req.method === 'PUT') {
       path      = req.headers.get('x-file-path') || ''
@@ -102,6 +103,7 @@ Deno.serve(async (req) => {
       path       = body.path      || ''
       bucketKey  = body.bucket    || 'floor-plans'
       expiresIn  = body.expiresIn || 3600
+      download   = body.download  === true
     }
 
     if (!path) {
@@ -152,7 +154,31 @@ Deno.serve(async (req) => {
       })
     }
 
-    // POST — presigned read URL
+    // POST download proxy — fetch bytes server-side to bypass client-side CORS restrictions
+    // Used by native Capacitor builds where the R2 bucket doesn't allow capacitor://localhost
+    if (download) {
+      const dlUrl = `${R2_ENDPOINT}/${bucket}/${path}`
+      const r2Res = await aws.fetch(dlUrl)
+      if (!r2Res.ok) {
+        const text = await r2Res.text()
+        console.error('R2 proxy GET failed:', r2Res.status, text)
+        return new Response(
+          JSON.stringify({ error: `R2 error: ${r2Res.status}` }),
+          { status: 500, headers: corsHeaders }
+        )
+      }
+      const contentType = r2Res.headers.get('Content-Type') || 'application/octet-stream'
+      const bytes = await r2Res.arrayBuffer()
+      return new Response(bytes, {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': contentType,
+          'Cache-Control': 'private, max-age=3600',
+        }
+      })
+    }
+
+    // POST — presigned read URL (web browsers with direct R2 CORS access)
     const r2Url  = `${R2_ENDPOINT}/${bucket}/${path}`
     const signed = await aws.sign(new Request(r2Url), {
       aws: { signQuery: true, expiresIn },
