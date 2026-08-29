@@ -50,13 +50,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { 
-      proposalId, company, clientName, jobDesc, 
-      industry, repName, lineItems, laborItems, aiNotes 
+    const {
+      proposalId, company, clientName, jobDesc,
+      industry, repName, lineItems, laborItems, aiNotes, sections
     } = await req.json()
 
     // Step 4: Verify proposal belongs to caller's org
-    // Uses user-scoped client so RLS double-checks this automatically
     const { data: proposal, error: proposalError } = await userSupabase
       .from('proposals')
       .select('id, org_id')
@@ -71,20 +70,49 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Step 5: Build prompt — same as before
-    const lineItemsText = lineItems.map((l: any) =>
-      `${l.itemName} - Qty: ${l.quantity} - Price: $${l.customerPriceUnit} Total: $${l.customerPriceTotal}`
-    ).join('\n')
+    // Step 5: Build prompt — group line items by section so AI understands the scope structure
+    const formatLabor = (items: any[]) =>
+      (items || [])
+        .filter((l: any) => l.role)
+        .map((l: any) => {
+          const customerRate = l.your_cost && l.markup
+            ? (parseFloat(l.your_cost) * (1 + parseFloat(l.markup) / 100)).toFixed(2)
+            : null
+          const rateStr = customerRate ? ` @ $${customerRate}/${l.unit || 'hr'}` : ''
+          return `  • ${l.role} - ${l.quantity} ${l.unit || 'hr'}${rateStr}`
+        }).join('\n')
 
-    const laborText = (laborItems || [])
-      .filter((l: any) => l.role)
-      .map((l: any) => {
-        const customerRate = l.your_cost && l.markup
-          ? (parseFloat(l.your_cost) * (1 + parseFloat(l.markup) / 100)).toFixed(2)
-          : null
-        const rateStr = customerRate ? ` @ $${customerRate}/${l.unit || 'hr'}` : ''
-        return `${l.role} - ${l.quantity} ${l.unit || 'hr'}${rateStr} - Total: $${l.customer_price}`
-      }).join('\n')
+    let materialsText = ''
+
+    if (sections && sections.length > 0) {
+      // Group items by section
+      const unsectioned = (lineItems || []).filter((l: any) => !l.sectionId)
+      const sectionBlocks: string[] = []
+
+      for (const sec of sections) {
+        const secItems = (lineItems || []).filter((l: any) => l.sectionId === sec.id)
+        const secLabor = formatLabor(sec.laborItems || [])
+        if (secItems.length === 0 && !secLabor) continue
+        const itemLines = secItems.map((l: any) => `  • ${l.itemName} (Qty: ${l.quantity})`).join('\n')
+        let block = `[${sec.name}]\n${itemLines}`
+        if (secLabor) block += `\n  Labor:\n${secLabor}`
+        sectionBlocks.push(block)
+      }
+
+      if (unsectioned.length > 0) {
+        const lines = unsectioned.map((l: any) => `  • ${l.itemName} (Qty: ${l.quantity})`).join('\n')
+        sectionBlocks.push(`[General]\n${lines}`)
+      }
+
+      materialsText = sectionBlocks.join('\n\n')
+    } else {
+      // No sections — flat list
+      materialsText = (lineItems || [])
+        .map((l: any) => `  • ${l.itemName} (Qty: ${l.quantity})`)
+        .join('\n') || 'None provided'
+    }
+
+    const globalLaborText = formatLabor(laborItems || '')
 
     const prompt = `You are a professional proposal writer for trades businesses.
 
@@ -107,21 +135,20 @@ If the rep says to emphasize something, emphasize it.
 ========================================
 ` : ''}
 
-Materials provided:
-${lineItemsText || 'None provided'}
-
-Labor provided:
-${laborText || 'None provided'}
+Scope of work breakdown by section:
+${materialsText || 'None provided'}
+${globalLaborText ? `\nGeneral Labor:\n${globalLaborText}` : ''}
 
 RULES:
 - ${company} is the contractor performing ALL work and supplying ALL materials
 - The client (${clientName || 'the client'}) is ONLY the recipient of the work
 - NEVER say the client provides, installs, or supplies anything
-- DO NOT add materials or tasks not in the line items above
+- DO NOT add materials or tasks not in the sections above
 - The first sentence MUST start with: "${company} will provide and install..."
+- If there are multiple named sections, briefly reference each system/area by name in the SOW
 - Follow the rep's Priority Instructions above as the primary guide for tone, content, and emphasis
 
-Write 2 short professional paragraphs as the Scope of Work only. Do NOT list the materials or labor items — they will be printed separately in the proposal document.`
+Write 2–3 short professional paragraphs as the Scope of Work only. Do NOT list the materials or labor items — they will be printed separately in the proposal document.`
 
     // Step 6: Call Claude
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {

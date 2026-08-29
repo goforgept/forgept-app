@@ -976,11 +976,17 @@ export default function ProposalDetail({ isAdmin }) {
         repName: proposal.rep_name,
         laborItems: laborItems,
         aiNotes: aiNotes,
+        sections: sections.map(s => ({
+          id: s.id,
+          name: s.name,
+          laborItems: s.include_labor ? (s.labor_items || []) : [],
+        })),
         lineItems: lineItems.map(l => ({
           itemName: l.item_name,
           quantity: l.quantity,
           customerPriceUnit: l.customer_price_unit,
-          customerPriceTotal: l.customer_price_total
+          customerPriceTotal: l.customer_price_total,
+          sectionId: l.section_id || null,
         }))
       }
     })
