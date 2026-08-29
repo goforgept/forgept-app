@@ -296,16 +296,22 @@ export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager =
 
   return (
     <>
-      {/* Mobile thin strip — in layout flow so it never overlaps content */}
-      <div className="lg:hidden flex-shrink-0 w-10 h-screen bg-fp-card border-r border-fp-border flex flex-col items-center pt-4">
+      {/* Mobile thin strip — stays in layout flow (never overlaps content) and above backdrop/sidebar so it can close the menu */}
+      <div className="lg:hidden relative z-[60] flex-shrink-0 w-10 h-screen bg-fp-card border-r border-fp-border flex flex-col items-center pt-4">
         <button
-          onClick={() => setMobileOpen(true)}
+          onClick={() => setMobileOpen(o => !o)}
           className="p-1.5 text-fp-muted hover:text-fp-text transition-colors rounded"
-          aria-label="Open menu"
+          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-          </svg>
+          {mobileOpen ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+          )}
         </button>
       </div>
 

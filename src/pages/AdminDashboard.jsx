@@ -352,7 +352,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         {(() => {
           const myLast30 = proposals.filter(p => p.user_id === profile?.id && new Date(p.created_at) >= new Date(Date.now() - 30 * 864e5)).length
           return (
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-6">
               <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-4 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Active Pipeline</p><p className="text-fp-text text-xl font-bold truncate">${activePipeline.toLocaleString()}</p></div>
               <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-4 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Won Revenue</p><p className="text-green-400 text-xl font-bold truncate">${wonPipeline.toLocaleString()}</p></div>
               <div className="bg-fp-card rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Avg Margin</p><p className="text-fp-brand text-xl font-bold truncate">{avgMargin ? `${avgMargin}%` : '—'}</p></div>
