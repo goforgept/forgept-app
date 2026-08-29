@@ -749,20 +749,19 @@ const deleteMeeting = async (meetingId) => {
           ]
           const overflowActive = overflowTabs.find(t => t.key === activeTab)
 
+          const allTabs = [...primaryTabs, ...overflowTabs]
+          const activeTabData = allTabs.find(t => t.key === activeTab)
+
           return (
+            <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {primaryTabs.map(t => (
                 <button key={t.key} onClick={() => setActiveTab(t.key)}
-                  className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                     activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
                   }`}
                 >
                   {t.label}
-                  {t.count !== null && (
-                    <span className={`text-xs font-bold tabular-nums ${activeTab === t.key ? 'opacity-75' : 'opacity-50'}`}>
-                      {t.count}
-                    </span>
-                  )}
                 </button>
               ))}
 
@@ -770,14 +769,11 @@ const deleteMeeting = async (meetingId) => {
               <div ref={moreRef} className="relative">
                 <button
                   onClick={() => setMoreOpen(o => !o)}
-                  className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                     overflowActive ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
                   }`}
                 >
                   {overflowActive ? overflowActive.label : 'More'}
-                  {overflowActive?.count !== null && overflowActive && (
-                    <span className="text-xs font-bold tabular-nums opacity-75">{overflowActive.count}</span>
-                  )}
                   <span className="text-[10px] opacity-60">{moreOpen ? '▴' : '▾'}</span>
                 </button>
                 {moreOpen && (
@@ -785,19 +781,23 @@ const deleteMeeting = async (meetingId) => {
                     {overflowTabs.map(t => (
                       <button key={t.key}
                         onClick={() => { setActiveTab(t.key); setMoreOpen(false) }}
-                        className={`w-full text-left px-4 py-2.5 text-sm font-medium flex items-center justify-between gap-4 transition-colors ${
+                        className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
                           activeTab === t.key ? 'text-fp-brand bg-fp-inset' : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
                         }`}
                       >
-                        <span>{t.label}</span>
-                        {t.count !== null && (
-                          <span className="text-xs font-bold tabular-nums opacity-50 shrink-0">{t.count}</span>
-                        )}
+                        {t.label}
                       </button>
                     ))}
                   </div>
                 )}
               </div>
+            </div>
+
+            {activeTabData?.count !== null && (
+              <span className="text-fp-muted text-sm tabular-nums">
+                Count: <span className="text-fp-text font-semibold">{activeTabData.count}</span>
+              </span>
+            )}
             </div>
           )
         })()}
