@@ -90,7 +90,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
       supabase.from('organizations').select('timezone').eq('id', profile.org_id).single(),
       supabase.from('profiles').select('id, full_name, dispatch_zone, role').eq('org_id', profile.org_id).order('full_name'),
       supabase.from('service_tickets').select('*, clients(company), profiles!service_tickets_assigned_tech_id_fkey(full_name)').eq('org_id', profile.org_id).not('status', 'in', '("Resolved","Cancelled")').order('scheduled_date', { ascending: true, nullsFirst: false }),
-      supabase.from('jobs').select('*, clients(company), proposals(proposal_name)').eq('org_id', profile.org_id).eq('status', 'Active').order('created_at', { ascending: false }),
+      supabase.from('jobs').select('*, clients(company), proposals(proposal_name)').eq('org_id', profile.org_id).not('status', 'in', '("Completed","Cancelled")').order('created_at', { ascending: false }),
       supabase.from('job_tech_schedules').select('*, jobs(name, job_number, clients(company)), profiles(full_name)').eq('org_id', profile.org_id).gte('date', startDate).lte('date', endDate),
       supabase.from('job_tech_schedules').select('job_id').eq('org_id', profile.org_id).gte('date', today),
     ])
