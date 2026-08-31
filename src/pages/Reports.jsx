@@ -782,10 +782,11 @@ export default function Reports(props) {
   const noDate        = GRAY_DATE_FILTER.includes(activeReport)
   const activeFilters = REPORT_FILTERS[activeReport] || []
 
-  const exportExcel = () => {
+  const exportExcel = (pmFilter = null) => {
     const wb = XLSX.utils.book_new()
     const prefix = branded && profile?.company_name ? profile.company_name.replace(/[^a-z0-9]/gi, '_') : 'ForgePt'
-    const filename = `${prefix}_${reportLabel.replace(/ /g, '_')}_${today()}.xlsx`
+    const pmSuffix = pmFilter ? `_${pmFilter.replace(/[^a-z0-9]/gi, '_')}` : ''
+    const filename = `${prefix}_${reportLabel.replace(/ /g, '_')}${pmSuffix}_${today()}.xlsx`
 
     const brandHeader = branded && profile?.company_name ? [
       [profile.company_name],
@@ -810,6 +811,33 @@ export default function Reports(props) {
       }
       const ws2 = XLSX.utils.aoa_to_sheet([detailCols, ...detailRows])
       XLSX.utils.book_append_sheet(wb, ws2, 'Detail')
+      XLSX.writeFile(wb, filename)
+      return
+    }
+
+    if (activeReport === 'pm_performance') {
+      const pmData = pmFilter ? pmReport.filter(p => p.pmName === pmFilter) : pmReport
+      const sumCols = ['PM', 'Active', 'Completed', 'Contract Value', 'CO Value', 'PO Spend', 'Billed', 'Hours', 'Jobs w/ COs']
+      const sumRows = pmData.map(pm => {
+        const s = (fn) => pm.jobs.reduce((acc, j) => acc + (fn(j) || 0), 0)
+        return [pm.pmName, pm.jobs.filter(j => j.isActive).length, pm.jobs.filter(j => j.status === 'Completed').length,
+          s(j => j.contractValue), s(j => j.totalCOValue), s(j => j.totalPOSpend), s(j => j.totalBilled),
+          +s(j => j.totalHours).toFixed(1), pm.jobs.filter(j => j.coCount > 0).length]
+      })
+      const ws1 = XLSX.utils.aoa_to_sheet([...brandHeader, sumCols, ...sumRows])
+      XLSX.utils.book_append_sheet(wb, ws1, 'Summary')
+      const jobCols = ['PM', 'Job #', 'Job Name', 'Client', 'Status', 'Contract $', 'Est. Margin %', 'Est. Cost', 'PO Spend', 'Billed', 'Hours', 'CO Count', 'CO Value']
+      const jobRows = []
+      for (const pm of pmData) {
+        for (const job of pm.jobs) {
+          jobRows.push([pm.pmName, job.jobNumber || '—', job.name, job.client, job.status,
+            job.contractValue || 0, job.estMarginPct != null ? +job.estMarginPct.toFixed(1) : '',
+            job.estCost || 0, job.totalPOSpend || 0, job.totalBilled || 0,
+            +job.totalHours.toFixed(1), job.coCount, job.totalCOValue || 0])
+        }
+      }
+      const ws2 = XLSX.utils.aoa_to_sheet([jobCols, ...jobRows])
+      XLSX.utils.book_append_sheet(wb, ws2, 'Jobs Detail')
       XLSX.writeFile(wb, filename)
       return
     }
@@ -848,7 +876,7 @@ export default function Reports(props) {
     XLSX.writeFile(wb, filename)
   }
 
-  const exportPDF = async () => {
+  const exportPDF = async (pmFilter = null) => {
     const doc = new jsPDF({ orientation: columns.length > 6 ? 'landscape' : 'portrait' })
     const pageW = doc.internal.pageSize.getWidth()
 
@@ -927,6 +955,50 @@ export default function Reports(props) {
       }
       const prefix = branded && profile?.company_name ? profile.company_name.replace(/[^a-z0-9]/gi, '_') : 'ForgePt'
       await savePdf(doc, `${prefix}_Payroll_${today()}.pdf`)
+      return
+    }
+
+    if (activeReport === 'pm_performance') {
+      const pmData = pmFilter ? pmReport.filter(p => p.pmName === pmFilter) : pmReport
+      const sumCols = ['PM', 'Active', 'Completed', 'Contract $', 'CO Value', 'PO Spend', 'Billed', 'Hours', 'Jobs w/ COs']
+      const sumRows = pmData.map(pm => {
+        const s = (fn) => pm.jobs.reduce((acc, j) => acc + (fn(j) || 0), 0)
+        return [pm.pmName, pm.jobs.filter(j => j.isActive).length, pm.jobs.filter(j => j.status === 'Completed').length,
+          fmt$(s(j => j.contractValue)), fmt$(s(j => j.totalCOValue)), fmt$(s(j => j.totalPOSpend)),
+          fmt$(s(j => j.totalBilled)), s(j => j.totalHours).toFixed(1), pm.jobs.filter(j => j.coCount > 0).length]
+      })
+      autoTable(doc, {
+        startY, head: [sumCols], body: sumRows,
+        headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
+        margin: { left: 14, right: 14 },
+      })
+      const jobCols = ['PM', 'Job #', 'Job Name', 'Client', 'Status', 'Contract $', 'Est. Mgn%', 'PO Spend', 'Billed', 'Hrs', 'COs']
+      const jobRows = []
+      for (const pm of pmData) {
+        for (const job of pm.jobs) {
+          jobRows.push([pm.pmName, job.jobNumber || '—', job.name, job.client, job.status,
+            job.contractValue > 0 ? fmt$(job.contractValue) : '—',
+            job.estMarginPct != null ? job.estMarginPct.toFixed(1) + '%' : '—',
+            job.totalPOSpend > 0 ? fmt$(job.totalPOSpend) : '—',
+            job.totalBilled > 0 ? fmt$(job.totalBilled) : '—',
+            job.totalHours.toFixed(1), job.coCount || 0])
+        }
+      }
+      if (jobRows.length) {
+        const afterY = doc.lastAutoTable?.finalY ?? 60
+        doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(40, 40, 40)
+        doc.text('Jobs Detail', 14, afterY + 10)
+        autoTable(doc, {
+          startY: afterY + 15, head: [jobCols], body: jobRows,
+          headStyles: { fillColor: accent, textColor: 255, fontStyle: 'bold', fontSize: 7 },
+          bodyStyles: { fontSize: 7, textColor: 40 }, alternateRowStyles: { fillColor: [245, 247, 250] },
+          margin: { left: 14, right: 14 },
+        })
+      }
+      const prefix = branded && profile?.company_name ? profile.company_name.replace(/[^a-z0-9]/gi, '_') : 'ForgePt'
+      const nameSuffix = pmFilter ? `_${pmFilter.replace(/[^a-z0-9]/gi, '_')}` : ''
+      await savePdf(doc, `${prefix}_PM_Performance${nameSuffix}_${today()}.pdf`)
       return
     }
 
@@ -1306,6 +1378,14 @@ export default function Reports(props) {
                                         <td key={col} className={`px-4 py-3 whitespace-nowrap font-medium tabular-nums ${isAlert ? 'text-yellow-400' : isRevenue ? 'text-green-400' : 'text-fp-text'}`}>{val}</td>
                                       )
                                     })}
+                                    <td className="px-3 py-3 whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                                      <div className="flex gap-1.5">
+                                        <button onClick={() => exportExcel(pm.pmName)}
+                                          className="text-xs px-2 py-1 rounded bg-fp-inset hover:bg-[#1E3A5F] text-fp-muted hover:text-fp-text transition-colors">XLS</button>
+                                        <button onClick={() => exportPDF(pm.pmName)}
+                                          className="text-xs px-2 py-1 rounded bg-fp-inset hover:bg-[#1E3A5F] text-fp-muted hover:text-fp-text transition-colors">PDF</button>
+                                      </div>
+                                    </td>
                                   </tr>
                                   {isOpen && (
                                     <tr key={`${i}-detail`} className="border-b border-fp-border/60 bg-fp-inset/30">
