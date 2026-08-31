@@ -63,6 +63,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [job, setJob] = useState(null)
   const [editingJobName, setEditingJobName] = useState(false)
   const [jobNameDraft, setJobNameDraft] = useState('')
+  const [editingJobNumber, setEditingJobNumber] = useState(false)
+  const [jobNumberDraft, setJobNumberDraft] = useState('')
   const [proposal, setProposal] = useState(null)
   const [lineItems, setLineItems] = useState([])
   const [checklist, setChecklist] = useState([])
@@ -383,6 +385,14 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     await supabase.from('jobs').update({ name: trimmed }).eq('id', id)
     setJob(prev => ({ ...prev, name: trimmed }))
     setEditingJobName(false)
+  }
+
+  const saveJobNumber = async () => {
+    const trimmed = jobNumberDraft.trim()
+    if (trimmed === (job?.job_number || '')) { setEditingJobNumber(false); return }
+    await supabase.from('jobs').update({ job_number: trimmed || null }).eq('id', id)
+    setJob(prev => ({ ...prev, job_number: trimmed || null }))
+    setEditingJobNumber(false)
   }
 
   const assignPM = async (userId) => {
@@ -1470,7 +1480,25 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             <div>
               <button onClick={() => navigate('/jobs')} className="text-fp-muted hover:text-fp-text text-xs mb-2 transition-colors">← Jobs</button>
               <div className="flex items-center gap-3">
-                {job?.job_number && <span className="text-fp-muted text-sm font-mono bg-fp-inset px-2 py-0.5 rounded">{job.job_number}</span>}
+                {editingJobNumber ? (
+                  <div className="flex items-center gap-1">
+                    <input
+                      autoFocus
+                      type="text"
+                      value={jobNumberDraft}
+                      onChange={e => setJobNumberDraft(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveJobNumber(); if (e.key === 'Escape') setEditingJobNumber(false) }}
+                      onBlur={saveJobNumber}
+                      className="bg-fp-inset text-fp-muted text-sm font-mono border-b border-[#C8622A] focus:outline-none px-1 w-28"
+                    />
+                  </div>
+                ) : (
+                  <span
+                    onClick={() => { setJobNumberDraft(job?.job_number || ''); setEditingJobNumber(true) }}
+                    className="text-fp-muted text-sm font-mono bg-fp-inset px-2 py-0.5 rounded cursor-pointer hover:text-fp-text hover:bg-fp-hover transition-colors">
+                    {job?.job_number || '+ Job #'}
+                  </span>
+                )}
                 {editingJobName ? (
                   <div className="flex items-center gap-2">
                     <input
@@ -1485,41 +1513,16 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                     <button onClick={() => setEditingJobName(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">Cancel</button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 group">
-                    <h2 className="text-fp-text text-2xl font-bold">{job?.name}</h2>
-                    <button onClick={() => { setJobNameDraft(job?.name || ''); setEditingJobName(true) }}
-                      className="opacity-0 group-hover:opacity-100 text-fp-muted hover:text-fp-text text-xs transition-all">✏️</button>
-                  </div>
+                  <h2
+                    onClick={() => { setJobNameDraft(job?.name || ''); setEditingJobName(true) }}
+                    className="text-fp-text text-2xl font-bold cursor-pointer hover:text-fp-brand transition-colors">
+                    {job?.name}
+                  </h2>
                 )}
               </div>
               <div className="flex items-center gap-4 mt-1 text-sm text-fp-muted">
                 {job?.clients?.company && <span>🏢 {job.clients.company}</span>}
                 {proposal?.quote_number && <span className="font-mono">#{proposal.quote_number}</span>}
-              </div>
-              <div className="flex flex-wrap items-center gap-2 mt-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-fp-muted text-xs font-medium">PM</span>
-                  <select value={job?.user_id || job?.profiles?.id || ''} onChange={e => assignPM(e.target.value)}
-                    className={inputClass}>
-                    <option value="">Unassigned</option>
-                    {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-fp-muted text-xs font-medium">Tech</span>
-                  <select value={job?.tech_id || ''} onChange={e => assignTech(e.target.value)}
-                    className={inputClass}>
-                    <option value="">Unassigned</option>
-                    {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-fp-muted text-xs font-medium">Billing</span>
-                  <select value={job?.billing_type || 'Lump Sum'} onChange={e => updateBillingType(e.target.value)}
-                    className={inputClass}>
-                    {['Lump Sum', 'T&M', 'AIA', 'Unit Price'].map(b => <option key={b}>{b}</option>)}
-                  </select>
-                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -1563,7 +1566,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             )}
           </div>
 
-          <div className="grid grid-cols-5 gap-4">
+          <div className="grid grid-cols-4 lg:grid-cols-8 gap-3">
             <div className="bg-fp-inset rounded-lg p-3">
               <p className="text-fp-muted text-xs mb-1">Contract Value</p>
               <p className="text-fp-text font-bold">${fmt(proposal?.proposal_value)}</p>
@@ -1587,6 +1590,29 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
               <p className="text-fp-muted text-xs mb-1">End Date</p>
               <input type="date" value={job?.end_date || ''} onChange={e => updateJobDates('end_date', e.target.value)}
                 className="bg-transparent text-fp-text text-sm font-medium focus:outline-none cursor-pointer w-full" />
+            </div>
+            <div className="bg-fp-inset rounded-lg p-3">
+              <p className="text-fp-muted text-xs mb-1">PM</p>
+              <select value={job?.user_id || job?.profiles?.id || ''} onChange={e => assignPM(e.target.value)}
+                className="bg-transparent text-fp-text text-sm font-medium focus:outline-none cursor-pointer w-full">
+                <option value="">Unassigned</option>
+                {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+              </select>
+            </div>
+            <div className="bg-fp-inset rounded-lg p-3">
+              <p className="text-fp-muted text-xs mb-1">Tech</p>
+              <select value={job?.tech_id || ''} onChange={e => assignTech(e.target.value)}
+                className="bg-transparent text-fp-text text-sm font-medium focus:outline-none cursor-pointer w-full">
+                <option value="">Unassigned</option>
+                {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
+              </select>
+            </div>
+            <div className="bg-fp-inset rounded-lg p-3">
+              <p className="text-fp-muted text-xs mb-1">Billing</p>
+              <select value={job?.billing_type || 'Lump Sum'} onChange={e => updateBillingType(e.target.value)}
+                className="bg-transparent text-fp-text text-sm font-medium focus:outline-none cursor-pointer w-full">
+                {['Lump Sum', 'T&M', 'AIA', 'Unit Price'].map(b => <option key={b}>{b}</option>)}
+              </select>
             </div>
           </div>
 
