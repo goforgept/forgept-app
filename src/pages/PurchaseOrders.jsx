@@ -450,7 +450,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                           <span className={`text-xs font-semibold px-2 py-0.5 rounded ${po.status === 'Received' ? 'bg-green-500/20 text-green-400' : po.status === 'Partial' ? 'bg-yellow-500/20 text-yellow-400' : po.status === 'Cancelled' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
                             {po.status}
                           </span>
-                          {progress && <span className="text-fp-muted text-xs">{progress.received}/{progress.total} rcvd</span>}
+                          {progress && <span className="text-fp-muted text-xs">{progress.received}/{progress.total} received</span>}
                         </div>
                         <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                           <span className="text-fp-muted text-xs">{po.vendor_name || '—'}</span>
