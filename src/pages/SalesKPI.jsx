@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { useProfile } from '../context/ProfileContext'
 import Sidebar from '../components/Sidebar'
@@ -45,6 +46,7 @@ function ProgressBar({ value, target }) {
 export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = true, featureCRM = false }) {
   const { profile } = useProfile()
   const canManage = isAdmin || isSalesManager
+  const navigate = useNavigate()
 
   const [period, setPeriod] = useState('monthly')
   const [reps, setReps] = useState([])
@@ -188,11 +190,11 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
     const start = periodStart(period)
     const orgId = profile.org_id
 
-    if (['calls', 'emails', 'notes', 'meeting'].includes(metricKey)) {
-      const typeMap = { calls: 'call', emails: 'email', notes: 'note', meeting: 'meeting' }
+    if (['calls', 'emails', 'notes'].includes(metricKey)) {
+      const typeMap = { calls: 'call', emails: 'email', notes: 'note' }
       const { data } = await supabase
         .from('activities')
-        .select('id, title, body, created_at, type, clients(company, client_name), client_contacts(full_name)')
+        .select('id, title, body, created_at, client_id, client_contacts(full_name), clients(company, client_name)')
         .eq('org_id', orgId)
         .eq('user_id', rep.id)
         .eq('type', typeMap[metricKey])
@@ -202,14 +204,14 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
     } else if (metricKey === 'meetings') {
       const [{ data: taskMtgs }, { data: actMtgs }] = await Promise.all([
         supabase.from('tasks')
-          .select('id, title, meeting_type, due_date, created_at, clients(company, client_name), client_contacts(full_name, title)')
+          .select('id, title, meeting_type, due_date, created_at, client_id, client_contacts(full_name)')
           .eq('org_id', orgId)
           .eq('assigned_to', rep.id)
           .not('meeting_type', 'is', null)
           .gte('created_at', start)
           .order('created_at', { ascending: false }),
         supabase.from('activities')
-          .select('id, title, body, created_at, clients(company, client_name), client_contacts(full_name)')
+          .select('id, title, body, created_at, client_id, client_contacts(full_name), clients(company, client_name)')
           .eq('org_id', orgId)
           .eq('user_id', rep.id)
           .eq('type', 'meeting')
@@ -223,7 +225,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
       setDrilldownData(combined)
     } else if (metricKey === 'proposals' || metricKey === 'deals_won') {
       let q = supabase.from('proposals')
-        .select('id, proposal_name, proposal_value, status, created_at, clients(company, client_name)')
+        .select('id, proposal_name, proposal_value, status, created_at, company, client_id')
         .eq('org_id', orgId)
         .eq('user_id', rep.id)
         .gte('created_at', start)
@@ -428,21 +430,37 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
             ) : drilldownData.map((row, i) => {
               const isProposal = drilldown.metricKey === 'proposals' || drilldown.metricKey === 'deals_won'
               const isTask = row._source === 'task'
-              const client = row.clients?.company || row.clients?.client_name || ''
+              const client = row.company || row.clients?.company || row.clients?.client_name || ''
               const contact = row.client_contacts?.full_name || ''
-              const date = isProposal
-                ? new Date(row.created_at).toLocaleDateString()
-                : isTask
-                  ? (row.due_date || new Date(row.created_at).toLocaleDateString())
-                  : new Date(row.created_at).toLocaleDateString()
+              const date = isTask
+                ? (row.due_date || new Date(row.created_at).toLocaleDateString())
+                : new Date(row.created_at).toLocaleDateString()
+
+              const handleRowClick = () => {
+                if (isProposal) {
+                  navigate(`/proposal/${row.id}`)
+                  setDrilldown(null)
+                } else if (row.client_id) {
+                  navigate(`/client/${row.client_id}`)
+                  setDrilldown(null)
+                }
+              }
+              const isNavigable = isProposal || !!row.client_id
 
               return (
-                <div key={row.id ?? i} className="bg-fp-inset rounded-lg p-3">
+                <div
+                  key={row.id ?? i}
+                  onClick={isNavigable ? handleRowClick : undefined}
+                  className={`bg-fp-inset rounded-lg p-3 transition-colors ${isNavigable ? 'cursor-pointer hover:bg-fp-border' : ''}`}
+                >
                   <div className="flex justify-between items-start gap-2">
                     <p className="text-fp-text text-sm font-medium leading-snug">
                       {isProposal ? row.proposal_name : row.title}
                     </p>
-                    <span className="text-fp-muted text-xs shrink-0">{date}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-fp-muted text-xs">{date}</span>
+                      {isNavigable && <span className="text-fp-muted text-xs">→</span>}
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-x-3 mt-1">
                     {client && <span className="text-fp-muted text-xs">🏢 {client}</span>}
