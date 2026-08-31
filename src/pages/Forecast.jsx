@@ -27,13 +27,14 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
 
   const fmt = (num) => num?.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) ?? '0'
 
-  // Must be declared first — other useMemos depend on it
+  // Active-only proposals filtered by close date window.
+  // Won/Lost are historical — they live in their own stat cards and never change with the filter.
   const filteredProposals = useMemo(() => {
-    if (dayRange === 'all') return proposals
+    const active = proposals.filter(p => p.status !== 'Won' && p.status !== 'Lost')
+    if (dayRange === 'all') return active
     const cutoff = new Date(Date.now() + dayRange * 86400000)
-    return proposals.filter(p => {
-      if (p.status === 'Won' || p.status === 'Lost') return true
-      if (!p.close_date) return true  // undated active proposals are always in the pipeline
+    return active.filter(p => {
+      if (!p.close_date) return true  // undated deals are always in the active pipeline
       return new Date(p.close_date) <= cutoff
     })
   }, [proposals, dayRange])
@@ -96,17 +97,23 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
 
   const repForecast = useMemo(() => {
     const repMap = Object.create(null)
-    filteredProposals.filter(p => p.status !== 'Lost').forEach(p => {
+    // Active pipeline from filtered window
+    filteredProposals.forEach(p => {
       const rep = p.rep_name || 'Unknown'
       if (!repMap[rep]) repMap[rep] = { name: rep, pipeline: 0, won: 0, count: 0 }
       repMap[rep].pipeline += p.proposal_value || 0
-      if (p.status === 'Won') repMap[rep].won += p.proposal_value || 0
       repMap[rep].count += 1
     })
+    // All-time won — always shown regardless of filter
+    proposals.filter(p => p.status === 'Won').forEach(p => {
+      const rep = p.rep_name || 'Unknown'
+      if (!repMap[rep]) repMap[rep] = { name: rep, pipeline: 0, won: 0, count: 0 }
+      repMap[rep].won += p.proposal_value || 0
+    })
     return Object.values(repMap).sort((a, b) => b.pipeline - a.pipeline)
-  }, [filteredProposals])
+  }, [filteredProposals, proposals])
 
-  const totalActivePipeline = filteredProposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+  const totalActivePipeline = filteredProposals.reduce((sum, p) => sum + (p.proposal_value || 0), 0)
   const totalWon = proposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
   const maxMonthlyValue = Math.max(...monthlyWon.map(m => m.total), 1)
   const maxStageValue = Math.max(...stageBreakdown.map(s => s.value), 1)
@@ -140,7 +147,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
           <div className="bg-fp-card rounded-xl p-5">
             <p className="text-fp-muted text-xs mb-1">Active Pipeline</p>
             <p className="text-fp-text text-2xl font-bold">${fmt(totalActivePipeline)}</p>
-            <p className="text-fp-muted text-xs mt-1">{filteredProposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').length} open deals</p>
+            <p className="text-fp-muted text-xs mt-1">{filteredProposals.length} open deals</p>
           </div>
           <div className="bg-fp-card rounded-xl p-5">
             <p className="text-fp-muted text-xs mb-1">Weighted Forecast</p>
