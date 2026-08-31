@@ -77,7 +77,13 @@ function SearchSelect({ options, value, onChange, placeholder = 'Search…' }) {
   const [display, setDisplay] = useState('')
   const ref = useRef(null)
 
-  useEffect(() => { if (!value) { setDisplay(''); setQuery('') } }, [value])
+  useEffect(() => {
+    if (!value) { setDisplay(''); setQuery('') }
+    else {
+      const match = options.find(o => o.value === value)
+      if (match) setDisplay(match.label)
+    }
+  }, [value, options])
   useEffect(() => {
     const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', handler)
@@ -539,21 +545,24 @@ export default function Reports(props) {
     // ── PM Performance ───────────────────────────────────────────────────────
     if (activeReport === 'pm_performance') {
       setExpandedPM(null)
-      const [{ data: jobs }, { data: logs }, { data: cos }, { data: pos }] = await Promise.all([
-        supabase.from('jobs')
-          .select('id, name, job_number, status, created_at, user_id, proposal_id, clients(company), profiles!jobs_assigned_pm_fkey(full_name)')
-          .eq('org_id', profile.org_id)
-          .order('created_at', { ascending: false }),
-        supabase.from('tech_daily_logs')
-          .select('job_id, hours_worked')
-          .eq('org_id', profile.org_id),
-        supabase.from('change_orders')
-          .select('job_id, status, amount')
-          .eq('org_id', profile.org_id),
-        supabase.from('purchase_orders')
-          .select('job_id, total_amount, status')
-          .eq('org_id', profile.org_id),
-      ])
+
+      // Fetch jobs first so we can filter related tables by job_id
+      const { data: jobs, error: jobsErr } = await supabase.from('jobs')
+        .select('id, name, job_number, status, created_at, user_id, clients(company), profiles!jobs_assigned_pm_fkey(full_name)')
+        .eq('org_id', profile.org_id)
+        .order('created_at', { ascending: false })
+      if (jobsErr) console.error('pm_performance jobs error:', jobsErr)
+
+      const jobIds = (jobs || []).map(j => j.id)
+
+      // Fetch related data filtered by job IDs (change_orders has no org_id column)
+      const [{ data: logs }, { data: cos }, { data: pos }] = jobIds.length
+        ? await Promise.all([
+            supabase.from('tech_daily_logs').select('job_id, hours_worked').in('job_id', jobIds),
+            supabase.from('change_orders').select('job_id, status, amount').in('job_id', jobIds),
+            supabase.from('purchase_orders').select('job_id, total_amount, status').in('job_id', jobIds),
+          ])
+        : [{ data: [] }, { data: [] }, { data: [] }]
 
       // Group by PM
       const byPM = Object.create(null)
