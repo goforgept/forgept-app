@@ -1119,7 +1119,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       const pointer = stageRef.current.getPointerPosition()
       const x = Math.min(Math.max((pointer.x - position.x) / scale / canvasW, 0.01), 0.99)
       const y = Math.min(Math.max((pointer.y - position.y) / scale / canvasH, 0.01), 0.99)
-      onRoomPlace?.({ x, y, drawing_sheet_id: sheet.id })
+      onRoomPlace?.({ x, y, drawing_sheet_id: sheet.id, room_type: activeTool?.roomType })
       return
     }
 
@@ -1685,6 +1685,20 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         onDrop={async (e) => {
           e.preventDefault()
           try {
+            // Room drag-and-drop
+            const roomRaw = e.dataTransfer.getData('application/room')
+            if (roomRaw) {
+              const roomData = JSON.parse(roomRaw)
+              const rect = containerRef.current.getBoundingClientRect()
+              const dropX = e.clientX - rect.left
+              const dropY = e.clientY - rect.top
+              const imgX  = (dropX - position.x) / scale
+              const imgY  = (dropY - position.y) / scale
+              const x = Math.min(Math.max(imgX / canvasW, 0.01), 0.99)
+              const y = Math.min(Math.max(imgY / canvasH, 0.01), 0.99)
+              onRoomPlace?.({ x, y, drawing_sheet_id: sheet.id, room_type: roomData.room_type })
+              return
+            }
             const symbol = JSON.parse(e.dataTransfer.getData('application/json'))
             if (!symbol) return
             const rect  = containerRef.current.getBoundingClientRect()

@@ -388,34 +388,51 @@ export default function SymbolPicker({ selectedSymbol, onSelect, orgId, allowedM
       {tab === 'rooms' && (
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="px-3 pt-3 pb-2">
-            <p className="text-xs text-[#8A9AB0]">Click on the floor plan to drop a room marker (MDF, IDF, Headend, etc). Then click the marker to build racks inside it.</p>
+            <p className="text-xs text-[#8A9AB0]">Drag a room type onto the floor plan, or click one to activate placement mode. Click a placed marker to build racks inside it.</p>
           </div>
-          <div className="flex-1 overflow-y-auto px-3 pb-3">
-            <button
-              onClick={() => onToolSelect?.(activeTool?.type === 'room' ? null : { type: 'room' })}
-              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-colors ${
-                activeTool?.type === 'room'
-                  ? 'bg-emerald-500/15 border-emerald-400/60 text-emerald-300'
-                  : 'bg-[#1a2d45] border-[#2a3d55] text-white hover:border-emerald-400/40 hover:bg-emerald-500/5'
-              }`}>
-              <svg className="w-5 h-5 flex-shrink-0 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
-              </svg>
-              <div>
-                <p className="text-xs font-semibold">Place Room Marker</p>
-                <p className="text-xs mt-0.5" style={{ color: activeTool?.type === 'room' ? '#6ee7b7' : '#4a6080' }}>
-                  {activeTool?.type === 'room' ? 'Click canvas to place — Active' : 'MDF · IDF · Headend · Electrical · AV'}
-                </p>
-              </div>
-              {activeTool?.type === 'room' && <span className="ml-auto text-emerald-400 text-xs font-semibold">Active</span>}
-            </button>
+          <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-1.5">
+            {[
+              { type: 'mdf',        label: 'MDF',           color: '#C8622A' },
+              { type: 'idf',        label: 'IDF',           color: '#3b82f6' },
+              { type: 'headend',    label: 'Headend',       color: '#8b5cf6' },
+              { type: 'electrical', label: 'Electrical',    color: '#f59e0b' },
+              { type: 'server',     label: 'Server Room',   color: '#10b981' },
+              { type: 'closet',     label: 'Wiring Closet', color: '#06b6d4' },
+              { type: 'av',         label: 'AV Room',       color: '#ec4899' },
+              { type: 'other',      label: 'Other',         color: '#64748b' },
+            ].map(({ type, label, color }) => {
+              const isActive = activeTool?.type === 'room' && activeTool?.roomType === type
+              return (
+                <div
+                  key={type}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('application/room', JSON.stringify({ room_type: type, label }))
+                    e.dataTransfer.effectAllowed = 'copy'
+                    onToolSelect?.(null)
+                  }}
+                  onClick={() => onToolSelect?.(isActive ? null : { type: 'room', roomType: type })}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors cursor-grab select-none ${
+                    isActive
+                      ? 'border-opacity-60 text-white'
+                      : 'bg-[#1a2d45] border-[#2a3d55] text-white hover:border-opacity-40'
+                  }`}
+                  style={isActive
+                    ? { background: color + '22', borderColor: color + '99' }
+                    : undefined
+                  }>
+                  <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ background: color }} />
+                  <span className="text-xs font-semibold flex-1">{label}</span>
+                  <span className="text-[10px] text-[#4a6080]">drag or click</span>
+                </div>
+              )
+            })}
           </div>
           {activeTool?.type === 'room' && (
             <div className="px-3 py-2 border-t flex-shrink-0" style={{ borderColor: '#34d39955', backgroundColor: '#34d39915' }}>
-              <p className="text-xs font-medium text-emerald-400">Placing Room Marker</p>
-              <p className="text-xs mt-0.5 text-emerald-600">Click anywhere on the floor plan</p>
-              <button onClick={() => onToolSelect?.(null)} className="mt-1.5 text-xs text-[#8A9AB0] hover:text-white underline">
-                Exit placement mode
+              <p className="text-xs font-medium text-emerald-400">Click canvas to place</p>
+              <button onClick={() => onToolSelect?.(null)} className="mt-1 text-xs text-[#8A9AB0] hover:text-white underline">
+                Cancel
               </button>
             </div>
           )}

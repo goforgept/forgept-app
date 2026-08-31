@@ -695,7 +695,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                         }}
                         rooms={rooms}
                         onRoomClick={(room) => { setSelectedRoom(room); setSelectedPlacement(null); setSelectedCable(null) }}
-                        onRoomPlace={(pos) => { setPlaceRoomModal(pos); setNewRoomForm({ name: '', room_type: 'mdf' }) }}
+                        onRoomPlace={(pos) => { setPlaceRoomModal(pos); setNewRoomForm({ name: '', room_type: pos.room_type || 'mdf' }) }}
                         onRoomMove={async (id, x, y) => {
                           await supabase.from('rooms').update({ x, y }).eq('id', id)
                           setRooms(prev => prev.map(r => r.id === id ? { ...r, x, y } : r))
