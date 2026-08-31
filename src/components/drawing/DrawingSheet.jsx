@@ -2612,7 +2612,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 const abbr  = ROOM_ABBREV[room.room_type] || '?'
                 const px    = position.x + room.x * canvasW * scale
                 const py    = position.y + room.y * canvasH * scale
-                const W = 130, H = 30, BADGE = 34
+                const W = 130 * scale, H = 30 * scale, BADGE = 34 * scale
 
                 return (
                   <Group
@@ -2628,16 +2628,16 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                     onTap={e => { e.cancelBubble = true; onRoomClick?.(room) }}
                   >
                     {/* Shadow */}
-                    <Rect x={2} y={2} width={W} height={H} fill="rgba(0,0,0,0.4)" cornerRadius={5} listening={false} />
+                    <Rect x={2 * scale} y={2 * scale} width={W} height={H} fill="rgba(0,0,0,0.4)" cornerRadius={5 * scale} listening={false} />
                     {/* Main body */}
-                    <Rect x={0} y={0} width={W} height={H} fill="#0d1927" stroke={col} strokeWidth={1.5} cornerRadius={5} />
+                    <Rect x={0} y={0} width={W} height={H} fill="#0d1927" stroke={col} strokeWidth={1.5} cornerRadius={5 * scale} />
                     {/* Type badge */}
-                    <Rect x={0} y={0} width={BADGE} height={H} fill={col + '33'} cornerRadius={[5, 0, 0, 5]} listening={false} />
-                    <Text x={0} y={0} width={BADGE} height={H} text={abbr} fontSize={9} fontStyle="bold" fill={col} align="center" verticalAlign="middle" listening={false} />
+                    <Rect x={0} y={0} width={BADGE} height={H} fill={col + '33'} cornerRadius={[5 * scale, 0, 0, 5 * scale]} listening={false} />
+                    <Text x={0} y={0} width={BADGE} height={H} text={abbr} fontSize={9 * scale} fontStyle="bold" fill={col} align="center" verticalAlign="middle" listening={false} />
                     {/* Name */}
-                    <Text x={BADGE + 5} y={0} width={W - BADGE - 8} height={H} text={room.name} fontSize={11} fontStyle="bold" fill="#ffffff" verticalAlign="middle" listening={false} />
+                    <Text x={BADGE + 5 * scale} y={0} width={W - BADGE - 8 * scale} height={H} text={room.name} fontSize={11 * scale} fontStyle="bold" fill="#ffffff" verticalAlign="middle" listening={false} />
                     {/* Rack count dot */}
-                    <Circle x={W - 8} y={H / 2} radius={3} fill={col} listening={false} />
+                    <Circle x={W - 8 * scale} y={H / 2} radius={3 * scale} fill={col} listening={false} />
                   </Group>
                 )
               })}
