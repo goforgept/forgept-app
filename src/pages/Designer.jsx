@@ -27,6 +27,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const [designerOnly,         setDesignerOnly]         = useState(false)
   const [laborDefaults,   setLaborDefaults]   = useState([])
   const [loading,         setLoading]         = useState(true)
+  const [isOnline,        setIsOnline]        = useState(navigator.onLine)
   const [uploading,       setUploading]       = useState(false)
   const [approving,        setApproving]        = useState(false)
   const [showApproveModal, setShowApproveModal] = useState(false)
@@ -61,6 +62,14 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const [showRevisionModal, setShowRevisionModal] = useState(false)
   const [creatingRevision,  setCreatingRevision]  = useState(false)
   const [nicetNumber, setNicetNumber] = useState('')
+
+  useEffect(() => {
+    const up   = () => setIsOnline(true)
+    const down = () => setIsOnline(false)
+    window.addEventListener('online',  up)
+    window.addEventListener('offline', down)
+    return () => { window.removeEventListener('online', up); window.removeEventListener('offline', down) }
+  }, [])
 
   useEffect(() => {
     if (featureDrawingTool === false && !featureDesignerOnly) { navigate('/'); return }
@@ -574,12 +583,12 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
         ))}
 
         {/* Upload */}
-        <label className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-dashed border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A] cursor-pointer transition-colors whitespace-nowrap ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+        <label title={!isOnline ? 'Unavailable offline' : undefined} className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-dashed border-[#2a3d55] text-[#8A9AB0] transition-colors whitespace-nowrap ${uploading || !isOnline ? 'opacity-40 pointer-events-none cursor-not-allowed' : 'hover:border-[#C8622A] hover:text-[#C8622A] cursor-pointer'}`}>
           {uploading
             ? <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>Uploading...</>
             : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>Upload Floor Plan</>
           }
-          <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleUpload} disabled={uploading} />
+          <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleUpload} disabled={uploading || !isOnline} />
         </label>
 
         {/* Blank canvas */}
@@ -611,9 +620,9 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap justify-center">
-                  <label className="px-5 py-2.5 bg-[#C8622A] text-white text-sm font-semibold rounded-lg hover:bg-[#b5571f] cursor-pointer transition-colors">
+                  <label title={!isOnline ? 'Unavailable offline' : undefined} className={`px-5 py-2.5 text-white text-sm font-semibold rounded-lg transition-colors ${!isOnline ? 'bg-[#C8622A]/40 cursor-not-allowed' : 'bg-[#C8622A] hover:bg-[#b5571f] cursor-pointer'}`}>
                     📄 Upload Floor Plan
-                    <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleUpload} />
+                    <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleUpload} disabled={!isOnline} />
                   </label>
                   <button onClick={handleAddBlankSheet}
                     className="px-5 py-2.5 bg-[#1a2d45] text-white text-sm font-semibold rounded-lg border border-[#2a3d55] hover:border-[#C8622A] transition-colors">

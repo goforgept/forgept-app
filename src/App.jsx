@@ -57,6 +57,8 @@ import AIAgent from './components/AIAgent'
 function App() {
   const { session, profile, features, loading } = useProfile()
   const location = useLocation()
+  const navigate  = useNavigate()
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
@@ -66,6 +68,17 @@ function App() {
     })
     return () => { cleanup.then(l => l.remove()) }
   }, [])
+
+  useEffect(() => {
+    const goOffline = () => { setIsOnline(false); navigate('/designer') }
+    const goOnline  = () => setIsOnline(true)
+    window.addEventListener('offline', goOffline)
+    window.addEventListener('online',  goOnline)
+    return () => {
+      window.removeEventListener('offline', goOffline)
+      window.removeEventListener('online',  goOnline)
+    }
+  }, [navigate])
 
   if (loading) return (
     <div className="min-h-screen bg-fp-inset flex items-center justify-center">
@@ -138,6 +151,12 @@ function App() {
 
   return (
     <>
+      {!isOnline && (
+        <div className="fixed top-0 left-0 right-0 z-[10000] bg-amber-600 text-white text-xs flex items-center justify-center gap-2 px-4 py-2">
+          <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636a9 9 0 010 12.728M15.536 8.464a5 5 0 010 7.072M6.343 6.343a9 9 0 000 12.728m2.829-2.829a5 5 0 000-7.072M12 12h.01"/></svg>
+          <span>You're offline — uploads and saves are unavailable until you reconnect.</span>
+        </div>
+      )}
       {impersonation && (
         <div className="fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-fp-text text-xs flex items-center justify-between px-4 py-1.5">
           <span>Superadmin viewing as <strong>{impersonation.orgName}</strong> · {impersonation.userName}</span>
