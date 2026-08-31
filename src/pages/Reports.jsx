@@ -548,7 +548,7 @@ export default function Reports(props) {
 
       // Fetch jobs first so we can filter related tables by job_id
       const { data: jobs, error: jobsErr } = await supabase.from('jobs')
-        .select('id, name, job_number, status, created_at, user_id, clients(company), profiles!jobs_assigned_pm_fkey(full_name)')
+        .select('id, name, job_number, status, created_at, assigned_pm, clients(company), profiles!jobs_assigned_pm_fkey(full_name)')
         .eq('org_id', profile.org_id)
         .order('created_at', { ascending: false })
       if (jobsErr) console.error('pm_performance jobs error:', jobsErr)
@@ -568,7 +568,7 @@ export default function Reports(props) {
       const byPM = Object.create(null)
       for (const job of (jobs || [])) {
         const pmName = job.profiles?.full_name || 'Unassigned'
-        if (!byPM[pmName]) byPM[pmName] = { pmName, pmId: job.user_id, jobs: [] }
+        if (!byPM[pmName]) byPM[pmName] = { pmName, pmId: job.assigned_pm, jobs: [] }
 
         const jobLogs  = (logs || []).filter(l => l.job_id === job.id)
         const jobCOs   = (cos  || []).filter(c => c.job_id === job.id)
