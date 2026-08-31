@@ -46,6 +46,7 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
       ...(featureCRM ? [
         { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
         { label: 'Forecast', path: '/forecast', icon: '📈' },
+        { label: 'Sales KPIs', path: '/sales-kpi', icon: '🎯' },
       ] : []),
       ...(featureProposals ? [
         { label: 'Proposals', path: '/proposals', icon: '📋' },
@@ -186,6 +187,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
         { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
         { label: 'Tasks', path: '/tasks', icon: '✅' },
         { label: 'Forecast', path: '/forecast', icon: '📈' },
+        { label: 'Sales KPIs', path: '/sales-kpi', icon: '🎯' },
       ] : []),
       ...(featureProposals && orgType !== 'manufacturer' ? [
         { label: 'Proposals', path: '/proposals', icon: '📋' },

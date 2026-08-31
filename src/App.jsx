@@ -25,6 +25,7 @@ import FAQ from './pages/FAQ'
 import Tasks from './pages/Tasks'
 import Pipeline from './pages/Pipeline'
 import Forecast from './pages/Forecast'
+import SalesKPI from './pages/SalesKPI'
 import Catalog from './pages/Catalog'
 import Templates from './pages/Templates'
 import Invoices from './pages/Invoices'
@@ -210,6 +211,7 @@ function App() {
             <Route path="/tasks" element={<Tasks {...sharedProps} />} />
             <Route path="/pipeline" element={<Pipeline {...sharedProps} />} />
             <Route path="/forecast" element={<Forecast {...sharedProps} />} />
+            <Route path="/sales-kpi" element={<SalesKPI {...sharedProps} />} />
             <Route path="/catalog" element={<Catalog {...sharedProps} />} />
             <Route path="/templates" element={<Templates isAdmin={isAdmin} />} />
             <Route path="/invoices" element={<Invoices {...sharedProps} />} />

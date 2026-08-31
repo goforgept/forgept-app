@@ -75,7 +75,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [meetingForm, setMeetingForm] = useState({
     title: '', due_date: '', start_time: '', duration_minutes: 60,
     meeting_type: 'Sales Call', is_virtual: false, assigned_to: '',
-    meeting_notes: '', customer_notified: false
+    meeting_notes: '', customer_notified: false, contact_id: ''
   })
 
   
@@ -229,7 +229,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const fetchClientMeetings = async () => {
     const { data } = await supabase
       .from('tasks')
-      .select('*, profiles!tasks_assigned_to_fkey(full_name)')
+      .select('*, profiles!tasks_assigned_to_fkey(full_name), client_contacts(full_name, title)')
       .eq('client_id', id)
       .not('meeting_type', 'is', null)
       .order('due_date', { ascending: false })
@@ -532,6 +532,7 @@ const deleteMeeting = async (meetingId) => {
       assigned_to: meeting.assigned_to || profile.id,
       meeting_notes: meeting.meeting_notes || '',
       customer_notified: meeting.customer_notified || false,
+      contact_id: meeting.contact_id || '',
     })
     setShowMeetingModal(true)
   }
@@ -551,9 +552,10 @@ const deleteMeeting = async (meetingId) => {
           is_virtual: meetingForm.is_virtual,
           meeting_notes: meetingForm.meeting_notes || null,
           customer_notified: meetingForm.customer_notified,
+          contact_id: meetingForm.contact_id || null,
         }).eq('id', editingMeeting)
         setEditingMeeting(null)
-        setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false })
+        setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false, contact_id: '' })
         setShowMeetingModal(false)
         fetchClientMeetings()
         setSavingMeeting(false)
@@ -574,6 +576,7 @@ const deleteMeeting = async (meetingId) => {
         is_virtual: meetingForm.is_virtual,
         customer_notified: meetingForm.customer_notified,
         meeting_notes: meetingForm.meeting_notes || null,
+        contact_id: meetingForm.contact_id || null,
       }).select('*, clients(company, client_name, email)').single()
 
       if (newTask) {
@@ -651,7 +654,7 @@ const deleteMeeting = async (meetingId) => {
       }
 
       setEditingMeeting(null)
-      setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false })
+      setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false, contact_id: '' })
       setShowMeetingModal(false)
       fetchClientMeetings()
     } catch (err) {
@@ -1107,7 +1110,7 @@ const deleteMeeting = async (meetingId) => {
           <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-fp-text font-bold text-lg">Meetings</h3>
-              <button onClick={() => { setEditingMeeting(null); setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false }); setShowMeetingModal(true) }}
+              <button onClick={() => { setEditingMeeting(null); setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false, contact_id: '' }); setShowMeetingModal(true) }}
                 className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                 + Schedule Meeting
               </button>
@@ -1133,6 +1136,7 @@ const deleteMeeting = async (meetingId) => {
                             <span>📆 {meeting.due_date}{meeting.start_time ? ` at ${meeting.start_time}` : ''}</span>
                             {meeting.duration_minutes && <span>⏱ {meeting.duration_minutes} min</span>}
                             {meeting.profiles?.full_name && <span>👤 {meeting.profiles.full_name}</span>}
+                            {meeting.client_contacts?.full_name && <span>🤝 with {meeting.client_contacts.full_name}</span>}
                           </div>
                           {meeting.meeting_notes && <p className="text-fp-muted text-xs mt-1 italic">{meeting.meeting_notes}</p>}
                           {meeting.meeting_link && (
@@ -1224,6 +1228,15 @@ const deleteMeeting = async (meetingId) => {
                     {teamProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                   </select>
                 </div>
+              {contacts.length > 0 && (
+                <div className="col-span-2">
+                  <label className="text-fp-muted text-xs mb-1 block">Contact (optional)</label>
+                  <select value={meetingForm.contact_id} onChange={e => setMeetingForm(p => ({ ...p, contact_id: e.target.value }))} className={inputClass}>
+                    <option value="">— No specific contact —</option>
+                    {contacts.map(c => <option key={c.id} value={c.id}>{c.full_name}{c.title ? ` — ${c.title}` : ''}</option>)}
+                  </select>
+                </div>
+              )}
                 <div>
                   <label className="text-fp-muted text-xs mb-1 block">Date <span className="text-[#C8622A]">*</span></label>
                   <input type="date" value={meetingForm.due_date} onChange={e => setMeetingForm(p => ({ ...p, due_date: e.target.value }))} className={inputClass} />
