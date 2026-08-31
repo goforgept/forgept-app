@@ -55,9 +55,10 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
   const [loading, setLoading] = useState(true)
 
   // Target editing state (manager only)
-  const [editingRep, setEditingRep] = useState(null) // rep id
-  const [targetDraft, setTargetDraft] = useState({}) // { metric_key: value }
+  const [editingRep, setEditingRep] = useState(null)
+  const [targetDraft, setTargetDraft] = useState({})
   const [savingTarget, setSavingTarget] = useState(false)
+  const [collapsed, setCollapsed] = useState({}) // { [repId]: true }
 
   useEffect(() => {
     if (!profile?.org_id) return
@@ -173,6 +174,31 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
 
   const displayReps = isMyView ? salesReps.filter(r => r.id === profile?.id) : salesReps
 
+  const toggleCollapse = (repId) =>
+    setCollapsed(prev => ({ ...prev, [repId]: !prev[repId] }))
+
+  const exportRepCSV = (rep) => {
+    const stats = actuals[rep.id] || {}
+    const periodLabel = PERIODS.find(p => p.key === period)?.label || period
+    const rows = [
+      ['Rep', 'Period', 'Metric', 'Actual', 'Target', '% to Target'],
+      ...METRICS.map(m => {
+        const actual = stats[m.key] ?? 0
+        const target = getTarget(rep.id, m.key)
+        const pct = target ? Math.round((actual / target) * 100) : ''
+        return [rep.full_name, periodLabel, m.label, actual, target ?? '', pct]
+      })
+    ]
+    const csv = rows.map(r => r.join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${rep.full_name.replace(/\s+/g, '_')}_KPIs_${periodLabel.replace(/\s+/g, '_')}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} isSalesManager={isSalesManager} />
@@ -201,33 +227,57 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
           {displayReps.map(rep => {
             const stats = actuals[rep.id] || {}
             const isEditing = editingRep === rep.id
+            const isCollapsed = collapsed[rep.id] && !isEditing
             const hasAnyTarget = METRICS.some(m => getTarget(rep.id, m.key) !== null)
             return (
-              <div key={rep.id} className="bg-fp-card rounded-xl p-5 border border-fp-border">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-fp-text font-bold">{rep.full_name}</p>
-                    <p className="text-fp-muted text-xs capitalize">{rep.org_role || rep.role || 'rep'}</p>
-                  </div>
-                  {canManage && !isEditing && (
-                    <button onClick={() => openEdit(rep)}
-                      className="text-fp-muted hover:text-fp-text text-xs transition-colors px-3 py-1.5 rounded-lg bg-fp-inset">
-                      {hasAnyTarget ? 'Edit Targets' : 'Set Targets'}
-                    </button>
-                  )}
-                  {canManage && isEditing && (
-                    <div className="flex gap-2">
-                      <button onClick={() => setEditingRep(null)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Cancel</button>
-                      <button onClick={saveTargets} disabled={savingTarget}
-                        className="bg-fp-brand text-white text-xs px-3 py-1.5 rounded-lg hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                        {savingTarget ? 'Saving...' : 'Save Targets'}
-                      </button>
+              <div key={rep.id} className="bg-fp-card rounded-xl border border-fp-border">
+                {/* Header — always visible */}
+                <div className="flex items-center justify-between p-5" style={{ paddingBottom: isCollapsed ? undefined : '1rem' }}>
+                  <button
+                    onClick={() => canManage && toggleCollapse(rep.id)}
+                    className={`flex items-center gap-2 text-left ${canManage ? 'cursor-pointer' : 'cursor-default'}`}
+                  >
+                    {canManage && (
+                      <span className="text-fp-muted text-xs select-none">{isCollapsed ? '+' : '−'}</span>
+                    )}
+                    <div>
+                      <p className="text-fp-text font-bold">{rep.full_name}</p>
+                      <p className="text-fp-muted text-xs capitalize">{rep.org_role || rep.role || 'rep'}</p>
                     </div>
-                  )}
+                  </button>
+                  <div className="flex items-center gap-2">
+                    {canManage && !isEditing && !isCollapsed && (
+                      <>
+                        <button onClick={() => exportRepCSV(rep)}
+                          className="text-fp-muted hover:text-fp-text text-xs transition-colors px-3 py-1.5 rounded-lg bg-fp-inset">
+                          Export CSV
+                        </button>
+                        <button onClick={() => openEdit(rep)}
+                          className="text-fp-muted hover:text-fp-text text-xs transition-colors px-3 py-1.5 rounded-lg bg-fp-inset">
+                          {hasAnyTarget ? 'Edit Targets' : 'Set Targets'}
+                        </button>
+                      </>
+                    )}
+                    {canManage && !isEditing && isCollapsed && (
+                      <button onClick={() => exportRepCSV(rep)}
+                        className="text-fp-muted hover:text-fp-text text-xs transition-colors px-3 py-1.5 rounded-lg bg-fp-inset">
+                        Export CSV
+                      </button>
+                    )}
+                    {canManage && isEditing && (
+                      <div className="flex gap-2">
+                        <button onClick={() => setEditingRep(null)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Cancel</button>
+                        <button onClick={saveTargets} disabled={savingTarget}
+                          className="bg-fp-brand text-white text-xs px-3 py-1.5 rounded-lg hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                          {savingTarget ? 'Saving...' : 'Save Targets'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
-                {isEditing ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {!isCollapsed && isEditing ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 px-5 pb-5">
                     {METRICS.map(m => (
                       <div key={m.key} className="bg-fp-inset rounded-lg p-3">
                         <p className="text-fp-muted text-xs mb-2">{m.icon} {m.label} target ({period === 'weekly' ? 'week' : 'month'})</p>
@@ -242,8 +292,8 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                ) : !isCollapsed ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 px-5 pb-5">
                     {METRICS.map(m => {
                       const actual = stats[m.key] ?? 0
                       const target = getTarget(rep.id, m.key)
@@ -272,7 +322,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                       )
                     })}
                   </div>
-                )}
+                ) : null}
               </div>
             )
           })}
