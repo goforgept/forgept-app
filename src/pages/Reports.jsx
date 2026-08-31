@@ -546,57 +546,73 @@ export default function Reports(props) {
     if (activeReport === 'pm_performance') {
       setExpandedPM(null)
 
-      // Fetch jobs first so we can filter related tables by job_id
       const { data: jobs, error: jobsErr } = await supabase.from('jobs')
-        .select('id, name, job_number, status, created_at, assigned_pm, clients(company), profiles!jobs_assigned_pm_fkey(full_name)')
+        .select('id, name, job_number, status, created_at, assigned_pm, proposal_id, clients(company), profiles!jobs_assigned_pm_fkey(full_name), proposals(proposal_value, total_your_cost, total_gross_margin_percent)')
         .eq('org_id', profile.org_id)
         .order('created_at', { ascending: false })
       if (jobsErr) console.error('pm_performance jobs error:', jobsErr)
 
-      const jobIds = (jobs || []).map(j => j.id)
+      const jobIds      = (jobs || []).map(j => j.id)
+      const proposalIds = (jobs || []).map(j => j.proposal_id).filter(Boolean)
 
-      // Fetch related data filtered by job IDs (change_orders has no org_id column)
-      const [{ data: logs }, { data: cos }, { data: pos }] = jobIds.length
+      const [{ data: logs }, { data: cos }, { data: pos }, { data: invs }] = jobIds.length
         ? await Promise.all([
             supabase.from('tech_daily_logs').select('job_id, hours_worked').in('job_id', jobIds),
             supabase.from('change_orders').select('job_id, status, amount').in('job_id', jobIds),
-            supabase.from('purchase_orders').select('job_id, total_amount, status').in('job_id', jobIds),
+            supabase.from('purchase_orders').select('job_id, total_amount').in('job_id', jobIds),
+            proposalIds.length
+              ? supabase.from('invoices').select('proposal_id, total, status').in('proposal_id', proposalIds)
+              : Promise.resolve({ data: [] }),
           ])
-        : [{ data: [] }, { data: [] }, { data: [] }]
+        : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
 
-      // Group by PM
       const byPM = Object.create(null)
       for (const job of (jobs || [])) {
         const pmName = job.profiles?.full_name || 'Unassigned'
         if (!byPM[pmName]) byPM[pmName] = { pmName, pmId: job.assigned_pm, jobs: [] }
 
-        const jobLogs  = (logs || []).filter(l => l.job_id === job.id)
-        const jobCOs   = (cos  || []).filter(c => c.job_id === job.id)
-        const jobPOs   = (pos  || []).filter(p => p.job_id === job.id)
-        const totalHours   = jobLogs.reduce((s, l) => s + (parseFloat(l.hours_worked) || 0), 0)
-        const approvedCOs  = jobCOs.filter(c => c.status === 'Approved')
-        const totalCOValue = approvedCOs.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0)
-        const totalPOSpend = jobPOs.reduce((s, p) => s + (parseFloat(p.total_amount) || 0), 0)
-        const isActive     = !['Completed', 'Cancelled'].includes(job.status)
+        const jobLogs     = (logs || []).filter(l => l.job_id === job.id)
+        const jobCOs      = (cos  || []).filter(c => c.job_id === job.id)
+        const jobPOs      = (pos  || []).filter(p => p.job_id === job.id)
+        const jobInvs     = (invs || []).filter(v => v.proposal_id === job.proposal_id)
+
+        const totalHours    = jobLogs.reduce((s, l) => s + (parseFloat(l.hours_worked) || 0), 0)
+        const approvedCOs   = jobCOs.filter(c => c.status === 'Approved')
+        const totalCOValue  = approvedCOs.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0)
+        const totalPOSpend  = jobPOs.reduce((s, p) => s + (parseFloat(p.total_amount) || 0), 0)
+        const totalBilled   = jobInvs.reduce((s, v) => s + (parseFloat(v.total) || 0), 0)
+        const isActive      = !['Completed', 'Cancelled'].includes(job.status)
+
+        const contractValue = parseFloat(job.proposals?.proposal_value) || 0
+        const estCost       = parseFloat(job.proposals?.total_your_cost) || 0
+        const estMarginPct  = parseFloat(job.proposals?.total_gross_margin_percent) || null
+        const totalRevenue  = contractValue + totalCOValue
+        // Actual margin uses PO spend as the measurable actual cost
+        const actualMargin  = totalRevenue > 0 ? totalRevenue - totalPOSpend : null
 
         byPM[pmName].jobs.push({
           id: job.id, name: job.name, jobNumber: job.job_number,
           status: job.status, client: job.clients?.company || '—',
-          isActive, totalHours,
-          coCount: approvedCOs.length, totalCOValue, totalPOSpend,
-          created: job.created_at?.slice(0, 10),
+          isActive, totalHours, totalPOSpend, totalBilled,
+          coCount: approvedCOs.length, totalCOValue,
+          contractValue, estCost, estMarginPct, totalRevenue, actualMargin,
+          overBudget: estCost > 0 && totalPOSpend > estCost,
         })
       }
 
       const pmRows = Object.values(byPM).sort((a, b) => a.pmName.localeCompare(b.pmName))
       setPmReport(pmRows)
+      const sumJ = (pm, fn) => pm.jobs.reduce((s, j) => s + (fn(j) || 0), 0)
       setData(pmRows.map(pm => ({
-        'PM':            pm.pmName,
-        'Active Jobs':   pm.jobs.filter(j => j.isActive).length,
-        'Completed':     pm.jobs.filter(j => j.status === 'Completed').length,
-        'Jobs w/ COs':   pm.jobs.filter(j => j.coCount > 0).length,
-        'Total CO Value': fmt$(pm.jobs.reduce((s, j) => s + j.totalCOValue, 0)),
-        'Total Hours':   pm.jobs.reduce((s, j) => s + j.totalHours, 0).toFixed(1),
+        'PM':              pm.pmName,
+        'Active':          pm.jobs.filter(j => j.isActive).length,
+        'Completed':       pm.jobs.filter(j => j.status === 'Completed').length,
+        'Contract Value':  fmt$(sumJ(pm, j => j.contractValue)),
+        'CO Value':        fmt$(sumJ(pm, j => j.totalCOValue)),
+        'PO Spend':        fmt$(sumJ(pm, j => j.totalPOSpend)),
+        'Billed':          fmt$(sumJ(pm, j => j.totalBilled)),
+        'Hours':           sumJ(pm, j => j.totalHours).toFixed(1),
+        'Jobs w/ COs':     pm.jobs.filter(j => j.coCount > 0).length,
       })))
     }
 
@@ -1285,8 +1301,9 @@ export default function Reports(props) {
                                     {columns.map(col => {
                                       const val = row[col]
                                       const isAlert = col === 'Jobs w/ COs' && parseInt(val) > 0
+                                      const isRevenue = ['Contract Value', 'CO Value', 'Billed'].includes(col)
                                       return (
-                                        <td key={col} className={`px-4 py-3 whitespace-nowrap font-medium ${isAlert ? 'text-yellow-400' : 'text-fp-text'}`}>{val}</td>
+                                        <td key={col} className={`px-4 py-3 whitespace-nowrap font-medium tabular-nums ${isAlert ? 'text-yellow-400' : isRevenue ? 'text-green-400' : 'text-fp-text'}`}>{val}</td>
                                       )
                                     })}
                                   </tr>
@@ -1296,22 +1313,26 @@ export default function Reports(props) {
                                         <table className="w-full text-xs">
                                           <thead>
                                             <tr className="border-b border-fp-border">
-                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Job #</th>
-                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Job Name</th>
-                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Client</th>
-                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Status</th>
-                                              <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Hours</th>
-                                              <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">COs</th>
-                                              <th className="text-right py-2 text-fp-muted font-semibold uppercase tracking-wide">CO Value</th>
+                                              <th className="text-left py-2 pr-3 text-fp-muted font-semibold uppercase tracking-wide">Job #</th>
+                                              <th className="text-left py-2 pr-3 text-fp-muted font-semibold uppercase tracking-wide">Job Name</th>
+                                              <th className="text-left py-2 pr-3 text-fp-muted font-semibold uppercase tracking-wide">Client</th>
+                                              <th className="text-left py-2 pr-3 text-fp-muted font-semibold uppercase tracking-wide">Status</th>
+                                              <th className="text-right py-2 pr-3 text-fp-muted font-semibold uppercase tracking-wide">Contract $</th>
+                                              <th className="text-right py-2 pr-3 text-fp-muted font-semibold uppercase tracking-wide">Est. Margin</th>
+                                              <th className="text-right py-2 pr-3 text-fp-muted font-semibold uppercase tracking-wide">PO Spend</th>
+                                              <th className="text-right py-2 pr-3 text-fp-muted font-semibold uppercase tracking-wide">Billed</th>
+                                              <th className="text-right py-2 pr-3 text-fp-muted font-semibold uppercase tracking-wide">Hours</th>
+                                              <th className="text-right py-2 text-fp-muted font-semibold uppercase tracking-wide">COs</th>
                                             </tr>
                                           </thead>
                                           <tbody>
                                             {pm.jobs.map((job, j) => (
-                                              <tr key={j} className={`border-b border-fp-border/40 ${job.coCount > 0 ? 'bg-yellow-500/5' : ''}`}>
-                                                <td className="py-1.5 pr-4 text-fp-muted font-mono whitespace-nowrap">{job.jobNumber || '—'}</td>
-                                                <td className="py-1.5 pr-4 text-fp-text whitespace-nowrap">{job.name}</td>
-                                                <td className="py-1.5 pr-4 text-fp-muted whitespace-nowrap">{job.client}</td>
-                                                <td className="py-1.5 pr-4 whitespace-nowrap">
+                                              <tr key={j} onClick={() => navigate(`/job/${job.id}`)}
+                                                className={`border-b border-fp-border/40 cursor-pointer hover:bg-fp-inset/60 transition-colors ${job.overBudget ? 'bg-red-500/5' : job.coCount > 0 ? 'bg-yellow-500/5' : ''}`}>
+                                                <td className="py-1.5 pr-3 text-fp-muted font-mono whitespace-nowrap">{job.jobNumber || '—'}</td>
+                                                <td className="py-1.5 pr-3 text-fp-text whitespace-nowrap max-w-[160px] truncate">{job.name}</td>
+                                                <td className="py-1.5 pr-3 text-fp-muted whitespace-nowrap">{job.client}</td>
+                                                <td className="py-1.5 pr-3 whitespace-nowrap">
                                                   <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                                                     job.status === 'Completed' ? 'bg-green-500/15 text-green-400' :
                                                     job.status === 'Cancelled' ? 'bg-fp-muted/20 text-fp-muted' :
@@ -1319,9 +1340,17 @@ export default function Reports(props) {
                                                     'bg-blue-500/15 text-blue-400'
                                                   }`}>{job.status}</span>
                                                 </td>
-                                                <td className="py-1.5 pr-4 text-fp-text text-right tabular-nums">{job.totalHours.toFixed(1)}</td>
-                                                <td className={`py-1.5 pr-4 text-right tabular-nums font-semibold ${job.coCount > 0 ? 'text-yellow-400' : 'text-fp-muted'}`}>{job.coCount}</td>
-                                                <td className="py-1.5 text-right tabular-nums text-fp-text">{job.totalCOValue > 0 ? fmt$(job.totalCOValue) : '—'}</td>
+                                                <td className="py-1.5 pr-3 text-fp-text text-right tabular-nums whitespace-nowrap">{job.contractValue > 0 ? fmt$(job.contractValue) : '—'}</td>
+                                                <td className={`py-1.5 pr-3 text-right tabular-nums whitespace-nowrap font-semibold ${job.estMarginPct != null ? (job.estMarginPct >= 30 ? 'text-green-400' : job.estMarginPct >= 15 ? 'text-yellow-400' : 'text-red-400') : 'text-fp-muted'}`}>
+                                                  {job.estMarginPct != null ? `${job.estMarginPct.toFixed(1)}%` : '—'}
+                                                </td>
+                                                <td className={`py-1.5 pr-3 text-right tabular-nums whitespace-nowrap ${job.overBudget ? 'text-red-400 font-semibold' : 'text-fp-text'}`}>
+                                                  {job.totalPOSpend > 0 ? fmt$(job.totalPOSpend) : '—'}
+                                                  {job.overBudget && <span className="ml-1 text-red-400">↑</span>}
+                                                </td>
+                                                <td className="py-1.5 pr-3 text-fp-text text-right tabular-nums whitespace-nowrap">{job.totalBilled > 0 ? fmt$(job.totalBilled) : '—'}</td>
+                                                <td className="py-1.5 pr-3 text-fp-text text-right tabular-nums">{job.totalHours.toFixed(1)}</td>
+                                                <td className={`py-1.5 text-right tabular-nums font-semibold ${job.coCount > 0 ? 'text-yellow-400' : 'text-fp-muted'}`}>{job.coCount || '—'}</td>
                                               </tr>
                                             ))}
                                           </tbody>
