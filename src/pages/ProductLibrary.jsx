@@ -721,7 +721,7 @@ if (!finalCost) continue
                           title="Delete product"
                           className="text-fp-muted hover:text-red-400 text-xs transition-colors px-1"
                         >✕</button>
-                        <span className="text-fp-muted text-xs">{isOpen ? '▲' : '▼'}</span>
+                        <span className="text-fp-muted text-lg leading-none">{isOpen ? '−' : '+'}</span>
                       </div>
                     </div>
 

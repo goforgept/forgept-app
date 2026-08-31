@@ -478,7 +478,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                         className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
                         {['Sent', 'Partial', 'Received', 'Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
-                      <span className="text-fp-muted text-sm">{isExpanded ? '▲' : '▼'}</span>
+                      <span className="text-fp-muted text-lg leading-none">{isExpanded ? '−' : '+'}</span>
                     </div>
                   </div>
 

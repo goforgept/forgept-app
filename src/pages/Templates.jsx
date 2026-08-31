@@ -807,7 +807,7 @@ export default function Templates({ isAdmin }) {
                         <button onClick={e => { e.stopPropagation(); handleDelete(template.id) }}
                           className="text-fp-muted hover:text-red-400 text-xs transition-colors px-2">Delete</button>
                       )}
-                      <span className="text-fp-muted text-sm">{isExpanded ? '▲' : '▼'}</span>
+                      <span className="text-fp-muted text-lg leading-none">{isExpanded ? '−' : '+'}</span>
                     </div>
                   </div>
 

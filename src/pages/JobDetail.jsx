@@ -1687,7 +1687,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                     }`}
                   >
                     {overflowActive ? overflowActive.label : 'More'}
-                    <span className="text-[10px] opacity-60">{moreOpen ? '▴' : '▾'}</span>
+                    <span className="text-sm leading-none opacity-60">{moreOpen ? '−' : '+'}</span>
                   </button>
                   {moreOpen && (
                     <div className="absolute top-full left-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-hidden">
