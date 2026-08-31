@@ -771,16 +771,57 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
             >
               {/* Modal header */}
               <div className="flex items-center justify-between px-5 py-3 border-b flex-shrink-0" style={{ borderColor: '#162030' }}>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   {(() => {
                     const COLORS = { mdf: '#C8622A', idf: '#3b82f6', headend: '#10b981', electrical: '#f59e0b', server: '#a855f7', closet: '#06b6d4', av: '#8b5cf6', other: '#64748b' }
                     const LABELS = { mdf: 'MDF', idf: 'IDF', headend: 'Headend', electrical: 'Electrical', server: 'Server Room', closet: 'Wiring Closet', av: 'AV Room', other: 'Other' }
                     const col = COLORS[selectedRoom.room_type] || '#64748b'
-                    return <span className="text-xs font-bold px-2.5 py-1 rounded-lg" style={{ background: col + '22', color: col }}>{LABELS[selectedRoom.room_type] || selectedRoom.room_type}</span>
+                    return <span className="text-xs font-bold px-2.5 py-1 rounded-lg flex-shrink-0" style={{ background: col + '22', color: col }}>{LABELS[selectedRoom.room_type] || selectedRoom.room_type}</span>
                   })()}
-                  <span className="text-white font-bold text-base">{selectedRoom.name}</span>
+                  {/* Inline name editor */}
+                  <input
+                    key={selectedRoom.id}
+                    defaultValue={selectedRoom.name}
+                    className="bg-transparent text-white font-bold text-base focus:outline-none border-b border-transparent focus:border-[#C8622A] transition-colors min-w-0 truncate"
+                    style={{ maxWidth: 220 }}
+                    onBlur={async e => {
+                      const name = e.target.value.trim()
+                      if (!name || name === selectedRoom.name) return
+                      await supabase.from('rooms').update({ name }).eq('id', selectedRoom.id)
+                      setRooms(prev => prev.map(r => r.id === selectedRoom.id ? { ...r, name } : r))
+                      setSelectedRoom(prev => ({ ...prev, name }))
+                    }}
+                    onKeyDown={e => { if (e.key === 'Enter') e.target.blur() }}
+                  />
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  {/* Size control */}
+                  <div className="flex items-center gap-1 px-2 py-1 rounded-lg" style={{ background: '#162030' }}>
+                    <span className="text-[10px] text-[#4a6080] mr-1">Size</span>
+                    <button
+                      onClick={async () => {
+                        const next = Math.max(0.5, Math.round(((selectedRoom.label_scale || 1) - 0.25) * 100) / 100)
+                        await supabase.from('rooms').update({ label_scale: next }).eq('id', selectedRoom.id)
+                        setRooms(prev => prev.map(r => r.id === selectedRoom.id ? { ...r, label_scale: next } : r))
+                        setSelectedRoom(prev => ({ ...prev, label_scale: next }))
+                      }}
+                      className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold transition-colors hover:text-white"
+                      style={{ color: '#4a6080' }}
+                    >−</button>
+                    <span className="text-xs text-white font-semibold w-8 text-center" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {((selectedRoom.label_scale || 1) * 100).toFixed(0)}%
+                    </span>
+                    <button
+                      onClick={async () => {
+                        const next = Math.min(4, Math.round(((selectedRoom.label_scale || 1) + 0.25) * 100) / 100)
+                        await supabase.from('rooms').update({ label_scale: next }).eq('id', selectedRoom.id)
+                        setRooms(prev => prev.map(r => r.id === selectedRoom.id ? { ...r, label_scale: next } : r))
+                        setSelectedRoom(prev => ({ ...prev, label_scale: next }))
+                      }}
+                      className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold transition-colors hover:text-white"
+                      style={{ color: '#4a6080' }}
+                    >+</button>
+                  </div>
                   <button
                     onClick={async () => {
                       if (!window.confirm(`Delete "${selectedRoom.name}" and all its racks?`)) return
