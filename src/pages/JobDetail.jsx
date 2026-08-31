@@ -1484,14 +1484,15 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureInventory={featureInventory} role={role} isPM={isPM} isTechnician={isTechnician} />
 
-      <div className="flex-1 p-6 space-y-6 min-w-0">
+      <div className="flex-1 p-3 lg:p-6 space-y-4 lg:space-y-6 min-w-0">
 
         {/* Header */}
-        <div className="bg-fp-card rounded-xl p-6">
-          <div className="flex justify-between items-start mb-4">
-            <div>
+        <div className="bg-fp-card rounded-xl p-4 lg:p-6">
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-3 mb-4">
+            {/* Left — job identity */}
+            <div className="min-w-0">
               <button onClick={() => navigate('/jobs')} className="text-fp-muted hover:text-fp-text text-xs mb-2 transition-colors">← Jobs</button>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 flex-wrap">
                 {editingJobNumber ? (
                   <div className="flex items-center gap-1">
                     <input
@@ -1507,76 +1508,86 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 ) : (
                   <span
                     onClick={() => { setJobNumberDraft(job?.job_number || ''); setEditingJobNumber(true) }}
-                    className="text-fp-muted text-sm font-mono bg-fp-inset px-2 py-0.5 rounded cursor-pointer hover:text-fp-text hover:bg-fp-hover transition-colors">
+                    className="text-fp-muted text-sm font-mono bg-fp-inset px-2 py-0.5 rounded cursor-pointer hover:text-fp-text hover:bg-fp-hover transition-colors flex-shrink-0">
                     {job?.job_number || '+ Job #'}
                   </span>
                 )}
                 {editingJobName ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     <input
                       autoFocus
                       type="text"
                       value={jobNameDraft}
                       onChange={e => setJobNameDraft(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') saveJobName(); if (e.key === 'Escape') setEditingJobName(false) }}
-                      className="bg-fp-inset text-fp-text text-2xl font-bold border-b-2 border-[#C8622A] focus:outline-none px-1"
+                      className="bg-fp-inset text-fp-text text-lg lg:text-2xl font-bold border-b-2 border-[#C8622A] focus:outline-none px-1 min-w-0 flex-1"
                     />
-                    <button onClick={saveJobName} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors">Save</button>
-                    <button onClick={() => setEditingJobName(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">Cancel</button>
+                    <button onClick={saveJobName} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors flex-shrink-0">Save</button>
+                    <button onClick={() => setEditingJobName(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors flex-shrink-0">Cancel</button>
                   </div>
                 ) : (
                   <h2
                     onClick={() => { setJobNameDraft(job?.name || ''); setEditingJobName(true) }}
-                    className="text-fp-text text-2xl font-bold cursor-pointer hover:text-fp-brand transition-colors">
+                    className="text-fp-text text-lg lg:text-2xl font-bold cursor-pointer hover:text-fp-brand transition-colors truncate">
                     {job?.name}
                   </h2>
                 )}
               </div>
-              <div className="flex items-center gap-4 mt-1 text-sm text-fp-muted">
+              <div className="flex items-center gap-3 mt-1 text-sm text-fp-muted flex-wrap">
                 {job?.clients?.company && <span>🏢 {job.clients.company}</span>}
                 {proposal?.quote_number && <span className="font-mono">#{proposal.quote_number}</span>}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+
+            {/* Right — actions */}
+            <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap flex-shrink-0">
               {(isAdmin || isPM) && (
                 <button onClick={() => setShowScheduleModal(true)}
-                  className="bg-blue-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors">
-                  📅 Schedule Tech
+                  className="bg-blue-600 text-fp-text px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+                  title="Schedule Tech">
+                  <span className="lg:hidden">📅</span>
+                  <span className="hidden lg:inline">📅 Schedule Tech</span>
                 </button>
               )}
               {job?.clients?.email && (
                 <button onClick={() => setShowNotifyModal(true)}
-                  className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
-                  ✉️ Notify Customer
+                  className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-sm hover:bg-fp-hover transition-colors"
+                  title="Notify Customer">
+                  <span className="lg:hidden">✉️</span>
+                  <span className="hidden lg:inline">✉️ Notify Customer</span>
                 </button>
               )}
               <button onClick={generateFinalJobPacket}
-                className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
-                📄 Final Packet
+                className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-sm hover:bg-fp-hover transition-colors"
+                title="Final Packet">
+                <span className="lg:hidden">📄</span>
+                <span className="hidden lg:inline">📄 Final Packet</span>
               </button>
               <button
                 onClick={() => setShowSignaturePad(true)}
-                className="px-4 py-2 rounded-lg text-sm font-semibold transition-colors border"
+                className="px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors border"
+                title={job?.completion_signature_data ? 'Re-sign' : 'Get Signature'}
                 style={job?.completion_signature_data
                   ? { background: '#16a34a20', color: '#16a34a', borderColor: '#16a34a40' }
                   : { background: 'transparent', color: '#C8622A', borderColor: '#C8622A60' }}>
-                {job?.completion_signature_data ? '✅ Re-sign' : '✍️ Get Signature'}
+                <span className="lg:hidden">{job?.completion_signature_data ? '✅' : '✍️'}</span>
+                <span className="hidden lg:inline">{job?.completion_signature_data ? '✅ Re-sign' : '✍️ Get Signature'}</span>
               </button>
               <select value={job?.status || 'In Progress'} onChange={e => updateJobStatus(e.target.value)} disabled={savingStatus}
-                className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-fp-brand">
                 {JOB_STATUSES.map(s => <option key={s.key}>{s.key}</option>)}
               </select>
             </div>
-            {job?.completion_signature_data && (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg mt-2 w-fit">
-                <img src={job.completion_signature_data} alt="signature" className="h-6 w-20 object-contain" />
-                <span className="text-xs text-green-400">
-                  Signed{job.completion_signed_by ? ` by ${job.completion_signed_by}` : ''}
-                  {job.completion_signed_at ? ` · ${new Date(job.completion_signed_at).toLocaleDateString()}` : ''}
-                </span>
-              </div>
-            )}
           </div>
+          {job?.completion_signature_data && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg mb-4 w-fit">
+              <img src={job.completion_signature_data} alt="signature" className="h-6 w-20 object-contain" />
+              <span className="text-xs text-green-400">
+                Signed{job.completion_signed_by ? ` by ${job.completion_signed_by}` : ''}
+                {job.completion_signed_at ? ` · ${new Date(job.completion_signed_at).toLocaleDateString()}` : ''}
+              </span>
+            </div>
+          )}
 
           <div className="grid grid-cols-4 lg:grid-cols-8 gap-3">
             <div className="bg-fp-inset rounded-lg p-3">
