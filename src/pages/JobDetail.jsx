@@ -397,9 +397,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   }
 
   const assignPM = async (userId) => {
-    await supabase.from('jobs').update({ user_id: userId || null }).eq('id', id)
+    await supabase.from('jobs').update({ assigned_pm: userId || null }).eq('id', id)
     const pm = orgProfiles.find(p => p.id === userId) || null
-    setJob(prev => ({ ...prev, user_id: userId, profiles: pm }))
+    setJob(prev => ({ ...prev, assigned_pm: userId, profiles: pm }))
     if (userId) await addToProposalCollaborators(userId)
   }
 
