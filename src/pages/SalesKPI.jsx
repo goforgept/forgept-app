@@ -58,7 +58,12 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
   const [editingRep, setEditingRep] = useState(null)
   const [targetDraft, setTargetDraft] = useState({})
   const [savingTarget, setSavingTarget] = useState(false)
-  const [collapsed, setCollapsed] = useState({}) // { [repId]: true }
+  const [collapsed, setCollapsed] = useState({})
+
+  // Drilldown modal
+  const [drilldown, setDrilldown] = useState(null) // { rep, metricKey }
+  const [drilldownData, setDrilldownData] = useState([])
+  const [drilldownLoading, setDrilldownLoading] = useState(false)
 
   useEffect(() => {
     if (!profile?.org_id) return
@@ -174,6 +179,63 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
 
   const displayReps = isMyView ? salesReps.filter(r => r.id === profile?.id) : salesReps
 
+  const openDrilldown = async (rep, metricKey) => {
+    const metric = METRICS.find(m => m.key === metricKey)
+    if (!metric) return
+    setDrilldown({ rep, metricKey })
+    setDrilldownData([])
+    setDrilldownLoading(true)
+    const start = periodStart(period)
+    const orgId = profile.org_id
+
+    if (['calls', 'emails', 'notes', 'meeting'].includes(metricKey)) {
+      const typeMap = { calls: 'call', emails: 'email', notes: 'note', meeting: 'meeting' }
+      const { data } = await supabase
+        .from('activities')
+        .select('id, title, body, created_at, type, clients(company, client_name), client_contacts(full_name)')
+        .eq('org_id', orgId)
+        .eq('user_id', rep.id)
+        .eq('type', typeMap[metricKey])
+        .gte('created_at', start)
+        .order('created_at', { ascending: false })
+      setDrilldownData(data || [])
+    } else if (metricKey === 'meetings') {
+      const [{ data: taskMtgs }, { data: actMtgs }] = await Promise.all([
+        supabase.from('tasks')
+          .select('id, title, meeting_type, due_date, created_at, clients(company, client_name), client_contacts(full_name, title)')
+          .eq('org_id', orgId)
+          .eq('assigned_to', rep.id)
+          .not('meeting_type', 'is', null)
+          .gte('created_at', start)
+          .order('created_at', { ascending: false }),
+        supabase.from('activities')
+          .select('id, title, body, created_at, clients(company, client_name), client_contacts(full_name)')
+          .eq('org_id', orgId)
+          .eq('user_id', rep.id)
+          .eq('type', 'meeting')
+          .gte('created_at', start)
+          .order('created_at', { ascending: false }),
+      ])
+      const combined = [
+        ...(taskMtgs || []).map(t => ({ ...t, _source: 'task' })),
+        ...(actMtgs || []).map(a => ({ ...a, _source: 'activity' })),
+      ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      setDrilldownData(combined)
+    } else if (metricKey === 'proposals' || metricKey === 'deals_won') {
+      let q = supabase.from('proposals')
+        .select('id, proposal_name, proposal_value, status, created_at, clients(company, client_name)')
+        .eq('org_id', orgId)
+        .eq('user_id', rep.id)
+        .gte('created_at', start)
+        .order('created_at', { ascending: false })
+      if (metricKey === 'deals_won') q = q.eq('status', 'Won')
+      const { data } = await q
+      setDrilldownData(data || [])
+    }
+
+    setDrilldownLoading(false)
+  }
+
   const toggleCollapse = (repId) =>
     setCollapsed(prev => ({ ...prev, [repId]: !prev[repId] }))
 
@@ -200,6 +262,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
   }
 
   return (
+    <>
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} isSalesManager={isSalesManager} />
     <div className="flex-1 p-6 space-y-6 min-w-0">
@@ -299,10 +362,14 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                       const target = getTarget(rep.id, m.key)
                       const pct = target ? Math.min(100, Math.round((actual / target) * 100)) : null
                       return (
-                        <div key={m.key} className="bg-fp-inset rounded-lg p-3">
+                        <button
+                          key={m.key}
+                          onClick={() => actual > 0 && openDrilldown(rep, m.key)}
+                          className={`bg-fp-inset rounded-lg p-3 text-left transition-colors ${actual > 0 ? 'hover:bg-fp-border cursor-pointer' : 'cursor-default'}`}
+                        >
                           <p className="text-fp-muted text-xs mb-1">{m.icon} {m.label}</p>
                           <div className="flex items-baseline gap-1">
-                            <span className="text-fp-text font-bold text-xl tabular-nums">{actual}</span>
+                            <span className={`font-bold text-xl tabular-nums ${actual > 0 ? 'text-fp-brand' : 'text-fp-text'}`}>{actual}</span>
                             {target !== null && (
                               <span className="text-fp-muted text-xs">/ {target}</span>
                             )}
@@ -316,9 +383,9 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                             </>
                           )}
                           {target === null && (
-                            <p className="text-fp-muted text-xs mt-1">No target</p>
+                            <p className="text-fp-muted text-xs mt-1">{actual > 0 ? 'Click to view' : 'No activity'}</p>
                           )}
-                        </div>
+                        </button>
                       )
                     })}
                   </div>
@@ -330,5 +397,72 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
       )}
     </div>
     </div>
+
+    {/* Drilldown modal */}
+    {drilldown && (
+      <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 px-0 sm:px-4" onClick={() => setDrilldown(null)}>
+        <div
+          className="bg-fp-card w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[80vh] flex flex-col"
+          onClick={e => e.stopPropagation()}
+        >
+          {/* Modal header */}
+          <div className="flex items-center justify-between p-5 border-b border-fp-border shrink-0">
+            <div>
+              <p className="text-fp-text font-bold">
+                {METRICS.find(m => m.key === drilldown.metricKey)?.icon}{' '}
+                {METRICS.find(m => m.key === drilldown.metricKey)?.label}
+              </p>
+              <p className="text-fp-muted text-xs mt-0.5">
+                {drilldown.rep.full_name} · {PERIODS.find(p => p.key === period)?.label}
+              </p>
+            </div>
+            <button onClick={() => setDrilldown(null)} className="text-fp-muted hover:text-fp-text text-xl leading-none">×</button>
+          </div>
+
+          {/* Modal body */}
+          <div className="overflow-y-auto p-5 space-y-2">
+            {drilldownLoading ? (
+              <p className="text-fp-muted text-sm">Loading...</p>
+            ) : drilldownData.length === 0 ? (
+              <p className="text-fp-muted text-sm">No records found.</p>
+            ) : drilldownData.map((row, i) => {
+              const isProposal = drilldown.metricKey === 'proposals' || drilldown.metricKey === 'deals_won'
+              const isTask = row._source === 'task'
+              const client = row.clients?.company || row.clients?.client_name || ''
+              const contact = row.client_contacts?.full_name || ''
+              const date = isProposal
+                ? new Date(row.created_at).toLocaleDateString()
+                : isTask
+                  ? (row.due_date || new Date(row.created_at).toLocaleDateString())
+                  : new Date(row.created_at).toLocaleDateString()
+
+              return (
+                <div key={row.id ?? i} className="bg-fp-inset rounded-lg p-3">
+                  <div className="flex justify-between items-start gap-2">
+                    <p className="text-fp-text text-sm font-medium leading-snug">
+                      {isProposal ? row.proposal_name : row.title}
+                    </p>
+                    <span className="text-fp-muted text-xs shrink-0">{date}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 mt-1">
+                    {client && <span className="text-fp-muted text-xs">🏢 {client}</span>}
+                    {contact && <span className="text-fp-muted text-xs">🤝 {contact}</span>}
+                    {isTask && row.meeting_type && <span className="text-fp-muted text-xs">📅 {row.meeting_type}</span>}
+                    {isProposal && row.proposal_value > 0 && (
+                      <span className="text-fp-muted text-xs">💰 ${row.proposal_value.toLocaleString()}</span>
+                    )}
+                    {isProposal && <span className="text-fp-muted text-xs">{row.status}</span>}
+                  </div>
+                  {!isProposal && row.body && (
+                    <p className="text-fp-muted text-xs mt-1 italic line-clamp-2">{row.body}</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
