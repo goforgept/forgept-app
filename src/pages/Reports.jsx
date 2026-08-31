@@ -1085,11 +1085,11 @@ export default function Reports(props) {
                   />
                   <span className="text-fp-muted text-sm hover:text-fp-text transition-colors">Include branding</span>
                 </label>
-                <button onClick={exportExcel} disabled={data.length === 0}
+                <button onClick={() => exportExcel()} disabled={data.length === 0}
                   className="flex items-center gap-2 px-4 py-2 bg-[#1a7a4a] hover:bg-[#1a7a4a]/80 disabled:opacity-40 disabled:cursor-not-allowed text-fp-text text-sm font-medium rounded-lg transition-colors">
                   <span>📊</span> Export Excel
                 </button>
-                <button onClick={exportPDF} disabled={data.length === 0}
+                <button onClick={() => exportPDF()} disabled={data.length === 0}
                   className="flex items-center gap-2 px-4 py-2 bg-[#C8622A] hover:bg-[#C8622A]/80 disabled:opacity-40 disabled:cursor-not-allowed text-fp-text text-sm font-medium rounded-lg transition-colors">
                   <span>📄</span> Export PDF
                 </button>
