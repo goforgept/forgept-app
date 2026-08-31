@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '../supabase'
 import { useProfile } from '../context/ProfileContext'
+import Sidebar from '../components/Sidebar'
 
 const METRICS = [
   { key: 'calls',      label: 'Calls',       icon: '📞' },
@@ -41,7 +42,7 @@ function ProgressBar({ value, target }) {
   )
 }
 
-export default function SalesKPI({ isAdmin, isSalesManager }) {
+export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = true, featureCRM = false }) {
   const { profile } = useProfile()
   const canManage = isAdmin || isSalesManager
 
@@ -173,6 +174,8 @@ export default function SalesKPI({ isAdmin, isSalesManager }) {
   const displayReps = isMyView ? salesReps.filter(r => r.id === profile?.id) : salesReps
 
   return (
+    <div className="flex min-h-screen bg-fp-inset">
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} isSalesManager={isSalesManager} />
     <div className="flex-1 p-6 space-y-6 min-w-0">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -275,6 +278,7 @@ export default function SalesKPI({ isAdmin, isSalesManager }) {
           })}
         </div>
       )}
+    </div>
     </div>
   )
 }
