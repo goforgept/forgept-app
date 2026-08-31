@@ -33,7 +33,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
     const cutoff = new Date(Date.now() + dayRange * 86400000)
     return proposals.filter(p => {
       if (p.status === 'Won' || p.status === 'Lost') return true
-      if (!p.close_date) return false
+      if (!p.close_date) return true  // undated active proposals are always in the pipeline
       return new Date(p.close_date) <= cutoff
     })
   }, [proposals, dayRange])
@@ -140,7 +140,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
           <div className="bg-fp-card rounded-xl p-5">
             <p className="text-fp-muted text-xs mb-1">Active Pipeline</p>
             <p className="text-fp-text text-2xl font-bold">${fmt(totalActivePipeline)}</p>
-            <p className="text-fp-muted text-xs mt-1">{proposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').length} open deals</p>
+            <p className="text-fp-muted text-xs mt-1">{filteredProposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').length} open deals</p>
           </div>
           <div className="bg-fp-card rounded-xl p-5">
             <p className="text-fp-muted text-xs mb-1">Weighted Forecast</p>
@@ -153,7 +153,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
             <p className="text-fp-muted text-xs mt-1">{proposals.filter(p => p.status === 'Won').length} deals closed</p>
           </div>
           <div className="bg-fp-card rounded-xl p-5">
-            <p className="text-fp-muted text-xs mb-1">Closing {dayRange === 'all' ? 'All Time' : `in ${dayRange}d`}</p>
+            <p className="text-fp-muted text-xs mb-1">Closing {dayRange === 'all' ? 'Upcoming' : `in ${dayRange}d`}</p>
             <p className="text-[#C8622A] text-2xl font-bold">{closingThisMonth.length}</p>
             <p className="text-fp-muted text-xs mt-1">${fmt(closingThisMonth.reduce((s, p) => s + (p.proposal_value || 0), 0))} at stake</p>
           </div>
@@ -267,7 +267,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
         {closingThisMonth.length > 0 && (
           <div className="bg-fp-card rounded-xl p-6">
             <h3 className="text-fp-text font-bold text-lg mb-4">
-              Closing This Month
+              {dayRange === 'all' ? 'Upcoming Closes' : `Closing in Next ${dayRange} Days`}
               <span className="ml-2 text-sm font-normal text-fp-muted">— ${fmt(closingThisMonth.reduce((s, p) => s + (p.proposal_value || 0), 0))} at stake</span>
             </h3>
             <div className="space-y-2">
