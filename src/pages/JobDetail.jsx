@@ -1496,27 +1496,27 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 {job?.clients?.company && <span>🏢 {job.clients.company}</span>}
                 {proposal?.quote_number && <span className="font-mono">#{proposal.quote_number}</span>}
               </div>
-              <div className="flex items-center gap-3 mt-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-fp-muted text-xs">👤 PM:</span>
+              <div className="flex flex-wrap items-center gap-2 mt-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-fp-muted text-xs font-medium">PM</span>
                   <select value={job?.user_id || job?.profiles?.id || ''} onChange={e => assignPM(e.target.value)}
-                    className="bg-fp-inset text-fp-text text-xs border border-fp-border rounded px-2 py-1 focus:outline-none focus:border-fp-brand">
+                    className={inputClass}>
                     <option value="">Unassigned</option>
                     {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                   </select>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-fp-muted text-xs">🔧 Tech:</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-fp-muted text-xs font-medium">Tech</span>
                   <select value={job?.tech_id || ''} onChange={e => assignTech(e.target.value)}
-                    className="bg-fp-inset text-fp-text text-xs border border-fp-border rounded px-2 py-1 focus:outline-none focus:border-fp-brand">
+                    className={inputClass}>
                     <option value="">Unassigned</option>
                     {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
                   </select>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-fp-muted text-xs">💰 Billing:</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-fp-muted text-xs font-medium">Billing</span>
                   <select value={job?.billing_type || 'Lump Sum'} onChange={e => updateBillingType(e.target.value)}
-                    className="bg-fp-inset text-fp-text text-xs border border-fp-border rounded px-2 py-1 focus:outline-none focus:border-fp-brand">
+                    className={inputClass}>
                     {['Lump Sum', 'T&M', 'AIA', 'Unit Price'].map(b => <option key={b}>{b}</option>)}
                   </select>
                 </div>
