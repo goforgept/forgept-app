@@ -256,7 +256,7 @@ export default function Reports(props) {
       const [clientsRes, propsRes, techsRes, vendorsRes] = await Promise.all([
         supabase.from('clients').select('id, company').eq('org_id', profile.org_id).order('company'),
         supabase.from('proposals').select('rep_name, industry').eq('org_id', profile.org_id),
-        supabase.from('profiles').select('id, full_name').eq('org_id', profile.org_id).eq('org_role', 'technician'),
+        supabase.from('profiles').select('id, full_name, org_role, role').eq('org_id', profile.org_id).order('full_name'),
         supabase.from('vendors').select('id, vendor_name').eq('org_id', profile.org_id).eq('active', true).order('vendor_name'),
       ])
       setClients((clientsRes.data || []).map(c => ({ value: c.id, label: c.company })))
@@ -266,7 +266,9 @@ export default function Reports(props) {
       setReps(scopedRepNames !== null ? allRepNames.filter(r => scopedRepNames.includes(r)) : allRepNames)
 
       setIndustries([...new Set((propsRes.data || []).map(r => r.industry).filter(Boolean))].sort())
-      setTechs((techsRes.data || []).map(t => ({ value: t.id, label: t.full_name })))
+      setTechs((techsRes.data || [])
+        .filter(t => ['technician', 'tech'].includes(t.org_role || t.role))
+        .map(t => ({ value: t.id, label: t.full_name })))
       setVendors((vendorsRes.data || []).map(v => ({ value: v.id, label: v.vendor_name })))
     }
     load()
@@ -484,14 +486,22 @@ export default function Reports(props) {
     // ── Payroll ───────────────────────────────────────────────────────────────
     if (activeReport === 'payroll') {
       setExpandedPayrollTech(null)
+      // Get all profile IDs in the org so we can find logs even if org_id wasn't set
+      const { data: orgProfs } = await supabase
+        .from('profiles').select('id').eq('org_id', profile.org_id)
+      const orgProfileIds = (orgProfs || []).map(p => p.id)
+
       let q = supabase
         .from('tech_daily_logs')
         .select('log_date, hours_worked, work_summary, user_id, profiles(full_name), jobs(name, job_number, clients(company))')
-        .eq('org_id', profile.org_id)
         .order('log_date', { ascending: false })
       if (from) q = q.gte('log_date', from)
       if (to)   q = q.lte('log_date', to)
-      if (filters.tech) q = q.eq('user_id', filters.tech)
+      if (filters.tech) {
+        q = q.eq('user_id', filters.tech)
+      } else if (orgProfileIds.length) {
+        q = q.in('user_id', orgProfileIds)
+      }
       const { data: rows, error: prErr } = await q
       if (prErr) console.error('payroll error:', prErr)
 
@@ -1147,7 +1157,7 @@ export default function Reports(props) {
                                 <>
                                   <tr key={i} onClick={() => setExpandedPayrollTech(isOpen ? null : tech)}
                                     className="border-b border-[#0F1C2E]/60 hover:bg-fp-inset/40 transition-colors cursor-pointer">
-                                    <td className="px-4 py-3 text-fp-muted text-xs">{isOpen ? '▾' : '▸'}</td>
+                                    <td className="px-4 py-3 text-fp-muted text-xs">{isOpen ? '−' : '+'}</td>
                                     {columns.map(col => <td key={col} className="px-4 py-3 text-fp-text whitespace-nowrap font-medium">{row[col]}</td>)}
                                   </tr>
                                   {isOpen && (
@@ -1218,7 +1228,7 @@ export default function Reports(props) {
                                     <tr key={i}
                                       onClick={() => setExpandedVendor(isOpen ? null : vendor)}
                                       className="border-b border-[#0F1C2E]/60 hover:bg-fp-inset/40 transition-colors cursor-pointer">
-                                      <td className="px-4 py-3 text-fp-muted text-xs">{isOpen ? '▾' : '▸'}</td>
+                                      <td className="px-4 py-3 text-fp-muted text-xs">{isOpen ? '−' : '+'}</td>
                                       {columns.map(col => <td key={col} className="px-4 py-3 text-fp-text whitespace-nowrap">{row[col]}</td>)}
                                     </tr>
                                     {isOpen && (
