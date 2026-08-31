@@ -174,8 +174,8 @@ const getNavGroups = (orgType) => {
 }
 
 const ALL_REPORTS = ALL_NAV_GROUPS.flatMap(g => g.items)
-const NO_DATE_FILTER  = ['user_activity', 'client_report', 'open_jobs', 'pm_performance']
-const GRAY_DATE_FILTER = ['user_activity', 'client_report', 'pm_performance']
+const NO_DATE_FILTER  = ['user_activity', 'client_report', 'open_jobs']
+const GRAY_DATE_FILTER = ['user_activity', 'client_report']
 
 const REPORT_FILTERS = {
   open_quotes:      ['clients', 'rep', 'industry'],
@@ -546,10 +546,13 @@ export default function Reports(props) {
     if (activeReport === 'pm_performance') {
       setExpandedPM(null)
 
-      const { data: jobs, error: jobsErr } = await supabase.from('jobs')
+      let jobsQ = supabase.from('jobs')
         .select('id, name, job_number, status, created_at, assigned_pm, proposal_id, clients(company), profiles!jobs_assigned_pm_fkey(full_name), proposals(proposal_value, total_your_cost, total_gross_margin_percent)')
         .eq('org_id', profile.org_id)
         .order('created_at', { ascending: false })
+      if (from) jobsQ = jobsQ.gte('created_at', from)
+      if (to)   jobsQ = jobsQ.lte('created_at', to + 'T23:59:59')
+      const { data: jobs, error: jobsErr } = await jobsQ
       if (jobsErr) console.error('pm_performance jobs error:', jobsErr)
 
       const jobIds      = (jobs || []).map(j => j.id)
