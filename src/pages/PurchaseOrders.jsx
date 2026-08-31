@@ -456,7 +456,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                           <span className="text-fp-muted text-xs">{po.vendor_name || '—'}</span>
                           {(po.jobs || po.proposals) && <span className="text-fp-muted text-xs">·</span>}
                           {po.jobs && (
-                            <span className="text-xs text-[#C8622A] font-medium cursor-pointer hover:underline" onClick={e => { e.stopPropagation(); navigate(`/job/${po.job_id}`) }}>
+                            <span className="text-xs text-[#C8622A] font-medium cursor-pointer hover:underline" onClick={e => { e.stopPropagation(); navigate(`/jobs/${po.job_id}`) }}>
                               {po.jobs.job_number ? `${po.jobs.job_number} — ` : ''}{po.jobs.name}
                             </span>
                           )}
