@@ -136,8 +136,9 @@ const ALL_NAV_GROUPS = [
   {
     label: 'Jobs',
     items: [
-      { key: 'open_jobs',   label: 'Open Jobs',   icon: '🔨' },
-      { key: 'closed_jobs', label: 'Closed Jobs', icon: '✅' },
+      { key: 'open_jobs',      label: 'Open Jobs',      icon: '🔨' },
+      { key: 'closed_jobs',    label: 'Closed Jobs',    icon: '✅' },
+      { key: 'pm_performance', label: 'PM Performance', icon: '📊' },
     ]
   },
   {
@@ -167,8 +168,8 @@ const getNavGroups = (orgType) => {
 }
 
 const ALL_REPORTS = ALL_NAV_GROUPS.flatMap(g => g.items)
-const NO_DATE_FILTER  = ['user_activity', 'client_report', 'open_jobs'] // don't filter these by created_at
-const GRAY_DATE_FILTER = ['user_activity', 'client_report']             // gray out UI for these only
+const NO_DATE_FILTER  = ['user_activity', 'client_report', 'open_jobs', 'pm_performance']
+const GRAY_DATE_FILTER = ['user_activity', 'client_report', 'pm_performance']
 
 const REPORT_FILTERS = {
   open_quotes:      ['clients', 'rep', 'industry'],
@@ -183,6 +184,7 @@ const REPORT_FILTERS = {
   vendor_spend:     [],
   user_activity:    [],
   payroll:          ['tech'],
+  pm_performance:   [],
 }
 
 function today()    { return new Date().toISOString().slice(0, 10) }
@@ -214,8 +216,10 @@ export default function Reports(props) {
   const [expandedVendor, setExpandedVendor]   = useState(null)
   const [vendorSearch, setVendorSearch]       = useState('')
 
-  const [payrollLogs, setPayrollLogs]             = useState({}) // tech name → log entries
+  const [payrollLogs, setPayrollLogs]             = useState({})
   const [expandedPayrollTech, setExpandedPayrollTech] = useState(null)
+  const [pmReport, setPmReport]                   = useState([]) // [{pm, jobs:[...], ...}]
+  const [expandedPM, setExpandedPM]               = useState(null)
 
   const [clients,    setClients]    = useState([])
   const [reps,       setReps]       = useState([])
@@ -529,6 +533,61 @@ export default function Reports(props) {
         'Total Hours': v.hours.toFixed(1),
         'Days Logged': v.days.size,
         'Entries':     v.entries,
+      })))
+    }
+
+    // ── PM Performance ───────────────────────────────────────────────────────
+    if (activeReport === 'pm_performance') {
+      setExpandedPM(null)
+      const [{ data: jobs }, { data: logs }, { data: cos }, { data: pos }] = await Promise.all([
+        supabase.from('jobs')
+          .select('id, name, job_number, status, created_at, user_id, proposal_id, clients(company), profiles!jobs_assigned_pm_fkey(full_name)')
+          .eq('org_id', profile.org_id)
+          .order('created_at', { ascending: false }),
+        supabase.from('tech_daily_logs')
+          .select('job_id, hours_worked')
+          .eq('org_id', profile.org_id),
+        supabase.from('change_orders')
+          .select('job_id, status, amount')
+          .eq('org_id', profile.org_id),
+        supabase.from('purchase_orders')
+          .select('job_id, total_amount, status')
+          .eq('org_id', profile.org_id),
+      ])
+
+      // Group by PM
+      const byPM = Object.create(null)
+      for (const job of (jobs || [])) {
+        const pmName = job.profiles?.full_name || 'Unassigned'
+        if (!byPM[pmName]) byPM[pmName] = { pmName, pmId: job.user_id, jobs: [] }
+
+        const jobLogs  = (logs || []).filter(l => l.job_id === job.id)
+        const jobCOs   = (cos  || []).filter(c => c.job_id === job.id)
+        const jobPOs   = (pos  || []).filter(p => p.job_id === job.id)
+        const totalHours   = jobLogs.reduce((s, l) => s + (parseFloat(l.hours_worked) || 0), 0)
+        const approvedCOs  = jobCOs.filter(c => c.status === 'Approved')
+        const totalCOValue = approvedCOs.reduce((s, c) => s + (parseFloat(c.amount) || 0), 0)
+        const totalPOSpend = jobPOs.reduce((s, p) => s + (parseFloat(p.total_amount) || 0), 0)
+        const isActive     = !['Completed', 'Cancelled'].includes(job.status)
+
+        byPM[pmName].jobs.push({
+          id: job.id, name: job.name, jobNumber: job.job_number,
+          status: job.status, client: job.clients?.company || '—',
+          isActive, totalHours,
+          coCount: approvedCOs.length, totalCOValue, totalPOSpend,
+          created: job.created_at?.slice(0, 10),
+        })
+      }
+
+      const pmRows = Object.values(byPM).sort((a, b) => a.pmName.localeCompare(b.pmName))
+      setPmReport(pmRows)
+      setData(pmRows.map(pm => ({
+        'PM':            pm.pmName,
+        'Active Jobs':   pm.jobs.filter(j => j.isActive).length,
+        'Completed':     pm.jobs.filter(j => j.status === 'Completed').length,
+        'Jobs w/ COs':   pm.jobs.filter(j => j.coCount > 0).length,
+        'Total CO Value': fmt$(pm.jobs.reduce((s, j) => s + j.totalCOValue, 0)),
+        'Total Hours':   pm.jobs.reduce((s, j) => s + j.totalHours, 0).toFixed(1),
       })))
     }
 
@@ -1183,6 +1242,77 @@ export default function Reports(props) {
                                                 <td className="py-1.5 pr-4 text-fp-text whitespace-nowrap">{log.client}</td>
                                                 <td className="py-1.5 pr-4 text-[#C8622A] font-bold text-right whitespace-nowrap">{log.hours}</td>
                                                 <td className="py-1.5 text-fp-muted max-w-xs">{log.summary}</td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : activeReport === 'pm_performance' ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-fp-border">
+                              <th className="text-left px-4 py-3 text-fp-muted text-xs font-semibold uppercase tracking-wide w-6" />
+                              {columns.map(col => <th key={col} className="text-left px-4 py-3 text-fp-muted text-xs font-semibold uppercase tracking-wide whitespace-nowrap">{col}</th>)}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pmReport.map((pm, i) => {
+                              const isOpen = expandedPM === pm.pmName
+                              const row = data[i] || {}
+                              return (
+                                <>
+                                  <tr key={i} onClick={() => setExpandedPM(isOpen ? null : pm.pmName)}
+                                    className="border-b border-fp-border/60 hover:bg-fp-inset/40 transition-colors cursor-pointer">
+                                    <td className="px-4 py-3 text-fp-muted text-xs">{isOpen ? '−' : '+'}</td>
+                                    {columns.map(col => {
+                                      const val = row[col]
+                                      const isAlert = col === 'Jobs w/ COs' && parseInt(val) > 0
+                                      return (
+                                        <td key={col} className={`px-4 py-3 whitespace-nowrap font-medium ${isAlert ? 'text-yellow-400' : 'text-fp-text'}`}>{val}</td>
+                                      )
+                                    })}
+                                  </tr>
+                                  {isOpen && (
+                                    <tr key={`${i}-detail`} className="border-b border-fp-border/60 bg-fp-inset/30">
+                                      <td colSpan={columns.length + 1} className="px-6 py-3">
+                                        <table className="w-full text-xs">
+                                          <thead>
+                                            <tr className="border-b border-fp-border">
+                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Job #</th>
+                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Job Name</th>
+                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Client</th>
+                                              <th className="text-left py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Status</th>
+                                              <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">Hours</th>
+                                              <th className="text-right py-2 pr-4 text-fp-muted font-semibold uppercase tracking-wide">COs</th>
+                                              <th className="text-right py-2 text-fp-muted font-semibold uppercase tracking-wide">CO Value</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {pm.jobs.map((job, j) => (
+                                              <tr key={j} className={`border-b border-fp-border/40 ${job.coCount > 0 ? 'bg-yellow-500/5' : ''}`}>
+                                                <td className="py-1.5 pr-4 text-fp-muted font-mono whitespace-nowrap">{job.jobNumber || '—'}</td>
+                                                <td className="py-1.5 pr-4 text-fp-text whitespace-nowrap">{job.name}</td>
+                                                <td className="py-1.5 pr-4 text-fp-muted whitespace-nowrap">{job.client}</td>
+                                                <td className="py-1.5 pr-4 whitespace-nowrap">
+                                                  <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                                                    job.status === 'Completed' ? 'bg-green-500/15 text-green-400' :
+                                                    job.status === 'Cancelled' ? 'bg-fp-muted/20 text-fp-muted' :
+                                                    job.status === 'On Hold' ? 'bg-yellow-500/15 text-yellow-400' :
+                                                    'bg-blue-500/15 text-blue-400'
+                                                  }`}>{job.status}</span>
+                                                </td>
+                                                <td className="py-1.5 pr-4 text-fp-text text-right tabular-nums">{job.totalHours.toFixed(1)}</td>
+                                                <td className={`py-1.5 pr-4 text-right tabular-nums font-semibold ${job.coCount > 0 ? 'text-yellow-400' : 'text-fp-muted'}`}>{job.coCount}</td>
+                                                <td className="py-1.5 text-right tabular-nums text-fp-text">{job.totalCOValue > 0 ? fmt$(job.totalCOValue) : '—'}</td>
                                               </tr>
                                             ))}
                                           </tbody>
