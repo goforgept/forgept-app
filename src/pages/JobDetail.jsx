@@ -1605,7 +1605,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             </div>
             <div className="bg-fp-inset rounded-lg p-3">
               <p className="text-fp-muted text-xs mb-1">PM</p>
-              <select value={job?.user_id || job?.profiles?.id || ''} onChange={e => assignPM(e.target.value)}
+              <select value={job?.assigned_pm || ''} onChange={e => assignPM(e.target.value)}
                 className="bg-transparent text-fp-text text-sm font-medium focus:outline-none cursor-pointer w-full">
                 <option value="">Unassigned</option>
                 {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
