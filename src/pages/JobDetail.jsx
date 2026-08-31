@@ -72,6 +72,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('checklist')
   const [moreOpen, setMoreOpen] = useState(false)
+  const [techPickerOpen, setTechPickerOpen] = useState(false)
   const moreRef = useRef(null)
   const [savingStatus, setSavingStatus] = useState(false)
   const [orgProfiles, setOrgProfiles] = useState([])
@@ -406,6 +407,17 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     await supabase.from('jobs').update({ tech_id: userId || null }).eq('id', id)
     setJob(prev => ({ ...prev, tech_id: userId }))
     if (userId) await addToProposalCollaborators(userId)
+  }
+
+  const toggleTech = async (userId) => {
+    const current = job?.tech_ids || (job?.tech_id ? [job.tech_id] : [])
+    const next = current.includes(userId)
+      ? current.filter(id => id !== userId)
+      : [...current, userId]
+    const primaryTech = next[0] || null
+    await supabase.from('jobs').update({ tech_ids: next, tech_id: primaryTech }).eq('id', id)
+    setJob(prev => ({ ...prev, tech_ids: next, tech_id: primaryTech }))
+    if (!current.includes(userId)) await addToProposalCollaborators(userId)
   }
 
   const toggleLineSelect = (lineId) => {
@@ -1599,13 +1611,51 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
               </select>
             </div>
-            <div className="bg-fp-inset rounded-lg p-3">
+            <div className="bg-fp-inset rounded-lg p-3 relative">
               <p className="text-fp-muted text-xs mb-1">Tech</p>
-              <select value={job?.tech_id || ''} onChange={e => assignTech(e.target.value)}
-                className="bg-transparent text-fp-text text-sm font-medium focus:outline-none cursor-pointer w-full">
-                <option value="">Unassigned</option>
-                {orgProfiles.map(p => <option key={p.id} value={p.id}>{p.full_name}</option>)}
-              </select>
+              {(() => {
+                const techIds = job?.tech_ids?.length ? job.tech_ids : (job?.tech_id ? [job.tech_id] : [])
+                return (
+                  <>
+                    <div className="flex flex-wrap gap-1 min-h-[22px]">
+                      {techIds.length === 0 && (
+                        <button onClick={() => setTechPickerOpen(o => !o)}
+                          className="text-fp-muted text-sm hover:text-fp-text transition-colors">Unassigned</button>
+                      )}
+                      {techIds.map(tid => {
+                        const p = orgProfiles.find(p => p.id === tid)
+                        if (!p) return null
+                        return (
+                          <span key={tid} className="flex items-center gap-1 bg-fp-card text-fp-text text-xs px-2 py-0.5 rounded-full">
+                            {p.full_name}
+                            <button onClick={() => toggleTech(tid)} className="text-fp-muted hover:text-red-400 transition-colors leading-none">×</button>
+                          </span>
+                        )
+                      })}
+                      <button onClick={() => setTechPickerOpen(o => !o)}
+                        className="text-fp-muted hover:text-fp-text text-xs transition-colors">
+                        {techIds.length > 0 ? '+' : ''}
+                      </button>
+                    </div>
+                    {techPickerOpen && (
+                      <div className="absolute top-full left-0 mt-1 bg-fp-card border border-fp-border rounded-xl shadow-lg z-20 w-48 py-1 max-h-52 overflow-y-auto">
+                        {orgProfiles.map(p => {
+                          const checked = techIds.includes(p.id)
+                          return (
+                            <button key={p.id} onClick={() => { toggleTech(p.id); setTechPickerOpen(false) }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-fp-inset transition-colors text-left">
+                              <span className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${checked ? 'bg-fp-brand border-fp-brand' : 'border-fp-border'}`}>
+                                {checked && <span className="text-white text-xs leading-none">✓</span>}
+                              </span>
+                              <span className="text-fp-text truncate">{p.full_name}</span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
             </div>
             <div className="bg-fp-inset rounded-lg p-3">
               <p className="text-fp-muted text-xs mb-1">Billing</p>
