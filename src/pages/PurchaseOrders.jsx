@@ -12,6 +12,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
   const [statusFilter, setStatusFilter] = useState('All')
   const [search, setSearch] = useState('')
   const [vendorFilter, setVendorFilter] = useState('')
+  const [jobFilter, setJobFilter] = useState('')
   const [expandedPO, setExpandedPO] = useState(null)
   const [lineItems, setLineItems] = useState({})
   const [savingReceiving, setSavingReceiving] = useState({})
@@ -47,7 +48,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
 
     const { data } = await supabase
       .from('purchase_orders')
-      .select('*, proposals(proposal_name, company)')
+      .select('*, proposals(proposal_name, company), jobs(name, job_number)')
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
     setPOs(data || [])
@@ -59,7 +60,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
 
     const { data: jobData } = await supabase
       .from('jobs').select('id, name, job_number, proposal_id')
-      .eq('org_id', profile.org_id).in('status', ['Active', 'On Hold']).order('created_at', { ascending: false })
+      .eq('org_id', profile.org_id).not('status', 'in', '("Completed","Cancelled")').order('created_at', { ascending: false })
     setJobs(jobData || [])
 
     const { data: ticketData } = await supabase
@@ -341,18 +342,22 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
   const filtered = pos.filter(p => {
     if (statusFilter !== 'All' && p.status !== statusFilter) return false
     if (vendorFilter && p.vendor_name !== vendorFilter) return false
+    if (jobFilter && p.job_id !== jobFilter) return false
     if (search) {
       const q = search.toLowerCase()
       return (
         p.po_number?.toLowerCase().includes(q) ||
         p.vendor_name?.toLowerCase().includes(q) ||
         p.proposals?.proposal_name?.toLowerCase().includes(q) ||
+        p.jobs?.name?.toLowerCase().includes(q) ||
+        p.jobs?.job_number?.toLowerCase().includes(q) ||
         p.description?.toLowerCase().includes(q)
       )
     }
     return true
   })
   const uniqueVendors = [...new Set(pos.map(p => p.vendor_name).filter(Boolean))].sort()
+  const uniqueJobs = [...new Map(pos.filter(p => p.job_id && p.jobs).map(p => [p.job_id, p.jobs])).entries()].map(([id, j]) => ({ id, name: j.name, job_number: j.job_number })).sort((a, b) => (a.job_number || '').localeCompare(b.job_number || ''))
   const totalSent = pos.reduce((sum, p) => sum + (p.total_amount || 0), 0)
   const totalReceived = pos.filter(p => p.status === 'Received').reduce((sum, p) => sum + (p.total_amount || 0), 0)
   const pendingCount = pos.filter(p => p.status === 'Sent' || p.status === 'Partial').length
@@ -391,13 +396,13 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
         </div>
 
         {/* Filters */}
-        <div className="flex gap-3 items-center">
+        <div className="flex flex-wrap gap-3 items-center">
           <input
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search PO #, vendor, proposal..."
-            className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 w-64 focus:outline-none focus:border-fp-brand placeholder-fp-muted"
+            placeholder="Search PO #, vendor, job..."
+            className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 w-56 focus:outline-none focus:border-fp-brand placeholder-fp-muted"
           />
           <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
             className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
@@ -410,8 +415,15 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
             <option value="">All Vendors</option>
             {uniqueVendors.map(v => <option key={v} value={v}>{v}</option>)}
           </select>
-          {(search || statusFilter !== 'All' || vendorFilter) && (
-            <button onClick={() => { setSearch(''); setStatusFilter('All'); setVendorFilter('') }}
+          {uniqueJobs.length > 0 && (
+            <select value={jobFilter} onChange={e => setJobFilter(e.target.value)}
+              className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
+              <option value="">All Jobs</option>
+              {uniqueJobs.map(j => <option key={j.id} value={j.id}>{j.job_number ? `${j.job_number} — ` : ''}{j.name}</option>)}
+            </select>
+          )}
+          {(search || statusFilter !== 'All' || vendorFilter || jobFilter) && (
+            <button onClick={() => { setSearch(''); setStatusFilter('All'); setVendorFilter(''); setJobFilter('') }}
               className="text-fp-muted hover:text-fp-text text-xs transition-colors">
               Clear
             </button>
@@ -431,26 +443,39 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
               return (
                 <div key={po.id} className="border border-fp-border rounded-xl overflow-x-auto bg-fp-card">
                   <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-fp-hover transition-colors" onClick={() => toggleExpand(po)}>
-                    <div className="flex items-center gap-4">
-                      <div>
-                        <p className="text-fp-text font-semibold text-sm">{po.po_number}</p>
-                        <p className="text-fp-muted text-xs">
-                          {po.vendor_name || '—'}
-                          {po.proposals?.proposal_name && (
-                            <span> · <span className="hover:text-[#C8622A] transition-colors cursor-pointer" onClick={e => { e.stopPropagation(); navigate(`/proposal/${po.proposal_id}`) }}>{po.proposals.proposal_name}</span></span>
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-fp-text font-semibold text-sm">{po.po_number}</p>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${po.status === 'Received' ? 'bg-green-500/20 text-green-400' : po.status === 'Partial' ? 'bg-yellow-500/20 text-yellow-400' : po.status === 'Cancelled' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                            {po.status}
+                          </span>
+                          {progress && <span className="text-fp-muted text-xs">{progress.received}/{progress.total} rcvd</span>}
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <span className="text-fp-muted text-xs">{po.vendor_name || '—'}</span>
+                          {(po.jobs || po.proposals) && <span className="text-fp-muted text-xs">·</span>}
+                          {po.jobs && (
+                            <span className="text-xs text-[#C8622A] font-medium cursor-pointer hover:underline" onClick={e => { e.stopPropagation(); navigate(`/job/${po.job_id}`) }}>
+                              {po.jobs.job_number ? `${po.jobs.job_number} — ` : ''}{po.jobs.name}
+                            </span>
                           )}
-                          {' '}· {new Date(po.created_at).toLocaleDateString()}
-                        </p>
+                          {!po.jobs && po.proposals?.proposal_name && (
+                            <span className="text-xs text-fp-muted cursor-pointer hover:text-[#C8622A] transition-colors" onClick={e => { e.stopPropagation(); navigate(`/proposal/${po.proposal_id}`) }}>
+                              {po.proposals.proposal_name}
+                            </span>
+                          )}
+                          <span className="text-fp-muted text-xs">· {new Date(po.created_at).toLocaleDateString()}</span>
+                        </div>
                       </div>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded ${po.status === 'Received' ? 'bg-green-500/20 text-green-400' : po.status === 'Partial' ? 'bg-yellow-500/20 text-yellow-400' : po.status === 'Cancelled' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                        {po.status}
-                      </span>
-                      {progress && <span className="text-fp-muted text-xs">{progress.received} of {progress.total} received</span>}
                     </div>
-                    <div className="flex items-center gap-4">
-                      <p className="text-fp-text text-sm font-semibold">${(po.total_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                      <div className="text-right">
+                        <p className="text-fp-text font-bold">${fmt(po.total_amount)}</p>
+                        <p className="text-fp-muted text-xs">total</p>
+                      </div>
                       <select value={po.status} onChange={e => { e.stopPropagation(); updateStatus(po.id, e.target.value) }} onClick={e => e.stopPropagation()}
-                        className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
+                        className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
                         {['Sent', 'Partial', 'Received', 'Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
                       <span className="text-fp-muted text-sm">{isExpanded ? '▲' : '▼'}</span>
