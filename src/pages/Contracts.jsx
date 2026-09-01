@@ -407,7 +407,7 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
   const fmt = (n) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
   const clientBreakdown = (() => {
-    const map = {}
+    const map = Object.create(null)
     contracts.filter(c => c.status === 'Active').forEach(c => {
       const company = getContractCompany(c)
       if (!map[company]) map[company] = { sla: 0, monitoring: 0, subscriptions: 0, contractCount: 0, nextRenewal: null }

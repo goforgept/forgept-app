@@ -189,7 +189,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   }).sort((a, b) => new Date(a.close_date) - new Date(b.close_date)).slice(0, 5)
 
   const topClients = useMemo(() => {
-    const clientMap = {}
+    const clientMap = Object.create(null)
     filteredProposals.forEach(p => {
       if (!p.client_id) return
       if (!clientMap[p.client_id]) {

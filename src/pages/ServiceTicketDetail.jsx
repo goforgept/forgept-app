@@ -175,7 +175,9 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     } catch (e) { console.error('Calendar delete error:', e) }
   }
 
+  const TICKET_FIELDS = new Set(['status','priority','assigned_tech_id','scheduled_date','scheduled_end','description','resolution_notes','title','location_id','client_id'])
   const updateTicket = async (field, value) => {
+    if (!TICKET_FIELDS.has(field)) return
     setSaving(true)
     const updates = { [field]: value || null }
     if (field === 'status' && value === 'Resolved') {
@@ -239,7 +241,9 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     your_cost_unit: '', markup_percent: 35, customer_price_unit: ''
   }])
 
+  const MATERIAL_FIELDS = new Set(['item_name','quantity','unit','your_cost_unit','markup_percent','customer_price_unit'])
   const updateMaterial = (id, field, value) => {
+    if (!MATERIAL_FIELDS.has(field)) return
     setLineItems(prev => prev.map(item => {
       if (item.id !== id) return item
       const updated = { ...item, [field]: value }
@@ -260,7 +264,9 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     your_cost: '', markup: 35, customer_price: ''
   }])
 
+  const LABOR_FIELDS = new Set(['role','quantity','unit','your_cost','markup','customer_price'])
   const updateLabor = (i, field, value) => {
+    if (!LABOR_FIELDS.has(field)) return
     setLaborItems(prev => {
       const updated = [...prev]
       updated[i] = { ...updated[i], [field]: value }

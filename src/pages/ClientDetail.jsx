@@ -1045,8 +1045,8 @@ const deleteMeeting = async (meetingId) => {
                           <div className="border-t border-fp-border pt-2 mt-2 space-y-1">
                             <p className="text-fp-muted text-xs font-semibold">Site Contact</p>
                             <p className="text-fp-text text-xs font-medium">{siteContact.full_name}{siteContact.title ? ` · ${siteContact.title}` : ''}</p>
-                            {siteContact.email && <a href={`mailto:${siteContact.email.replace(/[^a-zA-Z0-9.@_%+\-]/g, '')}`} className="text-[#C8622A] text-xs hover:underline block">{siteContact.email}</a>}
-                            {siteContact.phone && <a href={`tel:${siteContact.phone.replace(/[^0-9+\-().#, ]/g, '')}`} className="text-fp-muted text-xs hover:text-fp-text transition-colors block">{siteContact.phone}</a>}
+                            {siteContact.email && /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(siteContact.email) && <a href={`mailto:${siteContact.email}`} className="text-[#C8622A] text-xs hover:underline block">{siteContact.email}</a>}
+                            {siteContact.phone && /^[0-9+\-().#, ]{7,20}$/.test(siteContact.phone) && <a href={`tel:${siteContact.phone}`} className="text-fp-muted text-xs hover:text-fp-text transition-colors block">{siteContact.phone}</a>}
                           </div>
                         )
                         if (loc.site_contact_name || loc.site_contact_email || loc.site_contact_phone) return (
