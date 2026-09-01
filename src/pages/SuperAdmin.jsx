@@ -1421,15 +1421,15 @@ export default function SuperAdmin() {
         {/* Billing Tab */}
         {activeTab === 'billing' && (() => {
           const cancelledOrgs = orgs.filter(o => o.billing_status === 'cancelled').length
-          const planBreakdown = Object.entries(
-            orgs.reduce((acc, org) => {
-              const plan = org.plan || 'Trial'
-              if (!acc[plan]) acc[plan] = { count: 0, revenue: 0, active: 0 }
-              acc[plan].count++
-              if (org.billing_status === 'active') { acc[plan].active++; acc[plan].revenue += parseFloat(org.monthly_rate) || 0 }
-              return acc
-            }, Object.create(null))
-          ).sort((a, b) => b[1].revenue - a[1].revenue)
+          const planMap = new Map()
+          orgs.forEach(org => {
+            const plan = org.plan || 'Trial'
+            if (!planMap.has(plan)) planMap.set(plan, { count: 0, revenue: 0, active: 0 })
+            const entry = planMap.get(plan)
+            entry.count++
+            if (org.billing_status === 'active') { entry.active++; entry.revenue += parseFloat(org.monthly_rate) || 0 }
+          })
+          const planBreakdown = [...planMap.entries()].sort((a, b) => b[1].revenue - a[1].revenue)
 
           const achActive = orgs.filter(o => o.billing_status === 'active' && (o.preferred_payment_method || 'ACH') === 'ACH')
           const ccActive  = orgs.filter(o => o.billing_status === 'active' && o.preferred_payment_method === 'Credit Card')
