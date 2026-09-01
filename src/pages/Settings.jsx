@@ -55,6 +55,11 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [passwordError, setPasswordError] = useState(null)
   const [passwordSuccess, setPasswordSuccess] = useState(null)
   const [savingPassword, setSavingPassword] = useState(false)
+  const [mfaFactors, setMfaFactors] = useState([])
+  const [mfaEnrollData, setMfaEnrollData] = useState(null)
+  const [mfaEnrollCode, setMfaEnrollCode] = useState('')
+  const [mfaEnrollError, setMfaEnrollError] = useState(null)
+  const [mfaSaving, setMfaSaving] = useState(false)
   const [supportPin, setSupportPin] = useState('')
   const [pinInput, setPinInput] = useState('')
   const [savingPin, setSavingPin] = useState(false)
@@ -155,6 +160,10 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setOrgId(profile.org_id || null)
     if (profile.logo_url && profile.logo_url.startsWith('http')) setLogoUrl(profile.logo_url)
   }, [profile?.id])
+
+  useEffect(() => {
+    supabase.auth.mfa.listFactors().then(({ data }) => setMfaFactors(data?.totp?.filter(f => f.status === 'verified') || []))
+  }, [])
 
   useEffect(() => {
     if (profile?.id) fetchProfile()
@@ -427,6 +436,37 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     }
   }
 
+  const startMfaEnroll = async () => {
+    setMfaSaving(true)
+    setMfaEnrollError(null)
+    const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', issuer: 'ForgePt', friendlyName: profile?.email })
+    if (error) { setMfaEnrollError(error.message); setMfaSaving(false); return }
+    setMfaEnrollData({ factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret })
+    setMfaSaving(false)
+  }
+
+  const verifyMfaEnroll = async () => {
+    if (mfaEnrollCode.length !== 6) return
+    setMfaSaving(true)
+    setMfaEnrollError(null)
+    const { data: challenge, error: ce } = await supabase.auth.mfa.challenge({ factorId: mfaEnrollData.factorId })
+    if (ce) { setMfaEnrollError(ce.message); setMfaSaving(false); return }
+    const { error } = await supabase.auth.mfa.verify({ factorId: mfaEnrollData.factorId, challengeId: challenge.id, code: mfaEnrollCode })
+    if (error) { setMfaEnrollError(error.message); setMfaSaving(false); return }
+    const { data } = await supabase.auth.mfa.listFactors()
+    setMfaFactors(data?.totp?.filter(f => f.status === 'verified') || [])
+    setMfaEnrollData(null)
+    setMfaEnrollCode('')
+    setMfaSaving(false)
+  }
+
+  const disableMfa = async (factorId) => {
+    setMfaSaving(true)
+    await supabase.auth.mfa.unenroll({ factorId })
+    setMfaFactors(prev => prev.filter(f => f.id !== factorId))
+    setMfaSaving(false)
+  }
+
   const savePin = async () => {
     if (pinInput.length !== 6) return
     setSavingPin(true)
@@ -489,7 +529,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const inputClass = "w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   const navGroups = [
-    { items: [{ key: 'general', label: 'General' }, { key: 'proposals', label: 'Proposals' }] },
+    { items: [{ key: 'general', label: 'General' }, { key: 'proposals', label: 'Proposals' }, { key: 'security', label: 'Security' }] },
     ...(isAdmin && !featureDesignerOnly ? [{
       label: 'Admin',
       items: [
@@ -672,6 +712,75 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           {activeTab === 'team' && <TeamSettingsTab featureDesignerOnly={featureDesignerOnly} />}
 
           {activeTab === 'feedback' && <FeedbackTab profile={profile} />}
+
+          {activeTab === 'security' && (
+            <div className="space-y-6 max-w-lg">
+              <div>
+                <h3 className="text-fp-text font-semibold text-sm mb-1">Two-Factor Authentication</h3>
+                <p className="text-fp-muted text-xs mb-4">Add an extra layer of security to your account using an authenticator app like Google Authenticator or Authy.</p>
+
+                {mfaFactors.length > 0 ? (
+                  <div className="bg-fp-inset rounded-xl p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-green-500/10 rounded-lg flex items-center justify-center text-green-400 text-sm">✓</div>
+                      <div>
+                        <p className="text-fp-text text-sm font-medium">2FA is enabled</p>
+                        <p className="text-fp-muted text-xs">Authenticator app</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => disableMfa(mfaFactors[0].id)}
+                      disabled={mfaSaving}
+                      className="text-xs text-red-400 hover:text-red-300 transition-colors disabled:opacity-50"
+                    >
+                      {mfaSaving ? 'Disabling...' : 'Disable'}
+                    </button>
+                  </div>
+                ) : mfaEnrollData ? (
+                  <div className="space-y-4">
+                    <p className="text-fp-muted text-xs">Scan this QR code with your authenticator app, then enter the 6-digit code to verify.</p>
+                    <div className="bg-white rounded-xl p-4 inline-block" dangerouslySetInnerHTML={{ __html: mfaEnrollData.qrCode }} />
+                    <div>
+                      <p className="text-fp-muted text-xs mb-1">Or enter this key manually:</p>
+                      <code className="text-fp-text text-xs bg-fp-inset px-2 py-1 rounded font-mono break-all">{mfaEnrollData.secret}</code>
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={mfaEnrollCode}
+                      onChange={e => setMfaEnrollCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      placeholder="000000"
+                      className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-center tracking-[0.3em] text-lg focus:outline-none focus:border-fp-brand"
+                    />
+                    {mfaEnrollError && <p className="text-red-400 text-xs">{mfaEnrollError}</p>}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={verifyMfaEnroll}
+                        disabled={mfaSaving || mfaEnrollCode.length !== 6}
+                        className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+                      >
+                        {mfaSaving ? 'Verifying...' : 'Verify & Enable'}
+                      </button>
+                      <button
+                        onClick={() => { setMfaEnrollData(null); setMfaEnrollCode(''); setMfaEnrollError(null) }}
+                        className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={startMfaEnroll}
+                    disabled={mfaSaving}
+                    className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+                  >
+                    {mfaSaving ? 'Setting up...' : 'Enable 2FA'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

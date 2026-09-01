@@ -13,11 +13,36 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  const [mfaFactorId, setMfaFactorId] = useState(null)
+  const [mfaChallengeId, setMfaChallengeId] = useState(null)
+  const [mfaCode, setMfaCode] = useState('')
 
   const handleLogin = async () => {
     setLoading(true)
     setError(null)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) { setError(error.message); setLoading(false); return }
+
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    if (aal?.nextLevel === 'aal2' && aal?.currentLevel !== 'aal2') {
+      const { data: factors } = await supabase.auth.mfa.listFactors()
+      const totp = factors?.totp?.[0]
+      if (totp) {
+        const { data: challenge } = await supabase.auth.mfa.challenge({ factorId: totp.id })
+        setMfaFactorId(totp.id)
+        setMfaChallengeId(challenge?.id)
+        setTab('mfa')
+      }
+    }
+    setLoading(false)
+  }
+
+  const handleMfaVerify = async (code) => {
+    const c = code ?? mfaCode
+    if (c.length !== 6) return
+    setLoading(true)
+    setError(null)
+    const { error } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: mfaChallengeId, code: c })
     if (error) setError(error.message)
     setLoading(false)
   }
@@ -86,29 +111,59 @@ export default function Login() {
         </div>
 
         <div className="bg-fp-card rounded-2xl p-8">
-          <div className="flex gap-2 mb-6">
-            <button
-              onClick={() => { setTab('login'); setError(null); setSuccess(null) }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                tab === 'login' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              onClick={() => { setTab('request'); setError(null); setSuccess(null) }}
-              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                tab === 'request' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'
-              }`}
-            >
-              Request Access
-            </button>
-          </div>
+          {tab !== 'mfa' && (
+            <div className="flex gap-2 mb-6">
+              <button
+                onClick={() => { setTab('login'); setError(null); setSuccess(null) }}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  tab === 'login' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => { setTab('request'); setError(null); setSuccess(null) }}
+                className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  tab === 'request' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'
+                }`}
+              >
+                Request Access
+              </button>
+            </div>
+          )}
 
           {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
           {success && <p className="text-green-400 text-sm mb-4">{success}</p>}
 
-          {tab === 'login' ? (
+          {tab === 'mfa' ? (
+            <div className="space-y-5">
+              <div className="text-center">
+                <div className="text-3xl mb-2">🔐</div>
+                <p className="text-fp-text font-semibold">Two-factor authentication</p>
+                <p className="text-fp-muted text-sm mt-1">Enter the 6-digit code from your authenticator app</p>
+              </div>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoFocus
+                value={mfaCode}
+                onChange={e => {
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 6)
+                  setMfaCode(v)
+                  if (v.length === 6) handleMfaVerify(v)
+                }}
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-3 text-center tracking-[0.4em] text-xl focus:outline-none focus:border-fp-brand"
+                placeholder="000000"
+              />
+              <button
+                onClick={() => handleMfaVerify()}
+                disabled={loading || mfaCode.length !== 6}
+                className="w-full bg-fp-brand text-white py-3 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Verifying...' : 'Verify'}
+              </button>
+            </div>
+          ) : tab === 'login' ? (
             <div className="space-y-4">
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Email</label>
