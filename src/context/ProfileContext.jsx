@@ -11,10 +11,6 @@ export function ProfileProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = async (userId) => {
-    const impersonation = (() => {
-      try { return JSON.parse(localStorage.getItem('sa_impersonate') || 'null') } catch { return null }
-    })()
-
     for (let i = 0; i < 5; i++) {
       const { data, error } = await supabase
         .from('profiles')
@@ -23,23 +19,12 @@ export function ProfileProvider({ children }) {
         .single()
 
       if (error && error.code !== 'PGRST116') {
-        // Hard error (bad query, missing column, etc.) — stop retrying
         console.error('Profile fetch error:', error.message)
         setLoading(false)
         return
       }
 
       if (data?.org_role) {
-        if (data.role === 'superadmin' && impersonation?.userId) {
-          const { data: impResult } = await supabase.functions.invoke('superadmin-get-profile', {
-            body: { userId: impersonation.userId }
-          })
-          if (impResult?.profile) {
-            setProfile(impResult.profile)
-            setLoading(false)
-            return
-          }
-        }
         setProfile(data)
         setLoading(false)
         return
@@ -48,7 +33,6 @@ export function ProfileProvider({ children }) {
       await new Promise(resolve => setTimeout(resolve, 1000))
     }
 
-    // Final fallback after retries
     const { data } = await supabase
       .from('profiles')
       .select(PROFILE_SELECT)

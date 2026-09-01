@@ -473,16 +473,6 @@ export default function SuperAdmin() {
   }
 
 
-  const impersonateUser = (org, user) => {
-    localStorage.setItem('sa_impersonate', JSON.stringify({
-      orgId: org.id,
-      orgName: org.name,
-      userId: user.id,
-      userName: user.full_name,
-    }))
-    window.location.href = '/'
-  }
-
   const lookupSupportCode = async () => {
     const q = codeQuery.trim().toLowerCase()
     if (q.length !== 8) return
@@ -842,14 +832,6 @@ export default function SuperAdmin() {
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={() => impersonateUser(
-                    { id: codeResult.org_id, name: codeResult.organizations?.name || codeResult.company_name },
-                    { id: codeResult.id, full_name: codeResult.full_name }
-                  )}
-                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors whitespace-nowrap">
-                  View as User
-                </button>
               </div>
             )}
           </div>
@@ -1021,7 +1003,6 @@ export default function SuperAdmin() {
                             }
                           </p>
                         </div>
-                        <button onClick={() => impersonateUser(org, u)} className="bg-[#C8622A]/20 text-[#C8622A] px-3 py-1 rounded text-xs font-semibold hover:bg-[#C8622A]/30 transition-colors">Impersonate</button>
                       </div>
                     ))}
                     {members.length === 0 && <p className="text-[#8A9AB0] text-sm">No users yet.</p>}
