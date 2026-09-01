@@ -550,7 +550,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
       ]
     }] : []),
     ...(featureDesignerOnly ? [{ label: 'Team', items: [{ key: 'team', label: 'Team' }] }] : []),
-    { items: [{ key: 'feedback', label: 'Request a Feature' }] },
+    { items: [{ key: 'feedback', label: 'Request a Feature' }, { key: 'support', label: 'Support' }] },
   ]
 
   return (
@@ -712,6 +712,56 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           {activeTab === 'team' && <TeamSettingsTab featureDesignerOnly={featureDesignerOnly} />}
 
           {activeTab === 'feedback' && <FeedbackTab profile={profile} />}
+
+          {activeTab === 'support' && (
+            <div className="space-y-6 max-w-lg">
+              <div className="bg-fp-inset rounded-xl p-4">
+                <p className="text-fp-muted text-xs mb-1">Your support code</p>
+                <div className="flex items-center gap-2">
+                  <code className="text-fp-text font-mono text-lg tracking-widest">{profile?.id?.slice(0, 8).toUpperCase()}</code>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(profile?.id?.slice(0, 8).toUpperCase())}
+                    className="text-xs text-fp-muted hover:text-fp-text transition-colors"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-fp-muted text-xs mt-1">Provide this code when contacting support so we can locate your account quickly.</p>
+              </div>
+
+              <div>
+                <h3 className="text-fp-text font-semibold text-sm mb-3">Contact Support</h3>
+                <a
+                  href="mailto:Hello@goforgept.com"
+                  className="inline-flex items-center gap-2 bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+                >
+                  Email Hello@goforgept.com
+                </a>
+                <p className="text-fp-muted text-xs mt-2">We typically respond within 1 business day.</p>
+              </div>
+
+              <div>
+                <h3 className="text-fp-text font-semibold text-sm mb-1">Remote Support — Desktop</h3>
+                <p className="text-fp-muted text-xs mb-3">We can view your screen remotely to help troubleshoot issues on Mac or Windows.</p>
+                <ol className="text-fp-muted text-xs space-y-2 list-decimal list-inside">
+                  <li>Visit <a href="https://remotedesktop.google.com/support" target="_blank" rel="noreferrer" className="text-fp-brand hover:underline">remotedesktop.google.com/support</a> in Chrome</li>
+                  <li>Click <strong className="text-fp-text">Generate Code</strong> and copy the one-time access code</li>
+                  <li>Email the code to <a href="mailto:Hello@goforgept.com" className="text-fp-brand hover:underline">Hello@goforgept.com</a> along with your support code above</li>
+                </ol>
+              </div>
+
+              <div>
+                <h3 className="text-fp-text font-semibold text-sm mb-1">Remote Support — iPhone / iPad</h3>
+                <p className="text-fp-muted text-xs mb-3">Record a screen share showing the issue and send it to us.</p>
+                <ol className="text-fp-muted text-xs space-y-2 list-decimal list-inside">
+                  <li>Swipe down from the top-right corner to open Control Center</li>
+                  <li>Tap the Screen Recording button (circle inside a circle) to start recording</li>
+                  <li>Reproduce the issue, then stop the recording from Control Center</li>
+                  <li>Email the video along with your support code to <a href="mailto:Hello@goforgept.com" className="text-fp-brand hover:underline">Hello@goforgept.com</a></li>
+                </ol>
+              </div>
+            </div>
+          )}
 
           {activeTab === 'security' && (
             <div className="space-y-6 max-w-lg">
