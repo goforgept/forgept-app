@@ -495,10 +495,9 @@ export default function SuperAdmin() {
       .gte('id', `${q}-0000-0000-0000-000000000000`)
       .lte('id', `${q}-ffff-ffff-ffff-ffffffffffff`)
       .limit(1)
-      .single()
     setCodeLookupLoading(false)
-    if (error || !data) { setCodeError('No account found with that code.'); return }
-    setCodeResult(data)
+    if (error || !data?.length) { setCodeError('No account found with that code.'); return }
+    setCodeResult(data[0])
   }
 
   const getOrgHealth = (orgId) => {
