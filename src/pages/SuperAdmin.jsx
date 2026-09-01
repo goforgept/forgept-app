@@ -492,7 +492,8 @@ export default function SuperAdmin() {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, full_name, email, org_id, company_name, organizations(name, billing_status)')
-      .filter('id::text', 'like', `${q}-%`)
+      .gte('id', `${q}-0000-0000-0000-000000000000`)
+      .lte('id', `${q}-ffff-ffff-ffff-ffffffffffff`)
       .limit(1)
       .single()
     setCodeLookupLoading(false)
