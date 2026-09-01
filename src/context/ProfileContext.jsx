@@ -47,7 +47,7 @@ export function ProfileProvider({ children }) {
       setSession(session)
       if (session) {
         fetchProfile(session.user.id)
-        supabase.rpc('update_last_login')
+        supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', session.user.id)
       } else setLoading(false)
     })
 
@@ -56,7 +56,7 @@ export function ProfileProvider({ children }) {
       if (session) {
         fetchProfile(session.user.id)
         if (_event === 'SIGNED_IN') {
-          supabase.rpc('update_last_login')
+          supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', session.user.id)
         }
       } else {
         setProfile(null)
