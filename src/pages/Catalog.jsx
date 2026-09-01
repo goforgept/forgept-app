@@ -100,6 +100,7 @@ export default function Catalog({ isAdmin, featureProposals = true, featureCRM =
   const handleFileUpload = async (e) => {
     const file = e.target.files[0]
     if (!file) return
+    if (file.size > 10 * 1024 * 1024) { setError('File must be under 10 MB'); return }
     setUploadFileName(file.name)
     setUploading(true)
     setError(null)

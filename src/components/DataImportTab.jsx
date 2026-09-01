@@ -35,6 +35,7 @@ export default function DataImportTab({
   }, [])
 
   const handleFileUpload = async (file) => {
+    if (file.size > 10 * 1024 * 1024) return
     setImportFile(file)
     setImportPreview([])
     setImportHeaders([])
