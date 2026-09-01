@@ -14,21 +14,32 @@ const METRICS = [
 ]
 
 const PERIODS = [
-  { key: 'weekly',  label: 'This Week' },
-  { key: 'monthly', label: 'This Month' },
+  { key: 'weekly',  label: 'Weekly' },
+  { key: 'monthly', label: 'Monthly' },
 ]
 
-function periodStart(key) {
+function getPeriodRange(key, offset) {
   const now = new Date()
   if (key === 'weekly') {
     const day = now.getDay()
     const diff = now.getDate() - day + (day === 0 ? -6 : 1)
-    const mon = new Date(now)
-    mon.setDate(diff)
-    mon.setHours(0, 0, 0, 0)
-    return mon.toISOString()
+    const start = new Date(now)
+    start.setDate(diff + offset * 7)
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(start)
+    end.setDate(start.getDate() + 7)
+    const label = offset === 0 ? 'This Week'
+      : offset === -1 ? 'Last Week'
+      : start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' – ' + new Date(end - 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return { start: start.toISOString(), end: end.toISOString(), label }
+  } else {
+    const start = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+    const end = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1)
+    const label = offset === 0 ? 'This Month'
+      : offset === -1 ? 'Last Month'
+      : start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    return { start: start.toISOString(), end: end.toISOString(), label }
   }
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
 }
 
 function ProgressBar({ value, target }) {
@@ -49,6 +60,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
   const navigate = useNavigate()
 
   const [period, setPeriod] = useState('monthly')
+  const [periodOffset, setPeriodOffset] = useState(0)
   const [reps, setReps] = useState([])
   const [activities, setActivities] = useState([])
   const [meetings, setMeetings] = useState([])
@@ -70,11 +82,11 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
   useEffect(() => {
     if (!profile?.org_id) return
     load()
-  }, [profile?.org_id, period])
+  }, [profile?.org_id, period, periodOffset])
 
   const load = async () => {
     setLoading(true)
-    const start = periodStart(period)
+    const { start, end } = getPeriodRange(period, periodOffset)
     const orgId = profile.org_id
 
     const [
@@ -85,9 +97,9 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
       { data: tgtData },
     ] = await Promise.all([
       supabase.from('profiles').select('id, full_name, org_role, role').eq('org_id', orgId).order('full_name'),
-      supabase.from('activities').select('user_id, type, created_at').eq('org_id', orgId).gte('created_at', start).not('source', 'eq', 'system'),
-      supabase.from('tasks').select('assigned_to, created_at').eq('org_id', orgId).gte('created_at', start).not('meeting_type', 'is', null),
-      supabase.from('proposals').select('user_id, status, created_at').eq('org_id', orgId).gte('created_at', start),
+      supabase.from('activities').select('user_id, type, created_at').eq('org_id', orgId).gte('created_at', start).lt('created_at', end).not('source', 'eq', 'system'),
+      supabase.from('tasks').select('assigned_to, created_at').eq('org_id', orgId).gte('created_at', start).lt('created_at', end).not('meeting_type', 'is', null),
+      supabase.from('proposals').select('user_id, status, created_at').eq('org_id', orgId).gte('created_at', start).lt('created_at', end),
       supabase.from('rep_kpi_targets').select('*').eq('org_id', orgId).eq('period_type', period),
     ])
 
@@ -187,7 +199,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
     setDrilldown({ rep, metricKey })
     setDrilldownData([])
     setDrilldownLoading(true)
-    const start = periodStart(period)
+    const { start, end } = getPeriodRange(period, periodOffset)
     const orgId = profile.org_id
 
     if (['calls', 'emails', 'notes'].includes(metricKey)) {
@@ -198,7 +210,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
         .eq('org_id', orgId)
         .eq('user_id', rep.id)
         .eq('type', typeMap[metricKey])
-        .gte('created_at', start)
+        .gte('created_at', start).lt('created_at', end)
         .order('created_at', { ascending: false })
       setDrilldownData(data || [])
     } else if (metricKey === 'meetings') {
@@ -208,14 +220,14 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
           .eq('org_id', orgId)
           .eq('assigned_to', rep.id)
           .not('meeting_type', 'is', null)
-          .gte('created_at', start)
+          .gte('created_at', start).lt('created_at', end)
           .order('created_at', { ascending: false }),
         supabase.from('activities')
           .select('id, title, body, created_at, client_id, client_contacts(full_name), clients(company, client_name)')
           .eq('org_id', orgId)
           .eq('user_id', rep.id)
           .eq('type', 'meeting')
-          .gte('created_at', start)
+          .gte('created_at', start).lt('created_at', end)
           .order('created_at', { ascending: false }),
       ])
       const combined = [
@@ -228,7 +240,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
         .select('id, proposal_name, proposal_value, status, created_at, company, client_id')
         .eq('org_id', orgId)
         .eq('user_id', rep.id)
-        .gte('created_at', start)
+        .gte('created_at', start).lt('created_at', end)
         .order('created_at', { ascending: false })
       if (metricKey === 'deals_won') q = q.eq('status', 'Won')
       const { data } = await q
@@ -243,7 +255,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
 
   const exportRepCSV = (rep) => {
     const stats = actuals[rep.id] || {}
-    const periodLabel = PERIODS.find(p => p.key === period)?.label || period
+    const periodLabel = getPeriodRange(period, periodOffset).label
     const rows = [
       ['Rep', 'Period', 'Metric', 'Actual', 'Target', '% to Target'],
       ...METRICS.map(m => {
@@ -273,13 +285,22 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
           <h1 className="text-fp-text font-bold text-2xl">Sales KPIs</h1>
           <p className="text-fp-muted text-sm mt-0.5">Activity targets and actuals per rep</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           {PERIODS.map(p => (
-            <button key={p.key} onClick={() => setPeriod(p.key)}
+            <button key={p.key} onClick={() => { setPeriod(p.key); setPeriodOffset(0) }}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${period === p.key ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
               {p.label}
             </button>
           ))}
+          <div className="flex items-center gap-1 bg-fp-inset rounded-lg px-1 py-1">
+            <button onClick={() => setPeriodOffset(o => o - 1)}
+              className="text-fp-muted hover:text-fp-text px-2 py-1 rounded transition-colors text-sm">‹</button>
+            <span className="text-fp-text text-sm font-medium px-2 min-w-[110px] text-center">
+              {getPeriodRange(period, periodOffset).label}
+            </span>
+            <button onClick={() => setPeriodOffset(o => o + 1)} disabled={periodOffset >= 0}
+              className="text-fp-muted hover:text-fp-text px-2 py-1 rounded transition-colors text-sm disabled:opacity-30">›</button>
+          </div>
         </div>
       </div>
 
@@ -415,7 +436,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                 {METRICS.find(m => m.key === drilldown.metricKey)?.label}
               </p>
               <p className="text-fp-muted text-xs mt-0.5">
-                {drilldown.rep.full_name} · {PERIODS.find(p => p.key === period)?.label}
+                {drilldown.rep.full_name} · {getPeriodRange(period, periodOffset).label}
               </p>
             </div>
             <button onClick={() => setDrilldown(null)} className="text-fp-muted hover:text-fp-text text-xl leading-none">×</button>
