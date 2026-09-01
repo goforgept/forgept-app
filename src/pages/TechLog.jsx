@@ -425,7 +425,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
   const removeStMaterial = (id) => setStMaterials(prev => prev.filter(m => m.id !== id))
 
   // Compute per-job running totals from all logs (for list view)
-  const jobLogTotals = {}
+  const jobLogTotals = Object.create(null)
   logs.forEach(log => {
     if (!log.job_id) return
     if (!jobLogTotals[log.job_id]) jobLogTotals[log.job_id] = { hours: 0, materials: Object.create(null) }

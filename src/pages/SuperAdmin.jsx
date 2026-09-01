@@ -1447,7 +1447,7 @@ export default function SuperAdmin() {
               acc[plan].count++
               if (org.billing_status === 'active') { acc[plan].active++; acc[plan].revenue += parseFloat(org.monthly_rate) || 0 }
               return acc
-            }, {})
+            }, Object.create(null))
           ).sort((a, b) => b[1].revenue - a[1].revenue)
 
           const achActive = orgs.filter(o => o.billing_status === 'active' && (o.preferred_payment_method || 'ACH') === 'ACH')

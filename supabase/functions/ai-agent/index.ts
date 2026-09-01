@@ -173,7 +173,7 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       const { data: proposals } = await supabase.from("proposals")
         .select("status, proposal_value, pipeline_stage_id, pipeline_stages(name)")
         .eq("org_id", orgId)
-      const summary: Record<string, { count: number; value: number }> = {}
+      const summary = Object.create(null) as Record<string, { count: number; value: number }>
       for (const p of (proposals || [])) {
         const stage = p.pipeline_stages?.name || p.status || "Unknown"
         if (!summary[stage]) summary[stage] = { count: 0, value: 0 }
