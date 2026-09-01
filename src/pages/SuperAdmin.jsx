@@ -342,10 +342,10 @@ export default function SuperAdmin() {
   const [loadingDetail, setLoadingDetail] = useState(null)
   const [orgSearch, setOrgSearch] = useState('')
   const [metricsSortBy, setMetricsSortBy] = useState('health')
-  const [pinQuery, setPinQuery] = useState('')
-  const [pinResult, setPinResult] = useState(null)
-  const [pinLookupLoading, setPinLookupLoading] = useState(false)
-  const [pinError, setPinError] = useState(null)
+  const [codeQuery, setCodeQuery] = useState('')
+  const [codeResult, setCodeResult] = useState(null)
+  const [codeLookupLoading, setCodeLookupLoading] = useState(false)
+  const [codeError, setCodeError] = useState(null)
 
   // Password gate
   const [passwordInput, setPasswordInput] = useState('')
@@ -483,16 +483,21 @@ export default function SuperAdmin() {
     window.location.href = '/'
   }
 
-  const lookupPin = async () => {
-    if (!/^\d{6}$/.test(pinQuery)) return
-    setPinLookupLoading(true)
-    setPinError(null)
-    setPinResult(null)
-    const { data, error } = await supabase.functions.invoke('superadmin-pin-lookup', { body: { pin: pinQuery } })
-    setPinLookupLoading(false)
-    if (error) { setPinError('Lookup failed. Try again.'); return }
-    if (!data?.match) { setPinError('No account found with that PIN.'); return }
-    setPinResult(data.match)
+  const lookupSupportCode = async () => {
+    const q = codeQuery.trim().toLowerCase()
+    if (q.length !== 8) return
+    setCodeLookupLoading(true)
+    setCodeError(null)
+    setCodeResult(null)
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, email, org_id, company_name, organizations(name, billing_status)')
+      .ilike('id', `${q}%`)
+      .limit(1)
+      .single()
+    setCodeLookupLoading(false)
+    if (error || !data) { setCodeError('No account found with that code.'); return }
+    setCodeResult(data)
   }
 
   const getOrgHealth = (orgId) => {
@@ -806,46 +811,45 @@ export default function SuperAdmin() {
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">MRR</p><p className="text-[#C8622A] text-2xl font-bold">${mrr.toLocaleString()}</p></div>
         </div>
 
-        {/* Support PIN Lookup */}
+        {/* Support Code Lookup */}
         <div className="bg-[#1a2d45] rounded-xl p-5">
           <div className="flex items-start gap-6">
             <div className="flex-1">
-              <p className="text-white font-semibold text-sm mb-1">Support PIN Lookup</p>
-              <p className="text-[#8A9AB0] text-xs mb-3">Enter the 6-digit PIN the user reads to you to identify their account.</p>
+              <p className="text-white font-semibold text-sm mb-1">Support Code Lookup</p>
+              <p className="text-[#8A9AB0] text-xs mb-3">Enter the 8-character code from the user's Settings → Support page.</p>
               <div className="flex items-center gap-3">
                 <input
                   type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={pinQuery}
-                  onChange={e => { setPinQuery(e.target.value.replace(/\D/g, '').slice(0, 6)); setPinResult(null); setPinError(null) }}
-                  onKeyDown={e => e.key === 'Enter' && lookupPin()}
-                  placeholder="000000"
-                  className="w-32 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm font-mono tracking-widest focus:outline-none focus:border-[#C8622A]"
+                  maxLength={8}
+                  value={codeQuery}
+                  onChange={e => { setCodeQuery(e.target.value.toUpperCase().slice(0, 8)); setCodeResult(null); setCodeError(null) }}
+                  onKeyDown={e => e.key === 'Enter' && lookupSupportCode()}
+                  placeholder="XXXXXXXX"
+                  className="w-36 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm font-mono tracking-widest focus:outline-none focus:border-[#C8622A]"
                 />
-                <button onClick={lookupPin} disabled={pinLookupLoading || pinQuery.length !== 6}
+                <button onClick={lookupSupportCode} disabled={codeLookupLoading || codeQuery.length !== 8}
                   className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40">
-                  {pinLookupLoading ? 'Looking up...' : 'Look Up'}
+                  {codeLookupLoading ? 'Looking up...' : 'Look Up'}
                 </button>
-                {pinError && <span className="text-red-400 text-sm">{pinError}</span>}
+                {codeError && <span className="text-red-400 text-sm">{codeError}</span>}
               </div>
             </div>
-            {pinResult && (
+            {codeResult && (
               <div className="bg-[#0F1C2E] rounded-xl p-4 flex items-center gap-6 min-w-[320px]">
                 <div className="flex-1">
-                  <p className="text-white font-semibold">{pinResult.full_name}</p>
-                  <p className="text-[#8A9AB0] text-xs">{pinResult.email}</p>
-                  <p className="text-[#C8622A] text-xs mt-1 font-medium">{pinResult.organizations?.name || pinResult.company_name}</p>
-                  {pinResult.organizations?.billing_status && (
-                    <span className={`text-xs px-2 py-0.5 rounded-full mt-1 inline-block ${pinResult.organizations.billing_status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
-                      {pinResult.organizations.billing_status}
+                  <p className="text-white font-semibold">{codeResult.full_name}</p>
+                  <p className="text-[#8A9AB0] text-xs">{codeResult.email}</p>
+                  <p className="text-[#C8622A] text-xs mt-1 font-medium">{codeResult.organizations?.name || codeResult.company_name}</p>
+                  {codeResult.organizations?.billing_status && (
+                    <span className={`text-xs px-2 py-0.5 rounded-full mt-1 inline-block ${codeResult.organizations.billing_status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                      {codeResult.organizations.billing_status}
                     </span>
                   )}
                 </div>
                 <button
                   onClick={() => impersonateUser(
-                    { id: pinResult.org_id, name: pinResult.organizations?.name || pinResult.company_name },
-                    { id: pinResult.id, full_name: pinResult.full_name }
+                    { id: codeResult.org_id, name: codeResult.organizations?.name || codeResult.company_name },
+                    { id: codeResult.id, full_name: codeResult.full_name }
                   )}
                   className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors whitespace-nowrap">
                   View as User

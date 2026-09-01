@@ -60,10 +60,6 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [mfaEnrollCode, setMfaEnrollCode] = useState('')
   const [mfaEnrollError, setMfaEnrollError] = useState(null)
   const [mfaSaving, setMfaSaving] = useState(false)
-  const [supportPin, setSupportPin] = useState('')
-  const [pinInput, setPinInput] = useState('')
-  const [savingPin, setSavingPin] = useState(false)
-  const [pinSaved, setPinSaved] = useState(false)
   const [sameAsShipTo, setSameAsShipTo] = useState(false)
   const [expandedStage, setExpandedStage] = useState('early')
   const [orgTaxRate, setOrgTaxRate] = useState('')
@@ -213,14 +209,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   }, [profile?.id])
 
   const fetchProfile = async () => {
-    const { data: extraData } = await supabase.from('profiles').select('support_pin, terms_and_conditions, about_us, email_template_early_subject, email_template_early_body, email_cadence_early, email_template_14day_subject, email_template_14day_body, email_cadence_14day, email_template_7day_subject, email_template_7day_body, email_cadence_7day, email_template_close_subject, email_template_close_body, email_template_rfq_subject, email_template_rfq_body, email_template_send_subject, email_template_send_body, payment_instructions_bank, payment_instructions_routing, payment_instructions_account, google_email, microsoft_email').eq('id', profile.id).single()
+    const { data: extraData } = await supabase.from('profiles').select('terms_and_conditions, about_us, email_template_early_subject, email_template_early_body, email_cadence_early, email_template_14day_subject, email_template_14day_body, email_cadence_14day, email_template_7day_subject, email_template_7day_body, email_cadence_7day, email_template_close_subject, email_template_close_body, email_template_rfq_subject, email_template_rfq_body, email_template_send_subject, email_template_send_body, payment_instructions_bank, payment_instructions_routing, payment_instructions_account, google_email, microsoft_email').eq('id', profile.id).single()
     const data = { ...profile, ...extraData }
-    let pin = data?.support_pin || ''
-    if (!pin) {
-      pin = String(Math.floor(100000 + Math.random() * 900000))
-      await supabase.from('profiles').update({ support_pin: pin }).eq('id', data.id)
-    }
-    setSupportPin(pin); setPinInput(pin)
     if (data?.logo_url) {
       if (data.logo_url.startsWith('http')) { setLogoUrl(data.logo_url) }
       else {
@@ -467,24 +457,6 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     setMfaSaving(false)
   }
 
-  const savePin = async () => {
-    if (pinInput.length !== 6) return
-    setSavingPin(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({ support_pin: pinInput }).eq('id', user.id)
-    setSupportPin(pinInput); setSavingPin(false); setPinSaved(true)
-    setTimeout(() => setPinSaved(false), 2000)
-  }
-
-  const regeneratePin = async () => {
-    const pin = String(Math.floor(100000 + Math.random() * 900000))
-    setPinInput(pin); setSavingPin(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({ support_pin: pin }).eq('id', user.id)
-    setSupportPin(pin); setSavingPin(false); setPinSaved(true)
-    setTimeout(() => setPinSaved(false), 2000)
-  }
-
   const saveRateCard = async () => {
     setSavingRates(true)
     try {
@@ -591,7 +563,6 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
               orgTimezone={orgTimezone} setOrgTimezone={setOrgTimezone}
               passwordForm={passwordForm} setPasswordForm={setPasswordForm} passwordError={passwordError} passwordSuccess={passwordSuccess}
               savingPassword={savingPassword} handleChangePassword={handleChangePassword}
-              supportPin={supportPin} pinInput={pinInput} setPinInput={setPinInput} savingPin={savingPin} pinSaved={pinSaved} savePin={savePin} regeneratePin={regeneratePin}
               sameAsShipTo={sameAsShipTo} handleSameAsShipTo={handleSameAsShipTo} profile={profile} saving={saving} handleSave={handleSave}
               currentTheme={currentTheme} applyTheme={applyTheme} />
           )}

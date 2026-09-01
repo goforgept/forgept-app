@@ -2,7 +2,6 @@ export default function GeneralTab({
   form, setForm, inputClass,
   orgTimezone, setOrgTimezone,
   passwordForm, setPasswordForm, passwordError, passwordSuccess, savingPassword, handleChangePassword,
-  supportPin, pinInput, setPinInput, savingPin, pinSaved, savePin, regeneratePin,
   sameAsShipTo, handleSameAsShipTo, profile, saving, handleSave,
   currentTheme = 'dark', applyTheme,
 }) {
@@ -89,33 +88,6 @@ export default function GeneralTab({
           className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-50">
           {savingPassword ? 'Updating...' : 'Update Password'}
         </button>
-      </div>
-
-      {/* Support PIN */}
-      <div className="bg-fp-card rounded-xl p-6">
-        <h3 className="text-fp-text font-bold mb-1">Support PIN</h3>
-        <p className="text-fp-muted text-sm mb-5">Share this 6-digit PIN with ForgePt support when you need help.</p>
-        <div className="flex items-center gap-3 mb-4">
-          {supportPin.split('').map((digit, i) => (
-            <div key={i} className="w-10 h-12 bg-fp-bg border border-fp-border rounded-lg flex items-center justify-center text-fp-text text-2xl font-mono font-bold select-all">
-              {digit}
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center gap-3">
-          <input type="text" inputMode="numeric" maxLength={6} value={pinInput}
-            onChange={e => setPinInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
-            className="w-32 bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm font-mono tracking-widest focus:outline-none focus:border-fp-brand"
-            placeholder="000000" />
-          <button onClick={savePin} disabled={savingPin || pinInput.length !== 6 || pinInput === supportPin}
-            className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-colors disabled:opacity-40">
-            {savingPin ? 'Saving...' : 'Save PIN'}
-          </button>
-          <button onClick={regeneratePin} disabled={savingPin} className="text-fp-muted hover:text-fp-text text-sm transition-colors disabled:opacity-40">
-            ↺ Regenerate
-          </button>
-          {pinSaved && <span className="text-green-400 text-sm">Saved!</span>}
-        </div>
       </div>
 
       {/* Bill To / Ship To */}
