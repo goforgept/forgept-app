@@ -160,7 +160,7 @@ function App() {
       {impersonation && (
         <div className="fixed top-0 left-0 right-0 z-[9999] bg-blue-600 text-fp-text text-xs flex items-center justify-between px-4 py-1.5">
           <span>Superadmin viewing as <strong>{impersonation.orgName}</strong> · {impersonation.userName}</span>
-          <button onClick={() => { localStorage.removeItem('sa_impersonate'); window.location.reload() }} className="underline hover:no-underline ml-4">Exit</button>
+          <button onClick={() => { localStorage.removeItem('sa_impersonate'); window.location.href = '/superadmin' }} className="underline hover:no-underline ml-4">Exit</button>
         </div>
       )}
       {session?.user?.app_metadata?.must_change_password && (

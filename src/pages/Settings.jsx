@@ -60,6 +60,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const [mfaEnrollCode, setMfaEnrollCode] = useState('')
   const [mfaEnrollError, setMfaEnrollError] = useState(null)
   const [mfaSaving, setMfaSaving] = useState(false)
+  const [supportCodeCopied, setSupportCodeCopied] = useState(false)
   const [sameAsShipTo, setSameAsShipTo] = useState(false)
   const [expandedStage, setExpandedStage] = useState('early')
   const [orgTaxRate, setOrgTaxRate] = useState('')
@@ -691,10 +692,10 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                 <div className="flex items-center gap-2">
                   <code className="text-fp-text font-mono text-lg tracking-widest">{profile?.id?.slice(0, 8).toUpperCase()}</code>
                   <button
-                    onClick={() => navigator.clipboard.writeText(profile?.id?.slice(0, 8).toUpperCase())}
+                    onClick={() => { navigator.clipboard.writeText(profile?.id?.slice(0, 8).toUpperCase()); setSupportCodeCopied(true); setTimeout(() => setSupportCodeCopied(false), 2000) }}
                     className="text-xs text-fp-muted hover:text-fp-text transition-colors"
                   >
-                    Copy
+                    {supportCodeCopied ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
                 <p className="text-fp-muted text-xs mt-1">Provide this code when contacting support so we can locate your account quickly.</p>
