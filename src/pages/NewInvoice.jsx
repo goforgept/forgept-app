@@ -368,7 +368,9 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     else { setSelectedTicket(null); setLineItems([]); setClientPaymentMethod(''); setTicketSlaContracts([]); setSlaMode(null) }
   }
 
+  const LINE_FIELDS = new Set(['description', 'quantity', 'unit_price'])
   const updateLine = (i, field, value) => {
+    if (!LINE_FIELDS.has(field)) return
     setLineItems(prev => {
       const updated = [...prev]
       updated[i] = { ...updated[i], [field]: value }

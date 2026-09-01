@@ -1123,7 +1123,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                           <div key={photo.id} className="bg-fp-inset rounded-xl overflow-hidden border border-fp-border">
                             <img src={/^https?:\/\//.test(photo.url) ? photo.url : ''} alt={photo.caption || category}
                               className="w-full h-48 object-cover cursor-pointer"
-                              onClick={() => window.open(photo.url, '_blank')} />
+                              onClick={() => { if (/^https?:\/\//.test(photo.url)) window.open(photo.url, '_blank') }} />
                             <div className="p-3 space-y-2">
                               <input type="text" value={photo.caption || ''} placeholder="Add caption..."
                                 onChange={e => updateTicketPhotoCaption(photo.id, e.target.value)}

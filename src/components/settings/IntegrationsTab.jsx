@@ -191,7 +191,7 @@ export default function IntegrationsTab({
         body: JSON.stringify({ scope })
       })
       const data = await res.json()
-      if (data.url) window.location.href = data.url
+      if (data.url && /^https:\/\//.test(data.url)) window.location.href = data.url
       else setZohoMessage({ type: 'error', text: data.error || 'Could not start Zoho connection.' })
     } catch (err) { setZohoMessage({ type: 'error', text: err.message }) }
     setZohoConnecting(null)
@@ -219,7 +219,7 @@ export default function IntegrationsTab({
         body: JSON.stringify({ org_id: p.org_id })
       })
       const data = await res.json()
-      if (data.url) window.location.href = data.url
+      if (data.url && /^https:\/\//.test(data.url)) window.location.href = data.url
       else setQboMessage({ type: 'error', text: data.error || 'Could not start QuickBooks connection.' })
     } catch (err) { setQboMessage({ type: 'error', text: err.message }) }
     setConnectingQBO(false)
@@ -262,7 +262,7 @@ export default function IntegrationsTab({
         body: JSON.stringify({ org_id: p.org_id, user_id: user.id })
       })
       const data = await res.json()
-      if (data.url) window.location.href = data.url
+      if (data.url && /^https:\/\//.test(data.url)) window.location.href = data.url
       else setGoogleMessage({ type: 'error', text: data.error || 'Could not start Google connection.' })
     } catch (err) { setGoogleMessage({ type: 'error', text: err.message }) }
     setConnectingGoogle(false)
@@ -287,7 +287,7 @@ export default function IntegrationsTab({
         body: JSON.stringify({ org_id: p.org_id, user_id: user.id })
       })
       const data = await res.json()
-      if (data.url) window.location.href = data.url
+      if (data.url && /^https:\/\//.test(data.url)) window.location.href = data.url
       else setMicrosoftMessage({ type: 'error', text: data.error || 'Could not start Microsoft connection.' })
     } catch (err) { setMicrosoftMessage({ type: 'error', text: err.message }) }
     setConnectingMicrosoft(false)
@@ -314,7 +314,7 @@ export default function IntegrationsTab({
         body: JSON.stringify({ org_id: p.org_id }),
       })
       const data = await res.json()
-      if (data.url) window.location.href = data.url
+      if (data.url && /^https:\/\//.test(data.url)) window.location.href = data.url
       else setSquareMessage({ type: 'error', text: data.error || 'Could not start Square connection.' })
     } catch (err) { setSquareMessage({ type: 'error', text: err.message }) }
     setConnectingSquare(false)
@@ -427,7 +427,7 @@ export default function IntegrationsTab({
         body: JSON.stringify({ org_id: p.org_id }),
       })
       const data = await res.json()
-      if (data.url) window.location.href = data.url
+      if (data.url && /^https:\/\//.test(data.url)) window.location.href = data.url
       else setStripeMessage({ type: 'error', text: data.error || 'Could not start Stripe connection.' })
     } catch (err) { setStripeMessage({ type: 'error', text: err.message }) }
     setConnectingStripe(false)
