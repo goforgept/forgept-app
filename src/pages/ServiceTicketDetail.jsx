@@ -267,17 +267,23 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const LABOR_FIELDS = new Set(['role','quantity','unit','your_cost','markup','customer_price'])
   const updateLabor = (i, field, value) => {
     if (!LABOR_FIELDS.has(field)) return
-    setLaborItems(prev => {
-      const updated = [...prev]
-      updated[i] = { ...updated[i], [field]: value }
+    setLaborItems(prev => prev.map((item, idx) => {
+      if (idx !== i) return item
+      const next = { ...item }
+      if (field === 'role') next.role = value
+      if (field === 'unit') next.unit = value
+      if (field === 'quantity') next.quantity = value
+      if (field === 'your_cost') next.your_cost = value
+      if (field === 'markup') next.markup = value
+      if (field === 'customer_price') next.customer_price = value
       if (field === 'your_cost' || field === 'markup' || field === 'quantity') {
-        const cost = parseFloat(field === 'your_cost' ? value : updated[i].your_cost) || 0
-        const mkp = parseFloat(field === 'markup' ? value : updated[i].markup) || 0
-        const qty = parseFloat(field === 'quantity' ? value : updated[i].quantity) || 0
-        updated[i].customer_price = (cost * (1 + mkp / 100) * qty).toFixed(2)
+        const cost = parseFloat(field === 'your_cost' ? value : next.your_cost) || 0
+        const mkp  = parseFloat(field === 'markup'    ? value : next.markup) || 0
+        const qty  = parseFloat(field === 'quantity'  ? value : next.quantity) || 0
+        next.customer_price = (cost * (1 + mkp / 100) * qty).toFixed(2)
       }
-      return updated
-    })
+      return next
+    }))
   }
 
   const removeLabor = (i) => setLaborItems(prev => prev.filter((_, idx) => idx !== i))

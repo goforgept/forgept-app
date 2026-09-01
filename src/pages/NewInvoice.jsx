@@ -368,17 +368,15 @@ export default function NewInvoice({ isAdmin, featureProposals = true, featureCR
     else { setSelectedTicket(null); setLineItems([]); setClientPaymentMethod(''); setTicketSlaContracts([]); setSlaMode(null) }
   }
 
-  const LINE_FIELDS = new Set(['description', 'quantity', 'unit_price'])
   const updateLine = (i, field, value) => {
-    if (!LINE_FIELDS.has(field)) return
-    setLineItems(prev => {
-      const updated = [...prev]
-      updated[i] = { ...updated[i], [field]: value }
-      if (field === 'quantity' || field === 'unit_price') {
-        updated[i].total = (parseFloat(updated[i].quantity) || 0) * (parseFloat(updated[i].unit_price) || 0)
-      }
-      return updated
-    })
+    setLineItems(prev => prev.map((item, idx) => {
+      if (idx !== i) return item
+      const next = { ...item }
+      if (field === 'description') next.description = value
+      if (field === 'quantity') { next.quantity = value; next.total = (parseFloat(value) || 0) * (parseFloat(next.unit_price) || 0) }
+      if (field === 'unit_price') { next.unit_price = value; next.total = (parseFloat(next.quantity) || 0) * (parseFloat(value) || 0) }
+      return next
+    }))
   }
 
   const addLine = () => setLineItems(prev => [...prev, { description: '', quantity: 1, unit_price: 0, total: 0 }])

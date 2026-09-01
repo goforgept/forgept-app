@@ -113,9 +113,9 @@ export default function AccessoriesEditor({ product, tableName = 'global_product
                     <span className="text-fp-text text-xs flex-1">{choice.name}</span>
                     <span className="text-fp-muted text-xs">{choice.manufacturer}</span>
                     {group.default === choice.part_number && <span className="text-xs bg-green-900/40 text-green-400 px-1.5 py-0.5 rounded">Default</span>}
-                    <button onClick={() => setAccessories(p => { const opts = [...p.options]; opts[groupIdx] = { ...opts[groupIdx], default: choice.part_number }; return { ...p, options: opts } })}
+                    <button onClick={() => setAccessories(p => ({ ...p, options: p.options.map((opt, oi) => oi === groupIdx ? { ...opt, default: choice.part_number } : opt) }))}
                       className="text-xs text-fp-muted hover:text-green-400 transition-colors">Set Default</button>
-                    <button onClick={() => setAccessories(p => { const opts = [...p.options]; opts[groupIdx].choices = opts[groupIdx].choices.filter((_, i) => i !== choiceIdx); return { ...p, options: opts } })}
+                    <button onClick={() => setAccessories(p => ({ ...p, options: p.options.map((opt, oi) => oi === groupIdx ? { ...opt, choices: opt.choices.filter((_, ci) => ci !== choiceIdx) } : opt) }))}
                       className="text-red-400 hover:text-red-300 text-xs">✕</button>
                   </div>
                 ))}
