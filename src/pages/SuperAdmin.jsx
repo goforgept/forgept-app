@@ -492,7 +492,7 @@ export default function SuperAdmin() {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, full_name, email, org_id, company_name, organizations(name, billing_status)')
-      .ilike('id', `${q}%`)
+      .filter('id::text', 'like', `${q}-%`)
       .limit(1)
       .single()
     setCodeLookupLoading(false)
