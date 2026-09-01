@@ -681,10 +681,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 {stripeConnected && (
                   invoice?.stripe_invoice_id ? (
                     <div className="flex items-center gap-1.5">
-                      <a href={invoice.stripe_hosted_invoice_url} target="_blank" rel="noopener noreferrer"
+                      {/^https:\/\//.test(invoice.stripe_hosted_invoice_url) && <a href={invoice.stripe_hosted_invoice_url} target="_blank" rel="noopener noreferrer"
                         className="bg-[#635BFF]/10 text-[#635BFF] px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#635BFF]/20 hover:bg-[#635BFF]/20 transition-colors">
                         ✓ Stripe ↗
-                      </a>
+                      </a>}
                       <button onClick={sendToStripe} disabled={sendingToStripe}
                         className="bg-fp-inset text-fp-muted px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover hover:text-fp-text transition-colors disabled:opacity-50">
                         {sendingToStripe ? 'Sending...' : 'Resend'}
@@ -708,10 +708,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 {squareConnected && (
                   invoice?.square_invoice_id ? (
                     <div className="flex items-center gap-1.5">
-                      <a href={invoice.square_payment_url} target="_blank" rel="noopener noreferrer"
+                      {/^https:\/\//.test(invoice.square_payment_url) && <a href={invoice.square_payment_url} target="_blank" rel="noopener noreferrer"
                         className="bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-lg text-xs font-semibold border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors">
                         ✓ Square ↗
-                      </a>
+                      </a>}
                       <button onClick={syncSquarePayment} disabled={sendingToSquare}
                         className="bg-fp-inset text-fp-muted px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover hover:text-fp-text transition-colors disabled:opacity-50">
                         {sendingToSquare ? '...' : 'Sync'}
@@ -787,10 +787,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                   <p className="text-fp-muted text-xs mt-0.5">Share this with your client so they can pay by card or ACH online.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a href={invoice.square_payment_url} target="_blank" rel="noopener noreferrer"
+                  {/^https:\/\//.test(invoice.square_payment_url) && <a href={invoice.square_payment_url} target="_blank" rel="noopener noreferrer"
                     className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors">
                     Open ↗
-                  </a>
+                  </a>}
                   <button onClick={copyPaymentLink}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${copiedLink ? 'bg-green-600/20 text-green-400' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
                     {copiedLink ? '✓ Copied!' : 'Copy Link'}

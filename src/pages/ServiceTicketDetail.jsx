@@ -712,7 +712,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                     {ticket.completion_signature_data ? '✅ Re-sign' : '✍️ Get Signature'}
                   </button>
                 </div>
-                {ticket.completion_signature_data && (
+                {ticket.completion_signature_data && /^data:image\//.test(ticket.completion_signature_data) && (
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-lg">
                     <img src={ticket.completion_signature_data} alt="signature" className="h-6 w-20 object-contain" />
                     <span className="text-xs text-green-400">
@@ -1121,7 +1121,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         {categoryPhotos.map(photo => (
                           <div key={photo.id} className="bg-fp-inset rounded-xl overflow-hidden border border-fp-border">
-                            <img src={photo.url} alt={photo.caption || category}
+                            <img src={/^https?:\/\//.test(photo.url) ? photo.url : ''} alt={photo.caption || category}
                               className="w-full h-48 object-cover cursor-pointer"
                               onClick={() => window.open(photo.url, '_blank')} />
                             <div className="p-3 space-y-2">

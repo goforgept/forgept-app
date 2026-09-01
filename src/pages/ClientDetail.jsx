@@ -1053,8 +1053,8 @@ const deleteMeeting = async (meetingId) => {
                           <div className="border-t border-fp-border pt-2 mt-2 space-y-1">
                             <p className="text-fp-muted text-xs font-semibold">Site Contact</p>
                             {loc.site_contact_name && <p className="text-fp-text text-xs font-medium">{loc.site_contact_name}</p>}
-                            {loc.site_contact_email && <a href={`mailto:${loc.site_contact_email.replace(/[^a-zA-Z0-9.@_%+\-]/g, '')}`} className="text-[#C8622A] text-xs hover:underline block">{loc.site_contact_email}</a>}
-                            {loc.site_contact_phone && <a href={`tel:${loc.site_contact_phone.replace(/[^0-9+\-().#, ]/g, '')}`} className="text-fp-muted text-xs hover:text-fp-text transition-colors block">{loc.site_contact_phone}</a>}
+                            {loc.site_contact_email && /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(loc.site_contact_email) && <a href={`mailto:${loc.site_contact_email}`} className="text-[#C8622A] text-xs hover:underline block">{loc.site_contact_email}</a>}
+                            {loc.site_contact_phone && /^[0-9+\-().#, ]{7,20}$/.test(loc.site_contact_phone) && <a href={`tel:${loc.site_contact_phone}`} className="text-fp-muted text-xs hover:text-fp-text transition-colors block">{loc.site_contact_phone}</a>}
                           </div>
                         )
                         return null
@@ -1139,7 +1139,7 @@ const deleteMeeting = async (meetingId) => {
                             {meeting.client_contacts?.full_name && <span>🤝 with {meeting.client_contacts.full_name}</span>}
                           </div>
                           {meeting.meeting_notes && <p className="text-fp-muted text-xs mt-1 italic">{meeting.meeting_notes}</p>}
-                          {meeting.meeting_link && (
+                          {meeting.meeting_link && /^https?:\/\//i.test(meeting.meeting_link) && (
                             <a href={meeting.meeting_link} target="_blank" rel="noopener noreferrer"
                               className="text-[#C8622A] text-xs hover:underline mt-1 block">🔗 Join Meeting</a>
                           )}
@@ -1420,8 +1420,8 @@ const deleteMeeting = async (meetingId) => {
                 <input type="email" value={panelForm.email}
                   onChange={e => setPanelForm(p => ({ ...p, email: e.target.value }))}
                   placeholder="jane@example.com" className={inputClass} />
-                {panelForm.email && contactPanel !== 'new' && (
-                  <a href={`mailto:${panelForm.email.replace(/[^a-zA-Z0-9.@_%+\-]/g, '')}`}
+                {panelForm.email && contactPanel !== 'new' && /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(panelForm.email) && (
+                  <a href={`mailto:${panelForm.email}`}
                     className="text-[#C8622A] text-xs mt-1 inline-block hover:underline">Send email →</a>
                 )}
               </div>
@@ -1430,8 +1430,8 @@ const deleteMeeting = async (meetingId) => {
                 <input type="text" value={panelForm.phone}
                   onChange={e => setPanelForm(p => ({ ...p, phone: e.target.value }))}
                   placeholder="(615) 555-0100" className={inputClass} />
-                {panelForm.phone && contactPanel !== 'new' && (
-                  <a href={`tel:${panelForm.phone.replace(/[^0-9+\-().#, ]/g, '')}`}
+                {panelForm.phone && contactPanel !== 'new' && /^[0-9+\-().#, ]{7,20}$/.test(panelForm.phone) && (
+                  <a href={`tel:${panelForm.phone}`}
                     className="text-[#C8622A] text-xs mt-1 inline-block hover:underline">Call →</a>
                 )}
               </div>
