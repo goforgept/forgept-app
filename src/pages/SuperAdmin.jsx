@@ -489,15 +489,11 @@ export default function SuperAdmin() {
     setCodeLookupLoading(true)
     setCodeError(null)
     setCodeResult(null)
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, org_id, company_name, organizations(name, billing_status)')
-      .gte('id', `${q}-0000-0000-0000-000000000000`)
-      .lte('id', `${q}-ffff-ffff-ffff-ffffffffffff`)
-      .limit(1)
+    const { data, error } = await supabase.rpc('lookup_by_support_code', { code: q })
     setCodeLookupLoading(false)
     if (error || !data?.length) { setCodeError('No account found with that code.'); return }
-    setCodeResult(data[0])
+    const row = data[0]
+    setCodeResult({ ...row, organizations: { name: row.org_name, billing_status: row.billing_status } })
   }
 
   const getOrgHealth = (orgId) => {
