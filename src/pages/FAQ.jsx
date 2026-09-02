@@ -225,14 +225,7 @@ const faqs = [
   },
 ]
 
-const guideLinks = [
-  { title: 'How to Create a Client', url: '#' },
-  { title: 'How to Create a Contact', url: '#' },
-  { title: 'How to Create a Proposal', url: '#' },
-  { title: 'How to Create and Use Proposal Templates', url: '#' },
-  { title: 'How to Use the AI Agent', url: '#' },
-  { title: 'How to Use the Designer', url: '#' },
-]
+const GUIDES_URL = 'https://quilled-income-ab4.notion.site/How-to-Guides-3cfe4fc05815809ab371e6095ec60ac5'
 
 export default function FAQ({ isAdmin, featureProposals = true, featureCRM = false, featureAiAgent = false }) {
   const { profile } = useProfile()
@@ -390,18 +383,15 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
         </div>
 
         {/* How-To Guides */}
-        <div className="bg-fp-card rounded-xl p-6">
-          <h3 className="text-fp-text font-bold text-lg mb-1">How-To Guides</h3>
-          <p className="text-fp-muted text-sm mb-4">Step-by-step guides for common tasks in ForgePt.</p>
-          <div className="space-y-2">
-            {guideLinks.map(guide => (
-              <a key={guide.title} href={guide.url} target="_blank" rel="noreferrer"
-                className="flex items-center justify-between px-4 py-3 rounded-lg border border-fp-border hover:bg-fp-inset hover:border-fp-brand/40 transition-colors group">
-                <span className="text-fp-text text-sm font-medium">{guide.title}</span>
-                <span className="text-[#C8622A] text-sm opacity-60 group-hover:opacity-100 transition-opacity">→</span>
-              </a>
-            ))}
+        <div className="bg-fp-card rounded-xl p-6 flex items-center justify-between gap-4">
+          <div>
+            <h3 className="text-fp-text font-bold text-lg mb-1">How-To Guides</h3>
+            <p className="text-fp-muted text-sm">Step-by-step guides for common tasks — creating clients, building proposals, using the Designer, and more.</p>
           </div>
+          <a href={GUIDES_URL} target="_blank" rel="noreferrer"
+            className="shrink-0 bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+            How to Guides
+          </a>
         </div>
 
         <input type="text" placeholder="Search FAQ..." value={search} onChange={e => setSearch(e.target.value)}
