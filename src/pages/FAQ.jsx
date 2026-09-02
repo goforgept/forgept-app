@@ -225,6 +225,15 @@ const faqs = [
   },
 ]
 
+const guideLinks = [
+  { title: 'How to Create a Client', url: '#' },
+  { title: 'How to Create a Contact', url: '#' },
+  { title: 'How to Create a Proposal', url: '#' },
+  { title: 'How to Create and Use Proposal Templates', url: '#' },
+  { title: 'How to Use the AI Agent', url: '#' },
+  { title: 'How to Use the Designer', url: '#' },
+]
+
 export default function FAQ({ isAdmin, featureProposals = true, featureCRM = false, featureAiAgent = false }) {
   const { profile } = useProfile()
   const [openItem, setOpenItem] = useState(null)
@@ -377,6 +386,21 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
               className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40">
               Ask
             </button>
+          </div>
+        </div>
+
+        {/* How-To Guides */}
+        <div className="bg-fp-card rounded-xl p-6">
+          <h3 className="text-fp-text font-bold text-lg mb-1">How-To Guides</h3>
+          <p className="text-fp-muted text-sm mb-4">Step-by-step guides for common tasks in ForgePt.</p>
+          <div className="space-y-2">
+            {guideLinks.map(guide => (
+              <a key={guide.title} href={guide.url} target="_blank" rel="noreferrer"
+                className="flex items-center justify-between px-4 py-3 rounded-lg border border-fp-border hover:bg-fp-inset hover:border-fp-brand/40 transition-colors group">
+                <span className="text-fp-text text-sm font-medium">{guide.title}</span>
+                <span className="text-[#C8622A] text-sm opacity-60 group-hover:opacity-100 transition-opacity">→</span>
+              </a>
+            ))}
           </div>
         </div>
 
