@@ -281,7 +281,7 @@ DESIGNER: Floor plan design tool — upload drawings, place security/AV symbols,
 
 PRODUCT LIBRARY: Org-wide product catalog. Import from Excel or QuickBooks. Used in proposals and Designer placements.
 
-REPORTS: Revenue by rep, proposal win rates, pipeline analytics. Admin-only.
+REPORTS: Revenue by rep, proposal win rates, pipeline analytics. Admin-only. Sales KPIs page has a period filter — use the ‹ › arrows to navigate to previous weeks or months, and the Weekly/Monthly buttons to switch period type.
 
 INVENTORY: Track stock levels for products. Add items, set quantities, record adjustments.
 
@@ -289,7 +289,7 @@ AI AGENT: The floating orange chat button (bottom-right). Can create clients, ti
 
 NOTIFICATIONS: Bell icon in sidebar. Fires for: tasks due today or overdue, overdue invoices, auto-sent invoices. Proposal signed notification and invoice paid notification are also tracked.
 
-SETTINGS: Upload logo, set brand color, terms and conditions. Rate Card sets labor roles and rates. Calendar integrations (Google, Microsoft). API keys for external integrations.
+SETTINGS: Upload logo, set brand color, terms and conditions. Rate Card sets labor roles and rates. Calendar integrations (Google, Microsoft). API keys for external integrations. Security tab: enable or disable two-factor authentication (TOTP) using an authenticator app like Google Authenticator or Authy. Support tab: find your 8-character support code (used to identify your account when contacting support), and step-by-step instructions for Google Remote Desktop (desktop) and iOS screen recording for remote support sessions.
 
 INTEGRATIONS: QuickBooks Online (invoices, customers, payments), Zoho CRM (accounts, contacts), Square (payments), Stripe (subscriptions and client payments), REST API for custom integrations.`
 
