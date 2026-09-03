@@ -2510,9 +2510,6 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                     draggable={isSel && !annotationTool}
                     onMouseDown={e => e.cancelBubble = true}
                     onTouchStart={e => e.cancelBubble = true}
-                    onClick={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
-                    onTap={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
-                    onDblClick={e => { e.cancelBubble = true; openEdit(e.evt.clientX, e.evt.clientY) }}
                     onDragEnd={async (e) => {
                       const dx = e.target.x(), dy = e.target.y()
                       e.target.position({ x: 0, y: 0 })
@@ -2522,6 +2519,16 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                       setAnnotations(prev => prev.map(a => a.id === ann.id ? { ...a, points: newPoints } : a))
                       await supabase.from('drawing_annotations').update({ points: newPoints }).eq('id', ann.id)
                     }}>
+
+                    {/* Transparent hit area — makes the text box clickable/selectable */}
+                    <Rect x={tx} y={ty} width={boxW} height={Math.max(boxH, 20)}
+                      fill="transparent"
+                      onClick={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
+                      onTap={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
+                      onDblClick={e => { e.cancelBubble = true; openEdit(e.evt.clientX, e.evt.clientY) }}
+                      onMouseEnter={() => { if (stageRef.current) stageRef.current.container().style.cursor = 'pointer' }}
+                      onMouseLeave={() => { if (stageRef.current) stageRef.current.container().style.cursor = '' }}
+                    />
 
                     {/* Selection outline */}
                     {isSel && <Rect x={tx - 3} y={ty - 3} width={boxW + 6} height={boxH + 6}
