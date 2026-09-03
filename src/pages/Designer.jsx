@@ -220,14 +220,12 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
     if (sheet) setActiveSheetId(sheet.id)
   }
 
-  const handleAddNotesSheet = async (name = 'GENERAL NOTES') => {
-    const { data: sheet } = await supabase
-      .from('drawing_sheets')
-      .insert({ org_id: orgId, proposal_id: proposalId, name, storage_path: 'blank', sort_order: sheets.length })
-      .select().single()
-    await load()
-    if (sheet) setActiveSheetId(sheet.id)
-    return sheet?.id || null
+  const handleNotesSheetAdded = async () => {
+    const { data: sheetData } = await supabase
+      .from('drawing_sheets').select('*')
+      .eq('proposal_id', proposalId)
+      .order('sort_order', { ascending: true })
+    setSheets(sheetData || [])
   }
 
   const handleDeleteSheet = async (sheetId) => {
@@ -982,7 +980,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
               sheets={sheets}
               proposal={proposal}
               stageRefs={stageRefs}
-              onAddNotesSheet={handleAddNotesSheet}
+              onNotesSheetAdded={handleNotesSheetAdded}
             />
           </div>
         )}

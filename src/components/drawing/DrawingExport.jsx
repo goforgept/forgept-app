@@ -486,7 +486,7 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
 
 // ─── DrawingExport ────────────────────────────────────────────────────────────
 // Export tab — Client Overview, Shop Drawings, As-Builts, CSV BOM
-export default function DrawingExport({ proposalId, orgId, sheets, proposal, stageRefs, onAddNotesSheet }) {
+export default function DrawingExport({ proposalId, orgId, sheets, proposal, stageRefs, onNotesSheetAdded }) {
   const [activeExport,  setActiveExport]  = useState('client')
   const [placements,    setPlacements]    = useState([])
   const [cableRuns,     setCableRuns]     = useState([])
@@ -570,13 +570,15 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     setArchSheetSettings(prev => ({ ...prev, [id]: { ...prev[id], [key]: val } }))
 
   const addNotesPage = async () => {
-    if (!onAddNotesSheet) return
-    const id = await onAddNotesSheet('GENERAL NOTES')
-    if (id) {
-      setArchPageList(prev =>
-        prev.some(p => p.id === id) ? prev : [...prev, { type: 'sheet', id }]
-      )
-    }
+    const { data: sheet } = await supabase
+      .from('drawing_sheets')
+      .insert({ org_id: orgId, proposal_id: proposalId, name: 'GENERAL NOTES', storage_path: 'blank', sort_order: 9999 })
+      .select().single()
+    if (!sheet) return
+    setArchPageList(prev =>
+      prev.some(p => p.id === sheet.id) ? prev : [...prev, { type: 'sheet', id: sheet.id }]
+    )
+    onNotesSheetAdded?.()   // refresh Designer's sheet list
   }
 
   const movePage = (idx, dir) =>
@@ -1953,7 +1955,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
         pdf.text(`Date: ${dateStr}`, cx + 8, midY + 65)
         pdf.text(`Sheets: ${totalPages}`, cx + 8, midY + 88)
-        drawArchTitleBlock('COVER SHEET', 'C-001', null, totalPages)
+        drawArchTitleBlock('COVER SHEET', `${archDwgPrefix}-001`, null, totalPages)
       }
 
       // ── DEVICE SCHEDULE PAGE ─────────────────────────────────────────────────
@@ -1995,7 +1997,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           body: scheduleRows,
         })
 
-        drawArchTitleBlock('DEVICE SCHEDULE', 'S-001', coverPages + 1, totalPages)
+        drawArchTitleBlock('DEVICE SCHEDULE', `${archDwgPrefix}-002`, coverPages + 1, totalPages)
       }
 
       // ── SYMBOL LEGEND + DRAWING INDEX PAGE ───────────────────────────────────
@@ -2048,9 +2050,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
         // Build full index: cover + schedule + legend + floor plan sheets
         const indexEntries = []
-        if (archIncludeCover)                                    indexEntries.push({ num: 'C-001', lbl: 'COVER SHEET' })
-        if (archIncludeSchedule && placements.length > 0)        indexEntries.push({ num: 'S-001', lbl: 'DEVICE SCHEDULE' })
-        if (usedCategories.length > 0)                           indexEntries.push({ num: 'L-001', lbl: 'SYMBOL LEGEND' })
+        if (archIncludeCover)                                    indexEntries.push({ num: `${archDwgPrefix}-001`, lbl: 'COVER SHEET' })
+        if (archIncludeSchedule && placements.length > 0)        indexEntries.push({ num: `${archDwgPrefix}-002`, lbl: 'DEVICE SCHEDULE' })
+        if (usedCategories.length > 0)                           indexEntries.push({ num: `${archDwgPrefix}-003`, lbl: 'SYMBOL LEGEND' })
         pageList.forEach((item, pi) => {
           const s   = item.type === 'sheet' ? sheets.find(x => x.id === item.id) : null
           const lbl = archSheetSettings[item.id]?.label ?? (item.type === 'notes' ? 'GENERAL NOTES' : (s?.name ?? ''))
@@ -2073,7 +2075,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           pdf.text(lblLines[0] || '', idxAreaX + 30, iy + 11)
         })
 
-        drawArchTitleBlock('SYMBOL LEGEND', 'L-001', coverPages + schedPages + 1, totalPages)
+        drawArchTitleBlock('SYMBOL LEGEND', `${archDwgPrefix}-003`, coverPages + schedPages + 1, totalPages)
       }
 
       for (let i = 0; i < pageList.length; i++) {
