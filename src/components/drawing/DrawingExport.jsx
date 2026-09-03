@@ -1790,7 +1790,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           { label: 'DRAWING NO.', value: drawingNum },
           { label: 'DATE',        value: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) },
           { label: 'SCALE',       value: archScale || 'NTS' },
-          { label: 'SHEET',       value: `${sheetIndex} OF ${totalPages}` },
+          { label: 'SHEET',       value: sheetIndex != null ? `${sheetIndex} OF ${totalPages}` : '' },
           { label: 'DRAWN BY',    value: '' },
           { label: 'CHECKED BY',  value: '' },
         ]
@@ -1901,7 +1901,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             pNum++
           })
         }
-        drawArchTitleBlock('COVER SHEET', 'C-001', 1, totalPages)
+        drawArchTitleBlock('COVER SHEET', 'C-001', null, totalPages)
       }
 
       // ── DEVICE SCHEDULE PAGE ─────────────────────────────────────────────────
@@ -1911,52 +1911,37 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
         const schedTableStyle = {
           theme: 'grid',
-          styles: { fontSize: fs(7), cellPadding: fs(1.8), textColor: [30, 35, 40], fillColor: [255,255,255], lineColor: [210,215,220], lineWidth: 0.5 },
+          styles: { fontSize: fs(7), cellPadding: fs(2), textColor: [40, 40, 40], fillColor: [255,255,255], lineColor: [200,200,200], lineWidth: 0.5 },
           headStyles: { fillColor: [r, g, b], textColor: [255,255,255], fontStyle: 'bold', fontSize: fs(7) },
-          alternateRowStyles: { fillColor: [248, 250, 252] },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
           margin: { left: drawX + 2, right: outerM + tbW + 4, top: drawY + 2, bottom: outerM + 4 },
         }
 
-        // Group placements by system
-        const groups = {}
-        for (const p of placements) {
-          const grp = getDeviceSystemGroup(p.global_products?.category)
-          if (!groups[grp]) groups[grp] = []
-          groups[grp].push(p)
-        }
-
-        let curY = drawY + 32
         pdf.setTextColor(r, g, b); pdf.setFontSize(fs(12)); pdf.setFont('helvetica', 'bold')
         pdf.text('DEVICE SCHEDULE', drawX + 4, drawY + 22)
         pdf.setDrawColor(r, g, b); pdf.setLineWidth(1.5)
         pdf.line(drawX + 4, drawY + 26, drawX + drawW - 4, drawY + 26)
 
-        const groupOrder = [...DEVICE_SYSTEM_GROUPS.map(g => g.label), 'Other']
-        for (const grpLabel of groupOrder) {
-          if (!groups[grpLabel]) continue
-          const rows = groups[grpLabel].map((p, idx) => {
-            const gp  = p.global_products
-            const sht = sheets.find(s => s.id === p.drawing_sheet_id)
-            return [
-              idx + 1,
-              p.device_address || '—',
-              p.part_number_override || gp?.part_number || '—',
-              p.description_override || gp?.name || '—',
-              p.manufacturer_override || gp?.manufacturer || '—',
-              p.quantity || 1,
-              sht?.name || '—',
-            ]
-          })
-          autoTable(pdf, {
-            ...schedTableStyle,
-            startY: curY,
-            head: [[{ content: grpLabel, colSpan: 7, styles: { fillColor: [30, 40, 55], textColor: [255,255,255], fontStyle: 'bold', fontSize: fs(8) } }],
-                   ['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Qty', 'Sheet']],
-            body: rows,
-            columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 20 }, 2: { cellWidth: 38 }, 5: { cellWidth: 10 }, 6: { cellWidth: 30 } },
-          })
-          curY = pdf.lastAutoTable.finalY + 6
-        }
+        const scheduleRows = placements.map((p, idx) => {
+          const gp  = p.global_products
+          const sht = sheets.find(s => s.id === p.drawing_sheet_id)
+          return [
+            idx + 1,
+            p.device_address || '—',
+            p.part_number_override || gp?.part_number || '—',
+            p.description_override || gp?.name || '—',
+            p.manufacturer_override || gp?.manufacturer || '—',
+            gp?.category || '—',
+            p.quantity || 1,
+            sht?.name || '—',
+          ]
+        })
+        autoTable(pdf, {
+          ...schedTableStyle,
+          startY: drawY + 32,
+          head: [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Category', 'Qty', 'Sheet']],
+          body: scheduleRows,
+        })
 
         drawArchTitleBlock('DEVICE SCHEDULE', 'S-001', coverPages + 1, totalPages)
       }
