@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../../supabase'
 import { getCategorySVG } from './useCategoryIcons'
 import { PATHWAY_DEFS } from './SymbolPicker'
@@ -514,6 +514,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [archSettingsOpen,  setArchSettingsOpen]  = useState(false)
 
   const archStorageKey = `arch_settings_${proposalId}`
+  // Tracks whether localStorage already provided a page list — prevents the
+  // sheets-init effect from overwriting restored notes pages (race condition).
+  const pageListFromStorageRef = useRef(false)
 
   // Load persisted arch settings from localStorage on mount
   useEffect(() => {
@@ -528,9 +531,12 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         if (s.archIncludeCover !== undefined) setArchIncludeCover(s.archIncludeCover)
         if (s.archIncludeSchedule !== undefined) setArchIncludeSchedule(s.archIncludeSchedule)
         if (s.archSheetSettings !== undefined) setArchSheetSettings(s.archSheetSettings)
-        if (s.archPageList?.length > 0)       setArchPageList(s.archPageList)
         if (s.archRevisions    !== undefined) setArchRevisions(s.archRevisions)
         if (s.archScope        !== undefined) setArchScope(s.archScope)
+        if (s.archPageList?.length > 0) {
+          setArchPageList(s.archPageList)
+          pageListFromStorageRef.current = true  // tell init effect to stay hands-off
+        }
       }
     } catch { /* ignore corrupt storage */ }
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
@@ -546,9 +552,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     } catch { /* ignore quota errors */ }
   }, [archDwgPrefix, archScale, archPrelim, archFontScale, archIncludeCover, archIncludeSchedule, archSheetSettings, archPageList, archRevisions, archScope])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initialise page list from Designer sheets (runs once when sheets first load and nothing is persisted)
+  // Initialise page list from Designer sheets — only if localStorage had nothing
   useEffect(() => {
-    if (sheets.length > 0 && archPageList.length === 0)
+    if (sheets.length > 0 && archPageList.length === 0 && !pageListFromStorageRef.current)
       setArchPageList(sheets.map(s => ({ type: 'sheet', id: s.id })))
   }, [sheets])  // eslint-disable-line react-hooks/exhaustive-deps
 
