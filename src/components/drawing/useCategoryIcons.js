@@ -350,9 +350,9 @@ const CATEGORY_SVGS = {
     </svg>`,
 
   'Data Drop': (color) => `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
-      <rect x="12" y="6" width="16" height="28" rx="2"/>
-      <path d="M12 14 L6 14 M12 20 L6 20 M12 26 L6 26" stroke-linecap="round"/>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="miter">
+      <polygon points="20,34 4,9 36,9" fill="${color}" fill-opacity="0.18"/>
+      <line x1="4" y1="9" x2="36" y2="9" stroke-width="2.5"/>
     </svg>`,
 
   'Patch Panel': (color) => `

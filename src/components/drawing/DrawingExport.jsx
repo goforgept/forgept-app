@@ -231,6 +231,11 @@ const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, i
       pdf.setTextColor(255,255,255); pdf.setFontSize(Math.max(badgeR*3.5,4)); pdf.setFont('helvetica','bold')
       pdf.text(letter, bx, by + badgeR * 0.38, { align: 'center' })
     }
+    if (category === 'Data Drop' && (p.quantity || 1) > 1) {
+      const qFs = Math.max(symbolSizeMM * 0.65, 3)
+      pdf.setTextColor(r, g, b); pdf.setFontSize(qFs); pdf.setFont('helvetica', 'bold')
+      pdf.text(String(p.quantity), px + symbolSizeMM / 2 + 0.8, py + qFs * 0.18, { align: 'left' })
+    }
     if (p.device_address) {
       const fs = Math.max(symbolSizeMM * 0.7, 3), fsMm = ptToMm(fs), rad = symbolSizeMM / 2, gap = rad + 0.5
       const label = p.device_address

@@ -3126,6 +3126,22 @@ function PlacementMarker({ placement, product, icon, x, y, size, isSelected, isH
         </Group>
       )}
 
+      {/* Data drop port count — show 2 or 4 to the right for dual/quad, nothing for single */}
+      {product.category === 'Data Drop' && (placement.quantity || 1) > 1 && (
+        <Text
+          text={String(placement.quantity)}
+          fontSize={Math.max(9, totalSize * 0.38)}
+          fontStyle="bold"
+          fill="white"
+          x={totalSize / 2 + 2}
+          y={-totalSize * 0.22}
+          listening={false}
+          shadowColor="black"
+          shadowBlur={3}
+          shadowOpacity={0.9}
+        />
+      )}
+
       {/* Device address label below marker */}
       {placement.device_address && !isSelected && showLabels !== false && (
         <Text
