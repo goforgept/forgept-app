@@ -1558,196 +1558,315 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     }
   }
 
-  // ── Architect Drawing PDF ──────────────────────────────────────────────────
+  // ── Architect / Construction Drawing PDF ─────────────────────────────────
   const handleArchDrawing = async () => {
     setGenerating(true)
     try {
       const { default: jsPDF } = await import('jspdf')
 
-      // 24x36 Arch D, landscape: 914.4 x 609.6 mm
-      const pdf     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [609.6, 914.4] })
-      const pageW   = pdf.internal.pageSize.getWidth()   // 914.4
-      const pageH   = pdf.internal.pageSize.getHeight()  // 609.6
-      const [r, g, b] = hexToRgbArr(orgProfile?.primary_color || '#C8622A')
-      const logoImg = await loadOrgLogo()
+      // 24×36 Arch D, landscape: pageW=914.4 pageH=609.6
+      const pdf    = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [609.6, 914.4] })
+      const pageW  = pdf.internal.pageSize.getWidth()
+      const pageH  = pdf.internal.pageSize.getHeight()
+      const brandHex = orgProfile?.primary_color || '#C8622A'
+      const [r, g, b] = hexToRgbArr(brandHex)
+      const logoImg   = await loadOrgLogo()
 
-      const outerM  = 7    // outer border margin
-      const innerM  = 13   // inner border margin (drawing area starts here)
-      const tbH     = 58   // title block height
-      const tbY     = pageH - outerM - tbH  // title block top edge
+      // Layout constants
+      const outerM = 7     // outer border margin
+      const innerM = 13    // inner border (drawing frame)
+      const tbW    = 82    // title block width (right-side vertical panel)
+      const tbX    = pageW - outerM - tbW  // left edge of title block
+      const tbTop  = outerM
+      const tbBot  = pageH - outerM
+      const tbH    = tbBot - tbTop   // ≈595.6mm full height
+      const pad    = 4
 
-      // Right column: company + drawing info
-      const rcW   = 92
-      const rcX   = pageW - outerM - rcW
-      // Middle column: drawing title / project info
-      const mcW   = 130
-      const mcX   = rcX - mcW
-      // Left section: revision table
-      const revX  = outerM
-      const revW  = mcX - outerM
+      // Drawing area sits left of the title block, inside the inner border
+      const drawX  = innerM
+      const drawY  = innerM
+      const drawW  = tbX - innerM - 1
+      const drawH  = pageH - innerM * 2
+
+      // Title block section heights (fixed, top to bottom)
+      const logoH     = 38
+      const compH     = 18
+      const projH     = 52
+      const clientH   = 28
+      const stampH    = 22
+      const titleLabH = 8
+      const titleValH = 34
+      const infoRowH  = 12
+      const numInfoRows = 6
+      const infoTotalH  = infoRowH * numInfoRows  // 72
+      const revHeaderH  = 10
+      const revColH     = 8
+      const fixedH = logoH + compH + projH + clientH + stampH + titleLabH + titleValH + infoTotalH + revHeaderH + revColH
+      const revRowH   = Math.max(9, (tbH - fixedH) / 8)
+      const numRevRows = Math.floor((tbH - fixedH) / revRowH)
+
+      const drawSep = (y, thick = false) => {
+        pdf.setDrawColor(0, 0, 0)
+        pdf.setLineWidth(thick ? 0.7 : 0.25)
+        pdf.line(tbX, y, pageW - outerM, y)
+      }
 
       for (let i = 0; i < sheets.length; i++) {
         if (i > 0) pdf.addPage()
         const sheet      = sheets[i]
         const drawingNum = `E${i + 1}.0`
+        const isBlank    = !sheet.storage_path || ['blank', 'pending'].includes(sheet.storage_path)
 
         // White background
         pdf.setFillColor(255, 255, 255)
         pdf.rect(0, 0, pageW, pageH, 'F')
 
-        // ── Borders ──────────────────────────────────────────────────────────
+        // ── BORDERS ──────────────────────────────────────────────────────────
         pdf.setDrawColor(0, 0, 0)
-        pdf.setLineWidth(1.4)
+        pdf.setLineWidth(1.6)
         pdf.rect(outerM, outerM, pageW - outerM * 2, pageH - outerM * 2)
-        pdf.setLineWidth(0.3)
-        pdf.rect(innerM, innerM, pageW - innerM * 2, pageH - innerM * 2)
+        pdf.setLineWidth(0.35)
+        pdf.rect(innerM, innerM, drawW - 0.5, drawH)
 
-        // ── Floor plan area ───────────────────────────────────────────────────
-        const drawX = innerM + 0.5
-        const drawY = innerM + 0.5
-        const drawW = pageW - innerM * 2 - 1
-        const drawH = tbY - innerM - 2
-        const imgData = await getFloorPlanImage(sheet.id)
-        await drawSheetOnPDF(pdf, sheet, imgData, drawX, drawY, drawW, drawH, exportFOV)
+        // ── FLOOR PLAN or NOTES PAGE ─────────────────────────────────────────
+        if (isBlank) {
+          // General notes page — title + ruled lines
+          pdf.setTextColor(r, g, b)
+          pdf.setFontSize(12)
+          pdf.setFont('helvetica', 'bold')
+          pdf.text('GENERAL NOTES', drawX + 6, drawY + 14)
+          pdf.setDrawColor(r, g, b)
+          pdf.setLineWidth(0.6)
+          pdf.line(drawX + 6, drawY + 16, drawX + 72, drawY + 16)
+          pdf.setDrawColor(210, 215, 225)
+          pdf.setLineWidth(0.2)
+          const lineSpacing = 11
+          const numLines = Math.floor((drawH - 26) / lineSpacing)
+          for (let li = 0; li < numLines; li++) {
+            pdf.line(drawX + 6, drawY + 26 + li * lineSpacing, drawX + drawW - 6, drawY + 26 + li * lineSpacing)
+          }
+        } else {
+          // Render floor plan with device symbols
+          const imgData = await getFloorPlanImage(sheet.id)
+          await drawSheetOnPDF(pdf, sheet, imgData, drawX, drawY, drawW, drawH, exportFOV)
 
-        // ── Title block: full bottom strip ────────────────────────────────────
-        pdf.setFillColor(250, 250, 250)
-        pdf.rect(outerM, tbY, pageW - outerM * 2, tbH, 'F')
-        // Top edge of title block
+          // Drawing number + title label at bottom-left of drawing area
+          pdf.setFillColor(255, 255, 255)
+          pdf.rect(drawX + 2, drawY + drawH - 10, 200, 9, 'F')
+          pdf.setTextColor(10, 10, 10)
+          pdf.setFontSize(8)
+          pdf.setFont('helvetica', 'bold')
+          pdf.text(`${i + 1}.   ${(sheet.name || '').toUpperCase()}`, drawX + 5, drawY + drawH - 3)
+
+          // Symbol legend (keynotes) — inset box, upper-right of drawing area
+          const sheetPlacements = placements.filter(p => p.drawing_sheet_id === sheet.id)
+          const usedCats = [...new Set(sheetPlacements.map(p => p.global_products?.category).filter(Boolean))]
+          if (usedCats.length > 0) {
+            const legW   = 74
+            const legRowH = 9
+            const legH   = 10 + usedCats.length * legRowH
+            const legX   = drawX + drawW - legW - 4
+            const legY   = drawY + 4
+            pdf.setFillColor(255, 255, 255)
+            pdf.setDrawColor(80, 80, 80)
+            pdf.setLineWidth(0.4)
+            pdf.rect(legX, legY, legW, legH)
+            // Header bar
+            pdf.setFillColor(r, g, b)
+            pdf.rect(legX, legY, legW, 9, 'F')
+            pdf.setTextColor(255, 255, 255)
+            pdf.setFontSize(6)
+            pdf.setFont('helvetica', 'bold')
+            pdf.text('SYMBOL LEGEND', legX + legW / 2, legY + 6, { align: 'center' })
+            for (let ci = 0; ci < usedCats.length; ci++) {
+              const cat  = usedCats[ci]
+              const ry   = legY + 9 + ci * legRowH
+              const cnt  = sheetPlacements.filter(p => p.global_products?.category === cat).length
+              if (ci > 0) {
+                pdf.setDrawColor(220, 222, 226)
+                pdf.setLineWidth(0.15)
+                pdf.line(legX, ry, legX + legW, ry)
+              }
+              const icon = await getIconPng(cat, brandHex, 24)
+              if (icon) pdf.addImage(icon, 'PNG', legX + 2, ry + 1, 6, 6)
+              pdf.setTextColor(20, 20, 20)
+              pdf.setFontSize(5.8)
+              pdf.setFont('helvetica', 'normal')
+              pdf.text(`${cat} (${cnt})`, legX + 11, ry + 6.5)
+            }
+          }
+        }
+
+        // ── RIGHT-SIDE VERTICAL TITLE BLOCK ──────────────────────────────────
+        pdf.setFillColor(255, 255, 255)
+        pdf.rect(tbX, tbTop, tbW, tbH, 'F')
+        // Left border of title block
         pdf.setDrawColor(0, 0, 0)
-        pdf.setLineWidth(0.8)
-        pdf.line(outerM, tbY, pageW - outerM, tbY)
+        pdf.setLineWidth(1.0)
+        pdf.line(tbX, tbTop, tbX, tbBot)
 
-        // ── RIGHT COLUMN: company + drawing info ──────────────────────────────
-        pdf.setLineWidth(0.5)
-        pdf.line(rcX, tbY, rcX, pageH - outerM)
+        let ty = tbTop
 
-        const rcPad = 3.5
-        // Company logo or name
+        // ── Logo / Company name ───────────────────────────────────────────────
         if (logoImg) {
           try {
-            const maxW = rcW - rcPad * 2, maxH = 16
+            const maxW = tbW - pad * 2, maxH = logoH - 10
             const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
             const lw = logoImg.naturalWidth * ratio
             const lh = logoImg.naturalHeight * ratio
-            pdf.addImage(logoImg, 'PNG', rcX + (rcW - lw) / 2, tbY + rcPad, lw, lh)
+            pdf.addImage(logoImg, 'PNG', tbX + (tbW - lw) / 2, ty + 6, lw, lh)
           } catch { /* ignore */ }
         } else {
           pdf.setTextColor(r, g, b)
-          pdf.setFontSize(9)
+          pdf.setFontSize(10)
           pdf.setFont('helvetica', 'bold')
-          pdf.text(orgProfile?.company_name || '', rcX + rcW / 2, tbY + 12, { align: 'center' })
+          const cLines = pdf.splitTextToSize(orgProfile?.company_name || '', tbW - pad * 2)
+          cLines.slice(0, 2).forEach((l, li) => pdf.text(l, tbX + tbW / 2, ty + 14 + li * 10, { align: 'center' }))
         }
-        const logoLineY = tbY + 20
-        pdf.setLineWidth(0.3)
-        pdf.line(rcX, logoLineY, pageW - outerM, logoLineY)
+        ty += logoH
+        drawSep(ty, true)
 
-        // Info rows
+        // ── Company descriptor ────────────────────────────────────────────────
+        ty += 2
+        pdf.setTextColor(60, 70, 80)
+        pdf.setFontSize(6.5)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text(orgProfile?.company_name || '', tbX + tbW / 2, ty + 7, { align: 'center' })
+        pdf.setFontSize(5.5)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor(100, 110, 120)
+        pdf.text('LOW VOLTAGE SYSTEMS', tbX + tbW / 2, ty + compH - 5, { align: 'center' })
+        ty += compH
+        drawSep(ty, true)
+
+        // ── PROJECT ───────────────────────────────────────────────────────────
+        ty += 2
+        pdf.setTextColor(100, 110, 120)
+        pdf.setFontSize(5)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('PROJECT', tbX + pad, ty + 4)
+        pdf.setTextColor(10, 10, 10)
+        pdf.setFontSize(8.5)
+        pdf.setFont('helvetica', 'bold')
+        const pLines = pdf.splitTextToSize(proposal?.proposal_name || '', tbW - pad * 2)
+        pLines.slice(0, 3).forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 10))
+        ty += projH
+        drawSep(ty)
+
+        // ── CLIENT ────────────────────────────────────────────────────────────
+        ty += 2
+        pdf.setTextColor(100, 110, 120)
+        pdf.setFontSize(5)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('CLIENT', tbX + pad, ty + 4)
+        pdf.setTextColor(10, 10, 10)
+        pdf.setFontSize(7.5)
+        pdf.setFont('helvetica', 'normal')
+        const cliLines = pdf.splitTextToSize(proposal?.company || '', tbW - pad * 2)
+        cliLines.slice(0, 2).forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 9))
+        ty += clientH
+        drawSep(ty, true)
+
+        // ── PRELIMINARY STAMP ─────────────────────────────────────────────────
+        ty += 2
+        pdf.setFillColor(255, 248, 245)
+        pdf.rect(tbX + 2, ty, tbW - 4, stampH - 4)
+        pdf.setDrawColor(190, 60, 40)
+        pdf.setLineWidth(0.5)
+        pdf.rect(tbX + 3, ty + 1, tbW - 6, stampH - 6)
+        pdf.setTextColor(190, 60, 40)
+        pdf.setFontSize(6)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('PRELIMINARY', tbX + tbW / 2, ty + 8, { align: 'center' })
+        pdf.text('NOT FOR CONSTRUCTION', tbX + tbW / 2, ty + 14, { align: 'center' })
+        ty += stampH
+        drawSep(ty, true)
+
+        // ── DRAWING TITLE ─────────────────────────────────────────────────────
+        ty += 1
+        pdf.setTextColor(100, 110, 120)
+        pdf.setFontSize(5)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('DRAWING TITLE', tbX + pad, ty + 4)
+        ty += titleLabH
+        pdf.setTextColor(10, 10, 10)
+        pdf.setFontSize(8)
+        pdf.setFont('helvetica', 'bold')
+        const tLines = pdf.splitTextToSize((sheet.name || 'DRAWING').toUpperCase(), tbW - pad * 2)
+        tLines.slice(0, 3).forEach((l, li) => pdf.text(l, tbX + pad, ty + 8 + li * 9))
+        ty += titleValH
+        drawSep(ty, true)
+
+        // ── INFO ROWS ─────────────────────────────────────────────────────────
         const infoRows = [
-          { label: 'PROJECT',     value: proposal?.proposal_name || '' },
-          { label: 'CLIENT',      value: proposal?.company || ''        },
-          { label: 'DRAWING NO.', value: drawingNum                     },
-          { label: 'DATE',        value: new Date().toLocaleDateString() },
-          { label: 'SCALE',       value: 'NTS'                          },
+          { label: 'DRAWING NO.', value: drawingNum },
+          { label: 'DATE',        value: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) },
+          { label: 'SCALE',       value: 'NTS' },
           { label: 'SHEET',       value: `${i + 1} OF ${sheets.length}` },
+          { label: 'DRAWN BY',    value: '' },
+          { label: 'CHECKED BY',  value: '' },
         ]
-        const rowH = (tbH - 20 - rcPad) / infoRows.length
         infoRows.forEach((row, idx) => {
-          const ry = logoLineY + idx * rowH
+          const ry = ty + idx * infoRowH
           if (idx > 0) {
-            pdf.setDrawColor(200, 200, 200)
+            pdf.setDrawColor(200, 205, 210)
             pdf.setLineWidth(0.2)
-            pdf.line(rcX, ry, pageW - outerM, ry)
+            pdf.line(tbX, ry, pageW - outerM, ry)
           }
           pdf.setTextColor(110, 120, 130)
-          pdf.setFontSize(5.5)
+          pdf.setFontSize(5)
           pdf.setFont('helvetica', 'normal')
-          pdf.text(row.label, rcX + rcPad, ry + 3.5)
+          pdf.text(row.label, tbX + pad, ry + 3.5)
           pdf.setTextColor(15, 15, 15)
-          pdf.setFontSize(7.5)
+          pdf.setFontSize(7)
           pdf.setFont('helvetica', 'bold')
-          const truncated = pdf.splitTextToSize(row.value, rcW - rcPad * 2)[0] || ''
-          pdf.text(truncated, rcX + rcPad, ry + 9)
+          pdf.text(row.value, tbX + pad, ry + infoRowH - 2.5)
         })
+        ty += infoTotalH
+        drawSep(ty, true)
 
-        // ── MIDDLE COLUMN: drawing title + project info ───────────────────────
-        pdf.setDrawColor(0, 0, 0)
-        pdf.setLineWidth(0.5)
-        pdf.line(mcX, tbY, mcX, pageH - outerM)
-
-        const mcPad = 5
-        // Sheet name as drawing title
-        pdf.setTextColor(15, 15, 15)
-        pdf.setFontSize(13)
-        pdf.setFont('helvetica', 'bold')
-        const titleLines = pdf.splitTextToSize((sheet.name || '').toUpperCase(), mcW - mcPad * 2)
-        pdf.text(titleLines.slice(0, 2), mcX + mcPad, tbY + 14)
-
-        // Project name
-        pdf.setFontSize(9)
-        pdf.setFont('helvetica', 'normal')
-        pdf.setTextColor(40, 40, 40)
-        const projLines = pdf.splitTextToSize(proposal?.proposal_name || '', mcW - mcPad * 2)
-        pdf.text(projLines.slice(0, 2), mcX + mcPad, tbY + 27)
-
-        // Client
-        pdf.setFontSize(8)
-        pdf.setTextColor(90, 100, 110)
-        pdf.text(proposal?.company || '', mcX + mcPad, tbY + 35)
-
-        // Notes at bottom of middle column
-        pdf.setLineWidth(0.2)
-        pdf.setDrawColor(200, 200, 200)
-        pdf.line(mcX, tbY + tbH - 18, rcX, tbY + tbH - 18)
-        const notes = ['ALL DIMENSIONS IN FEET UNLESS NOTED', 'DO NOT SCALE FROM DRAWINGS', 'VERIFY ALL CONDITIONS IN FIELD']
-        notes.forEach((note, ni) => {
-          pdf.setFontSize(5.5)
-          pdf.setFont('helvetica', 'normal')
-          pdf.setTextColor(130, 140, 150)
-          pdf.text(`· ${note}`, mcX + mcPad, tbY + tbH - 13 + ni * 4.2)
-        })
-
-        // ── LEFT SECTION: revision table ──────────────────────────────────────
-        // Header bar
+        // ── REVISION TABLE ────────────────────────────────────────────────────
         pdf.setFillColor(r, g, b)
-        pdf.rect(revX, tbY, revW, 9, 'F')
+        pdf.rect(tbX, ty, tbW, revHeaderH, 'F')
         pdf.setTextColor(255, 255, 255)
-        pdf.setFontSize(7)
+        pdf.setFontSize(6.5)
         pdf.setFont('helvetica', 'bold')
-        pdf.text('REVISIONS', revX + 3, tbY + 6)
+        pdf.text('REVISIONS', tbX + pad, ty + 7)
+        ty += revHeaderH
 
         // Column headers
         const revCols = [
-          { label: 'REV',         w: 16 },
-          { label: 'DATE',        w: 30 },
-          { label: 'DESCRIPTION', w: revW - 16 - 30 - 18 },
-          { label: 'BY',          w: 18 },
+          { label: 'REV',  w: 13 },
+          { label: 'DATE', w: 23 },
+          { label: 'DESCRIPTION', w: tbW - 13 - 23 - 13 },
+          { label: 'BY',   w: 13 },
         ]
-        let cx = revX
+        let cx = tbX
         revCols.forEach((col, ci) => {
           if (ci > 0) {
-            pdf.setDrawColor(180, 180, 180)
+            pdf.setDrawColor(160, 168, 178)
             pdf.setLineWidth(0.2)
-            pdf.line(cx, tbY + 9, cx, pageH - outerM)
+            pdf.line(cx, ty, cx, tbBot)
           }
-          pdf.setTextColor(60, 60, 60)
-          pdf.setFontSize(5.5)
+          pdf.setTextColor(55, 65, 75)
+          pdf.setFontSize(5)
           pdf.setFont('helvetica', 'bold')
-          pdf.text(col.label, cx + 2, tbY + 15)
+          pdf.text(col.label, cx + 2, ty + 5.5)
           cx += col.w
         })
-        // Column header underline
-        pdf.setDrawColor(180, 180, 180)
+        ty += revColH
+        pdf.setDrawColor(160, 168, 178)
         pdf.setLineWidth(0.2)
-        pdf.line(revX, tbY + 17, mcX, tbY + 17)
+        pdf.line(tbX, ty, pageW - outerM, ty)
 
-        // 5 empty revision rows
-        const numRevRows = 5
-        const revRowH    = (tbH - 17) / numRevRows
-        for (let ri = 1; ri < numRevRows; ri++) {
-          pdf.setDrawColor(220, 220, 220)
-          pdf.setLineWidth(0.15)
-          pdf.line(revX, tbY + 17 + ri * revRowH, mcX, tbY + 17 + ri * revRowH)
+        // Empty revision rows
+        for (let ri = 1; ri <= numRevRows; ri++) {
+          const ry = ty + ri * revRowH
+          if (ry < tbBot - 1) {
+            pdf.setDrawColor(215, 218, 222)
+            pdf.setLineWidth(0.15)
+            pdf.line(tbX, ry, pageW - outerM, ry)
+          }
         }
       }
 
