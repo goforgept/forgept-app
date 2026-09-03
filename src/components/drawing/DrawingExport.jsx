@@ -500,7 +500,39 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [archRevisions,     setArchRevisions]     = useState([])  // { id, rev, date, description, by }
   const [archSettingsOpen,  setArchSettingsOpen]  = useState(false)
 
-  // Initialise page list from Designer sheets (runs once when sheets first load)
+  const archStorageKey = `arch_settings_${proposalId}`
+
+  // Load persisted arch settings from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(archStorageKey)
+      if (saved) {
+        const s = JSON.parse(saved)
+        if (s.archDwgPrefix    !== undefined) setArchDwgPrefix(s.archDwgPrefix)
+        if (s.archScale        !== undefined) setArchScale(s.archScale)
+        if (s.archPrelim       !== undefined) setArchPrelim(s.archPrelim)
+        if (s.archFontScale    !== undefined) setArchFontScale(s.archFontScale)
+        if (s.archIncludeCover !== undefined) setArchIncludeCover(s.archIncludeCover)
+        if (s.archIncludeSchedule !== undefined) setArchIncludeSchedule(s.archIncludeSchedule)
+        if (s.archSheetSettings !== undefined) setArchSheetSettings(s.archSheetSettings)
+        if (s.archPageList?.length > 0)       setArchPageList(s.archPageList)
+        if (s.archRevisions    !== undefined) setArchRevisions(s.archRevisions)
+      }
+    } catch { /* ignore corrupt storage */ }
+  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist arch settings to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(archStorageKey, JSON.stringify({
+        archDwgPrefix, archScale, archPrelim, archFontScale,
+        archIncludeCover, archIncludeSchedule,
+        archSheetSettings, archPageList, archRevisions,
+      }))
+    } catch { /* ignore quota errors */ }
+  }, [archDwgPrefix, archScale, archPrelim, archFontScale, archIncludeCover, archIncludeSchedule, archSheetSettings, archPageList, archRevisions])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Initialise page list from Designer sheets (runs once when sheets first load and nothing is persisted)
   useEffect(() => {
     if (sheets.length > 0 && archPageList.length === 0)
       setArchPageList(sheets.map(s => ({ type: 'sheet', id: s.id })))
@@ -1915,23 +1947,6 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
         pdf.text(`Date: ${dateStr}`, cx + 8, midY + 65)
         pdf.text(`Sheets: ${totalPages}`, cx + 8, midY + 88)
-        // Sheet index at bottom
-        const idxY = drawY + drawH - 20 - pageList.length * 20
-        if (idxY > midY + 110) {
-          pdf.setFontSize(fs(7)); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(r, g, b)
-          pdf.text('DRAWING INDEX', cx + 8, idxY - 4)
-          pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.8)
-          pdf.line(cx + 8, idxY - 4, cx + 160, idxY - 4)
-          let pNum = coverPages + schedPages
-          pageList.forEach((item, li) => {
-            const s = item.type === 'sheet' ? sheets.find(x => x.id === item.id) : null
-            const lbl = archSheetSettings[item.id]?.label ?? (item.type === 'notes' ? 'GENERAL NOTES' : (s?.name ?? ''))
-            const dnum = archSheetSettings[item.id]?.drawingNum || `${archDwgPrefix}${li + 1}.0`
-            pdf.setTextColor(20, 20, 20); pdf.setFont('helvetica', 'normal')
-            pdf.text(`${dnum}  ${lbl}`, cx + 8, idxY + li * 20)
-            pNum++
-          })
-        }
         drawArchTitleBlock('COVER SHEET', 'C-001', null, totalPages)
       }
 
@@ -1977,44 +1992,80 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         drawArchTitleBlock('DEVICE SCHEDULE', 'S-001', coverPages + 1, totalPages)
       }
 
-      // ── SYMBOL LEGEND PAGE ────────────────────────────────────────────────────
-      if (usedCategories.length > 0) {
+      // ── SYMBOL LEGEND + DRAWING INDEX PAGE ───────────────────────────────────
+      if (usedCategories.length > 0 || pageList.length > 0) {
         if (archIncludeCover || (archIncludeSchedule && placements.length > 0)) pdf.addPage()
         drawArchBorders()
 
+        // Split drawing area: left 58% legend, right 42% drawing index
+        const legAreaW = Math.round(drawW * 0.58)
+        const idxAreaX = drawX + legAreaW + 10
+        const idxAreaW = drawW - legAreaW - 14
+
+        // ── LEFT: Symbol legend ──
         pdf.setTextColor(r, g, b); pdf.setFontSize(fs(12)); pdf.setFont('helvetica', 'bold')
         pdf.text('SYMBOL LEGEND', drawX + 4, drawY + 22)
         pdf.setDrawColor(r, g, b); pdf.setLineWidth(1.5)
-        pdf.line(drawX + 4, drawY + 26, drawX + drawW - 4, drawY + 26)
+        pdf.line(drawX + 4, drawY + 26, drawX + legAreaW - 4, drawY + 26)
 
-        const colW   = (drawW - 8) / 3
-        const rowH   = 55
-        let lx = drawX + 4, ly = drawY + 42, col = 0
+        const legColW = (legAreaW - 8) / 2
+        const rowH    = 55
+        let legCol = 0, ly = drawY + 42
 
         for (const category of usedCategories) {
-          const icon = await getIconPng(category, brandHex, 64)
+          const icon  = await getIconPng(category, brandHex, 64)
           const count = placements.filter(p => p.global_products?.category === category).length
-          const cardX = drawX + 4 + col * colW
+          const cardX = drawX + 4 + legCol * legColW
           const cardY = ly
-
-          // Icon
           if (icon) pdf.addImage(icon, 'PNG', cardX + 2, cardY + 2, 30, 30)
-          else {
-            pdf.setFillColor(r, g, b); pdf.circle(cardX + 17, cardY + 17, 12, 'F')
-          }
-          // Category name
+          else { pdf.setFillColor(r, g, b); pdf.circle(cardX + 17, cardY + 17, 12, 'F') }
           pdf.setTextColor(20, 20, 20); pdf.setFontSize(fs(7.5)); pdf.setFont('helvetica', 'bold')
-          pdf.text(category, cardX + 38, cardY + 14)
-          // Count
+          const catLines = pdf.splitTextToSize(category, legColW - 42)
+          catLines.slice(0, 2).forEach((l, li2) => pdf.text(l, cardX + 38, cardY + 12 + li2 * 11))
           pdf.setFontSize(fs(6)); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(90, 100, 110)
-          pdf.text(`Count: ${count}`, cardX + 38, cardY + 26)
-          // Separator line below
+          pdf.text(`Count: ${count}`, cardX + 38, cardY + 34)
           pdf.setDrawColor(220, 222, 226); pdf.setLineWidth(0.4)
-          pdf.line(cardX, cardY + rowH - 2, cardX + colW - 4, cardY + rowH - 2)
-
-          col++
-          if (col >= 3) { col = 0; ly += rowH }
+          pdf.line(cardX, cardY + rowH - 2, cardX + legColW - 4, cardY + rowH - 2)
+          legCol++
+          if (legCol >= 2) { legCol = 0; ly += rowH }
         }
+
+        // Vertical divider
+        pdf.setDrawColor(200, 205, 210); pdf.setLineWidth(0.6)
+        pdf.line(idxAreaX - 6, drawY + 4, idxAreaX - 6, drawY + drawH - 4)
+
+        // ── RIGHT: Drawing index ──
+        pdf.setTextColor(r, g, b); pdf.setFontSize(fs(12)); pdf.setFont('helvetica', 'bold')
+        pdf.text('DRAWING INDEX', idxAreaX, drawY + 22)
+        pdf.setDrawColor(r, g, b); pdf.setLineWidth(1.5)
+        pdf.line(idxAreaX, drawY + 26, idxAreaX + idxAreaW - 4, drawY + 26)
+
+        // Build full index: cover + schedule + legend + floor plan sheets
+        const indexEntries = []
+        if (archIncludeCover)                                    indexEntries.push({ num: 'C-001', lbl: 'COVER SHEET' })
+        if (archIncludeSchedule && placements.length > 0)        indexEntries.push({ num: 'S-001', lbl: 'DEVICE SCHEDULE' })
+        if (usedCategories.length > 0)                           indexEntries.push({ num: 'L-001', lbl: 'SYMBOL LEGEND' })
+        pageList.forEach((item, pi) => {
+          const s   = item.type === 'sheet' ? sheets.find(x => x.id === item.id) : null
+          const lbl = archSheetSettings[item.id]?.label ?? (item.type === 'notes' ? 'GENERAL NOTES' : (s?.name ?? ''))
+          const num = archSheetSettings[item.id]?.drawingNum || `${archDwgPrefix}${pi + 1}.0`
+          indexEntries.push({ num, lbl })
+        })
+
+        const idxRowH = 18
+        indexEntries.forEach((entry, ei) => {
+          const iy = drawY + 42 + ei * idxRowH
+          if (iy + idxRowH > drawY + drawH - 4) return
+          if (ei > 0) {
+            pdf.setDrawColor(230, 232, 235); pdf.setLineWidth(0.3)
+            pdf.line(idxAreaX, iy, idxAreaX + idxAreaW - 4, iy)
+          }
+          pdf.setTextColor(r, g, b); pdf.setFontSize(fs(5.5)); pdf.setFont('helvetica', 'bold')
+          pdf.text(entry.num, idxAreaX, iy + 11)
+          pdf.setTextColor(20, 20, 20); pdf.setFontSize(fs(6.5)); pdf.setFont('helvetica', 'normal')
+          const lblLines = pdf.splitTextToSize(entry.lbl, idxAreaW - 36)
+          pdf.text(lblLines[0] || '', idxAreaX + 30, iy + 11)
+        })
 
         drawArchTitleBlock('SYMBOL LEGEND', 'L-001', coverPages + schedPages + 1, totalPages)
       }
