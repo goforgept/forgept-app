@@ -74,12 +74,24 @@ const drawPolylineOnPDF = (pdf, points, imgX, imgY, imgW, imgH, color, lineWidth
 
 const loadOrgLogoFromProfile = async (orgProfile) => {
   if (!orgProfile?.logo_url) return null
-  const img = new Image()
-  img.crossOrigin = 'anonymous'
-  img.src = orgProfile.logo_url
-  await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
-  if (img.naturalWidth === 0) return null
-  return img
+  try {
+    const resp = await fetch(orgProfile.logo_url)
+    if (!resp.ok) return null
+    const blob = await resp.blob()
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload  = () => resolve(reader.result)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+    const img = new Image()
+    img.src = dataUrl
+    await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+    if (img.naturalWidth === 0) return null
+    return img
+  } catch {
+    return null
+  }
 }
 
 // Maps device categories to higher-level system groups for schedule grouping
@@ -973,15 +985,27 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     }
   }
 
-  // ── Load org logo safely (CORS-safe, falls back to null) ──────────────────
+  // ── Load org logo safely (fetch → dataURL avoids CORS/tainted-canvas issues)
   const loadOrgLogo = async () => {
     if (!orgProfile?.logo_url) return null
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    img.src = orgProfile.logo_url
-    await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
-    if (img.naturalWidth === 0) return null
-    return img
+    try {
+      const resp = await fetch(orgProfile.logo_url)
+      if (!resp.ok) return null
+      const blob = await resp.blob()
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload  = () => resolve(reader.result)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+      const img = new Image()
+      img.src = dataUrl
+      await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+      if (img.naturalWidth === 0) return null
+      return img
+    } catch {
+      return null
+    }
   }
 
   const drawDocCover = (pdf, opts) => drawDocCoverPage(pdf, orgProfile, opts)
@@ -1713,6 +1737,18 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const [r, g, b] = hexToRgbArr(brandHex)
       const logoImg   = await loadOrgLogo()
 
+      // Resolve project address from client or location record
+      let projectAddress = ''
+      if (proposal?.location_id) {
+        const { data: loc } = await supabase.from('client_locations')
+          .select('site_name, address, city, state, zip').eq('id', proposal.location_id).single()
+        if (loc) projectAddress = [loc.site_name, loc.address, loc.city, loc.state, loc.zip].filter(Boolean).join(', ')
+      } else if (proposal?.client_id) {
+        const { data: cli } = await supabase.from('clients')
+          .select('address, city, state, zip').eq('id', proposal.client_id).single()
+        if (cli) projectAddress = [cli.address, cli.city, cli.state, cli.zip].filter(Boolean).join(', ')
+      }
+
       // Layout constants
       const outerM = 7     // outer border margin
       const innerM = 13    // inner border (drawing frame)
@@ -1808,13 +1844,18 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           .forEach((l, li) => pdf.text(l, tbX + pad, ty + 18 + li * 14))
         ty += clientH; drawSep(ty, true)
 
-        // ── Project name ──
+        // ── Project name + address ──
         ty += 4
         pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'normal')
         pdf.text('PROJECT', tbX + pad, ty + 6)
         pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(9.5)); pdf.setFont('helvetica', 'bold')
-        pdf.splitTextToSize((proposal?.proposal_name || '').toUpperCase(), tbW - pad * 2).slice(0, 4)
+        pdf.splitTextToSize((proposal?.proposal_name || '').toUpperCase(), tbW - pad * 2).slice(0, 3)
           .forEach((l, li) => pdf.text(l, tbX + pad, ty + 20 + li * 17))
+        if (projectAddress) {
+          pdf.setFontSize(fs(5.5)); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(80, 90, 100)
+          pdf.splitTextToSize(projectAddress, tbW - pad * 2).slice(0, 2)
+            .forEach((l, li) => pdf.text(l, tbX + pad, ty + projH - 18 + li * 10))
+        }
         ty += projH; drawSep(ty, true)
 
         // ── Scope — "Drawings For" ──

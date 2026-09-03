@@ -98,7 +98,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
       if (proposalId && proposalId !== 'new') {
         const { data: p } = await supabase
           .from('proposals')
-          .select('id, proposal_name, company, client_name, status, industry')
+          .select('id, proposal_name, company, client_name, status, industry, client_id, location_id')
           .eq('id', proposalId).single()
         setProposal(p)
 
