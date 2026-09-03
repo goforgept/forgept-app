@@ -1828,8 +1828,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         ty += revHeaderH
 
         const revCols = [
-          { label: 'REV', w: 20 }, { label: 'DATE', w: 34 },
-          { label: 'DESCRIPTION', w: tbW - 20 - 34 - 20 }, { label: 'BY', w: 20 },
+          { label: 'REV', w: 16 }, { label: 'DATE', w: 28 },
+          { label: 'BY', w: 36 }, { label: 'DESCRIPTION', w: tbW - 16 - 28 - 36 },
         ]
         let cx = tbX
         revCols.forEach((col, ci) => {
@@ -1845,7 +1845,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.setDrawColor(160, 168, 178); pdf.setLineWidth(0.5)
         pdf.line(tbX, ty, pageW - outerM, ty)
         // Render saved revisions first, then blank rows
-        const revColWidths = [20, 34, tbW - 20 - 34 - 20, 20]
+        const revColWidths = [16, 28, 36, tbW - 16 - 28 - 36]
         for (let ri = 0; ri < numRevRows; ri++) {
           const ry = ty + ri * revRowH
           if (ry + revRowH >= tbBot) break
@@ -1868,10 +1868,12 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       }
 
       const pageList   = archPageList.length > 0 ? archPageList : sheets.map(s => ({ type: 'sheet', id: s.id }))
+      const usedCategories = [...new Set(placements.map(p => p.global_products?.category).filter(Boolean))].sort()
       // Tally total page count for SHEET X OF Y
-      const coverPages = archIncludeCover ? 1 : 0
-      const schedPages = archIncludeSchedule && placements.length > 0 ? 1 : 0
-      const totalPages = coverPages + schedPages + pageList.length
+      const coverPages  = archIncludeCover ? 1 : 0
+      const schedPages  = archIncludeSchedule && placements.length > 0 ? 1 : 0
+      const legendPages = usedCategories.length > 0 ? 1 : 0
+      const totalPages  = coverPages + schedPages + legendPages + pageList.length
 
       // ── COVER PAGE ──────────────────────────────────────────────────────────
       if (archIncludeCover) {
@@ -1974,14 +1976,57 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
         drawArchTitleBlock('DEVICE SCHEDULE', 'S-001', coverPages + 1, totalPages)
       }
+
+      // ── SYMBOL LEGEND PAGE ────────────────────────────────────────────────────
+      if (usedCategories.length > 0) {
+        if (archIncludeCover || (archIncludeSchedule && placements.length > 0)) pdf.addPage()
+        drawArchBorders()
+
+        pdf.setTextColor(r, g, b); pdf.setFontSize(fs(12)); pdf.setFont('helvetica', 'bold')
+        pdf.text('SYMBOL LEGEND', drawX + 4, drawY + 22)
+        pdf.setDrawColor(r, g, b); pdf.setLineWidth(1.5)
+        pdf.line(drawX + 4, drawY + 26, drawX + drawW - 4, drawY + 26)
+
+        const colW   = (drawW - 8) / 3
+        const rowH   = 55
+        let lx = drawX + 4, ly = drawY + 42, col = 0
+
+        for (const category of usedCategories) {
+          const icon = await getIconPng(category, brandHex, 64)
+          const count = placements.filter(p => p.global_products?.category === category).length
+          const cardX = drawX + 4 + col * colW
+          const cardY = ly
+
+          // Icon
+          if (icon) pdf.addImage(icon, 'PNG', cardX + 2, cardY + 2, 30, 30)
+          else {
+            pdf.setFillColor(r, g, b); pdf.circle(cardX + 17, cardY + 17, 12, 'F')
+          }
+          // Category name
+          pdf.setTextColor(20, 20, 20); pdf.setFontSize(fs(7.5)); pdf.setFont('helvetica', 'bold')
+          pdf.text(category, cardX + 38, cardY + 14)
+          // Count
+          pdf.setFontSize(fs(6)); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(90, 100, 110)
+          pdf.text(`Count: ${count}`, cardX + 38, cardY + 26)
+          // Separator line below
+          pdf.setDrawColor(220, 222, 226); pdf.setLineWidth(0.4)
+          pdf.line(cardX, cardY + rowH - 2, cardX + colW - 4, cardY + rowH - 2)
+
+          col++
+          if (col >= 3) { col = 0; ly += rowH }
+        }
+
+        drawArchTitleBlock('SYMBOL LEGEND', 'L-001', coverPages + schedPages + 1, totalPages)
+      }
+
       for (let i = 0; i < pageList.length; i++) {
-        if (i > 0 || archIncludeCover || archIncludeSchedule) pdf.addPage()
+        if (i > 0 || archIncludeCover || archIncludeSchedule || legendPages > 0) pdf.addPage()
         const item       = pageList[i]
         const sheet      = item.type === 'sheet' ? sheets.find(s => s.id === item.id) : null
         const drawingNum = getSheetDwgNum(item, i)
         const sheetLabel = getSheetLabel(item, sheet)
         const isBlank    = item.type === 'notes' || !sheet?.storage_path || ['blank', 'pending'].includes(sheet.storage_path)
-        const pageNum    = coverPages + schedPages + i + 1
+        const pageNum    = coverPages + schedPages + legendPages + i + 1
 
         drawArchBorders()
 
@@ -2069,7 +2114,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             pdf.setTextColor(...annCol)
             pdf.setFontSize(fs(ann.font_size || 14))
             pdf.setFont('helvetica', 'normal')
-            const lines = pdf.splitTextToSize(ann.label, drawW * 0.4)
+            const annW = (ann.points[0].width ?? 0.3) * drawW
+            const lines = pdf.splitTextToSize(ann.label, annW)
             lines.forEach((line, li) => pdf.text(line, tx, ty + li * ptSize * 1.4))
           }
 

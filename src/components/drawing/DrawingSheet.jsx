@@ -2485,11 +2485,26 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               {/* ── Text annotations ── */}
               {annotations.filter(a => a.annotation_type === 'text').map(ann => {
                 if (!ann.points?.[0]) return null
-                const tx = position.x + ann.points[0].x * canvasW * scale
-                const ty = position.y + ann.points[0].y * canvasH * scale
-                const col = ann.color || '#111827'
-                const fsize = (ann.font_size || 14) * scale
-                const isSel = ann.id === selectedAnnotationId
+                const normW  = ann.points[0].width  ?? 0.3   // normalized width (0-1)
+                const tx     = position.x + ann.points[0].x * canvasW * scale
+                const ty     = position.y + ann.points[0].y * canvasH * scale
+                const boxW   = normW * canvasW * scale
+                const col    = ann.color || '#111827'
+                const fsize  = (ann.font_size || 14) * scale
+                const isSel  = ann.id === selectedAnnotationId
+
+                // Estimate rendered text height for selection rect
+                const lineH   = fsize * 1.3
+                const approxLines = Math.ceil(((ann.label || '').length * fsize * 0.55) / Math.max(boxW, 1))
+                const boxH    = Math.max(lineH, approxLines * lineH)
+
+                const openEdit = (screenX, screenY) => setTextPrompt({
+                  x: ann.points[0].x, y: ann.points[0].y,
+                  screenX, screenY,
+                  editId: ann.id, existing: ann.label || '',
+                  existingFontSize: ann.font_size || 14,
+                })
+
                 return (
                   <Group key={ann.id}
                     draggable={isSel && !annotationTool}
@@ -2497,23 +2512,66 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                     onTouchStart={e => e.cancelBubble = true}
                     onClick={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
                     onTap={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
-                    onDblClick={e => {
-                      e.cancelBubble = true
-                      setTextPrompt({ x: ann.points[0].x, y: ann.points[0].y, screenX: e.evt.clientX, screenY: e.evt.clientY, editId: ann.id, existing: ann.label || '' })
-                    }}
+                    onDblClick={e => { e.cancelBubble = true; openEdit(e.evt.clientX, e.evt.clientY) }}
                     onDragEnd={async (e) => {
                       const dx = e.target.x(), dy = e.target.y()
                       e.target.position({ x: 0, y: 0 })
                       const normDx = dx / (canvasWRef.current * scaleRef.current)
                       const normDy = dy / (canvasHRef.current * scaleRef.current)
-                      const newPoints = [{ x: Math.min(Math.max(ann.points[0].x + normDx, 0), 1), y: Math.min(Math.max(ann.points[0].y + normDy, 0), 1) }]
+                      const newPoints = [{ ...ann.points[0], x: Math.min(Math.max(ann.points[0].x + normDx, 0), 1), y: Math.min(Math.max(ann.points[0].y + normDy, 0), 1) }]
                       setAnnotations(prev => prev.map(a => a.id === ann.id ? { ...a, points: newPoints } : a))
                       await supabase.from('drawing_annotations').update({ points: newPoints }).eq('id', ann.id)
                     }}>
-                    {isSel && <Rect x={tx - 4} y={ty - fsize - 2} width={(ann.label || '').length * fsize * 0.6 + 8} height={fsize + 8} fill="rgba(59,130,246,0.12)" cornerRadius={3} stroke="#3b82f6" strokeWidth={1} listening={false}/>}
-                    <Text x={tx} y={ty - fsize} text={ann.label || ''} fontSize={fsize} fill={col} fontStyle="normal" wrap="none" listening={false}/>
+
+                    {/* Selection outline */}
+                    {isSel && <Rect x={tx - 3} y={ty - 3} width={boxW + 6} height={boxH + 6}
+                      fill="rgba(59,130,246,0.07)" stroke="#3b82f6" strokeWidth={1} dash={[4, 3]} cornerRadius={3} listening={false}/>}
+
+                    {/* Word-wrapped text */}
+                    <Text x={tx} y={ty} text={ann.label || ''} fontSize={fsize} fill={col}
+                      width={boxW} wrap="word" lineHeight={1.3} fontStyle="normal" listening={false}/>
+
+                    {/* Resize handle — bottom-right corner drag */}
                     {isSel && (
-                      <Group x={tx} y={ty - fsize - 20}>
+                      <Circle x={tx + boxW} y={ty + boxH} radius={6} fill="#3b82f6" stroke="white" strokeWidth={1.5}
+                        draggable
+                        onMouseDown={e => e.cancelBubble = true}
+                        onDragMove={e => {
+                          e.cancelBubble = true
+                          const raw = e.target.x()
+                          const minW = 60
+                          const newAbsW = Math.max(raw - tx, minW)
+                          e.target.x(tx + newAbsW)   // clamp handle position
+                        }}
+                        onDragEnd={async (e) => {
+                          e.cancelBubble = true
+                          const newAbsW = Math.max(e.target.x() - tx, 60)
+                          e.target.position({ x: tx + newAbsW, y: ty + boxH })
+                          const newNormW = Math.min(newAbsW / (canvasWRef.current * scaleRef.current), 0.99)
+                          const newPoints = [{ ...ann.points[0], width: newNormW }]
+                          setAnnotations(prev => prev.map(a => a.id === ann.id ? { ...a, points: newPoints } : a))
+                          await supabase.from('drawing_annotations').update({ points: newPoints }).eq('id', ann.id)
+                        }}
+                        onMouseEnter={e => { document.body.style.cursor = 'ew-resize' }}
+                        onMouseLeave={e => { document.body.style.cursor = '' }}
+                      />
+                    )}
+
+                    {/* Edit button */}
+                    {isSel && (
+                      <Group x={tx + boxW + 2} y={ty - 24}>
+                        <Circle radius={11} fill="#3b82f6" shadowColor="black" shadowBlur={4} shadowOpacity={0.3}/>
+                        <Text text="✎" fill="white" fontSize={12} x={-5} y={-7} listening={false}/>
+                        <Circle radius={11} fill="transparent"
+                          onClick={e => { e.cancelBubble = true; openEdit(e.evt.clientX, e.evt.clientY) }}
+                          onTap={e => { e.cancelBubble = true; openEdit(e.evt.clientX, e.evt.clientY) }}
+                        />
+                      </Group>
+                    )}
+
+                    {/* Delete button */}
+                    {isSel && (
+                      <Group x={tx - 16} y={ty - 24}>
                         <Circle radius={11} fill="#ef4444" shadowColor="black" shadowBlur={4} shadowOpacity={0.4}/>
                         <Text text="✕" fill="white" fontSize={12} fontStyle="bold" x={-4} y={-7} listening={false}/>
                         <Circle radius={11} fill="transparent"
@@ -2716,6 +2774,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         >
           <TextAnnotationInput
             initial={textPrompt.existing || ''}
+            initialFontSize={textPrompt.existingFontSize}
             color={annotationColor}
             onConfirm={async (text, fontSize) => {
               if (text.trim()) {
@@ -2729,7 +2788,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                     drawing_sheet_id: sheetIdRef.current,
                     org_id:           orgIdRef.current,
                     annotation_type:  'text',
-                    points:           [{ x: textPrompt.x, y: textPrompt.y }],
+                    points:           [{ x: textPrompt.x, y: textPrompt.y, width: 0.3 }],
                     color:            annotationColor,
                     label:            text,
                     font_size:        fontSize,
@@ -2931,9 +2990,9 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 }
 
 // ─── ContextMenu ─────────────────────────────────────────────────────────────
-function TextAnnotationInput({ initial, color, onConfirm, onCancel }) {
+function TextAnnotationInput({ initial, initialFontSize, color, onConfirm, onCancel }) {
   const [text, setText] = useState(initial)
-  const [fontSize, setFontSize] = useState(14)
+  const [fontSize, setFontSize] = useState(initialFontSize || 14)
   const ref = useRef(null)
   useEffect(() => { ref.current?.focus(); ref.current?.select() }, [])
 
