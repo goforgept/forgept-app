@@ -580,7 +580,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const getSheetLabel  = (item, sheet) =>
     archSheetSettings[item.id]?.label ?? (item.type === 'notes' ? 'GENERAL NOTES' : (sheet?.name ?? ''))
   const getSheetDwgNum = (item, i) =>
-    archSheetSettings[item.id]?.drawingNum ?? `${archDwgPrefix}${i + 1}.0`
+    archSheetSettings[item.id]?.drawingNum || `${archDwgPrefix}${i + 1}.0`
   const [packages,      setPackages]      = useState([])
   const [copiedId,      setCopiedId]      = useState(null)
   const [shareExpiry,   setShareExpiry]   = useState(() => {
@@ -1926,7 +1926,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           pageList.forEach((item, li) => {
             const s = item.type === 'sheet' ? sheets.find(x => x.id === item.id) : null
             const lbl = archSheetSettings[item.id]?.label ?? (item.type === 'notes' ? 'GENERAL NOTES' : (s?.name ?? ''))
-            const dnum = archSheetSettings[item.id]?.drawingNum ?? `${archDwgPrefix}${li + 1}.0`
+            const dnum = archSheetSettings[item.id]?.drawingNum || `${archDwgPrefix}${li + 1}.0`
             pdf.setTextColor(20, 20, 20); pdf.setFont('helvetica', 'normal')
             pdf.text(`${dnum}  ${lbl}`, cx + 8, idxY + li * 20)
             pNum++
@@ -2127,43 +2127,6 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           pdf.setFont('helvetica', 'bold')
           pdf.text(`${drawingNum}   ${sheetLabel.toUpperCase()}`, drawX + 8, drawY + drawH - 8)
 
-          // Symbol legend (keynotes) — inset box, upper-right of drawing area
-          const sheetPlacements = placements.filter(p => p.drawing_sheet_id === sheet.id)
-          const usedCats = [...new Set(sheetPlacements.map(p => p.global_products?.category).filter(Boolean))]
-          if (usedCats.length > 0) {
-            const legW   = 180
-            const legRowH = 22
-            const legH   = 22 + usedCats.length * legRowH
-            const legX   = drawX + drawW - legW - 6
-            const legY   = drawY + 6
-            pdf.setFillColor(255, 255, 255)
-            pdf.setDrawColor(80, 80, 80)
-            pdf.setLineWidth(1.0)
-            pdf.rect(legX, legY, legW, legH)
-            // Header bar
-            pdf.setFillColor(r, g, b)
-            pdf.rect(legX, legY, legW, 22, 'F')
-            pdf.setTextColor(255, 255, 255)
-            pdf.setFontSize(fs(6))
-            pdf.setFont('helvetica', 'bold')
-            pdf.text('SYMBOL LEGEND', legX + legW / 2, legY + 15, { align: 'center' })
-            for (let ci = 0; ci < usedCats.length; ci++) {
-              const cat  = usedCats[ci]
-              const ry   = legY + 22 + ci * legRowH
-              const cnt  = sheetPlacements.filter(p => p.global_products?.category === cat).length
-              if (ci > 0) {
-                pdf.setDrawColor(220, 222, 226)
-                pdf.setLineWidth(0.4)
-                pdf.line(legX, ry, legX + legW, ry)
-              }
-              const icon = await getIconPng(cat, brandHex, 24)
-              if (icon) pdf.addImage(icon, 'PNG', legX + 4, ry + 4, 14, 14)
-              pdf.setTextColor(20, 20, 20)
-              pdf.setFontSize(fs(5.8))
-              pdf.setFont('helvetica', 'normal')
-              pdf.text(`${cat} (${cnt})`, legX + 22, ry + 15)
-            }
-          }
         }
 
         drawArchTitleBlock(sheetLabel, drawingNum, pageNum, totalPages)
