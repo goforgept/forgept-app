@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-export default function SheetTab({ sheet, isActive, onSelect, onRename, onDelete }) {
+export default function SheetTab({ sheet, isActive, onSelect, onRename, onDelete, onMoveLeft, onMoveRight, canMoveLeft, canMoveRight }) {
   const [editing, setEditing] = useState(false)
   const [name,    setName]    = useState(sheet.name)
 
@@ -31,6 +31,17 @@ export default function SheetTab({ sheet, isActive, onSelect, onRename, onDelete
           className="w-20 text-xs border-b border-[#C8622A] outline-none bg-[#0F1C2E] text-white px-1" />
       ) : (
         <span onDoubleClick={(e) => { e.stopPropagation(); setEditing(true) }}>{sheet.name}</span>
+      )}
+      {/* Reorder arrows */}
+      {canMoveLeft && (
+        <button onClick={(e) => { e.stopPropagation(); onMoveLeft?.() }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-fp-muted hover:text-fp-text text-[10px] leading-none px-0.5"
+          title="Move left">◀</button>
+      )}
+      {canMoveRight && (
+        <button onClick={(e) => { e.stopPropagation(); onMoveRight?.() }}
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-fp-muted hover:text-fp-text text-[10px] leading-none px-0.5"
+          title="Move right">▶</button>
       )}
       {/* Rename icon */}
       <button onClick={(e) => { e.stopPropagation(); setEditing(true) }}

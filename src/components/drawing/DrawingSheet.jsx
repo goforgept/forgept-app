@@ -227,11 +227,12 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   // ── Annotations (arrows + revision clouds) ─────────────────────────────────
   const [annotations,         setAnnotations]         = useState([])
-  const [annotationTool,      setAnnotationTool]      = useState(null) // 'arrow' | 'cloud' | null
+  const [annotationTool,      setAnnotationTool]      = useState(null) // 'arrow' | 'cloud' | 'text' | null
   const [annotationColor,     setAnnotationColor]     = useState('#ef4444')
   const [annotationStart,     setAnnotationStart]     = useState(null) // {x,y} normalised
   const [annotationPreview,   setAnnotationPreview]   = useState(null) // {x,y} normalised live
   const [selectedAnnotationId, setSelectedAnnotationId] = useState(null)
+  const [textPrompt, setTextPrompt] = useState(null) // { x, y, screenX, screenY } — pending text placement
   const lastAnnotationPosRef = useRef(null) // last known pointer pos during drag
   useEffect(() => { annotationToolRef.current  = annotationTool },  [annotationTool])
   useEffect(() => { annotationStartRef.current = annotationStart }, [annotationStart])
@@ -750,6 +751,13 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   // ── Pan ────────────────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e) => {
+    // Text annotation: show floating input at click position
+    if (annotationToolRef.current === 'text' && e.evt.button === 0) {
+      const norm = clientToNorm(e.evt.clientX, e.evt.clientY)
+      if (!norm) return
+      setTextPrompt({ x: norm.x, y: norm.y, screenX: e.evt.clientX, screenY: e.evt.clientY })
+      return
+    }
     // Annotation draw mode: capture start point and block panning entirely
     if (annotationToolRef.current && e.evt.button === 0) {
       const norm = clientToNorm(e.evt.clientX, e.evt.clientY)
@@ -1518,6 +1526,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3"/> },
               { type: 'cloud', title: 'Cloud',
                 icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/> },
+              { type: 'text', title: 'Text',
+                icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h8m-8 6h16"/> },
             ].map(({ type, title, icon }) => (
               <button key={type}
                 onClick={() => {
@@ -2472,8 +2482,52 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                 )
               })}
 
+              {/* ── Text annotations ── */}
+              {annotations.filter(a => a.annotation_type === 'text').map(ann => {
+                if (!ann.points?.[0]) return null
+                const tx = position.x + ann.points[0].x * canvasW * scale
+                const ty = position.y + ann.points[0].y * canvasH * scale
+                const col = ann.color || '#111827'
+                const fsize = (ann.font_size || 14) * scale
+                const isSel = ann.id === selectedAnnotationId
+                return (
+                  <Group key={ann.id}
+                    draggable={isSel && !annotationTool}
+                    onMouseDown={e => e.cancelBubble = true}
+                    onTouchStart={e => e.cancelBubble = true}
+                    onClick={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
+                    onTap={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
+                    onDblClick={e => {
+                      e.cancelBubble = true
+                      setTextPrompt({ x: ann.points[0].x, y: ann.points[0].y, screenX: e.evt.clientX, screenY: e.evt.clientY, editId: ann.id, existing: ann.label || '' })
+                    }}
+                    onDragEnd={async (e) => {
+                      const dx = e.target.x(), dy = e.target.y()
+                      e.target.position({ x: 0, y: 0 })
+                      const normDx = dx / (canvasWRef.current * scaleRef.current)
+                      const normDy = dy / (canvasHRef.current * scaleRef.current)
+                      const newPoints = [{ x: Math.min(Math.max(ann.points[0].x + normDx, 0), 1), y: Math.min(Math.max(ann.points[0].y + normDy, 0), 1) }]
+                      setAnnotations(prev => prev.map(a => a.id === ann.id ? { ...a, points: newPoints } : a))
+                      await supabase.from('drawing_annotations').update({ points: newPoints }).eq('id', ann.id)
+                    }}>
+                    {isSel && <Rect x={tx - 4} y={ty - fsize - 2} width={(ann.label || '').length * fsize * 0.6 + 8} height={fsize + 8} fill="rgba(59,130,246,0.12)" cornerRadius={3} stroke="#3b82f6" strokeWidth={1} listening={false}/>}
+                    <Text x={tx} y={ty - fsize} text={ann.label || ''} fontSize={fsize} fill={col} fontStyle="normal" wrap="none" listening={false}/>
+                    {isSel && (
+                      <Group x={tx} y={ty - fsize - 20}>
+                        <Circle radius={11} fill="#ef4444" shadowColor="black" shadowBlur={4} shadowOpacity={0.4}/>
+                        <Text text="✕" fill="white" fontSize={12} fontStyle="bold" x={-4} y={-7} listening={false}/>
+                        <Circle radius={11} fill="transparent"
+                          onClick={async (e) => { e.cancelBubble = true; await supabase.from('drawing_annotations').delete().eq('id', ann.id); setAnnotations(prev => prev.filter(a => a.id !== ann.id)); setSelectedAnnotationId(null) }}
+                          onTap={async (e) => { e.cancelBubble = true; await supabase.from('drawing_annotations').delete().eq('id', ann.id); setAnnotations(prev => prev.filter(a => a.id !== ann.id)); setSelectedAnnotationId(null) }}
+                        />
+                      </Group>
+                    )}
+                  </Group>
+                )
+              })}
+
               {/* ── Annotations (arrows + revision clouds) ── */}
-              {annotations.map(ann => {
+              {annotations.filter(a => a.annotation_type !== 'text').map(ann => {
                 if (!ann.points?.[0] || !ann.points?.[1]) return null
                 const ax1 = position.x + ann.points[0].x * canvasW * scale
                 const ay1 = position.y + ann.points[0].y * canvasH * scale
@@ -2653,6 +2707,42 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
         )}
 
     
+
+      {/* Floating text input for text annotations */}
+      {textPrompt && (
+        <div
+          className="fixed z-50 shadow-xl"
+          style={{ left: textPrompt.screenX, top: textPrompt.screenY - 10 }}
+        >
+          <TextAnnotationInput
+            initial={textPrompt.existing || ''}
+            color={annotationColor}
+            onConfirm={async (text, fontSize) => {
+              if (text.trim()) {
+                if (textPrompt.editId) {
+                  // Edit existing
+                  await supabase.from('drawing_annotations').update({ label: text, color: annotationColor, font_size: fontSize }).eq('id', textPrompt.editId)
+                  setAnnotations(prev => prev.map(a => a.id === textPrompt.editId ? { ...a, label: text, color: annotationColor, font_size: fontSize } : a))
+                } else {
+                  // New text annotation
+                  const { data } = await supabase.from('drawing_annotations').insert({
+                    drawing_sheet_id: sheetIdRef.current,
+                    org_id:           orgIdRef.current,
+                    annotation_type:  'text',
+                    points:           [{ x: textPrompt.x, y: textPrompt.y }],
+                    color:            annotationColor,
+                    label:            text,
+                    font_size:        fontSize,
+                  }).select().single()
+                  if (data) setAnnotations(prev => [...prev, data])
+                }
+              }
+              setTextPrompt(null)
+            }}
+            onCancel={() => setTextPrompt(null)}
+          />
+        </div>
+      )}
 
       {/* Context menu — fixed position outside Konva canvas */}
       {contextMenu && <ContextMenu
@@ -2841,6 +2931,45 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 }
 
 // ─── ContextMenu ─────────────────────────────────────────────────────────────
+function TextAnnotationInput({ initial, color, onConfirm, onCancel }) {
+  const [text, setText] = useState(initial)
+  const [fontSize, setFontSize] = useState(14)
+  const ref = useRef(null)
+  useEffect(() => { ref.current?.focus(); ref.current?.select() }, [])
+
+  const confirm = () => onConfirm(text, fontSize)
+
+  return (
+    <div className="bg-[#0F1C2E] border border-[#C8622A]/60 rounded-xl shadow-2xl p-3 flex flex-col gap-2 min-w-[260px]">
+      <textarea
+        ref={ref}
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirm() } if (e.key === 'Escape') onCancel() }}
+        placeholder="Type your note here…"
+        rows={3}
+        className="w-full bg-[#1a2d45] border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-white text-sm resize-none focus:outline-none focus:border-[#C8622A] font-mono"
+      />
+      <div className="flex items-center gap-2">
+        <label className="text-[#8A9AB0] text-xs flex-shrink-0">Size</label>
+        <input type="range" min={8} max={36} value={fontSize} onChange={e => setFontSize(+e.target.value)}
+          className="flex-1 accent-[#C8622A]" />
+        <span className="text-[#8A9AB0] text-xs w-6 text-right">{fontSize}</span>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={confirm}
+          className="flex-1 bg-[#C8622A] hover:bg-[#b5571f] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+          Place (↵)
+        </button>
+        <button onClick={onCancel}
+          className="px-3 py-1.5 text-[#8A9AB0] hover:text-white text-xs border border-[#2a3d55] rounded-lg transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function ContextMenu({ contextMenu, copiedPlacement, onCopy, onPaste, onRotate, onDelete, onClose }) {
   const hasPl = !!contextMenu.placement
 

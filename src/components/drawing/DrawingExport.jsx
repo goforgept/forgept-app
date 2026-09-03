@@ -2045,6 +2045,23 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           const imgData = await getFloorPlanImage(sheet.id)
           await drawSheetOnPDF(pdf, sheet, imgData, drawX, drawY, drawW, drawH, exportFOV)
 
+          // Render text annotations on top of the floor plan
+          const { data: sheetAnnotations } = await supabase
+            .from('drawing_annotations')
+            .select('*').eq('drawing_sheet_id', sheet.id).eq('annotation_type', 'text')
+          for (const ann of (sheetAnnotations || [])) {
+            if (!ann.points?.[0] || !ann.label) continue
+            const tx = drawX + ann.points[0].x * drawW
+            const ty = drawY + ann.points[0].y * drawH
+            const ptSize = (ann.font_size || 14) * 0.352778   // pt → mm
+            const annCol = hexToRgbArr(ann.color || '#111827')
+            pdf.setTextColor(...annCol)
+            pdf.setFontSize(ann.font_size || 14)
+            pdf.setFont('helvetica', 'normal')
+            const lines = pdf.splitTextToSize(ann.label, drawW * 0.4)
+            lines.forEach((line, li) => pdf.text(line, tx, ty + li * ptSize * 1.4))
+          }
+
           // Drawing number + title label at bottom-left of drawing area
           pdf.setFillColor(255, 255, 255)
           pdf.rect(drawX + 2, drawY + drawH - 10, 200, 9, 'F')

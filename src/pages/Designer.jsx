@@ -250,6 +250,17 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
     await load()
   }
 
+  const handleReorderSheet = async (sheetId, dir) => {
+    const idx = sheets.findIndex(s => s.id === sheetId)
+    const swapIdx = idx + dir
+    if (swapIdx < 0 || swapIdx >= sheets.length) return
+    const a = sheets[idx], b = sheets[swapIdx]
+    // Swap sort_order values
+    await supabase.from('drawing_sheets').update({ sort_order: b.sort_order }).eq('id', a.id)
+    await supabase.from('drawing_sheets').update({ sort_order: a.sort_order }).eq('id', b.id)
+    await load()
+  }
+
   const createRevision = async () => {
     if (!proposal || !proposalId) return
     setCreatingRevision(true)
@@ -574,12 +585,16 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
 
       {/* ── Sheet tabs ── */}
       <div className="flex items-center gap-1 px-3 py-1.5 border-b border-[#2a3d55] bg-[#0F1C2E] overflow-x-auto flex-shrink-0">
-        {sheets.map(sheet => (
+        {sheets.map((sheet, si) => (
           <SheetTab key={sheet.id} sheet={sheet}
             isActive={sheet.id === activeSheetId}
             onSelect={() => { setActiveSheetId(sheet.id); setSelectedPlacement(null) }}
             onRename={(name) => handleRenameSheet(sheet.id, name)}
-            onDelete={() => handleDeleteSheet(sheet.id)} />
+            onDelete={() => handleDeleteSheet(sheet.id)}
+            canMoveLeft={si > 0}
+            canMoveRight={si < sheets.length - 1}
+            onMoveLeft={() => handleReorderSheet(sheet.id, -1)}
+            onMoveRight={() => handleReorderSheet(sheet.id, 1)} />
         ))}
 
         {/* Upload */}
