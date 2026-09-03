@@ -2109,7 +2109,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             pdf.setFontSize(scaledFontPt)
             pdf.setFont('helvetica', 'normal')
             const storedW = ann.points[0].width
-            const annW = storedW != null ? storedW * drawW : drawW * 0.9
+            const annW = storedW != null ? storedW * drawW : Math.max(30, drawX + drawW - tx - 4)
             const lines = pdf.splitTextToSize(ann.label, annW)
             lines.forEach((line, li) => pdf.text(line, tx, ty + li * lineHeightMm))
           }
