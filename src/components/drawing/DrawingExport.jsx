@@ -2102,16 +2102,23 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             if (!ann.points?.[0] || !ann.label) continue
             const tx = drawX + ann.points[0].x * drawW
             const ty = drawY + ann.points[0].y * drawH
-            const scaledFontPt = fs(ann.font_size || 14)
-            const lineHeightMm = scaledFontPt * 0.352778 * 1.35
-            const annCol = hexToRgbArr(ann.color || '#111827')
-            pdf.setTextColor(...annCol)
-            pdf.setFontSize(scaledFontPt)
-            pdf.setFont('helvetica', 'normal')
             const storedW = ann.points[0].width
             const annW = storedW != null ? storedW * drawW : Math.max(30, drawX + drawW - tx - 4)
-            const lines = pdf.splitTextToSize(ann.label, annW)
-            lines.forEach((line, li) => pdf.text(line, tx, ty + li * lineHeightMm))
+            const availH = Math.max(10, drawY + drawH - ty - 4)
+            const annCol = hexToRgbArr(ann.color || '#111827')
+            pdf.setTextColor(...annCol)
+            pdf.setFont('helvetica', 'normal')
+            // shrink font until all wrapped lines fit within the remaining vertical space
+            let fontPt = fs(ann.font_size || 14)
+            let lines, lineH
+            while (fontPt >= 5) {
+              pdf.setFontSize(fontPt)
+              lineH = fontPt * 0.352778 * 1.35
+              lines = pdf.splitTextToSize(ann.label, annW)
+              if (lines.length * lineH <= availH) break
+              fontPt = Math.max(5, fontPt - 2)
+            }
+            lines.forEach((line, li) => pdf.text(line, tx, ty + li * lineH))
           }
         }
 
