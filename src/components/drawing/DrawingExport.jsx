@@ -497,6 +497,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [archIncludeSchedule, setArchIncludeSchedule] = useState(true)
   const [archSheetSettings, setArchSheetSettings] = useState({})  // { [id]: { label?, drawingNum? } }
   const [archPageList,      setArchPageList]      = useState([])  // ordered: { type:'sheet'|'notes', id }
+  const [archRevisions,     setArchRevisions]     = useState([])  // { id, rev, date, description, by }
+  const [archSettingsOpen,  setArchSettingsOpen]  = useState(false)
 
   // Initialise page list from Designer sheets (runs once when sheets first load)
   useEffect(() => {
@@ -562,6 +564,19 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const removePage = (id) =>
     setArchPageList(prev => prev.filter(p => p.id !== id))
 
+  const addRevision = () =>
+    setArchRevisions(prev => [...prev, {
+      id: `rev-${Date.now()}`,
+      rev: String(prev.length + 1),
+      date: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }),
+      description: '',
+      by: orgProfile?.full_name || '',
+    }])
+  const updateRevision = (id, key, val) =>
+    setArchRevisions(prev => prev.map(r => r.id === id ? { ...r, [key]: val } : r))
+  const removeRevision = (id) =>
+    setArchRevisions(prev => prev.filter(r => r.id !== id))
+
   const getSheetLabel  = (item, sheet) =>
     archSheetSettings[item.id]?.label ?? (item.type === 'notes' ? 'GENERAL NOTES' : (sheet?.name ?? ''))
   const getSheetDwgNum = (item, i) =>
@@ -598,7 +613,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           .in('drawing_placements.drawing_sheet_id', sheetIds),
         supabase.auth.getUser().then(({ data: { user } }) =>
           supabase.from('profiles')
-            .select('company_name, logo_url, primary_color, organizations(title_block_engineer, title_block_license, title_block_scale)')
+            .select('full_name, company_name, logo_url, primary_color, organizations(title_block_engineer, title_block_license, title_block_scale)')
             .eq('id', user.id)
             .single()
         ),
@@ -1791,7 +1806,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           { label: 'DATE',        value: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) },
           { label: 'SCALE',       value: archScale || 'NTS' },
           { label: 'SHEET',       value: sheetIndex != null ? `${sheetIndex} OF ${totalPages}` : '' },
-          { label: 'DRAWN BY',    value: '' },
+          { label: 'DRAWN BY',    value: orgProfile?.full_name || '' },
           { label: 'CHECKED BY',  value: '' },
         ]
         infoRows.forEach((row, idx) => {
@@ -1829,11 +1844,25 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         ty += revColH
         pdf.setDrawColor(160, 168, 178); pdf.setLineWidth(0.5)
         pdf.line(tbX, ty, pageW - outerM, ty)
-        for (let ri = 1; ri <= numRevRows; ri++) {
+        // Render saved revisions first, then blank rows
+        const revColWidths = [20, 34, tbW - 20 - 34 - 20, 20]
+        for (let ri = 0; ri < numRevRows; ri++) {
           const ry = ty + ri * revRowH
-          if (ry < tbBot - 1) {
+          if (ry + revRowH >= tbBot) break
+          // separator between rows
+          if (ri > 0) {
             pdf.setDrawColor(215, 218, 222); pdf.setLineWidth(0.4)
             pdf.line(tbX, ry, pageW - outerM, ry)
+          }
+          const rev = archRevisions[ri]
+          if (rev) {
+            const cells = [rev.rev, rev.date, rev.description, rev.by]
+            let rcx = tbX
+            cells.forEach((val, ci) => {
+              pdf.setTextColor(15, 15, 15); pdf.setFontSize(fs(5.5)); pdf.setFont('helvetica', 'normal')
+              pdf.text(String(val || ''), rcx + 4, ry + revRowH * 0.6)
+              rcx += revColWidths[ci]
+            })
           }
         }
       }
@@ -2220,10 +2249,21 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
             {/* Construction Drawing inline settings */}
             {exp.id === 'arch' && (
-              <div className="border-t border-[#2a3d55] bg-[#0F1C2E] px-5 py-3 space-y-3">
+              <div className="border-t border-[#2a3d55] bg-[#0F1C2E]">
+                {/* Collapsible toggle header */}
+                <button
+                  onClick={() => setArchSettingsOpen(o => !o)}
+                  className="w-full flex items-center justify-between px-5 py-2.5 text-left hover:bg-[#1a2d45] transition-colors"
+                >
+                  <span className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Drawing Settings</span>
+                  <span className="text-[#8A9AB0] text-xs">{archSettingsOpen ? '▲' : '▼'}</span>
+                </button>
+
+              {archSettingsOpen && (
+              <div className="px-5 pb-4 space-y-3 border-t border-[#2a3d55]">
                 {/* Global options row */}
-                <div className="flex flex-wrap gap-x-6 gap-y-2 items-center">
-                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Drawing Settings</p>
+                <div className="flex flex-wrap gap-x-6 gap-y-2 items-center pt-3">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide sr-only">Options</p>
 
                   <label className="flex items-center gap-1.5">
                     <span className="text-[#8A9AB0] text-xs">Dwg # Prefix</span>
@@ -2373,6 +2413,60 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
                     </div>
                   </div>
                 )}
+
+                {/* Revisions editor */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Revisions</p>
+                    <button
+                      onClick={addRevision}
+                      className="text-xs text-[#C8622A] hover:text-white border border-[#C8622A] rounded px-2 py-0.5 transition-colors"
+                    >+ Add Rev</button>
+                  </div>
+                  {archRevisions.length === 0 ? (
+                    <p className="text-[#4a5a6a] text-xs italic">No revisions — add one to populate the revision block.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {/* Header */}
+                      <div className="grid grid-cols-[40px_90px_1fr_80px_24px] gap-1.5 px-1">
+                        {['Rev', 'Date', 'Description', 'By', ''].map(h => (
+                          <span key={h} className="text-[#4a5a6a] text-[10px] font-semibold uppercase">{h}</span>
+                        ))}
+                      </div>
+                      {archRevisions.map(rev => (
+                        <div key={rev.id} className="grid grid-cols-[40px_90px_1fr_80px_24px] gap-1.5 items-center">
+                          <input
+                            value={rev.rev}
+                            onChange={e => updateRevision(rev.id, 'rev', e.target.value)}
+                            className="bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs text-center focus:outline-none focus:border-[#C8622A]"
+                          />
+                          <input
+                            value={rev.date}
+                            onChange={e => updateRevision(rev.id, 'date', e.target.value)}
+                            className="bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                          <input
+                            value={rev.description}
+                            onChange={e => updateRevision(rev.id, 'description', e.target.value)}
+                            placeholder="Description of change"
+                            className="bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                          <input
+                            value={rev.by}
+                            onChange={e => updateRevision(rev.id, 'by', e.target.value)}
+                            placeholder="Initials"
+                            className="bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                          <button onClick={() => removeRevision(rev.id)}
+                            className="text-[#8A9AB0] hover:text-red-400 text-xs text-center">✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+              )}
               </div>
             )}
           </div>
