@@ -233,6 +233,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
   const [annotationPreview,   setAnnotationPreview]   = useState(null) // {x,y} normalised live
   const [selectedAnnotationId, setSelectedAnnotationId] = useState(null)
   const [textPrompt, setTextPrompt] = useState(null) // { x, y, screenX, screenY } — pending text placement
+  const textNodeRefs   = useRef({})   // Konva Text node refs keyed by annotation id
+  const [textMeasureTick, setTextMeasureTick] = useState(0) // bumped after text nodes mount to trigger re-measure
   const lastAnnotationPosRef = useRef(null) // last known pointer pos during drag
   useEffect(() => { annotationToolRef.current  = annotationTool },  [annotationTool])
   useEffect(() => { annotationStartRef.current = annotationStart }, [annotationStart])
@@ -2485,24 +2487,26 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
               {/* ── Text annotations ── */}
               {annotations.filter(a => a.annotation_type === 'text').map(ann => {
                 if (!ann.points?.[0]) return null
-                const normW  = ann.points[0].width  ?? 0.3   // normalized width (0-1)
+                const hasStoredWidth = ann.points[0].width != null
+                const normW  = ann.points[0].width           // undefined = auto-size
                 const tx     = position.x + ann.points[0].x * canvasW * scale
                 const ty     = position.y + ann.points[0].y * canvasH * scale
-                const boxW   = normW * canvasW * scale
+                const boxW   = hasStoredWidth ? normW * canvasW * scale : undefined
                 const col    = ann.color || '#111827'
                 const fsize  = (ann.font_size || 14) * scale
                 const isSel  = ann.id === selectedAnnotationId
 
-                // Estimate rendered text height for selection rect
-                const lineH   = fsize * 1.3
-                const approxLines = Math.ceil(((ann.label || '').length * fsize * 0.55) / Math.max(boxW, 1))
-                const boxH    = Math.max(lineH, approxLines * lineH)
+                // Use Konva node ref for accurate dimensions; fall back to rough estimate on first render
+                const tn = textNodeRefs.current[ann.id]
+                const measuredW = tn ? tn.width()  : (boxW ?? fsize * (ann.label || '').length * 0.6)
+                const measuredH = tn ? tn.height() : fsize * 1.4
 
                 const openEdit = (screenX, screenY) => setTextPrompt({
                   x: ann.points[0].x, y: ann.points[0].y,
                   screenX, screenY,
                   editId: ann.id, existing: ann.label || '',
                   existingFontSize: ann.font_size || 14,
+                  existingColor: ann.color || '#111827',
                 })
 
                 return (
@@ -2521,7 +2525,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                     }}>
 
                     {/* Transparent hit area — makes the text box clickable/selectable */}
-                    <Rect x={tx} y={ty} width={boxW} height={Math.max(boxH, 20)}
+                    <Rect x={tx} y={ty} width={Math.max(measuredW, 40)} height={Math.max(measuredH, 20)}
                       fill="transparent"
                       onClick={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
                       onTap={e => { e.cancelBubble = true; setSelectedAnnotationId(isSel ? null : ann.id) }}
@@ -2530,45 +2534,55 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                       onMouseLeave={() => { if (stageRef.current) stageRef.current.container().style.cursor = '' }}
                     />
 
-                    {/* Always-visible light border */}
-                    <Rect x={tx - 2} y={ty - 2} width={boxW + 4} height={boxH + 4}
-                      fill="rgba(255,255,255,0.04)" stroke={isSel ? '#3b82f6' : 'rgba(160,180,210,0.45)'}
-                      strokeWidth={isSel ? 1.5 : 0.8} dash={isSel ? [4, 3] : []}
+                    {/* Always-visible border — sized from actual Konva text measurement */}
+                    <Rect x={tx - 3} y={ty - 3} width={measuredW + 6} height={measuredH + 6}
+                      fill="rgba(255,255,255,0.03)"
+                      stroke={isSel ? '#3b82f6' : 'rgba(160,180,210,0.4)'}
+                      strokeWidth={isSel ? 1.5 : 0.7}
+                      dash={isSel ? [4, 3] : []}
                       cornerRadius={3} listening={false}/>
 
-                    {/* Word-wrapped text */}
+                    {/* Text — auto-size when no stored width, word-wrap when width is set */}
                     <Text x={tx} y={ty} text={ann.label || ''} fontSize={fsize} fill={col}
-                      width={boxW} wrap="word" lineHeight={1.3} fontStyle="normal" listening={false}/>
+                      width={boxW} wrap={hasStoredWidth ? 'word' : 'none'}
+                      lineHeight={1.3} fontStyle="normal" listening={false}
+                      ref={node => {
+                        if (node) {
+                          const prev = textNodeRefs.current[ann.id]
+                          textNodeRefs.current[ann.id] = node
+                          if (!prev) setTextMeasureTick(t => t + 1)
+                        }
+                      }}
+                    />
 
-                    {/* Resize handle — bottom-right corner drag */}
+                    {/* Resize handle — drag right edge to enable word-wrap at that width */}
                     {isSel && (
-                      <Circle x={tx + boxW} y={ty + boxH} radius={6} fill="#3b82f6" stroke="white" strokeWidth={1.5}
+                      <Circle x={tx + measuredW} y={ty + measuredH / 2} radius={6} fill="#3b82f6" stroke="white" strokeWidth={1.5}
                         draggable
                         onMouseDown={e => e.cancelBubble = true}
                         onDragMove={e => {
                           e.cancelBubble = true
-                          const raw = e.target.x()
-                          const minW = 60
-                          const newAbsW = Math.max(raw - tx, minW)
-                          e.target.x(tx + newAbsW)   // clamp handle position
+                          const newAbsW = Math.max(e.target.x() - tx, 60)
+                          e.target.x(tx + newAbsW)
+                          e.target.y(ty + measuredH / 2)
                         }}
                         onDragEnd={async (e) => {
                           e.cancelBubble = true
                           const newAbsW = Math.max(e.target.x() - tx, 60)
-                          e.target.position({ x: tx + newAbsW, y: ty + boxH })
+                          e.target.position({ x: tx + newAbsW, y: ty + measuredH / 2 })
                           const newNormW = Math.min(newAbsW / (canvasWRef.current * scaleRef.current), 0.99)
                           const newPoints = [{ ...ann.points[0], width: newNormW }]
                           setAnnotations(prev => prev.map(a => a.id === ann.id ? { ...a, points: newPoints } : a))
                           await supabase.from('drawing_annotations').update({ points: newPoints }).eq('id', ann.id)
                         }}
-                        onMouseEnter={e => { document.body.style.cursor = 'ew-resize' }}
-                        onMouseLeave={e => { document.body.style.cursor = '' }}
+                        onMouseEnter={() => { document.body.style.cursor = 'ew-resize' }}
+                        onMouseLeave={() => { document.body.style.cursor = '' }}
                       />
                     )}
 
                     {/* Edit button */}
                     {isSel && (
-                      <Group x={tx + boxW + 2} y={ty - 24}>
+                      <Group x={tx + measuredW + 2} y={ty - 24}>
                         <Circle radius={11} fill="#3b82f6" shadowColor="black" shadowBlur={4} shadowOpacity={0.3}/>
                         <Text text="✎" fill="white" fontSize={12} x={-5} y={-7} listening={false}/>
                         <Circle radius={11} fill="transparent"
@@ -2784,21 +2798,19 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
           <TextAnnotationInput
             initial={textPrompt.existing || ''}
             initialFontSize={textPrompt.existingFontSize}
-            color={annotationColor}
-            onConfirm={async (text, fontSize) => {
+            initialColor={textPrompt.existingColor || annotationColor}
+            onConfirm={async (text, fontSize, color) => {
               if (text.trim()) {
                 if (textPrompt.editId) {
-                  // Edit existing
-                  await supabase.from('drawing_annotations').update({ label: text, color: annotationColor, font_size: fontSize }).eq('id', textPrompt.editId)
-                  setAnnotations(prev => prev.map(a => a.id === textPrompt.editId ? { ...a, label: text, color: annotationColor, font_size: fontSize } : a))
+                  await supabase.from('drawing_annotations').update({ label: text, color, font_size: fontSize }).eq('id', textPrompt.editId)
+                  setAnnotations(prev => prev.map(a => a.id === textPrompt.editId ? { ...a, label: text, color, font_size: fontSize } : a))
                 } else {
-                  // New text annotation
                   const { data } = await supabase.from('drawing_annotations').insert({
                     drawing_sheet_id: sheetIdRef.current,
                     org_id:           orgIdRef.current,
                     annotation_type:  'text',
-                    points:           [{ x: textPrompt.x, y: textPrompt.y, width: 0.3 }],
-                    color:            annotationColor,
+                    points:           [{ x: textPrompt.x, y: textPrompt.y }],  // no width → auto-size
+                    color,
                     label:            text,
                     font_size:        fontSize,
                   }).select().single()
@@ -2999,38 +3011,77 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 }
 
 // ─── ContextMenu ─────────────────────────────────────────────────────────────
-function TextAnnotationInput({ initial, initialFontSize, color, onConfirm, onCancel }) {
-  const [text, setText] = useState(initial)
-  const [fontSize, setFontSize] = useState(initialFontSize || 14)
+const TEXT_COLORS = [
+  { label: 'Black',  hex: '#111827' },
+  { label: 'White',  hex: '#ffffff' },
+  { label: 'Red',    hex: '#ef4444' },
+  { label: 'Blue',   hex: '#3b82f6' },
+  { label: 'Orange', hex: '#C8622A' },
+  { label: 'Green',  hex: '#22c55e' },
+  { label: 'Gray',   hex: '#6b7280' },
+]
+
+function TextAnnotationInput({ initial, initialFontSize, initialColor, onConfirm, onCancel }) {
+  const [text,     setText]     = useState(initial)
+  const [fontSize, setFontSize] = useState(initialFontSize || 16)
+  const [color,    setColor]    = useState(initialColor || '#111827')
   const ref = useRef(null)
   useEffect(() => { ref.current?.focus(); ref.current?.select() }, [])
 
-  const confirm = () => onConfirm(text, fontSize)
+  const confirm = () => onConfirm(text, fontSize, color)
 
   return (
-    <div className="bg-[#0F1C2E] border border-[#C8622A]/60 rounded-xl shadow-2xl p-3 flex flex-col gap-2 min-w-[260px]">
+    <div className="bg-[#0F1C2E] border border-[#C8622A]/60 rounded-xl shadow-2xl p-4 flex flex-col gap-3 min-w-[340px]">
+      {/* Live preview strip */}
+      <div className="rounded-lg px-3 py-2 bg-[#1a2d45] border border-[#2a3d55] min-h-[36px]">
+        <span style={{ fontSize: Math.min(fontSize, 22), color, fontFamily: 'sans-serif', lineHeight: 1.3 }}>
+          {text || <span className="text-[#4a5a6a]">Preview…</span>}
+        </span>
+      </div>
+
       <textarea
         ref={ref}
         value={text}
         onChange={e => setText(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirm() } if (e.key === 'Escape') onCancel() }}
-        placeholder="Type your note here…"
-        rows={3}
-        className="w-full bg-[#1a2d45] border border-[#2a3d55] rounded-lg px-2.5 py-1.5 text-white text-sm resize-none focus:outline-none focus:border-[#C8622A] font-mono"
+        placeholder="Type your note…"
+        rows={4}
+        className="w-full bg-[#1a2d45] border border-[#2a3d55] rounded-lg px-3 py-2 text-white text-base resize-none focus:outline-none focus:border-[#C8622A] leading-relaxed"
       />
+
+      {/* Font size */}
       <div className="flex items-center gap-2">
-        <label className="text-[#8A9AB0] text-xs flex-shrink-0">Size</label>
-        <input type="range" min={8} max={36} value={fontSize} onChange={e => setFontSize(+e.target.value)}
+        <span className="text-[#8A9AB0] text-xs w-8 flex-shrink-0">Size</span>
+        <input type="range" min={8} max={72} value={fontSize} onChange={e => setFontSize(+e.target.value)}
           className="flex-1 accent-[#C8622A]" />
-        <span className="text-[#8A9AB0] text-xs w-6 text-right">{fontSize}</span>
+        <input type="number" min={8} max={72} value={fontSize} onChange={e => setFontSize(Math.max(8, Math.min(72, +e.target.value)))}
+          className="w-12 bg-[#1a2d45] border border-[#2a3d55] rounded px-1 py-0.5 text-white text-xs text-center focus:outline-none focus:border-[#C8622A]" />
       </div>
-      <div className="flex gap-2">
+
+      {/* Color swatches */}
+      <div className="flex items-center gap-2">
+        <span className="text-[#8A9AB0] text-xs w-8 flex-shrink-0">Color</span>
+        <div className="flex gap-1.5 flex-wrap">
+          {TEXT_COLORS.map(c => (
+            <button key={c.hex} title={c.label}
+              onClick={() => setColor(c.hex)}
+              style={{ background: c.hex, border: color === c.hex ? '2px solid #C8622A' : '2px solid transparent' }}
+              className="w-6 h-6 rounded-full shadow transition-transform hover:scale-110"
+            />
+          ))}
+          <input type="color" value={color} onChange={e => setColor(e.target.value)}
+            className="w-6 h-6 rounded-full cursor-pointer border-0 bg-transparent p-0"
+            title="Custom color" />
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-1">
         <button onClick={confirm}
-          className="flex-1 bg-[#C8622A] hover:bg-[#b5571f] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
-          Place (↵)
+          className="flex-1 bg-[#C8622A] hover:bg-[#b5571f] text-white text-sm font-semibold px-3 py-2 rounded-lg transition-colors">
+          Place  (↵)
         </button>
         <button onClick={onCancel}
-          className="px-3 py-1.5 text-[#8A9AB0] hover:text-white text-xs border border-[#2a3d55] rounded-lg transition-colors">
+          className="px-4 py-2 text-[#8A9AB0] hover:text-white text-sm border border-[#2a3d55] rounded-lg transition-colors">
           Cancel
         </button>
       </div>
