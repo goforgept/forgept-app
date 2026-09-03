@@ -1558,7 +1558,216 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     }
   }
 
+  // ── Architect Drawing PDF ──────────────────────────────────────────────────
+  const handleArchDrawing = async () => {
+    setGenerating(true)
+    try {
+      const { default: jsPDF } = await import('jspdf')
+
+      // 24x36 Arch D, landscape: 914.4 x 609.6 mm
+      const pdf     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [609.6, 914.4] })
+      const pageW   = pdf.internal.pageSize.getWidth()   // 914.4
+      const pageH   = pdf.internal.pageSize.getHeight()  // 609.6
+      const [r, g, b] = hexToRgbArr(orgProfile?.primary_color || '#C8622A')
+      const logoImg = await loadOrgLogo()
+
+      const outerM  = 7    // outer border margin
+      const innerM  = 13   // inner border margin (drawing area starts here)
+      const tbH     = 58   // title block height
+      const tbY     = pageH - outerM - tbH  // title block top edge
+
+      // Right column: company + drawing info
+      const rcW   = 92
+      const rcX   = pageW - outerM - rcW
+      // Middle column: drawing title / project info
+      const mcW   = 130
+      const mcX   = rcX - mcW
+      // Left section: revision table
+      const revX  = outerM
+      const revW  = mcX - outerM
+
+      for (let i = 0; i < sheets.length; i++) {
+        if (i > 0) pdf.addPage()
+        const sheet      = sheets[i]
+        const drawingNum = `E${i + 1}.0`
+
+        // White background
+        pdf.setFillColor(255, 255, 255)
+        pdf.rect(0, 0, pageW, pageH, 'F')
+
+        // ── Borders ──────────────────────────────────────────────────────────
+        pdf.setDrawColor(0, 0, 0)
+        pdf.setLineWidth(1.4)
+        pdf.rect(outerM, outerM, pageW - outerM * 2, pageH - outerM * 2)
+        pdf.setLineWidth(0.3)
+        pdf.rect(innerM, innerM, pageW - innerM * 2, pageH - innerM * 2)
+
+        // ── Floor plan area ───────────────────────────────────────────────────
+        const drawX = innerM + 0.5
+        const drawY = innerM + 0.5
+        const drawW = pageW - innerM * 2 - 1
+        const drawH = tbY - innerM - 2
+        const imgData = await getFloorPlanImage(sheet.id)
+        await drawSheetOnPDF(pdf, sheet, imgData, drawX, drawY, drawW, drawH, exportFOV)
+
+        // ── Title block: full bottom strip ────────────────────────────────────
+        pdf.setFillColor(250, 250, 250)
+        pdf.rect(outerM, tbY, pageW - outerM * 2, tbH, 'F')
+        // Top edge of title block
+        pdf.setDrawColor(0, 0, 0)
+        pdf.setLineWidth(0.8)
+        pdf.line(outerM, tbY, pageW - outerM, tbY)
+
+        // ── RIGHT COLUMN: company + drawing info ──────────────────────────────
+        pdf.setLineWidth(0.5)
+        pdf.line(rcX, tbY, rcX, pageH - outerM)
+
+        const rcPad = 3.5
+        // Company logo or name
+        if (logoImg) {
+          try {
+            const maxW = rcW - rcPad * 2, maxH = 16
+            const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+            const lw = logoImg.naturalWidth * ratio
+            const lh = logoImg.naturalHeight * ratio
+            pdf.addImage(logoImg, 'PNG', rcX + (rcW - lw) / 2, tbY + rcPad, lw, lh)
+          } catch { /* ignore */ }
+        } else {
+          pdf.setTextColor(r, g, b)
+          pdf.setFontSize(9)
+          pdf.setFont('helvetica', 'bold')
+          pdf.text(orgProfile?.company_name || '', rcX + rcW / 2, tbY + 12, { align: 'center' })
+        }
+        const logoLineY = tbY + 20
+        pdf.setLineWidth(0.3)
+        pdf.line(rcX, logoLineY, pageW - outerM, logoLineY)
+
+        // Info rows
+        const infoRows = [
+          { label: 'PROJECT',     value: proposal?.proposal_name || '' },
+          { label: 'CLIENT',      value: proposal?.company || ''        },
+          { label: 'DRAWING NO.', value: drawingNum                     },
+          { label: 'DATE',        value: new Date().toLocaleDateString() },
+          { label: 'SCALE',       value: 'NTS'                          },
+          { label: 'SHEET',       value: `${i + 1} OF ${sheets.length}` },
+        ]
+        const rowH = (tbH - 20 - rcPad) / infoRows.length
+        infoRows.forEach((row, idx) => {
+          const ry = logoLineY + idx * rowH
+          if (idx > 0) {
+            pdf.setDrawColor(200, 200, 200)
+            pdf.setLineWidth(0.2)
+            pdf.line(rcX, ry, pageW - outerM, ry)
+          }
+          pdf.setTextColor(110, 120, 130)
+          pdf.setFontSize(5.5)
+          pdf.setFont('helvetica', 'normal')
+          pdf.text(row.label, rcX + rcPad, ry + 3.5)
+          pdf.setTextColor(15, 15, 15)
+          pdf.setFontSize(7.5)
+          pdf.setFont('helvetica', 'bold')
+          const truncated = pdf.splitTextToSize(row.value, rcW - rcPad * 2)[0] || ''
+          pdf.text(truncated, rcX + rcPad, ry + 9)
+        })
+
+        // ── MIDDLE COLUMN: drawing title + project info ───────────────────────
+        pdf.setDrawColor(0, 0, 0)
+        pdf.setLineWidth(0.5)
+        pdf.line(mcX, tbY, mcX, pageH - outerM)
+
+        const mcPad = 5
+        // Sheet name as drawing title
+        pdf.setTextColor(15, 15, 15)
+        pdf.setFontSize(13)
+        pdf.setFont('helvetica', 'bold')
+        const titleLines = pdf.splitTextToSize((sheet.name || '').toUpperCase(), mcW - mcPad * 2)
+        pdf.text(titleLines.slice(0, 2), mcX + mcPad, tbY + 14)
+
+        // Project name
+        pdf.setFontSize(9)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setTextColor(40, 40, 40)
+        const projLines = pdf.splitTextToSize(proposal?.proposal_name || '', mcW - mcPad * 2)
+        pdf.text(projLines.slice(0, 2), mcX + mcPad, tbY + 27)
+
+        // Client
+        pdf.setFontSize(8)
+        pdf.setTextColor(90, 100, 110)
+        pdf.text(proposal?.company || '', mcX + mcPad, tbY + 35)
+
+        // Notes at bottom of middle column
+        pdf.setLineWidth(0.2)
+        pdf.setDrawColor(200, 200, 200)
+        pdf.line(mcX, tbY + tbH - 18, rcX, tbY + tbH - 18)
+        const notes = ['ALL DIMENSIONS IN FEET UNLESS NOTED', 'DO NOT SCALE FROM DRAWINGS', 'VERIFY ALL CONDITIONS IN FIELD']
+        notes.forEach((note, ni) => {
+          pdf.setFontSize(5.5)
+          pdf.setFont('helvetica', 'normal')
+          pdf.setTextColor(130, 140, 150)
+          pdf.text(`· ${note}`, mcX + mcPad, tbY + tbH - 13 + ni * 4.2)
+        })
+
+        // ── LEFT SECTION: revision table ──────────────────────────────────────
+        // Header bar
+        pdf.setFillColor(r, g, b)
+        pdf.rect(revX, tbY, revW, 9, 'F')
+        pdf.setTextColor(255, 255, 255)
+        pdf.setFontSize(7)
+        pdf.setFont('helvetica', 'bold')
+        pdf.text('REVISIONS', revX + 3, tbY + 6)
+
+        // Column headers
+        const revCols = [
+          { label: 'REV',         w: 16 },
+          { label: 'DATE',        w: 30 },
+          { label: 'DESCRIPTION', w: revW - 16 - 30 - 18 },
+          { label: 'BY',          w: 18 },
+        ]
+        let cx = revX
+        revCols.forEach((col, ci) => {
+          if (ci > 0) {
+            pdf.setDrawColor(180, 180, 180)
+            pdf.setLineWidth(0.2)
+            pdf.line(cx, tbY + 9, cx, pageH - outerM)
+          }
+          pdf.setTextColor(60, 60, 60)
+          pdf.setFontSize(5.5)
+          pdf.setFont('helvetica', 'bold')
+          pdf.text(col.label, cx + 2, tbY + 15)
+          cx += col.w
+        })
+        // Column header underline
+        pdf.setDrawColor(180, 180, 180)
+        pdf.setLineWidth(0.2)
+        pdf.line(revX, tbY + 17, mcX, tbY + 17)
+
+        // 5 empty revision rows
+        const numRevRows = 5
+        const revRowH    = (tbH - 17) / numRevRows
+        for (let ri = 1; ri < numRevRows; ri++) {
+          pdf.setDrawColor(220, 220, 220)
+          pdf.setLineWidth(0.15)
+          pdf.line(revX, tbY + 17 + ri * revRowH, mcX, tbY + 17 + ri * revRowH)
+        }
+      }
+
+      await savePdf(pdf, `${proposal?.proposal_name || 'Drawing'}_Construction_Drawings.pdf`)
+    } catch (err) {
+      console.error('Arch drawing failed:', err)
+      alert('PDF generation failed. Please try again.')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
   const exports = [
+    {
+      id:          'arch',
+      label:       'Construction Drawing',
+      description: 'CAD-style 24×36 drawing set with title block, revision table, drawing number, and border. One sheet per floor plan.',
+      icon:        '📏',
+      action:      handleArchDrawing,
+    },
     {
       id:          'client',
       label:       'Client Overview',
