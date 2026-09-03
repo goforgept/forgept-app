@@ -558,9 +558,12 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   }, [archDwgPrefix, archScale, archPrelim, archFontScale, archIncludeCover, archIncludeSchedule, archSheetSettings, archPageList, archRevisions, archScope])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialise page list from Designer sheets — only if localStorage had nothing
+  // Also merge any new sheets (added while archPageList already has items) without duplicating
   useEffect(() => {
-    if (sheets.length > 0 && archPageList.length === 0 && !pageListFromStorageRef.current)
+    if (sheets.length === 0) return
+    if (archPageList.length === 0 && !pageListFromStorageRef.current) {
       setArchPageList(sheets.map(s => ({ type: 'sheet', id: s.id })))
+    }
   }, [sheets])  // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateSheetSetting = (id, key, val) =>
@@ -569,7 +572,11 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const addNotesPage = async () => {
     if (!onAddNotesSheet) return
     const id = await onAddNotesSheet('GENERAL NOTES')
-    if (id) setArchPageList(prev => [...prev, { type: 'sheet', id }])
+    if (id) {
+      setArchPageList(prev =>
+        prev.some(p => p.id === id) ? prev : [...prev, { type: 'sheet', id }]
+      )
+    }
   }
 
   const movePage = (idx, dir) =>
