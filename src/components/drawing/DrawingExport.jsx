@@ -82,6 +82,20 @@ const loadOrgLogoFromProfile = async (orgProfile) => {
   return img
 }
 
+// Maps device categories to higher-level system groups for schedule grouping
+const DEVICE_SYSTEM_GROUPS = [
+  { label: 'Security Systems',      categories: ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera','Thermal Camera','Access Control Reader','Access Controller','Door Contact','Motion Sensor','Glass Break','Panic Button','Siren','Alarm Panel','Video Intercom','Intercom'] },
+  { label: 'Low Voltage / AV',      categories: ['TV Display','Projector','Speaker','Ceiling Speaker','Subwoofer','Amplifier','AV Receiver','Matrix Switch','Video Wall','Digital Signage','Control Processor','Keypad','Touch Panel','Display Mount'] },
+  { label: 'Network / IT',          categories: ['Switch','Managed Switch','Router','Wireless AP','Firewall','UPS','Patch Panel','Server','Rack Server','Media Converter','SFP Module'] },
+  { label: 'Infrastructure',        categories: ['Rack','Rack Enclosure','Cable Management','Power Strip','PDU','J-Hook','Conduit','Back Box','Junction Box','Low Voltage Bracket'] },
+]
+const getDeviceSystemGroup = (category) => {
+  for (const g of DEVICE_SYSTEM_GROUPS) {
+    if (g.categories.some(c => c.toLowerCase() === (category || '').toLowerCase())) return g.label
+  }
+  return 'Other'
+}
+
 const drawDocCoverPage = (pdf, orgProfile, { eyebrow, title, subtitle, meta = [], logoImg }) => {
   const pageW = pdf.internal.pageSize.getWidth()
   const pageH = pdf.internal.pageSize.getHeight()
@@ -478,7 +492,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [archDwgPrefix,    setArchDwgPrefix]    = useState('E')
   const [archScale,        setArchScale]        = useState('NTS')
   const [archPrelim,       setArchPrelim]       = useState(true)
-  const [archFontScale,    setArchFontScale]    = useState(1.0)
+  const [archFontScale,       setArchFontScale]       = useState(1.0)
+  const [archIncludeCover,    setArchIncludeCover]    = useState(true)
+  const [archIncludeSchedule, setArchIncludeSchedule] = useState(true)
   const [archSheetSettings, setArchSheetSettings] = useState({})  // { [id]: { label?, drawingNum? } }
   const [archPageList,      setArchPageList]      = useState([])  // ordered: { type:'sheet'|'notes', id }
 
@@ -1681,6 +1697,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const revRowH   = Math.max(9, (tbH - fixedH) / 8)
       const numRevRows = Math.floor((tbH - fixedH) / revRowH)
 
+      const { default: autoTable } = await import('jspdf-autotable')
       const fs = (n) => n * archFontScale   // scaled font size helper
 
       const drawSep = (y, thick = false) => {
@@ -1689,25 +1706,273 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.line(tbX, y, pageW - outerM, y)
       }
 
-      const pageList = archPageList.length > 0 ? archPageList : sheets.map(s => ({ type: 'sheet', id: s.id }))
-      for (let i = 0; i < pageList.length; i++) {
-        if (i > 0) pdf.addPage()
-        const item       = pageList[i]
-        const sheet      = item.type === 'sheet' ? sheets.find(s => s.id === item.id) : null
-        const drawingNum = getSheetDwgNum(item, i)
-        const sheetLabel = getSheetLabel(item, sheet)
-        const isBlank    = item.type === 'notes' || !sheet?.storage_path || ['blank', 'pending'].includes(sheet.storage_path)
-
-        // White background
+      // Draw the outer/inner borders for any arch page (does not draw title block)
+      const drawArchBorders = () => {
         pdf.setFillColor(255, 255, 255)
         pdf.rect(0, 0, pageW, pageH, 'F')
-
-        // ── BORDERS ──────────────────────────────────────────────────────────
         pdf.setDrawColor(0, 0, 0)
         pdf.setLineWidth(1.6)
         pdf.rect(outerM, outerM, pageW - outerM * 2, pageH - outerM * 2)
         pdf.setLineWidth(0.35)
         pdf.rect(innerM, innerM, drawW - 0.5, drawH)
+      }
+
+      // Draw the right-side title block for a given page (sheetLabel, drawingNum, sheetIndex, totalPages)
+      const drawArchTitleBlock = (sheetLabel, drawingNum, sheetIndex, totalPages) => {
+        pdf.setFillColor(255, 255, 255)
+        pdf.rect(tbX, tbTop, tbW, tbH, 'F')
+        pdf.setDrawColor(0, 0, 0)
+        pdf.setLineWidth(1.0)
+        pdf.line(tbX, tbTop, tbX, tbBot)
+
+        let ty = tbTop
+
+        if (logoImg) {
+          try {
+            const maxW = tbW - pad * 2, maxH = logoH - 10
+            const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+            const lw = logoImg.naturalWidth * ratio
+            const lh = logoImg.naturalHeight * ratio
+            pdf.addImage(logoImg, 'PNG', tbX + (tbW - lw) / 2, ty + 6, lw, lh)
+          } catch { /* ignore */ }
+        } else {
+          pdf.setTextColor(r, g, b); pdf.setFontSize(fs(10)); pdf.setFont('helvetica', 'bold')
+          const cLines = pdf.splitTextToSize(orgProfile?.company_name || '', tbW - pad * 2)
+          cLines.slice(0, 2).forEach((l, li) => pdf.text(l, tbX + tbW / 2, ty + 14 + li * 10, { align: 'center' }))
+        }
+        ty += logoH; drawSep(ty, true)
+
+        ty += 2
+        pdf.setTextColor(60, 70, 80); pdf.setFontSize(fs(6.5)); pdf.setFont('helvetica', 'bold')
+        pdf.text(orgProfile?.company_name || '', tbX + tbW / 2, ty + 7, { align: 'center' })
+        pdf.setFontSize(fs(5.5)); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 110, 120)
+        pdf.text('LOW VOLTAGE SYSTEMS', tbX + tbW / 2, ty + compH - 5, { align: 'center' })
+        ty += compH; drawSep(ty, true)
+
+        ty += 2
+        pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
+        pdf.text('PROJECT', tbX + pad, ty + 4)
+        pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(8.5)); pdf.setFont('helvetica', 'bold')
+        pdf.splitTextToSize(proposal?.proposal_name || '', tbW - pad * 2).slice(0, 3)
+          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 10))
+        ty += projH; drawSep(ty)
+
+        ty += 2
+        pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
+        pdf.text('CLIENT', tbX + pad, ty + 4)
+        pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(7.5)); pdf.setFont('helvetica', 'normal')
+        pdf.splitTextToSize(proposal?.company || '', tbW - pad * 2).slice(0, 2)
+          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 9))
+        ty += clientH; drawSep(ty, true)
+
+        ty += 2
+        if (archPrelim) {
+          pdf.setFillColor(255, 248, 245)
+          pdf.rect(tbX + 2, ty, tbW - 4, stampH - 4)
+          pdf.setDrawColor(190, 60, 40); pdf.setLineWidth(0.5)
+          pdf.rect(tbX + 3, ty + 1, tbW - 6, stampH - 6)
+          pdf.setTextColor(190, 60, 40); pdf.setFontSize(fs(6)); pdf.setFont('helvetica', 'bold')
+          pdf.text('PRELIMINARY', tbX + tbW / 2, ty + 8, { align: 'center' })
+          pdf.text('NOT FOR CONSTRUCTION', tbX + tbW / 2, ty + 14, { align: 'center' })
+        }
+        ty += stampH; drawSep(ty, true)
+
+        ty += 1
+        pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
+        pdf.text('DRAWING TITLE', tbX + pad, ty + 4)
+        ty += titleLabH
+        pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(8)); pdf.setFont('helvetica', 'bold')
+        pdf.splitTextToSize(sheetLabel.toUpperCase() || 'DRAWING', tbW - pad * 2).slice(0, 3)
+          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 8 + li * 9))
+        ty += titleValH; drawSep(ty, true)
+
+        const infoRows = [
+          { label: 'DRAWING NO.', value: drawingNum },
+          { label: 'DATE',        value: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) },
+          { label: 'SCALE',       value: archScale || 'NTS' },
+          { label: 'SHEET',       value: `${sheetIndex} OF ${totalPages}` },
+          { label: 'DRAWN BY',    value: '' },
+          { label: 'CHECKED BY',  value: '' },
+        ]
+        infoRows.forEach((row, idx) => {
+          const ry = ty + idx * infoRowH
+          if (idx > 0) {
+            pdf.setDrawColor(200, 205, 210); pdf.setLineWidth(0.2)
+            pdf.line(tbX, ry, pageW - outerM, ry)
+          }
+          pdf.setTextColor(110, 120, 130); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'normal')
+          pdf.text(row.label, tbX + pad, ry + 3.5)
+          pdf.setTextColor(15, 15, 15); pdf.setFontSize(fs(7)); pdf.setFont('helvetica', 'bold')
+          pdf.text(row.value, tbX + pad, ry + infoRowH - 2.5)
+        })
+        ty += infoTotalH; drawSep(ty, true)
+
+        pdf.setFillColor(r, g, b); pdf.rect(tbX, ty, tbW, revHeaderH, 'F')
+        pdf.setTextColor(255, 255, 255); pdf.setFontSize(fs(6.5)); pdf.setFont('helvetica', 'bold')
+        pdf.text('REVISIONS', tbX + pad, ty + 7)
+        ty += revHeaderH
+
+        const revCols = [
+          { label: 'REV', w: 13 }, { label: 'DATE', w: 23 },
+          { label: 'DESCRIPTION', w: tbW - 13 - 23 - 13 }, { label: 'BY', w: 13 },
+        ]
+        let cx = tbX
+        revCols.forEach((col, ci) => {
+          if (ci > 0) {
+            pdf.setDrawColor(160, 168, 178); pdf.setLineWidth(0.2)
+            pdf.line(cx, ty, cx, tbBot)
+          }
+          pdf.setTextColor(55, 65, 75); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
+          pdf.text(col.label, cx + 2, ty + 5.5)
+          cx += col.w
+        })
+        ty += revColH
+        pdf.setDrawColor(160, 168, 178); pdf.setLineWidth(0.2)
+        pdf.line(tbX, ty, pageW - outerM, ty)
+        for (let ri = 1; ri <= numRevRows; ri++) {
+          const ry = ty + ri * revRowH
+          if (ry < tbBot - 1) {
+            pdf.setDrawColor(215, 218, 222); pdf.setLineWidth(0.15)
+            pdf.line(tbX, ry, pageW - outerM, ry)
+          }
+        }
+      }
+
+      const pageList   = archPageList.length > 0 ? archPageList : sheets.map(s => ({ type: 'sheet', id: s.id }))
+      // Tally total page count for SHEET X OF Y
+      const coverPages = archIncludeCover ? 1 : 0
+      const schedPages = archIncludeSchedule && placements.length > 0 ? 1 : 0
+      const totalPages = coverPages + schedPages + pageList.length
+
+      // ── COVER PAGE ──────────────────────────────────────────────────────────
+      if (archIncludeCover) {
+        drawArchBorders()
+        // Drawing area: large project cover content
+        const cx = drawX + 6
+        // Brand bar
+        pdf.setFillColor(r, g, b)
+        pdf.rect(drawX, drawY, 6, drawH, 'F')
+        // Logo
+        if (logoImg) {
+          try {
+            const maxW = 160, maxH = 60
+            const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+            const lw = logoImg.naturalWidth * ratio
+            const lh = logoImg.naturalHeight * ratio
+            pdf.addImage(logoImg, 'PNG', cx + 8, drawY + 16, lw, lh)
+          } catch { /* ignore */ }
+        } else {
+          pdf.setTextColor(r, g, b); pdf.setFontSize(22); pdf.setFont('helvetica', 'bold')
+          pdf.text(orgProfile?.company_name || '', cx + 8, drawY + 40)
+        }
+        // Horizontal rule
+        const midY = drawY + drawH * 0.42
+        pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.8)
+        pdf.line(cx + 8, midY, drawX + drawW - 8, midY)
+        // Eyebrow
+        pdf.setTextColor(r, g, b); pdf.setFontSize(8); pdf.setFont('helvetica', 'bold')
+        pdf.setCharSpace(2); pdf.text('CONSTRUCTION DOCUMENT SET', cx + 8, midY - 20); pdf.setCharSpace(0)
+        // Project name
+        pdf.setTextColor(15, 15, 15); pdf.setFontSize(28); pdf.setFont('helvetica', 'bold')
+        const titleLines = pdf.splitTextToSize(proposal?.proposal_name || 'PROJECT', drawW - 40)
+        titleLines.slice(0, 2).forEach((l, li) => pdf.text(l, cx + 8, midY - 8 + li * 0))
+        // Actually stack them
+        pdf.setFontSize(26)
+        titleLines.slice(0, 2).forEach((l, li) => pdf.text(l, cx + 8, midY - 6 + li * 12))
+        // Client
+        pdf.setFontSize(14); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(40, 50, 60)
+        pdf.text(proposal?.company || '', cx + 8, midY + 16)
+        // Meta row
+        pdf.setFontSize(8); pdf.setTextColor(90, 100, 110)
+        const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+        pdf.text(`Date: ${dateStr}`, cx + 8, midY + 26)
+        pdf.text(`Sheets: ${totalPages}`, cx + 8, midY + 33)
+        // Sheet index at bottom
+        const idxY = drawY + drawH - 10 - pageList.length * 8
+        if (idxY > midY + 50) {
+          pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(r, g, b)
+          pdf.text('DRAWING INDEX', cx + 8, idxY - 4)
+          pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.3)
+          pdf.line(cx + 8, idxY - 2, cx + 80, idxY - 2)
+          let pNum = coverPages + schedPages
+          pageList.forEach((item, li) => {
+            const s = item.type === 'sheet' ? sheets.find(x => x.id === item.id) : null
+            const lbl = archSheetSettings[item.id]?.label ?? (item.type === 'notes' ? 'GENERAL NOTES' : (s?.name ?? ''))
+            const dnum = archSheetSettings[item.id]?.drawingNum ?? `${archDwgPrefix}${li + 1}.0`
+            pdf.setTextColor(20, 20, 20); pdf.setFont('helvetica', 'normal')
+            pdf.text(`${dnum}  ${lbl}`, cx + 8, idxY + li * 8)
+            pNum++
+          })
+        }
+        drawArchTitleBlock('COVER SHEET', 'C-001', 1, totalPages)
+      }
+
+      // ── DEVICE SCHEDULE PAGE ─────────────────────────────────────────────────
+      if (archIncludeSchedule && placements.length > 0) {
+        if (archIncludeCover) pdf.addPage()
+        drawArchBorders()
+
+        const schedTableStyle = {
+          theme: 'grid',
+          styles: { fontSize: 7, cellPadding: 1.8, textColor: [30, 35, 40], fillColor: [255,255,255], lineColor: [210,215,220], lineWidth: 0.2 },
+          headStyles: { fillColor: [r, g, b], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7 },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          margin: { left: drawX + 2, right: outerM + tbW + 4, top: drawY + 2, bottom: outerM + 4 },
+        }
+
+        // Group placements by system
+        const groups = {}
+        for (const p of placements) {
+          const grp = getDeviceSystemGroup(p.global_products?.category)
+          if (!groups[grp]) groups[grp] = []
+          groups[grp].push(p)
+        }
+
+        let curY = drawY + 14
+        pdf.setTextColor(r, g, b); pdf.setFontSize(fs(12)); pdf.setFont('helvetica', 'bold')
+        pdf.text('DEVICE SCHEDULE', drawX + 4, drawY + 10)
+        pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.6)
+        pdf.line(drawX + 4, drawY + 12, drawX + drawW - 4, drawY + 12)
+
+        const groupOrder = [...DEVICE_SYSTEM_GROUPS.map(g => g.label), 'Other']
+        for (const grpLabel of groupOrder) {
+          if (!groups[grpLabel]) continue
+          const rows = groups[grpLabel].map((p, idx) => {
+            const gp  = p.global_products
+            const sht = sheets.find(s => s.id === p.drawing_sheet_id)
+            return [
+              idx + 1,
+              p.device_address || '—',
+              p.part_number_override || gp?.part_number || '—',
+              p.description_override || gp?.name || '—',
+              p.manufacturer_override || gp?.manufacturer || '—',
+              p.quantity || 1,
+              sht?.name || '—',
+            ]
+          })
+          autoTable(pdf, {
+            ...schedTableStyle,
+            startY: curY,
+            head: [[{ content: grpLabel, colSpan: 7, styles: { fillColor: [30, 40, 55], textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 } }],
+                   ['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Qty', 'Sheet']],
+            body: rows,
+            columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 20 }, 2: { cellWidth: 38 }, 5: { cellWidth: 10 }, 6: { cellWidth: 30 } },
+          })
+          curY = pdf.lastAutoTable.finalY + 6
+        }
+
+        drawArchTitleBlock('DEVICE SCHEDULE', 'S-001', coverPages + 1, totalPages)
+      }
+      for (let i = 0; i < pageList.length; i++) {
+        if (i > 0 || archIncludeCover || archIncludeSchedule) pdf.addPage()
+        const item       = pageList[i]
+        const sheet      = item.type === 'sheet' ? sheets.find(s => s.id === item.id) : null
+        const drawingNum = getSheetDwgNum(item, i)
+        const sheetLabel = getSheetLabel(item, sheet)
+        const isBlank    = item.type === 'notes' || !sheet?.storage_path || ['blank', 'pending'].includes(sheet.storage_path)
+        const pageNum    = coverPages + schedPages + i + 1
+
+        drawArchBorders()
 
         // ── FLOOR PLAN or NOTES PAGE ─────────────────────────────────────────
         if (isBlank) {
@@ -1827,179 +2092,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           }
         }
 
-        // ── RIGHT-SIDE VERTICAL TITLE BLOCK ──────────────────────────────────
-        pdf.setFillColor(255, 255, 255)
-        pdf.rect(tbX, tbTop, tbW, tbH, 'F')
-        // Left border of title block
-        pdf.setDrawColor(0, 0, 0)
-        pdf.setLineWidth(1.0)
-        pdf.line(tbX, tbTop, tbX, tbBot)
-
-        let ty = tbTop
-
-        // ── Logo / Company name ───────────────────────────────────────────────
-        if (logoImg) {
-          try {
-            const maxW = tbW - pad * 2, maxH = logoH - 10
-            const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
-            const lw = logoImg.naturalWidth * ratio
-            const lh = logoImg.naturalHeight * ratio
-            pdf.addImage(logoImg, 'PNG', tbX + (tbW - lw) / 2, ty + 6, lw, lh)
-          } catch { /* ignore */ }
-        } else {
-          pdf.setTextColor(r, g, b)
-          pdf.setFontSize(fs(10))
-          pdf.setFont('helvetica', 'bold')
-          const cLines = pdf.splitTextToSize(orgProfile?.company_name || '', tbW - pad * 2)
-          cLines.slice(0, 2).forEach((l, li) => pdf.text(l, tbX + tbW / 2, ty + 14 + li * 10, { align: 'center' }))
-        }
-        ty += logoH
-        drawSep(ty, true)
-
-        // ── Company descriptor ────────────────────────────────────────────────
-        ty += 2
-        pdf.setTextColor(60, 70, 80)
-        pdf.setFontSize(fs(6.5))
-        pdf.setFont('helvetica', 'bold')
-        pdf.text(orgProfile?.company_name || '', tbX + tbW / 2, ty + 7, { align: 'center' })
-        pdf.setFontSize(fs(5.5))
-        pdf.setFont('helvetica', 'normal')
-        pdf.setTextColor(100, 110, 120)
-        pdf.text('LOW VOLTAGE SYSTEMS', tbX + tbW / 2, ty + compH - 5, { align: 'center' })
-        ty += compH
-        drawSep(ty, true)
-
-        // ── PROJECT ───────────────────────────────────────────────────────────
-        ty += 2
-        pdf.setTextColor(100, 110, 120)
-        pdf.setFontSize(fs(5))
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('PROJECT', tbX + pad, ty + 4)
-        pdf.setTextColor(10, 10, 10)
-        pdf.setFontSize(fs(8.5))
-        pdf.setFont('helvetica', 'bold')
-        const pLines = pdf.splitTextToSize(proposal?.proposal_name || '', tbW - pad * 2)
-        pLines.slice(0, 3).forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 10))
-        ty += projH
-        drawSep(ty)
-
-        // ── CLIENT ────────────────────────────────────────────────────────────
-        ty += 2
-        pdf.setTextColor(100, 110, 120)
-        pdf.setFontSize(fs(5))
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('CLIENT', tbX + pad, ty + 4)
-        pdf.setTextColor(10, 10, 10)
-        pdf.setFontSize(fs(7.5))
-        pdf.setFont('helvetica', 'normal')
-        const cliLines = pdf.splitTextToSize(proposal?.company || '', tbW - pad * 2)
-        cliLines.slice(0, 2).forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 9))
-        ty += clientH
-        drawSep(ty, true)
-
-        // ── PRELIMINARY STAMP ─────────────────────────────────────────────────
-        ty += 2
-        if (archPrelim) {
-          pdf.setFillColor(255, 248, 245)
-          pdf.rect(tbX + 2, ty, tbW - 4, stampH - 4)
-          pdf.setDrawColor(190, 60, 40)
-          pdf.setLineWidth(0.5)
-          pdf.rect(tbX + 3, ty + 1, tbW - 6, stampH - 6)
-          pdf.setTextColor(190, 60, 40)
-          pdf.setFontSize(fs(6))
-          pdf.setFont('helvetica', 'bold')
-          pdf.text('PRELIMINARY', tbX + tbW / 2, ty + 8, { align: 'center' })
-          pdf.text('NOT FOR CONSTRUCTION', tbX + tbW / 2, ty + 14, { align: 'center' })
-        }
-        ty += stampH
-        drawSep(ty, true)
-
-        // ── DRAWING TITLE ─────────────────────────────────────────────────────
-        ty += 1
-        pdf.setTextColor(100, 110, 120)
-        pdf.setFontSize(fs(5))
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('DRAWING TITLE', tbX + pad, ty + 4)
-        ty += titleLabH
-        pdf.setTextColor(10, 10, 10)
-        pdf.setFontSize(fs(8))
-        pdf.setFont('helvetica', 'bold')
-        const tLines = pdf.splitTextToSize(sheetLabel.toUpperCase() || 'DRAWING', tbW - pad * 2)
-        tLines.slice(0, 3).forEach((l, li) => pdf.text(l, tbX + pad, ty + 8 + li * 9))
-        ty += titleValH
-        drawSep(ty, true)
-
-        // ── INFO ROWS ─────────────────────────────────────────────────────────
-        const infoRows = [
-          { label: 'DRAWING NO.', value: drawingNum },
-          { label: 'DATE',        value: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) },
-          { label: 'SCALE',       value: archScale || 'NTS' },
-          { label: 'SHEET',       value: `${i + 1} OF ${pageList.length}` },
-          { label: 'DRAWN BY',    value: '' },
-          { label: 'CHECKED BY',  value: '' },
-        ]
-        infoRows.forEach((row, idx) => {
-          const ry = ty + idx * infoRowH
-          if (idx > 0) {
-            pdf.setDrawColor(200, 205, 210)
-            pdf.setLineWidth(0.2)
-            pdf.line(tbX, ry, pageW - outerM, ry)
-          }
-          pdf.setTextColor(110, 120, 130)
-          pdf.setFontSize(fs(5))
-          pdf.setFont('helvetica', 'normal')
-          pdf.text(row.label, tbX + pad, ry + 3.5)
-          pdf.setTextColor(15, 15, 15)
-          pdf.setFontSize(fs(7))
-          pdf.setFont('helvetica', 'bold')
-          pdf.text(row.value, tbX + pad, ry + infoRowH - 2.5)
-        })
-        ty += infoTotalH
-        drawSep(ty, true)
-
-        // ── REVISION TABLE ────────────────────────────────────────────────────
-        pdf.setFillColor(r, g, b)
-        pdf.rect(tbX, ty, tbW, revHeaderH, 'F')
-        pdf.setTextColor(255, 255, 255)
-        pdf.setFontSize(fs(6.5))
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('REVISIONS', tbX + pad, ty + 7)
-        ty += revHeaderH
-
-        // Column headers
-        const revCols = [
-          { label: 'REV',  w: 13 },
-          { label: 'DATE', w: 23 },
-          { label: 'DESCRIPTION', w: tbW - 13 - 23 - 13 },
-          { label: 'BY',   w: 13 },
-        ]
-        let cx = tbX
-        revCols.forEach((col, ci) => {
-          if (ci > 0) {
-            pdf.setDrawColor(160, 168, 178)
-            pdf.setLineWidth(0.2)
-            pdf.line(cx, ty, cx, tbBot)
-          }
-          pdf.setTextColor(55, 65, 75)
-          pdf.setFontSize(fs(5))
-          pdf.setFont('helvetica', 'bold')
-          pdf.text(col.label, cx + 2, ty + 5.5)
-          cx += col.w
-        })
-        ty += revColH
-        pdf.setDrawColor(160, 168, 178)
-        pdf.setLineWidth(0.2)
-        pdf.line(tbX, ty, pageW - outerM, ty)
-
-        // Empty revision rows
-        for (let ri = 1; ri <= numRevRows; ri++) {
-          const ry = ty + ri * revRowH
-          if (ry < tbBot - 1) {
-            pdf.setDrawColor(215, 218, 222)
-            pdf.setLineWidth(0.15)
-            pdf.line(tbX, ry, pageW - outerM, ry)
-          }
-        }
+        drawArchTitleBlock(sheetLabel, drawingNum, pageNum, totalPages)
       }
 
       await savePdf(pdf, `${proposal?.proposal_name || 'Drawing'}_Construction_Drawings.pdf`)
@@ -2173,6 +2266,18 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
                     <input type="checkbox" checked={archPrelim} onChange={e => setArchPrelim(e.target.checked)}
                       className="accent-[#C8622A] w-3.5 h-3.5" />
                     <span className="text-[#8A9AB0] text-xs">Preliminary stamp</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={archIncludeCover} onChange={e => setArchIncludeCover(e.target.checked)}
+                      className="accent-[#C8622A] w-3.5 h-3.5" />
+                    <span className="text-[#8A9AB0] text-xs">Cover page</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={archIncludeSchedule} onChange={e => setArchIncludeSchedule(e.target.checked)}
+                      className="accent-[#C8622A] w-3.5 h-3.5" />
+                    <span className="text-[#8A9AB0] text-xs">Device schedule</span>
                   </label>
                 </div>
 
