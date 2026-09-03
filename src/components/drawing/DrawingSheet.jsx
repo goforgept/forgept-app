@@ -3032,13 +3032,6 @@ function TextAnnotationInput({ initial, initialFontSize, initialColor, onConfirm
 
   return (
     <div className="bg-[#0F1C2E] border border-[#C8622A]/60 rounded-xl shadow-2xl p-4 flex flex-col gap-3 min-w-[340px]">
-      {/* Live preview strip */}
-      <div className="rounded-lg px-3 py-2 bg-[#1a2d45] border border-[#2a3d55] min-h-[36px]">
-        <span style={{ fontSize: Math.min(fontSize, 22), color, fontFamily: 'sans-serif', lineHeight: 1.3 }}>
-          {text || <span className="text-[#4a5a6a]">Preview…</span>}
-        </span>
-      </div>
-
       <textarea
         ref={ref}
         value={text}

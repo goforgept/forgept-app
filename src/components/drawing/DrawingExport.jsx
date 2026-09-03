@@ -2102,14 +2102,16 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             if (!ann.points?.[0] || !ann.label) continue
             const tx = drawX + ann.points[0].x * drawW
             const ty = drawY + ann.points[0].y * drawH
-            const ptSize = (ann.font_size || 14) * 0.352778
+            const scaledFontPt = fs(ann.font_size || 14)
+            const lineHeightMm = scaledFontPt * 0.352778 * 1.35
             const annCol = hexToRgbArr(ann.color || '#111827')
             pdf.setTextColor(...annCol)
-            pdf.setFontSize(fs(ann.font_size || 14))
+            pdf.setFontSize(scaledFontPt)
             pdf.setFont('helvetica', 'normal')
-            const annW = (ann.points[0].width ?? 0.3) * drawW
+            const storedW = ann.points[0].width
+            const annW = storedW != null ? storedW * drawW : drawW * 0.9
             const lines = pdf.splitTextToSize(ann.label, annW)
-            lines.forEach((line, li) => pdf.text(line, tx, ty + li * ptSize * 1.4))
+            lines.forEach((line, li) => pdf.text(line, tx, ty + li * lineHeightMm))
           }
         }
 
