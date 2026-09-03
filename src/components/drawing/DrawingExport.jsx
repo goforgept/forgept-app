@@ -498,6 +498,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [archSheetSettings, setArchSheetSettings] = useState({})  // { [id]: { label?, drawingNum? } }
   const [archPageList,      setArchPageList]      = useState([])  // ordered: { type:'sheet'|'notes', id }
   const [archRevisions,     setArchRevisions]     = useState([])  // { id, rev, date, description, by }
+  const [archScope,         setArchScope]         = useState('')  // "Drawings For" bullet list
   const [archSettingsOpen,  setArchSettingsOpen]  = useState(false)
 
   const archStorageKey = `arch_settings_${proposalId}`
@@ -517,6 +518,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         if (s.archSheetSettings !== undefined) setArchSheetSettings(s.archSheetSettings)
         if (s.archPageList?.length > 0)       setArchPageList(s.archPageList)
         if (s.archRevisions    !== undefined) setArchRevisions(s.archRevisions)
+        if (s.archScope        !== undefined) setArchScope(s.archScope)
       }
     } catch { /* ignore corrupt storage */ }
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
@@ -527,10 +529,10 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       localStorage.setItem(archStorageKey, JSON.stringify({
         archDwgPrefix, archScale, archPrelim, archFontScale,
         archIncludeCover, archIncludeSchedule,
-        archSheetSettings, archPageList, archRevisions,
+        archSheetSettings, archPageList, archRevisions, archScope,
       }))
     } catch { /* ignore quota errors */ }
-  }, [archDwgPrefix, archScale, archPrelim, archFontScale, archIncludeCover, archIncludeSchedule, archSheetSettings, archPageList, archRevisions])  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [archDwgPrefix, archScale, archPrelim, archFontScale, archIncludeCover, archIncludeSchedule, archSheetSettings, archPageList, archRevisions, archScope])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialise page list from Designer sheets (runs once when sheets first load and nothing is persisted)
   useEffect(() => {
@@ -645,7 +647,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           .in('drawing_placements.drawing_sheet_id', sheetIds),
         supabase.auth.getUser().then(({ data: { user } }) =>
           supabase.from('profiles')
-            .select('full_name, company_name, logo_url, primary_color, organizations(title_block_engineer, title_block_license, title_block_scale)')
+            .select('full_name, company_name, logo_url, primary_color, phone, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, organizations(title_block_engineer, title_block_license, title_block_scale)')
             .eq('id', user.id)
             .single()
         ),
@@ -1727,22 +1729,19 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const drawW  = tbX - innerM - 1
       const drawH  = pageH - innerM * 2
 
-      // Title block section heights — sized for Arch D (3× letter scale)
-      const logoH     = 55
-      const compH     = 30
-      const projH     = 72
-      const clientH   = 42
-      const stampH    = 32
-      const titleLabH = 14
-      const titleValH = 52
-      const infoRowH  = 20
-      const numInfoRows = 6
-      const infoTotalH  = infoRowH * numInfoRows  // 120
-      const revHeaderH  = 18
-      const revColH     = 14
-      const fixedH = logoH + compH + projH + clientH + stampH + titleLabH + titleValH + infoTotalH + revHeaderH + revColH
-      const revRowH   = Math.max(16, (tbH - fixedH) / 8)
-      const numRevRows = Math.floor((tbH - fixedH) / revRowH)
+      // Title block section heights — simplified reference style
+      const logoH      = 60   // org logo
+      const contactH   = 48   // address / phone lines
+      const clientH    = 60   // client name
+      const projH      = 100  // project name (large)
+      const scopeH     = 90   // "Drawings For" scope list
+      const stampH     = 28   // preliminary stamp (optional)
+      const dwgNumH    = 55   // large drawing number at bottom
+      const revHeaderH = 18   // "REVISIONS" bar
+      const revColH    = 14   // column label row
+      const fixedH = logoH + contactH + clientH + projH + scopeH + (archPrelim ? stampH : 0) + dwgNumH + revHeaderH + revColH
+      const revRowH    = Math.max(16, (tbH - fixedH) / 6)
+      const numRevRows = Math.max(0, Math.floor((tbH - fixedH) / revRowH))
 
       const { default: autoTable } = await import('jspdf-autotable')
       const fs = (n) => n * archFontScale   // scaled font size helper
@@ -1764,7 +1763,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.rect(innerM, innerM, drawW - 0.5, drawH)
       }
 
-      // Draw the right-side title block for a given page (sheetLabel, drawingNum, sheetIndex, totalPages)
+      // Draw the right-side title block — simplified reference style
       const drawArchTitleBlock = (sheetLabel, drawingNum, sheetIndex, totalPages) => {
         pdf.setFillColor(255, 255, 255)
         pdf.rect(tbX, tbTop, tbW, tbH, 'F')
@@ -1774,129 +1773,114 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
         let ty = tbTop
 
+        // ── Org logo ──
         if (logoImg) {
           try {
-            const maxW = tbW - pad * 2, maxH = logoH - 10
+            const maxW = tbW - pad * 2, maxH = logoH - 8
             const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
             const lw = logoImg.naturalWidth * ratio
             const lh = logoImg.naturalHeight * ratio
-            pdf.addImage(logoImg, 'PNG', tbX + (tbW - lw) / 2, ty + 8, lw, lh)
+            pdf.addImage(logoImg, 'PNG', tbX + (tbW - lw) / 2, ty + 4, lw, lh)
           } catch { /* ignore */ }
         } else {
-          pdf.setTextColor(r, g, b); pdf.setFontSize(fs(10)); pdf.setFont('helvetica', 'bold')
+          pdf.setTextColor(r, g, b); pdf.setFontSize(fs(9)); pdf.setFont('helvetica', 'bold')
           const cLines = pdf.splitTextToSize(orgProfile?.company_name || '', tbW - pad * 2)
-          cLines.slice(0, 2).forEach((l, li) => pdf.text(l, tbX + tbW / 2, ty + 18 + li * 12, { align: 'center' }))
+          cLines.slice(0, 2).forEach((l, li) => pdf.text(l, tbX + tbW / 2, ty + 20 + li * 14, { align: 'center' }))
         }
         ty += logoH; drawSep(ty, true)
 
-        ty += 3
-        pdf.setTextColor(60, 70, 80); pdf.setFontSize(fs(6.5)); pdf.setFont('helvetica', 'bold')
-        pdf.text(orgProfile?.company_name || '', tbX + tbW / 2, ty + 10, { align: 'center' })
-        pdf.setFontSize(fs(5.5)); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 110, 120)
-        pdf.text('LOW VOLTAGE SYSTEMS', tbX + tbW / 2, ty + compH - 7, { align: 'center' })
-        ty += compH; drawSep(ty, true)
+        // ── Contact info ──
+        const addr1 = orgProfile?.bill_to_address || ''
+        const addr2 = [orgProfile?.bill_to_city, orgProfile?.bill_to_state, orgProfile?.bill_to_zip].filter(Boolean).join(', ')
+        const phone = orgProfile?.phone || ''
+        const contactLines = [orgProfile?.company_name, addr1, addr2, phone].filter(Boolean)
+        pdf.setFontSize(fs(5.5)); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(50, 55, 65)
+        const lineStep = (contactH - 6) / Math.max(contactLines.length, 1)
+        contactLines.forEach((line, li) => pdf.text(line, tbX + tbW / 2, ty + 8 + li * lineStep, { align: 'center' }))
+        ty += contactH; drawSep(ty, true)
 
-        ty += 3
-        pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
-        pdf.text('PROJECT', tbX + pad, ty + 7)
-        pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(8.5)); pdf.setFont('helvetica', 'bold')
-        pdf.splitTextToSize(proposal?.proposal_name || '', tbW - pad * 2).slice(0, 3)
-          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 18 + li * 13))
-        ty += projH; drawSep(ty)
-
-        ty += 3
-        pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
-        pdf.text('CLIENT', tbX + pad, ty + 7)
-        pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(7.5)); pdf.setFont('helvetica', 'normal')
-        pdf.splitTextToSize(proposal?.company || '', tbW - pad * 2).slice(0, 2)
-          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 18 + li * 13))
+        // ── Client name ──
+        ty += 4
+        pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'normal')
+        pdf.text('CLIENT', tbX + pad, ty + 6)
+        pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(8)); pdf.setFont('helvetica', 'bold')
+        pdf.splitTextToSize(proposal?.company || '', tbW - pad * 2).slice(0, 3)
+          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 18 + li * 14))
         ty += clientH; drawSep(ty, true)
 
-        ty += 3
+        // ── Project name ──
+        ty += 4
+        pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'normal')
+        pdf.text('PROJECT', tbX + pad, ty + 6)
+        pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(9.5)); pdf.setFont('helvetica', 'bold')
+        pdf.splitTextToSize((proposal?.proposal_name || '').toUpperCase(), tbW - pad * 2).slice(0, 4)
+          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 20 + li * 17))
+        ty += projH; drawSep(ty, true)
+
+        // ── Scope — "Drawings For" ──
+        ty += 4
+        pdf.setTextColor(55, 65, 75); pdf.setFontSize(fs(6)); pdf.setFont('helvetica', 'bold')
+        pdf.text('Drawings For', tbX + pad, ty + 9)
+        if (archScope) {
+          const scopeLines = archScope.split('\n').filter(l => l.trim())
+          pdf.setFontSize(fs(5.5)); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(30, 35, 45)
+          scopeLines.forEach((line, li) => pdf.text(`  ${line.trim()}`, tbX + pad, ty + 20 + li * 11))
+        }
+        ty += scopeH; drawSep(ty, true)
+
+        // ── Preliminary stamp (optional) ──
         if (archPrelim) {
           pdf.setFillColor(255, 248, 245)
-          pdf.rect(tbX + 4, ty + 1, tbW - 8, stampH - 6)
+          pdf.rect(tbX + 4, ty + 2, tbW - 8, stampH - 4)
           pdf.setDrawColor(190, 60, 40); pdf.setLineWidth(1.2)
-          pdf.rect(tbX + 6, ty + 3, tbW - 12, stampH - 10)
+          pdf.rect(tbX + 6, ty + 4, tbW - 12, stampH - 8)
           pdf.setTextColor(190, 60, 40); pdf.setFontSize(fs(6)); pdf.setFont('helvetica', 'bold')
-          pdf.text('PRELIMINARY', tbX + tbW / 2, ty + 13, { align: 'center' })
-          pdf.text('NOT FOR CONSTRUCTION', tbX + tbW / 2, ty + 22, { align: 'center' })
+          pdf.text('PRELIMINARY', tbX + tbW / 2, ty + 14, { align: 'center' })
+          pdf.text('NOT FOR CONSTRUCTION', tbX + tbW / 2, ty + 24, { align: 'center' })
+          ty += stampH; drawSep(ty, true)
         }
-        ty += stampH; drawSep(ty, true)
 
-        ty += 2
-        pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
-        pdf.text('DRAWING TITLE', tbX + pad, ty + 7)
-        ty += titleLabH
-        pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(8)); pdf.setFont('helvetica', 'bold')
-        pdf.splitTextToSize(sheetLabel.toUpperCase() || 'DRAWING', tbW - pad * 2).slice(0, 3)
-          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 13))
-        ty += titleValH; drawSep(ty, true)
-
-        const infoRows = [
-          { label: 'DRAWING NO.', value: drawingNum },
-          { label: 'DATE',        value: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) },
-          { label: 'SCALE',       value: archScale || 'NTS' },
-          { label: 'SHEET',       value: sheetIndex != null ? `${sheetIndex} OF ${totalPages}` : '' },
-          { label: 'DRAWN BY',    value: orgProfile?.full_name || '' },
-          { label: 'CHECKED BY',  value: '' },
-        ]
-        infoRows.forEach((row, idx) => {
-          const ry = ty + idx * infoRowH
-          if (idx > 0) {
-            pdf.setDrawColor(200, 205, 210); pdf.setLineWidth(0.5)
-            pdf.line(tbX, ry, pageW - outerM, ry)
-          }
-          pdf.setTextColor(110, 120, 130); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'normal')
-          pdf.text(row.label, tbX + pad, ry + 6)
-          pdf.setTextColor(15, 15, 15); pdf.setFontSize(fs(7)); pdf.setFont('helvetica', 'bold')
-          pdf.text(row.value, tbX + pad, ry + infoRowH - 4)
-        })
-        ty += infoTotalH; drawSep(ty, true)
-
+        // ── Revision table ──
         pdf.setFillColor(r, g, b); pdf.rect(tbX, ty, tbW, revHeaderH, 'F')
         pdf.setTextColor(255, 255, 255); pdf.setFontSize(fs(6.5)); pdf.setFont('helvetica', 'bold')
         pdf.text('REVISIONS', tbX + pad, ty + 12)
         ty += revHeaderH
 
-        const revCols = [
-          { label: 'REV', w: 16 }, { label: 'DATE', w: 28 },
-          { label: 'BY', w: 36 }, { label: 'DESCRIPTION', w: tbW - 16 - 28 - 36 },
-        ]
-        let cx = tbX
-        revCols.forEach((col, ci) => {
-          if (ci > 0) {
-            pdf.setDrawColor(160, 168, 178); pdf.setLineWidth(0.5)
-            pdf.line(cx, ty, cx, tbBot)
-          }
-          pdf.setTextColor(55, 65, 75); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
-          pdf.text(col.label, cx + 4, ty + 9)
-          cx += col.w
-        })
+        const dateW = 34, descW = tbW - dateW
+        // Column headers
+        pdf.setDrawColor(160, 168, 178); pdf.setLineWidth(0.5)
+        pdf.line(tbX + dateW, ty, tbX + dateW, tbBot - dwgNumH - 6)
+        pdf.setTextColor(55, 65, 75); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
+        pdf.text('DATE', tbX + pad, ty + 9)
+        pdf.text('REVISION VERSION', tbX + dateW + pad, ty + 9)
         ty += revColH
         pdf.setDrawColor(160, 168, 178); pdf.setLineWidth(0.5)
         pdf.line(tbX, ty, pageW - outerM, ty)
-        // Render saved revisions first, then blank rows
-        const revColWidths = [16, 28, 36, tbW - 16 - 28 - 36]
+
         for (let ri = 0; ri < numRevRows; ri++) {
           const ry = ty + ri * revRowH
-          if (ry + revRowH >= tbBot) break
-          // separator between rows
+          if (ry + revRowH >= tbBot - dwgNumH - 6) break
           if (ri > 0) {
             pdf.setDrawColor(215, 218, 222); pdf.setLineWidth(0.4)
             pdf.line(tbX, ry, pageW - outerM, ry)
           }
           const rev = archRevisions[ri]
           if (rev) {
-            const cells = [rev.rev, rev.date, rev.description, rev.by]
-            let rcx = tbX
-            cells.forEach((val, ci) => {
-              pdf.setTextColor(15, 15, 15); pdf.setFontSize(fs(5.5)); pdf.setFont('helvetica', 'normal')
-              pdf.text(String(val || ''), rcx + 4, ry + revRowH * 0.6)
-              rcx += revColWidths[ci]
-            })
+            pdf.setTextColor(15, 15, 15); pdf.setFontSize(fs(5.5)); pdf.setFont('helvetica', 'normal')
+            pdf.text(rev.date || '', tbX + pad, ry + revRowH * 0.65)
+            pdf.text(rev.description || '', tbX + dateW + pad, ry + revRowH * 0.65)
           }
         }
+
+        // ── Drawing number — large at bottom ──
+        const dnY = tbBot - dwgNumH
+        drawSep(dnY, true)
+        // Sheet label small above
+        pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'normal')
+        pdf.text(sheetLabel ? sheetLabel.toUpperCase() : '', tbX + tbW / 2, dnY + 10, { align: 'center' })
+        // Drawing number large
+        pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(16)); pdf.setFont('helvetica', 'bold')
+        pdf.text(drawingNum || '', tbX + tbW / 2, dnY + dwgNumH - 10, { align: 'center' })
       }
 
       const pageList   = archPageList.length > 0 ? archPageList : sheets.map(s => ({ type: 'sheet', id: s.id }))
@@ -2378,6 +2362,19 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
                       className="accent-[#C8622A] w-3.5 h-3.5" />
                     <span className="text-[#8A9AB0] text-xs">Device schedule</span>
                   </label>
+                </div>
+
+                {/* Drawings For scope */}
+                <div>
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-1">Drawings For</p>
+                  <textarea
+                    value={archScope}
+                    onChange={e => setArchScope(e.target.value)}
+                    rows={3}
+                    placeholder={"Low Voltage Systems\nFire Alarm\nAccess Control"}
+                    className="w-full bg-[#1a2d45] border border-[#2a3d55] rounded px-2 py-1.5 text-white text-xs focus:outline-none focus:border-[#C8622A] resize-y font-mono leading-relaxed"
+                  />
+                  <p className="text-[#4a5a6a] text-[10px] mt-0.5">One item per line — appears in title block scope section</p>
                 </div>
 
                 {/* Ordered page list */}
