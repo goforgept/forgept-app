@@ -491,9 +491,47 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const updateSheetSetting = (id, key, val) =>
     setArchSheetSettings(prev => ({ ...prev, [id]: { ...prev[id], [key]: val } }))
 
+  const [expandedNotes, setExpandedNotes] = useState(null)  // id of notes page currently open in editor
+
   const addNotesPage = () => {
     const id = `notes-${Date.now()}`
     setArchPageList(prev => [...prev, { type: 'notes', id }])
+    // Start with one blank section
+    setArchSheetSettings(prev => ({
+      ...prev,
+      [id]: { ...prev[id], sections: [{ id: `s-${Date.now()}`, heading: '', body: '' }] }
+    }))
+    setExpandedNotes(id)
+  }
+
+  const addSection = (pageId) => {
+    setArchSheetSettings(prev => ({
+      ...prev,
+      [pageId]: {
+        ...prev[pageId],
+        sections: [...(prev[pageId]?.sections || []), { id: `s-${Date.now()}`, heading: '', body: '' }]
+      }
+    }))
+  }
+
+  const updateSection = (pageId, secId, key, val) => {
+    setArchSheetSettings(prev => ({
+      ...prev,
+      [pageId]: {
+        ...prev[pageId],
+        sections: (prev[pageId]?.sections || []).map(s => s.id === secId ? { ...s, [key]: val } : s)
+      }
+    }))
+  }
+
+  const removeSection = (pageId, secId) => {
+    setArchSheetSettings(prev => ({
+      ...prev,
+      [pageId]: {
+        ...prev[pageId],
+        sections: (prev[pageId]?.sections || []).filter(s => s.id !== secId)
+      }
+    }))
   }
 
   const movePage = (idx, dir) =>
@@ -1674,19 +1712,68 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         // ── FLOOR PLAN or NOTES PAGE ─────────────────────────────────────────
         if (isBlank) {
           // General notes page — title + ruled lines
+          // Page heading
           pdf.setTextColor(r, g, b)
-          pdf.setFontSize(fs(12))
+          pdf.setFontSize(fs(13))
           pdf.setFont('helvetica', 'bold')
           pdf.text(sheetLabel.toUpperCase() || 'GENERAL NOTES', drawX + 6, drawY + 14)
           pdf.setDrawColor(r, g, b)
-          pdf.setLineWidth(0.6)
-          pdf.line(drawX + 6, drawY + 16, drawX + 72, drawY + 16)
-          pdf.setDrawColor(210, 215, 225)
-          pdf.setLineWidth(0.2)
-          const lineSpacing = 11
-          const numLines = Math.floor((drawH - 26) / lineSpacing)
-          for (let li = 0; li < numLines; li++) {
-            pdf.line(drawX + 6, drawY + 26 + li * lineSpacing, drawX + drawW - 6, drawY + 26 + li * lineSpacing)
+          pdf.setLineWidth(0.7)
+          pdf.line(drawX + 6, drawY + 17, drawX + drawW - 6, drawY + 17)
+
+          // Render text sections — two-column layout
+          const sections = archSheetSettings[item.id]?.sections || []
+          if (sections.length > 0) {
+            const colGap  = 8
+            const colW    = (drawW - 12 - colGap) / 2
+            const col1X   = drawX + 6
+            const col2X   = col1X + colW + colGap
+            const bodyFontSize = fs(7.5)
+            const headFontSize = fs(8.5)
+            const lineH   = bodyFontSize * 0.45 + 1.2  // mm per line
+            const headH   = headFontSize * 0.45 + 4
+            let cy        = [drawY + 24, drawY + 24]  // current y per column
+            let col       = 0
+
+            sections.forEach(sec => {
+              const cx    = col === 0 ? col1X : col2X
+              const maxW  = colW
+              const bodyLines = sec.body
+                ? pdf.setFontSize(bodyFontSize) || pdf.splitTextToSize(sec.body, maxW)
+                : []
+              const blockH = (sec.heading ? headH : 0) + bodyLines.length * lineH + 4
+
+              // Overflow to next column
+              if (cy[col] + blockH > drawY + drawH - 8 && col === 0) col = 1
+
+              const bx = col === 0 ? col1X : col2X
+              let by = cy[col]
+
+              if (sec.heading) {
+                pdf.setTextColor(r, g, b)
+                pdf.setFontSize(headFontSize)
+                pdf.setFont('helvetica', 'bold')
+                pdf.text(sec.heading.toUpperCase(), bx, by + headH - 3)
+                pdf.setDrawColor(r, g, b)
+                pdf.setLineWidth(0.3)
+                pdf.line(bx, by + headH - 1, bx + colW, by + headH - 1)
+                by += headH + 1
+              }
+
+              if (bodyLines.length > 0) {
+                pdf.setTextColor(20, 25, 30)
+                pdf.setFontSize(bodyFontSize)
+                pdf.setFont('helvetica', 'normal')
+                bodyLines.forEach((line, li) => {
+                  pdf.text(line, bx, by + li * lineH)
+                })
+                by += bodyLines.length * lineH
+              }
+
+              cy[col] = by + 5
+              // Move to next column when current one is getting full
+              if (col === 0 && cy[0] > drawY + drawH * 0.5) col = 1
+            })
           }
         } else {
           // Render floor plan with device symbols
@@ -2106,53 +2193,75 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
                         const sheet = item.type === 'sheet' ? sheets.find(s => s.id === item.id) : null
                         const defaultLabel  = item.type === 'notes' ? 'GENERAL NOTES' : (sheet?.name ?? '')
                         const defaultDwgNum = `${archDwgPrefix}${si + 1}.0`
+                        const sections = archSheetSettings[item.id]?.sections || []
+                        const isOpen   = expandedNotes === item.id
                         return (
-                          <div key={item.id} className="flex items-center gap-1.5">
-                            {/* Reorder buttons */}
-                            <div className="flex flex-col gap-px flex-shrink-0">
-                              <button
-                                onClick={() => movePage(si, -1)}
-                                disabled={si === 0}
-                                className="text-[#8A9AB0] hover:text-white disabled:opacity-25 leading-none text-[9px] px-0.5"
-                              >▲</button>
-                              <button
-                                onClick={() => movePage(si, 1)}
-                                disabled={si === archPageList.length - 1}
-                                className="text-[#8A9AB0] hover:text-white disabled:opacity-25 leading-none text-[9px] px-0.5"
-                              >▼</button>
+                          <div key={item.id} className="flex flex-col gap-0">
+                            {/* Row */}
+                            <div className="flex items-center gap-1.5">
+                              {/* Reorder buttons */}
+                              <div className="flex flex-col gap-px flex-shrink-0">
+                                <button onClick={() => movePage(si, -1)} disabled={si === 0}
+                                  className="text-[#8A9AB0] hover:text-white disabled:opacity-25 leading-none text-[9px] px-0.5">▲</button>
+                                <button onClick={() => movePage(si, 1)} disabled={si === archPageList.length - 1}
+                                  className="text-[#8A9AB0] hover:text-white disabled:opacity-25 leading-none text-[9px] px-0.5">▼</button>
+                              </div>
+                              <span className="text-[#8A9AB0] text-xs w-4 text-right flex-shrink-0">{si + 1}.</span>
+                              <input type="text"
+                                value={archSheetSettings[item.id]?.drawingNum ?? defaultDwgNum}
+                                onChange={e => updateSheetSetting(item.id, 'drawingNum', e.target.value)}
+                                className="w-16 bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs text-center focus:outline-none focus:border-[#C8622A]"
+                                placeholder={defaultDwgNum}
+                              />
+                              <input type="text"
+                                value={archSheetSettings[item.id]?.label ?? defaultLabel}
+                                onChange={e => updateSheetSetting(item.id, 'label', e.target.value)}
+                                className="flex-1 bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-[#C8622A]"
+                                placeholder={defaultLabel || 'Drawing title'}
+                              />
+                              {item.type === 'notes' && (
+                                <>
+                                  <button
+                                    onClick={() => setExpandedNotes(isOpen ? null : item.id)}
+                                    className="text-[10px] border rounded px-1.5 py-0.5 flex-shrink-0 transition-colors text-[#C8622A] border-[#C8622A] hover:bg-[#C8622A] hover:text-white"
+                                  >{isOpen ? 'Done' : 'Edit'}</button>
+                                  <button onClick={() => removePage(item.id)}
+                                    className="text-[#8A9AB0] hover:text-red-400 text-xs flex-shrink-0">✕</button>
+                                </>
+                              )}
                             </div>
 
-                            <span className="text-[#8A9AB0] text-xs w-4 text-right flex-shrink-0">{si + 1}.</span>
-
-                            {/* Drawing number */}
-                            <input
-                              type="text"
-                              value={archSheetSettings[item.id]?.drawingNum ?? defaultDwgNum}
-                              onChange={e => updateSheetSetting(item.id, 'drawingNum', e.target.value)}
-                              className="w-16 bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs text-center focus:outline-none focus:border-[#C8622A]"
-                              placeholder={defaultDwgNum}
-                            />
-
-                            {/* Drawing title / notes label */}
-                            <input
-                              type="text"
-                              value={archSheetSettings[item.id]?.label ?? defaultLabel}
-                              onChange={e => updateSheetSetting(item.id, 'label', e.target.value)}
-                              className="flex-1 bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-[#C8622A]"
-                              placeholder={defaultLabel || 'Drawing title'}
-                            />
-
-                            {/* Notes badge */}
-                            {item.type === 'notes' && (
-                              <span className="text-[10px] text-[#8A9AB0] bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 flex-shrink-0">Notes</span>
-                            )}
-
-                            {/* Remove notes page */}
-                            {item.type === 'notes' && (
-                              <button
-                                onClick={() => removePage(item.id)}
-                                className="text-[#8A9AB0] hover:text-red-400 text-xs flex-shrink-0 leading-none"
-                              >✕</button>
+                            {/* Notes section editor */}
+                            {item.type === 'notes' && isOpen && (
+                              <div className="mt-2 ml-10 bg-[#1a2d45] border border-[#2a3d55] rounded-lg p-3 space-y-3">
+                                {sections.map((sec, sIdx) => (
+                                  <div key={sec.id} className="space-y-1.5">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[#8A9AB0] text-[10px] flex-shrink-0">Section {sIdx + 1}</span>
+                                      <input
+                                        type="text"
+                                        value={sec.heading}
+                                        onChange={e => updateSection(item.id, sec.id, 'heading', e.target.value)}
+                                        placeholder="Section heading (e.g. GENERAL CONDITIONS)"
+                                        className="flex-1 bg-[#0F1C2E] border border-[#2a3d55] rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-[#C8622A] font-semibold"
+                                      />
+                                      <button onClick={() => removeSection(item.id, sec.id)}
+                                        className="text-[#8A9AB0] hover:text-red-400 text-xs flex-shrink-0">✕</button>
+                                    </div>
+                                    <textarea
+                                      value={sec.body}
+                                      onChange={e => updateSection(item.id, sec.id, 'body', e.target.value)}
+                                      placeholder="Type notes here. Use numbered lists (1. Item), bullets (• Item), or plain paragraphs."
+                                      rows={5}
+                                      className="w-full bg-[#0F1C2E] border border-[#2a3d55] rounded px-2 py-1.5 text-white text-xs focus:outline-none focus:border-[#C8622A] resize-y font-mono leading-relaxed"
+                                    />
+                                  </div>
+                                ))}
+                                <button
+                                  onClick={() => addSection(item.id)}
+                                  className="text-xs text-[#8A9AB0] hover:text-white border border-dashed border-[#2a3d55] hover:border-[#8A9AB0] rounded px-3 py-1 w-full transition-colors"
+                                >+ Add Section</button>
+                              </div>
                             )}
                           </div>
                         )
