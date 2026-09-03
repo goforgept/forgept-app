@@ -474,6 +474,44 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [exportFOV,      setExportFOV]      = useState(true)
   const [exportCables,   setExportCables]   = useState(true)
   const [exportPathways, setExportPathways] = useState(true)
+  // Construction Drawing settings
+  const [archDwgPrefix,    setArchDwgPrefix]    = useState('E')
+  const [archScale,        setArchScale]        = useState('NTS')
+  const [archPrelim,       setArchPrelim]       = useState(true)
+  const [archFontScale,    setArchFontScale]    = useState(1.0)
+  const [archSheetSettings, setArchSheetSettings] = useState({})  // { [id]: { label?, drawingNum? } }
+  const [archPageList,      setArchPageList]      = useState([])  // ordered: { type:'sheet'|'notes', id }
+
+  // Initialise page list from Designer sheets (runs once when sheets first load)
+  useEffect(() => {
+    if (sheets.length > 0 && archPageList.length === 0)
+      setArchPageList(sheets.map(s => ({ type: 'sheet', id: s.id })))
+  }, [sheets])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  const updateSheetSetting = (id, key, val) =>
+    setArchSheetSettings(prev => ({ ...prev, [id]: { ...prev[id], [key]: val } }))
+
+  const addNotesPage = () => {
+    const id = `notes-${Date.now()}`
+    setArchPageList(prev => [...prev, { type: 'notes', id }])
+  }
+
+  const movePage = (idx, dir) =>
+    setArchPageList(prev => {
+      const next = [...prev]
+      const t = idx + dir
+      if (t < 0 || t >= next.length) return prev
+      ;[next[idx], next[t]] = [next[t], next[idx]]
+      return next
+    })
+
+  const removePage = (id) =>
+    setArchPageList(prev => prev.filter(p => p.id !== id))
+
+  const getSheetLabel  = (item, sheet) =>
+    archSheetSettings[item.id]?.label ?? (item.type === 'notes' ? 'GENERAL NOTES' : (sheet?.name ?? ''))
+  const getSheetDwgNum = (item, i) =>
+    archSheetSettings[item.id]?.drawingNum ?? `${archDwgPrefix}${i + 1}.0`
   const [packages,      setPackages]      = useState([])
   const [copiedId,      setCopiedId]      = useState(null)
   const [shareExpiry,   setShareExpiry]   = useState(() => {
@@ -1605,17 +1643,22 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const revRowH   = Math.max(9, (tbH - fixedH) / 8)
       const numRevRows = Math.floor((tbH - fixedH) / revRowH)
 
+      const fs = (n) => n * archFontScale   // scaled font size helper
+
       const drawSep = (y, thick = false) => {
         pdf.setDrawColor(0, 0, 0)
         pdf.setLineWidth(thick ? 0.7 : 0.25)
         pdf.line(tbX, y, pageW - outerM, y)
       }
 
-      for (let i = 0; i < sheets.length; i++) {
+      const pageList = archPageList.length > 0 ? archPageList : sheets.map(s => ({ type: 'sheet', id: s.id }))
+      for (let i = 0; i < pageList.length; i++) {
         if (i > 0) pdf.addPage()
-        const sheet      = sheets[i]
-        const drawingNum = `E${i + 1}.0`
-        const isBlank    = !sheet.storage_path || ['blank', 'pending'].includes(sheet.storage_path)
+        const item       = pageList[i]
+        const sheet      = item.type === 'sheet' ? sheets.find(s => s.id === item.id) : null
+        const drawingNum = getSheetDwgNum(item, i)
+        const sheetLabel = getSheetLabel(item, sheet)
+        const isBlank    = item.type === 'notes' || !sheet?.storage_path || ['blank', 'pending'].includes(sheet.storage_path)
 
         // White background
         pdf.setFillColor(255, 255, 255)
@@ -1632,9 +1675,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         if (isBlank) {
           // General notes page — title + ruled lines
           pdf.setTextColor(r, g, b)
-          pdf.setFontSize(12)
+          pdf.setFontSize(fs(12))
           pdf.setFont('helvetica', 'bold')
-          pdf.text('GENERAL NOTES', drawX + 6, drawY + 14)
+          pdf.text(sheetLabel.toUpperCase() || 'GENERAL NOTES', drawX + 6, drawY + 14)
           pdf.setDrawColor(r, g, b)
           pdf.setLineWidth(0.6)
           pdf.line(drawX + 6, drawY + 16, drawX + 72, drawY + 16)
@@ -1654,9 +1697,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           pdf.setFillColor(255, 255, 255)
           pdf.rect(drawX + 2, drawY + drawH - 10, 200, 9, 'F')
           pdf.setTextColor(10, 10, 10)
-          pdf.setFontSize(8)
+          pdf.setFontSize(fs(8))
           pdf.setFont('helvetica', 'bold')
-          pdf.text(`${i + 1}.   ${(sheet.name || '').toUpperCase()}`, drawX + 5, drawY + drawH - 3)
+          pdf.text(`${drawingNum}   ${sheetLabel.toUpperCase()}`, drawX + 5, drawY + drawH - 3)
 
           // Symbol legend (keynotes) — inset box, upper-right of drawing area
           const sheetPlacements = placements.filter(p => p.drawing_sheet_id === sheet.id)
@@ -1718,7 +1761,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           } catch { /* ignore */ }
         } else {
           pdf.setTextColor(r, g, b)
-          pdf.setFontSize(10)
+          pdf.setFontSize(fs(10))
           pdf.setFont('helvetica', 'bold')
           const cLines = pdf.splitTextToSize(orgProfile?.company_name || '', tbW - pad * 2)
           cLines.slice(0, 2).forEach((l, li) => pdf.text(l, tbX + tbW / 2, ty + 14 + li * 10, { align: 'center' }))
@@ -1729,10 +1772,10 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         // ── Company descriptor ────────────────────────────────────────────────
         ty += 2
         pdf.setTextColor(60, 70, 80)
-        pdf.setFontSize(6.5)
+        pdf.setFontSize(fs(6.5))
         pdf.setFont('helvetica', 'bold')
         pdf.text(orgProfile?.company_name || '', tbX + tbW / 2, ty + 7, { align: 'center' })
-        pdf.setFontSize(5.5)
+        pdf.setFontSize(fs(5.5))
         pdf.setFont('helvetica', 'normal')
         pdf.setTextColor(100, 110, 120)
         pdf.text('LOW VOLTAGE SYSTEMS', tbX + tbW / 2, ty + compH - 5, { align: 'center' })
@@ -1742,11 +1785,11 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         // ── PROJECT ───────────────────────────────────────────────────────────
         ty += 2
         pdf.setTextColor(100, 110, 120)
-        pdf.setFontSize(5)
+        pdf.setFontSize(fs(5))
         pdf.setFont('helvetica', 'bold')
         pdf.text('PROJECT', tbX + pad, ty + 4)
         pdf.setTextColor(10, 10, 10)
-        pdf.setFontSize(8.5)
+        pdf.setFontSize(fs(8.5))
         pdf.setFont('helvetica', 'bold')
         const pLines = pdf.splitTextToSize(proposal?.proposal_name || '', tbW - pad * 2)
         pLines.slice(0, 3).forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 10))
@@ -1756,11 +1799,11 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         // ── CLIENT ────────────────────────────────────────────────────────────
         ty += 2
         pdf.setTextColor(100, 110, 120)
-        pdf.setFontSize(5)
+        pdf.setFontSize(fs(5))
         pdf.setFont('helvetica', 'bold')
         pdf.text('CLIENT', tbX + pad, ty + 4)
         pdf.setTextColor(10, 10, 10)
-        pdf.setFontSize(7.5)
+        pdf.setFontSize(fs(7.5))
         pdf.setFont('helvetica', 'normal')
         const cliLines = pdf.splitTextToSize(proposal?.company || '', tbW - pad * 2)
         cliLines.slice(0, 2).forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 9))
@@ -1769,30 +1812,32 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
         // ── PRELIMINARY STAMP ─────────────────────────────────────────────────
         ty += 2
-        pdf.setFillColor(255, 248, 245)
-        pdf.rect(tbX + 2, ty, tbW - 4, stampH - 4)
-        pdf.setDrawColor(190, 60, 40)
-        pdf.setLineWidth(0.5)
-        pdf.rect(tbX + 3, ty + 1, tbW - 6, stampH - 6)
-        pdf.setTextColor(190, 60, 40)
-        pdf.setFontSize(6)
-        pdf.setFont('helvetica', 'bold')
-        pdf.text('PRELIMINARY', tbX + tbW / 2, ty + 8, { align: 'center' })
-        pdf.text('NOT FOR CONSTRUCTION', tbX + tbW / 2, ty + 14, { align: 'center' })
+        if (archPrelim) {
+          pdf.setFillColor(255, 248, 245)
+          pdf.rect(tbX + 2, ty, tbW - 4, stampH - 4)
+          pdf.setDrawColor(190, 60, 40)
+          pdf.setLineWidth(0.5)
+          pdf.rect(tbX + 3, ty + 1, tbW - 6, stampH - 6)
+          pdf.setTextColor(190, 60, 40)
+          pdf.setFontSize(fs(6))
+          pdf.setFont('helvetica', 'bold')
+          pdf.text('PRELIMINARY', tbX + tbW / 2, ty + 8, { align: 'center' })
+          pdf.text('NOT FOR CONSTRUCTION', tbX + tbW / 2, ty + 14, { align: 'center' })
+        }
         ty += stampH
         drawSep(ty, true)
 
         // ── DRAWING TITLE ─────────────────────────────────────────────────────
         ty += 1
         pdf.setTextColor(100, 110, 120)
-        pdf.setFontSize(5)
+        pdf.setFontSize(fs(5))
         pdf.setFont('helvetica', 'bold')
         pdf.text('DRAWING TITLE', tbX + pad, ty + 4)
         ty += titleLabH
         pdf.setTextColor(10, 10, 10)
-        pdf.setFontSize(8)
+        pdf.setFontSize(fs(8))
         pdf.setFont('helvetica', 'bold')
-        const tLines = pdf.splitTextToSize((sheet.name || 'DRAWING').toUpperCase(), tbW - pad * 2)
+        const tLines = pdf.splitTextToSize(sheetLabel.toUpperCase() || 'DRAWING', tbW - pad * 2)
         tLines.slice(0, 3).forEach((l, li) => pdf.text(l, tbX + pad, ty + 8 + li * 9))
         ty += titleValH
         drawSep(ty, true)
@@ -1801,8 +1846,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         const infoRows = [
           { label: 'DRAWING NO.', value: drawingNum },
           { label: 'DATE',        value: new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) },
-          { label: 'SCALE',       value: 'NTS' },
-          { label: 'SHEET',       value: `${i + 1} OF ${sheets.length}` },
+          { label: 'SCALE',       value: archScale || 'NTS' },
+          { label: 'SHEET',       value: `${i + 1} OF ${pageList.length}` },
           { label: 'DRAWN BY',    value: '' },
           { label: 'CHECKED BY',  value: '' },
         ]
@@ -1814,11 +1859,11 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             pdf.line(tbX, ry, pageW - outerM, ry)
           }
           pdf.setTextColor(110, 120, 130)
-          pdf.setFontSize(5)
+          pdf.setFontSize(fs(5))
           pdf.setFont('helvetica', 'normal')
           pdf.text(row.label, tbX + pad, ry + 3.5)
           pdf.setTextColor(15, 15, 15)
-          pdf.setFontSize(7)
+          pdf.setFontSize(fs(7))
           pdf.setFont('helvetica', 'bold')
           pdf.text(row.value, tbX + pad, ry + infoRowH - 2.5)
         })
@@ -1829,7 +1874,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.setFillColor(r, g, b)
         pdf.rect(tbX, ty, tbW, revHeaderH, 'F')
         pdf.setTextColor(255, 255, 255)
-        pdf.setFontSize(6.5)
+        pdf.setFontSize(fs(6.5))
         pdf.setFont('helvetica', 'bold')
         pdf.text('REVISIONS', tbX + pad, ty + 7)
         ty += revHeaderH
@@ -1849,7 +1894,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             pdf.line(cx, ty, cx, tbBot)
           }
           pdf.setTextColor(55, 65, 75)
-          pdf.setFontSize(5)
+          pdf.setFontSize(fs(5))
           pdf.setFont('helvetica', 'bold')
           pdf.text(col.label, cx + 2, ty + 5.5)
           cx += col.w
@@ -1971,27 +2016,152 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       <div className="grid grid-cols-1 gap-4">
         {exports.map(exp => (
-          <div key={exp.id}
-            className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl p-5 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[#0F1C2E] flex items-center justify-center text-2xl flex-shrink-0">
-                {exp.icon}
+          <div key={exp.id} className="bg-[#1a2d45] border border-[#2a3d55] rounded-xl overflow-hidden">
+            <div className="p-5 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-[#0F1C2E] flex items-center justify-center text-2xl flex-shrink-0">
+                  {exp.icon}
+                </div>
+                <div>
+                  <p className="text-white font-semibold text-sm">{exp.label}</p>
+                  <p className="text-[#8A9AB0] text-xs mt-0.5">{exp.description}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-white font-semibold text-sm">{exp.label}</p>
-                <p className="text-[#8A9AB0] text-xs mt-0.5">{exp.description}</p>
-              </div>
+              <button
+                onClick={exp.action}
+                disabled={generating || (exp.disabled ?? sheets.length === 0)}
+                className={`flex-shrink-0 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  generating || (exp.disabled ?? sheets.length === 0)
+                    ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
+                    : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
+                }`}>
+                {generating ? 'Generating...' : 'Export'}
+              </button>
             </div>
-            <button
-              onClick={exp.action}
-              disabled={generating || (exp.disabled ?? sheets.length === 0)}
-              className={`flex-shrink-0 px-4 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                generating || (exp.disabled ?? sheets.length === 0)
-                  ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
-                  : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
-              }`}>
-              {generating ? 'Generating...' : 'Export'}
-            </button>
+
+            {/* Construction Drawing inline settings */}
+            {exp.id === 'arch' && (
+              <div className="border-t border-[#2a3d55] bg-[#0F1C2E] px-5 py-3 space-y-3">
+                {/* Global options row */}
+                <div className="flex flex-wrap gap-x-6 gap-y-2 items-center">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Drawing Settings</p>
+
+                  <label className="flex items-center gap-1.5">
+                    <span className="text-[#8A9AB0] text-xs">Dwg # Prefix</span>
+                    <input
+                      type="text"
+                      value={archDwgPrefix}
+                      onChange={e => setArchDwgPrefix(e.target.value.toUpperCase().slice(0, 4))}
+                      className="w-12 bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs text-center focus:outline-none focus:border-[#C8622A]"
+                      placeholder="E"
+                    />
+                  </label>
+
+                  <label className="flex items-center gap-1.5">
+                    <span className="text-[#8A9AB0] text-xs">Scale</span>
+                    <input
+                      type="text"
+                      value={archScale}
+                      onChange={e => setArchScale(e.target.value.slice(0, 20))}
+                      className="w-28 bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-[#C8622A]"
+                      placeholder="NTS"
+                    />
+                  </label>
+
+                  <label className="flex items-center gap-1.5">
+                    <span className="text-[#8A9AB0] text-xs">Font size</span>
+                    <select
+                      value={archFontScale}
+                      onChange={e => setArchFontScale(parseFloat(e.target.value))}
+                      className="bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-[#C8622A]"
+                    >
+                      <option value={0.85}>Small</option>
+                      <option value={1.0}>Medium</option>
+                      <option value={1.2}>Large</option>
+                      <option value={1.4}>X-Large</option>
+                    </select>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={archPrelim} onChange={e => setArchPrelim(e.target.checked)}
+                      className="accent-[#C8622A] w-3.5 h-3.5" />
+                    <span className="text-[#8A9AB0] text-xs">Preliminary stamp</span>
+                  </label>
+                </div>
+
+                {/* Ordered page list */}
+                {archPageList.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Page Order &amp; Labels</p>
+                      <button
+                        onClick={addNotesPage}
+                        className="text-xs text-[#C8622A] hover:text-white border border-[#C8622A] rounded px-2 py-0.5 transition-colors"
+                      >
+                        + Add Notes Page
+                      </button>
+                    </div>
+                    <div className="space-y-1.5">
+                      {archPageList.map((item, si) => {
+                        const sheet = item.type === 'sheet' ? sheets.find(s => s.id === item.id) : null
+                        const defaultLabel  = item.type === 'notes' ? 'GENERAL NOTES' : (sheet?.name ?? '')
+                        const defaultDwgNum = `${archDwgPrefix}${si + 1}.0`
+                        return (
+                          <div key={item.id} className="flex items-center gap-1.5">
+                            {/* Reorder buttons */}
+                            <div className="flex flex-col gap-px flex-shrink-0">
+                              <button
+                                onClick={() => movePage(si, -1)}
+                                disabled={si === 0}
+                                className="text-[#8A9AB0] hover:text-white disabled:opacity-25 leading-none text-[9px] px-0.5"
+                              >▲</button>
+                              <button
+                                onClick={() => movePage(si, 1)}
+                                disabled={si === archPageList.length - 1}
+                                className="text-[#8A9AB0] hover:text-white disabled:opacity-25 leading-none text-[9px] px-0.5"
+                              >▼</button>
+                            </div>
+
+                            <span className="text-[#8A9AB0] text-xs w-4 text-right flex-shrink-0">{si + 1}.</span>
+
+                            {/* Drawing number */}
+                            <input
+                              type="text"
+                              value={archSheetSettings[item.id]?.drawingNum ?? defaultDwgNum}
+                              onChange={e => updateSheetSetting(item.id, 'drawingNum', e.target.value)}
+                              className="w-16 bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs text-center focus:outline-none focus:border-[#C8622A]"
+                              placeholder={defaultDwgNum}
+                            />
+
+                            {/* Drawing title / notes label */}
+                            <input
+                              type="text"
+                              value={archSheetSettings[item.id]?.label ?? defaultLabel}
+                              onChange={e => updateSheetSetting(item.id, 'label', e.target.value)}
+                              className="flex-1 bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-[#C8622A]"
+                              placeholder={defaultLabel || 'Drawing title'}
+                            />
+
+                            {/* Notes badge */}
+                            {item.type === 'notes' && (
+                              <span className="text-[10px] text-[#8A9AB0] bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 flex-shrink-0">Notes</span>
+                            )}
+
+                            {/* Remove notes page */}
+                            {item.type === 'notes' && (
+                              <button
+                                onClick={() => removePage(item.id)}
+                                className="text-[#8A9AB0] hover:text-red-400 text-xs flex-shrink-0 leading-none"
+                              >✕</button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ))}
       </div>
