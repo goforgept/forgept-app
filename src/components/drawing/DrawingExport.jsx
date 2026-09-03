@@ -492,7 +492,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
   const [archDwgPrefix,    setArchDwgPrefix]    = useState('E')
   const [archScale,        setArchScale]        = useState('NTS')
   const [archPrelim,       setArchPrelim]       = useState(true)
-  const [archFontScale,       setArchFontScale]       = useState(1.0)
+  const [archFontScale,       setArchFontScale]       = useState(3.0)
   const [archIncludeCover,    setArchIncludeCover]    = useState(true)
   const [archIncludeSchedule, setArchIncludeSchedule] = useState(true)
   const [archSheetSettings, setArchSheetSettings] = useState({})  // { [id]: { label?, drawingNum? } }
@@ -1667,12 +1667,12 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       // Layout constants
       const outerM = 7     // outer border margin
       const innerM = 13    // inner border (drawing frame)
-      const tbW    = 82    // title block width (right-side vertical panel)
+      const tbW    = 120   // title block width (right-side vertical panel, ~4.7" on 36" page)
       const tbX    = pageW - outerM - tbW  // left edge of title block
       const tbTop  = outerM
       const tbBot  = pageH - outerM
       const tbH    = tbBot - tbTop   // ≈595.6mm full height
-      const pad    = 4
+      const pad    = 10
 
       // Drawing area sits left of the title block, inside the inner border
       const drawX  = innerM
@@ -1680,21 +1680,21 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const drawW  = tbX - innerM - 1
       const drawH  = pageH - innerM * 2
 
-      // Title block section heights (fixed, top to bottom)
-      const logoH     = 38
-      const compH     = 18
-      const projH     = 52
-      const clientH   = 28
-      const stampH    = 22
-      const titleLabH = 8
-      const titleValH = 34
-      const infoRowH  = 12
+      // Title block section heights — sized for Arch D (3× letter scale)
+      const logoH     = 55
+      const compH     = 30
+      const projH     = 72
+      const clientH   = 42
+      const stampH    = 32
+      const titleLabH = 14
+      const titleValH = 52
+      const infoRowH  = 20
       const numInfoRows = 6
-      const infoTotalH  = infoRowH * numInfoRows  // 72
-      const revHeaderH  = 10
-      const revColH     = 8
+      const infoTotalH  = infoRowH * numInfoRows  // 120
+      const revHeaderH  = 18
+      const revColH     = 14
       const fixedH = logoH + compH + projH + clientH + stampH + titleLabH + titleValH + infoTotalH + revHeaderH + revColH
-      const revRowH   = Math.max(9, (tbH - fixedH) / 8)
+      const revRowH   = Math.max(16, (tbH - fixedH) / 8)
       const numRevRows = Math.floor((tbH - fixedH) / revRowH)
 
       const { default: autoTable } = await import('jspdf-autotable')
@@ -1702,7 +1702,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
       const drawSep = (y, thick = false) => {
         pdf.setDrawColor(0, 0, 0)
-        pdf.setLineWidth(thick ? 0.7 : 0.25)
+        pdf.setLineWidth(thick ? 1.8 : 0.6)
         pdf.line(tbX, y, pageW - outerM, y)
       }
 
@@ -1711,9 +1711,9 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.setFillColor(255, 255, 255)
         pdf.rect(0, 0, pageW, pageH, 'F')
         pdf.setDrawColor(0, 0, 0)
-        pdf.setLineWidth(1.6)
+        pdf.setLineWidth(2.8)
         pdf.rect(outerM, outerM, pageW - outerM * 2, pageH - outerM * 2)
-        pdf.setLineWidth(0.35)
+        pdf.setLineWidth(1.0)
         pdf.rect(innerM, innerM, drawW - 0.5, drawH)
       }
 
@@ -1722,7 +1722,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.setFillColor(255, 255, 255)
         pdf.rect(tbX, tbTop, tbW, tbH, 'F')
         pdf.setDrawColor(0, 0, 0)
-        pdf.setLineWidth(1.0)
+        pdf.setLineWidth(2.0)
         pdf.line(tbX, tbTop, tbX, tbBot)
 
         let ty = tbTop
@@ -1733,57 +1733,57 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
             const lw = logoImg.naturalWidth * ratio
             const lh = logoImg.naturalHeight * ratio
-            pdf.addImage(logoImg, 'PNG', tbX + (tbW - lw) / 2, ty + 6, lw, lh)
+            pdf.addImage(logoImg, 'PNG', tbX + (tbW - lw) / 2, ty + 8, lw, lh)
           } catch { /* ignore */ }
         } else {
           pdf.setTextColor(r, g, b); pdf.setFontSize(fs(10)); pdf.setFont('helvetica', 'bold')
           const cLines = pdf.splitTextToSize(orgProfile?.company_name || '', tbW - pad * 2)
-          cLines.slice(0, 2).forEach((l, li) => pdf.text(l, tbX + tbW / 2, ty + 14 + li * 10, { align: 'center' }))
+          cLines.slice(0, 2).forEach((l, li) => pdf.text(l, tbX + tbW / 2, ty + 18 + li * 12, { align: 'center' }))
         }
         ty += logoH; drawSep(ty, true)
 
-        ty += 2
+        ty += 3
         pdf.setTextColor(60, 70, 80); pdf.setFontSize(fs(6.5)); pdf.setFont('helvetica', 'bold')
-        pdf.text(orgProfile?.company_name || '', tbX + tbW / 2, ty + 7, { align: 'center' })
+        pdf.text(orgProfile?.company_name || '', tbX + tbW / 2, ty + 10, { align: 'center' })
         pdf.setFontSize(fs(5.5)); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(100, 110, 120)
-        pdf.text('LOW VOLTAGE SYSTEMS', tbX + tbW / 2, ty + compH - 5, { align: 'center' })
+        pdf.text('LOW VOLTAGE SYSTEMS', tbX + tbW / 2, ty + compH - 7, { align: 'center' })
         ty += compH; drawSep(ty, true)
 
-        ty += 2
+        ty += 3
         pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
-        pdf.text('PROJECT', tbX + pad, ty + 4)
+        pdf.text('PROJECT', tbX + pad, ty + 7)
         pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(8.5)); pdf.setFont('helvetica', 'bold')
         pdf.splitTextToSize(proposal?.proposal_name || '', tbW - pad * 2).slice(0, 3)
-          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 10))
+          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 18 + li * 13))
         ty += projH; drawSep(ty)
 
-        ty += 2
+        ty += 3
         pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
-        pdf.text('CLIENT', tbX + pad, ty + 4)
+        pdf.text('CLIENT', tbX + pad, ty + 7)
         pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(7.5)); pdf.setFont('helvetica', 'normal')
         pdf.splitTextToSize(proposal?.company || '', tbW - pad * 2).slice(0, 2)
-          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 9))
+          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 18 + li * 13))
         ty += clientH; drawSep(ty, true)
 
-        ty += 2
+        ty += 3
         if (archPrelim) {
           pdf.setFillColor(255, 248, 245)
-          pdf.rect(tbX + 2, ty, tbW - 4, stampH - 4)
-          pdf.setDrawColor(190, 60, 40); pdf.setLineWidth(0.5)
-          pdf.rect(tbX + 3, ty + 1, tbW - 6, stampH - 6)
+          pdf.rect(tbX + 4, ty + 1, tbW - 8, stampH - 6)
+          pdf.setDrawColor(190, 60, 40); pdf.setLineWidth(1.2)
+          pdf.rect(tbX + 6, ty + 3, tbW - 12, stampH - 10)
           pdf.setTextColor(190, 60, 40); pdf.setFontSize(fs(6)); pdf.setFont('helvetica', 'bold')
-          pdf.text('PRELIMINARY', tbX + tbW / 2, ty + 8, { align: 'center' })
-          pdf.text('NOT FOR CONSTRUCTION', tbX + tbW / 2, ty + 14, { align: 'center' })
+          pdf.text('PRELIMINARY', tbX + tbW / 2, ty + 13, { align: 'center' })
+          pdf.text('NOT FOR CONSTRUCTION', tbX + tbW / 2, ty + 22, { align: 'center' })
         }
         ty += stampH; drawSep(ty, true)
 
-        ty += 1
+        ty += 2
         pdf.setTextColor(100, 110, 120); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
-        pdf.text('DRAWING TITLE', tbX + pad, ty + 4)
+        pdf.text('DRAWING TITLE', tbX + pad, ty + 7)
         ty += titleLabH
         pdf.setTextColor(10, 10, 10); pdf.setFontSize(fs(8)); pdf.setFont('helvetica', 'bold')
         pdf.splitTextToSize(sheetLabel.toUpperCase() || 'DRAWING', tbW - pad * 2).slice(0, 3)
-          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 8 + li * 9))
+          .forEach((l, li) => pdf.text(l, tbX + pad, ty + 12 + li * 13))
         ty += titleValH; drawSep(ty, true)
 
         const infoRows = [
@@ -1797,42 +1797,42 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         infoRows.forEach((row, idx) => {
           const ry = ty + idx * infoRowH
           if (idx > 0) {
-            pdf.setDrawColor(200, 205, 210); pdf.setLineWidth(0.2)
+            pdf.setDrawColor(200, 205, 210); pdf.setLineWidth(0.5)
             pdf.line(tbX, ry, pageW - outerM, ry)
           }
           pdf.setTextColor(110, 120, 130); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'normal')
-          pdf.text(row.label, tbX + pad, ry + 3.5)
+          pdf.text(row.label, tbX + pad, ry + 6)
           pdf.setTextColor(15, 15, 15); pdf.setFontSize(fs(7)); pdf.setFont('helvetica', 'bold')
-          pdf.text(row.value, tbX + pad, ry + infoRowH - 2.5)
+          pdf.text(row.value, tbX + pad, ry + infoRowH - 4)
         })
         ty += infoTotalH; drawSep(ty, true)
 
         pdf.setFillColor(r, g, b); pdf.rect(tbX, ty, tbW, revHeaderH, 'F')
         pdf.setTextColor(255, 255, 255); pdf.setFontSize(fs(6.5)); pdf.setFont('helvetica', 'bold')
-        pdf.text('REVISIONS', tbX + pad, ty + 7)
+        pdf.text('REVISIONS', tbX + pad, ty + 12)
         ty += revHeaderH
 
         const revCols = [
-          { label: 'REV', w: 13 }, { label: 'DATE', w: 23 },
-          { label: 'DESCRIPTION', w: tbW - 13 - 23 - 13 }, { label: 'BY', w: 13 },
+          { label: 'REV', w: 20 }, { label: 'DATE', w: 34 },
+          { label: 'DESCRIPTION', w: tbW - 20 - 34 - 20 }, { label: 'BY', w: 20 },
         ]
         let cx = tbX
         revCols.forEach((col, ci) => {
           if (ci > 0) {
-            pdf.setDrawColor(160, 168, 178); pdf.setLineWidth(0.2)
+            pdf.setDrawColor(160, 168, 178); pdf.setLineWidth(0.5)
             pdf.line(cx, ty, cx, tbBot)
           }
           pdf.setTextColor(55, 65, 75); pdf.setFontSize(fs(5)); pdf.setFont('helvetica', 'bold')
-          pdf.text(col.label, cx + 2, ty + 5.5)
+          pdf.text(col.label, cx + 4, ty + 9)
           cx += col.w
         })
         ty += revColH
-        pdf.setDrawColor(160, 168, 178); pdf.setLineWidth(0.2)
+        pdf.setDrawColor(160, 168, 178); pdf.setLineWidth(0.5)
         pdf.line(tbX, ty, pageW - outerM, ty)
         for (let ri = 1; ri <= numRevRows; ri++) {
           const ry = ty + ri * revRowH
           if (ry < tbBot - 1) {
-            pdf.setDrawColor(215, 218, 222); pdf.setLineWidth(0.15)
+            pdf.setDrawColor(215, 218, 222); pdf.setLineWidth(0.4)
             pdf.line(tbX, ry, pageW - outerM, ry)
           }
         }
@@ -1862,45 +1862,42 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             pdf.addImage(logoImg, 'PNG', cx + 8, drawY + 16, lw, lh)
           } catch { /* ignore */ }
         } else {
-          pdf.setTextColor(r, g, b); pdf.setFontSize(22); pdf.setFont('helvetica', 'bold')
+          pdf.setTextColor(r, g, b); pdf.setFontSize(fs(22)); pdf.setFont('helvetica', 'bold')
           pdf.text(orgProfile?.company_name || '', cx + 8, drawY + 40)
         }
         // Horizontal rule
         const midY = drawY + drawH * 0.42
-        pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.8)
+        pdf.setDrawColor(r, g, b); pdf.setLineWidth(2.0)
         pdf.line(cx + 8, midY, drawX + drawW - 8, midY)
         // Eyebrow
-        pdf.setTextColor(r, g, b); pdf.setFontSize(8); pdf.setFont('helvetica', 'bold')
-        pdf.setCharSpace(2); pdf.text('CONSTRUCTION DOCUMENT SET', cx + 8, midY - 20); pdf.setCharSpace(0)
+        pdf.setTextColor(r, g, b); pdf.setFontSize(fs(8)); pdf.setFont('helvetica', 'bold')
+        pdf.setCharSpace(2); pdf.text('CONSTRUCTION DOCUMENT SET', cx + 8, midY - 55); pdf.setCharSpace(0)
         // Project name
-        pdf.setTextColor(15, 15, 15); pdf.setFontSize(28); pdf.setFont('helvetica', 'bold')
+        pdf.setTextColor(15, 15, 15); pdf.setFontSize(fs(26)); pdf.setFont('helvetica', 'bold')
         const titleLines = pdf.splitTextToSize(proposal?.proposal_name || 'PROJECT', drawW - 40)
-        titleLines.slice(0, 2).forEach((l, li) => pdf.text(l, cx + 8, midY - 8 + li * 0))
-        // Actually stack them
-        pdf.setFontSize(26)
-        titleLines.slice(0, 2).forEach((l, li) => pdf.text(l, cx + 8, midY - 6 + li * 12))
+        titleLines.slice(0, 2).forEach((l, li) => pdf.text(l, cx + 8, midY - 14 + li * 36))
         // Client
-        pdf.setFontSize(14); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(40, 50, 60)
-        pdf.text(proposal?.company || '', cx + 8, midY + 16)
+        pdf.setFontSize(fs(14)); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(40, 50, 60)
+        pdf.text(proposal?.company || '', cx + 8, midY + 40)
         // Meta row
-        pdf.setFontSize(8); pdf.setTextColor(90, 100, 110)
+        pdf.setFontSize(fs(8)); pdf.setTextColor(90, 100, 110)
         const dateStr = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-        pdf.text(`Date: ${dateStr}`, cx + 8, midY + 26)
-        pdf.text(`Sheets: ${totalPages}`, cx + 8, midY + 33)
+        pdf.text(`Date: ${dateStr}`, cx + 8, midY + 65)
+        pdf.text(`Sheets: ${totalPages}`, cx + 8, midY + 88)
         // Sheet index at bottom
-        const idxY = drawY + drawH - 10 - pageList.length * 8
-        if (idxY > midY + 50) {
-          pdf.setFontSize(7); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(r, g, b)
+        const idxY = drawY + drawH - 20 - pageList.length * 20
+        if (idxY > midY + 110) {
+          pdf.setFontSize(fs(7)); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(r, g, b)
           pdf.text('DRAWING INDEX', cx + 8, idxY - 4)
-          pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.3)
-          pdf.line(cx + 8, idxY - 2, cx + 80, idxY - 2)
+          pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.8)
+          pdf.line(cx + 8, idxY - 4, cx + 160, idxY - 4)
           let pNum = coverPages + schedPages
           pageList.forEach((item, li) => {
             const s = item.type === 'sheet' ? sheets.find(x => x.id === item.id) : null
             const lbl = archSheetSettings[item.id]?.label ?? (item.type === 'notes' ? 'GENERAL NOTES' : (s?.name ?? ''))
             const dnum = archSheetSettings[item.id]?.drawingNum ?? `${archDwgPrefix}${li + 1}.0`
             pdf.setTextColor(20, 20, 20); pdf.setFont('helvetica', 'normal')
-            pdf.text(`${dnum}  ${lbl}`, cx + 8, idxY + li * 8)
+            pdf.text(`${dnum}  ${lbl}`, cx + 8, idxY + li * 20)
             pNum++
           })
         }
@@ -1914,8 +1911,8 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
         const schedTableStyle = {
           theme: 'grid',
-          styles: { fontSize: 7, cellPadding: 1.8, textColor: [30, 35, 40], fillColor: [255,255,255], lineColor: [210,215,220], lineWidth: 0.2 },
-          headStyles: { fillColor: [r, g, b], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7 },
+          styles: { fontSize: fs(7), cellPadding: fs(1.8), textColor: [30, 35, 40], fillColor: [255,255,255], lineColor: [210,215,220], lineWidth: 0.5 },
+          headStyles: { fillColor: [r, g, b], textColor: [255,255,255], fontStyle: 'bold', fontSize: fs(7) },
           alternateRowStyles: { fillColor: [248, 250, 252] },
           margin: { left: drawX + 2, right: outerM + tbW + 4, top: drawY + 2, bottom: outerM + 4 },
         }
@@ -1928,11 +1925,11 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           groups[grp].push(p)
         }
 
-        let curY = drawY + 14
+        let curY = drawY + 32
         pdf.setTextColor(r, g, b); pdf.setFontSize(fs(12)); pdf.setFont('helvetica', 'bold')
-        pdf.text('DEVICE SCHEDULE', drawX + 4, drawY + 10)
-        pdf.setDrawColor(r, g, b); pdf.setLineWidth(0.6)
-        pdf.line(drawX + 4, drawY + 12, drawX + drawW - 4, drawY + 12)
+        pdf.text('DEVICE SCHEDULE', drawX + 4, drawY + 22)
+        pdf.setDrawColor(r, g, b); pdf.setLineWidth(1.5)
+        pdf.line(drawX + 4, drawY + 26, drawX + drawW - 4, drawY + 26)
 
         const groupOrder = [...DEVICE_SYSTEM_GROUPS.map(g => g.label), 'Other']
         for (const grpLabel of groupOrder) {
@@ -1953,7 +1950,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           autoTable(pdf, {
             ...schedTableStyle,
             startY: curY,
-            head: [[{ content: grpLabel, colSpan: 7, styles: { fillColor: [30, 40, 55], textColor: [255,255,255], fontStyle: 'bold', fontSize: 8 } }],
+            head: [[{ content: grpLabel, colSpan: 7, styles: { fillColor: [30, 40, 55], textColor: [255,255,255], fontStyle: 'bold', fontSize: fs(8) } }],
                    ['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Qty', 'Sheet']],
             body: rows,
             columnStyles: { 0: { cellWidth: 8 }, 1: { cellWidth: 20 }, 2: { cellWidth: 38 }, 5: { cellWidth: 10 }, 6: { cellWidth: 30 } },
@@ -1981,10 +1978,10 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           pdf.setTextColor(r, g, b)
           pdf.setFontSize(fs(13))
           pdf.setFont('helvetica', 'bold')
-          pdf.text(sheetLabel.toUpperCase() || 'GENERAL NOTES', drawX + 6, drawY + 14)
+          pdf.text(sheetLabel.toUpperCase() || 'GENERAL NOTES', drawX + 6, drawY + 30)
           pdf.setDrawColor(r, g, b)
-          pdf.setLineWidth(0.7)
-          pdf.line(drawX + 6, drawY + 17, drawX + drawW - 6, drawY + 17)
+          pdf.setLineWidth(1.8)
+          pdf.line(drawX + 6, drawY + 40, drawX + drawW - 6, drawY + 40)
 
           // Render text sections — two-column layout
           const sections = archSheetSettings[item.id]?.sections || []
@@ -1997,7 +1994,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             const headFontSize = fs(8.5)
             const lineH   = bodyFontSize * 0.45 + 1.2  // mm per line
             const headH   = headFontSize * 0.45 + 4
-            let cy        = [drawY + 24, drawY + 24]  // current y per column
+            let cy        = [drawY + 50, drawY + 50]  // current y per column
             let col       = 0
 
             sections.forEach(sec => {
@@ -2020,7 +2017,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
                 pdf.setFont('helvetica', 'bold')
                 pdf.text(sec.heading.toUpperCase(), bx, by + headH - 3)
                 pdf.setDrawColor(r, g, b)
-                pdf.setLineWidth(0.3)
+                pdf.setLineWidth(0.8)
                 pdf.line(bx, by + headH - 1, bx + colW, by + headH - 1)
                 by += headH + 1
               }
@@ -2056,7 +2053,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             const ptSize = (ann.font_size || 14) * 0.352778   // pt → mm
             const annCol = hexToRgbArr(ann.color || '#111827')
             pdf.setTextColor(...annCol)
-            pdf.setFontSize(ann.font_size || 14)
+            pdf.setFontSize(fs(ann.font_size || 14))
             pdf.setFont('helvetica', 'normal')
             const lines = pdf.splitTextToSize(ann.label, drawW * 0.4)
             lines.forEach((line, li) => pdf.text(line, tx, ty + li * ptSize * 1.4))
@@ -2064,47 +2061,47 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
 
           // Drawing number + title label at bottom-left of drawing area
           pdf.setFillColor(255, 255, 255)
-          pdf.rect(drawX + 2, drawY + drawH - 10, 200, 9, 'F')
+          pdf.rect(drawX + 2, drawY + drawH - 28, 320, 26, 'F')
           pdf.setTextColor(10, 10, 10)
           pdf.setFontSize(fs(8))
           pdf.setFont('helvetica', 'bold')
-          pdf.text(`${drawingNum}   ${sheetLabel.toUpperCase()}`, drawX + 5, drawY + drawH - 3)
+          pdf.text(`${drawingNum}   ${sheetLabel.toUpperCase()}`, drawX + 8, drawY + drawH - 8)
 
           // Symbol legend (keynotes) — inset box, upper-right of drawing area
           const sheetPlacements = placements.filter(p => p.drawing_sheet_id === sheet.id)
           const usedCats = [...new Set(sheetPlacements.map(p => p.global_products?.category).filter(Boolean))]
           if (usedCats.length > 0) {
-            const legW   = 74
-            const legRowH = 9
-            const legH   = 10 + usedCats.length * legRowH
-            const legX   = drawX + drawW - legW - 4
-            const legY   = drawY + 4
+            const legW   = 180
+            const legRowH = 22
+            const legH   = 22 + usedCats.length * legRowH
+            const legX   = drawX + drawW - legW - 6
+            const legY   = drawY + 6
             pdf.setFillColor(255, 255, 255)
             pdf.setDrawColor(80, 80, 80)
-            pdf.setLineWidth(0.4)
+            pdf.setLineWidth(1.0)
             pdf.rect(legX, legY, legW, legH)
             // Header bar
             pdf.setFillColor(r, g, b)
-            pdf.rect(legX, legY, legW, 9, 'F')
+            pdf.rect(legX, legY, legW, 22, 'F')
             pdf.setTextColor(255, 255, 255)
-            pdf.setFontSize(6)
+            pdf.setFontSize(fs(6))
             pdf.setFont('helvetica', 'bold')
-            pdf.text('SYMBOL LEGEND', legX + legW / 2, legY + 6, { align: 'center' })
+            pdf.text('SYMBOL LEGEND', legX + legW / 2, legY + 15, { align: 'center' })
             for (let ci = 0; ci < usedCats.length; ci++) {
               const cat  = usedCats[ci]
-              const ry   = legY + 9 + ci * legRowH
+              const ry   = legY + 22 + ci * legRowH
               const cnt  = sheetPlacements.filter(p => p.global_products?.category === cat).length
               if (ci > 0) {
                 pdf.setDrawColor(220, 222, 226)
-                pdf.setLineWidth(0.15)
+                pdf.setLineWidth(0.4)
                 pdf.line(legX, ry, legX + legW, ry)
               }
               const icon = await getIconPng(cat, brandHex, 24)
-              if (icon) pdf.addImage(icon, 'PNG', legX + 2, ry + 1, 6, 6)
+              if (icon) pdf.addImage(icon, 'PNG', legX + 4, ry + 4, 14, 14)
               pdf.setTextColor(20, 20, 20)
-              pdf.setFontSize(5.8)
+              pdf.setFontSize(fs(5.8))
               pdf.setFont('helvetica', 'normal')
-              pdf.text(`${cat} (${cnt})`, legX + 11, ry + 6.5)
+              pdf.text(`${cat} (${cnt})`, legX + 22, ry + 15)
             }
           }
         }
@@ -2272,10 +2269,10 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
                       onChange={e => setArchFontScale(parseFloat(e.target.value))}
                       className="bg-[#1a2d45] border border-[#2a3d55] rounded px-1.5 py-0.5 text-white text-xs focus:outline-none focus:border-[#C8622A]"
                     >
-                      <option value={0.85}>Small</option>
-                      <option value={1.0}>Medium</option>
-                      <option value={1.2}>Large</option>
-                      <option value={1.4}>X-Large</option>
+                      <option value={2.5}>Small</option>
+                      <option value={3.0}>Medium</option>
+                      <option value={3.5}>Large</option>
+                      <option value={4.0}>X-Large</option>
                     </select>
                   </label>
 
