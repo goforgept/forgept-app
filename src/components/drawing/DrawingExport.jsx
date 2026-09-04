@@ -2014,7 +2014,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           startY: drawY + 32,
           head: [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Category', 'Qty', 'Sheet', 'Runs To', 'Components']],
           body: scheduleRows,
-          columnStyles: { 9: { cellWidth: 55 } },
+          columnStyles: { 9: { cellWidth: 75 } },
         })
 
         drawArchTitleBlock('DEVICE SCHEDULE', `${archDwgPrefix}-002`, coverPages + 1, totalPages)
