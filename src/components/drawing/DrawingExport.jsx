@@ -1977,26 +1977,20 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       // ── DEVICE SCHEDULE PAGE ─────────────────────────────────────────────────
       if (archIncludeSchedule && placements.length > 0) {
         if (archIncludeCover) pdf.addPage()
-        drawArchBorders()
+
+        // willDrawPage fires before each table page (including page 1); didDrawPage fires after.
+        // We draw borders + section header in willDrawPage so they sit behind table cells,
+        // and draw the title block in didDrawPage so it renders last on each page.
+        let schedPage = 0
 
         const schedTableStyle = {
           theme: 'grid',
           styles: { fontSize: fs(7), cellPadding: fs(2), textColor: [40, 40, 40], fillColor: [255,255,255], lineColor: [200,200,200], lineWidth: 0.5 },
           headStyles: { fillColor: [r, g, b], textColor: [255,255,255], fontStyle: 'bold', fontSize: fs(7) },
           alternateRowStyles: { fillColor: [245, 247, 250] },
-          margin: { left: drawX + 2, right: outerM + tbW + 4, top: drawY + 2, bottom: outerM + 4 },
+          // top margin matches startY so every overflow page leaves the same header gap
+          margin: { left: drawX + 2, right: outerM + tbW + 4, top: drawY + 32, bottom: outerM + 4 },
         }
-
-        const drawSchedHeader = (label) => {
-          pdf.setTextColor(r, g, b); pdf.setFontSize(fs(12)); pdf.setFont('helvetica', 'bold')
-          pdf.text(label, drawX + 4, drawY + 22)
-          pdf.setDrawColor(r, g, b); pdf.setLineWidth(1.5)
-          pdf.line(drawX + 4, drawY + 26, drawX + drawW - 4, drawY + 26)
-        }
-        drawSchedHeader('DEVICE SCHEDULE')
-        drawArchTitleBlock('DEVICE SCHEDULE', `${archDwgPrefix}-002`, coverPages + 1, totalPages)
-
-        let schedOverflowCount = 0
 
         // Cable type comes from rise_cable_type set in device settings (Runs To section)
 
@@ -2050,11 +2044,17 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           head: [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Qty', 'Cable', 'Sheet', 'Runs To', 'Components']],
           body: scheduleRows,
           columnStyles: { 9: { cellWidth: 75 } },
-          didAddPage: () => {
-            schedOverflowCount++
+          willDrawPage: () => {
+            schedPage++
             drawArchBorders()
-            drawSchedHeader('DEVICE SCHEDULE (CONT.)')
-            drawArchTitleBlock('DEVICE SCHEDULE', `${archDwgPrefix}-002`, coverPages + 1 + schedOverflowCount, totalPages)
+            const label = schedPage === 1 ? 'DEVICE SCHEDULE' : 'DEVICE SCHEDULE (CONT.)'
+            pdf.setTextColor(r, g, b); pdf.setFontSize(fs(12)); pdf.setFont('helvetica', 'bold')
+            pdf.text(label, drawX + 4, drawY + 22)
+            pdf.setDrawColor(r, g, b); pdf.setLineWidth(1.5)
+            pdf.line(drawX + 4, drawY + 26, drawX + drawW - 4, drawY + 26)
+          },
+          didDrawPage: () => {
+            drawArchTitleBlock('DEVICE SCHEDULE', `${archDwgPrefix}-002`, coverPages + schedPage, totalPages)
           },
         })
       }
