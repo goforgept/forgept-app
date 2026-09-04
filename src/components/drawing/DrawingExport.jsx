@@ -1987,10 +1987,16 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           margin: { left: drawX + 2, right: outerM + tbW + 4, top: drawY + 2, bottom: outerM + 4 },
         }
 
-        pdf.setTextColor(r, g, b); pdf.setFontSize(fs(12)); pdf.setFont('helvetica', 'bold')
-        pdf.text('DEVICE SCHEDULE', drawX + 4, drawY + 22)
-        pdf.setDrawColor(r, g, b); pdf.setLineWidth(1.5)
-        pdf.line(drawX + 4, drawY + 26, drawX + drawW - 4, drawY + 26)
+        const drawSchedHeader = (label) => {
+          pdf.setTextColor(r, g, b); pdf.setFontSize(fs(12)); pdf.setFont('helvetica', 'bold')
+          pdf.text(label, drawX + 4, drawY + 22)
+          pdf.setDrawColor(r, g, b); pdf.setLineWidth(1.5)
+          pdf.line(drawX + 4, drawY + 26, drawX + drawW - 4, drawY + 26)
+        }
+        drawSchedHeader('DEVICE SCHEDULE')
+        drawArchTitleBlock('DEVICE SCHEDULE', `${archDwgPrefix}-002`, coverPages + 1, totalPages)
+
+        let schedOverflowCount = 0
 
         // Cable type comes from rise_cable_type set in device settings (Runs To section)
 
@@ -2044,9 +2050,13 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           head: [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Qty', 'Cable', 'Sheet', 'Runs To', 'Components']],
           body: scheduleRows,
           columnStyles: { 9: { cellWidth: 75 } },
+          didAddPage: () => {
+            schedOverflowCount++
+            drawArchBorders()
+            drawSchedHeader('DEVICE SCHEDULE (CONT.)')
+            drawArchTitleBlock('DEVICE SCHEDULE', `${archDwgPrefix}-002`, coverPages + 1 + schedOverflowCount, totalPages)
+          },
         })
-
-        drawArchTitleBlock('DEVICE SCHEDULE', `${archDwgPrefix}-002`, coverPages + 1, totalPages)
       }
 
       // ── SYMBOL LEGEND + DRAWING INDEX PAGE ───────────────────────────────────
