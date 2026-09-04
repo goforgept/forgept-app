@@ -1732,6 +1732,22 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         if (cli) projectAddress = [cli.address, cli.city, cli.state, cli.zip].filter(Boolean).join(', ')
       }
 
+      // Per-placement component lookup: { placementId → "Reader, REX, Door Contact, Lock" }
+      const placementIds = placements.map(p => p.id)
+      let compByPlacement = {}
+      if (placementIds.length > 0) {
+        const { data: pcData } = await supabase
+          .from('placement_components')
+          .select('placement_id, component_type, quantity')
+          .in('placement_id', placementIds)
+        ;(pcData || []).forEach(c => {
+          if (!compByPlacement[c.placement_id]) compByPlacement[c.placement_id] = []
+          const label = c.quantity > 1 ? `${c.component_type} ×${c.quantity}` : c.component_type
+          if (!compByPlacement[c.placement_id].includes(label))
+            compByPlacement[c.placement_id].push(label)
+        })
+      }
+
       // Layout constants
       const outerM = 7     // outer border margin
       const innerM = 13    // inner border (drawing frame)
@@ -1979,6 +1995,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         const scheduleRows = placements.map((p, idx) => {
           const gp  = p.global_products
           const sht = sheets.find(s => s.id === p.drawing_sheet_id)
+          const comps = (compByPlacement[p.id] || []).join(', ') || '—'
           return [
             idx + 1,
             p.device_address || '—',
@@ -1988,13 +2005,16 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
             gp?.category || '—',
             p.quantity || 1,
             sht?.name || '—',
+            p.runs_to_label || '—',
+            comps,
           ]
         })
         autoTable(pdf, {
           ...schedTableStyle,
           startY: drawY + 32,
-          head: [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Category', 'Qty', 'Sheet']],
+          head: [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Category', 'Qty', 'Sheet', 'Runs To', 'Components']],
           body: scheduleRows,
+          columnStyles: { 9: { cellWidth: 55 } },
         })
 
         drawArchTitleBlock('DEVICE SCHEDULE', `${archDwgPrefix}-002`, coverPages + 1, totalPages)

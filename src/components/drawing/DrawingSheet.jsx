@@ -28,6 +28,7 @@ const LABEL_PREFIXES = {
   'Display':             'DISP',
   'Network':             'SW',
   'Wireless Lock':       'WL',
+  'Media Panel':         'MP',
   'Data Drop':           'DD',
   'Patch Panel':         'PP',
   'UPS':                 'UPS',
