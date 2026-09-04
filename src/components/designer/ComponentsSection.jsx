@@ -42,6 +42,7 @@ const DEFAULT_COMPONENTS = {
   'Rack':                ['Cable Management', 'PDU', 'Shelf', 'Rail Kit'],
 
   // Low Voltage / DataCom
+  'Media Panel':         ['Cat6 Keystone', 'Coax Splitter', 'Patch Cable', 'Backbone Cable', 'Mounting Bracket', 'Power Supply'],
   'Data Drop':           ['Cat6 Jack', 'Faceplate', 'Back Box', 'RJ45 Connector', 'Cat6 Cable', 'Patch Cable'],
   'Data':                ['Cat6 Jack', 'Faceplate', 'Back Box', 'RJ45 Connector', 'Cat6 Cable'],
   'Fiber Panel':         ['LC Fiber Connector', 'LC Adapter', 'Fiber Cable', 'Cable Management'],

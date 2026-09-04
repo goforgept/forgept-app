@@ -355,6 +355,23 @@ const CATEGORY_SVGS = {
       <line x1="4" y1="9" x2="36" y2="9" stroke-width="2.5"/>
     </svg>`,
 
+  'Media Panel': (color) => `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
+      <!-- Cabinet outline -->
+      <rect x="5" y="7" width="30" height="26" rx="2"/>
+      <!-- Front panel inset -->
+      <rect x="9" y="11" width="22" height="18" rx="1" stroke-width="1" stroke-dasharray="0"/>
+      <!-- Input ports — left side (unit drops) -->
+      <circle cx="9" cy="15" r="1.3" fill="${color}"/>
+      <circle cx="9" cy="20" r="1.3" fill="${color}"/>
+      <circle cx="9" cy="25" r="1.3" fill="${color}"/>
+      <!-- Output ports — right side (backbone to IDF) -->
+      <circle cx="31" cy="17.5" r="1.3" fill="${color}"/>
+      <circle cx="31" cy="22.5" r="1.3" fill="${color}"/>
+      <!-- Center distribution line -->
+      <line x1="13" y1="20" x2="27" y2="20" stroke-width="1" stroke-dasharray="2 1.5"/>
+    </svg>`,
+
   'Patch Panel': (color) => `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none" stroke="${color}" stroke-width="1.5">
       <rect x="4" y="14" width="32" height="12" rx="2"/>

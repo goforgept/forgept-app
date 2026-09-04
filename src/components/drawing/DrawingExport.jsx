@@ -98,7 +98,7 @@ const loadOrgLogoFromProfile = async (orgProfile) => {
 const DEVICE_SYSTEM_GROUPS = [
   { label: 'Security Systems',      categories: ['Dome Camera','Bullet Camera','PTZ Camera','Multi-Lens Camera','Fisheye Camera','Thermal Camera','Access Control Reader','Access Controller','Door Contact','Motion Sensor','Glass Break','Panic Button','Siren','Alarm Panel','Video Intercom','Intercom'] },
   { label: 'Low Voltage / AV',      categories: ['TV Display','Projector','Speaker','Ceiling Speaker','Subwoofer','Amplifier','AV Receiver','Matrix Switch','Video Wall','Digital Signage','Control Processor','Keypad','Touch Panel','Display Mount'] },
-  { label: 'Network / IT',          categories: ['Switch','Managed Switch','Router','Wireless AP','Firewall','UPS','Patch Panel','Server','Rack Server','Media Converter','SFP Module'] },
+  { label: 'Network / IT',          categories: ['Switch','Managed Switch','Router','Wireless AP','Firewall','UPS','Patch Panel','Server','Rack Server','Media Converter','SFP Module','Media Panel'] },
   { label: 'Infrastructure',        categories: ['Rack','Rack Enclosure','Cable Management','Power Strip','PDU','J-Hook','Conduit','Back Box','Junction Box','Low Voltage Bracket'] },
 ]
 const getDeviceSystemGroup = (category) => {
