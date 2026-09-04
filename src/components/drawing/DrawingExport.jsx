@@ -1992,13 +1992,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.setDrawColor(r, g, b); pdf.setLineWidth(1.5)
         pdf.line(drawX + 4, drawY + 26, drawX + drawW - 4, drawY + 26)
 
-        // Cable type per placement (from cable runs originating at that device)
-        const cableByPlacementId = {}
-        cableRuns.forEach(run => {
-          if (!run.from_placement_id || !run.cable_type) return
-          if (!cableByPlacementId[run.from_placement_id]) cableByPlacementId[run.from_placement_id] = new Set()
-          cableByPlacementId[run.from_placement_id].add(run.cable_type)
-        })
+        // Cable type comes from rise_cable_type set in device settings (Runs To section)
 
         // Sort placements by category then by device_address for readable grouping
         const schedSorted = [...placements].sort((a, b) => {
@@ -2029,7 +2023,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           groupSeq++
           const sht   = sheets.find(s => s.id === p.drawing_sheet_id)
           const comps = (compByPlacement[p.id] || []).join(', ') || '—'
-          const cable = [...(cableByPlacementId[p.id] || [])].join(', ') || '—'
+          const cable = p.rise_cable_type || '—'
           scheduleRows.push([
             groupSeq,
             p.device_address || '—',
