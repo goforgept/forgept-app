@@ -1992,27 +1992,62 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
         pdf.setDrawColor(r, g, b); pdf.setLineWidth(1.5)
         pdf.line(drawX + 4, drawY + 26, drawX + drawW - 4, drawY + 26)
 
-        const scheduleRows = placements.map((p, idx) => {
+        // Cable type per placement (from cable runs originating at that device)
+        const cableByPlacementId = {}
+        cableRuns.forEach(run => {
+          if (!run.from_placement_id || !run.cable_type) return
+          if (!cableByPlacementId[run.from_placement_id]) cableByPlacementId[run.from_placement_id] = new Set()
+          cableByPlacementId[run.from_placement_id].add(run.cable_type)
+        })
+
+        // Sort placements by category then by device_address for readable grouping
+        const schedSorted = [...placements].sort((a, b) => {
+          const cA = a.global_products?.category || '—'
+          const cB = b.global_products?.category || '—'
+          if (cA !== cB) return cA.localeCompare(cB)
+          return (a.device_address || '').localeCompare(b.device_address || '')
+        })
+
+        const NUM_COLS = 10
+        const scheduleRows = []
+        let lastCat = null
+        let groupSeq = 0
+
+        schedSorted.forEach(p => {
           const gp  = p.global_products
-          const sht = sheets.find(s => s.id === p.drawing_sheet_id)
+          const cat = gp?.category || 'Uncategorized'
+          if (cat !== lastCat) {
+            // Category group header row
+            scheduleRows.push([{
+              content: cat.toUpperCase(),
+              colSpan: NUM_COLS,
+              styles: { fillColor: [r, g, b], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: fs(7), halign: 'left', cellPadding: { left: fs(2), top: fs(1.2), bottom: fs(1.2), right: fs(2) } },
+            }])
+            lastCat = cat
+            groupSeq = 0
+          }
+          groupSeq++
+          const sht   = sheets.find(s => s.id === p.drawing_sheet_id)
           const comps = (compByPlacement[p.id] || []).join(', ') || '—'
-          return [
-            idx + 1,
+          const cable = [...(cableByPlacementId[p.id] || [])].join(', ') || '—'
+          scheduleRows.push([
+            groupSeq,
             p.device_address || '—',
             p.part_number_override || gp?.part_number || '—',
             p.description_override || gp?.name || '—',
             p.manufacturer_override || gp?.manufacturer || '—',
-            gp?.category || '—',
             p.quantity || 1,
+            cable,
             sht?.name || '—',
             p.runs_to_label || '—',
             comps,
-          ]
+          ])
         })
+
         autoTable(pdf, {
           ...schedTableStyle,
           startY: drawY + 32,
-          head: [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Category', 'Qty', 'Sheet', 'Runs To', 'Components']],
+          head: [['#', 'Address', 'Part Number', 'Description', 'Manufacturer', 'Qty', 'Cable', 'Sheet', 'Runs To', 'Components']],
           body: scheduleRows,
           columnStyles: { 9: { cellWidth: 75 } },
         })
