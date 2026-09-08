@@ -1,4 +1,4 @@
-export default function PricingOptionsModal({ proposal, onToggleHideMaterialPrices, onToggleLaborBreakdown, onToggleLumpSumLabor, onToggleShowMsrp, featureMsrp, onToggleShowCompliance, featureComplianceFields, onToggleShowWarranty, hasWarranty, onToggleCoverPage, onToggleDisableAutoUpdates, onClose }) {
+export default function PricingOptionsModal({ proposal, onToggleHideMaterialPrices, onToggleLaborBreakdown, onToggleLumpSumLabor, onToggleShowMsrp, featureMsrp, onToggleShowCompliance, featureComplianceFields, onToggleShowWarranty, hasWarranty, onToggleCoverPage, onToggleDisableAutoUpdates, onToggleDisableFollowupEmails, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
       <div className="bg-fp-card rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
@@ -71,6 +71,16 @@ export default function PricingOptionsModal({ proposal, onToggleHideMaterialPric
               </button>
             </div>
           )}
+          <div className="flex items-center justify-between bg-fp-inset rounded-xl px-4 py-3">
+            <div>
+              <p className="text-fp-text text-sm font-semibold">Disable Follow-up Emails</p>
+              <p className="text-fp-muted text-xs mt-0.5">Stop close-date reminder emails from being sent for this deal</p>
+            </div>
+            <button onClick={onToggleDisableFollowupEmails}
+              className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.disable_followup_emails ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}>
+              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.disable_followup_emails ? 'left-6' : 'left-1'}`} />
+            </button>
+          </div>
           <div className="flex items-center justify-between bg-fp-inset rounded-xl px-4 py-3 border border-yellow-600/20">
             <div>
               <p className="text-fp-text text-sm font-semibold">Lock Automatic Updates</p>

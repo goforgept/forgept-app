@@ -52,6 +52,7 @@ Deno.serve(async (req) => {
     for (const proposal of proposals) {
       try {
         if (!proposal.close_date || !proposal.user_id) continue
+        if (proposal.disable_followup_emails) { skipped++; continue }
 
         const profileRes = await fetch(
           `${supabaseUrl}/rest/v1/profiles?id=eq.${proposal.user_id}&select=*`,

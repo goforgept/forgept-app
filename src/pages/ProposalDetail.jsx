@@ -215,7 +215,7 @@ export default function ProposalDetail({ isAdmin }) {
   const fetchProposal = async () => {
     const { data } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,lump_sum_labor,show_msrp,show_compliance,show_warranty,warranty_text,warranty_template_id,show_terms,terms_text,tc_font_size,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at,show_cover_page,disable_auto_updates')
+      .select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,rep_phone,rep_title,industry,status,pipeline_stage_id,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type,quote_number,contract_number,lump_sum_pricing,hide_material_prices,hide_labor_breakdown,lump_sum_labor,show_msrp,show_compliance,show_warranty,warranty_text,warranty_template_id,show_terms,terms_text,tc_font_size,tax_rate,tax_exempt,qbo_invoice_id,location_id,signing_token,signature_name,signature_at,signed_pdf_url,sla_contracts,monitoring_contracts,sla_contract,monitoring_contract,revision_number,original_proposal_id,is_current_revision,archived_at,show_cover_page,disable_auto_updates,disable_followup_emails')
       .eq('id', id)
       .single()
 
@@ -641,6 +641,12 @@ export default function ProposalDetail({ isAdmin }) {
     const newVal = !proposal?.disable_auto_updates
     await supabase.from('proposals').update({ disable_auto_updates: newVal }).eq('id', id)
     setProposal(prev => ({ ...prev, disable_auto_updates: newVal }))
+  }
+
+  const toggleDisableFollowupEmails = async () => {
+    const newVal = !proposal?.disable_followup_emails
+    await supabase.from('proposals').update({ disable_followup_emails: newVal }).eq('id', id)
+    setProposal(prev => ({ ...prev, disable_followup_emails: newVal }))
   }
 
   const toggleShowTerms = async () => {
@@ -3844,7 +3850,7 @@ const analyzeDrawing = async () => {
 
       {showSendModal && <SendProposalModal proposal={proposal} sendForm={sendForm} setSendForm={setSendForm} sendingProposal={sendingProposal} onSend={sendProposal} onClose={() => setShowSendModal(false)} />}
 
-      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleLumpSumLabor={toggleLumpSumLabor} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onToggleShowCompliance={toggleShowCompliance} featureComplianceFields={features.complianceFields} onToggleShowWarranty={toggleShowWarranty} hasWarranty={!!(proposal?.warranty_text || (profile?.organizations?.warranty_templates || []).length > 0)} onToggleCoverPage={toggleCoverPage} onToggleDisableAutoUpdates={toggleDisableAutoUpdates} onClose={() => setShowPricingModal(false)} />}
+      {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleLumpSumLabor={toggleLumpSumLabor} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onToggleShowCompliance={toggleShowCompliance} featureComplianceFields={features.complianceFields} onToggleShowWarranty={toggleShowWarranty} hasWarranty={!!(proposal?.warranty_text || (profile?.organizations?.warranty_templates || []).length > 0)} onToggleCoverPage={toggleCoverPage} onToggleDisableAutoUpdates={toggleDisableAutoUpdates} onToggleDisableFollowupEmails={toggleDisableFollowupEmails} onClose={() => setShowPricingModal(false)} />}
 
       {showMoveModal && moveLineIndex !== null && <MoveLineModal editLines={editLines} moveLineIndex={moveLineIndex} editSections={editSections} onMove={moveLineToSection} onClose={() => { setShowMoveModal(false); setMoveLineIndex(null) }} />}
 
