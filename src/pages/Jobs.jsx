@@ -64,12 +64,15 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
 
   const fetchJobs = async () => {
     if (!profile?.org_id) { setLoading(false); return }
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('jobs')
       .select('*, proposals(proposal_name, proposal_value), clients(company), profiles!jobs_assigned_pm_fkey(full_name), job_checklist_items(id, completed)')
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
-    setJobs(data || [])
+    if (error) console.error('fetchJobs error:', error.message, error.details)
+    // Remap legacy 'Active' status (not a valid stage) to 'Pending' in memory
+    const mapped = (data || []).map(j => j.status === 'Active' ? { ...j, status: 'Pending' } : j)
+    setJobs(mapped)
     setLoading(false)
   }
 

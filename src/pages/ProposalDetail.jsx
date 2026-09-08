@@ -458,12 +458,25 @@ export default function ProposalDetail({ isAdmin }) {
   const updateStatus = async (newStatus, stageId = null) => {
     const stageUpdate = stageId !== null ? { pipeline_stage_id: stageId } : {}
     const stageStateUpdate = stageId !== null ? { pipeline_stage_id: stageId } : {}
-    if (newStatus === 'Won' && proposal?.status !== 'Won') {
-      try {
+    if (newStatus === 'Won') {
+      // Check if a job already exists for this proposal
+      const { data: existingJob } = await supabase
+        .from('jobs')
+        .select('id, status')
+        .eq('proposal_id', id)
+        .maybeSingle()
+
+      if (existingJob) {
+        // Job already exists — if it's stuck on a non-visible status, reset to Pending
+        if (existingJob.status === 'Active') {
+          await supabase.from('jobs').update({ status: 'Pending' }).eq('id', existingJob.id)
+        }
+      } else if (proposal?.status !== 'Won') {
+        // First time winning — create the job
         const { data: orgData } = await supabase.from('organizations').select('job_counter').eq('id', proposal.org_id).single()
         const jobNumber = `JOB-${orgData?.job_counter || 1000}`
         await supabase.from('organizations').update({ job_counter: (orgData?.job_counter || 1000) + 1 }).eq('id', proposal.org_id)
-        await supabase.from('jobs').insert({
+        const { error: jobErr } = await supabase.from('jobs').insert({
           org_id: proposal.org_id,
           proposal_id: id,
           client_id: proposal.client_id || null,
@@ -471,7 +484,8 @@ export default function ProposalDetail({ isAdmin }) {
           name: proposal.proposal_name,
           status: 'Pending',
         })
-      } catch (e) { console.error('Job creation error:', e) }
+        if (jobErr) console.error('Job creation failed:', jobErr.message, jobErr.details, jobErr.hint)
+      }
     }
     if (newStatus === 'Won') {
       const recurringMissingDate = lineItems.filter(l => l.recurring && !l.renewal_date && !(renewalDates[l.id]))
