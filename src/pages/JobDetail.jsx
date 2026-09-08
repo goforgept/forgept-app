@@ -614,13 +614,10 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       const primaryRgb = hexToRgb(profileData?.primary_color || '#0F1C2E')
       const doc = new jsPDF()
       const pageWidth = doc.internal.pageSize.getWidth()
-      const isLargeHeader = (profile?.organizations?.pdf_header_style || 'compact') === 'large'
-      const headerH = isLargeHeader ? 60 : 40
-      const logoMaxW = isLargeHeader ? 80 : 50
-      const logoMaxH = isLargeHeader ? 44 : 26
-      const logopadY = isLargeHeader ? 8 : 8
-      doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.rect(0, 0, pageWidth, headerH, 'F')
+
+      // Logo (left) — no colored background
+      const maxLogoW = 60, maxLogoH = 30
+      let logoBottom = 14
       if (profileData?.logo_url) {
         try {
           const img = new Image()
@@ -631,36 +628,52 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             const canvas = document.createElement('canvas')
             canvas.width = img.naturalWidth; canvas.height = img.naturalHeight
             canvas.getContext('2d').drawImage(img, 0, 0)
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
-            const ratio = Math.min(logoMaxW / img.naturalWidth, logoMaxH / img.naturalHeight)
-            doc.addImage(dataUrl, 'JPEG', 14, logopadY + (logoMaxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+            const dataUrl = canvas.toDataURL('image/png')
+            const ratio = Math.min(maxLogoW / img.naturalWidth, maxLogoH / img.naturalHeight)
+            const w = img.naturalWidth * ratio, h = img.naturalHeight * ratio
+            doc.addImage(dataUrl, 'PNG', 14, 12, w, h)
+            logoBottom = 12 + h
           } else { throw new Error('load failed') }
         } catch {
-          doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
-          doc.text(profileData?.company_name || 'ForgePt.', 14, headerH / 2 + 3)
+          doc.setTextColor(30, 30, 30); doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+          doc.text(profileData?.company_name || 'ForgePt.', 14, 24)
+          logoBottom = 28
         }
       } else {
-        doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
-        doc.text(profileData?.company_name || 'ForgePt.', 14, headerH / 2 + 3)
+        doc.setTextColor(30, 30, 30); doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+        doc.text(profileData?.company_name || 'ForgePt.', 14, 24)
+        logoBottom = 28
       }
-      doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-      doc.text('PURCHASE ORDER', pageWidth - 14, headerH / 2 - 4, { align: 'right' })
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-      doc.text(finalPONumber, pageWidth - 14, headerH / 2 + 6, { align: 'right' })
-      const poContentY = headerH + 12
-      doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, poContentY)
-      doc.text(`Project: ${job?.name || ''}`, 14, poContentY + 8)
+
+      // PO title (right)
+      doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setFontSize(18); doc.setFont('helvetica', 'bold')
+      doc.text('PURCHASE ORDER', pageWidth - 14, 22, { align: 'right' })
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80)
+      doc.text(finalPONumber, pageWidth - 14, 30, { align: 'right' })
+
+      // Thin accent rule below header
+      const headerBottom = Math.max(logoBottom, 34) + 4
+      doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.setLineWidth(0.8)
+      doc.line(14, headerBottom, pageWidth - 14, headerBottom)
+      doc.setLineWidth(0.2)
+
+      doc.setTextColor(60, 60, 60); doc.setFontSize(9); doc.setFont('helvetica', 'normal')
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, headerBottom + 8)
+      doc.text(`Project: ${job?.name || ''}`, 14, headerBottom + 15)
+
+      const addrY = headerBottom + 25
       const billLines = [profileData?.company_name || '', profileData?.bill_to_address || '', [profileData?.bill_to_city, profileData?.bill_to_state, profileData?.bill_to_zip].filter(Boolean).join(', ')].filter(Boolean)
       const shipLines = [profileData?.company_name || '', profileData?.ship_to_address || '', [profileData?.ship_to_city, profileData?.ship_to_state, profileData?.ship_to_zip].filter(Boolean).join(', ')].filter(Boolean)
       const col2 = pageWidth / 2 - 10, col3 = pageWidth / 2 + 30
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('VENDOR', 14, poContentY + 22); doc.text('BILL TO', col2, poContentY + 22); doc.text('SHIP TO', col3, poContentY + 22)
+      doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('VENDOR', 14, addrY); doc.text('BILL TO', col2, addrY); doc.text('SHIP TO', col3, addrY)
       doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40); doc.setFontSize(9)
-      doc.text(vendorNames || '—', 14, poContentY + 29)
-      billLines.forEach((line, i) => doc.text(line, col2, poContentY + 29 + i * 6))
-      shipLines.forEach((line, i) => doc.text(line, col3, poContentY + 29 + i * 6))
-      const tableStart = poContentY + 29 + Math.max(billLines.length, shipLines.length) * 6 + 6
+      doc.text(vendorNames || '—', 14, addrY + 6)
+      billLines.forEach((line, i) => doc.text(line, col2, addrY + 6 + i * 6))
+      shipLines.forEach((line, i) => doc.text(line, col3, addrY + 6 + i * 6))
+      const tableStart = addrY + 6 + Math.max(billLines.length, shipLines.length) * 6 + 8
       doc.setDrawColor(220, 220, 220)
       doc.line(14, tableStart - 2, pageWidth - 14, tableStart - 2)
       autoTable(doc, {
