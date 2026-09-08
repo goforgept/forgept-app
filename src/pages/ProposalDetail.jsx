@@ -3020,6 +3020,11 @@ const analyzeDrawing = async () => {
       if (img.naturalWidth > 0) logoImg = img
     }
 
+    // Resolve header style (needed by both cover page and content page header)
+    const hdrStyle = freshOrg?.pdf_header_style || profile?.organizations?.pdf_header_style || 'compact'
+    const isFullLogo = hdrStyle === 'full-logo'
+    const isPropLarge = hdrStyle === 'large'
+
     // Cover page (optional)
     if (p?.show_cover_page) {
       // Left accent bar
@@ -3111,10 +3116,6 @@ const analyzeDrawing = async () => {
       doc.addPage()
     }
 
-    // Resolve header style
-    const hdrStyle = freshOrg?.pdf_header_style || profile?.organizations?.pdf_header_style || 'compact'
-    const isFullLogo = hdrStyle === 'full-logo'
-    const isPropLarge = hdrStyle === 'large'
     let yPos
     if (p?.show_cover_page) {
       // Cover page already has all branding — content pages start clean
