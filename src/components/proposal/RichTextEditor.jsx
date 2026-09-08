@@ -24,26 +24,34 @@ export const renderHtmlToPdf = (doc, html, { x = 14, startY, maxWidth, fontSize,
   const tmp = document.createElement('div')
   tmp.innerHTML = html
 
-  // Recursively extract [{text, b, it}] runs from an element
-  const getRuns = (el, b = false, it = false) => {
+  // Recursively extract [{text, b, it, ul}] runs from an element.
+  // Checks the element itself AND its inline styles so spans like
+  // <span style="font-weight:bold"> produced by execCommand or Word paste are caught.
+  const getRuns = (el, b = false, it = false, ul = false) => {
+    if (!el?.childNodes) return []
+    const tag = el.tagName?.toLowerCase?.() || ''
+    const fw = el.style?.fontWeight || ''
+    const thisB = b || tag === 'b' || tag === 'strong' || fw === 'bold' || parseInt(fw) >= 600
+    const thisI = it || tag === 'i' || tag === 'em' || el.style?.fontStyle === 'italic'
+    const thisU = ul || tag === 'u' || (el.style?.textDecoration || '').includes('underline')
+
     const runs = []
     for (const node of el.childNodes) {
       if (node.nodeType === 3) {
-        if (node.textContent) runs.push({ text: node.textContent, b, it })
+        if (node.textContent) runs.push({ text: node.textContent, b: thisB, it: thisI, ul: thisU })
       } else if (node.nodeType === 1) {
-        const t = node.tagName.toLowerCase()
-        runs.push(...getRuns(node, b || t === 'b' || t === 'strong', it || t === 'i' || t === 'em'))
+        runs.push(...getRuns(node, thisB, thisI, thisU))
       }
     }
     return runs
   }
 
-  // Word-wrap a run array into lines of [{text, b, it, w}]
+  // Word-wrap a run array into lines of [{text, b, it, ul, w}]
   const wrapRuns = (runs, availW) => {
     const words = []
     for (const run of runs) {
       for (const part of run.text.split(/(\s+)/)) {
-        if (part) words.push({ text: part, b: run.b, it: run.it })
+        if (part) words.push({ text: part, b: run.b, it: run.it, ul: run.ul })
       }
     }
     if (!words.length) return []
@@ -63,16 +71,22 @@ export const renderHtmlToPdf = (doc, html, { x = 14, startY, maxWidth, fontSize,
 
   // Draw pre-built lines starting at (lx, ly), returns y after last line
   const drawLines = (lines, lx, ly) => {
+    const prevLineWidth = doc.getLineWidth()
     for (const line of lines) {
       if (ly + lineH > pageH - 20) { doc.addPage(); ly = 20 }
       let cx = lx
       for (const word of line) {
         doc.setFont(font, style(word.b, word.it))
         doc.text(word.text, cx, ly)
+        if (word.ul && word.text.trim()) {
+          doc.setLineWidth(0.3)
+          doc.line(cx, ly + 0.6, cx + word.w, ly + 0.6)
+        }
         cx += word.w
       }
       ly += lineH
     }
+    doc.setLineWidth(prevLineWidth)
     return ly
   }
 
@@ -163,23 +177,32 @@ const cleanPastedHtml = (html) => {
 
     const tag = node.tagName.toLowerCase()
 
-    // Strip all attributes from every element (removes Word inline styles, class, id, etc.)
+    // Capture semantic styles BEFORE stripping attributes
+    const fw = node.style?.fontWeight || ''
+    const isBold = fw === 'bold' || parseInt(fw) >= 600
+    const isItalic = (node.style?.fontStyle || '') === 'italic'
+    const isUnderline = (node.style?.textDecoration || '').includes('underline')
+
+    // Strip all attributes (removes Word inline styles, class, id, etc.)
     while (node.attributes.length > 0) node.removeAttribute(node.attributes[0].name)
 
     if (KEEP.has(tag)) return // keep as-is, stripped of attributes
 
     if (TO_P.has(tag)) {
-      // Replace with <p> so it still creates a line break
       const p = document.createElement('p')
       while (node.firstChild) p.appendChild(node.firstChild)
       node.replaceWith(p)
       return
     }
 
-    // Everything else (span, font, table cruft, etc.) — unwrap: keep children, drop the tag
-    const frag = document.createDocumentFragment()
-    while (node.firstChild) frag.appendChild(node.firstChild)
-    node.replaceWith(frag)
+    // For non-semantic tags (span, font, etc.) — preserve bold/italic/underline as semantic tags
+    let container = document.createDocumentFragment()
+    let inner = container
+    if (isBold) { const b = document.createElement('b'); inner.appendChild(b); inner = b }
+    if (isItalic) { const i = document.createElement('i'); inner.appendChild(i); inner = i }
+    if (isUnderline) { const u = document.createElement('u'); inner.appendChild(u); inner = u }
+    while (node.firstChild) inner.appendChild(node.firstChild)
+    node.replaceWith(container)
   }
 
   // Remove script/style/meta entirely
