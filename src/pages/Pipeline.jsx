@@ -2,14 +2,19 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import PipelineStagesModal from '../components/pipeline/PipelineStagesModal'
 
 const DEFAULT_STAGES = [
-  { name: 'Lead', color: '#8A9AB0' },
-  { name: 'Contacted', color: '#3b82f6' },
-  { name: 'Proposal Sent', color: '#C8622A' },
-  { name: 'Negotiating', color: '#f59e0b' },
-  { name: 'Won', color: '#22c55e' },
-  { name: 'Lost', color: '#ef4444' },
+  { name: 'Lead',                  color: '#8A9AB0', probability: 10,  definition: 'Potential opportunity identified' },
+  { name: 'Qualified',             color: '#3b82f6', probability: 20,  definition: 'Valid requirement confirmed' },
+  { name: 'Site Assessment',       color: '#6366f1', probability: 40,  definition: 'Site survey/discovery required or underway' },
+  { name: 'Design & Engineering',  color: '#a855f7', probability: 50,  definition: 'Solution, SOW and BOM development' },
+  { name: 'Quoting',               color: '#C8622A', probability: 60,  definition: 'Pricing/proposal being finalized' },
+  { name: 'Quote Submitted',       color: '#f59e0b', probability: 70,  definition: 'Proposal delivered' },
+  { name: 'Negotiation / Revision',color: '#ec4899', probability: 80,  definition: 'Customer requests pricing, scope, BOM, or proposal changes' },
+  { name: 'Pending Award',         color: '#14b8a6', probability: 90,  definition: 'Final proposal accepted / awaiting funding, PO or contract' },
+  { name: 'Won',                   color: '#22c55e', probability: 100, definition: 'PO/contract received' },
+  { name: 'Lost',                  color: '#ef4444', probability: 0,   definition: 'Opportunity did not proceed' },
 ]
 
 export default function Pipeline({ isAdmin, featureProposals = true, featureCRM = false }) {
@@ -19,8 +24,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
   const [loading, setLoading] = useState(true)
   const [orgId, setOrgId] = useState(null)
   const [dragging, setDragging] = useState(null)
-  const [showAddStage, setShowAddStage] = useState(false)
-  const [newStageName, setNewStageName] = useState('')
+  const [showManageStages, setShowManageStages] = useState(false)
   const [search, setSearch] = useState('')
   const [dateRange, setDateRange] = useState(90)
   const navigate = useNavigate()
@@ -56,6 +60,8 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
           org_id: profile.org_id,
           name: s.name,
           color: s.color,
+          probability: s.probability,
+          definition: s.definition,
           position: i
         })))
         .select()
@@ -129,17 +135,13 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
     fetchData()
   }
 
-  const addStage = async () => {
-    if (!newStageName) return
-    await supabase.from('pipeline_stages').insert({
-      org_id: orgId,
-      name: newStageName,
-      color: '#8A9AB0',
-      position: stages.length
-    })
-    setNewStageName('')
-    setShowAddStage(false)
-    fetchData()
+  const reloadStages = async () => {
+    const { data } = await supabase
+      .from('pipeline_stages')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('position')
+    if (data) setStages(data)
   }
 
   const totalPipeline = filteredProposals
@@ -188,10 +190,10 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
               className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm w-48 focus:outline-none focus:border-fp-brand placeholder-fp-muted"
             />
             <button
-              onClick={() => setShowAddStage(!showAddStage)}
+              onClick={() => setShowManageStages(true)}
               className="bg-fp-card text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm transition-colors"
             >
-              + Add Stage
+              Manage Stages
             </button>
             <button
               onClick={() => navigate('/new')}
@@ -201,24 +203,6 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
             </button>
           </div>
         </div>
-
-        {showAddStage && (
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={newStageName}
-              onChange={e => setNewStageName(e.target.value)}
-              placeholder="Stage name..."
-              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-            />
-            <button
-              onClick={addStage}
-              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
-            >
-              Add
-            </button>
-          </div>
-        )}
 
         {/* Kanban Board */}
         <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: '70vh' }}>
@@ -235,19 +219,24 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
               >
                 {/* Stage Header */}
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <div
-                      className="w-2.5 h-2.5 rounded-full"
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                       style={{ background: stage.color }}
                     />
-                    <span className="text-fp-text text-sm font-semibold">{stage.name}</span>
-                    <span className="bg-fp-inset text-fp-muted text-xs px-1.5 py-0.5 rounded-full">
+                    <span className="text-fp-text text-sm font-semibold truncate">{stage.name}</span>
+                    <span className="bg-fp-inset text-fp-muted text-xs px-1.5 py-0.5 rounded-full flex-shrink-0">
                       {stageProposals.length}
                     </span>
                   </div>
-                  {stageTotal > 0 && (
-                    <span className="text-fp-muted text-xs">${stageTotal.toLocaleString()}</span>
-                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {stage.probability != null && (
+                      <span className="text-fp-muted text-xs font-mono">{stage.probability}%</span>
+                    )}
+                    {stageTotal > 0 && (
+                      <span className="text-fp-muted text-xs">${stageTotal.toLocaleString()}</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Drop Zone */}
@@ -308,6 +297,15 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
         </div>
       </>)}
       </div>
+
+      {showManageStages && (
+        <PipelineStagesModal
+          stages={stages}
+          orgId={orgId}
+          onClose={() => setShowManageStages(false)}
+          onSaved={reloadStages}
+        />
+      )}
     </div>
   )
 }

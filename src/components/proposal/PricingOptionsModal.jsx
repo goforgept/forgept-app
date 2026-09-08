@@ -1,4 +1,4 @@
-export default function PricingOptionsModal({ proposal, onToggleHideMaterialPrices, onToggleLaborBreakdown, onToggleLumpSumLabor, onToggleShowMsrp, featureMsrp, onToggleShowCompliance, featureComplianceFields, onToggleShowWarranty, hasWarranty, onToggleCoverPage, onClose }) {
+export default function PricingOptionsModal({ proposal, onToggleHideMaterialPrices, onToggleLaborBreakdown, onToggleLumpSumLabor, onToggleShowMsrp, featureMsrp, onToggleShowCompliance, featureComplianceFields, onToggleShowWarranty, hasWarranty, onToggleCoverPage, onToggleDisableAutoUpdates, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
       <div className="bg-fp-card rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
@@ -71,6 +71,16 @@ export default function PricingOptionsModal({ proposal, onToggleHideMaterialPric
               </button>
             </div>
           )}
+          <div className="flex items-center justify-between bg-fp-inset rounded-xl px-4 py-3 border border-yellow-600/20">
+            <div>
+              <p className="text-fp-text text-sm font-semibold">Lock Automatic Updates</p>
+              <p className="text-fp-muted text-xs mt-0.5">Skip catalog pricing &amp; MSRP lookups when syncing the drawing to the BOM — prices stay exactly as entered</p>
+            </div>
+            <button onClick={onToggleDisableAutoUpdates}
+              className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.disable_auto_updates ? 'bg-yellow-600' : 'bg-fp-inset'}`}>
+              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.disable_auto_updates ? 'left-6' : 'left-1'}`} />
+            </button>
+          </div>
         </div>
         <button onClick={onClose} className="mt-5 w-full py-2 bg-fp-brand text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Done</button>
       </div>

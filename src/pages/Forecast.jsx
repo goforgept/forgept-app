@@ -64,17 +64,13 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
         return false
       })
       const value = stageProposals.reduce((sum, p) => sum + (p.proposal_value || 0), 0)
-      return { ...stage, count: stageProposals.length, value }
+      const prob = stage.probability ?? (stage.name === 'Won' ? 100 : stage.name === 'Lost' ? 0 : 50)
+      return { ...stage, count: stageProposals.length, value, prob }
     }).filter(s => s.count > 0)
   }, [filteredProposals, stages])
 
-  const stageProbability = (stageName) => {
-    const map = { 'Lead': 10, 'Contacted': 25, 'Proposal Sent': 50, 'Negotiating': 75, 'Won': 100, 'Lost': 0 }
-    return map[stageName] ?? 40
-  }
-
   const weightedPipeline = useMemo(() => {
-    return stageBreakdown.reduce((sum, stage) => sum + (stage.value * stageProbability(stage.name) / 100), 0)
+    return stageBreakdown.reduce((sum, stage) => sum + (stage.value * stage.prob / 100), 0)
   }, [stageBreakdown])
 
   const closingThisMonth = useMemo(() => {
@@ -203,7 +199,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
                         <span className="text-fp-muted text-xs">({stage.count})</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-fp-muted text-xs">{stageProbability(stage.name)}% prob</span>
+                        <span className="text-fp-muted text-xs">{stage.prob}% prob</span>
                         <span className="text-fp-text text-xs font-semibold">${fmt(stage.value)}</span>
                       </div>
                     </div>

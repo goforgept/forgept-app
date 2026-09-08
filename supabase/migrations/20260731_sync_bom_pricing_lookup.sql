@@ -13,11 +13,14 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  v_org_id         UUID;
-  v_labor_enabled  boolean := false;
-  v_default_markup numeric  := 35;
+  v_org_id              UUID;
+  v_labor_enabled       boolean := false;
+  v_default_markup      numeric  := 35;
+  v_disable_auto_updates boolean := false;
 BEGIN
-  SELECT org_id INTO v_org_id FROM proposals WHERE id = p_proposal_id;
+  SELECT org_id, COALESCE(disable_auto_updates, false)
+    INTO v_org_id, v_disable_auto_updates
+  FROM proposals WHERE id = p_proposal_id;
   SELECT COALESCE(designer_labor_enabled, false) INTO v_labor_enabled
     FROM organizations WHERE id = v_org_id;
 
@@ -153,54 +156,57 @@ BEGIN
     AND jsonb_array_length(pw.cable_types) > 0
   GROUP BY ct->>'type';
 
-  -- ── Pricing lookup from product library ───────────────────────────────────
-  -- Use cheapest vendor price for any item whose part_number_sku matches.
-  SELECT COALESCE(MAX(p.default_markup_percent), 35) INTO v_default_markup
-  FROM profiles p WHERE p.org_id = v_org_id;
+  -- ── Pricing + MSRP lookup (skipped when disable_auto_updates = true) ────────
+  IF NOT v_disable_auto_updates THEN
 
-  UPDATE bom_line_items bli
-  SET
-    your_cost_unit       = best.your_cost,
-    markup_percent       = v_default_markup,
-    customer_price_unit  = ROUND((best.your_cost * (1 + v_default_markup / 100))::numeric, 2),
-    customer_price_total = ROUND((best.your_cost * (1 + v_default_markup / 100) * bli.quantity)::numeric, 2),
-    pricing_status       = 'Priced'
-  FROM (
-    SELECT DISTINCT ON (bli2.id) bli2.id AS bli_id, plp.your_cost
-    FROM bom_line_items bli2
-    INNER JOIN product_library pl
-           ON pl.org_id      = v_org_id
-          AND pl.part_number = bli2.part_number_sku
-    INNER JOIN product_library_pricing plp
-           ON plp.product_id = pl.id
-          AND plp.org_id     = v_org_id
-          AND plp.your_cost  IS NOT NULL
-          AND plp.your_cost  > 0
-    WHERE bli2.proposal_id   = p_proposal_id
-      AND bli2.source        = 'drawing'
-      AND bli2.part_number_sku IS NOT NULL
-      AND bli2.part_number_sku <> ''
-    ORDER BY bli2.id, plp.your_cost ASC
-  ) best
-  WHERE bli.id = best.bli_id;
+    -- Use cheapest vendor price for any item whose part_number_sku matches.
+    SELECT COALESCE(MAX(p.default_markup_percent), 35) INTO v_default_markup
+    FROM profiles p WHERE p.org_id = v_org_id;
 
-  -- ── MSRP + compliance fields from product library ────────────────────────
-  -- Populate msrp_unit, COO, Berry, and lead time for any item whose part
-  -- number matches, regardless of whether cost pricing was found.
-  UPDATE bom_line_items bli
-  SET
-    msrp_unit         = pl.msrp,
-    lead_time         = pl.lead_time,
-    country_of_origin = pl.country_of_origin,
-    berry_compliance  = pl.berry_compliance
-  FROM product_library pl
-  WHERE pl.org_id          = v_org_id
-    AND pl.part_number     = bli.part_number_sku
-    AND bli.proposal_id    = p_proposal_id
-    AND bli.source         = 'drawing'
-    AND bli.part_number_sku IS NOT NULL
-    AND bli.part_number_sku <> ''
-    AND (pl.msrp IS NOT NULL OR pl.lead_time IS NOT NULL OR pl.country_of_origin IS NOT NULL OR pl.berry_compliance IS NOT NULL);
+    UPDATE bom_line_items bli
+    SET
+      your_cost_unit       = best.your_cost,
+      markup_percent       = v_default_markup,
+      customer_price_unit  = ROUND((best.your_cost * (1 + v_default_markup / 100))::numeric, 2),
+      customer_price_total = ROUND((best.your_cost * (1 + v_default_markup / 100) * bli.quantity)::numeric, 2),
+      pricing_status       = 'Priced'
+    FROM (
+      SELECT DISTINCT ON (bli2.id) bli2.id AS bli_id, plp.your_cost
+      FROM bom_line_items bli2
+      INNER JOIN product_library pl
+             ON pl.org_id      = v_org_id
+            AND pl.part_number = bli2.part_number_sku
+      INNER JOIN product_library_pricing plp
+             ON plp.product_id = pl.id
+            AND plp.org_id     = v_org_id
+            AND plp.your_cost  IS NOT NULL
+            AND plp.your_cost  > 0
+      WHERE bli2.proposal_id   = p_proposal_id
+        AND bli2.source        = 'drawing'
+        AND bli2.part_number_sku IS NOT NULL
+        AND bli2.part_number_sku <> ''
+      ORDER BY bli2.id, plp.your_cost ASC
+    ) best
+    WHERE bli.id = best.bli_id;
+
+    -- Populate msrp_unit, COO, Berry, and lead time for any item whose part
+    -- number matches, regardless of whether cost pricing was found.
+    UPDATE bom_line_items bli
+    SET
+      msrp_unit         = pl.msrp,
+      lead_time         = pl.lead_time,
+      country_of_origin = pl.country_of_origin,
+      berry_compliance  = pl.berry_compliance
+    FROM product_library pl
+    WHERE pl.org_id          = v_org_id
+      AND pl.part_number     = bli.part_number_sku
+      AND bli.proposal_id    = p_proposal_id
+      AND bli.source         = 'drawing'
+      AND bli.part_number_sku IS NOT NULL
+      AND bli.part_number_sku <> ''
+      AND (pl.msrp IS NOT NULL OR pl.lead_time IS NOT NULL OR pl.country_of_origin IS NOT NULL OR pl.berry_compliance IS NOT NULL);
+
+  END IF; -- disable_auto_updates
 
   -- ── Labor sync (only when designer_labor_enabled) ─────────────────────────
   IF v_labor_enabled THEN
