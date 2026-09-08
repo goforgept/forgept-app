@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import RichTextEditor, { RichTextDisplay } from './RichTextEditor'
 
 export default function TermsSection({ proposal, orgTermsText, onToggle, onSave, canEdit, tcFontSize = 9, onSaveFontSize }) {
   const [editing, setEditing] = useState(false)
@@ -9,7 +10,7 @@ export default function TermsSection({ proposal, orgTermsText, onToggle, onSave,
   const hasCustomText = !!proposal?.terms_text
   const isOn = proposal?.show_terms !== false
 
-  if (!effectiveText) return null
+  if (!effectiveText && !canEdit) return null
 
   const startEdit = () => {
     setDraft(proposal?.terms_text || orgTermsText || '')
@@ -36,7 +37,7 @@ export default function TermsSection({ proposal, orgTermsText, onToggle, onSave,
         <h3 className="text-fp-text font-bold text-lg">Terms & Conditions</h3>
         {canEdit && (
           <div className="flex items-center gap-3">
-            {!editing && (
+            {!editing && effectiveText && (
               <button onClick={startEdit} className="text-fp-muted hover:text-fp-text text-xs transition-colors">
                 Edit
               </button>
@@ -69,12 +70,11 @@ export default function TermsSection({ proposal, orgTermsText, onToggle, onSave,
 
       {editing ? (
         <div className="space-y-3">
-          <textarea
+          <RichTextEditor
             value={draft}
-            onChange={e => setDraft(e.target.value)}
+            onChange={setDraft}
+            placeholder="Enter terms and conditions..."
             rows={8}
-            autoFocus
-            className="w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y"
           />
           <div className="flex items-center gap-2">
             <button
@@ -94,16 +94,21 @@ export default function TermsSection({ proposal, orgTermsText, onToggle, onSave,
             )}
           </div>
         </div>
-      ) : (
-        <div>
-          <p className={`text-fp-muted text-sm leading-relaxed whitespace-pre-wrap ${!isOn ? 'opacity-40' : ''}`}>
-            {effectiveText}
-          </p>
+      ) : effectiveText ? (
+        <div className={!isOn ? 'opacity-40' : ''}>
+          <RichTextDisplay text={effectiveText} />
           {hasCustomText && orgTermsText && (
             <p className="text-fp-muted text-xs mt-2 opacity-60">Custom — overrides org default</p>
           )}
         </div>
-      )}
+      ) : canEdit ? (
+        <button
+          onClick={startEdit}
+          className="text-fp-brand hover:opacity-80 text-sm font-semibold transition-opacity"
+        >
+          + Write custom terms
+        </button>
+      ) : null}
     </div>
   )
 }

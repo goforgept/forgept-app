@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { RichTextDisplay, htmlToPlain } from '../components/proposal/RichTextEditor'
 
 export default function SignProposal() {
   const { token } = useParams()
@@ -260,7 +261,7 @@ export default function SignProposal() {
         doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
         doc.text(title, 14, ty); ty += 12
         doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
-        const lines = doc.splitTextToSize(text, pageWidth - 28)
+        const lines = doc.splitTextToSize(htmlToPlain(text), pageWidth - 28)
         for (const line of lines) {
           if (ty + lineH > pageH - 20) { doc.addPage(); ty = 20 }
           doc.text(line, 14, ty); ty += lineH
@@ -520,7 +521,7 @@ export default function SignProposal() {
         {orgProfile?.about_us && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">About Us</h3>
-            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{orgProfile.about_us}</p>
+            <RichTextDisplay text={orgProfile.about_us} className="text-[#D6E4F0]" />
           </div>
         )}
 
@@ -720,7 +721,7 @@ export default function SignProposal() {
         {terms && (
           <div className="bg-[#1a2d45] rounded-xl p-6">
             <h3 className="text-white font-bold text-lg mb-4">Terms and Conditions</h3>
-            <p className="text-[#D6E4F0] text-sm leading-relaxed whitespace-pre-wrap">{terms}</p>
+            <RichTextDisplay text={terms} className="text-[#D6E4F0]" />
           </div>
         )}
 

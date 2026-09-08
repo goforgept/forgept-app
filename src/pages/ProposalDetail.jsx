@@ -39,6 +39,7 @@ import MonitoringSection from '../components/proposal/MonitoringSection'
 import BomSection from '../components/proposal/BomSection'
 import WarrantySection from '../components/proposal/WarrantySection'
 import TermsSection from '../components/proposal/TermsSection'
+import { htmlToPlain } from '../components/proposal/RichTextEditor'
 import CatalogSearch from '../components/CatalogSearch'
 import { APP_BASE_URL } from '../config'
 
@@ -1863,7 +1864,7 @@ export default function ProposalDetail({ isAdmin }) {
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         new Paragraph({ children: [new TextRun({ text: 'Terms and Conditions', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
-        ...effectiveTerms.split('\n').map(line =>
+        ...htmlToPlain(effectiveTerms).split('\n').map(line =>
           new Paragraph({ children: [new TextRun({ text: line, size: docxTcHalfPts, color: '444444' })] })
         )
       )
@@ -1878,7 +1879,7 @@ export default function ProposalDetail({ isAdmin }) {
         new Paragraph({ children: [new TextRun({ text: '' })] }),
         new Paragraph({ children: [new TextRun({ text: 'Warranty', bold: true, size: 28, color: primaryColor })] }),
         new Paragraph({ children: [new TextRun({ text: '' })] }),
-        ...effectiveWarranty.split('\n').map(line =>
+        ...htmlToPlain(effectiveWarranty).split('\n').map(line =>
           new Paragraph({ children: [new TextRun({ text: line, size: docxTcHalfPts, color: '444444' })] })
         )
       )
@@ -3463,7 +3464,7 @@ const analyzeDrawing = async () => {
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text(title, 14, ty); ty += 12
       doc.setFontSize(pdfTcFontSize); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
-      const lines = doc.splitTextToSize(text, pageWidth - 28)
+      const lines = doc.splitTextToSize(htmlToPlain(text), pageWidth - 28)
       for (const line of lines) {
         if (ty + pdfLineH > pageHeight - 20) { doc.addPage(); ty = 20 }
         doc.text(line, 14, ty); ty += pdfLineH

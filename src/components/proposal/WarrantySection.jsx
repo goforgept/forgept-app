@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import RichTextEditor, { RichTextDisplay } from './RichTextEditor'
 
 export default function WarrantySection({ proposal, warrantyTemplates = [], onSaveTemplateId, onSave, onToggle, canEdit, tcFontSize = 9, onSaveFontSize }) {
   const [editing, setEditing] = useState(false)
@@ -10,7 +11,6 @@ export default function WarrantySection({ proposal, warrantyTemplates = [], onSa
   const hasCustomText = !!proposal?.warranty_text
   const isOn = proposal?.show_warranty !== false
 
-  // Always show to editors so they can add warranty; hide for non-editors with no content
   if (!canEdit && !effectiveText) return null
 
   const handleSelectTemplate = async (templateId) => {
@@ -81,7 +81,6 @@ export default function WarrantySection({ proposal, warrantyTemplates = [], onSa
         )}
       </div>
 
-      {/* Template selector — shown when templates exist */}
       {canEdit && warrantyTemplates.length > 0 && (
         <div className="mb-3">
           <select
@@ -98,16 +97,13 @@ export default function WarrantySection({ proposal, warrantyTemplates = [], onSa
         </div>
       )}
 
-      {/* Text area — editing mode */}
       {editing && (
         <div className="space-y-3">
-          <textarea
+          <RichTextEditor
             value={draft}
-            onChange={e => setDraft(e.target.value)}
-            rows={6}
-            autoFocus
+            onChange={setDraft}
             placeholder="Enter warranty text for this proposal..."
-            className="w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y"
+            rows={6}
           />
           <div className="flex items-center gap-2">
             <button
@@ -129,19 +125,15 @@ export default function WarrantySection({ proposal, warrantyTemplates = [], onSa
         </div>
       )}
 
-      {/* Text display */}
       {!editing && effectiveText && (
-        <div>
-          <p className={`text-fp-muted text-sm leading-relaxed whitespace-pre-wrap ${!isOn ? 'opacity-40' : ''}`}>
-            {effectiveText}
-          </p>
+        <div className={!isOn ? 'opacity-40' : ''}>
+          <RichTextDisplay text={effectiveText} />
           {hasCustomText && selectedTemplate && (
             <p className="text-fp-muted text-xs mt-2 opacity-60">Customized — based on "{selectedTemplate.name}"</p>
           )}
         </div>
       )}
 
-      {/* Empty state — no text yet */}
       {!editing && !effectiveText && canEdit && (
         <div className="text-center py-4 space-y-2">
           {warrantyTemplates.length === 0 ? (
