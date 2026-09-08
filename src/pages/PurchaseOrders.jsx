@@ -36,6 +36,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     po_number_manual: '',
     description: '',
     notes: '',
+    send_mode: 'download', // 'download' | 'email'
   })
   const [poLines, setPOLines] = useState([
     { id: crypto.randomUUID(), item_name: '', part_number: '', quantity: 1, unit: 'ea', unit_cost: '' }
@@ -89,8 +90,83 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     if (!lineItems[po.id]) await fetchLineItemsForPO(po)
   }
 
+  const receiveIntoInventory = async (poId) => {
+    // Check if already received into inventory for this PO
+    const { data: existingTx } = await supabase
+      .from('inventory_transactions')
+      .select('id')
+      .eq('po_id', poId)
+      .eq('type', 'receipt')
+      .limit(1)
+    if (existingTx && existingTx.length > 0) return // already received
+
+    // Get line items
+    const { data: poItems } = await supabase.from('purchase_order_line_items').select('*').eq('po_id', poId)
+    const lines = poItems && poItems.length > 0 ? poItems : []
+    if (!lines.length) return
+
+    // Get first warehouse (if any) as default
+    const { data: wh } = await supabase.from('warehouses').select('id').eq('org_id', profile.org_id).limit(1)
+    const warehouseId = wh?.[0]?.id || null
+
+    for (const line of lines) {
+      const qty = parseFloat(line.quantity) || 0
+      const cost = parseFloat(line.unit_cost) || 0
+      if (!qty) continue
+
+      // Try to match existing inventory item by part number
+      let inventoryItemId = null
+      if (line.part_number) {
+        const { data: match } = await supabase
+          .from('inventory_items')
+          .select('id, qty_on_hand')
+          .eq('org_id', profile.org_id)
+          .ilike('part_number', line.part_number)
+          .limit(1)
+          .single()
+        if (match) {
+          inventoryItemId = match.id
+          await supabase.from('inventory_items').update({
+            qty_on_hand: (parseFloat(match.qty_on_hand) || 0) + qty,
+            unit_cost: cost || match.unit_cost,
+            updated_at: new Date().toISOString(),
+          }).eq('id', match.id)
+        }
+      }
+
+      if (!inventoryItemId) {
+        const { data: newItem } = await supabase.from('inventory_items').insert({
+          org_id: profile.org_id,
+          warehouse_id: warehouseId,
+          part_number: line.part_number || null,
+          description: line.item_name,
+          qty_on_hand: qty,
+          unit_cost: cost,
+        }).select().single()
+        inventoryItemId = newItem?.id
+      }
+
+      if (inventoryItemId) {
+        await supabase.from('inventory_transactions').insert({
+          org_id: profile.org_id,
+          inventory_item_id: inventoryItemId,
+          type: 'receipt',
+          quantity: qty,
+          unit_cost: cost,
+          po_id: poId,
+          notes: `Received from PO`,
+          created_by: profile.id,
+        })
+      }
+    }
+  }
+
   const updateStatus = async (poId, status) => {
     await supabase.from('purchase_orders').update({ status }).eq('id', poId)
+    if (status === 'Received') {
+      const po = pos.find(p => p.id === poId)
+      if (!po?.job_id) await receiveIntoInventory(poId)
+    }
     fetchAll()
   }
 
@@ -107,6 +183,10 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
       const received = items.reduce((sum, i) => sum + (parseFloat(i.received_qty) || 0), 0)
       const newStatus = received === 0 ? 'Sent' : received >= total ? 'Received' : 'Partial'
       await supabase.from('purchase_orders').update({ receiving_status: newStatus, status: newStatus }).eq('id', poId)
+      if (newStatus === 'Received') {
+        const po = pos.find(p => p.id === poId)
+        if (!po?.job_id) await receiveIntoInventory(poId)
+      }
       fetchAll()
     }
     setSavingReceiving(prev => ({ ...prev, [itemId]: false }))
@@ -364,12 +444,27 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
           .is('po_number', null)
       }
 
-      // Download PDF
-      await savePdf(doc, `${finalPONumber}.pdf`)
+      // Download or email PDF
+      if (poForm.send_mode === 'email' && poForm.vendor_email) {
+        const pdfBase64 = doc.output('datauristring').split(',')[1]
+        const { error: emailErr } = await supabase.functions.invoke('send-po', {
+          body: {
+            poNumber: finalPONumber,
+            vendorEmail: poForm.vendor_email,
+            vendorName: poForm.vendor_name,
+            projectLabel,
+            companyName: profileData?.company_name || '',
+            pdfBase64,
+          }
+        })
+        if (emailErr) throw new Error('Email failed: ' + emailErr.message)
+      } else {
+        await savePdf(doc, `${finalPONumber}.pdf`)
+      }
 
       // Reset and close
       setShowNewPO(false)
-      setPOForm({ vendor_id: '', vendor_name: '', vendor_email: '', link_type: 'none', job_id: '', ticket_id: '', po_number_mode: 'auto', po_number_manual: '', description: '', notes: '' })
+      setPOForm({ vendor_id: '', vendor_name: '', vendor_email: '', link_type: 'none', job_id: '', ticket_id: '', po_number_mode: 'auto', po_number_manual: '', description: '', notes: '', send_mode: 'download' })
       setPOLines([{ id: crypto.randomUUID(), item_name: '', part_number: '', quantity: 1, unit: 'ea', unit_cost: '' }])
       setJobBudget(null)
       fetchAll()
@@ -767,11 +862,39 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                   className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none" />
               </div>
 
+              {/* Send mode */}
+              <div>
+                <label className="text-fp-muted text-xs mb-2 block">After Generating</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPOForm(p => ({ ...p, send_mode: 'download' }))}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poForm.send_mode === 'download' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}
+                  >
+                    ↓ Download PDF
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPOForm(p => ({ ...p, send_mode: 'email' }))}
+                    disabled={!poForm.vendor_email}
+                    title={!poForm.vendor_email ? 'Enter a vendor email above to enable' : ''}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poForm.send_mode === 'email' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'} disabled:opacity-40 disabled:cursor-not-allowed`}
+                  >
+                    ✉ Email to Vendor
+                  </button>
+                </div>
+              </div>
+
               <div className="flex gap-3 pt-1">
                 <button onClick={() => { setShowNewPO(false); setJobBudget(null) }} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
                 <button onClick={generateNewPO} disabled={generatingPO || (!poForm.vendor_name && !poForm.vendor_id) || poLines.filter(l => l.item_name.trim()).length === 0}
                   className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {generatingPO ? 'Generating...' : `Generate PO — $${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                  {generatingPO
+                    ? (poForm.send_mode === 'email' ? 'Sending...' : 'Generating...')
+                    : poForm.send_mode === 'email'
+                      ? `Send PO — $${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                      : `Generate & Download — $${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                  }
                 </button>
               </div>
             </div>
