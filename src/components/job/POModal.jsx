@@ -1,4 +1,4 @@
-export default function POModal({ lineItems, selectedForPO, vendors, poVendorEmail, setPOVendorEmail, poNumber, setPONumber, poAutoNumber, setPOAutoNumber, generatingPO, onGenerate, onClose }) {
+export default function POModal({ lineItems, selectedForPO, vendors, poVendorEmail, setPOVendorEmail, poNumber, setPONumber, poAutoNumber, setPOAutoNumber, poSendMode, setPoSendMode, generatingPO, onGenerate, onClose }) {
   const selectedItems = lineItems.filter(l => selectedForPO.has(l.id))
   const vendorNames = [...new Set(selectedItems.map(i => i.vendor).filter(Boolean))]
   const poTotal = selectedItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
@@ -39,11 +39,37 @@ export default function POModal({ lineItems, selectedForPO, vendors, poVendorEma
               ))}
             </div>
           </div>
+          <div>
+            <label className="text-fp-muted text-xs mb-2 block">After Generating</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPoSendMode('download')}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poSendMode === 'download' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}
+              >
+                ↓ Download PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => setPoSendMode('email')}
+                disabled={!poVendorEmail}
+                title={!poVendorEmail ? 'Enter a vendor email above to enable' : ''}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${poSendMode === 'email' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'} disabled:opacity-40 disabled:cursor-not-allowed`}
+              >
+                ✉ Email to Vendor
+              </button>
+            </div>
+          </div>
           <div className="flex gap-3 pt-1">
             <button onClick={onClose} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
             <button onClick={onGenerate} disabled={generatingPO || (!poAutoNumber && !poNumber.trim())}
               className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-              {generatingPO ? 'Generating...' : `Generate PO (${selectedItems.length} items)`}
+              {generatingPO
+                ? (poSendMode === 'email' ? 'Sending...' : 'Generating...')
+                : poSendMode === 'email'
+                  ? `Send PO (${selectedItems.length} items)`
+                  : `Generate & Download (${selectedItems.length} items)`
+              }
             </button>
           </div>
         </div>

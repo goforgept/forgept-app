@@ -414,7 +414,6 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
         vendor_name: poForm.vendor_name || null,
         status: 'Sent',
         total_amount: poTotal,
-        description: poForm.description || null,
         notes: poForm.notes || null,
       }).select().single()
 

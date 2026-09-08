@@ -97,6 +97,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [poVendorEmail, setPOVendorEmail] = useState('')
   const [poNumber, setPONumber] = useState('')
   const [poAutoNumber, setPOAutoNumber] = useState(true)
+  const [poSendMode, setPoSendMode] = useState('download') // 'download' | 'email'
   const [generatingPO, setGeneratingPO] = useState(false)
 
   // Change order modal
@@ -684,7 +685,23 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       setLineItems(prev => prev.map(l => selectedForPO.has(l.id) ? { ...l, po_number: finalPONumber, po_status: 'PO Sent' } : l))
       setSelectedForPO(new Set())
       setShowPOModal(false)
-      await savePdf(doc, `${finalPONumber}.pdf`)
+      setPoSendMode('download')
+      if (poSendMode === 'email' && poVendorEmail) {
+        const pdfBase64 = doc.output('datauristring').split(',')[1]
+        const { error: emailErr } = await supabase.functions.invoke('send-po', {
+          body: {
+            poNumber: finalPONumber,
+            vendorEmail: poVendorEmail,
+            vendorName: vendorNames,
+            projectLabel: job?.name || '',
+            companyName: profileData?.company_name || '',
+            pdfBase64,
+          }
+        })
+        if (emailErr) throw new Error('Email failed: ' + emailErr.message)
+      } else {
+        await savePdf(doc, `${finalPONumber}.pdf`)
+      }
     } catch (err) { alert('Error generating PO: ' + err.message) }
     setGeneratingPO(false)
   }
@@ -1893,9 +1910,11 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           setPONumber={setPONumber}
           poAutoNumber={poAutoNumber}
           setPOAutoNumber={setPOAutoNumber}
+          poSendMode={poSendMode}
+          setPoSendMode={setPoSendMode}
           generatingPO={generatingPO}
           onGenerate={generatePO}
-          onClose={() => setShowPOModal(false)}
+          onClose={() => { setShowPOModal(false); setPoSendMode('download') }}
         />
       )}
 
