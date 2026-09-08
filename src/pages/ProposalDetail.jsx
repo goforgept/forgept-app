@@ -220,6 +220,7 @@ export default function ProposalDetail({ isAdmin }) {
       .single()
 
     setProposal(data)
+    if (!data) return
 
     // Load revision history — always check so rev 1 can see newer revisions
     const originalId = data.original_proposal_id || data.id

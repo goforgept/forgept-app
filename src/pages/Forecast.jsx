@@ -64,7 +64,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
         return false
       })
       const value = stageProposals.reduce((sum, p) => sum + (p.proposal_value || 0), 0)
-      const prob = stage.probability ?? (stage.name === 'Won' ? 100 : stage.name === 'Lost' ? 0 : 50)
+      const prob = stage.probability ?? (stage.name === 'Won' ? 100 : stage.name === 'Lost' ? 0 : 40)
       return { ...stage, count: stageProposals.length, value, prob }
     }).filter(s => s.count > 0)
   }, [filteredProposals, stages])
