@@ -1118,7 +1118,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     const rows = []
 
     // Header
-    rows.push(['Device Address', 'Part Number', 'Name', 'Manufacturer', 'Category', 'Qty', 'Notes'])
+    rows.push(['Part Number', 'Name', 'Manufacturer', 'Category', 'Qty', 'Notes'])
 
     // Devices — New and Replace only (Existing/Demo excluded from BOM)
     const deviceMap = {}
@@ -1132,16 +1132,13 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
           manufacturer: p.manufacturer_override || gp?.manufacturer || '',
           category:     gp?.category || '',
           qty:          0,
-          addresses:    [],
         }
       }
       deviceMap[key].qty += p.quantity || 1
-      if (p.device_address) deviceMap[key].addresses.push(p.device_address)
     })
 
     Object.values(deviceMap).forEach(d => {
       rows.push([
-        d.addresses.join(', '),
         d.part_number,
         d.name,
         d.manufacturer,
