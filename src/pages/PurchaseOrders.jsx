@@ -72,8 +72,15 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
   }
 
   const fetchLineItemsForPO = async (po) => {
-    const { data } = await supabase.from('bom_line_items').select('*').eq('po_number', po.po_number)
-    setLineItems(prev => ({ ...prev, [po.id]: data || [] }))
+    // Try purchase_order_line_items first (manually-created POs)
+    const { data: poItems } = await supabase.from('purchase_order_line_items').select('*').eq('po_id', po.id)
+    if (poItems && poItems.length > 0) {
+      setLineItems(prev => ({ ...prev, [po.id]: poItems }))
+      return
+    }
+    // Fall back to bom_line_items (BOM-linked POs)
+    const { data: bomItems } = await supabase.from('bom_line_items').select('*').eq('po_number', po.po_number)
+    setLineItems(prev => ({ ...prev, [po.id]: bomItems || [] }))
   }
 
   const toggleExpand = async (po) => {
@@ -174,6 +181,119 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [15, 28, 46]
   }
 
+  const buildPOPdf = async (poNumber, vendorName, vendorEmail, projectLabel, notesText, lines, profileData) => {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const primaryRgb = hexToRgb(profileData?.primary_color || '#0F1C2E')
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const total = lines.reduce((sum, l) => sum + ((parseFloat(l.unit_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+
+    doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.rect(0, 0, pageWidth, 40, 'F')
+    if (profileData?.logo_url) {
+      try {
+        const img = new Image(); img.crossOrigin = 'anonymous'; img.src = profileData.logo_url
+        await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
+        if (img.naturalWidth > 0) {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.naturalWidth; canvas.height = img.naturalHeight
+          canvas.getContext('2d').drawImage(img, 0, 0)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
+          const maxW = 50, maxH = 26
+          const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
+          doc.addImage(dataUrl, 'JPEG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
+        } else { throw new Error('load failed') }
+      } catch {
+        doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+        doc.text(profileData?.company_name || 'ForgePt.', 14, 22)
+      }
+    } else {
+      doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
+      doc.text(profileData?.company_name || 'ForgePt.', 14, 22)
+    }
+    doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont('helvetica', 'bold')
+    doc.text('PURCHASE ORDER', pageWidth - 14, 18, { align: 'right' })
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+    doc.text(poNumber, pageWidth - 14, 28, { align: 'right' })
+
+    doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52)
+    if (projectLabel) doc.text(`Project: ${projectLabel}`, 14, 60)
+
+    const billLines = [profileData?.company_name || '', profileData?.bill_to_address || '', [profileData?.bill_to_city, profileData?.bill_to_state, profileData?.bill_to_zip].filter(Boolean).join(', ')].filter(Boolean)
+    const shipLines = [profileData?.company_name || '', profileData?.ship_to_address || '', [profileData?.ship_to_city, profileData?.ship_to_state, profileData?.ship_to_zip].filter(Boolean).join(', ')].filter(Boolean)
+    const col2 = pageWidth / 2 - 10, col3 = pageWidth / 2 + 30
+
+    doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+    doc.text('VENDOR', 14, 74); doc.text('BILL TO', col2, 74); doc.text('SHIP TO', col3, 74)
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40); doc.setFontSize(9)
+    doc.text(vendorName || '—', 14, 81)
+    if (vendorEmail) doc.text(vendorEmail, 14, 87)
+    billLines.forEach((line, i) => doc.text(line, col2, 81 + i * 6))
+    shipLines.forEach((line, i) => doc.text(line, col3, 81 + i * 6))
+
+    const tableStart = 81 + Math.max(billLines.length, shipLines.length) * 6 + 10
+    doc.setDrawColor(220, 220, 220)
+    doc.line(14, tableStart - 2, pageWidth - 14, tableStart - 2)
+
+    autoTable(doc, {
+      startY: tableStart,
+      head: [['Item', 'Part #', 'Qty', 'Unit', 'Unit Cost', 'Total']],
+      body: lines.map(l => [
+        l.item_name,
+        l.part_number || l.part_number_sku || '—',
+        l.quantity,
+        l.unit || 'ea',
+        `$${(parseFloat(l.unit_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+        `$${((parseFloat(l.unit_cost) || 0) * (parseFloat(l.quantity) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+      ]),
+      foot: [['', '', '', '', 'Total', `$${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+      headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
+      footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      styles: { fontSize: 9 }, showFoot: 'lastPage'
+    })
+
+    if (notesText) {
+      const y = doc.lastAutoTable.finalY + 10
+      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+      doc.text('Notes', 14, y)
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
+      doc.text(notesText, 14, y + 6)
+    }
+
+    const pageHeight = doc.internal.pageSize.getHeight()
+    doc.setFontSize(8); doc.setTextColor(150, 150, 150); doc.setFont('helvetica', 'normal')
+    doc.text(`${profileData?.company_name || 'ForgePt.'} · Thank you for your business.`, pageWidth / 2, pageHeight - 10, { align: 'center' })
+
+    return doc
+  }
+
+  const downloadExistingPO = async (po) => {
+    try {
+      let lines = lineItems[po.id]
+      if (!lines) {
+        const { data: poItems } = await supabase.from('purchase_order_line_items').select('*').eq('po_id', po.id)
+        if (poItems && poItems.length > 0) {
+          lines = poItems
+        } else {
+          const { data: bomItems } = await supabase.from('bom_line_items').select('*').eq('po_number', po.po_number)
+          lines = bomItems || []
+        }
+      }
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('company_name, logo_url, primary_color, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip')
+        .eq('id', profile.id).single()
+      const projectLabel = po.jobs ? `${po.jobs.job_number ? po.jobs.job_number + ' — ' : ''}${po.jobs.name}` : ''
+      const doc = await buildPOPdf(po.po_number, po.vendor_name, '', projectLabel, po.notes, lines, profileData)
+      await savePdf(doc, `${po.po_number}.pdf`)
+    } catch (err) {
+      alert('Error downloading PO: ' + err.message)
+    }
+  }
+
   const generateNewPO = async () => {
     const validLines = poLines.filter(l => l.item_name.trim())
     if (validLines.length === 0) { alert('Add at least one line item.'); return }
@@ -197,95 +317,13 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
         .select('company_name, logo_url, primary_color, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip')
         .eq('id', profile.id).single()
 
-      // Get linked job name if applicable
+      // Get linked job/ticket name if applicable
       const linkedJob = poForm.link_type === 'job' ? jobs.find(j => j.id === poForm.job_id) : null
       const linkedTicket = poForm.link_type === 'ticket' ? serviceTickets.find(t => t.id === poForm.ticket_id) : null
       const projectLabel = linkedJob ? `${linkedJob.job_number ? linkedJob.job_number + ' — ' : ''}${linkedJob.name}` : linkedTicket ? linkedTicket.title : ''
 
       // Generate PDF
-      const { default: jsPDF } = await import('jspdf')
-      const { default: autoTable } = await import('jspdf-autotable')
-      const primaryRgb = hexToRgb(profileData?.primary_color || '#0F1C2E')
-      const doc = new jsPDF()
-      const pageWidth = doc.internal.pageSize.getWidth()
-
-      doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.rect(0, 0, pageWidth, 40, 'F')
-      if (profileData?.logo_url) {
-        try {
-          const img = new Image(); img.crossOrigin = 'anonymous'; img.src = profileData.logo_url
-          await new Promise(resolve => { img.onload = resolve; img.onerror = resolve })
-          if (img.naturalWidth > 0) {
-            const canvas = document.createElement('canvas')
-            canvas.width = img.naturalWidth; canvas.height = img.naturalHeight
-            canvas.getContext('2d').drawImage(img, 0, 0)
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
-            const maxW = 50, maxH = 26
-            const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight)
-            doc.addImage(dataUrl, 'JPEG', 14, 8 + (maxH - img.naturalHeight * ratio) / 2, img.naturalWidth * ratio, img.naturalHeight * ratio)
-          } else { throw new Error('load failed') }
-        } catch {
-          doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
-          doc.text(profileData?.company_name || 'ForgePt.', 14, 22)
-        }
-      } else {
-        doc.setTextColor(255, 255, 255); doc.setFontSize(20); doc.setFont('helvetica', 'bold')
-        doc.text(profileData?.company_name || 'ForgePt.', 14, 22)
-      }
-      doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.setFont('helvetica', 'bold')
-      doc.text('PURCHASE ORDER', pageWidth - 14, 18, { align: 'right' })
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-      doc.text(finalPONumber, pageWidth - 14, 28, { align: 'right' })
-
-      doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont('helvetica', 'normal')
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 52)
-      if (projectLabel) doc.text(`Project: ${projectLabel}`, 14, 60)
-
-      const billLines = [profileData?.company_name || '', profileData?.bill_to_address || '', [profileData?.bill_to_city, profileData?.bill_to_state, profileData?.bill_to_zip].filter(Boolean).join(', ')].filter(Boolean)
-      const shipLines = [profileData?.company_name || '', profileData?.ship_to_address || '', [profileData?.ship_to_city, profileData?.ship_to_state, profileData?.ship_to_zip].filter(Boolean).join(', ')].filter(Boolean)
-      const col2 = pageWidth / 2 - 10, col3 = pageWidth / 2 + 30
-
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-      doc.text('VENDOR', 14, 74); doc.text('BILL TO', col2, 74); doc.text('SHIP TO', col3, 74)
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40); doc.setFontSize(9)
-      doc.text(poForm.vendor_name || '—', 14, 81)
-      if (poForm.vendor_email) doc.text(poForm.vendor_email, 14, 87)
-      billLines.forEach((line, i) => doc.text(line, col2, 81 + i * 6))
-      shipLines.forEach((line, i) => doc.text(line, col3, 81 + i * 6))
-
-      const tableStart = 81 + Math.max(billLines.length, shipLines.length) * 6 + 10
-      doc.setDrawColor(220, 220, 220)
-      doc.line(14, tableStart - 2, pageWidth - 14, tableStart - 2)
-
-      autoTable(doc, {
-        startY: tableStart,
-        head: [['Item', 'Part #', 'Qty', 'Unit', 'Unit Cost', 'Total']],
-        body: validLines.map(l => [
-          l.item_name,
-          l.part_number || '—',
-          l.quantity,
-          l.unit || 'ea',
-          `$${(parseFloat(l.unit_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-          `$${((parseFloat(l.unit_cost) || 0) * (parseFloat(l.quantity) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-        ]),
-        foot: [['', '', '', '', 'Total', `$${poTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
-        headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] },
-        footStyles: { fillColor: primaryRgb, textColor: [255, 255, 255], fontStyle: 'bold' },
-        alternateRowStyles: { fillColor: [245, 245, 245] },
-        styles: { fontSize: 9 }, showFoot: 'lastPage'
-      })
-
-      if (poForm.notes) {
-        const y = doc.lastAutoTable.finalY + 10
-        doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
-        doc.text('Notes', 14, y)
-        doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
-        doc.text(poForm.notes, 14, y + 6)
-      }
-
-      const pageHeight = doc.internal.pageSize.getHeight()
-      doc.setFontSize(8); doc.setTextColor(150, 150, 150); doc.setFont('helvetica', 'normal')
-      doc.text(`${profileData?.company_name || 'ForgePt.'} · Thank you for your business.`, pageWidth / 2, pageHeight - 10, { align: 'center' })
+      const doc = await buildPOPdf(finalPONumber, poForm.vendor_name, poForm.vendor_email, projectLabel, poForm.notes, validLines, profileData)
 
       // Save PO to DB
       const { data: newPO, error: poInsertError } = await supabase.from('purchase_orders').insert({
@@ -299,6 +337,8 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
         description: poForm.description || null,
         notes: poForm.notes || null,
       }).select().single()
+
+      if (poInsertError) throw new Error('PO save failed: ' + poInsertError.message)
 
       // Save line items to purchase_order_line_items
       if (newPO && validLines.length > 0) {
@@ -474,6 +514,13 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                         <p className="text-fp-text font-bold">${fmt(po.total_amount)}</p>
                         <p className="text-fp-muted text-xs">total</p>
                       </div>
+                      <button
+                        onClick={e => { e.stopPropagation(); downloadExistingPO(po) }}
+                        className="text-fp-muted hover:text-fp-text text-xs px-2 py-1 rounded border border-fp-border hover:border-fp-brand transition-colors flex-shrink-0"
+                        title="Download PDF"
+                      >
+                        ↓ PDF
+                      </button>
                       <select value={po.status} onChange={e => { e.stopPropagation(); updateStatus(po.id, e.target.value) }} onClick={e => e.stopPropagation()}
                         className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
                         {['Sent', 'Partial', 'Received', 'Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
