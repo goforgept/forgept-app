@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import RichTextEditor, { RichTextDisplay } from './RichTextEditor'
 
 export default function ScopeSection({
   proposal, features, photos,
@@ -172,8 +173,7 @@ export default function ScopeSection({
 
       {canEdit && editingSOW ? (
         <div className="space-y-3">
-          <textarea value={sowDraft} onChange={e => setSowDraft(e.target.value)} rows={14}
-            className="w-full bg-fp-inset text-fp-text border border-[#C8622A]/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y leading-relaxed" />
+          <RichTextEditor value={sowDraft} onChange={setSowDraft} rows={14} placeholder="Describe the scope of work for this project..." />
           <div className="flex gap-2 justify-end">
             <button onClick={() => setEditingSOW(false)} className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
             <button onClick={saveSOW} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Save SOW</button>
@@ -181,7 +181,7 @@ export default function ScopeSection({
         </div>
       ) : proposal?.scope_of_work ? (
         <div className="relative group">
-          <p className="text-fp-text text-sm leading-relaxed whitespace-pre-wrap">{proposal.scope_of_work}</p>
+          <RichTextDisplay text={proposal.scope_of_work} className="text-fp-text" />
           {canEdit && (
             <button onClick={() => { setSowDraft(proposal.scope_of_work); setEditingSOW(true) }}
               className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity bg-fp-inset text-fp-muted hover:text-fp-text px-2 py-1 rounded text-xs">

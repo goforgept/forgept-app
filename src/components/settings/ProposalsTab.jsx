@@ -98,12 +98,11 @@ export default function ProposalsTab({
                   Remove
                 </button>
               </div>
-              <textarea
+              <RichTextEditor
                 value={tmpl.text}
-                onChange={e => setWarrantyTemplates(prev => prev.map((t, j) => j === i ? { ...t, text: e.target.value } : t))}
+                onChange={val => setWarrantyTemplates(prev => prev.map((t, j) => j === i ? { ...t, text: val } : t))}
                 placeholder="Warranty text..."
                 rows={4}
-                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y"
               />
             </div>
           ))}

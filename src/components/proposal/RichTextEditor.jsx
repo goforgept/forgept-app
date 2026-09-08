@@ -1,6 +1,129 @@
 import { useRef, useEffect } from 'react'
 
-// Converts stored HTML to plain text for PDF/DOCX rendering.
+// Renders HTML (or legacy plain text) directly into a jsPDF document.
+// Preserves bold, italic, bullet lists, numbered lists, and paragraph spacing.
+// Returns the final Y position after rendering.
+export const renderHtmlToPdf = (doc, html, { x = 14, startY, maxWidth, fontSize, lineH, pageH, font = 'helvetica' }) => {
+  if (!html) return startY
+  doc.setFontSize(fontSize)
+
+  const style = (b, it) => b ? (it ? 'bolditalic' : 'bold') : (it ? 'italic' : 'normal')
+
+  // Legacy plain text — no HTML tags
+  if (!/<[a-z][\s\S]*>/i.test(html)) {
+    doc.setFont(font, 'normal')
+    const lines = doc.splitTextToSize(html, maxWidth)
+    let y = startY
+    for (const line of lines) {
+      if (y + lineH > pageH - 20) { doc.addPage(); y = 20 }
+      doc.text(line, x, y); y += lineH
+    }
+    return y
+  }
+
+  const tmp = document.createElement('div')
+  tmp.innerHTML = html
+
+  // Recursively extract [{text, b, it}] runs from an element
+  const getRuns = (el, b = false, it = false) => {
+    const runs = []
+    for (const node of el.childNodes) {
+      if (node.nodeType === 3) {
+        if (node.textContent) runs.push({ text: node.textContent, b, it })
+      } else if (node.nodeType === 1) {
+        const t = node.tagName.toLowerCase()
+        runs.push(...getRuns(node, b || t === 'b' || t === 'strong', it || t === 'i' || t === 'em'))
+      }
+    }
+    return runs
+  }
+
+  // Word-wrap a run array into lines of [{text, b, it, w}]
+  const wrapRuns = (runs, availW) => {
+    const words = []
+    for (const run of runs) {
+      for (const part of run.text.split(/(\s+)/)) {
+        if (part) words.push({ text: part, b: run.b, it: run.it })
+      }
+    }
+    if (!words.length) return []
+    const lines = []; let cur = [], curW = 0
+    for (const word of words) {
+      doc.setFont(font, style(word.b, word.it))
+      const w = doc.getTextWidth(word.text)
+      if (curW + w > availW && cur.length && word.text.trim()) {
+        lines.push(cur); cur = [{ ...word, w }]; curW = w
+      } else {
+        cur.push({ ...word, w }); curW += w
+      }
+    }
+    if (cur.length) lines.push(cur)
+    return lines
+  }
+
+  // Draw pre-built lines starting at (lx, ly), returns y after last line
+  const drawLines = (lines, lx, ly) => {
+    for (const line of lines) {
+      if (ly + lineH > pageH - 20) { doc.addPage(); ly = 20 }
+      let cx = lx
+      for (const word of line) {
+        doc.setFont(font, style(word.b, word.it))
+        doc.text(word.text, cx, ly)
+        cx += word.w
+      }
+      ly += lineH
+    }
+    return ly
+  }
+
+  let y = startY
+
+  for (const node of tmp.childNodes) {
+    if (node.nodeType === 3) {
+      const text = node.textContent.trim()
+      if (text) y = drawLines(wrapRuns([{ text, b: false, it: false }], maxWidth), x, y)
+    } else if (node.nodeType === 1) {
+      const tag = node.tagName.toLowerCase()
+
+      if (tag === 'ul' || tag === 'ol') {
+        let idx = 1
+        for (const li of node.children) {
+          if (li.tagName.toLowerCase() !== 'li') continue
+          const prefix = tag === 'ul' ? '• ' : `${idx++}. `
+          doc.setFont(font, 'normal')
+          const prefW = doc.getTextWidth(prefix)
+          const textX = x + 4 + prefW
+          const lines = wrapRuns(getRuns(li), maxWidth - 4 - prefW)
+          if (y + lineH > pageH - 20) { doc.addPage(); y = 20 }
+          doc.setFont(font, 'normal')
+          doc.text(prefix, x + 4, y)
+          y = lines.length ? drawLines(lines, textX, y) : y + lineH
+        }
+        y += lineH * 0.3
+
+      } else if (tag === 'p' || tag === 'div') {
+        const runs = getRuns(node)
+        if (runs.some(r => r.text.trim())) {
+          y = drawLines(wrapRuns(runs, maxWidth), x, y)
+          y += lineH * 0.3 // paragraph gap
+        }
+
+      } else if (tag === 'br') {
+        y += lineH
+
+      } else {
+        const runs = getRuns(node)
+        if (runs.some(r => r.text.trim()))
+          y = drawLines(wrapRuns(runs, maxWidth), x, y)
+      }
+    }
+  }
+
+  doc.setFont(font, 'normal')
+  return y
+}
+
+// Converts stored HTML to plain text for DOCX rendering.
 // Pass-through for legacy plain-text content.
 export const htmlToPlain = (html) => {
   if (!html) return ''

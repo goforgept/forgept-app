@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { RichTextDisplay, htmlToPlain } from '../components/proposal/RichTextEditor'
+import { RichTextDisplay, htmlToPlain, renderHtmlToPdf } from '../components/proposal/RichTextEditor'
 
 export default function SignProposal() {
   const { token } = useParams()
@@ -260,12 +260,8 @@ export default function SignProposal() {
         let ty = startY
         doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
         doc.text(title, 14, ty); ty += 12
-        doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(60, 60, 60)
-        const lines = doc.splitTextToSize(htmlToPlain(text), pageWidth - 28)
-        for (const line of lines) {
-          if (ty + lineH > pageH - 20) { doc.addPage(); ty = 20 }
-          doc.text(line, 14, ty); ty += lineH
-        }
+        doc.setTextColor(60, 60, 60)
+        ty = renderHtmlToPdf(doc, text, { x: 14, startY: ty, maxWidth: pageWidth - 28, fontSize: 9, lineH, pageH, font: 'helvetica' })
         return ty
       }
       let ty = 20

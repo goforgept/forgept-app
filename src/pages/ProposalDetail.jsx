@@ -39,7 +39,7 @@ import MonitoringSection from '../components/proposal/MonitoringSection'
 import BomSection from '../components/proposal/BomSection'
 import WarrantySection from '../components/proposal/WarrantySection'
 import TermsSection from '../components/proposal/TermsSection'
-import { htmlToPlain } from '../components/proposal/RichTextEditor'
+import { htmlToPlain, renderHtmlToPdf } from '../components/proposal/RichTextEditor'
 import CatalogSearch from '../components/CatalogSearch'
 import { APP_BASE_URL } from '../config'
 
@@ -3232,13 +3232,8 @@ const analyzeDrawing = async () => {
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text(title, 14, yPos)
       yPos += 8
-      doc.setFontSize(10); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
-      const lines = doc.splitTextToSize(text, pageWidth - 28)
-      for (const line of lines) {
-        if (yPos + lineH > pageHeight - textMargin) { doc.addPage(); yPos = 20 }
-        doc.text(line, 14, yPos)
-        yPos += lineH
-      }
+      doc.setTextColor(60, 60, 60)
+      yPos = renderHtmlToPdf(doc, text, { x: 14, startY: yPos, maxWidth: pageWidth - 28, fontSize: 10, lineH, pageH: pageHeight, font: pdfFont })
       yPos += 10
     }
 
@@ -3247,7 +3242,9 @@ const analyzeDrawing = async () => {
     }
 
     if (p?.scope_of_work) {
-      const cleanSOW = p.scope_of_work.replace(/^\*\*Scope of Work\*\*\s*/i, '').replace(/\*\*(.*?)\*\*/g, '$1').trim()
+      // Strip legacy AI-generated markdown markers; HTML content passes through unchanged
+      const isHtml = /<[a-z][\s\S]*>/i.test(p.scope_of_work)
+      const cleanSOW = isHtml ? p.scope_of_work : p.scope_of_work.replace(/^\*\*Scope of Work\*\*\s*/i, '').replace(/\*\*(.*?)\*\*/g, '$1').trim()
       renderTextSection('Scope of Work', cleanSOW)
     }
 
@@ -3463,12 +3460,8 @@ const analyzeDrawing = async () => {
       let ty = startY
       doc.setFontSize(13); doc.setFont(pdfFont, 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text(title, 14, ty); ty += 12
-      doc.setFontSize(pdfTcFontSize); doc.setFont(pdfFont, 'normal'); doc.setTextColor(60, 60, 60)
-      const lines = doc.splitTextToSize(htmlToPlain(text), pageWidth - 28)
-      for (const line of lines) {
-        if (ty + pdfLineH > pageHeight - 20) { doc.addPage(); ty = 20 }
-        doc.text(line, 14, ty); ty += pdfLineH
-      }
+      doc.setTextColor(60, 60, 60)
+      ty = renderHtmlToPdf(doc, text, { x: 14, startY: ty, maxWidth: pageWidth - 28, fontSize: pdfTcFontSize, lineH: pdfLineH, pageH: pageHeight, font: pdfFont })
       return ty
     }
 

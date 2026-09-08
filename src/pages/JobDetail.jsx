@@ -20,6 +20,7 @@ import ChangeOrderModal from '../components/job/ChangeOrderModal'
 import AIATab from '../components/job/AIATab'
 import BillingsTab from '../components/job/BillingsTab'
 import { JOB_STATUSES } from './Jobs'
+import { renderHtmlToPdf } from '../components/proposal/RichTextEditor'
 
 const AUTO_CHECK_TYPES = [
   { type: 'proposal_signed', label: 'Proposal signed', icon: '✍️' },
@@ -544,9 +545,12 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     if (proposal?.scope_of_work) {
       doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(100, 100, 100)
       doc.text('SCOPE OF WORK', 14, y); y += 5
-      doc.setFont('helvetica', 'normal'); doc.setTextColor(40, 40, 40)
-      const lines = doc.splitTextToSize(proposal.scope_of_work, pw - 28)
-      doc.text(lines, 14, y); y += lines.length * 5 + 8
+      doc.setTextColor(40, 40, 40)
+      const isHtml = /<[a-z][\s\S]*>/i.test(proposal.scope_of_work)
+      const sowText = isHtml ? proposal.scope_of_work : proposal.scope_of_work.replace(/^\*\*Scope of Work\*\*\s*/i, '').replace(/\*\*(.*?)\*\*/g, '$1').trim()
+      const ph = doc.internal.pageSize.getHeight()
+      y = renderHtmlToPdf(doc, sowText, { x: 14, startY: y, maxWidth: pw - 28, fontSize: 9, lineH: 4.5, pageH: ph, font: 'helvetica' })
+      y += 8
     }
 
     const tableItems = lineItems.map(i => [
