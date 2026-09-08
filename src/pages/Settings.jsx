@@ -326,15 +326,23 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const handleLogoUpload = async (e) => {
     const file = e.target.files[0]; if (!file) return
     setUploadingLogo(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    const fileExt = file.name.split('.').pop()
-    const orgIdVal = (await supabase.from('profiles').select('org_id').eq('id', user.id).single()).data?.org_id
-    const r2Path = `${orgIdVal}/logos/${user.id}.${fileExt}`
-    const { uploadToR2, getR2Url, BUCKETS } = await import('../r2')
-    await uploadToR2(r2Path, file, file.type, BUCKETS.ASSETS)
-    const url = await getR2Url(r2Path, 60 * 60 * 24 * 365, BUCKETS.ASSETS)
-    await supabase.from('profiles').update({ logo_url: r2Path }).eq('id', user.id)
-    setLogoUrl(url); setUploadingLogo(false); setSuccess('Logo uploaded successfully')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const fileExt = file.name.split('.').pop()
+      const orgIdVal = (await supabase.from('profiles').select('org_id').eq('id', user.id).single()).data?.org_id
+      const r2Path = `${orgIdVal}/logos/${user.id}.${fileExt}`
+      const { uploadToR2, getR2Url, BUCKETS } = await import('../r2')
+      await uploadToR2(r2Path, file, file.type, BUCKETS.ASSETS)
+      const url = await getR2Url(r2Path, 60 * 60 * 24 * 365, BUCKETS.ASSETS)
+      const { error } = await supabase.from('profiles').update({ logo_url: r2Path }).eq('id', user.id)
+      if (error) { setSuccess(`Error saving logo: ${error.message}`); return }
+      setLogoUrl(url); setSuccess('Logo uploaded successfully')
+      refreshProfile()
+    } catch (err) {
+      setSuccess(`Error uploading logo: ${err.message}`)
+    } finally {
+      setUploadingLogo(false)
+    }
   }
 
   const handleSameAsShipTo = (checked) => {
@@ -344,59 +352,92 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
 
   const handleSave = async () => {
     setSaving(true); setSuccess(null)
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({
-      full_name: form.full_name, company_name: form.company_name,
-      phone: form.phone || null, job_title: form.job_title || null, license_number: form.license_number || null,
-      default_markup_percent: parseFloat(form.default_markup_percent) || 35,
-      followup_days: form.followup_days, terms_and_conditions: form.terms_and_conditions, about_us: form.about_us || null,
-      primary_color: form.primary_color,
-      bill_to_address: form.bill_to_address, bill_to_city: form.bill_to_city,
-      bill_to_state: form.bill_to_state, bill_to_zip: form.bill_to_zip,
-      ship_to_address: form.ship_to_address, ship_to_city: form.ship_to_city,
-      ship_to_state: form.ship_to_state, ship_to_zip: form.ship_to_zip,
-    }).eq('id', user.id)
-    if (orgId) await supabase.from('organizations').update({ timezone: orgTimezone, default_hide_material_prices: defaultHideMaterialPrices, default_hide_labor_breakdown: defaultHideLaborBreakdown, default_lump_sum_labor: defaultLumpSumLabor, default_tc_font_size: defaultTcFontSize, warranty_templates: warrantyTemplates.filter(t => t.name || t.text) }).eq('id', orgId)
-    refreshProfile()
-    setSuccess('Settings saved successfully'); setSaving(false)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { error: profileErr } = await supabase.from('profiles').update({
+        full_name: form.full_name, company_name: form.company_name,
+        phone: form.phone || null, job_title: form.job_title || null, license_number: form.license_number || null,
+        default_markup_percent: parseFloat(form.default_markup_percent) || 35,
+        followup_days: form.followup_days, terms_and_conditions: form.terms_and_conditions, about_us: form.about_us || null,
+        primary_color: form.primary_color,
+        bill_to_address: form.bill_to_address, bill_to_city: form.bill_to_city,
+        bill_to_state: form.bill_to_state, bill_to_zip: form.bill_to_zip,
+        ship_to_address: form.ship_to_address, ship_to_city: form.ship_to_city,
+        ship_to_state: form.ship_to_state, ship_to_zip: form.ship_to_zip,
+      }).eq('id', user.id)
+      if (profileErr) { setSuccess(`Error saving settings: ${profileErr.message}`); setSaving(false); return }
+
+      if (orgId) {
+        const { error: orgErr } = await supabase.from('organizations').update({
+          default_hide_material_prices: defaultHideMaterialPrices,
+          default_hide_labor_breakdown: defaultHideLaborBreakdown,
+          default_lump_sum_labor: defaultLumpSumLabor,
+          default_tc_font_size: defaultTcFontSize,
+          warranty_templates: warrantyTemplates.filter(t => t.name || t.text),
+        }).eq('id', orgId)
+        if (orgErr) console.error('Org settings error:', orgErr.message)
+      }
+
+      refreshProfile()
+      setSuccess('Settings saved successfully')
+    } catch (err) {
+      setSuccess(`Error: ${err.message}`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleSaveTemplates = async () => {
     setSavingTemplates(true); setSuccess(null)
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({
-      email_cadence_early: parseInt(emailTemplates.early_days) || 30,
-      email_template_early_subject: emailTemplates.early_subject, email_template_early_body: emailTemplates.early_body,
-      email_cadence_14day: parseInt(emailTemplates.day14_days) || 14,
-      email_template_14day_subject: emailTemplates.day14_subject, email_template_14day_body: emailTemplates.day14_body,
-      email_cadence_7day: parseInt(emailTemplates.day7_days) || 7,
-      email_template_7day_subject: emailTemplates.day7_subject, email_template_7day_body: emailTemplates.day7_body,
-      email_template_close_subject: emailTemplates.close_subject, email_template_close_body: emailTemplates.close_body,
-      email_template_rfq_subject: emailTemplates.rfq_subject, email_template_rfq_body: emailTemplates.rfq_body,
-      email_template_send_subject: emailTemplates.send_subject, email_template_send_body: emailTemplates.send_body,
-      followup_days: `${emailTemplates.early_days},${emailTemplates.day14_days},${emailTemplates.day7_days},0`
-    }).eq('id', user.id)
-    setForm(prev => ({ ...prev, followup_days: `${emailTemplates.early_days},${emailTemplates.day14_days},${emailTemplates.day7_days},0` }))
-    setSuccess('Email templates saved successfully'); setSavingTemplates(false)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { error } = await supabase.from('profiles').update({
+        email_cadence_early: parseInt(emailTemplates.early_days) || 30,
+        email_template_early_subject: emailTemplates.early_subject, email_template_early_body: emailTemplates.early_body,
+        email_cadence_14day: parseInt(emailTemplates.day14_days) || 14,
+        email_template_14day_subject: emailTemplates.day14_subject, email_template_14day_body: emailTemplates.day14_body,
+        email_cadence_7day: parseInt(emailTemplates.day7_days) || 7,
+        email_template_7day_subject: emailTemplates.day7_subject, email_template_7day_body: emailTemplates.day7_body,
+        email_template_close_subject: emailTemplates.close_subject, email_template_close_body: emailTemplates.close_body,
+        email_template_rfq_subject: emailTemplates.rfq_subject, email_template_rfq_body: emailTemplates.rfq_body,
+        email_template_send_subject: emailTemplates.send_subject, email_template_send_body: emailTemplates.send_body,
+        followup_days: `${emailTemplates.early_days},${emailTemplates.day14_days},${emailTemplates.day7_days},0`
+      }).eq('id', user.id)
+      if (error) { setSuccess(`Error saving templates: ${error.message}`); return }
+      setForm(prev => ({ ...prev, followup_days: `${emailTemplates.early_days},${emailTemplates.day14_days},${emailTemplates.day7_days},0` }))
+      setSuccess('Email templates saved successfully')
+    } catch (err) {
+      setSuccess(`Error: ${err.message}`)
+    } finally {
+      setSavingTemplates(false)
+    }
   }
 
   const handleSaveInvoicing = async () => {
     setSavingInvoicing(true); setSuccess(null)
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({
-      payment_instructions_payable_to: invoicingForm.payment_instructions_payable_to,
-      payment_instructions_bank: invoicingForm.payment_instructions_bank,
-      payment_instructions_routing: invoicingForm.payment_instructions_routing,
-      payment_instructions_account: invoicingForm.payment_instructions_account,
-      payment_instructions_zelle: invoicingForm.payment_instructions_zelle,
-      payment_instructions_notes: invoicingForm.payment_instructions_notes,
-    }).eq('id', user.id)
-    if (profile?.org_id) {
-      await supabase.from('organizations').update({
-        cc_fee_percent: parseFloat(invoicingForm.cc_fee_percent) || 3.0,
-      }).eq('id', profile.org_id)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { error: profileErr } = await supabase.from('profiles').update({
+        payment_instructions_payable_to: invoicingForm.payment_instructions_payable_to,
+        payment_instructions_bank: invoicingForm.payment_instructions_bank,
+        payment_instructions_routing: invoicingForm.payment_instructions_routing,
+        payment_instructions_account: invoicingForm.payment_instructions_account,
+        payment_instructions_zelle: invoicingForm.payment_instructions_zelle,
+        payment_instructions_notes: invoicingForm.payment_instructions_notes,
+      }).eq('id', user.id)
+      if (profileErr) { setSuccess(`Error saving invoicing: ${profileErr.message}`); return }
+      if (profile?.org_id) {
+        const { error: orgErr } = await supabase.from('organizations').update({
+          cc_fee_percent: parseFloat(invoicingForm.cc_fee_percent) || 3.0,
+        }).eq('id', profile.org_id)
+        if (orgErr) console.error('Org invoicing error:', orgErr.message)
+      }
+      setSuccess('Invoicing settings saved')
+    } catch (err) {
+      setSuccess(`Error: ${err.message}`)
+    } finally {
+      setSavingInvoicing(false)
     }
-    setSuccess('Invoicing settings saved'); setSavingInvoicing(false)
   }
 
   const handleChangePassword = async () => {

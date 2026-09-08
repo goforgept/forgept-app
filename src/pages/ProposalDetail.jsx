@@ -163,6 +163,8 @@ export default function ProposalDetail({ isAdmin }) {
   const [uploadingSignedPDF, setUploadingSignedPDF] = useState(false)
   const [sections, setSections] = useState([])
   const [showPricingModal, setShowPricingModal] = useState(false)
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState(null)
+  const [pdfPreviewGenerating, setPdfPreviewGenerating] = useState(false)
   const [editSections, setEditSections] = useState([])
   const [showMoveModal, setShowMoveModal] = useState(false)
   const [moveLineIndex, setMoveLineIndex] = useState(null)
@@ -1379,6 +1381,23 @@ export default function ProposalDetail({ isAdmin }) {
     if (proposal?.status === 'Draft') setShowSentPrompt(true)
     const doc = await generatePDFDoc()
     await savePdf(doc, `${proposal?.proposal_name || 'Proposal'}.pdf`)
+  }
+
+  const previewPDF = async () => {
+    setPdfPreviewGenerating(true)
+    try {
+      const doc = await generatePDFDoc()
+      const blob = doc.output('blob')
+      const url = URL.createObjectURL(blob)
+      setPdfPreviewUrl(url)
+    } finally {
+      setPdfPreviewGenerating(false)
+    }
+  }
+
+  const closePdfPreview = () => {
+    if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl)
+    setPdfPreviewUrl(null)
   }
 
   const downloadBundle = async () => {
@@ -3638,6 +3657,7 @@ const analyzeDrawing = async () => {
           qboConnected={qboConnected} qboInvoiceId={qboInvoiceId} sendingToQBO={sendingToQBO} sendToQBO={sendToQBO}
           setShowPricingModal={setShowPricingModal} downloadPDF={downloadPDF} downloadDOCX={downloadDOCX} downloadSignedCopy={downloadSignedCopy} downloadInstallerPDF={downloadInstallerPDF} downloadInstallerDOCX={downloadInstallerDOCX}
           downloadBundle={drawingSheets.length > 0 ? downloadBundle : null}
+          previewPDF={previewPDF} pdfPreviewGenerating={pdfPreviewGenerating}
           onToggleCoverPage={toggleCoverPage}
           setShowPhotosModal={setShowPhotosModal}
           canEdit={canEdit}
@@ -3849,6 +3869,23 @@ const analyzeDrawing = async () => {
       {showSaveTemplateModal && <SaveTemplateModal lineItems={lineItems} laborItems={laborItems} templateName={templateName} setTemplateName={setTemplateName} savingTemplate={savingTemplate} onSave={saveAsTemplate} onClose={() => { setShowSaveTemplateModal(false); setTemplateName('') }} />}
 
       {showSendModal && <SendProposalModal proposal={proposal} sendForm={sendForm} setSendForm={setSendForm} sendingProposal={sendingProposal} onSend={sendProposal} onClose={() => setShowSendModal(false)} />}
+
+      {pdfPreviewUrl && (
+        <div className="fixed inset-0 z-[999] bg-black/90 flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 bg-fp-card border-b border-fp-border flex-shrink-0">
+            <span className="text-fp-text font-semibold text-sm truncate">{proposal?.proposal_name || 'Proposal'} — Preview</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => { const doc = await generatePDFDoc(); await savePdf(doc, `${proposal?.proposal_name || 'Proposal'}.pdf`) }}
+                className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                ↓ Download PDF
+              </button>
+              <button onClick={closePdfPreview} className="text-fp-muted hover:text-fp-text text-2xl leading-none px-2">✕</button>
+            </div>
+          </div>
+          <iframe src={pdfPreviewUrl} className="flex-1 w-full border-0" title="PDF Preview" />
+        </div>
+      )}
 
       {showPricingModal && <PricingOptionsModal proposal={proposal} onToggleHideMaterialPrices={toggleHideMaterialPrices} onToggleLaborBreakdown={toggleHideLaborBreakdown} onToggleLumpSumLabor={toggleLumpSumLabor} onToggleShowMsrp={toggleShowMsrp} featureMsrp={features.msrp} onToggleShowCompliance={toggleShowCompliance} featureComplianceFields={features.complianceFields} onToggleShowWarranty={toggleShowWarranty} hasWarranty={!!(proposal?.warranty_text || (profile?.organizations?.warranty_templates || []).length > 0)} onToggleCoverPage={toggleCoverPage} onToggleDisableAutoUpdates={toggleDisableAutoUpdates} onToggleDisableFollowupEmails={toggleDisableFollowupEmails} onClose={() => setShowPricingModal(false)} />}
 

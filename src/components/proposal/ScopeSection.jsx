@@ -12,6 +12,7 @@ export default function ScopeSection({
   qboConnected, qboInvoiceId, sendingToQBO, sendToQBO,
   setShowPricingModal, downloadPDF, downloadDOCX, downloadSignedCopy, downloadInstallerPDF, downloadInstallerDOCX,
   downloadBundle,
+  previewPDF, pdfPreviewGenerating,
   onToggleCoverPage,
   setShowPhotosModal,
   canEdit = true,
@@ -98,6 +99,10 @@ export default function ScopeSection({
             </button>
             {dlOpen && (
               <div className="absolute right-0 top-full mt-1 z-50 bg-fp-card border border-fp-border rounded-xl shadow-2xl min-w-[220px] py-1 overflow-hidden">
+                <button onClick={() => { setDlOpen(false); previewPDF() }} disabled={pdfPreviewGenerating}
+                  className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors flex items-center gap-2 border-b border-fp-border disabled:opacity-50">
+                  <span className="text-fp-muted text-xs font-mono">👁</span> {pdfPreviewGenerating ? 'Generating…' : 'Preview PDF'}
+                </button>
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-fp-border">
                   <span className="text-sm text-fp-text font-semibold">Cover Page</span>
                   <button onClick={onToggleCoverPage}
