@@ -3026,14 +3026,29 @@ const analyzeDrawing = async () => {
       doc.setFillColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.rect(0, 0, 5, pageHeight, 'F')
 
-      // Logo / company name — top left
+      // Logo / company name — full-logo: centered full-width; otherwise top-left
       let cpLogoBottom = 36
       if (logoImg) {
         try {
-          const maxW = 72, maxH = 36
-          const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
-          doc.addImage(logoImg, 'PNG', 16, 28, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
-          cpLogoBottom = 28 + logoImg.naturalHeight * ratio + 4
+          if (isFullLogo) {
+            const maxW = pageWidth - 28, maxH = 52
+            const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+            const logoW = logoImg.naturalWidth * ratio
+            const logoH = logoImg.naturalHeight * ratio
+            const logoX = (pageWidth - logoW) / 2
+            doc.addImage(logoImg, 'PNG', logoX, 16, logoW, logoH)
+            cpLogoBottom = 16 + logoH + 6
+            // Thin accent line below logo
+            doc.setDrawColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
+            doc.setLineWidth(0.8)
+            doc.line(14, cpLogoBottom, pageWidth - 14, cpLogoBottom)
+            cpLogoBottom += 4
+          } else {
+            const maxW = 72, maxH = 36
+            const ratio = Math.min(maxW / logoImg.naturalWidth, maxH / logoImg.naturalHeight)
+            doc.addImage(logoImg, 'PNG', 16, 28, logoImg.naturalWidth * ratio, logoImg.naturalHeight * ratio)
+            cpLogoBottom = 28 + logoImg.naturalHeight * ratio + 4
+          }
         } catch { /* ignore */ }
       }
       if (!logoImg) {
@@ -3096,13 +3111,13 @@ const analyzeDrawing = async () => {
       doc.addPage()
     }
 
-    // Resolve header style before cover-page check so full-logo can override
+    // Resolve header style
     const hdrStyle = freshOrg?.pdf_header_style || profile?.organizations?.pdf_header_style || 'compact'
     const isFullLogo = hdrStyle === 'full-logo'
     const isPropLarge = hdrStyle === 'large'
     let yPos
-    if (p?.show_cover_page && !(isFullLogo && logoImg)) {
-      // Cover page already has all branding — skip header for compact/large styles
+    if (p?.show_cover_page) {
+      // Cover page already has all branding — content pages start clean
       yPos = 20
     } else {
       if (isFullLogo && logoImg) {

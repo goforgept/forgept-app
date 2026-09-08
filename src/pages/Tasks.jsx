@@ -27,6 +27,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
   })
   const [showMeeting, setShowMeeting] = useState(false)
   const [newAttendeeEmail, setNewAttendeeEmail] = useState('')
+  const [editTask, setEditTask] = useState(null)
 
   useEffect(() => { if (profile?.org_id) fetchData() }, [profile?.org_id])
 
@@ -162,6 +163,66 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
     setSaving(false)
   }
 
+  const startEdit = (task) => {
+    setEditTask(task)
+    setForm({
+      title: task.title || '',
+      due_date: task.due_date || '',
+      priority: task.priority || 'normal',
+      assigned_to: task.assigned_to || profile.id,
+      client_id: task.client_id || '',
+      notes: task.notes || '',
+      meeting_type: task.meeting_type || '',
+      meeting_link: task.meeting_link || '',
+      start_time: task.start_time || '',
+      duration_minutes: task.duration_minutes || 60,
+      is_virtual: task.is_virtual || false,
+      customer_notified: task.customer_notified || false,
+      attendee_ids: task.attendee_ids || [],
+      attendee_emails: task.attendee_emails || [],
+      meeting_notes: task.meeting_notes || '',
+      recurrence: task.recurrence || '',
+    })
+    setShowMeeting(!!task.meeting_type)
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleUpdate = async () => {
+    if (!form.title || !editTask) return
+    setSaving(true)
+    const isMeeting = !!form.meeting_type
+    await supabase.from('tasks').update({
+      title: form.title,
+      due_date: form.due_date || null,
+      priority: form.priority,
+      assigned_to: form.assigned_to || profile.id,
+      client_id: form.client_id || null,
+      notes: form.notes || null,
+      meeting_type: isMeeting ? form.meeting_type : null,
+      meeting_link: isMeeting ? form.meeting_link || null : null,
+      duration_minutes: isMeeting ? form.duration_minutes : null,
+      customer_notified: isMeeting ? form.customer_notified : false,
+      attendee_ids: isMeeting && form.attendee_ids.length > 0 ? form.attendee_ids : null,
+      attendee_emails: isMeeting && form.attendee_emails.length > 0 ? form.attendee_emails : null,
+      meeting_notes: isMeeting ? form.meeting_notes || null : null,
+      start_time: isMeeting ? form.start_time || null : null,
+      recurrence: form.recurrence || null,
+    }).eq('id', editTask.id)
+    setEditTask(null)
+    setShowForm(false)
+    setShowMeeting(false)
+    setForm({ title: '', due_date: '', priority: 'normal', assigned_to: profile.id, client_id: '', notes: '', meeting_type: '', meeting_link: '', start_time: '', duration_minutes: 60, is_virtual: false, customer_notified: false, attendee_ids: [], attendee_emails: [], meeting_notes: '', recurrence: '' })
+    fetchData()
+    setSaving(false)
+  }
+
+  const handleDelete = async (taskId) => {
+    if (!window.confirm('Delete this task?')) return
+    await supabase.from('tasks').delete().eq('id', taskId)
+    fetchData()
+  }
+
   const nextRecurrenceDate = (fromDate, recurrence) => {
     const d = new Date(fromDate + 'T12:00:00')
     if (recurrence === 'weekly')     d.setDate(d.getDate() + 7)
@@ -280,7 +341,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 📅 Calendar
               </button>
             </div>
-            <button onClick={() => setShowForm(!showForm)}
+            <button onClick={() => { setShowForm(v => { if (v) { setEditTask(null); setShowMeeting(false) } return !v }); }}
               className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
               {showForm ? 'Cancel' : '+ New Task'}
             </button>
@@ -297,7 +358,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
         {/* New Task Form */}
         {showForm && (
           <div className="bg-fp-card rounded-xl p-6">
-            <h3 className="text-fp-text font-bold mb-4">New Task</h3>
+            <h3 className="text-fp-text font-bold mb-4">{editTask ? 'Edit Task' : 'New Task'}</h3>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="col-span-2">
                 <label className="text-fp-muted text-xs mb-1 block">Task Title</label>
@@ -443,11 +504,17 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 )}
               </>
             )}
-            <div className="mt-4">
-              <button onClick={handleAdd} disabled={saving || !form.title}
+            <div className="mt-4 flex gap-3">
+              <button onClick={editTask ? handleUpdate : handleAdd} disabled={saving || !form.title}
                 className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                {saving ? 'Saving...' : 'Create Task'}
+                {saving ? 'Saving...' : editTask ? 'Save Changes' : 'Create Task'}
               </button>
+              {editTask && (
+                <button onClick={() => { setEditTask(null); setShowForm(false); setShowMeeting(false) }}
+                  className="px-6 py-2 rounded-lg text-sm font-semibold text-fp-muted hover:text-fp-text border border-fp-border transition-colors">
+                  Cancel
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -566,9 +633,19 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                                 <p className="text-purple-400 text-xs mt-0.5">↻ {task.recurrence === 'biweekly' ? 'every 2 weeks' : task.recurrence}</p>
                               )}
                             </div>
-                            <span className={`text-xs font-semibold capitalize shrink-0 ${priorityColor(task.priority)}`}>
-                              {task.priority}
-                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className={`text-xs font-semibold capitalize ${priorityColor(task.priority)}`}>
+                                {task.priority}
+                              </span>
+                              <button onClick={() => startEdit(task)}
+                                className="text-fp-muted hover:text-fp-text px-1.5 py-1 rounded transition-colors ml-1">
+                                Edit
+                              </button>
+                              <button onClick={() => handleDelete(task.id)}
+                                className="text-fp-muted hover:text-red-400 px-1.5 py-1 rounded transition-colors">
+                                ✕
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -614,7 +691,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
               ) : (
                 <div className="space-y-2">
                   {filtered.map(task => (
-                    <div key={task.id} className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${
+                    <div key={task.id} className={`group flex items-center gap-4 p-4 rounded-lg border transition-colors ${
                       task.completed ? 'border-fp-border/30 bg-fp-inset/30 opacity-60' :
                       isOverdue(task) ? 'border-red-500/20 bg-red-500/5' :
                       isDueToday(task) ? 'border-[#C8622A]/20 bg-[#C8622A]/5' :
@@ -659,6 +736,14 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                           {isOverdue(task) ? 'Overdue' : isDueToday(task) ? 'Today' : task.due_date}
                         </span>
                       )}
+                      <button onClick={() => startEdit(task)}
+                        className="text-fp-muted hover:text-fp-text text-xs px-2 py-1 rounded hover:bg-fp-hover transition-colors">
+                        Edit
+                      </button>
+                      <button onClick={() => handleDelete(task.id)}
+                        className="text-fp-muted hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-fp-hover transition-colors">
+                        ✕
+                      </button>
                     </div>
                   ))}
                 </div>

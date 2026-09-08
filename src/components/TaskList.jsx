@@ -8,6 +8,7 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState({ title: '', due_date: '', priority: 'normal', assigned_to: userId || '', recurrence: '' })
+  const [editTask, setEditTask] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -53,6 +54,35 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
     setShowForm(false)
     fetchTasks()
     setSaving(false)
+  }
+
+  const startEdit = (task) => {
+    setEditTask(task)
+    setForm({ title: task.title || '', due_date: task.due_date || '', priority: task.priority || 'normal', assigned_to: task.assigned_to || userId || '', recurrence: task.recurrence || '' })
+    setShowForm(true)
+  }
+
+  const handleUpdate = async () => {
+    if (!form.title || !editTask) return
+    setSaving(true)
+    await supabase.from('tasks').update({
+      title: form.title,
+      due_date: form.due_date || null,
+      priority: form.priority,
+      assigned_to: form.assigned_to || userId,
+      recurrence: form.recurrence || null,
+    }).eq('id', editTask.id)
+    setEditTask(null)
+    setShowForm(false)
+    setForm({ title: '', due_date: '', priority: 'normal', assigned_to: userId || '', recurrence: '' })
+    fetchTasks()
+    setSaving(false)
+  }
+
+  const handleDelete = async (taskId) => {
+    if (!window.confirm('Delete this task?')) return
+    await supabase.from('tasks').delete().eq('id', taskId)
+    fetchTasks()
   }
 
   const nextRecurrenceDate = (fromDate, recurrence) => {
@@ -123,7 +153,7 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
           )}
         </div>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => { if (showForm) { setEditTask(null); setForm({ title: '', due_date: '', priority: 'normal', assigned_to: userId || '', recurrence: '' }) } setShowForm(v => !v) }}
           className="bg-fp-brand text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors"
         >
           {showForm ? 'Cancel' : '+ Add Task'}
@@ -191,13 +221,21 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
               </div>
             )}
           </div>
-          <button
-            onClick={handleAdd}
-            disabled={saving || !form.title}
-            className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
-          >
-            {saving ? 'Saving...' : 'Create Task'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={editTask ? handleUpdate : handleAdd}
+              disabled={saving || !form.title}
+              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50"
+            >
+              {saving ? 'Saving...' : editTask ? 'Save Changes' : 'Create Task'}
+            </button>
+            {editTask && (
+              <button onClick={() => { setEditTask(null); setShowForm(false); setForm({ title: '', due_date: '', priority: 'normal', assigned_to: userId || '', recurrence: '' }) }}
+                className="px-4 py-2 rounded-lg text-sm text-fp-muted hover:text-fp-text border border-fp-border transition-colors">
+                Cancel
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -251,6 +289,14 @@ export default function TaskList({ clientId, proposalId, orgId, userId, profiles
                   {isOverdue(task) ? 'Overdue' : isDueToday(task) ? 'Today' : task.due_date}
                 </span>
               )}
+              <button onClick={() => startEdit(task)}
+                className="text-fp-muted hover:text-fp-text text-xs px-2 py-1 rounded hover:bg-fp-hover transition-colors">
+                Edit
+              </button>
+              <button onClick={() => handleDelete(task.id)}
+                className="text-fp-muted hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-fp-hover transition-colors">
+                ✕
+              </button>
             </div>
           ))}
         </div>
