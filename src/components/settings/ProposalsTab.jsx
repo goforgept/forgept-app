@@ -203,6 +203,7 @@ export default function ProposalsTab({
                 {[
                   { value: 'compact', label: 'Compact', desc: 'Small logo, slim header' },
                   { value: 'large', label: 'Large', desc: 'Bigger logo, taller header' },
+                  { value: 'full-logo', label: 'Full Width', desc: 'Logo spans the entire top' },
                 ].map(opt => (
                   <button key={opt.value} onClick={() => onChangePdfHeaderStyle?.(opt.value)}
                     className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors border text-left ${pdfHeaderStyle === opt.value ? 'bg-fp-brand text-white border-fp-brand' : 'bg-fp-bg text-fp-muted hover:text-fp-text border-fp-border'}`}>
