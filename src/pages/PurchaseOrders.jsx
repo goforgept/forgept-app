@@ -84,6 +84,13 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     setLineItems(prev => ({ ...prev, [po.id]: bomItems || [] }))
   }
 
+  const deletePO = async (po) => {
+    if (!window.confirm(`Delete ${po.po_number}? This cannot be undone.`)) return
+    await supabase.from('purchase_order_line_items').delete().eq('po_id', po.id)
+    await supabase.from('purchase_orders').delete().eq('id', po.id)
+    fetchAll()
+  }
+
   const toggleExpand = async (po) => {
     if (expandedPO === po.id) { setExpandedPO(null); return }
     setExpandedPO(po.id)
@@ -634,6 +641,13 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                         className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
                         {['Sent', 'Partial', 'Received', 'Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
                       </select>
+                      <button
+                        onClick={e => { e.stopPropagation(); deletePO(po) }}
+                        className="text-fp-muted hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-fp-hover transition-colors flex-shrink-0"
+                        title="Delete PO"
+                      >
+                        ✕
+                      </button>
                       <span className="text-fp-muted text-lg leading-none">{isExpanded ? '−' : '+'}</span>
                     </div>
                   </div>

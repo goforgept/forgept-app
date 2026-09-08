@@ -12,12 +12,18 @@ CREATE TABLE IF NOT EXISTS public.purchase_order_line_items (
 
 ALTER TABLE public.purchase_order_line_items ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "org members" ON public.purchase_order_line_items;
+
 CREATE POLICY "org members" ON public.purchase_order_line_items
   FOR ALL USING (
-    po_id IN (
-      SELECT id FROM public.purchase_orders
-      WHERE org_id IN (SELECT org_id FROM public.profiles WHERE id = auth.uid())
+    EXISTS (
+      SELECT 1
+      FROM public.purchase_orders po
+      JOIN public.profiles pr ON pr.org_id = po.org_id
+      WHERE po.id = purchase_order_line_items.po_id
+        AND pr.id = auth.uid()
     )
   );
 
-CREATE INDEX IF NOT EXISTS purchase_order_line_items_po_id_idx ON public.purchase_order_line_items(po_id);
+CREATE INDEX IF NOT EXISTS purchase_order_line_items_po_id_idx
+  ON public.purchase_order_line_items(po_id);
