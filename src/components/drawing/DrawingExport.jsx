@@ -1238,6 +1238,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       pdf.text(`${orgProfile?.company_name || ''}  ·  ${proposal?.proposal_name || ''}`, pageW - margin, 7, { align: 'right' })
 
       let lx = margin
+      let ly = 18
       // Draw legend items
       const colW   = 55
       const rowH   = 14
