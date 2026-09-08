@@ -4,13 +4,13 @@ import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 
 const emptyForm = {
-  client_name: '', company: '', email: '', phone: '',
+  client_name: '', company: '', email: '', phone: '', website: '',
   industry: '', crm_source: '', notes: '',
   address: '', city: '', state: '', zip: '', store_id: '',
   net_terms: 'NET 30', payment_method: 'Default',
 }
 
-const industries = ['Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security', 'Low Voltage', 'General Contractor', 'Roofing', 'Home Improvement', 'Flooring', 'Painting', 'Landscaping', 'Solar', 'Fire Protection', 'Telecom', 'IT / Networking', 'Other']
+const industries = ['Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security', 'Low Voltage', 'General Contractor', 'Roofing', 'Home Improvement', 'Flooring', 'Painting', 'Landscaping', 'Solar', 'Fire Protection', 'Telecom', 'IT / Networking', 'Manufacturing Partner', 'Distributor', 'Sub-Contractor', 'Residential', 'Commercial', 'Other']
 
 const industryColors = {
   'Electrical': 'bg-yellow-500/20 text-yellow-400',
@@ -30,6 +30,11 @@ const industryColors = {
   'Fire Protection': 'bg-red-600/20 text-red-300',
   'Telecom': 'bg-indigo-500/20 text-indigo-400',
   'IT / Networking': 'bg-violet-500/20 text-violet-400',
+  'Manufacturing Partner': 'bg-slate-500/20 text-slate-400',
+  'Distributor': 'bg-fuchsia-500/20 text-fuchsia-400',
+  'Sub-Contractor': 'bg-rose-500/20 text-rose-400',
+  'Residential': 'bg-green-400/20 text-green-300',
+  'Commercial': 'bg-blue-600/20 text-blue-300',
   'Other': 'bg-fp-inset text-fp-muted',
 }
 
@@ -424,6 +429,14 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                   <label className="text-fp-muted text-xs mb-1 block">Phone</label>
                   <input type="text" value={form.phone}
                     onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                  />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Website</label>
+                  <input type="url" value={form.website}
+                    onChange={e => setForm(p => ({ ...p, website: e.target.value }))}
+                    placeholder="https://example.com"
                     className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                   />
                 </div>
