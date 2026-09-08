@@ -141,7 +141,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
       attendee_ids: isMeeting && form.attendee_ids.length > 0 ? form.attendee_ids : null,
       attendee_emails: isMeeting && form.attendee_emails.length > 0 ? form.attendee_emails : null,
       meeting_notes: isMeeting ? form.meeting_notes || null : null,
-      start_time: isMeeting ? form.start_time || null : null,
+      start_time: form.start_time || null,
       recurrence: form.recurrence || null,
     }).select('*, clients(company, client_name, email)').single()
 
@@ -206,7 +206,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
       attendee_ids: isMeeting && form.attendee_ids.length > 0 ? form.attendee_ids : null,
       attendee_emails: isMeeting && form.attendee_emails.length > 0 ? form.attendee_emails : null,
       meeting_notes: isMeeting ? form.meeting_notes || null : null,
-      start_time: isMeeting ? form.start_time || null : null,
+      start_time: form.start_time || null,
       recurrence: form.recurrence || null,
     }).eq('id', editTask.id)
     setEditTask(null)
@@ -370,6 +370,10 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 <input type="date" value={form.due_date} onChange={e => setForm(prev => ({ ...prev, due_date: e.target.value }))} className={inputClass} />
               </div>
               <div>
+                <label className="text-fp-muted text-xs mb-1 block">Due Time <span className="text-fp-muted font-normal">(optional)</span></label>
+                <input type="time" value={form.start_time || ''} onChange={e => setForm(prev => ({ ...prev, start_time: e.target.value }))} className={inputClass} />
+              </div>
+              <div>
                 <label className="text-fp-muted text-xs mb-1 block">Priority</label>
                 <select value={form.priority} onChange={e => setForm(prev => ({ ...prev, priority: e.target.value }))} className={inputClass}>
                   <option value="low">Low</option>
@@ -423,10 +427,6 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
-                </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Start Time</label>
-                  <input type="time" value={form.start_time || ''} onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))} className={inputClass} />
                 </div>
                 <div>
                   <label className="text-fp-muted text-xs mb-1 block">Duration (minutes)</label>
@@ -734,6 +734,10 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                           isOverdue(task) ? 'text-red-400' : isDueToday(task) ? 'text-[#C8622A]' : 'text-fp-muted'
                         }`}>
                           {isOverdue(task) ? 'Overdue' : isDueToday(task) ? 'Today' : task.due_date}
+                          {task.start_time && (() => {
+                            const [h, m] = task.start_time.split(':').map(Number)
+                            return ` ${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`
+                          })()}
                         </span>
                       )}
                       <button onClick={() => startEdit(task)}
