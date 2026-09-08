@@ -266,14 +266,42 @@ export default function RichTextEditor({ value, onChange, placeholder, rows = 6 
   const handlePaste = (e) => {
     e.preventDefault()
     const clipHtml = e.clipboardData.getData('text/html')
+    const clipText = e.clipboardData.getData('text/plain')
+
+    let html = ''
     if (clipHtml) {
-      const clean = cleanPastedHtml(clipHtml)
-      document.execCommand('insertHTML', false, clean)
-    } else {
-      // Plain text fallback — preserve line breaks
-      const text = e.clipboardData.getData('text/plain')
-      document.execCommand('insertText', false, text)
+      html = cleanPastedHtml(clipHtml)
+    } else if (clipText) {
+      // Preserve line breaks from plain-text sources
+      html = clipText
+        .split(/\r?\n/)
+        .map(line => `<p>${line || '<br>'}</p>`)
+        .join('')
     }
+    if (!html) return
+
+    // Use Selection API — more reliable than the deprecated execCommand('insertHTML')
+    const sel = window.getSelection()
+    if (sel && sel.rangeCount) {
+      sel.deleteFromDocument()
+      const range = sel.getRangeAt(0)
+      const frag = range.createContextualFragment(html)
+      const lastNode = frag.lastChild
+      range.insertNode(frag)
+      // Move cursor to end of inserted content
+      if (lastNode) {
+        const after = document.createRange()
+        after.setStartAfter(lastNode)
+        after.collapse(true)
+        sel.removeAllRanges()
+        sel.addRange(after)
+      }
+    } else {
+      // Fallback if no selection (editor wasn't focused)
+      ref.current.focus()
+      document.execCommand('insertHTML', false, html)
+    }
+
     onChange(ref.current.innerHTML)
   }
 

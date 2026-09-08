@@ -469,7 +469,7 @@ export default function ProposalDetail({ isAdmin }) {
           client_id: proposal.client_id || null,
           job_number: jobNumber,
           name: proposal.proposal_name,
-          status: 'Active',
+          status: 'Pending',
         })
       } catch (e) { console.error('Job creation error:', e) }
     }

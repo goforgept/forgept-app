@@ -131,6 +131,35 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
       .update({ pipeline_stage_id: stage.id, status: newStatus })
       .eq('id', dragging.id)
 
+    // Create a job when moving to Won (only if one doesn't already exist)
+    if (newStatus === 'Won' && dragging.status !== 'Won') {
+      try {
+        const { data: existing } = await supabase
+          .from('jobs')
+          .select('id')
+          .eq('proposal_id', dragging.id)
+          .maybeSingle()
+
+        if (!existing) {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('job_counter')
+            .eq('id', orgId)
+            .single()
+          const jobNumber = `JOB-${orgData?.job_counter || 1000}`
+          await supabase.from('organizations').update({ job_counter: (orgData?.job_counter || 1000) + 1 }).eq('id', orgId)
+          await supabase.from('jobs').insert({
+            org_id: orgId,
+            proposal_id: dragging.id,
+            client_id: dragging.client_id || null,
+            job_number: jobNumber,
+            name: dragging.proposal_name,
+            status: 'Pending',
+          })
+        }
+      } catch (e) { console.error('Job creation error:', e) }
+    }
+
     setDragging(null)
     fetchData()
   }
