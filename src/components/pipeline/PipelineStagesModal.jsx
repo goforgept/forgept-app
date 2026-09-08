@@ -7,7 +7,7 @@ const COLORS = [
   '#14b8a6', '#ef4444',
 ]
 
-function StageRow({ stage, index, total, onUpdate, onDelete, onMove, dragHandleProps }) {
+function StageRow({ stage, isDragOver, dragHandleProps, onEdit, onDelete }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState({ name: stage.name, probability: stage.probability ?? 50, definition: stage.definition ?? '', color: stage.color })
 
@@ -18,7 +18,7 @@ function StageRow({ stage, index, total, onUpdate, onDelete, onMove, dragHandleP
       definition: draft.definition,
       color: draft.color,
     }).eq('id', stage.id)
-    onUpdate({ ...stage, ...draft, probability: Number(draft.probability) })
+    onEdit({ ...stage, ...draft, probability: Number(draft.probability) })
     setEditing(false)
   }
 
@@ -28,12 +28,13 @@ function StageRow({ stage, index, total, onUpdate, onDelete, onMove, dragHandleP
   }
 
   return (
-    <div className="bg-fp-card border border-fp-border rounded-xl overflow-hidden">
-      {/* Row header */}
+    <div className={`bg-fp-card border rounded-xl overflow-hidden transition-all ${isDragOver ? 'border-fp-brand shadow-lg scale-[1.01]' : 'border-fp-border'}`}>
       <div className="flex items-center gap-3 px-4 py-3">
-        {/* Drag handle */}
-        <span {...dragHandleProps} className="text-fp-muted cursor-grab active:cursor-grabbing select-none text-lg leading-none">⠿</span>
-
+        <span
+          {...dragHandleProps}
+          className="text-fp-muted cursor-grab active:cursor-grabbing select-none text-lg leading-none touch-none"
+          title="Drag to reorder"
+        >⠿</span>
         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: stage.color }} />
         <div className="flex-1 min-w-0">
           <p className="text-fp-text text-sm font-semibold truncate">{stage.name}</p>
@@ -42,15 +43,6 @@ function StageRow({ stage, index, total, onUpdate, onDelete, onMove, dragHandleP
           )}
         </div>
         <span className="text-fp-muted text-xs font-mono w-10 text-right">{stage.probability ?? 50}%</span>
-
-        {/* Move up / down */}
-        <div className="flex flex-col gap-0.5">
-          <button disabled={index === 0} onClick={() => onMove(index, -1)}
-            className="text-fp-muted hover:text-fp-text disabled:opacity-20 text-xs leading-none px-0.5">▲</button>
-          <button disabled={index === total - 1} onClick={() => onMove(index, 1)}
-            className="text-fp-muted hover:text-fp-text disabled:opacity-20 text-xs leading-none px-0.5">▼</button>
-        </div>
-
         <button onClick={() => setEditing(e => !e)}
           className="text-fp-muted hover:text-fp-text text-xs px-2 py-1 rounded transition-colors">
           {editing ? 'Cancel' : 'Edit'}
@@ -61,7 +53,6 @@ function StageRow({ stage, index, total, onUpdate, onDelete, onMove, dragHandleP
         </button>
       </div>
 
-      {/* Edit form */}
       {editing && (
         <div className="px-4 pb-4 border-t border-fp-border space-y-3 pt-3">
           <div className="grid grid-cols-2 gap-3">
@@ -76,9 +67,7 @@ function StageRow({ stage, index, total, onUpdate, onDelete, onMove, dragHandleP
             <div>
               <label className="text-fp-muted text-xs mb-1 block">Probability (%)</label>
               <input
-                type="number"
-                min="0"
-                max="100"
+                type="number" min="0" max="100"
                 value={draft.probability}
                 onChange={e => setDraft(d => ({ ...d, probability: e.target.value }))}
                 className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
@@ -125,6 +114,43 @@ export default function PipelineStagesModal({ stages: initialStages, orgId, onCl
   const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
 
+  // Drag state
+  const dragIndex = useRef(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
+
+  const handleDragStart = (index) => (e) => {
+    dragIndex.current = index
+    e.dataTransfer.effectAllowed = 'move'
+    // Minimal ghost image so the handle feels like a drag, not a copy
+    e.dataTransfer.setDragImage(e.currentTarget.closest('[data-stage-row]'), 20, 20)
+  }
+
+  const handleDragOver = (index) => (e) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (index !== dragIndex.current) setDragOverIndex(index)
+  }
+
+  const handleDrop = async (index) => (e) => {
+    e.preventDefault()
+    const from = dragIndex.current
+    if (from == null || from === index) { setDragOverIndex(null); return }
+    const next = [...stages]
+    const [moved] = next.splice(from, 1)
+    next.splice(index, 0, moved)
+    const reindexed = next.map((s, i) => ({ ...s, position: i }))
+    setStages(reindexed)
+    setDragOverIndex(null)
+    dragIndex.current = null
+    await Promise.all(reindexed.map(s => supabase.from('pipeline_stages').update({ position: s.position }).eq('id', s.id)))
+    onSaved?.()
+  }
+
+  const handleDragEnd = () => {
+    dragIndex.current = null
+    setDragOverIndex(null)
+  }
+
   const handleUpdate = (updated) => {
     setStages(prev => prev.map(s => s.id === updated.id ? updated : s))
     onSaved?.()
@@ -134,18 +160,6 @@ export default function PipelineStagesModal({ stages: initialStages, orgId, onCl
     if (!window.confirm(`Delete "${stage.name}"? Proposals in this stage will need to be reassigned.`)) return
     await supabase.from('pipeline_stages').delete().eq('id', stage.id)
     setStages(prev => prev.filter(s => s.id !== stage.id))
-    onSaved?.()
-  }
-
-  const handleMove = async (index, dir) => {
-    const next = [...stages]
-    const swap = index + dir
-    if (swap < 0 || swap >= next.length) return
-    ;[next[index], next[swap]] = [next[swap], next[index]]
-    // Update positions
-    const updates = next.map((s, i) => supabase.from('pipeline_stages').update({ position: i }).eq('id', s.id))
-    await Promise.all(updates)
-    setStages(next.map((s, i) => ({ ...s, position: i })))
     onSaved?.()
   }
 
@@ -162,10 +176,7 @@ export default function PipelineStagesModal({ stages: initialStages, orgId, onCl
     }).select().single()
     if (data) {
       setStages(prev => [...prev, data])
-      setNewName('')
-      setNewProb(50)
-      setNewDef('')
-      setNewColor('#8A9AB0')
+      setNewName(''); setNewProb(50); setNewDef(''); setNewColor('#8A9AB0')
       setAdding(false)
       onSaved?.()
     }
@@ -178,27 +189,34 @@ export default function PipelineStagesModal({ stages: initialStages, orgId, onCl
         <div className="flex items-center justify-between px-6 py-4 border-b border-fp-border">
           <div>
             <h3 className="text-fp-text font-bold text-lg">Pipeline Stages</h3>
-            <p className="text-fp-muted text-xs mt-0.5">Drag ⠿ or use arrows to reorder</p>
+            <p className="text-fp-muted text-xs mt-0.5">Drag ⠿ to reorder</p>
           </div>
           <button onClick={onClose} className="text-fp-muted hover:text-fp-text text-xl leading-none">✕</button>
         </div>
 
         <div className="overflow-y-auto flex-1 p-4 space-y-2">
           {stages.map((stage, i) => (
-            <StageRow
+            <div
               key={stage.id}
-              stage={stage}
-              index={i}
-              total={stages.length}
-              onUpdate={handleUpdate}
-              onDelete={handleDelete}
-              onMove={handleMove}
-              dragHandleProps={{}}
-            />
+              data-stage-row
+              onDragOver={handleDragOver(i)}
+              onDrop={handleDrop(i)}
+            >
+              <StageRow
+                stage={stage}
+                isDragOver={dragOverIndex === i}
+                onEdit={handleUpdate}
+                onDelete={handleDelete}
+                dragHandleProps={{
+                  draggable: true,
+                  onDragStart: handleDragStart(i),
+                  onDragEnd: handleDragEnd,
+                }}
+              />
+            </div>
           ))}
         </div>
 
-        {/* Add new stage */}
         <div className="border-t border-fp-border p-4">
           {adding ? (
             <div className="space-y-3">
