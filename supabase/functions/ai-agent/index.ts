@@ -85,6 +85,22 @@ const TOOLS = [
     },
   },
   {
+    name: "create_contact",
+    description: "Add a contact person to an existing client account. Use this when adding a new person to a company that already exists — do NOT use create_client. Inserts into the contacts tab.",
+    input_schema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Company name to find the client account" },
+        full_name: { type: "string", description: "Contact person's full name" },
+        email: { type: "string", description: "Contact email address" },
+        phone: { type: "string", description: "Contact phone number" },
+        title: { type: "string", description: "Job title or role" },
+        is_primary: { type: "boolean", description: "Set as primary contact (default false)" },
+      },
+      required: ["company", "full_name"],
+    },
+  },
+  {
     name: "get_recent_activity",
     description: "Get recent clients, proposals, or service tickets",
     input_schema: {
@@ -167,6 +183,26 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       }).select("id, title").single()
       if (error) return { error: error.message }
       return { success: true, id: data.id, title: data.title, action: "created_task" }
+    }
+
+    case "create_contact": {
+      // Find the client account by company name
+      const { data: client } = await supabase.from("clients")
+        .select("id, company").eq("org_id", orgId)
+        .ilike("company", `%${input.company}%`).limit(1).maybeSingle()
+      if (!client) return { error: `No client account found matching "${input.company}". Create the company first with create_client.` }
+      const { data, error } = await supabase.from("client_contacts").insert({
+        org_id: orgId,
+        client_id: client.id,
+        full_name: input.full_name,
+        email: input.email || null,
+        phone: input.phone || null,
+        title: input.title || null,
+        is_primary: input.is_primary || false,
+        notes: "",
+      }).select("id, full_name").single()
+      if (error) return { error: error.message }
+      return { success: true, id: data.id, full_name: data.full_name, company: client.company, action: "created_contact" }
     }
 
     case "get_pipeline_summary": {
@@ -312,6 +348,7 @@ Guidelines:
 - When you create something, always mention what was created and that the user can find it in the app.
 - If a required field is missing (like company name for a client), ask for just that field.
 - Format dollar amounts with $ and commas. Format dates as Month Day, Year.
+- IMPORTANT: When adding a contact person to an existing company, always use create_contact (not create_client). create_client creates a new company account. create_contact adds a person to an existing company's Contacts tab.
 - Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`
 
     // Agentic loop — keep calling Claude until it stops using tools
