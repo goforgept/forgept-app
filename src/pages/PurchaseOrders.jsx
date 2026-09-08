@@ -678,7 +678,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                               return (
                                 <tr key={item.id} className="border-b border-fp-border/30">
                                   <td className="text-fp-text py-3 pr-4">{item.item_name}</td>
-                                  <td className="text-fp-muted py-3 pr-4">{item.part_number_sku || '—'}</td>
+                                  <td className="text-fp-muted py-3 pr-4">{item.part_number || item.part_number_sku || '—'}</td>
                                   <td className="text-fp-text py-3 pr-4 text-right">{ordered} {item.unit || 'ea'}</td>
                                   <td className="py-3 pr-4 text-right">
                                     <input type="number" min="0" max={ordered} value={received || ''} onChange={e => updateReceivedQty(po.id, item.id, e.target.value, ordered)} placeholder="0"
