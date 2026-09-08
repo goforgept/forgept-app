@@ -3,19 +3,26 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import JobStagesModal from '../components/jobs/JobStagesModal'
 
+// Kept as export for JobDetail fallback; DB-driven stages take precedence
 export const JOB_STATUSES = [
-  { key: 'Pending',          color: 'bg-fp-inset text-fp-muted',         dot: 'bg-gray-400' },
-  { key: 'Scheduled',        color: 'bg-purple-500/20 text-purple-400',   dot: 'bg-purple-400' },
-  { key: 'In Progress',      color: 'bg-green-500/20 text-green-400',     dot: 'bg-green-400' },
-  { key: 'Waiting on Parts', color: 'bg-orange-500/20 text-orange-400',   dot: 'bg-orange-400' },
-  { key: 'Punch List',       color: 'bg-cyan-500/20 text-cyan-400',       dot: 'bg-cyan-400' },
-  { key: 'On Hold',          color: 'bg-yellow-500/20 text-yellow-400',   dot: 'bg-yellow-400' },
-  { key: 'Completed',        color: 'bg-blue-500/20 text-blue-400',       dot: 'bg-blue-400' },
-  { key: 'Cancelled',        color: 'bg-red-500/20 text-red-400',         dot: 'bg-red-400' },
+  { key: 'Pending',          color: '#8A9AB0' },
+  { key: 'Scheduled',        color: '#a855f7' },
+  { key: 'In Progress',      color: '#22c55e' },
+  { key: 'Waiting on Parts', color: '#f59e0b' },
+  { key: 'Punch List',       color: '#14b8a6' },
+  { key: 'On Hold',          color: '#eab308' },
+  { key: 'Completed',        color: '#3b82f6' },
+  { key: 'Cancelled',        color: '#ef4444' },
 ]
 
-const STATUS_COLOR_MAP = Object.fromEntries(JOB_STATUSES.map(s => [s.key, s.color]))
+const DEFAULT_JOB_STAGES = JOB_STATUSES.map((s, i) => ({ name: s.key, color: s.color, position: i }))
+
+const stageBadgeStyle = (color) => ({
+  background: color + '33',
+  color: color,
+})
 
 const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 
@@ -28,11 +35,32 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
   const [statusFilter, setStatusFilter] = useState('All')
   const [showArchived, setShowArchived] = useState(false)
   const [view, setView] = useState(() => localStorage.getItem('jobs_view') || 'board')
+  const [jobStages, setJobStages] = useState(JOB_STATUSES.map(s => ({ id: s.key, name: s.key, color: s.color })))
+  const [showManageStages, setShowManageStages] = useState(false)
   const dragJob = useRef(null)
 
   const setView_ = (v) => { setView(v); localStorage.setItem('jobs_view', v) }
 
-  useEffect(() => { if (profile?.org_id) fetchJobs() }, [profile?.org_id])
+  useEffect(() => { if (profile?.org_id) { fetchJobs(); fetchJobStages() } }, [profile?.org_id])
+
+  const fetchJobStages = async () => {
+    if (!profile?.org_id) return
+    const { data: existing } = await supabase
+      .from('job_stages')
+      .select('*')
+      .eq('org_id', profile.org_id)
+      .order('position')
+    if (existing && existing.length > 0) {
+      setJobStages(existing)
+    } else {
+      // Seed defaults for this org
+      const { data: seeded } = await supabase
+        .from('job_stages')
+        .insert(DEFAULT_JOB_STAGES.map(s => ({ ...s, org_id: profile.org_id })))
+        .select()
+      setJobStages(seeded || JOB_STATUSES.map(s => ({ id: s.key, name: s.key, color: s.color })))
+    }
+  }
 
   const fetchJobs = async () => {
     if (!profile?.org_id) { setLoading(false); return }
@@ -105,8 +133,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
   const jobUrl = (job) => isTechnician ? `/tech/job/${job.id}` : `/jobs/${job.id}`
 
   // Stats for header
-  const statuses = JOB_STATUSES.filter(s => s.key !== 'Completed' && s.key !== 'Cancelled')
-  const activeByStatus = Object.fromEntries(statuses.map(s => [s.key, activeJobs.filter(j => j.status === s.key).length]))
+  const activeByStatus = Object.fromEntries(jobStages.map(s => [s.name, activeJobs.filter(j => j.status === s.name).length]))
   const totalValue = activeJobs.reduce((sum, j) => sum + (j.proposals?.proposal_value || 0), 0)
 
   return (
@@ -121,6 +148,12 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
             <p className="text-fp-muted text-sm mt-0.5">{filtered.length} job{filtered.length !== 1 ? 's' : ''}</p>
           </div>
           <div className="flex items-center gap-2">
+            {isAdmin && (
+              <button onClick={() => setShowManageStages(true)}
+                className="px-3 py-2 rounded-lg text-xs font-semibold bg-fp-card text-fp-muted hover:text-fp-text border border-fp-border transition-colors">
+                Manage Stages
+              </button>
+            )}
             {archivedCount > 0 && (
               <button onClick={() => setShowArchived(v => !v)}
                 className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${showArchived ? 'bg-fp-brand/20 text-fp-brand border border-fp-brand/30' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
@@ -164,7 +197,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
               className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
               <option value="All">All Statuses</option>
-              {JOB_STATUSES.map(s => <option key={s.key} value={s.key}>{s.key}</option>)}
+              {jobStages.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
             </select>
           </div>
         )}
@@ -172,7 +205,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
         {loading ? (
           <p className="text-fp-muted">Loading...</p>
         ) : view === 'board' ? (
-          <KanbanBoard jobs={filtered} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}
+          <KanbanBoard jobs={filtered} jobStages={jobStages} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}
             jobUrl={jobUrl} navigate={navigate} getProgress={getProgress} isAdmin={isAdmin}
             onArchive={archiveJob} onRestore={restoreJob} onDelete={deleteJob} showArchived={showArchived} />
         ) : (
@@ -211,9 +244,15 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
                         {job.billing_type && job.billing_type !== 'Lump Sum' && (
                           <span className="px-2 py-1 rounded text-xs font-semibold bg-fp-inset text-fp-muted">{job.billing_type}</span>
                         )}
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${STATUS_COLOR_MAP[job.status] || 'bg-fp-inset text-fp-muted'}`}>
-                          {job.status}
-                        </span>
+                        {(() => {
+                          const s = jobStages.find(st => st.name === job.status)
+                          return (
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold"
+                              style={s ? stageBadgeStyle(s.color) : { background: 'rgba(138,154,176,0.2)', color: '#8A9AB0' }}>
+                              {job.status}
+                            </span>
+                          )
+                        })()}
                         {isAdmin && (
                           job.archived_at
                             ? <button onClick={e => restoreJob(e, job.id)} className="text-fp-muted hover:text-green-400 text-xs transition-colors opacity-0 group-hover:opacity-100">Restore</button>
@@ -243,22 +282,32 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
           )
         )}
       </div>
+
+      {showManageStages && profile?.org_id && (
+        <JobStagesModal
+          stages={jobStages.filter(s => s.org_id)}
+          orgId={profile.org_id}
+          onClose={() => setShowManageStages(false)}
+          onSaved={fetchJobStages}
+        />
+      )}
     </div>
   )
 }
 
-function KanbanBoard({ jobs, onDragStart, onDragOver, onDrop, jobUrl, navigate, getProgress, isAdmin, onArchive, onRestore, onDelete, showArchived }) {
+function KanbanBoard({ jobs, jobStages, onDragStart, onDragOver, onDrop, jobUrl, navigate, getProgress, isAdmin, onArchive, onRestore, onDelete, showArchived }) {
   const [dragOver, setDragOver] = useState(null)
 
-  const columns = JOB_STATUSES.map(s => ({
+  const columns = jobStages.map(s => ({
     ...s,
-    jobs: jobs.filter(j => j.status === s.key),
-    value: jobs.filter(j => j.status === s.key).reduce((sum, j) => sum + (j.proposals?.proposal_value || 0), 0),
+    key: s.name,
+    jobs: jobs.filter(j => j.status === s.name),
+    value: jobs.filter(j => j.status === s.name).reduce((sum, j) => sum + (j.proposals?.proposal_value || 0), 0),
   }))
 
   return (
     <div className="overflow-x-auto pb-4 w-full min-w-0">
-      <div className="flex gap-4" style={{ minWidth: `${JOB_STATUSES.length * 252}px` }}>
+      <div className="flex gap-4" style={{ minWidth: `${jobStages.length * 252}px` }}>
         {columns.map(col => (
           <div key={col.key}
             onDragOver={e => { onDragOver(e); setDragOver(col.key) }}
@@ -268,7 +317,7 @@ function KanbanBoard({ jobs, onDragStart, onDragOver, onDrop, jobUrl, navigate, 
             {/* Column header */}
             <div className="px-3 py-3 border-b border-fp-border flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${col.dot}`} />
+                <span className="w-2 h-2 rounded-full" style={{ background: col.color }} />
                 <span className="text-fp-text font-semibold text-sm">{col.key}</span>
                 <span className="text-fp-muted text-xs bg-fp-inset px-1.5 py-0.5 rounded-full">{col.jobs.length}</span>
               </div>

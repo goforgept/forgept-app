@@ -696,6 +696,11 @@ export default function ProposalDetail({ isAdmin }) {
     setProposal(prev => ({ ...prev, tax_exempt: val, tax_rate: val ? null : prev?.tax_rate }))
   }
 
+  const updateIndustry = async (val) => {
+    await supabase.from('proposals').update({ industry: val || null }).eq('id', id)
+    setProposal(prev => ({ ...prev, industry: val || null }))
+  }
+
   const applyBulkEdit = () => {
     if (!bulkField || !bulkValue || bulkSelectedLines.size === 0) return
     setEditLines(prev => prev.map(l => {
@@ -3688,7 +3693,7 @@ const analyzeDrawing = async () => {
           editingContractNumber={editingContractNumber} contractNumberDraft={contractNumberDraft}
           setContractNumberDraft={setContractNumberDraft} saveContractNumber={saveContractNumber}
           setEditingContractNumber={setEditingContractNumber}
-          updateCloseDate={updateCloseDate} updateTaxExempt={updateTaxExempt} updateTaxRate={updateTaxRate}
+          updateCloseDate={updateCloseDate} updateTaxExempt={updateTaxExempt} updateTaxRate={updateTaxRate} updateIndustry={updateIndustry}
           onSaveDealAmount={saveDealAmount}
           setShowDealSummaryModal={setShowDealSummaryModal} setDealSummary={setDealSummary}
           setShowShareModal={setShowShareModal}

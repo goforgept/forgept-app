@@ -20,7 +20,7 @@ export default function ProposalHeader({
   quoteNumberError, setQuoteNumberError,
   saveQuoteNumber, setEditingQuoteNumber,
   saveContractNumber, setEditingContractNumber,
-  updateCloseDate, updateTaxExempt, updateTaxRate,
+  updateCloseDate, updateTaxExempt, updateTaxRate, updateIndustry,
   onSaveDealAmount,
   setShowDealSummaryModal, setDealSummary,
   setShowShareModal, setDeleteConfirmText, setShowDeleteModal,
@@ -277,8 +277,21 @@ export default function ProposalHeader({
         </Cell>
 
         {/* Industry */}
-        <Cell label="Industry" className="min-w-[100px]">
-          <span className="text-fp-text text-sm font-medium">{proposal?.industry || '—'}</span>
+        <Cell label="Industry" className="min-w-[120px]">
+          {canEdit && updateIndustry ? (
+            <select
+              value={proposal?.industry || ''}
+              onChange={e => updateIndustry(e.target.value)}
+              className="bg-transparent text-fp-text text-sm font-medium focus:outline-none w-full cursor-pointer"
+            >
+              <option value="">—</option>
+              {['Security','Audio/Visual','IT','Fire','Manufacturing Partner','Distributor','Sub-Contractor','Residential','Commercial','Other'].map(ind => (
+                <option key={ind} value={ind}>{ind}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-fp-text text-sm font-medium">{proposal?.industry || '—'}</span>
+          )}
         </Cell>
 
         {/* Margin */}

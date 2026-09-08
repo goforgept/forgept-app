@@ -9,21 +9,16 @@ const COLORS = [
 
 function StageRow({ stage, isDragOver, dragHandleProps, onEdit, onDelete }) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState({ name: stage.name, probability: stage.probability ?? 50, definition: stage.definition ?? '', color: stage.color })
+  const [draft, setDraft] = useState({ name: stage.name, color: stage.color })
 
   const save = async () => {
-    await supabase.from('pipeline_stages').update({
-      name: draft.name,
-      probability: Number(draft.probability),
-      definition: draft.definition,
-      color: draft.color,
-    }).eq('id', stage.id)
-    onEdit({ ...stage, ...draft, probability: Number(draft.probability) })
+    await supabase.from('job_stages').update({ name: draft.name, color: draft.color }).eq('id', stage.id)
+    onEdit({ ...stage, ...draft })
     setEditing(false)
   }
 
   const cancel = () => {
-    setDraft({ name: stage.name, probability: stage.probability ?? 50, definition: stage.definition ?? '', color: stage.color })
+    setDraft({ name: stage.name, color: stage.color })
     setEditing(false)
   }
 
@@ -38,11 +33,7 @@ function StageRow({ stage, isDragOver, dragHandleProps, onEdit, onDelete }) {
         <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: stage.color }} />
         <div className="flex-1 min-w-0">
           <p className="text-fp-text text-sm font-semibold truncate">{stage.name}</p>
-          {stage.definition && !editing && (
-            <p className="text-fp-muted text-xs truncate">{stage.definition}</p>
-          )}
         </div>
-        <span className="text-fp-muted text-xs font-mono w-10 text-right">{stage.probability ?? 50}%</span>
         <button onClick={() => setEditing(e => !e)}
           className="text-fp-muted hover:text-fp-text text-xs px-2 py-1 rounded transition-colors">
           {editing ? 'Cancel' : 'Edit'}
@@ -55,31 +46,11 @@ function StageRow({ stage, isDragOver, dragHandleProps, onEdit, onDelete }) {
 
       {editing && (
         <div className="px-4 pb-4 border-t border-fp-border space-y-3 pt-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-fp-muted text-xs mb-1 block">Stage Name</label>
-              <input
-                value={draft.name}
-                onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
-                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-              />
-            </div>
-            <div>
-              <label className="text-fp-muted text-xs mb-1 block">Probability (%)</label>
-              <input
-                type="number" min="0" max="100"
-                value={draft.probability}
-                onChange={e => setDraft(d => ({ ...d, probability: e.target.value }))}
-                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-              />
-            </div>
-          </div>
           <div>
-            <label className="text-fp-muted text-xs mb-1 block">Definition</label>
+            <label className="text-fp-muted text-xs mb-1 block">Stage Name</label>
             <input
-              value={draft.definition}
-              onChange={e => setDraft(d => ({ ...d, definition: e.target.value }))}
-              placeholder="What does this stage mean?"
+              value={draft.name}
+              onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}
               className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
             />
           </div>
@@ -105,23 +76,19 @@ function StageRow({ stage, isDragOver, dragHandleProps, onEdit, onDelete }) {
   )
 }
 
-export default function PipelineStagesModal({ stages: initialStages, orgId, onClose, onSaved }) {
+export default function JobStagesModal({ stages: initialStages, orgId, onClose, onSaved }) {
   const [stages, setStages] = useState(initialStages)
   const [newName, setNewName] = useState('')
-  const [newProb, setNewProb] = useState(50)
-  const [newDef, setNewDef] = useState('')
   const [newColor, setNewColor] = useState('#8A9AB0')
   const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Drag state
   const dragIndex = useRef(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
 
   const handleDragStart = (index) => (e) => {
     dragIndex.current = index
     e.dataTransfer.effectAllowed = 'move'
-    // Minimal ghost image so the handle feels like a drag, not a copy
     e.dataTransfer.setDragImage(e.currentTarget.closest('[data-stage-row]'), 20, 20)
   }
 
@@ -142,7 +109,7 @@ export default function PipelineStagesModal({ stages: initialStages, orgId, onCl
     setStages(reindexed)
     setDragOverIndex(null)
     dragIndex.current = null
-    await Promise.all(reindexed.map(s => supabase.from('pipeline_stages').update({ position: s.position }).eq('id', s.id)))
+    await Promise.all(reindexed.map(s => supabase.from('job_stages').update({ position: s.position }).eq('id', s.id)))
     onSaved?.()
   }
 
@@ -157,8 +124,8 @@ export default function PipelineStagesModal({ stages: initialStages, orgId, onCl
   }
 
   const handleDelete = async (stage) => {
-    if (!window.confirm(`Delete "${stage.name}"? Proposals in this stage will need to be reassigned.`)) return
-    await supabase.from('pipeline_stages').delete().eq('id', stage.id)
+    if (!window.confirm(`Delete "${stage.name}"? Jobs in this stage will keep the status name but it won't appear in the board.`)) return
+    await supabase.from('job_stages').delete().eq('id', stage.id)
     setStages(prev => prev.filter(s => s.id !== stage.id))
     onSaved?.()
   }
@@ -166,17 +133,15 @@ export default function PipelineStagesModal({ stages: initialStages, orgId, onCl
   const handleAdd = async () => {
     if (!newName.trim()) return
     setSaving(true)
-    const { data } = await supabase.from('pipeline_stages').insert({
+    const { data } = await supabase.from('job_stages').insert({
       org_id: orgId,
       name: newName.trim(),
-      probability: Number(newProb),
-      definition: newDef.trim() || null,
       color: newColor,
       position: stages.length,
     }).select().single()
     if (data) {
       setStages(prev => [...prev, data])
-      setNewName(''); setNewProb(50); setNewDef(''); setNewColor('#8A9AB0')
+      setNewName(''); setNewColor('#8A9AB0')
       setAdding(false)
       onSaved?.()
     }
@@ -188,7 +153,7 @@ export default function PipelineStagesModal({ stages: initialStages, orgId, onCl
       <div className="bg-fp-card rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-fp-border">
           <div>
-            <h3 className="text-fp-text font-bold text-lg">Pipeline Stages</h3>
+            <h3 className="text-fp-text font-bold text-lg">Job Stages</h3>
             <p className="text-fp-muted text-xs mt-0.5">Drag ⠿ to reorder</p>
           </div>
           <button onClick={onClose} className="text-fp-muted hover:text-fp-text text-xl leading-none">✕</button>
@@ -220,34 +185,14 @@ export default function PipelineStagesModal({ stages: initialStages, orgId, onCl
         <div className="border-t border-fp-border p-4">
           {adding ? (
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Stage Name</label>
-                  <input
-                    value={newName}
-                    onChange={e => setNewName(e.target.value)}
-                    placeholder="e.g. Site Assessment"
-                    autoFocus
-                    onKeyDown={e => e.key === 'Enter' && handleAdd()}
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Probability (%)</label>
-                  <input
-                    type="number" min="0" max="100"
-                    value={newProb}
-                    onChange={e => setNewProb(e.target.value)}
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                </div>
-              </div>
               <div>
-                <label className="text-fp-muted text-xs mb-1 block">Definition</label>
+                <label className="text-fp-muted text-xs mb-1 block">Stage Name</label>
                 <input
-                  value={newDef}
-                  onChange={e => setNewDef(e.target.value)}
-                  placeholder="What does this stage mean?"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  placeholder="e.g. On Site"
+                  autoFocus
+                  onKeyDown={e => e.key === 'Enter' && handleAdd()}
                   className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                 />
               </div>

@@ -71,6 +71,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [changeOrders, setChangeOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('checklist')
+  const [jobStages, setJobStages] = useState(JOB_STATUSES.map(s => ({ key: s.key, name: s.key, color: s.color })))
   const [moreOpen, setMoreOpen] = useState(false)
   const [techPickerOpen, setTechPickerOpen] = useState(false)
   const moreRef = useRef(null)
@@ -158,6 +159,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       setOrgProfiles(profilesData || [])
       const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', profile.org_id).single()
       setOrgTimezone(orgData?.timezone || 'America/Chicago')
+      const { data: stagesData } = await supabase.from('job_stages').select('*').eq('org_id', profile.org_id).order('position')
+      if (stagesData && stagesData.length > 0) setJobStages(stagesData.map(s => ({ ...s, key: s.name })))
     }
 
     if (jobData?.proposal_id) {
@@ -1575,7 +1578,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
               </button>
               <select value={job?.status || 'In Progress'} onChange={e => updateJobStatus(e.target.value)} disabled={savingStatus}
                 className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-fp-brand">
-                {JOB_STATUSES.map(s => <option key={s.key}>{s.key}</option>)}
+                {jobStages.map(s => <option key={s.key || s.name}>{s.name || s.key}</option>)}
               </select>
             </div>
           </div>
