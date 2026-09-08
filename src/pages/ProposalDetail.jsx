@@ -3698,6 +3698,19 @@ const analyzeDrawing = async () => {
           canEdit={canEdit}
         />
 
+        {canEdit && (
+          <div className="flex items-center justify-between bg-fp-card rounded-xl px-5 py-3">
+            <div>
+              <p className="text-fp-text text-sm font-semibold">Disable Follow-up Emails</p>
+              <p className="text-fp-muted text-xs mt-0.5">Stop close-date reminder emails for this deal</p>
+            </div>
+            <button onClick={toggleDisableFollowupEmails}
+              className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.disable_followup_emails ? 'bg-[#C8622A]' : 'bg-fp-border'}`}>
+              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.disable_followup_emails ? 'left-6' : 'left-1'}`} />
+            </button>
+          </div>
+        )}
+
         {profile?.about_us && (
           <div className="bg-fp-card rounded-xl p-6 mb-6">
             <h3 className="text-fp-text font-bold text-lg mb-3">About Us</h3>

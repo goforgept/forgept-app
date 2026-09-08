@@ -72,10 +72,21 @@ const drawPolylineOnPDF = (pdf, points, imgX, imgY, imgW, imgH, color, lineWidth
   pdf.setLineDashPattern([], 0)
 }
 
+const resolveLogoUrl = async (rawUrl) => {
+  if (!rawUrl) return null
+  if (rawUrl.startsWith('http')) return rawUrl
+  try {
+    const { getR2Url, BUCKETS } = await import('../../r2')
+    return await getR2Url(rawUrl, 60 * 60 * 24, BUCKETS.ASSETS)
+  } catch { return null }
+}
+
 const loadOrgLogoFromProfile = async (orgProfile) => {
   if (!orgProfile?.logo_url) return null
   try {
-    const resp = await fetch(orgProfile.logo_url)
+    const url = await resolveLogoUrl(orgProfile.logo_url)
+    if (!url) return null
+    const resp = await fetch(url)
     if (!resp.ok) return null
     const blob = await resp.blob()
     const dataUrl = await new Promise((resolve, reject) => {
@@ -968,11 +979,13 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
     }
   }
 
-  // ── Load org logo safely (fetch → dataURL avoids CORS/tainted-canvas issues)
+  // ── Load org logo safely — resolves R2 path to signed URL first
   const loadOrgLogo = async () => {
     if (!orgProfile?.logo_url) return null
     try {
-      const resp = await fetch(orgProfile.logo_url)
+      const url = await resolveLogoUrl(orgProfile.logo_url)
+      if (!url) return null
+      const resp = await fetch(url)
       if (!resp.ok) return null
       const blob = await resp.blob()
       const dataUrl = await new Promise((resolve, reject) => {

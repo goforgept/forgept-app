@@ -71,26 +71,6 @@ export default function PricingOptionsModal({ proposal, onToggleHideMaterialPric
               </button>
             </div>
           )}
-          <div className="flex items-center justify-between bg-fp-inset rounded-xl px-4 py-3">
-            <div>
-              <p className="text-fp-text text-sm font-semibold">Disable Follow-up Emails</p>
-              <p className="text-fp-muted text-xs mt-0.5">Stop close-date reminder emails from being sent for this deal</p>
-            </div>
-            <button onClick={onToggleDisableFollowupEmails}
-              className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.disable_followup_emails ? 'bg-[#C8622A]' : 'bg-fp-inset'}`}>
-              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.disable_followup_emails ? 'left-6' : 'left-1'}`} />
-            </button>
-          </div>
-          <div className="flex items-center justify-between bg-fp-inset rounded-xl px-4 py-3 border border-yellow-600/20">
-            <div>
-              <p className="text-fp-text text-sm font-semibold">Lock Automatic Updates</p>
-              <p className="text-fp-muted text-xs mt-0.5">Skip catalog pricing &amp; MSRP lookups when syncing the drawing to the BOM — prices stay exactly as entered</p>
-            </div>
-            <button onClick={onToggleDisableAutoUpdates}
-              className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${proposal?.disable_auto_updates ? 'bg-yellow-600' : 'bg-fp-inset'}`}>
-              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proposal?.disable_auto_updates ? 'left-6' : 'left-1'}`} />
-            </button>
-          </div>
         </div>
         <button onClick={onClose} className="mt-5 w-full py-2 bg-fp-brand text-white rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">Done</button>
       </div>
