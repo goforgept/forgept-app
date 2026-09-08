@@ -3096,16 +3096,15 @@ const analyzeDrawing = async () => {
       doc.addPage()
     }
 
+    // Resolve header style before cover-page check so full-logo can override
+    const hdrStyle = freshOrg?.pdf_header_style || profile?.organizations?.pdf_header_style || 'compact'
+    const isFullLogo = hdrStyle === 'full-logo'
+    const isPropLarge = hdrStyle === 'large'
     let yPos
-    if (p?.show_cover_page) {
-      // Cover page already has all branding/client info — start content clean at top of page
+    if (p?.show_cover_page && !(isFullLogo && logoImg)) {
+      // Cover page already has all branding — skip header for compact/large styles
       yPos = 20
     } else {
-      // Header banner
-      const hdrStyle = freshOrg?.pdf_header_style || profile?.organizations?.pdf_header_style || 'compact'
-      const isFullLogo = hdrStyle === 'full-logo'
-      const isPropLarge = hdrStyle === 'large'
-
       if (isFullLogo && logoImg) {
         // Full-width logo: fit logo to full page width, no color bar
         const maxLogoH = 40
