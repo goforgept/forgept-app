@@ -11,13 +11,18 @@ function orgLocalDate(tz: string): string {
 }
 
 function orgLocalHour(tz: string): string {
-  // Returns 'HH' in 24h in the org timezone
-  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hour12: false }).format(new Date()).split(',')[0].trim().padStart(2, '0')
+  // formatToParts gives us the named 'hour' value reliably in 24h regardless of locale quirks
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', hour12: false }).formatToParts(new Date())
+  const h = parts.find(p => p.type === 'hour')?.value ?? '0'
+  return h.padStart(2, '0')
 }
 
 function orgLocalTime(tz: string): string {
-  // Returns 'HH:MM' in the org timezone
-  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).replace(', ', '').trim().slice(0, 5)
+  // formatToParts reliably gives 24h hour + minute regardless of locale quirks
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
+  const h = (parts.find(p => p.type === 'hour')?.value ?? '0').padStart(2, '0')
+  const m = (parts.find(p => p.type === 'minute')?.value ?? '0').padStart(2, '0')
+  return `${h}:${m}`
 }
 
 Deno.serve(async (req) => {
@@ -213,24 +218,37 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Batch insert all notifications — use raw fetch with ignore-duplicates so
-    // the partial unique index (user_id, dedup_key WHERE NOT NULL) is respected
-    if (allNotifications.length > 0) {
+    // Pre-filter: remove any notifications whose dedup_key already exists in the DB
+    // so we never hit the unique constraint at all (Prefer:resolution=ignore-duplicates
+    // uses the PK as conflict target, not the dedup index, causing full-chunk failures)
+    let toInsert = allNotifications
+    const keyed = allNotifications.filter(n => n.dedup_key)
+    if (keyed.length > 0) {
+      const uniqueKeys = [...new Set(keyed.map(n => n.dedup_key))]
+      const { data: existing } = await supabase
+        .from('notifications')
+        .select('dedup_key')
+        .in('dedup_key', uniqueKeys)
+      const seen = new Set((existing || []).map((e: any) => e.dedup_key))
+      toInsert = allNotifications.filter(n => !n.dedup_key || !seen.has(n.dedup_key))
+    }
+
+    if (toInsert.length > 0) {
       const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
       const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       const dbHeaders   = {
         'apikey': serviceKey,
         'Authorization': `Bearer ${serviceKey}`,
         'Content-Type': 'application/json',
-        'Prefer': 'resolution=ignore-duplicates,return=minimal',
+        'Prefer': 'return=minimal',
       }
       const CHUNK = 50
       let insertErrors = 0
-      for (let i = 0; i < allNotifications.length; i += CHUNK) {
+      for (let i = 0; i < toInsert.length; i += CHUNK) {
         const res = await fetch(`${supabaseUrl}/rest/v1/notifications`, {
           method: 'POST',
           headers: dbHeaders,
-          body: JSON.stringify(allNotifications.slice(i, i + CHUNK)),
+          body: JSON.stringify(toInsert.slice(i, i + CHUNK)),
         })
         if (!res.ok) {
           const txt = await res.text()
@@ -238,7 +256,9 @@ Deno.serve(async (req) => {
           insertErrors++
         }
       }
-      inserted.push(`${allNotifications.length} notifications queued${insertErrors ? `, ${insertErrors} batch errors` : ''}`)
+      inserted.push(`${toInsert.length} new notifications inserted (${allNotifications.length - toInsert.length} skipped as duplicates)${insertErrors ? `, ${insertErrors} batch errors` : ''}`)
+    } else if (allNotifications.length > 0) {
+      inserted.push(`0 new notifications (${allNotifications.length} already sent)`)
     }
 
     return new Response(

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { clientName } from '../utils/client'
+import AddressAutocomplete from '../components/AddressAutocomplete'
 
 const emptyForm = {
   client_type: 'commercial',
@@ -554,10 +555,11 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
 
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Street Address</label>
-                <input type="text" value={form.address}
-                  onChange={e => setForm(p => ({ ...p, address: e.target.value }))}
-                  placeholder="123 Main St"
-                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                <AddressAutocomplete
+                  inputClass="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                  onSelect={({ address, city, state, zip }) =>
+                    setForm(p => ({ ...p, address, city, state, zip }))
+                  }
                 />
               </div>
               <div className="grid grid-cols-3 gap-3">
