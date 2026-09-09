@@ -4,8 +4,8 @@ const STATUS_FALLBACK = { Won: 'Won', Lost: 'Lost', Sent: 'Proposal Sent', Draft
 
 function Cell({ label, children, className = '' }) {
   return (
-    <div className={`flex flex-col gap-0.5 px-3 py-2 shrink-0 ${className}`}>
-      <span className="text-[9px] font-semibold uppercase tracking-wider text-fp-muted/60 select-none whitespace-nowrap">{label}</span>
+    <div className={`flex flex-col gap-0.5 bg-fp-inset border border-fp-border rounded-lg px-3 py-2 focus-within:border-fp-brand/40 hover:border-fp-border/80 transition-colors ${className}`}>
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-fp-muted/70 select-none">{label}</span>
       {children}
     </div>
   )
@@ -30,13 +30,14 @@ export default function ProposalHeader({
   const [contractDraft,   setContractDraft]   = useState(proposal?.contract_number ?? '')
   const [taxRateDraft,    setTaxRateDraft]    = useState(proposal?.tax_rate        ?? '')
   const [dealAmountDraft, setDealAmountDraft] = useState(proposal?.proposal_value != null ? String(proposal.proposal_value) : '')
+  const [dealAmountDirty, setDealAmountDirty] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
 
   useEffect(() => { setQuoteDraft(proposal?.quote_number    ?? '') }, [proposal?.quote_number])
   useEffect(() => { setContractDraft(proposal?.contract_number ?? '') }, [proposal?.contract_number])
   useEffect(() => { setTaxRateDraft(proposal?.tax_rate        ?? '') }, [proposal?.tax_rate])
-  useEffect(() => { setDealAmountDraft(proposal?.proposal_value != null ? String(proposal.proposal_value) : '') }, [proposal?.proposal_value])
+  useEffect(() => { setDealAmountDraft(proposal?.proposal_value != null ? String(proposal.proposal_value) : ''); setDealAmountDirty(false) }, [proposal?.proposal_value])
 
   // Close menu on outside click
   useEffect(() => {
@@ -237,10 +238,10 @@ export default function ProposalHeader({
         </div>
       )}
 
-      {/* CRM cells — single strip, scrollable */}
-      <div className="flex items-stretch mt-4 bg-fp-inset border border-fp-border rounded-lg divide-x divide-fp-border overflow-x-auto">
+      {/* CRM cells */}
+      <div className="flex flex-wrap gap-2 mt-4">
 
-        <Cell label="Rep" className="min-w-[110px]">
+        <Cell label="Rep" className="min-w-[120px]">
           {isAdmin && onUpdateRep && orgProfiles?.length > 0 ? (
             <select value={proposal?.user_id || ''} onChange={e => { const p = orgProfiles.find(o => o.id === e.target.value); if (p) onUpdateRep(p) }}
               className="bg-transparent text-fp-text text-sm font-medium focus:outline-none cursor-pointer appearance-none w-full">
@@ -252,7 +253,7 @@ export default function ProposalHeader({
           {proposal?.rep_title && <span className="text-[11px] text-fp-muted leading-none">{proposal.rep_title}</span>}
         </Cell>
 
-        <Cell label="Quote #" className="min-w-[88px]">
+        <Cell label="Quote #" className="min-w-[100px]">
           {canEdit ? (
             <input type="text" value={quoteDraft} placeholder="—"
               onChange={e => { setQuoteDraft(e.target.value); setQuoteNumberError('') }}
@@ -265,7 +266,7 @@ export default function ProposalHeader({
           {quoteNumberError && <span className="text-red-400 text-[10px] leading-tight">{quoteNumberError}</span>}
         </Cell>
 
-        <Cell label="Contract #" className="min-w-[88px]">
+        <Cell label="Contract #" className="min-w-[100px]">
           {canEdit ? (
             <input type="text" value={contractDraft} placeholder="—"
               onChange={e => setContractDraft(e.target.value)}
@@ -277,7 +278,7 @@ export default function ProposalHeader({
           )}
         </Cell>
 
-        <Cell label="Close Date" className="min-w-[108px]">
+        <Cell label="Close Date" className="min-w-[120px]">
           {canEdit ? (
             <input type="date" value={proposal?.close_date || ''} onChange={e => updateCloseDate(e.target.value)}
               className={`${inputCls} cursor-pointer`} />
@@ -286,14 +287,14 @@ export default function ProposalHeader({
           )}
         </Cell>
 
-        <Cell label="Deal Amount" className="min-w-[108px]">
+        <Cell label="Deal Amount" className="min-w-[120px]">
           {canEdit ? (
             <div className="flex items-center gap-0.5">
               <span className="text-fp-muted text-sm">$</span>
               <input type="number" min="0" step="0.01" value={dealAmountDraft} placeholder="0.00"
-                onChange={e => setDealAmountDraft(e.target.value)}
-                onBlur={e => { if (e.target.value !== '') onSaveDealAmount?.(parseFloat(e.target.value) || 0) }}
-                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setDealAmountDraft(proposal?.proposal_value != null ? String(proposal.proposal_value) : ''); e.currentTarget.blur() } }}
+                onChange={e => { setDealAmountDraft(e.target.value); setDealAmountDirty(true) }}
+                onBlur={e => { if (dealAmountDirty && e.target.value !== '') { onSaveDealAmount?.(parseFloat(e.target.value) || 0); setDealAmountDirty(false) } }}
+                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setDealAmountDraft(proposal?.proposal_value != null ? String(proposal.proposal_value) : ''); setDealAmountDirty(false); e.currentTarget.blur() } }}
                 className={inputCls} />
             </div>
           ) : (
@@ -303,7 +304,7 @@ export default function ProposalHeader({
           )}
         </Cell>
 
-        <Cell label="Industry" className="min-w-[100px]">
+        <Cell label="Industry" className="min-w-[110px]">
           {canEdit && updateIndustry ? (
             <select value={proposal?.industry || ''} onChange={e => updateIndustry(e.target.value)}
               className="bg-transparent text-fp-text text-sm font-medium focus:outline-none w-full cursor-pointer">
@@ -323,7 +324,7 @@ export default function ProposalHeader({
           </span>
         </Cell>
 
-        <Cell label="Tax" className="min-w-[78px]">
+        <Cell label="Tax" className="min-w-[85px]">
           {canEdit ? (
             <button onClick={() => updateTaxExempt(!proposal?.tax_exempt)}
               className={`text-sm font-semibold text-left transition-colors ${proposal?.tax_exempt ? 'text-green-500' : 'text-fp-text hover:text-fp-muted'}`}>
