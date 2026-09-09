@@ -14,7 +14,7 @@ export default function GeneralTab({
         <div className="flex gap-3">
           {[
             { value: 'dark',  label: 'Dark',  icon: '🌙', desc: 'Default dark theme' },
-            { value: 'light', label: 'Light', icon: '☀️', desc: 'Light theme (beta)' },
+            { value: 'light', label: 'Light', icon: '☀️', desc: 'Light theme' },
           ].map(opt => (
             <button key={opt.value} onClick={() => applyTheme?.(opt.value)}
               className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${

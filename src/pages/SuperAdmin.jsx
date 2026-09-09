@@ -571,6 +571,7 @@ export default function SuperAdmin() {
   const startEditingOrg = (org) => {
     setEditingOrg(org.id)
     setOrgForm({
+      name: org.name || '',
       org_type: org.org_type || 'integrator',
       feature_proposals:      org.feature_proposals !== false,
       feature_crm:            org.feature_crm            || false,
@@ -598,6 +599,7 @@ export default function SuperAdmin() {
 
   const saveOrgSettings = async (orgId) => {
     const { error } = await supabase.from('organizations').update({
+      name: orgForm.name || undefined,
       org_type: orgForm.org_type,
       designer_allowed_manufacturers: orgForm.designer_allowed_manufacturers?.length ? orgForm.designer_allowed_manufacturers : null,
       designer_enabled_industries: orgForm.designer_enabled_industries?.length ? orgForm.designer_enabled_industries : null,
@@ -1309,6 +1311,15 @@ export default function SuperAdmin() {
                 {/* Org Type + Designer/Catalog */}
                 <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
                   <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Advanced Settings</p>
+                    <div>
+                      <label className="text-[#8A9AB0] text-xs mb-1 block font-semibold uppercase tracking-wide">Organization Name</label>
+                      <input
+                        type="text"
+                        value={orgForm.name || ''}
+                        onChange={e => setOrgForm(p => ({ ...p, name: e.target.value }))}
+                        className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]"
+                      />
+                    </div>
                     <div>
                       <label className="text-[#8A9AB0] text-xs mb-2 block font-semibold uppercase tracking-wide">Org Type</label>
                       <div className="grid grid-cols-3 gap-2">
