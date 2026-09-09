@@ -321,15 +321,14 @@ async function parseSystemSurveyorFile(file) {
     if (installNotes) specs.install_notes = installNotes
     if (mountHeight)  specs.mount_height  = parseFloat(mountHeight)
 
+    const descLabel = getVal('Descriptive Label', offset) || getVal('Product Description', offset) || getVal('Description', offset)
+
     products.push({
       industry,
       manufacturer: mfr,
       category,
-      name:         (() => {
-        const label = getVal('Descriptive Label', offset) || getVal('Product Description', offset) || getVal('Description', offset)
-        if (label && label !== partNum) return `${partNum} — ${label}`
-        return `${mfr} ${partNum}`
-      })(),
+      name:         descLabel && descLabel !== partNum ? `${partNum} — ${descLabel}` : `${mfr} ${partNum}`,
+      description:  descLabel || null,
       part_number:  partNum,
       is_basic:     false,
       is_active:    true,

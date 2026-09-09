@@ -318,7 +318,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
               <label className={labelClass}>Description</label>
               <input type="text" value={form.description_override}
                 onChange={e => update('description_override', e.target.value)}
-                placeholder="e.g. 4MP IR IK10 Dome"
+                placeholder={product.description || 'e.g. 4MP IR IK10 Dome'}
                 className={inputClass} />
             </div>
             <div>
