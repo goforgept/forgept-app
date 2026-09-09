@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import RichTextEditor from '../components/proposal/RichTextEditor'
 
 const mkKey = () => `_${Date.now()}_${Math.random().toString(36).slice(2)}`
 
@@ -693,10 +694,8 @@ export default function Templates({ isAdmin }) {
 
             <div>
               <label className="text-fp-muted text-xs mb-1 block">Scope of Work <span className="text-fp-muted font-normal">(optional — applied to proposals when this template is loaded)</span></label>
-              <textarea value={form.scope_of_work} onChange={e => setForm(p => ({ ...p, scope_of_work: e.target.value }))}
-                placeholder="Describe the scope of work for this template..."
-                rows={5}
-                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y leading-relaxed" />
+              <RichTextEditor value={form.scope_of_work} onChange={v => setForm(p => ({ ...p, scope_of_work: v }))}
+                placeholder="Describe the scope of work for this template..." rows={8} />
             </div>
 
             {renderBomEditor(lines, setLines, laborItems, setLaborItems, sections, setSections, 'create')}
@@ -743,10 +742,8 @@ export default function Templates({ isAdmin }) {
 
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Scope of Work <span className="text-fp-muted font-normal">(optional — applied to proposals when this template is loaded)</span></label>
-                <textarea value={editForm.scope_of_work} onChange={e => setEditForm(p => ({ ...p, scope_of_work: e.target.value }))}
-                  placeholder="Describe the scope of work for this template..."
-                  rows={5}
-                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-y leading-relaxed" />
+                <RichTextEditor value={editForm.scope_of_work} onChange={v => setEditForm(p => ({ ...p, scope_of_work: v }))}
+                  placeholder="Describe the scope of work for this template..." rows={8} />
               </div>
 
               {renderBomEditor(editLines, setEditLines, editLaborItems, setEditLaborItems, editSections, setEditSections, 'edit')}
