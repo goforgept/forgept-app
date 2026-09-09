@@ -17,6 +17,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
   const [lineItems, setLineItems] = useState({})
   const [savingReceiving, setSavingReceiving] = useState({})
   const [qboPushing, setQboPushing] = useState({})
+  const [qboConnected, setQboConnected] = useState(false)
   const navigate = useNavigate()
 
   // New PO modal
@@ -69,6 +70,9 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
       .from('service_tickets').select('id, title, clients(company)')
       .eq('org_id', profile.org_id).not('status', 'in', '("Resolved","Cancelled")').order('created_at', { ascending: false })
     setServiceTickets(ticketData || [])
+
+    const { data: orgData } = await supabase.from('organizations').select('qbo_connected').eq('id', profile.org_id).single()
+    setQboConnected(orgData?.qbo_connected || false)
 
     setLoading(false)
   }
@@ -677,18 +681,20 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                       >
                         ↓ PDF
                       </button>
-                      <button
-                        onClick={e => { e.stopPropagation(); pushToQBO(po.id) }}
-                        disabled={qboPushing[po.id]}
-                        title={po.qbo_po_id ? `Update QBO PO #${po.qbo_po_number || po.qbo_po_id}` : 'Push to QuickBooks as PO'}
-                        className={`text-xs px-2 py-1 rounded border transition-colors flex-shrink-0 flex items-center gap-1 ${
-                          po.qbo_po_id
-                            ? 'border-green-500/40 text-green-400 hover:bg-green-500/10'
-                            : 'border-fp-border text-fp-muted hover:text-fp-text hover:border-fp-brand'
-                        } ${qboPushing[po.id] ? 'opacity-50 cursor-wait' : ''}`}
-                      >
-                        {qboPushing[po.id] ? '…' : po.qbo_po_id ? '✓ QBO' : 'QBO ↑'}
-                      </button>
+                      {qboConnected && (
+                        <button
+                          onClick={e => { e.stopPropagation(); pushToQBO(po.id) }}
+                          disabled={qboPushing[po.id]}
+                          title={po.qbo_po_id ? `Update QBO PO #${po.qbo_po_number || po.qbo_po_id}` : 'Push to QuickBooks as PO'}
+                          className={`text-xs px-2 py-1 rounded border transition-colors flex-shrink-0 flex items-center gap-1 ${
+                            po.qbo_po_id
+                              ? 'border-green-500/40 text-green-400 hover:bg-green-500/10'
+                              : 'border-fp-border text-fp-muted hover:text-fp-text hover:border-fp-brand'
+                          } ${qboPushing[po.id] ? 'opacity-50 cursor-wait' : ''}`}
+                        >
+                          {qboPushing[po.id] ? '…' : po.qbo_po_id ? '✓ QBO' : 'QBO ↑'}
+                        </button>
+                      )}
                       <select value={po.status} onChange={e => { e.stopPropagation(); updateStatus(po.id, e.target.value) }} onClick={e => e.stopPropagation()}
                         className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
                         {['Sent', 'Partial', 'Received', 'Cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
