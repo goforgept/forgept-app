@@ -213,16 +213,32 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Batch upsert all notifications
+    // Batch insert all notifications — use raw fetch with ignore-duplicates so
+    // the partial unique index (user_id, dedup_key WHERE NOT NULL) is respected
     if (allNotifications.length > 0) {
-      const CHUNK = 50
-      for (let i = 0; i < allNotifications.length; i += CHUNK) {
-        const { error } = await supabase
-          .from('notifications')
-          .upsert(allNotifications.slice(i, i + CHUNK), { onConflict: 'user_id,dedup_key', ignoreDuplicates: true })
-        if (error) console.error('notifications upsert error:', error)
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+      const serviceKey  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      const dbHeaders   = {
+        'apikey': serviceKey,
+        'Authorization': `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=ignore-duplicates,return=minimal',
       }
-      inserted.push(`${allNotifications.length} notifications queued`)
+      const CHUNK = 50
+      let insertErrors = 0
+      for (let i = 0; i < allNotifications.length; i += CHUNK) {
+        const res = await fetch(`${supabaseUrl}/rest/v1/notifications`, {
+          method: 'POST',
+          headers: dbHeaders,
+          body: JSON.stringify(allNotifications.slice(i, i + CHUNK)),
+        })
+        if (!res.ok) {
+          const txt = await res.text()
+          console.error('notifications insert error:', txt)
+          insertErrors++
+        }
+      }
+      inserted.push(`${allNotifications.length} notifications queued${insertErrors ? `, ${insertErrors} batch errors` : ''}`)
     }
 
     return new Response(
