@@ -48,12 +48,13 @@ export default function NotificationBell({ userId }) {
   }, [userId])
 
   const fetchNotifications = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('notifications')
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(50)
+    console.log('[Bell] userId:', userId, 'rows:', data?.length, 'error:', error?.message)
     setNotifications(data || [])
   }
 
