@@ -108,9 +108,28 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
       .limit(1)
     if (existingTx && existingTx.length > 0) return // already received
 
-    // Get line items
+    // Try purchase_order_line_items first, fall back to bom_line_items (POs from proposals)
     const { data: poItems } = await supabase.from('purchase_order_line_items').select('*').eq('po_id', poId)
-    const lines = poItems && poItems.length > 0 ? poItems : []
+    let lines = poItems && poItems.length > 0
+      ? poItems.map(l => ({ part_number: l.part_number, item_name: l.item_name, quantity: l.quantity, unit_cost: l.unit_cost }))
+      : []
+
+    if (!lines.length) {
+      const po = pos.find(p => p.id === poId)
+      if (po?.po_number) {
+        const { data: bomItems } = await supabase
+          .from('bom_line_items')
+          .select('part_number_sku, item_name, quantity, received_qty, your_cost_unit')
+          .eq('po_number', po.po_number)
+        lines = (bomItems || []).map(l => ({
+          part_number: l.part_number_sku,
+          item_name: l.item_name,
+          quantity: parseFloat(l.received_qty) || parseFloat(l.quantity) || 0,
+          unit_cost: l.your_cost_unit,
+        }))
+      }
+    }
+
     if (!lines.length) return
 
     // Get first warehouse (if any) as default
