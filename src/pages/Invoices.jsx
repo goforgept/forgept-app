@@ -18,6 +18,7 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('All')
+  const [clientTypeFilter, setClientTypeFilter] = useState('All')
   const [search, setSearch] = useState('')
 
   useEffect(() => { if (profile?.org_id) fetchInvoices() }, [profile?.org_id])
@@ -25,19 +26,27 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
   const fetchInvoices = async () => {
     if (!profile?.org_id) { setLoading(false); return }
 
-    const { data } = await supabase
-      .from('invoices')
-      .select('*, proposals(proposal_name, company, client_name), service_tickets(title, clients(company, client_name)), clients(company, client_name)')
-      .eq('org_id', profile.org_id)
-      .order('created_at', { ascending: false })
+    const [{ data }, { data: clientRows }] = await Promise.all([
+      supabase
+        .from('invoices')
+        .select('*, proposals(proposal_name, company, client_name), service_tickets(title, clients(company, client_name)), clients(company, client_name)')
+        .eq('org_id', profile.org_id)
+        .order('created_at', { ascending: false }),
+      supabase.from('clients').select('id, client_type').eq('org_id', profile.org_id),
+    ])
+
+    const clientTypeMap = {}
+    for (const c of (clientRows || [])) {
+      if (c.id) clientTypeMap[c.id] = c.client_type || 'commercial'
+    }
 
     // Auto-flag overdue
     const today = new Date()
     const updated = (data || []).map(inv => {
-      if (inv.status === 'Sent' && inv.due_date && new Date(inv.due_date) < today) {
-        return { ...inv, status: 'Overdue' }
-      }
-      return inv
+      const ct = clientTypeMap[inv.client_id] || 'commercial'
+      const flagged = (inv.status === 'Sent' && inv.due_date && new Date(inv.due_date) < today)
+        ? { ...inv, status: 'Overdue' } : inv
+      return { ...flagged, _clientType: ct }
     })
 
     setInvoices(updated)
@@ -46,6 +55,7 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
 
   const filtered = invoices.filter(i => {
     if (filter !== 'All' && i.status !== filter) return false
+    if (clientTypeFilter !== 'All' && i._clientType !== clientTypeFilter) return false
     if (search) {
       const q = search.toLowerCase()
       return (
@@ -115,7 +125,7 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
         </div>
 
         {/* Filters */}
-        <div className="flex gap-3 items-center mb-4">
+        <div className="flex gap-3 items-center mb-3">
           <input type="text" placeholder="Search invoice #, client, proposal..." value={search} onChange={e => setSearch(e.target.value)}
             className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-fp-muted" />
           <select value={filter} onChange={e => setFilter(e.target.value)}
@@ -124,10 +134,26 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
               <option key={s} value={s}>{s === 'All' ? 'All Statuses' : s}</option>
             ))}
           </select>
-          {(search || filter !== 'All') && (
-            <button onClick={() => { setSearch(''); setFilter('All') }}
+          {(search || filter !== 'All' || clientTypeFilter !== 'All') && (
+            <button onClick={() => { setSearch(''); setFilter('All'); setClientTypeFilter('All') }}
               className="text-fp-muted hover:text-fp-text text-xs transition-colors">Clear</button>
           )}
+        </div>
+        <div className="flex gap-2 mb-4">
+          {[['All', 'All'], ['commercial', 'Commercial'], ['residential', 'Residential']].map(([val, label]) => (
+            <button key={val} onClick={() => setClientTypeFilter(val)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                clientTypeFilter === val
+                  ? val === 'residential'
+                    ? 'bg-green-500/20 border-green-500/40 text-green-400'
+                    : val === 'commercial'
+                      ? 'bg-blue-500/20 border-blue-500/40 text-blue-400'
+                      : 'bg-fp-brand/20 border-fp-brand/40 text-fp-brand'
+                  : 'bg-fp-card border-fp-border text-fp-muted hover:text-fp-text'
+              }`}>
+              {label}
+            </button>
+          ))}
         </div>
 
         {loading ? <p className="text-fp-muted">Loading...</p> : filtered.length === 0 ? (

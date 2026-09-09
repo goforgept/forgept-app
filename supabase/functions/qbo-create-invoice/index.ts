@@ -58,7 +58,8 @@ async function findOrCreateCustomer(
   accessToken: string, realmId: string,
   clientName: string, companyName: string,
   clientEmail?: string, phone?: string,
-  address?: string, city?: string, state?: string, zip?: string
+  address?: string, city?: string, state?: string, zip?: string,
+  firstName?: string, lastName?: string,
 ) {
   const baseUrl = qboBase(realmId)
   const headers = {
@@ -67,7 +68,12 @@ async function findOrCreateCustomer(
     'Accept': 'application/json'
   }
 
-  const displayName = companyName || clientName || 'ForgePt Client'
+  // Residential clients: prefer first+last name; commercial: prefer company name
+  const givenName  = firstName || (clientName || '').split(' ')[0] || ''
+  const familyName = lastName  || (clientName || '').split(' ').slice(1).join(' ') || ''
+  const fullName   = [givenName, familyName].filter(Boolean).join(' ')
+  const displayName = companyName || fullName || clientName || 'ForgePt Client'
+
   const query = encodeURIComponent(`SELECT * FROM Customer WHERE DisplayName = '${displayName.replace(/'/g, "\\'")}'`)
   const searchRes = await fetch(`${baseUrl}/query?query=${query}&minorversion=65`, { headers })
   const searchData = await searchRes.json()
@@ -106,8 +112,8 @@ async function findOrCreateCustomer(
     body: JSON.stringify({
       DisplayName: displayName,
       CompanyName: companyName || '',
-      GivenName: (clientName || '').split(' ')[0] || '',
-      FamilyName: (clientName || '').split(' ').slice(1).join(' ') || '',
+      GivenName: givenName,
+      FamilyName: familyName,
       PrimaryEmailAddr: clientEmail ? { Address: clientEmail } : undefined,
       PrimaryPhone: phone ? { FreeFormNumber: phone } : undefined,
       BillAddr: billingAddr,
@@ -170,6 +176,8 @@ Deno.serve(async (req) => {
     let clientState = ''
     let clientZip = ''
     let clientNetTerms = ''
+    let firstName = ''
+    let lastName = ''
     let docNumber = ''
     let dueDate: string | undefined
     let description = ''
@@ -200,11 +208,11 @@ Deno.serve(async (req) => {
         clientEmail = inv.proposals.client_email || ''
         docNumber   = inv.proposals.quote_number || inv.invoice_number || ''
 
-        // Fetch client record separately for phone/address
+        // Fetch client record separately for phone/address/type
         if (inv.proposals.client_id) {
           const { data: cl } = await adminSupabase
             .from('clients')
-            .select('email, phone, address, city, state, zip, net_terms')
+            .select('email, phone, address, city, state, zip, net_terms, client_type, first_name, last_name')
             .eq('id', inv.proposals.client_id)
             .maybeSingle()
           if (cl) {
@@ -215,6 +223,10 @@ Deno.serve(async (req) => {
             clientState    = cl.state || ''
             clientZip      = cl.zip || ''
             clientNetTerms = cl.net_terms || ''
+            if (cl.client_type === 'residential') {
+              firstName = cl.first_name || ''
+              lastName  = cl.last_name  || ''
+            }
           }
         }
       } else if (inv.service_tickets) {
@@ -279,7 +291,7 @@ Deno.serve(async (req) => {
       if (proposal.client_id) {
         const { data: cl } = await adminSupabase
           .from('clients')
-          .select('phone, address, city, state, zip, net_terms')
+          .select('phone, address, city, state, zip, net_terms, client_type, first_name, last_name')
           .eq('id', proposal.client_id)
           .maybeSingle()
         if (cl) {
@@ -289,6 +301,10 @@ Deno.serve(async (req) => {
           clientState    = cl.state || ''
           clientZip      = cl.zip || ''
           clientNetTerms = cl.net_terms || ''
+          if (cl.client_type === 'residential') {
+            firstName = cl.first_name || ''
+            lastName  = cl.last_name  || ''
+          }
         }
       }
 
@@ -374,7 +390,8 @@ Deno.serve(async (req) => {
     // Find or create QBO customer
     const customerId = await findOrCreateCustomer(
       accessToken, realmId, clientName, companyName,
-      clientEmail, clientPhone, clientAddress, clientCity, clientState, clientZip
+      clientEmail, clientPhone, clientAddress, clientCity, clientState, clientZip,
+      firstName, lastName,
     )
     if (!customerId) return new Response(JSON.stringify({ error: 'Could not find or create QBO customer' }), { status: 500, headers: corsHeaders })
 
