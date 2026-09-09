@@ -34,6 +34,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [clientTypeFilter, setClientTypeFilter] = useState('all')
+  const [dateRange, setDateRange] = useState(0)
   const [showArchived, setShowArchived] = useState(false)
   const [view, setView] = useState(() => localStorage.getItem('jobs_view') || 'board')
   const [jobStages, setJobStages] = useState(JOB_STATUSES.map(s => ({ id: s.key, name: s.key, color: s.color })))
@@ -111,6 +112,8 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
   const archivedCount = jobs.filter(j => !!j.archived_at).length
   const activeJobs = jobs.filter(j => !j.archived_at)
 
+  const dateThreshold = dateRange === 0 ? null : new Date(Date.now() - dateRange * 24 * 60 * 60 * 1000).toISOString()
+
   const filtered = jobs
     .filter(j => showArchived ? !!j.archived_at : !j.archived_at)
     .filter(j => {
@@ -121,7 +124,8 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
         ? [j.clients?.first_name, j.clients?.last_name].filter(Boolean).join(' ')
         : j.clients?.company || ''
       const matchSearch = !q || j.name?.toLowerCase().includes(q) || clientDisplay.toLowerCase().includes(q) || j.job_number?.toLowerCase().includes(q)
-      return matchStatus && matchType && matchSearch
+      const matchDate = !dateThreshold || (j.start_date || j.created_at) >= dateThreshold
+      return matchStatus && matchType && matchSearch && matchDate
     })
 
   // Kanban drag handlers
@@ -205,6 +209,14 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
             {[['all', 'All'], ['commercial', 'Commercial'], ['residential', 'Residential']].map(([val, label]) => (
               <button key={val} onClick={() => setClientTypeFilter(val)}
                 className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${clientTypeFilter === val ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1 bg-fp-card border border-fp-border rounded-lg px-2 py-1">
+            {[[0, 'All Time'], [30, '30d'], [60, '60d'], [90, '90d'], [180, '6mo'], [365, '1yr']].map(([val, label]) => (
+              <button key={val} onClick={() => setDateRange(val)}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${dateRange === val ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
                 {label}
               </button>
             ))}
