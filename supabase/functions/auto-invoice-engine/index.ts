@@ -19,9 +19,17 @@ function addInterval(dateStr: string, frequency: string): string {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const cronSecret = Deno.env.get('CRON_SECRET') ?? ''
-  const authHeader = req.headers.get('Authorization')
-  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+  const authHeader = req.headers.get('Authorization') ?? ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+  let authorized = false
+  try {
+    const parts = token.split('.')
+    if (parts.length === 3) {
+      const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
+      authorized = payload?.role === 'service_role'
+    }
+  } catch { /* invalid JWT */ }
+  if (!authorized) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
