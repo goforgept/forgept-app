@@ -33,6 +33,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
+  const [clientTypeFilter, setClientTypeFilter] = useState('all')
   const [showArchived, setShowArchived] = useState(false)
   const [view, setView] = useState(() => localStorage.getItem('jobs_view') || 'board')
   const [jobStages, setJobStages] = useState(JOB_STATUSES.map(s => ({ id: s.key, name: s.key, color: s.color })))
@@ -66,7 +67,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
     if (!profile?.org_id) { setLoading(false); return }
     const { data, error } = await supabase
       .from('jobs')
-      .select('*, proposals(proposal_name, proposal_value), clients(company), profiles!jobs_assigned_pm_fkey(full_name), job_checklist_items(id, completed)')
+      .select('*, proposals(proposal_name, proposal_value), clients(company, client_type, first_name, last_name), profiles!jobs_assigned_pm_fkey(full_name), job_checklist_items(id, completed)')
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
     if (error) console.error('fetchJobs error:', error.message, error.details)
@@ -114,9 +115,13 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
     .filter(j => showArchived ? !!j.archived_at : !j.archived_at)
     .filter(j => {
       const matchStatus = statusFilter === 'All' || j.status === statusFilter
+      const matchType = clientTypeFilter === 'all' || (j.clients?.client_type || 'commercial') === clientTypeFilter
       const q = search.toLowerCase()
-      const matchSearch = !q || j.name?.toLowerCase().includes(q) || j.clients?.company?.toLowerCase().includes(q) || j.job_number?.toLowerCase().includes(q)
-      return matchStatus && matchSearch
+      const clientDisplay = j.clients?.client_type === 'residential'
+        ? [j.clients?.first_name, j.clients?.last_name].filter(Boolean).join(' ')
+        : j.clients?.company || ''
+      const matchSearch = !q || j.name?.toLowerCase().includes(q) || clientDisplay.toLowerCase().includes(q) || j.job_number?.toLowerCase().includes(q)
+      return matchStatus && matchType && matchSearch
     })
 
   // Kanban drag handlers
@@ -194,9 +199,17 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
 
         {/* Filters (list view only) */}
         {view === 'list' && (
-          <div className="flex gap-3">
+          <div className="flex gap-3 flex-wrap">
             <input type="text" placeholder="Search jobs, clients..." value={search} onChange={e => setSearch(e.target.value)}
-              className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
+              className="flex-1 min-w-48 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
+            <div className="flex items-center gap-1 bg-fp-card border border-fp-border rounded-lg px-2 py-1">
+              {[['all', 'All'], ['commercial', 'Commercial'], ['residential', 'Residential']].map(([val, label]) => (
+                <button key={val} onClick={() => setClientTypeFilter(val)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${clientTypeFilter === val ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
               className="bg-fp-card border border-fp-border text-fp-text text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-fp-brand cursor-pointer">
               <option value="All">All Statuses</option>

@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
 import ActivityTimeline from '../components/ActivityTimeline'
 import TaskList from '../components/TaskList'
+import { clientName } from '../utils/client'
 
 const INDUSTRIES = [
   'Electrical', 'Mechanical', 'Plumbing', 'HVAC', 'Audio/Visual', 'Security',
@@ -442,6 +443,8 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const saveClient = async () => {
     setSavingClient(true)
     await supabase.from('clients').update({
+      client_type: editForm.client_type || 'commercial',
+      first_name: editForm.first_name || null, last_name: editForm.last_name || null,
       company: editForm.company, client_name: editForm.client_name, email: editForm.email, phone: editForm.phone, website: editForm.website || null,
       industry: editForm.industry, address: editForm.address, city: editForm.city, state: editForm.state, zip: editForm.zip, notes: editForm.notes, store_id: editForm.store_id || null, net_terms: editForm.net_terms || 'NET 30', payment_method: editForm.payment_method || 'Default',
     }).eq('id', id)
@@ -692,12 +695,22 @@ const deleteMeeting = async (meetingId) => {
           <div className="flex justify-between items-start">
             <div className="flex items-start gap-4">
               <div className="w-14 h-14 rounded-xl bg-[#C8622A]/20 flex items-center justify-center flex-shrink-0">
-                <span className="text-[#C8622A] text-xl font-bold">{(client?.company || client?.client_name || '?')[0].toUpperCase()}</span>
+                <span className="text-[#C8622A] text-xl font-bold">{(clientName(client) || '?')[0].toUpperCase()}</span>
               </div>
               <div>
                 <button onClick={() => navigate('/clients')} className="text-fp-muted hover:text-fp-text text-xs transition-colors mb-1">← Clients</button>
-                <h2 className="text-fp-text text-2xl font-bold">{client?.company}</h2>
-                <p className="text-fp-muted mt-0.5">{client?.client_name}</p>
+                <h2 className="text-fp-text text-2xl font-bold">{clientName(client)}</h2>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${client?.client_type === 'residential' ? 'bg-green-500/15 text-green-400' : 'bg-blue-500/15 text-blue-400'}`}>
+                    {client?.client_type === 'residential' ? 'Residential' : 'Commercial'}
+                  </span>
+                  {client?.client_type === 'residential' && client?.company && (
+                    <p className="text-fp-muted text-sm">{client.company}</p>
+                  )}
+                  {client?.client_type !== 'residential' && client?.client_name && (
+                    <p className="text-fp-muted text-sm">{client.client_name}</p>
+                  )}
+                </div>
                 {fullAddress && <p className="text-fp-muted text-sm mt-0.5">{fullAddress}</p>}
               </div>
             </div>
@@ -1621,8 +1634,32 @@ const deleteMeeting = async (meetingId) => {
             <h3 className="text-fp-text font-bold text-lg mb-5">Edit Client</h3>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div><label className="text-fp-muted text-xs mb-1 block">Company</label><input type="text" value={editForm.company || ''} onChange={e => setEditForm(p => ({ ...p, company: e.target.value }))} className={inputClass} /></div>
-                <div><label className="text-fp-muted text-xs mb-1 block">Contact Name</label><input type="text" value={editForm.client_name || ''} onChange={e => setEditForm(p => ({ ...p, client_name: e.target.value }))} className={inputClass} /></div>
+                {/* Client type toggle */}
+                <div className="col-span-2 flex gap-2 mb-1">
+                  {[['commercial', 'Commercial'], ['residential', 'Residential']].map(([val, label]) => (
+                    <button key={val} type="button"
+                      onClick={() => setEditForm(p => ({ ...p, client_type: val }))}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                        (editForm.client_type || 'commercial') === val
+                          ? val === 'residential' ? 'bg-green-500/20 border-green-500/40 text-green-400' : 'bg-blue-500/20 border-blue-500/40 text-blue-400'
+                          : 'bg-fp-inset border-fp-border text-fp-muted hover:text-fp-text'
+                      }`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {(editForm.client_type || 'commercial') === 'residential' ? (
+                  <>
+                    <div><label className="text-fp-muted text-xs mb-1 block">First Name</label><input type="text" value={editForm.first_name || ''} onChange={e => setEditForm(p => ({ ...p, first_name: e.target.value }))} className={inputClass} /></div>
+                    <div><label className="text-fp-muted text-xs mb-1 block">Last Name</label><input type="text" value={editForm.last_name || ''} onChange={e => setEditForm(p => ({ ...p, last_name: e.target.value }))} className={inputClass} /></div>
+                    <div><label className="text-fp-muted text-xs mb-1 block">Company (optional)</label><input type="text" value={editForm.company || ''} onChange={e => setEditForm(p => ({ ...p, company: e.target.value }))} className={inputClass} /></div>
+                  </>
+                ) : (
+                  <>
+                    <div><label className="text-fp-muted text-xs mb-1 block">Company</label><input type="text" value={editForm.company || ''} onChange={e => setEditForm(p => ({ ...p, company: e.target.value }))} className={inputClass} /></div>
+                    <div><label className="text-fp-muted text-xs mb-1 block">Contact Name</label><input type="text" value={editForm.client_name || ''} onChange={e => setEditForm(p => ({ ...p, client_name: e.target.value }))} className={inputClass} /></div>
+                  </>
+                )}
                 <div><label className="text-fp-muted text-xs mb-1 block">Email</label><input type="email" value={editForm.email || ''} onChange={e => setEditForm(p => ({ ...p, email: e.target.value }))} className={inputClass} /></div>
                 <div><label className="text-fp-muted text-xs mb-1 block">Phone</label><input type="text" value={editForm.phone || ''} onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))} className={inputClass} /></div>
                 <div><label className="text-fp-muted text-xs mb-1 block">Website</label><input type="url" value={editForm.website || ''} onChange={e => setEditForm(p => ({ ...p, website: e.target.value }))} placeholder="https://example.com" className={inputClass} /></div>

@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { clientName } from '../utils/client'
 
 const emptyForm = {
+  client_type: 'commercial',
+  first_name: '', last_name: '',
   client_name: '', company: '', email: '', phone: '', website: '',
   industry: '', crm_source: '', notes: '',
   address: '', city: '', state: '', zip: '', store_id: '',
@@ -51,6 +54,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
   const [form, setForm] = useState(emptyForm)
   const [search, setSearch] = useState('')
   const [filterIndustry, setFilterIndustry] = useState('')
+  const [filterType, setFilterType] = useState('all') // 'all' | 'commercial' | 'residential'
   const [showArchived, setShowArchived] = useState(false)
   const [companySuggestions, setCompanySuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -93,7 +97,11 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
   const handleAdd = async () => {
     setSaving(true)
     setError(null)
-    if (!form.company) { setError('Company name is required'); setSaving(false); return }
+    if (form.client_type === 'residential') {
+      if (!form.first_name && !form.last_name) { setError('First or last name is required'); setSaving(false); return }
+    } else {
+      if (!form.company) { setError('Company name is required'); setSaving(false); return }
+    }
 
     const { data: newClient, error } = await supabase.from('clients')
       .insert({ ...form, active: true, org_id: orgId })
@@ -153,35 +161,43 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
     setClients(prev => prev.map(c => ids.includes(c.id) ? { ...c, archived_at: null } : c))
   }
 
-  // Group clients by company
+  // Group commercial clients by company; each residential client is its own group
   const grouped = clients.reduce((acc, client) => {
-    const company = client.company || 'No Company'
-    if (!acc.has(company)) acc.set(company, [])
-    acc.get(company).push(client)
+    const key = client.client_type === 'residential' ? `__res__${client.id}` : (client.company || 'No Company')
+    if (!acc.has(key)) acc.set(key, [])
+    acc.get(key).push(client)
     return acc
   }, new Map())
 
-  // One card per company — archived if all contacts are archived
-  const companies = Array.from(grouped.entries()).map(([company, contacts]) => ({
-    company,
-    contacts,
-    primary: contacts[0],
-    industry: contacts[0]?.industry || '',
-    location: [contacts[0]?.city, contacts[0]?.state].filter(Boolean).join(', '),
-    email: contacts[0]?.email || '',
-    phone: contacts[0]?.phone || '',
-    isArchived: contacts.every(c => !!c.archived_at),
-  }))
+  // One card per company/person
+  const companies = Array.from(grouped.entries()).map(([key, contacts]) => {
+    const primary = contacts[0]
+    const displayName = clientName(primary)
+    return {
+      company: displayName,
+      client_type: primary.client_type || 'commercial',
+      contacts,
+      primary,
+      industry: primary.industry || '',
+      location: [primary.city, primary.state].filter(Boolean).join(', '),
+      email: primary.email || '',
+      phone: primary.phone || '',
+      isArchived: contacts.every(c => !!c.archived_at),
+    }
+  })
 
   const archivedCount = companies.filter(c => c.isArchived).length
 
   const filtered = companies
     .filter(c => showArchived ? c.isArchived : !c.isArchived)
+    .filter(c => filterType === 'all' || c.client_type === filterType)
     .filter(c => {
       const q = search.toLowerCase()
       const matchSearch = !q ||
         c.company.toLowerCase().includes(q) ||
         c.contacts.some(x => (x.client_name || '').toLowerCase().includes(q)) ||
+        c.contacts.some(x => (x.first_name || '').toLowerCase().includes(q)) ||
+        c.contacts.some(x => (x.last_name || '').toLowerCase().includes(q)) ||
         c.contacts.some(x => (x.email || '').toLowerCase().includes(q))
       const matchIndustry = !filterIndustry || c.industry === filterIndustry
       return matchSearch && matchIndustry
@@ -191,6 +207,8 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
       if (!q || c.company.toLowerCase().includes(q)) return { ...c, visibleContacts: c.contacts, navigateTo: c.contacts[0]?.id }
       const matched = c.contacts.filter(x =>
         (x.client_name || '').toLowerCase().includes(q) ||
+        (x.first_name || '').toLowerCase().includes(q) ||
+        (x.last_name || '').toLowerCase().includes(q) ||
         (x.email || '').toLowerCase().includes(q)
       )
       return { ...c, visibleContacts: matched.length ? matched : c.contacts, navigateTo: (matched[0] || c.contacts[0])?.id }
@@ -206,7 +224,9 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-fp-text text-2xl font-bold">{showArchived ? 'Archived Clients' : 'Clients'}</h2>
-            <p className="text-fp-muted text-sm mt-0.5">{clients.length} total · {companies.length} companies</p>
+            <p className="text-fp-muted text-sm mt-0.5">
+              {clients.filter(c => c.client_type !== 'residential').length} commercial · {clients.filter(c => c.client_type === 'residential').length} residential
+            </p>
           </div>
           <div className="flex items-center gap-3">
             {archivedCount > 0 && (
@@ -231,14 +251,28 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
         </div>
 
         {/* Search + Filter bar */}
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <input
             type="text"
-            placeholder="Search companies, contacts, email..."
+            placeholder="Search clients, contacts, email..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]"
+            className="flex-1 min-w-48 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]"
           />
+          {/* Type filter chips */}
+          <div className="flex items-center gap-1 bg-fp-card border border-fp-border rounded-lg px-2 py-1">
+            {[['all', 'All'], ['commercial', 'Commercial'], ['residential', 'Residential']].map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setFilterType(val)}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
+                  filterType === val ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <select
             value={filterIndustry}
             onChange={e => setFilterIndustry(e.target.value)}
@@ -259,7 +293,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filtered.map(({ company, contacts, visibleContacts, navigateTo, primary, industry, location, email, phone, isArchived }) => {
+            {filtered.map(({ company, client_type, contacts, visibleContacts, navigateTo, primary, industry, location, email, phone, isArchived }) => {
               const initials = company.slice(0, 2).toUpperCase()
               const badgeClass = industryColors[industry] || industryColors['Other']
               const displayPrimary = visibleContacts[0] || primary
@@ -281,14 +315,23 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                         <p className="text-fp-text font-semibold group-hover:text-[#C8622A] transition-colors leading-tight">
                           {company}
                         </p>
-                        {visibleContacts.length > 0 && (
-                          <p className="text-fp-muted text-xs mt-0.5">
-                            {visibleContacts.map(c => c.client_name).filter(Boolean).join(', ') || 'No contact name'}
-                            {visibleContacts.length < contacts.length && (
-                              <span className="text-fp-muted/50"> +{contacts.length - visibleContacts.length} more</span>
-                            )}
-                          </p>
-                        )}
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                            client_type === 'residential'
+                              ? 'bg-green-500/15 text-green-400'
+                              : 'bg-blue-500/15 text-blue-400'
+                          }`}>
+                            {client_type === 'residential' ? 'Residential' : 'Commercial'}
+                          </span>
+                          {client_type === 'residential' && primary?.company && (
+                            <span className="text-fp-muted text-xs truncate">{primary.company}</span>
+                          )}
+                          {client_type === 'commercial' && visibleContacts.length > 0 && (
+                            <span className="text-fp-muted text-xs truncate">
+                              {visibleContacts.map(c => c.client_name).filter(Boolean).join(', ') || ''}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                     {industry && (
@@ -389,35 +432,84 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
             {error && <p className="text-red-400 text-sm mb-4">{error}</p>}
 
             <div className="space-y-4">
+              {/* Client type toggle */}
+              <div className="flex gap-2">
+                {[['commercial', 'Commercial'], ['residential', 'Residential']].map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, client_type: val }))}
+                    className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                      form.client_type === val
+                        ? val === 'residential'
+                          ? 'bg-green-500/20 border-green-500/40 text-green-400'
+                          : 'bg-blue-500/20 border-blue-500/40 text-blue-400'
+                        : 'bg-fp-inset border-fp-border text-fp-muted hover:text-fp-text'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <label className="text-fp-muted text-xs mb-1 block">Company <span className="text-[#C8622A]">*</span></label>
-                  <input
-                    type="text"
-                    value={form.company}
-                    onChange={e => handleCompanyInput(e.target.value)}
-                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                    placeholder="Company name"
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                  {showSuggestions && (
-                    <div className="absolute z-10 w-full mt-1 bg-fp-inset border border-fp-border rounded-lg overflow-hidden shadow-lg">
-                      {companySuggestions.map(c => (
-                        <button key={c} onClick={() => { setForm(prev => ({ ...prev, company: c })); setShowSuggestions(false) }}
-                          className="w-full text-left px-3 py-2 text-fp-text text-sm hover:bg-fp-card transition-colors">
-                          {c}
-                        </button>
-                      ))}
+                {form.client_type === 'residential' ? (
+                  <>
+                    <div>
+                      <label className="text-fp-muted text-xs mb-1 block">First Name <span className="text-[#C8622A]">*</span></label>
+                      <input type="text" value={form.first_name}
+                        onChange={e => setForm(p => ({ ...p, first_name: e.target.value }))}
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                      />
                     </div>
-                  )}
-                </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Contact Name</label>
-                  <input type="text" value={form.client_name}
-                    onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))}
-                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                  />
-                </div>
+                    <div>
+                      <label className="text-fp-muted text-xs mb-1 block">Last Name <span className="text-[#C8622A]">*</span></label>
+                      <input type="text" value={form.last_name}
+                        onChange={e => setForm(p => ({ ...p, last_name: e.target.value }))}
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-fp-muted text-xs mb-1 block">Company (optional)</label>
+                      <input type="text" value={form.company}
+                        onChange={e => setForm(p => ({ ...p, company: e.target.value }))}
+                        placeholder="e.g. employer or HOA"
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="relative">
+                      <label className="text-fp-muted text-xs mb-1 block">Company <span className="text-[#C8622A]">*</span></label>
+                      <input
+                        type="text"
+                        value={form.company}
+                        onChange={e => handleCompanyInput(e.target.value)}
+                        onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                        placeholder="Company name"
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                      />
+                      {showSuggestions && (
+                        <div className="absolute z-10 w-full mt-1 bg-fp-inset border border-fp-border rounded-lg overflow-hidden shadow-lg">
+                          {companySuggestions.map(c => (
+                            <button key={c} onClick={() => { setForm(prev => ({ ...prev, company: c })); setShowSuggestions(false) }}
+                              className="w-full text-left px-3 py-2 text-fp-text text-sm hover:bg-fp-card transition-colors">
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-fp-muted text-xs mb-1 block">Contact Name</label>
+                      <input type="text" value={form.client_name}
+                        onChange={e => setForm(p => ({ ...p, client_name: e.target.value }))}
+                        className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                      />
+                    </div>
+                  </>
+                )}
                 <div>
                   <label className="text-fp-muted text-xs mb-1 block">Email</label>
                   <input type="email" value={form.email}

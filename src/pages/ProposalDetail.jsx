@@ -2143,6 +2143,7 @@ export default function ProposalDetail({ isAdmin }) {
         const qty = clean(r['Quantity'] || r['Qty'] || r['quantity'] || r['AreaQty'] || '1')
         const unit = String(r['Unit'] || r['unit'] || 'ea').trim().toLowerCase()
         const vendor = r['Vendor'] || r['vendor'] || r['Supplier'] || ''
+        const manufacturer = String(r['Manufacturer'] || r['manufacturer'] || r['Mfr'] || r['Brand'] || '').trim() || null
 
         // Derive markup from cost + sell price if present; fall back to stored markup or 35%
         let markup = clean(r['Markup %'] || r['markup_percent'] || '')
@@ -2157,7 +2158,7 @@ export default function ProposalDetail({ isAdmin }) {
         }
         return {
           proposal_id: id, item_name: itemName, part_number_sku: partNum, quantity: qty || '1', unit: unit || 'ea',
-          category: r['Category'] || r['category'] || '', vendor,
+          category: r['Category'] || r['category'] || '', vendor, manufacturer,
           your_cost_unit: yourCost, markup_percent: markup, customer_price_unit: finalCustomerPrice,
           customer_price_total: finalCustomerPrice && qty ? (parseFloat(finalCustomerPrice) * parseFloat(qty)).toFixed(2) : '',
           pricing_status: yourCost ? 'Confirmed' : 'Needs Pricing'

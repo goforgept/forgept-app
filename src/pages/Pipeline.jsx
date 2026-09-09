@@ -27,6 +27,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
   const [showManageStages, setShowManageStages] = useState(false)
   const [search, setSearch] = useState('')
   const [dateRange, setDateRange] = useState(90)
+  const [clientTypeFilter, setClientTypeFilter] = useState('all')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -70,7 +71,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
 
     const [proposalsRes, clientsRes] = await Promise.all([
       supabase.from('proposals').select('*').eq('org_id', profile.org_id).order('created_at', { ascending: false }),
-      supabase.from('clients').select('id, company').eq('org_id', profile.org_id)
+      supabase.from('clients').select('id, company, client_type, first_name, last_name').eq('org_id', profile.org_id)
     ])
 
     setStages(stageData)
@@ -85,6 +86,8 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
     ? proposals.filter(p => p.created_at >= dateThreshold)
     : proposals
 
+  const clientMap = Object.fromEntries((clients || []).map(c => [c.id, c]))
+
   const getProposalsForStage = (stage) => {
     const q = search.toLowerCase()
     return filteredProposals.filter(p => {
@@ -95,6 +98,11 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
         else if (stage.name === 'Lost' && p.status !== 'Lost') return false
         else if (stage.name === 'Lead' && p.status !== 'Draft') return false
         else if (!['Proposal Sent','Won','Lost','Lead'].includes(stage.name)) return false
+      }
+      if (clientTypeFilter !== 'all') {
+        const client = p.client_id ? clientMap[p.client_id] : null
+        const type = client?.client_type || 'commercial'
+        if (type !== clientTypeFilter) return false
       }
       if (!q) return true
       return (
@@ -214,6 +222,14 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
               <option value={365}>Last year</option>
               <option value={0}>All time</option>
             </select>
+            <div className="flex items-center gap-1 bg-fp-card border border-fp-border rounded-lg px-2 py-1">
+              {[['all', 'All'], ['commercial', 'Commercial'], ['residential', 'Residential']].map(([val, label]) => (
+                <button key={val} onClick={() => setClientTypeFilter(val)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${clientTypeFilter === val ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <input
               type="text"
               placeholder="Search deals..."
