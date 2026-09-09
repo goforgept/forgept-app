@@ -292,11 +292,7 @@ export default function ProposalHeader({
               <span className="text-fp-muted text-sm">$</span>
               <input type="number" min="0" step="0.01" value={dealAmountDraft} placeholder="0.00"
                 onChange={e => setDealAmountDraft(e.target.value)}
-                onBlur={e => {
-                  const next = parseFloat(e.target.value) || 0
-                  const current = parseFloat(proposal?.proposal_value) || 0
-                  if (next !== current) onSaveDealAmount?.(next)
-                }}
+                onBlur={e => { if (e.target.value !== '') onSaveDealAmount?.(parseFloat(e.target.value) || 0) }}
                 onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setDealAmountDraft(proposal?.proposal_value != null ? String(proposal.proposal_value) : ''); e.currentTarget.blur() } }}
                 className={inputCls} />
             </div>

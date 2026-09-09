@@ -154,6 +154,35 @@ Deno.serve(async (req) => {
           }
         }
 
+        // ── PurchaseOrder closed — mark Forge PO as Received ───────────────
+        if (entity.name === 'PurchaseOrder' && (entity.operation === 'Update' || entity.operation === 'Create')) {
+          try {
+            const poRes = await fetch(`${baseUrl}/purchaseorder/${entity.id}?minorversion=65`, { headers: qboHeaders })
+            const poData = await poRes.json()
+            const qboPO = poData?.PurchaseOrder
+            if (!qboPO) continue
+
+            const isClosed = qboPO.POStatus === 'Closed'
+            if (!isClosed) continue
+
+            const { data: forgePO } = await supabase
+              .from('purchase_orders')
+              .select('id, status')
+              .eq('qbo_po_id', String(entity.id))
+              .eq('org_id', org.id)
+              .maybeSingle()
+
+            if (forgePO && forgePO.status !== 'Received') {
+              await supabase
+                .from('purchase_orders')
+                .update({ status: 'Received', receiving_status: 'Received' })
+                .eq('id', forgePO.id)
+            }
+          } catch (e) {
+            console.error(`QBO webhook: purchaseorder ${entity.id} error:`, e)
+          }
+        }
+
         // ── Customer updated — sync back to ForgePt client ─────────────────
         if (entity.name === 'Customer' && (entity.operation === 'Update' || entity.operation === 'Create')) {
           try {

@@ -16,6 +16,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
   const [expandedPO, setExpandedPO] = useState(null)
   const [lineItems, setLineItems] = useState({})
   const [savingReceiving, setSavingReceiving] = useState({})
+  const [qboPushing, setQboPushing] = useState({})
   const navigate = useNavigate()
 
   // New PO modal
@@ -175,6 +176,26 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
       if (!po?.job_id) await receiveIntoInventory(poId)
     }
     fetchAll()
+  }
+
+  const pushToQBO = async (poId) => {
+    setQboPushing(prev => ({ ...prev, [poId]: true }))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/qbo-push-po', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ poId }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Push failed')
+      setPOs(prev => prev.map(p => p.id === poId ? { ...p, qbo_po_id: result.qboPoId, qbo_po_number: result.qboPoNumber } : p))
+      alert(`Pushed to QuickBooks — PO #${result.qboPoNumber || result.qboPoId}`)
+    } catch (err) {
+      alert(`QBO push failed: ${err.message}`)
+    } finally {
+      setQboPushing(prev => ({ ...prev, [poId]: false }))
+    }
   }
 
   const updateReceivedQty = async (poId, itemId, receivedQty, orderedQty) => {
@@ -636,6 +657,18 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                         title="Download PDF"
                       >
                         ↓ PDF
+                      </button>
+                      <button
+                        onClick={e => { e.stopPropagation(); pushToQBO(po.id) }}
+                        disabled={qboPushing[po.id]}
+                        title={po.qbo_po_id ? `Update QBO PO #${po.qbo_po_number || po.qbo_po_id}` : 'Push to QuickBooks as PO'}
+                        className={`text-xs px-2 py-1 rounded border transition-colors flex-shrink-0 flex items-center gap-1 ${
+                          po.qbo_po_id
+                            ? 'border-green-500/40 text-green-400 hover:bg-green-500/10'
+                            : 'border-fp-border text-fp-muted hover:text-fp-text hover:border-fp-brand'
+                        } ${qboPushing[po.id] ? 'opacity-50 cursor-wait' : ''}`}
+                      >
+                        {qboPushing[po.id] ? '…' : po.qbo_po_id ? '✓ QBO' : 'QBO ↑'}
                       </button>
                       <select value={po.status} onChange={e => { e.stopPropagation(); updateStatus(po.id, e.target.value) }} onClick={e => e.stopPropagation()}
                         className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
