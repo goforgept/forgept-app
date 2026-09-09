@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import DataImportTab from '../components/DataImportTab'
@@ -19,7 +20,8 @@ import GlobalProductsImport from '../components/GlobalProductsImport'
 
 export default function Settings({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, featureDesignerOnly = false, featureApi = false, role, isSalesManager, isPM, isTechnician, isDevTeam = false }) {
   const { profile, refreshProfile } = useProfile()
-  const [activeTab, setActiveTab] = useState('general')
+  const location = useLocation()
+  const [activeTab, setActiveTab] = useState(() => location.hash.replace('#', '') || 'general')
   const [laborRates, setLaborRates] = useState([])
   const [savingRates, setSavingRates] = useState(false)
   const [orgServiceSettings, setOrgServiceSettings] = useState({ trip_fee_default: '', drive_time_rate_default: '', service_billing_mode: 'trip_fee' })
@@ -563,7 +565,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
         { key: 'catalog', label: 'Product Catalog' },
       ]
     }] : []),
-    ...(featureDesignerOnly ? [{ label: 'Team', items: [{ key: 'team', label: 'Team' }] }] : []),
+    ...(isAdmin || featureDesignerOnly ? [{ label: 'Team', items: [{ key: 'team', label: 'Team' }] }] : []),
     { items: [{ key: 'feedback', label: 'Request a Feature' }, { key: 'support', label: 'Support' }] },
   ]
 

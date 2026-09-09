@@ -220,7 +220,7 @@ function App() {
             <Route path="/rep" element={<Dashboard {...sharedProps} />} />
             <Route path="/new" element={<NewProposal />} />
             <Route path="/proposal/:id" element={<ProposalDetail {...sharedProps} />} />
-            <Route path="/reps" element={<ManageReps {...sharedProps} />} />
+            <Route path="/reps" element={<Navigate to="/settings" replace />} />
             <Route path="/proposals" element={<PermRoute area="proposals"><Proposals {...sharedProps} /></PermRoute>} />
             <Route path="/vendors" element={<Vendors {...sharedProps} />} />
             <Route path="/settings" element={<Settings {...sharedProps} />} />
