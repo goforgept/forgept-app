@@ -10,6 +10,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
   const [profiles, setProfiles] = useState([])
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
+  const [orgTimezone, setOrgTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState('pending')
@@ -44,6 +45,10 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
     setProfiles(profilesRes.data || [])
     setClients(clientsRes.data || [])
     setForm(prev => ({ ...prev, assigned_to: profile.id }))
+
+    const { data: orgData } = await supabase.from('organizations').select('timezone').eq('id', profile.org_id).single()
+    if (orgData?.timezone) setOrgTimezone(orgData.timezone)
+
     setLoading(false)
   }
 
@@ -264,18 +269,23 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
     fetchData()
   }
 
+  const todayInOrgTZ = () => new Intl.DateTimeFormat('en-CA', { timeZone: orgTimezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+  const nowTimeInOrgTZ = () => new Intl.DateTimeFormat('en-GB', { timeZone: orgTimezone, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).replace(', ', 'T').split('T')[1] // 'HH:MM'
+
   const isOverdue = (task) => {
     if (!task.due_date || task.completed) return false
+    const today = todayInOrgTZ()
     if (task.start_time) {
-      // Has a specific time — only overdue once that moment has passed
-      return new Date(`${task.due_date}T${task.start_time}`) < new Date()
+      if (task.due_date > today) return false
+      if (task.due_date < today) return true
+      // Same day — overdue only if the scheduled time has passed
+      return task.start_time < nowTimeInOrgTZ()
     }
-    // No time — overdue if the date is strictly before today (string compare is timezone-safe)
-    return task.due_date < new Date().toISOString().split('T')[0]
+    return task.due_date < today
   }
   const isDueToday = (task) => {
     if (!task.due_date || task.completed) return false
-    return task.due_date === new Date().toISOString().split('T')[0]
+    return task.due_date === todayInOrgTZ()
   }
 
   const filtered = tasks.filter(t => {
@@ -320,7 +330,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
     return tasks.filter(t => t.due_date === dateStr)
   }
 
-  const todayStr = new Date().toISOString().split('T')[0]
+  const todayStr = todayInOrgTZ()
   const selectedDayStr = selectedDay
     ? `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`
     : null

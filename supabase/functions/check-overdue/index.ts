@@ -6,18 +6,31 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function orgLocalDate(tz: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+}
+
+function orgLocalHour(tz: string): string {
+  // Returns 'HH' in 24h in the org timezone
+  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hour12: false }).format(new Date()).split(',')[0].trim().padStart(2, '0')
+}
+
+function orgLocalTime(tz: string): string {
+  // Returns 'HH:MM' in the org timezone
+  return new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date()).replace(', ', '').trim().slice(0, 5)
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Cron-protected endpoint
   const cronSecret = Deno.env.get('CRON_SECRET') ?? ''
   const authHeader = req.headers.get('Authorization')
   if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
@@ -26,160 +39,187 @@ Deno.serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
-  const todayStr = new Date().toISOString().split('T')[0]
   const inserted: string[] = []
 
   try {
-    // ── 1. OVERDUE SERVICE TICKETS ───────────────────────────────────────
-    // Tickets are overdue when scheduled_date is past and not Resolved/Cancelled
+    // Load all orgs with their timezone + admin user ids in one pass
+    const { data: orgs } = await supabase
+      .from('organizations')
+      .select('id, timezone')
+
+    // Build orgId → { today, hour, time, tz }
+    const orgTime: Record<string, { today: string; hour: string; nowTime: string; tz: string }> = {}
+    for (const org of (orgs || [])) {
+      const tz = org.timezone || 'America/Chicago'
+      orgTime[org.id] = { today: orgLocalDate(tz), hour: orgLocalHour(tz), nowTime: orgLocalTime(tz), tz }
+    }
+
+    // Load admins grouped by org
+    const { data: admins } = await supabase
+      .from('profiles')
+      .select('id, org_id')
+      .in('org_role', ['admin'])
+
+    const adminsByOrg: Record<string, string[]> = {}
+    for (const a of (admins || [])) {
+      if (!a.org_id) continue
+      if (!adminsByOrg[a.org_id]) adminsByOrg[a.org_id] = []
+      adminsByOrg[a.org_id].push(a.id)
+    }
+
+    const allNotifications: any[] = []
+
+    // ── 1. OVERDUE SERVICE TICKETS ─────────────────────────────────────────
     const { data: tickets } = await supabase
       .from('service_tickets')
       .select('id, ticket_number, title, org_id, assigned_tech_id, scheduled_date')
-      .lt('scheduled_date', todayStr)
       .not('status', 'in', '("Resolved","Cancelled")')
+      .not('scheduled_date', 'is', null)
 
-    if (tickets?.length) {
-      // Find org admins (role: admin) for each ticket's org
-      const orgIds = [...new Set(tickets.map((t: any) => t.org_id).filter(Boolean))]
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id, org_id')
-        .in('org_id', orgIds)
-        .in('org_role', ['admin'])
-
-      const adminsByOrg: Record<string, string[]> = {}
-      for (const a of (admins || [])) {
-        if (!adminsByOrg[a.org_id]) adminsByOrg[a.org_id] = []
-        adminsByOrg[a.org_id].push(a.id)
-      }
-
-      const ticketNotifications: any[] = []
-      for (const ticket of tickets) {
-        const recipientSet = new Set<string>()
-        if (ticket.assigned_tech_id) recipientSet.add(ticket.assigned_tech_id)
-        for (const adminId of (adminsByOrg[ticket.org_id] || [])) recipientSet.add(adminId)
-
-        for (const userId of recipientSet) {
-          ticketNotifications.push({
-            org_id: ticket.org_id,
-            user_id: userId,
-            type: 'ticket_overdue',
-            title: 'Service Ticket Overdue',
-            body: `Ticket #${ticket.ticket_number || ''}: "${ticket.title}" was scheduled for ${ticket.scheduled_date} and is past due.`,
-            link: `/service-tickets/${ticket.id}`,
-            dedup_key: `overdue:ticket:${ticket.id}:${todayStr}`,
-          })
-        }
-      }
-
-      if (ticketNotifications.length) {
-        const { error } = await supabase
-          .from('notifications')
-          .upsert(ticketNotifications, { onConflict: 'user_id,dedup_key', ignoreDuplicates: true })
-        if (error) console.error('ticket notifications error:', error)
-        else inserted.push(`${ticketNotifications.length} ticket notifications`)
+    for (const ticket of (tickets || [])) {
+      const ot = orgTime[ticket.org_id]
+      if (!ot || ticket.scheduled_date >= ot.today) continue
+      const recipients = new Set<string>([
+        ...(ticket.assigned_tech_id ? [ticket.assigned_tech_id] : []),
+        ...(adminsByOrg[ticket.org_id] || []),
+      ])
+      for (const userId of recipients) {
+        allNotifications.push({
+          org_id: ticket.org_id, user_id: userId,
+          type: 'ticket_overdue', title: 'Service Ticket Overdue',
+          body: `Ticket #${ticket.ticket_number || ''}: "${ticket.title}" was scheduled for ${ticket.scheduled_date} and is past due.`,
+          link: `/service-tickets/${ticket.id}`,
+          dedup_key: `overdue:ticket:${ticket.id}:${ot.today}`,
+        })
       }
     }
 
-    // ── 2. OVERDUE INVOICES ──────────────────────────────────────────────
-    // Overdue when due_date is past and status is Sent or Partially Paid
+    // ── 2. OVERDUE INVOICES ────────────────────────────────────────────────
     const { data: invoices } = await supabase
       .from('invoices')
       .select('id, invoice_number, org_id, due_date, proposals(company, client_name)')
-      .lt('due_date', todayStr)
       .in('status', ['Sent', 'Partially Paid'])
+      .not('due_date', 'is', null)
 
-    if (invoices?.length) {
-      const orgIds = [...new Set(invoices.map((i: any) => i.org_id).filter(Boolean))]
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id, org_id')
-        .in('org_id', orgIds)
-        .in('org_role', ['admin'])
-
-      const adminsByOrg: Record<string, string[]> = {}
-      for (const a of (admins || [])) {
-        if (!adminsByOrg[a.org_id]) adminsByOrg[a.org_id] = []
-        adminsByOrg[a.org_id].push(a.id)
-      }
-
-      const invoiceNotifications: any[] = []
-      for (const inv of invoices) {
-        const client = (inv.proposals as any)?.company || (inv.proposals as any)?.client_name || 'Unknown'
-        for (const userId of (adminsByOrg[inv.org_id] || [])) {
-          invoiceNotifications.push({
-            org_id: inv.org_id,
-            user_id: userId,
-            type: 'invoice_overdue',
-            title: 'Invoice Overdue',
-            body: `Invoice #${inv.invoice_number || ''} for ${client} was due ${inv.due_date} and is unpaid.`,
-            link: `/invoices/${inv.id}`,
-            dedup_key: `overdue:invoice:${inv.id}:${todayStr}`,
-          })
-        }
-      }
-
-      if (invoiceNotifications.length) {
-        const { error } = await supabase
-          .from('notifications')
-          .upsert(invoiceNotifications, { onConflict: 'user_id,dedup_key', ignoreDuplicates: true })
-        if (error) console.error('invoice notifications error:', error)
-        else inserted.push(`${invoiceNotifications.length} invoice notifications`)
+    for (const inv of (invoices || [])) {
+      const ot = orgTime[inv.org_id]
+      if (!ot || inv.due_date >= ot.today) continue
+      const client = (inv.proposals as any)?.company || (inv.proposals as any)?.client_name || 'Unknown'
+      for (const userId of (adminsByOrg[inv.org_id] || [])) {
+        allNotifications.push({
+          org_id: inv.org_id, user_id: userId,
+          type: 'invoice_overdue', title: 'Invoice Overdue',
+          body: `Invoice #${inv.invoice_number || ''} for ${client} was due ${inv.due_date} and is unpaid.`,
+          link: `/invoices/${inv.id}`,
+          dedup_key: `overdue:invoice:${inv.id}:${ot.today}`,
+        })
       }
     }
 
-    // ── 3. PROPOSALS PAST CLOSE DATE ─────────────────────────────────────
-    // Proposals still open (Draft or Sent) but close_date has passed
+    // ── 3. PROPOSALS PAST CLOSE DATE ──────────────────────────────────────
     const { data: proposals } = await supabase
       .from('proposals')
       .select('id, quote_number, proposal_name, company, client_name, org_id, close_date')
-      .lt('close_date', todayStr)
       .in('status', ['Draft', 'Sent'])
+      .not('close_date', 'is', null)
 
-    if (proposals?.length) {
-      const orgIds = [...new Set(proposals.map((p: any) => p.org_id).filter(Boolean))]
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id, org_id')
-        .in('org_id', orgIds)
-        .in('org_role', ['admin'])
-
-      const adminsByOrg: Record<string, string[]> = {}
-      for (const a of (admins || [])) {
-        if (!adminsByOrg[a.org_id]) adminsByOrg[a.org_id] = []
-        adminsByOrg[a.org_id].push(a.id)
-      }
-
-      const proposalNotifications: any[] = []
-      for (const p of proposals) {
-        const client = p.company || p.client_name || 'Unknown'
-        for (const userId of (adminsByOrg[p.org_id] || [])) {
-          proposalNotifications.push({
-            org_id: p.org_id,
-            user_id: userId,
-            type: 'proposal_past_close',
-            title: 'Proposal Past Close Date',
-            body: `Proposal #${p.quote_number || ''} "${p.proposal_name || ''}" for ${client} passed its close date of ${p.close_date} without being closed.`,
-            link: `/proposals/${p.id}`,
-            dedup_key: `overdue:proposal:${p.id}:${todayStr}`,
-          })
-        }
-      }
-
-      if (proposalNotifications.length) {
-        const { error } = await supabase
-          .from('notifications')
-          .upsert(proposalNotifications, { onConflict: 'user_id,dedup_key', ignoreDuplicates: true })
-        if (error) console.error('proposal notifications error:', error)
-        else inserted.push(`${proposalNotifications.length} proposal notifications`)
+    for (const p of (proposals || [])) {
+      const ot = orgTime[p.org_id]
+      if (!ot || p.close_date >= ot.today) continue
+      const client = p.company || p.client_name || 'Unknown'
+      for (const userId of (adminsByOrg[p.org_id] || [])) {
+        allNotifications.push({
+          org_id: p.org_id, user_id: userId,
+          type: 'proposal_past_close', title: 'Proposal Past Close Date',
+          body: `Proposal "${p.proposal_name || ''}" for ${client} passed its close date of ${p.close_date}.`,
+          link: `/proposals/${p.id}`,
+          dedup_key: `overdue:proposal:${p.id}:${ot.today}`,
+        })
       }
     }
 
+    // ── 4. OVERDUE TASKS ──────────────────────────────────────────────────
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id, title, org_id, assigned_to, due_date, start_time')
+      .eq('completed', false)
+      .not('due_date', 'is', null)
+
+    for (const task of (tasks || [])) {
+      const ot = orgTime[task.org_id]
+      if (!ot) continue
+
+      let isOverdue = false
+      if (task.start_time) {
+        // Has a specific time — overdue if date is past, or same day and time has passed
+        if (task.due_date < ot.today) {
+          isOverdue = true
+        } else if (task.due_date === ot.today && task.start_time <= ot.nowTime) {
+          isOverdue = true
+        }
+      } else {
+        isOverdue = task.due_date < ot.today
+      }
+
+      if (!isOverdue) continue
+
+      const recipients = new Set<string>([
+        ...(task.assigned_to ? [task.assigned_to] : []),
+        ...(adminsByOrg[task.org_id] || []),
+      ])
+      const dedupDate = task.due_date
+      for (const userId of recipients) {
+        allNotifications.push({
+          org_id: task.org_id, user_id: userId,
+          type: 'task_overdue', title: 'Task Overdue',
+          body: `"${task.title}" was due ${task.due_date}${task.start_time ? ` at ${task.start_time}` : ''} and is not completed.`,
+          link: `/tasks`,
+          dedup_key: `overdue:task:${task.id}:${dedupDate}`,
+        })
+      }
+    }
+
+    // ── 5. TASKS DUE NOW (within current hour window) ─────────────────────
+    // Hourly cron: find tasks due today at a start_time within the current hour
+    for (const task of (tasks || [])) {
+      if (!task.start_time) continue
+      const ot = orgTime[task.org_id]
+      if (!ot || task.due_date !== ot.today) continue
+
+      const taskHour = task.start_time.slice(0, 2) // 'HH' from 'HH:MM'
+      if (taskHour !== ot.hour) continue
+
+      const recipients = new Set<string>([
+        ...(task.assigned_to ? [task.assigned_to] : []),
+        ...(adminsByOrg[task.org_id] || []),
+      ])
+      for (const userId of recipients) {
+        allNotifications.push({
+          org_id: task.org_id, user_id: userId,
+          type: 'task_due', title: 'Task Due Now',
+          body: `"${task.title}" is due today at ${task.start_time}.`,
+          link: `/tasks`,
+          dedup_key: `due:task:${task.id}:${ot.today}:${ot.hour}`,
+        })
+      }
+    }
+
+    // Batch upsert all notifications
+    if (allNotifications.length > 0) {
+      const CHUNK = 50
+      for (let i = 0; i < allNotifications.length; i += CHUNK) {
+        const { error } = await supabase
+          .from('notifications')
+          .upsert(allNotifications.slice(i, i + CHUNK), { onConflict: 'user_id,dedup_key', ignoreDuplicates: true })
+        if (error) console.error('notifications upsert error:', error)
+      }
+      inserted.push(`${allNotifications.length} notifications queued`)
+    }
+
     return new Response(
-      JSON.stringify({ success: true, date: todayStr, results: inserted }),
+      JSON.stringify({ success: true, results: inserted }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-
   } catch (err: any) {
     console.error('check-overdue error:', err)
     return new Response(
