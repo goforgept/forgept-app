@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import NotificationBell from './NotificationBell'
+import { usePermissions } from '../hooks/usePermissions'
 
 const GROUP_ICONS = {
   sales: (
@@ -37,11 +38,41 @@ const GROUP_ICONS = {
   ),
 }
 
+// Maps nav path prefixes to their permission area key
+const NAV_PERMISSION_MAP = {
+  '/':                'dashboard',
+  '/pipeline':        'pipeline',
+  '/forecast':        'pipeline',
+  '/sales-kpi':       'pipeline',
+  '/proposals':       'proposals',
+  '/templates':       'proposals',
+  '/clients':         'clients',
+  '/client':          'clients',
+  '/tasks':           'tasks',
+  '/jobs':            'jobs',
+  '/tech-log':        'jobs',
+  '/service-tickets': 'serviceTickets',
+  '/dispatch':        'dispatch',
+  '/invoices':        'invoices',
+  '/purchase-orders': 'purchaseOrders',
+  '/inventory':       'inventory',
+  '/contracts':       'contracts',
+  '/vendors':         'vendors',
+  '/product-library': 'productLibrary',
+  '/reports':         'reports',
+  '/settings':        'settings',
+  '/reps':            'settings',
+}
+
+function withPermission(links) {
+  return links.map(l => ({ ...l, permission: NAV_PERMISSION_MAP[l.path] || null }))
+}
+
 const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool, featureInventory) => [
   {
     key: 'sales',
     label: 'Sales',
-    links: [
+    links: withPermission([
       { label: 'Dashboard', path: '/', icon: '📊' },
       ...(featureCRM ? [
         { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
@@ -54,12 +85,12 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
       ] : []),
       { label: 'Clients', path: '/clients', icon: '🏢' },
       ...(featureCRM ? [{ label: 'Tasks', path: '/tasks', icon: '✅' }] : []),
-    ]
+    ])
   },
   {
     key: 'operations',
     label: 'Operations',
-    links: [
+    links: withPermission([
       ...(orgType !== 'manufacturer' ? [
         { label: 'Jobs', path: '/jobs', icon: '🔨' },
         { label: 'Tech Log', path: '/tech-log', icon: '📋' },
@@ -77,12 +108,12 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
         { label: 'Orders', path: '/orders', icon: '🛒' },
       ] : []),
       ...((featureSla || featureMonitoring) ? [{ label: 'Contracts', path: '/contracts', icon: '📋' }] : []),
-    ].filter(l => l)
+    ].filter(l => l))
   },
   {
     key: 'manage',
     label: 'Manage',
-    links: [
+    links: withPermission([
       ...(orgType !== 'manufacturer' ? [{ label: 'Product Library', path: '/product-library', icon: '📦' }] : []),
       ...(featureDrawingTool ? [{ label: 'Designer', path: '/designer', icon: '📐' }] : []),
       ...(orgType === 'manufacturer' ? [{ label: 'Roadmap', path: '/roadmap', icon: '🗺️' }] : []),
@@ -90,7 +121,7 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
       { label: 'Team', path: '/reps', icon: '👥' },
       { label: 'Settings', path: '/settings', icon: '⚙️' },
       { label: 'Help', path: '/faq', icon: '❓' },
-    ]
+    ])
   }
 ]
 
@@ -98,7 +129,7 @@ const NAV_GROUPS_PM = (featurePurchaseOrders, featureInvoices, featureInventory)
   {
     key: 'operations',
     label: 'Operations',
-    links: [
+    links: withPermission([
       { label: 'Dashboard', path: '/', icon: '📊' },
       { label: 'Jobs', path: '/jobs', icon: '🔨' },
       { label: 'Tech Log', path: '/tech-log', icon: '📋' },
@@ -108,15 +139,15 @@ const NAV_GROUPS_PM = (featurePurchaseOrders, featureInvoices, featureInventory)
       ...(featurePurchaseOrders ? [{ label: 'Purchase Orders', path: '/purchase-orders', icon: '📄' }] : []),
       ...(featureInventory ? [{ label: 'Inventory', path: '/inventory', icon: '🏭' }] : []),
       { label: 'Vendors', path: '/vendors', icon: '🏭' },
-    ]
+    ])
   },
   {
     key: 'manage',
     label: 'Manage',
-    links: [
+    links: withPermission([
       { label: 'Settings', path: '/settings', icon: '⚙️' },
       { label: 'Help', path: '/faq', icon: '❓' },
-    ]
+    ])
   }
 ]
 
@@ -124,18 +155,18 @@ const NAV_GROUPS_PRODUCT_MANAGER = () => [
   {
     key: 'roadmap',
     label: 'Roadmap',
-    links: [
+    links: withPermission([
       { label: 'Roadmap', path: '/roadmap', icon: '🗺️' },
       { label: 'Catalog', path: '/catalog', icon: '📚' },
-    ]
+    ])
   },
   {
     key: 'manage',
     label: 'Manage',
-    links: [
+    links: withPermission([
       { label: 'Settings', path: '/settings', icon: '⚙️' },
       { label: 'Help', path: '/faq', icon: '❓' },
-    ]
+    ])
   }
 ]
 
@@ -143,18 +174,18 @@ const NAV_GROUPS_TECH = () => [
   {
     key: 'operations',
     label: 'Operations',
-    links: [
+    links: withPermission([
       { label: 'Tech Log', path: '/tech-log', icon: '📋' },
       { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
       { label: 'Jobs', path: '/jobs', icon: '🔨' },
-    ]
+    ])
   },
   {
     key: 'manage',
     label: 'Manage',
-    links: [
+    links: withPermission([
       { label: 'Settings', path: '/settings', icon: '⚙️' },
-    ]
+    ])
   }
 ]
 
@@ -162,18 +193,18 @@ const NAV_GROUPS_DEV = () => [
   {
     key: 'roadmap',
     label: 'Roadmap',
-    links: [
+    links: withPermission([
       { label: 'Roadmap', path: '/roadmap', icon: '🗺️' },
       { label: 'Catalog', path: '/catalog', icon: '📚' },
-    ]
+    ])
   },
   {
     key: 'manage',
     label: 'Manage',
-    links: [
+    links: withPermission([
       { label: 'Settings', path: '/settings', icon: '⚙️' },
       { label: 'Help', path: '/faq', icon: '❓' },
-    ]
+    ])
   }
 ]
 
@@ -181,7 +212,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
   {
     key: 'sales',
     label: 'Sales',
-    links: [
+    links: withPermission([
       { label: 'Dashboard', path: '/', icon: '📊' },
       ...(featureCRM ? [
         { label: 'Pipeline', path: '/pipeline', icon: '🗂️' },
@@ -194,12 +225,12 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
       ] : []),
       { label: 'Clients', path: '/clients', icon: '🏢' },
       ...(featureDrawingTool && orgType !== 'manufacturer' ? [{ label: 'Designer', path: '/designer', icon: '📐' }] : []),
-    ]
+    ])
   },
   {
     key: 'operations',
     label: 'Operations',
-    links: [
+    links: withPermission([
       ...(orgType !== 'manufacturer' ? [
         { label: 'Jobs', path: '/jobs', icon: '🔨' },
         { label: 'Tech Log', path: '/tech-log', icon: '📋' },
@@ -212,21 +243,22 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
         { label: 'Orders', path: '/orders', icon: '🛒' },
       ] : []),
       ...((featureSla || featureMonitoring) ? [{ label: 'Contracts', path: '/contracts', icon: '📋' }] : []),
-    ].filter(l => l)
+    ].filter(l => l))
   },
   {
     key: 'manage',
     label: 'Manage',
-    links: [
+    links: withPermission([
       ...(orgType === 'manufacturer' ? [{ label: 'Roadmap', path: '/roadmap', icon: '🗺️' }] : []),
       { label: 'Settings', path: '/settings', icon: '⚙️' },
       { label: 'Help', path: '/faq', icon: '❓' },
-    ]
+    ])
   }
 ]
 
 export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager = false, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, featureDesignerOnly = false, featureInventory: featureInventoryProp = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
   const location = useLocation()
+  const { can, roleName } = usePermissions()
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
   const featureSla = featurSlaProp || sessionStorage.getItem('featureSla') === 'true'
@@ -291,7 +323,12 @@ export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager =
     ? NAV_GROUPS_TECH()
     : NAV_GROUPS_REP(featureProposals, featureCRM, featureInvoices, orgType, featureSla, featureMonitoring, featureDrawingTool || sessionStorage.getItem('featureDrawingTool') === 'true')
 
-  const visibleGroups = groups.filter(g => g.links.length > 0)
+  // Filter each group's links by the user's permissions
+  const filteredGroups = groups.map(g => ({
+    ...g,
+    links: g.links.filter(l => !l.permission || can(l.permission)),
+  }))
+  const visibleGroups = filteredGroups.filter(g => g.links.length > 0)
 
   const isActive = (path) =>
     location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'))
@@ -338,9 +375,9 @@ export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager =
             <h1 className="text-fp-text text-xl font-bold">
               ForgePt<span className="text-[#C8622A]">.</span>
             </h1>
-            {(isAdmin || isSalesManager || isPM || isProductManager || isTechnician || isDevTeam) && (
+            {(roleName || isAdmin || isSalesManager || isPM || isProductManager || isTechnician || isDevTeam) && (
               <span className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-semibold mt-1 inline-block">
-                {isAdmin ? 'Admin' : isSalesManager ? 'Sales Mgr' : isPM ? 'Project Mgr' : isProductManager ? 'Product Mgr' : isTechnician ? 'Technician' : 'Dev Team'}
+                {roleName || (isAdmin ? 'Admin' : isSalesManager ? 'Sales Mgr' : isPM ? 'Project Mgr' : isProductManager ? 'Product Mgr' : isTechnician ? 'Technician' : 'Dev Team')}
               </span>
             )}
           </div>

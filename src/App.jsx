@@ -4,6 +4,7 @@ import { App as CapApp } from '@capacitor/app'
 import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from './supabase'
 import { useProfile } from './context/ProfileContext'
+import { usePermissions } from './hooks/usePermissions'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ProposalDetail from './pages/ProposalDetail'
@@ -54,6 +55,12 @@ import Roadmap from './pages/Roadmap'
 import Inventory from './pages/Inventory'
 import AIAgent from './components/AIAgent'
 
+// Redirects to / if the user's permissions don't allow this area
+function PermRoute({ area, children }) {
+  const { can } = usePermissions()
+  return can(area) ? children : <Navigate to="/" replace />
+}
+
 function App() {
   const { session, profile, features, loading } = useProfile()
   const location = useLocation()
@@ -91,6 +98,8 @@ function App() {
 
   const isAdmin      = profile?.org_role === 'admin' || profile?.role === 'admin'
   const isPending    = profile?.organizations?.status === 'pending'
+  // If the user has a custom role with a specific nav template, use it
+  const customBaseRole = profile?.org_roles?.base_role
 
   sessionStorage.setItem('featureDesignerOnly', features.designerOnly)
   sessionStorage.setItem('featureSla', features.sla)
@@ -119,11 +128,13 @@ function App() {
   )
 
   const role              = profile?.org_role || profile?.role || 'rep'
-  const isSalesManager    = role === 'sales_manager'
-  const isPM              = role === 'project_manager'   // integrator: manages jobs/projects
-  const isProductManager  = role === 'product_manager'   // manufacturer: manages product roadmap
-  const isTechnician      = role === 'technician'
-  const isDevTeam         = role === 'dev'
+  // Custom role's base_role overrides the system role for nav template selection
+  const effectiveRole     = customBaseRole || role
+  const isSalesManager    = effectiveRole === 'sales_manager'
+  const isPM              = effectiveRole === 'project_manager'
+  const isProductManager  = effectiveRole === 'product_manager'
+  const isTechnician      = effectiveRole === 'technician'
+  const isDevTeam         = effectiveRole === 'dev'
 
 
   const sharedProps = {
@@ -210,13 +221,13 @@ function App() {
             <Route path="/new" element={<NewProposal />} />
             <Route path="/proposal/:id" element={<ProposalDetail {...sharedProps} />} />
             <Route path="/reps" element={<ManageReps {...sharedProps} />} />
-            <Route path="/proposals" element={<Proposals {...sharedProps} />} />
+            <Route path="/proposals" element={<PermRoute area="proposals"><Proposals {...sharedProps} /></PermRoute>} />
             <Route path="/vendors" element={<Vendors {...sharedProps} />} />
             <Route path="/settings" element={<Settings {...sharedProps} />} />
             <Route path="/clients" element={<Clients {...sharedProps} />} />
             {profile?.is_superadmin && <Route path="/superadmin" element={<SuperAdmin />} />}
             <Route path="/client/:id" element={<ClientDetail {...sharedProps} />} />
-            <Route path="/purchase-orders" element={<PurchaseOrders {...sharedProps} />} />
+            <Route path="/purchase-orders" element={<PermRoute area="purchaseOrders"><PurchaseOrders {...sharedProps} /></PermRoute>} />
             <Route path="/faq" element={<FAQ {...sharedProps} />} />
             <Route path="/tasks" element={<Tasks {...sharedProps} />} />
             <Route path="/pipeline" element={<Pipeline {...sharedProps} />} />
@@ -224,9 +235,9 @@ function App() {
             <Route path="/sales-kpi" element={<SalesKPI {...sharedProps} />} />
             <Route path="/catalog" element={<Catalog {...sharedProps} />} />
             <Route path="/templates" element={<Templates isAdmin={isAdmin} />} />
-            <Route path="/invoices" element={<Invoices {...sharedProps} />} />
-            <Route path="/invoices/new" element={<NewInvoice {...sharedProps} />} />
-            <Route path="/invoices/:id" element={<InvoiceDetail {...sharedProps} />} />
+            <Route path="/invoices" element={<PermRoute area="invoices"><Invoices {...sharedProps} /></PermRoute>} />
+            <Route path="/invoices/new" element={<PermRoute area="invoices"><NewInvoice {...sharedProps} /></PermRoute>} />
+            <Route path="/invoices/:id" element={<PermRoute area="invoices"><InvoiceDetail {...sharedProps} /></PermRoute>} />
             <Route path="/orders" element={<ManufacturerOrders {...sharedProps} />} />
             <Route path="/jobs" element={<Jobs {...sharedProps} />} />
             <Route path="/jobs/:id" element={<JobDetail {...sharedProps} />} />
@@ -238,14 +249,14 @@ function App() {
             <Route path="/integrations/square/callback" element={<SquareCallback />} />
             <Route path="/integrations/google/callback" element={<GoogleCallback />} />
             <Route path="/integrations/microsoft/callback" element={<MicrosoftCallback />} />
-            {isAdmin && <Route path="/reports" element={<Reports {...sharedProps} />} />}
+            <Route path="/reports" element={<PermRoute area="reports"><Reports {...sharedProps} /></PermRoute>} />
             <Route path="/product-library" element={<ProductLibrary {...sharedProps} />} />
             {(features.sla || features.monitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
             <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />
             <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />
             {features.drawingTool && <Route path="/sld" element={<SLDProjects {...sharedProps} />} />}
             {features.drawingTool && <Route path="/sld/:id" element={<SLD {...sharedProps} />} />}
-            {features.inventory && <Route path="/inventory" element={<Inventory {...sharedProps} />} />}
+            {features.inventory && <Route path="/inventory" element={<PermRoute area="inventory"><Inventory {...sharedProps} /></PermRoute>} />}
             {features.designerOnly && <Route path="*" element={<Navigate to="/designer" replace />} />}
             <Route path="/roadmap" element={<Roadmap {...sharedProps} />} />
           </>
