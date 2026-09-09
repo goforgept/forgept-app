@@ -222,14 +222,12 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
               <option value={365}>Last year</option>
               <option value={0}>All time</option>
             </select>
-            <div className="flex items-center gap-1 bg-fp-card border border-fp-border rounded-lg px-2 py-1">
-              {[['all', 'All'], ['commercial', 'Commercial'], ['residential', 'Residential']].map(([val, label]) => (
-                <button key={val} onClick={() => setClientTypeFilter(val)}
-                  className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${clientTypeFilter === val ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
+            <select value={clientTypeFilter} onChange={e => setClientTypeFilter(e.target.value)}
+              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand cursor-pointer">
+              <option value="all">All Clients</option>
+              <option value="commercial">Commercial</option>
+              <option value="residential">Residential</option>
+            </select>
             <input
               type="text"
               placeholder="Search deals..."
