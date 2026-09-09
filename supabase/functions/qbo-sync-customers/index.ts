@@ -60,12 +60,9 @@ Deno.serve(async (req) => {
     }
 
     const baseUrl = qboBase(org.qbo_realm_id)
-    const qboHeaders = {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/json',
-    }
+    const qboHeaders = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
 
-    // Fetch all existing ForgePt clients for this org to do matching in memory
+    // Load existing clients for matching
     const { data: existingClients } = await supabase
       .from('clients')
       .select('id, company, client_name, qbo_customer_id')
@@ -79,11 +76,21 @@ Deno.serve(async (req) => {
       if (name) byName.set(name, c)
     }
 
-    // Paginate through all active QBO customers
+    // Load existing contacts for matching
+    const { data: existingContacts } = await supabase
+      .from('client_contacts')
+      .select('id, client_id, full_name, email, qbo_contact_id')
+      .in('client_id', (existingClients || []).map((c: any) => c.id))
+
+    const contactByQboId = new Map<string, any>()
+    for (const c of (existingContacts || [])) {
+      if (c.qbo_contact_id) contactByQboId.set(c.qbo_contact_id, c)
+    }
+
+    // Paginate QBO customers
     const pageSize = 1000
     let startPosition = 1
     let allCustomers: any[] = []
-
     while (true) {
       const query = encodeURIComponent(
         `SELECT * FROM Customer WHERE Active = true MAXRESULTS ${pageSize} STARTPOSITION ${startPosition}`
@@ -96,31 +103,21 @@ Deno.serve(async (req) => {
       startPosition += pageSize
     }
 
-    // Build a map of QBO ID → company name for top-level customers (Level 0)
-    // so sub-customers can resolve their parent's company name
-    const qboIdToCompany = new Map<string, string>()
-    for (const c of allCustomers) {
-      if (!c.ParentRef) {
-        qboIdToCompany.set(String(c.Id), c.CompanyName || c.DisplayName || '')
-      }
-    }
+    // Separate top-level and sub-customers; process top-level first so parent
+    // client rows exist before we try to link sub-customers as contacts.
+    const topLevel = allCustomers.filter(c => !c.ParentRef)
+    const subCustomers = allCustomers.filter(c => !!c.ParentRef)
 
     const now = new Date().toISOString()
-    let created = 0, updated = 0, skipped = 0
+    let clientsCreated = 0, clientsUpdated = 0
+    let contactsCreated = 0, contactsUpdated = 0, skipped = 0
 
-    for (const customer of allCustomers) {
+    // ── 1. Top-level customers → clients table ────────────────────────────────
+    for (const customer of topLevel) {
       const qboId = String(customer.Id)
-      const isSubCustomer = !!customer.ParentRef
       const contactName = [customer.GivenName, customer.FamilyName].filter(Boolean).join(' ').trim()
-
-      // Sub-customers are contacts — group them under the parent's company name
-      const companyName = isSubCustomer
-        ? (qboIdToCompany.get(String(customer.ParentRef?.value)) || customer.CompanyName || customer.DisplayName || '')
-        : (customer.CompanyName || customer.DisplayName || '')
-
-      const clientName = isSubCustomer
-        ? (contactName || customer.DisplayName || '')
-        : (contactName || null)
+      const companyName = customer.CompanyName || customer.DisplayName || ''
+      const clientName = contactName || null
 
       const clientFields = {
         company: companyName || null,
@@ -135,54 +132,107 @@ Deno.serve(async (req) => {
         qbo_last_sync_at: now,
       }
 
-      // Match by qbo_customer_id first
-      const existingById = byQboId.get(qboId)
-      if (existingById) {
-        await supabase.from('clients').update(clientFields).eq('id', existingById.id)
-        updated++
+      const existing = byQboId.get(qboId)
+      if (existing) {
+        await supabase.from('clients').update(clientFields).eq('id', existing.id)
+        // Refresh local map with updated id so sub-customers can find it
+        byQboId.set(qboId, { ...existing, ...clientFields })
+        clientsUpdated++
         continue
       }
 
-      // For sub-customers, match by both company name + contact name to avoid creating duplicates
-      if (isSubCustomer && companyName && clientName) {
-        const companyLower = companyName.toLowerCase().trim()
-        const nameLower = clientName.toLowerCase().trim()
-        const existingByCompany = existingClients?.find(c =>
-          (c.company || '').toLowerCase().trim() === companyLower &&
-          (c.client_name || '').toLowerCase().trim() === nameLower
-        )
-        if (existingByCompany) {
-          await supabase.from('clients').update(clientFields).eq('id', existingByCompany.id)
-          updated++
-          continue
-        }
+      const nameLower = companyName.toLowerCase().trim()
+      const existingByName = nameLower ? byName.get(nameLower) : undefined
+      if (existingByName) {
+        await supabase.from('clients').update(clientFields).eq('id', existingByName.id)
+        byQboId.set(qboId, { ...existingByName, ...clientFields })
+        clientsUpdated++
+        continue
       }
 
-      // For top-level customers, match by company name
-      if (!isSubCustomer) {
-        const nameLower = companyName.toLowerCase().trim()
-        const existingByName = nameLower ? byName.get(nameLower) : undefined
-        if (existingByName) {
-          await supabase.from('clients').update(clientFields).eq('id', existingByName.id)
-          updated++
-          continue
-        }
-      }
-
-      // Skip if no usable name
       if (!companyName && !clientName) { skipped++; continue }
 
-      // Create new ForgePt client
-      await supabase.from('clients').insert({
-        org_id: profile.org_id,
-        ...clientFields,
-      })
-      created++
+      const { data: newClient } = await supabase
+        .from('clients')
+        .insert({ org_id: profile.org_id, ...clientFields })
+        .select('id')
+        .single()
+      if (newClient) byQboId.set(qboId, { id: newClient.id, ...clientFields })
+      clientsCreated++
     }
 
-    return new Response(JSON.stringify({ success: true, total: allCustomers.length, created, updated, skipped }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    // ── 2. Sub-customers → client_contacts table ──────────────────────────────
+    for (const customer of subCustomers) {
+      const qboId = String(customer.Id)
+      const parentQboId = String(customer.ParentRef?.value)
+      const parentClient = byQboId.get(parentQboId)
+
+      if (!parentClient) {
+        // Parent company doesn't exist in ForgePt — skip this contact
+        skipped++
+        continue
+      }
+
+      const fullName = [customer.GivenName, customer.FamilyName].filter(Boolean).join(' ').trim()
+        || customer.DisplayName || ''
+      const email = customer.PrimaryEmailAddr?.Address || null
+      const phone = customer.PrimaryPhone?.FreeFormNumber || null
+      const title = customer.JobDescription || null
+
+      if (!fullName) { skipped++; continue }
+
+      const contactFields = {
+        client_id: parentClient.id,
+        full_name: fullName,
+        email,
+        phone,
+        title,
+        qbo_contact_id: qboId,
+      }
+
+      // Match by qbo_contact_id first
+      const existingContact = contactByQboId.get(qboId)
+      if (existingContact) {
+        await supabase.from('client_contacts').update(contactFields).eq('id', existingContact.id)
+        contactsUpdated++
+        continue
+      }
+
+      // Fall back: match by client_id + email
+      if (email) {
+        const byEmail = (existingContacts || []).find(
+          (c: any) => c.client_id === parentClient.id && c.email === email && !c.qbo_contact_id
+        )
+        if (byEmail) {
+          await supabase.from('client_contacts').update(contactFields).eq('id', byEmail.id)
+          contactsUpdated++
+          continue
+        }
+      }
+
+      // Fall back: match by client_id + full_name
+      const byNameMatch = (existingContacts || []).find(
+        (c: any) => c.client_id === parentClient.id &&
+          (c.full_name || '').toLowerCase() === fullName.toLowerCase() &&
+          !c.qbo_contact_id
+      )
+      if (byNameMatch) {
+        await supabase.from('client_contacts').update(contactFields).eq('id', byNameMatch.id)
+        contactsUpdated++
+        continue
+      }
+
+      await supabase.from('client_contacts').insert(contactFields)
+      contactsCreated++
+    }
+
+    return new Response(JSON.stringify({
+      success: true,
+      total: allCustomers.length,
+      clients: { created: clientsCreated, updated: clientsUpdated },
+      contacts: { created: contactsCreated, updated: contactsUpdated },
+      skipped,
+    }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (err: any) {
     return new Response(JSON.stringify({ error: err.message }), {
