@@ -213,27 +213,25 @@ const skipNames = [
         const vendorsImported = new Set()
 
         for (const r of rows) {
-  const itemName = String(r['Item Name'] || r['Product/Service Name'] || r['item_name'] || r['Name'] || r['name'] || '').trim()
-  const partNumber = String(r['Part #'] || r['Part Number'] || r['part_number'] || r['SKU'] || '').trim()
-  const vendor = String(r['Vendor'] || r['vendor'] || r['Distributor'] || '').trim()
-  const itemType = String(r['Item type'] || r['Type'] || '').trim().toLowerCase()
+  const itemName = String(r['Item Name'] || r['Product/Service Name'] || r['item_name'] || r['Name'] || r['name'] || r['ShortDescription'] || '').trim()
+  const partNumber = String(r['Part #'] || r['Part Number'] || r['part_number'] || r['SKU'] || r['Model or Labor/Fee Name'] || '').trim()
+  const vendor = String(r['Vendor'] || r['vendor'] || r['Distributor'] || r['Supplier'] || '').trim()
+  const itemType = String(r['Item type'] || r['Type'] || r['ItemType'] || '').trim().toLowerCase()
   const rawCategory = String(r['Category'] || r['category'] || '').trim()
   const category = mapCategory(rawCategory) || rawCategory || null
-  const description = String(r['Sales Description'] || r['Purchase Description'] || r['Description'] || r['description'] || '').trim() || null
-  const manufacturer = String(r['Manufacturer'] || r['manufacturer'] || r['Mfr'] || '').trim() || null
+  const description = String(r['Sales Description'] || r['Purchase Description'] || r['Description'] || r['description'] || r['ShortDescription'] || '').trim() || null
+  const manufacturer = String(r['Manufacturer'] || r['manufacturer'] || r['Mfr'] || r['Brand'] || '').trim() || null
 
-  // Skip pure service items from QuickBooks
-  if (itemType === 'service') continue
+  // Skip non-product rows (QuickBooks services, Portal.io labor/fee rows)
+  if (itemType === 'service' || itemType === 'labor' || itemType === 'fee') continue
 
   // Skip known non-product names
   if (skipNames.some(s => itemName.toLowerCase().includes(s))) continue
 
-  // For QB imports, use Cost column as your_cost
   const costRaw = clean(r['Your Cost'] || r['Cost'] || r['your_cost'] || r['Unit Cost'] || '')
   const cost = parseFloat(costRaw) || null
 
-  // For QB imports, use Price as a fallback if no cost
-  const priceRaw = clean(r['Price'] || r['your_cost'] || '')
+  const priceRaw = clean(r['Price'] || r['SellPrice'] || r['your_cost'] || '')
   const price = parseFloat(priceRaw) || null
 
   const pricingDateRaw = r['Pricing Date'] || r['pricing_date'] || r['Date'] || ''
@@ -258,6 +256,7 @@ const skipNames = [
     category,
     unit: String(r['Unit'] || r['unit'] || 'ea').trim().toLowerCase() || 'ea',
     description,
+    msrp: price && price > 0 ? price : null,
     active: true,
   })
               .select('id')

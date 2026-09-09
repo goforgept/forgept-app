@@ -2124,26 +2124,41 @@ export default function ProposalDetail({ isAdmin }) {
         return String(val).replace(/[$,%]/g, '').replace(/,/g, '').trim()
       }
 
-      const mapped = rows.filter(r => r['Item Name'] || r['item_name'] || r['Part #'] || r['part_number_sku']).map(r => {
-        let itemName = r['Item Name'] || r['item_name'] || ''
-        let partNum = clean(r['Part Number'] || r['Part #'] || r['part_number_sku'] || '')
+      // Skip Portal.io labor/fee rows before mapping
+      const filteredRows = rows.filter(r => {
+        const itemType = String(r['ItemType'] || r['Item type'] || r['Type'] || '').trim().toLowerCase()
+        if (itemType === 'labor' || itemType === 'fee' || itemType === 'service') return false
+        return r['Item Name'] || r['item_name'] || r['Part #'] || r['part_number_sku'] || r['ShortDescription'] || r['Model or Labor/Fee Name']
+      })
+
+      const mapped = filteredRows.map(r => {
+        let itemName = r['Item Name'] || r['item_name'] || r['ShortDescription'] || ''
+        let partNum = clean(r['Part Number'] || r['Part #'] || r['part_number_sku'] || r['Model or Labor/Fee Name'] || '')
         const looksLikePartNumber = (s) => /^[A-Z0-9\-]{3,}$/i.test(String(s).trim()) && !String(s).includes(' ')
         if (looksLikePartNumber(itemName) && !looksLikePartNumber(partNum) && partNum) {
           const temp = itemName; itemName = partNum; partNum = temp
         }
-        const yourCost = clean(r['Your Cost'] || r['Your Cost (Unit)'] || r['your_cost_unit'] || '')
-        const markup = clean(r['Markup %'] || r['markup_percent'] || '35')
-        const rawCustomerPrice = clean(r['Customer Price'] || r['Customer Price (Unit)'] || r['customer_price_unit'] || '')
-        const qty = clean(r['Quantity'] || r['Qty'] || r['quantity'] || '1')
+        const yourCost = clean(r['Your Cost'] || r['Your Cost (Unit)'] || r['your_cost_unit'] || r['Cost'] || '')
+        const rawCustomerPrice = clean(r['Customer Price'] || r['Customer Price (Unit)'] || r['customer_price_unit'] || r['SellPrice'] || '')
+        const qty = clean(r['Quantity'] || r['Qty'] || r['quantity'] || r['AreaQty'] || '1')
         const unit = String(r['Unit'] || r['unit'] || 'ea').trim().toLowerCase()
+        const vendor = r['Vendor'] || r['vendor'] || r['Supplier'] || ''
+
+        // Derive markup from cost + sell price if present; fall back to stored markup or 35%
+        let markup = clean(r['Markup %'] || r['markup_percent'] || '')
+        if (!markup && yourCost && rawCustomerPrice && parseFloat(yourCost) > 0) {
+          markup = (((parseFloat(rawCustomerPrice) / parseFloat(yourCost)) - 1) * 100).toFixed(1)
+        }
+        markup = markup || '35'
+
         let finalCustomerPrice = rawCustomerPrice
         if ((!finalCustomerPrice || parseFloat(finalCustomerPrice) === 0) && yourCost && markup) {
           finalCustomerPrice = (parseFloat(yourCost) * (1 + parseFloat(markup) / 100)).toFixed(2)
         }
         return {
           proposal_id: id, item_name: itemName, part_number_sku: partNum, quantity: qty || '1', unit: unit || 'ea',
-          category: r['Category'] || r['category'] || '', vendor: r['Vendor'] || r['vendor'] || '',
-          your_cost_unit: yourCost, markup_percent: markup || '35', customer_price_unit: finalCustomerPrice,
+          category: r['Category'] || r['category'] || '', vendor,
+          your_cost_unit: yourCost, markup_percent: markup, customer_price_unit: finalCustomerPrice,
           customer_price_total: finalCustomerPrice && qty ? (parseFloat(finalCustomerPrice) * parseFloat(qty)).toFixed(2) : '',
           pricing_status: yourCost ? 'Confirmed' : 'Needs Pricing'
         }
