@@ -37,14 +37,23 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
 
     if (!profile?.org_id) { setLoading(false); return }
 
-    const { data, error } = await supabase
-      .from('proposals')
-      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id,clients(client_type)')
-      .eq('org_id', profile.org_id)
-      .eq('is_current_revision', true)
-      .order('created_at', { ascending: false })
+    const [{ data, error }, { data: clientRows }] = await Promise.all([
+      supabase
+        .from('proposals')
+        .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id')
+        .eq('org_id', profile.org_id)
+        .eq('is_current_revision', true)
+        .order('created_at', { ascending: false }),
+      supabase.from('clients').select('id,client_type').eq('org_id', profile.org_id)
+    ])
 
-    if (!error) setProposals(data)
+    // Build a quick id→client_type map; safe if client_type column doesn't exist yet
+    const clientTypeMap = {}
+    for (const c of (clientRows || [])) {
+      if (c.id) clientTypeMap[c.id] = c.client_type || 'commercial'
+    }
+
+    if (!error) setProposals((data || []).map(p => ({ ...p, _clientType: clientTypeMap[p.client_id] || 'commercial' })))
     setLoading(false)
   }
 
@@ -87,8 +96,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
     })
     .filter(p => {
       if (clientTypeFilter === 'all') return true
-      const type = p.clients?.client_type || 'commercial'
-      return type === clientTypeFilter
+      return (p._clientType || 'commercial') === clientTypeFilter
     })
     .filter(p => {
       if (!search) return true
