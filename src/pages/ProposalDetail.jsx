@@ -297,14 +297,15 @@ export default function ProposalDetail({ isAdmin }) {
       setEnabledCatalogSlugs(orgSLA?.enabled_catalogs || [])
       const notifications = []
       const updates = {}
-      if (orgSLA?.feature_sla && orgSLA?.sla_auto_attach && slaArr.length === 0) {
+      // Only auto-attach when the column is null (never set) — not when it's [] (user explicitly removed)
+      if (orgSLA?.feature_sla && orgSLA?.sla_auto_attach && data?.sla_contracts == null && slaArr.length === 0) {
         const tmpl = orgSLA.sla_templates?.[data.industry]
         if (tmpl?.enabled) {
           const newArr = [{ ...tmpl }]
           updates.sla_contracts = newArr; setSlaContracts(newArr); slaArr = newArr; notifications.push('SLA contract')
         }
       }
-      if (orgSLA?.feature_monitoring && orgSLA?.monitoring_auto_attach && monArr.length === 0) {
+      if (orgSLA?.feature_monitoring && orgSLA?.monitoring_auto_attach && data?.monitoring_contracts == null && monArr.length === 0) {
         const tmpl = orgSLA.monitoring_templates?.[data.industry]
         if (tmpl?.enabled) {
           const newArr = [{ ...tmpl }]
