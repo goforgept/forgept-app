@@ -20,16 +20,25 @@ function saveMuted(m) {
   try { localStorage.setItem('notif_muted', JSON.stringify(m)) } catch {}
 }
 
-export default function NotificationBell({ userId }) {
+export default function NotificationBell({ userId: userIdProp }) {
   const [notifications, setNotifications] = useState([])
   const [open, setOpen] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [muted, setMuted] = useState(loadMuted)
+  const [resolvedUserId, setResolvedUserId] = useState(userIdProp || null)
   const navigate = useNavigate()
   const panelRef = useRef(null)
 
+  // Resolve userId — use prop if available, otherwise fetch from auth
   useEffect(() => {
-    if (!userId) return
+    if (userIdProp) { setResolvedUserId(userIdProp); return }
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.id) setResolvedUserId(data.user.id)
+    })
+  }, [userIdProp])
+
+  useEffect(() => {
+    if (!resolvedUserId) return
     fetchNotifications()
 
     const channel = supabase
@@ -38,23 +47,23 @@ export default function NotificationBell({ userId }) {
         event: 'INSERT',
         schema: 'public',
         table: 'notifications',
-        filter: `user_id=eq.${userId}`
+        filter: `user_id=eq.${resolvedUserId}`
       }, (payload) => {
         setNotifications(prev => [payload.new, ...prev])
       })
       .subscribe()
 
     return () => supabase.removeChannel(channel)
-  }, [userId])
+  }, [resolvedUserId])
 
   const fetchNotifications = async () => {
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', resolvedUserId)
       .order('created_at', { ascending: false })
       .limit(50)
-    console.error('[Bell] userId:', userId, 'rows:', data?.length, 'error:', error?.message)
+    console.error('[Bell] userId:', resolvedUserId, 'rows:', data?.length, 'error:', error?.message)
     setNotifications(data || [])
   }
 
@@ -70,7 +79,7 @@ export default function NotificationBell({ userId }) {
   const unreadCount = visible.filter(n => !n.read).length
 
   const markAllRead = async () => {
-    await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
+    await supabase.from('notifications').update({ read: true }).eq('user_id', resolvedUserId).eq('read', false)
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
   }
 
