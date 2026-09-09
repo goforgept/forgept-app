@@ -92,20 +92,35 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
 }
 
-/* ── Rich text editor ───────────────────────────────────────────────── */
-.rich-editor[data-placeholder]:empty::before {
+/* ── Tiptap editor ──────────────────────────────────────────────────── */
+.tiptap-editor .ProseMirror {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--fp-text);
+  background: var(--fp-bg);
+  outline: none;
+  min-height: inherit;
+}
+.tiptap-editor .ProseMirror p { margin: 0.2rem 0; }
+.tiptap-editor .ProseMirror h1 { font-size: 1.5em; font-weight: 700; margin: 0.4rem 0 0.2rem; }
+.tiptap-editor .ProseMirror h2 { font-size: 1.25em; font-weight: 700; margin: 0.35rem 0 0.15rem; }
+.tiptap-editor .ProseMirror h3 { font-size: 1.1em; font-weight: 700; margin: 0.3rem 0 0.1rem; }
+.tiptap-editor .ProseMirror ul { list-style: disc; padding-left: 1.25rem; margin: 0.25rem 0; }
+.tiptap-editor .ProseMirror ol { list-style: decimal; padding-left: 1.25rem; margin: 0.25rem 0; }
+.tiptap-editor .ProseMirror li { margin: 0.1rem 0; }
+.tiptap-editor .ProseMirror strong { font-weight: 700; }
+.tiptap-editor .ProseMirror em { font-style: italic; }
+.tiptap-editor .ProseMirror u { text-decoration: underline; }
+.tiptap-editor .ProseMirror s { text-decoration: line-through; }
+.tiptap-editor .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: var(--fp-muted);
   opacity: 0.5;
+  float: left;
+  height: 0;
   pointer-events: none;
 }
-.rich-editor ul { list-style: disc; padding-left: 1.25rem; margin: 0.25rem 0; }
-.rich-editor ol { list-style: decimal; padding-left: 1.25rem; margin: 0.25rem 0; }
-.rich-editor li { margin: 0.1rem 0; }
-.rich-editor b, .rich-editor strong { font-weight: 700; }
-.rich-editor i, .rich-editor em { font-style: italic; }
-.rich-editor u { text-decoration: underline; }
-.rich-editor p { margin: 0.2rem 0; }
 
 .rich-display ul { list-style: disc; padding-left: 1.25rem; margin: 0.25rem 0; }
 .rich-display ol { list-style: decimal; padding-left: 1.25rem; margin: 0.25rem 0; }
