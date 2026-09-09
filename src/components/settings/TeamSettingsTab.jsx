@@ -1,6 +1,56 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../supabase'
-import { PERMISSION_AREAS, computePermissions } from '../../hooks/usePermissions'
+import { PERMISSION_AREAS } from '../../hooks/usePermissions'
+
+// Default role templates seeded for every new org (editable per org)
+const DEFAULT_ROLE_TEMPLATES = [
+  {
+    name: 'Sales Rep',
+    description: 'Creates and manages proposals, clients, and pipeline',
+    base_role: 'rep',
+    is_admin: false,
+    permissions: {
+      dashboard: 'write', proposals: 'write', clients: 'write', pipeline: 'write', tasks: 'write',
+      jobs: 'read', serviceTickets: 'read', dispatch: 'none',
+      invoices: 'read', purchaseOrders: 'none', inventory: 'none',
+      contracts: 'read', vendors: 'none', productLibrary: 'read',
+      reports: 'none', settings: 'none',
+    },
+  },
+  {
+    name: 'Project Manager',
+    description: 'Manages active jobs, purchase orders, and field operations',
+    base_role: 'project_manager',
+    is_admin: false,
+    permissions: {
+      dashboard: 'write', proposals: 'read', clients: 'read', pipeline: 'none', tasks: 'write',
+      jobs: 'write', serviceTickets: 'write', dispatch: 'write',
+      invoices: 'read', purchaseOrders: 'write', inventory: 'write',
+      contracts: 'read', vendors: 'write', productLibrary: 'read',
+      reports: 'read', settings: 'none',
+    },
+  },
+  {
+    name: 'Field Tech',
+    description: 'Field access — service tickets, jobs, and tech log only',
+    base_role: 'technician',
+    is_admin: false,
+    permissions: {
+      dashboard: 'read', proposals: 'none', clients: 'none', pipeline: 'none', tasks: 'write',
+      jobs: 'read', serviceTickets: 'write', dispatch: 'read',
+      invoices: 'none', purchaseOrders: 'none', inventory: 'read',
+      contracts: 'none', vendors: 'none', productLibrary: 'none',
+      reports: 'none', settings: 'none',
+    },
+  },
+  {
+    name: 'Admin',
+    description: 'Full access to everything — manages team, settings, and all features',
+    base_role: 'admin',
+    is_admin: true,
+    permissions: {},
+  },
+]
 
 // ── Permission level selector ─────────────────────────────────────────────────
 const LEVELS = ['none', 'read', 'write']
@@ -239,6 +289,13 @@ function RoleModal({ role, orgId, onSave, onClose }) {
 
 // ── Member edit modal ─────────────────────────────────────────────────────────
 function MemberModal({ member, roles, onSave, onClose }) {
+  const [tab, setTab] = useState('info')
+  const [info, setInfo] = useState({
+    full_name: member.full_name || '',
+    job_title: member.job_title || '',
+    phone: member.phone || '',
+    org_role: member.org_role || 'rep',
+  })
   const [roleId, setRoleId] = useState(member.org_role_id || '')
   const [overrides, setOverrides] = useState(member.permission_overrides || {})
   const [saving, setSaving] = useState(false)
@@ -259,15 +316,32 @@ function MemberModal({ member, roles, onSave, onClose }) {
   const handleSave = async () => {
     setSaving(true); setError(null)
     const { error } = await supabase.from('profiles').update({
+      full_name: info.full_name,
+      job_title: info.job_title || null,
+      phone: info.phone || null,
+      org_role: info.org_role,
       org_role_id: roleId || null,
       permission_overrides: overrides,
     }).eq('id', member.id)
     setSaving(false)
     if (error) { setError(error.message); return }
-    onSave({ ...member, org_role_id: roleId || null, permission_overrides: overrides, org_roles: selectedRole })
+    onSave({
+      ...member,
+      full_name: info.full_name,
+      job_title: info.job_title,
+      phone: info.phone,
+      org_role: info.org_role,
+      org_role_id: roleId || null,
+      permission_overrides: overrides,
+      org_roles: selectedRole,
+    })
   }
 
-  const rolePerms = selectedRole ? { ...Object.fromEntries(PERMISSION_AREAS.map(a => [a.key, 'write'])), ...(selectedRole.permissions || {}) } : null
+  const rolePerms = selectedRole
+    ? { ...Object.fromEntries(PERMISSION_AREAS.map(a => [a.key, 'write'])), ...(selectedRole.permissions || {}) }
+    : null
+
+  const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center pt-12 px-4 overflow-y-auto">
@@ -280,42 +354,96 @@ function MemberModal({ member, roles, onSave, onClose }) {
           <button onClick={onClose} className="text-fp-muted hover:text-fp-text transition-colors text-xl leading-none">✕</button>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        {/* Inner tabs */}
+        <div className="flex gap-1 px-6 pt-3 border-b border-fp-border">
+          {[['info', 'Info'], ['permissions', 'Permissions']].map(([k, l]) => (
+            <button key={k} onClick={() => setTab(k)}
+              className={`px-3 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                tab === k ? 'border-fp-brand text-fp-brand' : 'border-transparent text-fp-muted hover:text-fp-text'
+              }`}>
+              {l}
+              {k === 'permissions' && overrideCount > 0 && (
+                <span className="ml-1.5 text-xs text-yellow-400">({overrideCount})</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="px-6 py-5 space-y-4">
           {error && <p className="text-red-400 text-sm bg-red-400/10 rounded-lg px-3 py-2">{error}</p>}
 
-          <div>
-            <label className="text-fp-muted text-xs mb-1.5 block font-semibold">Assigned Role</label>
-            <select
-              value={roleId}
-              onChange={e => { setRoleId(e.target.value); setOverrides({}) }}
-              className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-            >
-              <option value="">No custom role (full access)</option>
-              {roles.map(r => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
-            {selectedRole?.description && (
-              <p className="text-fp-muted text-xs mt-1.5">{selectedRole.description}</p>
-            )}
-          </div>
+          {tab === 'info' && (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2">
+                  <label className="text-fp-muted text-xs mb-1 block">Full Name</label>
+                  <input value={info.full_name} onChange={e => setInfo(p => ({ ...p, full_name: e.target.value }))}
+                    placeholder="Jane Smith" className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Job Title</label>
+                  <input value={info.job_title} onChange={e => setInfo(p => ({ ...p, job_title: e.target.value }))}
+                    placeholder="e.g. Sales Rep" className={inputClass} />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Phone</label>
+                  <input value={info.phone} onChange={e => setInfo(p => ({ ...p, phone: e.target.value }))}
+                    placeholder="(555) 000-0000" className={inputClass} />
+                </div>
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Email</label>
+                <input value={member.email} disabled className={inputClass + ' opacity-50 cursor-not-allowed'} />
+                <p className="text-fp-muted text-xs mt-1">Email is managed by the member in their account settings.</p>
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">System Role</label>
+                <select value={info.org_role} onChange={e => setInfo(p => ({ ...p, org_role: e.target.value }))} className={inputClass}>
+                  <option value="rep">Member</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <p className="text-fp-muted text-xs mt-1">Admins bypass all permission checks and can manage team settings.</p>
+              </div>
+            </>
+          )}
 
-          <div className="border-t border-fp-border pt-4">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-fp-text text-sm font-semibold">Permissions</p>
-              {overrideCount > 0 && (
-                <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded-full">
-                  {overrideCount} override{overrideCount !== 1 ? 's' : ''}
-                </span>
-              )}
-            </div>
-            <UserPermissionOverrides
-              rolePermissions={rolePerms}
-              overrides={overrides}
-              onChange={handleOverride}
-              isAdminRole={selectedRole?.is_admin || false}
-            />
-          </div>
+          {tab === 'permissions' && (
+            <>
+              <div>
+                <label className="text-fp-muted text-xs mb-1.5 block font-semibold">Assigned Role</label>
+                <select
+                  value={roleId}
+                  onChange={e => { setRoleId(e.target.value); setOverrides({}) }}
+                  className={inputClass}
+                >
+                  <option value="">No custom role (full access)</option>
+                  {roles.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+                {selectedRole?.description && (
+                  <p className="text-fp-muted text-xs mt-1.5">{selectedRole.description}</p>
+                )}
+              </div>
+
+              <div className="border-t border-fp-border pt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-fp-text text-sm font-semibold">Permission Overrides</p>
+                  {overrideCount > 0 && (
+                    <span className="text-xs text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded-full">
+                      {overrideCount} override{overrideCount !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+                <UserPermissionOverrides
+                  rolePermissions={rolePerms}
+                  overrides={overrides}
+                  onChange={handleOverride}
+                  isAdminRole={selectedRole?.is_admin || info.org_role === 'admin'}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex gap-3 px-6 py-4 border-t border-fp-border">
@@ -324,7 +452,7 @@ function MemberModal({ member, roles, onSave, onClose }) {
           </button>
           <button onClick={handleSave} disabled={saving}
             className="flex-1 py-2 text-sm font-semibold bg-fp-brand text-white rounded-lg hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-            {saving ? 'Saving...' : 'Save Permissions'}
+            {saving ? 'Saving...' : 'Save'}
           </button>
         </div>
       </div>
@@ -361,11 +489,21 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
       const [{ data: rolesData }, { data: membersData }] = await Promise.all([
         supabase.from('org_roles').select('*').eq('org_id', profile.org_id).order('created_at'),
         supabase.from('profiles')
-          .select('id, full_name, email, org_role, org_role_id, permission_overrides, created_at, org_roles(id, name, is_admin)')
+          .select('id, full_name, email, org_role, org_role_id, permission_overrides, created_at, job_title, phone, org_roles(id, name, is_admin)')
           .eq('org_id', profile.org_id)
           .order('created_at'),
       ])
-      setRoles(rolesData || [])
+
+      let finalRoles = rolesData || []
+
+      // Seed default role templates if this org has no roles yet
+      if (finalRoles.length === 0) {
+        const toInsert = DEFAULT_ROLE_TEMPLATES.map(t => ({ ...t, org_id: profile.org_id }))
+        const { data: seeded } = await supabase.from('org_roles').insert(toInsert).select()
+        finalRoles = seeded || []
+      }
+
+      setRoles(finalRoles)
       setMembers(membersData || [])
       setLoading(false)
     }
@@ -524,10 +662,9 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
             <thead>
               <tr className="border-b border-fp-border bg-fp-inset">
                 <th className="text-left px-4 py-2.5 font-medium text-fp-muted">Name</th>
-                <th className="text-left px-4 py-2.5 font-medium text-fp-muted">Email</th>
-                <th className="text-left px-4 py-2.5 font-medium text-fp-muted">Custom Role</th>
-                <th className="text-left px-4 py-2.5 font-medium text-fp-muted">Overrides</th>
-                <th className="text-left px-4 py-2.5 font-medium text-fp-muted">Joined</th>
+                <th className="text-left px-4 py-2.5 font-medium text-fp-muted hidden md:table-cell">Email</th>
+                <th className="text-left px-4 py-2.5 font-medium text-fp-muted">Role</th>
+                <th className="text-left px-4 py-2.5 font-medium text-fp-muted hidden sm:table-cell">Joined</th>
                 <th />
               </tr>
             </thead>
@@ -536,29 +673,33 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
                 const overrideCount = Object.keys(m.permission_overrides || {}).length
                 return (
                   <tr key={m.id} className="hover:bg-fp-inset/50">
-                    <td className="px-4 py-2.5 text-fp-text font-medium">{m.full_name || '—'}</td>
-                    <td className="px-4 py-2.5 text-fp-muted text-xs">{m.email}</td>
                     <td className="px-4 py-2.5">
-                      {m.org_roles ? (
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${m.org_roles.is_admin ? 'bg-fp-brand/20 text-fp-brand' : 'bg-fp-inset text-fp-muted border border-fp-border'}`}>
-                          {m.org_roles.name}
-                        </span>
-                      ) : (
-                        <span className="text-fp-muted text-xs">
-                          {m.org_role === 'admin' ? <span className="text-fp-brand text-xs font-medium">Admin</span> : '—'}
-                        </span>
-                      )}
+                      <p className="text-fp-text font-medium text-sm">{m.full_name || '—'}</p>
+                      {m.job_title && <p className="text-fp-muted text-xs">{m.job_title}</p>}
                     </td>
+                    <td className="px-4 py-2.5 text-fp-muted text-xs hidden md:table-cell">{m.email}</td>
                     <td className="px-4 py-2.5">
-                      {overrideCount > 0 ? (
-                        <span className="text-xs text-yellow-400">{overrideCount} override{overrideCount !== 1 ? 's' : ''}</span>
-                      ) : <span className="text-fp-muted text-xs">—</span>}
+                      <div className="flex flex-col gap-1">
+                        {m.org_role === 'admin' && !m.org_roles && (
+                          <span className="text-fp-brand text-xs font-medium">Admin</span>
+                        )}
+                        {m.org_roles ? (
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium w-fit ${m.org_roles.is_admin ? 'bg-fp-brand/20 text-fp-brand' : 'bg-fp-inset text-fp-muted border border-fp-border'}`}>
+                            {m.org_roles.name}
+                          </span>
+                        ) : m.org_role !== 'admin' ? (
+                          <span className="text-fp-muted text-xs">No role</span>
+                        ) : null}
+                        {overrideCount > 0 && (
+                          <span className="text-xs text-yellow-400">{overrideCount} override{overrideCount !== 1 ? 's' : ''}</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-4 py-2.5 text-fp-muted text-xs">{m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}</td>
+                    <td className="px-4 py-2.5 text-fp-muted text-xs hidden sm:table-cell">{m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-2.5">
                       <button onClick={() => setEditMember(m)}
-                        className="text-fp-muted hover:text-fp-brand text-xs transition-colors font-medium">
-                        Edit permissions
+                        className="text-fp-muted hover:text-fp-brand text-xs transition-colors font-medium whitespace-nowrap">
+                        Edit
                       </button>
                     </td>
                   </tr>

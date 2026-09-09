@@ -119,7 +119,6 @@ const NAV_GROUPS_ADMIN = (featureProposals, featureCRM, featurePurchaseOrders, f
       ...(featureDrawingTool ? [{ label: 'Designer', path: '/designer', icon: '📐' }] : []),
       ...(orgType === 'manufacturer' ? [{ label: 'Roadmap', path: '/roadmap', icon: '🗺️' }] : []),
       { label: 'Reports', path: '/reports', icon: '📊' },
-      { label: 'Team', path: '/settings#team', icon: '👥' },
       { label: 'Settings', path: '/settings', icon: '⚙️' },
       { label: 'Help', path: '/faq', icon: '❓' },
     ])
