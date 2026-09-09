@@ -254,9 +254,9 @@ export default function ProposalDetail({ isAdmin }) {
 
     setCanEdit(isAdminUser || isOwner || isCollaborator || isRegionalManagerOfDeal)
 
-    // Backward-compat: fall back to old singular columns if new arrays are empty
-    let slaArr = (data?.sla_contracts?.length > 0) ? data.sla_contracts : (data?.sla_contract ? [data.sla_contract] : [])
-    let monArr = (data?.monitoring_contracts?.length > 0) ? data.monitoring_contracts : (data?.monitoring_contract ? [data.monitoring_contract] : [])
+    // Backward-compat: fall back to old singular columns only when the array column is absent (null/undefined), not when it's an intentional empty array
+    let slaArr = (data?.sla_contracts != null) ? data.sla_contracts : (data?.sla_contract ? [data.sla_contract] : [])
+    let monArr = (data?.monitoring_contracts != null) ? data.monitoring_contracts : (data?.monitoring_contract ? [data.monitoring_contract] : [])
     setSlaContracts(slaArr)
     setMonitoringContracts(monArr)
 
