@@ -192,13 +192,12 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
     if (!form.title || !editTask) return
     setSaving(true)
     const isMeeting = !!form.meeting_type
-    await supabase.from('tasks').update({
+    const { error } = await supabase.from('tasks').update({
       title: form.title,
       due_date: form.due_date || null,
       priority: form.priority,
       assigned_to: form.assigned_to || profile.id,
       client_id: form.client_id || null,
-      notes: form.notes || null,
       meeting_type: isMeeting ? form.meeting_type : null,
       meeting_link: isMeeting ? form.meeting_link || null : null,
       duration_minutes: isMeeting ? form.duration_minutes : null,
@@ -209,12 +208,13 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
       start_time: form.start_time || null,
       recurrence: form.recurrence || null,
     }).eq('id', editTask.id)
+    setSaving(false)
+    if (error) { alert(`Failed to save: ${error.message}`); return }
     setEditTask(null)
     setShowForm(false)
     setShowMeeting(false)
     setForm({ title: '', due_date: '', priority: 'normal', assigned_to: profile.id, client_id: '', notes: '', meeting_type: '', meeting_link: '', start_time: '', duration_minutes: 60, is_virtual: false, customer_notified: false, attendee_ids: [], attendee_emails: [], meeting_notes: '', recurrence: '' })
     fetchData()
-    setSaving(false)
   }
 
   const handleDelete = async (taskId) => {
