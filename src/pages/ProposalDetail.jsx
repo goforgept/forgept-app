@@ -433,13 +433,19 @@ export default function ProposalDetail({ isAdmin }) {
     const newCost = bomCostTotal + laborCostTotal + slaCostTotal + monCostTotal
     const newMarginDollars = newValue - newCost
     const newMarginPct = newValue > 0 ? (newMarginDollars / newValue) * 100 : 0
-    await supabase.from('proposals').update({
-      proposal_value: newValue,
+    // Only overwrite proposal_value when there are actual calculated items — otherwise
+    // preserve a manually entered deal amount (no BOM, no labor, no contracts).
+    const hasItems = lineItems.length > 0 ||
+      (proposal?.labor_items || []).some(l => l.role) ||
+      slaArr.length > 0 || monArr.length > 0
+    const updatePayload = {
       total_customer_value: newValue,
       total_your_cost: newCost,
       total_gross_margin_dollars: newMarginDollars,
       total_gross_margin_percent: newMarginPct,
-    }).eq('id', id)
+    }
+    if (hasItems) updatePayload.proposal_value = newValue
+    await supabase.from('proposals').update(updatePayload).eq('id', id)
   }
 
   const logActivity = async (event, type = 'note') => {
