@@ -264,7 +264,15 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
     fetchData()
   }
 
-  const isOverdue = (task) => !task.due_date || task.completed ? false : new Date(task.due_date) < new Date(new Date().toDateString())
+  const isOverdue = (task) => {
+    if (!task.due_date || task.completed) return false
+    if (task.start_time) {
+      // Has a specific time — only overdue once that moment has passed
+      return new Date(`${task.due_date}T${task.start_time}`) < new Date()
+    }
+    // No time — overdue if the date is strictly before today (string compare is timezone-safe)
+    return task.due_date < new Date().toISOString().split('T')[0]
+  }
   const isDueToday = (task) => {
     if (!task.due_date || task.completed) return false
     return task.due_date === new Date().toISOString().split('T')[0]

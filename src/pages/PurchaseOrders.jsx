@@ -81,12 +81,12 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     // Try purchase_order_line_items first (manually-created POs)
     const { data: poItems } = await supabase.from('purchase_order_line_items').select('*').eq('po_id', po.id)
     if (poItems && poItems.length > 0) {
-      setLineItems(prev => ({ ...prev, [po.id]: poItems }))
+      setLineItems(prev => ({ ...prev, [po.id]: poItems.map(i => ({ ...i, _source: 'po' })) }))
       return
     }
     // Fall back to bom_line_items (BOM-linked POs)
     const { data: bomItems } = await supabase.from('bom_line_items').select('*').eq('po_number', po.po_number)
-    setLineItems(prev => ({ ...prev, [po.id]: bomItems || [] }))
+    setLineItems(prev => ({ ...prev, [po.id]: (bomItems || []).map(i => ({ ...i, _source: 'bom' })) }))
   }
 
   const deletePO = async (po) => {
@@ -225,21 +225,34 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
     setSavingReceiving(prev => ({ ...prev, [itemId]: true }))
     const qty = parseFloat(receivedQty) || 0
     const now = qty > 0 ? new Date().toISOString() : null
-    await supabase.from('bom_line_items').update({ received_qty: qty, received_at: now }).eq('id', itemId)
-    const po = pos.find(p => p.id === poId)
-    const { data: items } = await supabase.from('bom_line_items').select('*').eq('po_number', po?.po_number)
-    setLineItems(prev => ({ ...prev, [poId]: items || [] }))
-    if (items) {
-      const total = items.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0)
-      const received = items.reduce((sum, i) => sum + (parseFloat(i.received_qty) || 0), 0)
-      const newStatus = received === 0 ? 'Sent' : received >= total ? 'Received' : 'Partial'
-      await supabase.from('purchase_orders').update({ receiving_status: newStatus, status: newStatus }).eq('id', poId)
-      if (newStatus === 'Received') {
-        const po = pos.find(p => p.id === poId)
-        if (!po?.job_id) await receiveIntoInventory(poId)
-      }
-      fetchAll()
+
+    // Detect which table the item came from via the _source tag set in fetchLineItemsForPO
+    const currentItems = lineItems[poId] || []
+    const source = currentItems.find(i => i.id === itemId)?._source || 'bom'
+
+    // Update the correct table
+    if (source === 'po') {
+      await supabase.from('purchase_order_line_items').update({ received_qty: qty, received_at: now }).eq('id', itemId)
+    } else {
+      await supabase.from('bom_line_items').update({ received_qty: qty, received_at: now }).eq('id', itemId)
     }
+
+    // Update local state optimistically so items don't disappear
+    const updatedItems = currentItems.map(i => i.id === itemId ? { ...i, received_qty: qty, received_at: now } : i)
+    setLineItems(prev => ({ ...prev, [poId]: updatedItems }))
+
+    // Calculate status from the updated items
+    const total = updatedItems.reduce((sum, i) => sum + (parseFloat(i.quantity) || 0), 0)
+    const received = updatedItems.reduce((sum, i) => sum + (parseFloat(i.received_qty) || 0), 0)
+    const newStatus = total === 0 ? 'Sent' : received === 0 ? 'Sent' : received >= total ? 'Received' : 'Partial'
+    await supabase.from('purchase_orders').update({ receiving_status: newStatus, status: newStatus }).eq('id', poId)
+
+    if (newStatus === 'Received') {
+      const po = pos.find(p => p.id === poId)
+      if (!po?.job_id) await receiveIntoInventory(poId)
+    }
+
+    fetchAll()
     setSavingReceiving(prev => ({ ...prev, [itemId]: false }))
   }
 
