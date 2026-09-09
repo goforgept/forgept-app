@@ -26,7 +26,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
   const [dragging, setDragging] = useState(null)
   const [showManageStages, setShowManageStages] = useState(false)
   const [search, setSearch] = useState('')
-  const [dateRange, setDateRange] = useState(90)
+  const [dateRange, setDateRange] = useState(0)
   const [clientTypeFilter, setClientTypeFilter] = useState('all')
   const navigate = useNavigate()
 
