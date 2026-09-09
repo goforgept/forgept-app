@@ -29,7 +29,7 @@ export default function AddressAutocomplete({ onSelect, inputClass, placeholder 
         body: JSON.stringify({
           input,
           includedRegionCodes: ['us'],
-          includedPrimaryTypes: ['street_address', 'premise'],
+          includedPrimaryTypes: ['address'],
         }),
       })
       const data = await res.json()
