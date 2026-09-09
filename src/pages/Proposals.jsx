@@ -11,6 +11,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
   const [showArchived, setShowArchived] = useState(false)
   const [closingSoon, setClosingSoon] = useState(false)
   const [sortBy, setSortBy] = useState('newest')
+  const [clientTypeFilter, setClientTypeFilter] = useState('all')
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -38,7 +39,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
 
     const { data, error } = await supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id')
+      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id,clients(client_type)')
       .eq('org_id', profile.org_id)
       .eq('is_current_revision', true)
       .order('created_at', { ascending: false })
@@ -83,6 +84,11 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
         return days <= 30 && days >= 0 && p.status !== 'Won' && p.status !== 'Lost'
       }
       return true
+    })
+    .filter(p => {
+      if (clientTypeFilter === 'all') return true
+      const type = p.clients?.client_type || 'commercial'
+      return type === clientTypeFilter
     })
     .filter(p => {
       if (!search) return true
@@ -187,6 +193,14 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
           </div>
           {!showArchived && (
             <div className="flex gap-2">
+              <div className="flex items-center gap-1 bg-fp-card border border-fp-border rounded-lg px-2 py-1">
+                {[['all', 'All'], ['commercial', 'Commercial'], ['residential', 'Residential']].map(([val, label]) => (
+                  <button key={val} onClick={() => setClientTypeFilter(val)}
+                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${clientTypeFilter === val ? 'bg-fp-brand text-white' : 'text-fp-muted hover:text-fp-text'}`}>
+                    {label}
+                  </button>
+                ))}
+              </div>
               <select
                 value={closingSoon ? 'Closing Soon' : statusFilter}
                 onChange={e => {

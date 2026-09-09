@@ -2124,12 +2124,35 @@ export default function ProposalDetail({ isAdmin }) {
         return String(val).replace(/[$,%]/g, '').replace(/,/g, '').trim()
       }
 
-      // Skip Portal.io labor/fee rows before mapping
+      // Separate labor/fee rows from material rows
+      const laborRows = []
       const filteredRows = rows.filter(r => {
         const itemType = String(r['ItemType'] || r['Item type'] || r['Type'] || '').trim().toLowerCase()
-        if (itemType === 'labor' || itemType === 'fee' || itemType === 'service') return false
+        if (itemType === 'labor' || itemType === 'fee' || itemType === 'service') {
+          laborRows.push(r)
+          return false
+        }
         return r['Item Name'] || r['item_name'] || r['Part #'] || r['part_number_sku'] || r['ShortDescription'] || r['Model or Labor/Fee Name']
       })
+
+      // Map labor/fee rows into the proposal labor_items format
+      if (laborRows.length > 0) {
+        const newLaborItems = laborRows.map(r => {
+          const itemType = String(r['ItemType'] || r['Item type'] || r['Type'] || '').trim().toLowerCase()
+          const role = String(r['Model or Labor/Fee Name'] || r['Item Name'] || r['item_name'] || r['ShortDescription'] || '').trim()
+          const qty = clean(r['AreaQty'] || r['Quantity'] || r['Qty'] || r['quantity'] || '1')
+          const yourCost = clean(r['Cost'] || r['Your Cost'] || r['your_cost_unit'] || '')
+          const sellPrice = clean(r['SellPrice'] || r['Customer Price'] || r['customer_price_unit'] || '')
+          const unit = itemType === 'fee' ? 'ea' : 'hr'
+          let markup = '35'
+          if (yourCost && sellPrice && parseFloat(yourCost) > 0) {
+            markup = (((parseFloat(sellPrice) / parseFloat(yourCost)) - 1) * 100).toFixed(1)
+          }
+          const customerPrice = sellPrice || (yourCost && markup ? (parseFloat(yourCost) * (1 + parseFloat(markup) / 100) * (parseFloat(qty) || 1)).toFixed(2) : '0')
+          return { role, quantity: qty || '1', unit, your_cost: yourCost, markup: parseFloat(markup) || 35, customer_price: parseFloat(customerPrice) || 0 }
+        }).filter(l => l.role)
+        setLaborItems(prev => [...prev.filter(l => l.role), ...newLaborItems])
+      }
 
       const mapped = filteredRows.map(r => {
         let itemName = r['Item Name'] || r['item_name'] || r['ShortDescription'] || ''

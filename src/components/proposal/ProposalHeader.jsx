@@ -157,6 +157,31 @@ export default function ProposalHeader({
           ) : (
             <span className="bg-fp-inset text-fp-muted border border-fp-border rounded-lg px-3 py-2 text-sm">{proposal?.status}</span>
           )}
+
+          {/* Sent checkbox — gates follow-up emails */}
+          {(() => {
+            const isSent = proposal?.status === 'Sent' || proposal?.status === 'Won' || proposal?.status === 'Lost'
+            const isLocked = proposal?.status === 'Won' || proposal?.status === 'Lost' || !canEdit
+            return (
+              <button
+                type="button"
+                disabled={isLocked}
+                onClick={() => !isLocked && updateStatus(isSent ? 'Draft' : 'Sent')}
+                title={isLocked ? 'Status locked' : isSent ? 'Mark as not sent (stops follow-up emails)' : 'Mark as sent (arms follow-up emails)'}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                  isSent
+                    ? 'bg-blue-500/20 border-blue-500/40 text-blue-400'
+                    : 'bg-fp-inset border-fp-border text-fp-muted hover:text-fp-text'
+                } ${isLocked ? 'opacity-60 cursor-default' : 'cursor-pointer'}`}>
+                <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center flex-shrink-0 ${
+                  isSent ? 'bg-blue-500 border-blue-500' : 'border-fp-border bg-transparent'
+                }`}>
+                  {isSent && <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M1 4l3 3 5-6"/></svg>}
+                </span>
+                Proposal Sent
+              </button>
+            )
+          })()}
         </div>
       </div>
 
