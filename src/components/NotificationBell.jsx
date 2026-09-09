@@ -63,7 +63,6 @@ export default function NotificationBell({ userId: userIdProp }) {
       .eq('user_id', resolvedUserId)
       .order('created_at', { ascending: false })
       .limit(50)
-    console.error('[Bell] userId:', resolvedUserId, 'rows:', data?.length, 'error:', error?.message)
     setNotifications(data || [])
   }
 
