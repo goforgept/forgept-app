@@ -130,6 +130,7 @@ Deno.serve(async (req) => {
     // Phase 6 — remaining org-level tables
     await Promise.all([
       delEq(admin, 'activities', 'org_id', orgId),
+      delEq(admin, 'notifications', 'org_id', orgId),
       delEq(admin, 'jobs', 'org_id', orgId),
       delEq(admin, 'service_tickets', 'org_id', orgId),
       delEq(admin, 'invoices', 'org_id', orgId),
@@ -147,14 +148,22 @@ Deno.serve(async (req) => {
     ])
 
     // Phase 7 — delete auth users
-    await Promise.allSettled(
-      profileIds.map((uid: string) =>
-        fetch(`${supabaseUrl}/auth/v1/admin/users/${uid}`, {
+    const authResults = await Promise.allSettled(
+      profileIds.map(async (uid: string) => {
+        const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${uid}`, {
           method: 'DELETE',
           headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
         })
-      )
+        if (!res.ok) {
+          const txt = await res.text()
+          console.error(`auth delete failed for ${uid}:`, res.status, txt)
+          throw new Error(`auth delete ${uid}: ${res.status} ${txt}`)
+        }
+        return uid
+      })
     )
+    const authFailed = authResults.filter(r => r.status === 'rejected').length
+    if (authFailed > 0) console.error(`${authFailed}/${profileIds.length} auth user deletions failed`)
 
     // Phase 8 — profiles then org
     await delEq(admin, 'profiles', 'org_id', orgId)
