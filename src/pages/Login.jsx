@@ -37,7 +37,8 @@ export default function Login() {
         setTab('mfa')
       }
     } else {
-      // No MFA required — clear the flag so the session gets set normally
+      // No MFA required — stamp activity so the idle check doesn't see stale data
+      try { localStorage.setItem('fp_last_activity', Date.now()) } catch {}
       mfaState.pending = false
     }
     setLoading(false)
@@ -51,6 +52,7 @@ export default function Login() {
     mfaState.pending = false
     const { error } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: mfaChallengeId, code: c })
     if (error) { mfaState.pending = true; setError(error.message) }
+    else { try { localStorage.setItem('fp_last_activity', Date.now()) } catch {} }
     setLoading(false)
   }
 

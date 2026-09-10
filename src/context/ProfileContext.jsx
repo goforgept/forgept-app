@@ -70,56 +70,48 @@ export function ProfileProvider({ children }) {
   }, [])
 
   // Auto-logout after 1 hour of inactivity
-  // Uses localStorage so closing and reopening the browser is also caught
   const loggedIn = !!session
-  const IDLE_TIMEOUT = 60 * 60 * 1000
-
-  const stampActivity = () => {
-    try { localStorage.setItem('fp_last_activity', Date.now()) } catch {}
-  }
-
-  const checkIdleOnLoad = () => {
-    try {
-      const last = parseInt(localStorage.getItem('fp_last_activity') || '0', 10)
-      if (last && Date.now() - last > IDLE_TIMEOUT) {
-        supabase.auth.signOut()
-        return true
-      }
-    } catch {}
-    return false
-  }
+  const IDLE_MS = 60 * 60 * 1000
+  const LS_KEY  = 'fp_last_activity'
 
   useEffect(() => {
-    if (!loggedIn) return
-
-    // If they've been idle since before they last closed the browser, sign out now
-    if (checkIdleOnLoad()) return
-
-    stampActivity()
-    let timer
-
-    const resetTimer = () => {
-      stampActivity()
-      clearTimeout(timer)
-      timer = setTimeout(() => supabase.auth.signOut(), IDLE_TIMEOUT)
+    if (!loggedIn) {
+      // Clear timestamp on sign-out so the next login starts fresh
+      try { localStorage.removeItem(LS_KEY) } catch {}
+      return
     }
 
-    // Also check when tab becomes visible again after being hidden
+    // On session restore (browser reopen), check how long it's been idle.
+    // If fp_last_activity is missing we treat it as a fresh login (no sign-out).
+    const last = parseInt(localStorage.getItem(LS_KEY) || '0', 10)
+    if (last && Date.now() - last > IDLE_MS) {
+      supabase.auth.signOut()
+      return
+    }
+
+    // Stamp now so we have a baseline; subsequent activity keeps refreshing it.
+    try { localStorage.setItem(LS_KEY, Date.now()) } catch {}
+
+    let timer
+    const stamp = () => { try { localStorage.setItem(LS_KEY, Date.now()) } catch {} }
+    const reset = () => { stamp(); clearTimeout(timer); timer = setTimeout(() => supabase.auth.signOut(), IDLE_MS) }
+
+    // When the tab comes back into focus, check idle time before resetting
     const onVisible = () => {
-      if (document.visibilityState === 'visible') {
-        if (checkIdleOnLoad()) return
-        resetTimer()
-      }
+      if (document.visibilityState !== 'visible') return
+      const t = parseInt(localStorage.getItem(LS_KEY) || '0', 10)
+      if (t && Date.now() - t > IDLE_MS) { supabase.auth.signOut(); return }
+      reset()
     }
 
     const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
-    events.forEach(e => window.addEventListener(e, resetTimer))
+    events.forEach(e => window.addEventListener(e, reset, { passive: true }))
     document.addEventListener('visibilitychange', onVisible)
-    resetTimer()
+    reset()
 
     return () => {
       clearTimeout(timer)
-      events.forEach(e => window.removeEventListener(e, resetTimer))
+      events.forEach(e => window.removeEventListener(e, reset))
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [loggedIn])
