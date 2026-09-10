@@ -200,7 +200,7 @@ const drawSheetOnPDFStandalone = async (pdf, sheet, imgData, imgX, imgY, imgW, i
     if (!isFinite(px) || !isFinite(py)) continue
     const col = p.marker_color || '#C8622A'
     const r = parseInt(col.slice(1,3),16), g = parseInt(col.slice(3,5),16), b = parseInt(col.slice(5,7),16)
-    const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera']
+    const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Multi Sensor Camera','Fisheye Camera']
     const category = p.global_products?.category || ''
     if (showFOV && fovCategories.includes(category) && isFinite(px) && isFinite(py)) {
       const fovAngle = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
@@ -907,7 +907,7 @@ export default function DrawingExport({ proposalId, orgId, sheets, proposal, sta
       const b   = parseInt(col.slice(5,7),16)
 
       // FOV cone — mirrors canvas rendering in DrawingSheet
-      const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Fisheye Camera']
+      const fovCategories = ['Dome Camera','Bullet Camera','PTZ Camera','Motion Sensor','Multi-Lens Camera','Multi Sensor Camera','Fisheye Camera']
       const category = p.global_products?.category || ''
       if (showFOV && fovCategories.includes(category) && isFinite(px) && isFinite(py)) {
         const fovAngle    = p.fov_angle || p.global_products?.specs?.fov_angle || (category === 'PTZ Camera' ? 360 : 90)
