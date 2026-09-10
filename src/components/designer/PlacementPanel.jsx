@@ -5,7 +5,7 @@ import ComponentsSection from './ComponentsSection'
 // Categories that act as power sources (provide PoE / power to other devices)
 const POE_SOURCE_CATEGORIES = ['Network', 'Network Switch', 'Switch', 'NVR', 'UPS', 'Panel', 'Controller', 'Rack', 'Power Supply']
 
-const CAMERA_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Multi-Lens Camera', 'Fisheye Camera']
+const CAMERA_CATEGORIES = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Multi-Lens Camera', 'Multi Sensor Camera', 'Fisheye Camera']
 
 const SENSOR_WIDTHS = {
   '1/4"': 3.68,

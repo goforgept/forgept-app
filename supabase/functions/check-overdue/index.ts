@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
           org_id: p.org_id, user_id: userId,
           type: 'proposal_past_close', title: 'Proposal Past Close Date',
           body: `Proposal "${p.proposal_name || ''}" for ${client} passed its close date of ${p.close_date}.`,
-          link: `/proposals/${p.id}`,
+          link: `/proposal/${p.id}`,
           dedup_key: `overdue:proposal:${p.id}:${ot.today}`,
         })
       }

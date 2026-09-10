@@ -11,6 +11,7 @@ const LABEL_PREFIXES = {
   'PTZ Camera':              'PTZ',
   'Turret Camera':           'CAM',
   'Multi-Lens Camera':       'CAM',
+  'Multi Sensor Camera':     'CAM',
   'Fisheye Camera':          'CAM',
   'LPR Camera':              'LPR',
   'Cabinet System':          'CAB',

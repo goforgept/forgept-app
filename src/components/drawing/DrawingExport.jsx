@@ -434,16 +434,49 @@ export async function generateShopDrawingsPdf({ sheets, placements, cableRuns, v
   }
   drawTitleBlock('Legend', 2)
 
-  // Device + Cable schedule page
+  // Fetch placement components for the schedule
+  const placementIds = placements.map(p => p.id)
+  let compByPlacement = {}
+  if (placementIds.length > 0) {
+    const { data: pcData } = await supabase
+      .from('placement_components')
+      .select('placement_id, component_type, quantity')
+      .in('placement_id', placementIds)
+    ;(pcData || []).forEach(c => {
+      if (!compByPlacement[c.placement_id]) compByPlacement[c.placement_id] = []
+      const label = c.quantity > 1 ? `${c.component_type} ×${c.quantity}` : c.component_type
+      if (!compByPlacement[c.placement_id].includes(label))
+        compByPlacement[c.placement_id].push(label)
+    })
+  }
+
+  // Device + Cable schedule page — grouped by category with components
   const schedTableStyle = { theme: 'grid', styles: { fontSize: 7, cellPadding: 2, textColor: [40,40,40], fillColor: [255,255,255], lineColor: [200,200,200] }, headStyles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7 }, alternateRowStyles: { fillColor: [245,247,250] } }
   pdf.addPage(); pdf.setFillColor(255,255,255); pdf.rect(0,0,pageW,pageH,'F')
   pdf.setTextColor(brandR, brandG, brandB); pdf.setFontSize(11); pdf.setFont('helvetica','bold')
   pdf.text('DEVICE SCHEDULE', margin, margin+8)
-  const scheduleRows = placements.map((p, idx) => {
-    const gp = p.global_products, sheet = sheets.find(s => s.id === p.drawing_sheet_id)
-    return [idx+1, p.device_address||'—', p.part_number_override||gp?.part_number||'—', p.description_override||gp?.name||'—', p.manufacturer_override||gp?.manufacturer||'—', gp?.category||'—', p.quantity||1, conditionLabel(p.site_condition), sheet?.name||'—', p.runs_to_label||'—']
+
+  const schedSorted = [...placements].sort((a, b) => {
+    const catA = a.global_products?.category || 'Uncategorized'
+    const catB = b.global_products?.category || 'Uncategorized'
+    if (catA !== catB) return catA.localeCompare(catB)
+    return (a.device_address || '').localeCompare(b.device_address || '')
   })
-  autoTable(pdf, { ...schedTableStyle, startY: margin+12, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['#','Address','Part Number','Description','Manufacturer','Category','Qty','Condition','Sheet','Runs To']], body: scheduleRows })
+
+  const scheduleRows = []
+  let lastCat = null, groupSeq = 0
+  schedSorted.forEach(p => {
+    const gp = p.global_products, sheet = sheets.find(s => s.id === p.drawing_sheet_id)
+    const cat = gp?.category || 'Uncategorized'
+    if (cat !== lastCat) {
+      scheduleRows.push([{ content: cat.toUpperCase(), colSpan: 10, styles: { fillColor: [brandR, brandG, brandB], textColor: [255,255,255], fontStyle: 'bold', fontSize: 7, halign: 'left', cellPadding: { left: 2, top: 1.2, bottom: 1.2, right: 2 } } }])
+      lastCat = cat; groupSeq = 0
+    }
+    groupSeq++
+    const comps = (compByPlacement[p.id] || []).join(', ') || '—'
+    scheduleRows.push([groupSeq, p.device_address||'—', p.part_number_override||gp?.part_number||'—', p.description_override||gp?.name||'—', p.manufacturer_override||gp?.manufacturer||'—', p.quantity||1, conditionLabel(p.site_condition), sheet?.name||'—', p.runs_to_label||'—', comps])
+  })
+  autoTable(pdf, { ...schedTableStyle, startY: margin+12, margin: { left: margin, right: margin, bottom: titleBlockH+margin+5 }, head: [['#','Address','Part Number','Description','Manufacturer','Qty','Condition','Sheet','Runs To','Components']], body: scheduleRows, columnStyles: { 9: { cellWidth: 50 } } })
 
   // Cable schedule — inline below device schedule, same style
   const cableRows = Object.entries(cableByType).map(([type, data]) => [type, data.runs || '—', `${Math.round(data.footage)}ft`, `${Math.round(data.total_footage)}ft`])
