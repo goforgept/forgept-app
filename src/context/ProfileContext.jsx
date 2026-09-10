@@ -70,27 +70,57 @@ export function ProfileProvider({ children }) {
   }, [])
 
   // Auto-logout after 1 hour of inactivity
+  // Uses localStorage so closing and reopening the browser is also caught
   const loggedIn = !!session
+  const IDLE_TIMEOUT = 60 * 60 * 1000
+
+  const stampActivity = () => {
+    try { localStorage.setItem('fp_last_activity', Date.now()) } catch {}
+  }
+
+  const checkIdleOnLoad = () => {
+    try {
+      const last = parseInt(localStorage.getItem('fp_last_activity') || '0', 10)
+      if (last && Date.now() - last > IDLE_TIMEOUT) {
+        supabase.auth.signOut()
+        return true
+      }
+    } catch {}
+    return false
+  }
+
   useEffect(() => {
     if (!loggedIn) return
 
-    const IDLE_TIMEOUT = 60 * 60 * 1000
+    // If they've been idle since before they last closed the browser, sign out now
+    if (checkIdleOnLoad()) return
+
+    stampActivity()
     let timer
 
     const resetTimer = () => {
+      stampActivity()
       clearTimeout(timer)
-      timer = setTimeout(() => {
-        supabase.auth.signOut()
-      }, IDLE_TIMEOUT)
+      timer = setTimeout(() => supabase.auth.signOut(), IDLE_TIMEOUT)
+    }
+
+    // Also check when tab becomes visible again after being hidden
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        if (checkIdleOnLoad()) return
+        resetTimer()
+      }
     }
 
     const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
     events.forEach(e => window.addEventListener(e, resetTimer))
+    document.addEventListener('visibilitychange', onVisible)
     resetTimer()
 
     return () => {
       clearTimeout(timer)
       events.forEach(e => window.removeEventListener(e, resetTimer))
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [loggedIn])
 
