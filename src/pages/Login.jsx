@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabase'
 import { APP_BASE_URL } from '../config'
-import { mfaState } from '../mfaState'
+import { mfaState, clearMfaPending } from '../mfaState'
 
 export default function Login() {
   const [tab, setTab] = useState('login')
@@ -37,9 +37,9 @@ export default function Login() {
         setTab('mfa')
       }
     } else {
-      // No MFA required — stamp activity so the idle check doesn't see stale data
+      // No MFA required — clear pending and apply the held session
       try { localStorage.setItem('fp_last_activity', Date.now()) } catch {}
-      mfaState.pending = false
+      clearMfaPending()
     }
     setLoading(false)
   }
@@ -49,9 +49,8 @@ export default function Login() {
     if (c.length !== 6) return
     setLoading(true)
     setError(null)
-    mfaState.pending = false
     const { error } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: mfaChallengeId, code: c })
-    if (error) { mfaState.pending = true; setError(error.message) }
+    if (error) { setError(error.message) }
     else { try { localStorage.setItem('fp_last_activity', Date.now()) } catch {} }
     setLoading(false)
   }

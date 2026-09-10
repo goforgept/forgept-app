@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { mfaState } from '../mfaState'
 
+
 const ProfileContext = createContext(null)
 
 const PROFILE_SELECT = 'id, full_name, email, org_id, role, org_role, is_superadmin, company_name, logo_url, primary_color, default_markup_percent, followup_days, phone, job_title, license_number, terms_and_conditions, about_us, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, payment_instructions_payable_to, payment_instructions_zelle, payment_instructions_notes, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, region_id, email_template_send_subject, email_template_send_body, org_role_id, permission_overrides, org_roles(id, name, base_role, permissions, is_admin, description), organizations(status, org_type, default_tax_rate, billing_status, trial_ends_at, feature_proposals, feature_crm, feature_send_proposal, feature_ai_email, feature_purchase_orders, feature_invoices, feature_ai_bom, feature_site_photos, feature_sla, feature_monitoring, feature_drawing_tool, feature_designer_only, feature_spec_reader, feature_drawing_reader, feature_api, feature_regions, feature_msrp, feature_compliance_fields, doc_font, pdf_table_style, pdf_color_headers, cc_fee_percent, feature_inventory, feature_ai_agent, pdf_header_style, default_hide_material_prices, default_hide_labor_breakdown, default_lump_sum_labor, default_tc_font_size, warranty_templates)'
@@ -53,9 +54,19 @@ export function ProfileProvider({ children }) {
     })
 
     supabase.auth.onAuthStateChange((_event, session) => {
-      // If Login page flagged MFA as pending, don't set session yet —
-      // wait for MFA_CHALLENGE_VERIFIED so the MFA prompt stays visible
-      if (_event === 'SIGNED_IN' && mfaState.pending) return
+      // If Login page flagged MFA as pending, hold the session until MFA completes
+      // or until Login clears the flag (non-MFA users)
+      if (_event === 'SIGNED_IN' && mfaState.pending) {
+        mfaState.onClear = (resolvedSession) => {
+          const s = resolvedSession ?? session
+          setSession(s)
+          if (s) {
+            fetchProfile(s.user.id)
+            supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', s.user.id)
+          }
+        }
+        return
+      }
       setSession(session)
       if (session) {
         fetchProfile(session.user.id)
