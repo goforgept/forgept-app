@@ -1814,7 +1814,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
                   const product = placement.global_products
                   if (!product) return null
                   const category = product.category
-                  const fovCategories = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Fisheye Camera']
+                  const fovCategories = ['Dome Camera', 'Bullet Camera', 'PTZ Camera', 'Motion Sensor', 'Multi-Lens Camera', 'Multi Sensor Camera', 'Fisheye Camera']
                   if (!fovCategories.includes(category)) return null
 
                   const isSelected = selectedId === placement.id
