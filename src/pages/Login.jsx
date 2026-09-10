@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../supabase'
 import { APP_BASE_URL } from '../config'
+import { mfaState } from '../mfaState'
 
 export default function Login() {
   const [tab, setTab] = useState('login')
@@ -20,8 +21,10 @@ export default function Login() {
   const handleLogin = async () => {
     setLoading(true)
     setError(null)
+    // Set flag BEFORE sign-in so onAuthStateChange knows to wait for MFA
+    mfaState.pending = true
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) { setError(error.message); setLoading(false); return }
+    if (error) { mfaState.pending = false; setError(error.message); setLoading(false); return }
 
     const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
     if (aal?.nextLevel === 'aal2' && aal?.currentLevel !== 'aal2') {
@@ -33,6 +36,9 @@ export default function Login() {
         setMfaChallengeId(challenge?.id)
         setTab('mfa')
       }
+    } else {
+      // No MFA required — clear the flag so the session gets set normally
+      mfaState.pending = false
     }
     setLoading(false)
   }
@@ -42,8 +48,9 @@ export default function Login() {
     if (c.length !== 6) return
     setLoading(true)
     setError(null)
+    mfaState.pending = false
     const { error } = await supabase.auth.mfa.verify({ factorId: mfaFactorId, challengeId: mfaChallengeId, code: c })
-    if (error) setError(error.message)
+    if (error) { mfaState.pending = true; setError(error.message) }
     setLoading(false)
   }
 

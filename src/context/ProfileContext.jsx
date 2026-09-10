@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from '../supabase'
+import { mfaState } from '../mfaState'
 
 const ProfileContext = createContext(null)
 
@@ -52,10 +53,13 @@ export function ProfileProvider({ children }) {
     })
 
     supabase.auth.onAuthStateChange((_event, session) => {
+      // If Login page flagged MFA as pending, don't set session yet —
+      // wait for MFA_CHALLENGE_VERIFIED so the MFA prompt stays visible
+      if (_event === 'SIGNED_IN' && mfaState.pending) return
       setSession(session)
       if (session) {
         fetchProfile(session.user.id)
-        if (_event === 'SIGNED_IN') {
+        if (_event === 'SIGNED_IN' || _event === 'MFA_CHALLENGE_VERIFIED') {
           supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', session.user.id)
         }
       } else {
