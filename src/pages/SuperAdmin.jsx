@@ -2711,6 +2711,7 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
     name:         product.name,
     category:     product.category,
     manufacturer: product.manufacturer,
+    description:  product.description || '',
     fov_angle:    product.specs?.fov_angle    || '',
     ir_range:     product.specs?.ir_range     || '',
     power_watts:  product.specs?.power_watts  || '',
@@ -2747,6 +2748,7 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
       name:         form.name,
       category:     form.category,
       manufacturer: form.manufacturer,
+      description:  form.description || null,
       is_active:    form.is_active,
       specs: {
         ...product.specs,
@@ -2761,25 +2763,36 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
   }
 
   if (editing) return (
-    <div className="grid grid-cols-5 gap-1.5 text-xs py-1.5 bg-[#1a2d45] rounded px-1 border border-[#C8622A]/30">
-      <input value={form.part_number} onChange={e => setForm(p => ({ ...p, part_number: e.target.value }))} className={inputClass} placeholder="Part #" />
-      <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className={inputClass} placeholder="Name" />
-      <input value={form.manufacturer} onChange={e => setForm(p => ({ ...p, manufacturer: e.target.value }))} className={inputClass} placeholder="Manufacturer" />
-      <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className={inputClass}>
-        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-      </select>
-      <div className="flex gap-1">
-        <input value={form.fov_angle}   onChange={e => setForm(p => ({ ...p, fov_angle: e.target.value }))}   className={inputClass} placeholder="FOV°" type="number" />
-        <input value={form.ir_range}    onChange={e => setForm(p => ({ ...p, ir_range: e.target.value }))}    className={inputClass} placeholder="IR ft" type="number" />
-        <input value={form.power_watts} onChange={e => setForm(p => ({ ...p, power_watts: e.target.value }))} className={inputClass} placeholder="W"    type="number" />
+    <div className="flex flex-col gap-1.5 text-xs py-1.5 bg-[#1a2d45] rounded px-1 border border-[#C8622A]/30">
+      <div className="grid grid-cols-5 gap-1.5">
+        <input value={form.part_number} onChange={e => setForm(p => ({ ...p, part_number: e.target.value }))} className={inputClass} placeholder="Part #" />
+        <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className={inputClass} placeholder="Name" />
+        <input value={form.manufacturer} onChange={e => setForm(p => ({ ...p, manufacturer: e.target.value }))} className={inputClass} placeholder="Manufacturer" />
+        <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className={inputClass}>
+          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <div className="flex gap-1">
+          <input value={form.fov_angle}   onChange={e => setForm(p => ({ ...p, fov_angle: e.target.value }))}   className={inputClass} placeholder="FOV°" type="number" />
+          <input value={form.ir_range}    onChange={e => setForm(p => ({ ...p, ir_range: e.target.value }))}    className={inputClass} placeholder="IR ft" type="number" />
+          <input value={form.power_watts} onChange={e => setForm(p => ({ ...p, power_watts: e.target.value }))} className={inputClass} placeholder="W"    type="number" />
+        </div>
       </div>
-      <div className="flex items-center justify-end gap-1.5">
-        <button onClick={handleSave} disabled={saving} className="text-xs bg-[#C8622A] text-white px-2 py-0.5 rounded hover:bg-[#b5571f] transition-colors">
-          {saving ? '...' : 'Save'}
-        </button>
-        <button onClick={() => setEditing(false)} className="text-xs text-[#8A9AB0] hover:text-white transition-colors">
-          Cancel
-        </button>
+      <div className="flex gap-1.5 items-start">
+        <textarea
+          value={form.description}
+          onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+          className={`${inputClass} flex-1 resize-none`}
+          rows={2}
+          placeholder="Description (Attribute Tab)"
+        />
+        <div className="flex flex-col gap-1 shrink-0">
+          <button onClick={handleSave} disabled={saving} className="text-xs bg-[#C8622A] text-white px-2 py-0.5 rounded hover:bg-[#b5571f] transition-colors">
+            {saving ? '...' : 'Save'}
+          </button>
+          <button onClick={() => setEditing(false)} className="text-xs text-[#8A9AB0] hover:text-white transition-colors">
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -2787,7 +2800,10 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
   return (
     <div className="grid grid-cols-5 gap-2 text-xs py-1 hover:bg-[#1a2d45] rounded px-1 group">
       <span className="font-mono text-[#C8622A] truncate">{product.part_number}</span>
-      <span className="text-white truncate">{product.name}</span>
+      <div className="min-w-0">
+        <span className="text-white truncate block">{product.name}</span>
+        {product.description && <span className="text-[#8A9AB0] truncate block text-[10px]">{product.description}</span>}
+      </div>
       <span className="text-[#8A9AB0]">{product.category}</span>
       <div className="flex gap-2 text-[#8A9AB0]">
         <span>{product.specs?.fov_angle ? `${product.specs.fov_angle}°` : '—'}</span>
