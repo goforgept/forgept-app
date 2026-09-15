@@ -268,6 +268,14 @@ export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager =
     try { return JSON.parse(localStorage.getItem('sidebarCollapsed') || '{}') } catch { return {} }
   })
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [desktopCollapsed, setDesktopCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebarDesktopCollapsed') === 'true' } catch { return false }
+  })
+  const toggleDesktop = () => setDesktopCollapsed(prev => {
+    const next = !prev
+    localStorage.setItem('sidebarDesktopCollapsed', String(next))
+    return next
+  })
 
   useEffect(() => {
     if (sessionStorage.getItem('orgType')) return
@@ -365,84 +373,128 @@ export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager =
     <div className={`
       h-full bg-fp-card border-r border-fp-border flex flex-col
       fixed top-0 left-10 z-50 w-64
-      transition-transform duration-300 ease-in-out
-      lg:relative lg:left-auto lg:top-auto lg:w-56 lg:flex-shrink-0 lg:translate-x-0
+      transition-all duration-300 ease-in-out
+      lg:relative lg:left-auto lg:top-auto lg:flex-shrink-0 lg:translate-x-0
+      ${desktopCollapsed ? 'lg:w-12' : 'lg:w-56'}
       ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
     `}>
-      <div className="px-6 py-5 border-b border-fp-border">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-fp-text text-xl font-bold">
-              ForgePt<span className="text-[#C8622A]">.</span>
-            </h1>
-            {(roleName || isAdmin || isSalesManager || isPM || isProductManager || isTechnician || isDevTeam) && (
-              <span className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-semibold mt-1 inline-block">
-                {roleName || (isAdmin ? 'Admin' : isSalesManager ? 'Sales Mgr' : isPM ? 'Project Mgr' : isProductManager ? 'Product Mgr' : isTechnician ? 'Technician' : 'Dev Team')}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <NotificationBell userId={userId} />
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="lg:hidden p-1 text-fp-muted hover:text-fp-text transition-colors rounded"
-              aria-label="Close menu"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
-        {visibleGroups.map((group) => {
-          const isOpen = !collapsed[group.key]
-          const hasActive = group.links.some(l => isActive(l.path))
-          return (
-            <div key={group.key} className="mb-2">
-              <button
-                onClick={() => toggleGroup(group.key)}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors hover:bg-fp-inset group"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="text-[#C8622A]">{GROUP_ICONS[group.key]}</span>
-                  <span className="text-xs font-semibold tracking-widest uppercase text-fp-muted group-hover:text-fp-text transition-colors">{group.label}</span>
+      <div className={`border-b border-fp-border flex flex-col ${desktopCollapsed ? 'px-1 py-3 items-center gap-2' : 'px-6 py-5'}`}>
+        {!desktopCollapsed && (
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-fp-text text-xl font-bold">
+                ForgePt<span className="text-[#C8622A]">.</span>
+              </h1>
+              {(roleName || isAdmin || isSalesManager || isPM || isProductManager || isTechnician || isDevTeam) && (
+                <span className="bg-[#C8622A]/20 text-[#C8622A] text-xs px-2 py-0.5 rounded-full font-semibold mt-1 inline-block">
+                  {roleName || (isAdmin ? 'Admin' : isSalesManager ? 'Sales Mgr' : isPM ? 'Project Mgr' : isProductManager ? 'Product Mgr' : isTechnician ? 'Technician' : 'Dev Team')}
                 </span>
-                <span className="text-fp-muted text-xs">{isOpen ? '▾' : '▸'}</span>
-              </button>
-              {isOpen && (
-                <div className="mt-0.5 space-y-0.5">
-                  {group.links.map(({ label, path, icon }) => (
-                    <Link
-                      key={path}
-                      to={path}
-                      onClick={() => setMobileOpen(false)}
-                      className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-3 transition-all duration-150 ${
-                        isActive(path)
-                          ? 'bg-[#C8622A]/20 text-[#C8622A]'
-                          : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
-                      }`}
-                    >
-                      {label}
-                    </Link>
-                  ))}
-                </div>
               )}
             </div>
-          )
-        })}
-      </nav>
-
-      <div className="px-3 py-4 border-t border-fp-border">
+            <div className="flex items-center gap-2">
+              <NotificationBell userId={userId} />
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="lg:hidden p-1 text-fp-muted hover:text-fp-text transition-colors rounded"
+                aria-label="Close menu"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+        {desktopCollapsed && <NotificationBell userId={userId} />}
         <button
-          onClick={handleSignOut}
-          className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-fp-muted hover:text-fp-text hover:bg-fp-inset transition-all duration-200 flex items-center gap-3"
+          onClick={toggleDesktop}
+          className="hidden lg:flex items-center justify-center p-1 text-fp-muted hover:text-fp-text transition-colors rounded self-end"
+          title={desktopCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
-          <span>🚪</span>
-          Sign Out
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {desktopCollapsed
+              ? <><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></>
+              : <><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></>
+            }
+          </svg>
         </button>
+      </div>
+
+      {desktopCollapsed ? (
+        <nav className="hidden lg:flex flex-col flex-1 items-center py-3 gap-0.5 overflow-y-auto">
+          {visibleGroups.flatMap(g => g.links).map(({ label, path, icon }) => (
+            <Link
+              key={path}
+              to={path}
+              title={label}
+              className={`w-9 h-9 flex items-center justify-center rounded-lg text-base transition-all duration-150 ${
+                isActive(path)
+                  ? 'bg-[#C8622A]/20 text-[#C8622A]'
+                  : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
+              }`}
+            >
+              {icon}
+            </Link>
+          ))}
+        </nav>
+      ) : (
+        <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto">
+          {visibleGroups.map((group) => {
+            const isOpen = !collapsed[group.key]
+            return (
+              <div key={group.key} className="mb-2">
+                <button
+                  onClick={() => toggleGroup(group.key)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors hover:bg-fp-inset group"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="text-[#C8622A]">{GROUP_ICONS[group.key]}</span>
+                    <span className="text-xs font-semibold tracking-widest uppercase text-fp-muted group-hover:text-fp-text transition-colors">{group.label}</span>
+                  </span>
+                  <span className="text-fp-muted text-xs">{isOpen ? '▾' : '▸'}</span>
+                </button>
+                {isOpen && (
+                  <div className="mt-0.5 space-y-0.5">
+                    {group.links.map(({ label, path, icon }) => (
+                      <Link
+                        key={path}
+                        to={path}
+                        onClick={() => setMobileOpen(false)}
+                        className={`w-full text-left px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-3 transition-all duration-150 ${
+                          isActive(path)
+                            ? 'bg-[#C8622A]/20 text-[#C8622A]'
+                            : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
+                        }`}
+                      >
+                        {label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </nav>
+      )}
+
+      <div className={`border-t border-fp-border ${desktopCollapsed ? 'px-1 py-3 flex justify-center' : 'px-3 py-4'}`}>
+        {desktopCollapsed ? (
+          <button
+            onClick={handleSignOut}
+            title="Sign Out"
+            className="hidden lg:flex w-9 h-9 items-center justify-center rounded-lg text-fp-muted hover:text-fp-text hover:bg-fp-inset transition-all duration-200 text-base"
+          >
+            🚪
+          </button>
+        ) : (
+          <button
+            onClick={handleSignOut}
+            className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-fp-muted hover:text-fp-text hover:bg-fp-inset transition-all duration-200 flex items-center gap-3"
+          >
+            <span>🚪</span>
+            Sign Out
+          </button>
+        )}
       </div>
     </div>
     </>
