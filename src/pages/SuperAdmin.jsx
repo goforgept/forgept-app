@@ -2659,11 +2659,11 @@ function GlobalProductStats() {
                             className="w-full bg-[#1a2d45] text-white border border-[#2a3d55] rounded-lg px-3 py-1.5 text-xs mb-2 focus:outline-none focus:border-[#C8622A] placeholder-[#4a5d75]"
                           />
                           <div className="max-h-64 overflow-y-auto space-y-1">
-                          <div className="grid grid-cols-5 gap-2 text-xs text-[#8A9AB0] font-medium pb-1 border-b border-[#2a3d55] sticky top-0 bg-[#0F1C2E]">
+                          <div className="grid grid-cols-6 gap-2 text-xs text-[#8A9AB0] font-medium pb-1 border-b border-[#2a3d55] sticky top-0 bg-[#0F1C2E]">
                             <span>Part Number</span>
                             <span>Name</span>
+                            <span className="col-span-2">Description</span>
                             <span>Category</span>
-                            <span>FOV°</span>
                             <span className="text-right">Actions</span>
                           </div>
                           {filteredProducts.map(p => (
@@ -2763,52 +2763,38 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
   }
 
   if (editing) return (
-    <div className="flex flex-col gap-1.5 text-xs py-1.5 bg-[#1a2d45] rounded px-1 border border-[#C8622A]/30">
-      <div className="grid grid-cols-5 gap-1.5">
-        <input value={form.part_number} onChange={e => setForm(p => ({ ...p, part_number: e.target.value }))} className={inputClass} placeholder="Part #" />
-        <input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} className={inputClass} placeholder="Name" />
+    <div className="flex flex-col gap-1.5 text-xs py-2 bg-[#1a2d45] rounded px-2 border border-[#C8622A]/30">
+      <div className="grid grid-cols-6 gap-1.5">
+        <input value={form.part_number}  onChange={e => setForm(p => ({ ...p, part_number: e.target.value }))}  className={inputClass} placeholder="Part #" />
+        <input value={form.name}         onChange={e => setForm(p => ({ ...p, name: e.target.value }))}         className={inputClass} placeholder="Name" />
+        <input value={form.description}  onChange={e => setForm(p => ({ ...p, description: e.target.value }))}  className={`${inputClass} col-span-2`} placeholder="Description" />
         <input value={form.manufacturer} onChange={e => setForm(p => ({ ...p, manufacturer: e.target.value }))} className={inputClass} placeholder="Manufacturer" />
-        <select value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} className={inputClass}>
+        <select value={form.category}    onChange={e => setForm(p => ({ ...p, category: e.target.value }))}     className={inputClass}>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <div className="flex gap-1">
-          <input value={form.fov_angle}   onChange={e => setForm(p => ({ ...p, fov_angle: e.target.value }))}   className={inputClass} placeholder="FOV°" type="number" />
-          <input value={form.ir_range}    onChange={e => setForm(p => ({ ...p, ir_range: e.target.value }))}    className={inputClass} placeholder="IR ft" type="number" />
-          <input value={form.power_watts} onChange={e => setForm(p => ({ ...p, power_watts: e.target.value }))} className={inputClass} placeholder="W"    type="number" />
-        </div>
       </div>
-      <div className="flex gap-1.5 items-start">
-        <textarea
-          value={form.description}
-          onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-          className={`${inputClass} flex-1 resize-none`}
-          rows={2}
-          placeholder="Description (Attribute Tab)"
-        />
-        <div className="flex flex-col gap-1 shrink-0">
-          <button onClick={handleSave} disabled={saving} className="text-xs bg-[#C8622A] text-white px-2 py-0.5 rounded hover:bg-[#b5571f] transition-colors">
-            {saving ? '...' : 'Save'}
+      <div className="flex gap-1.5 items-center justify-between">
+        <div className="flex gap-1">
+          <input value={form.fov_angle}   onChange={e => setForm(p => ({ ...p, fov_angle: e.target.value }))}   className={`${inputClass} w-16`} placeholder="FOV°" type="number" />
+          <input value={form.ir_range}    onChange={e => setForm(p => ({ ...p, ir_range: e.target.value }))}    className={`${inputClass} w-16`} placeholder="IR ft" type="number" />
+          <input value={form.power_watts} onChange={e => setForm(p => ({ ...p, power_watts: e.target.value }))} className={`${inputClass} w-16`} placeholder="Watts" type="number" />
+        </div>
+        <div className="flex gap-2">
+          <button onClick={handleSave} disabled={saving} className="text-xs bg-[#C8622A] text-white px-3 py-1 rounded hover:bg-[#b5571f] transition-colors">
+            {saving ? '…' : 'Save'}
           </button>
-          <button onClick={() => setEditing(false)} className="text-xs text-[#8A9AB0] hover:text-white transition-colors">
-            Cancel
-          </button>
+          <button onClick={() => setEditing(false)} className="text-xs text-[#8A9AB0] hover:text-white transition-colors">Cancel</button>
         </div>
       </div>
     </div>
   )
 
   return (
-    <div className="grid grid-cols-5 gap-2 text-xs py-1 hover:bg-[#1a2d45] rounded px-1 group">
+    <div className="grid grid-cols-6 gap-2 text-xs py-1 hover:bg-[#1a2d45] rounded px-1 group">
       <span className="font-mono text-[#C8622A] truncate">{product.part_number}</span>
-      <div className="min-w-0">
-        <span className="text-white truncate block">{product.name}</span>
-        {product.description && <span className="text-[#8A9AB0] truncate block text-[10px]">{product.description}</span>}
-      </div>
+      <span className="text-white truncate">{product.name}</span>
+      <span className="text-[#8A9AB0] truncate col-span-2">{product.description || <span className="text-[#4a5a6a] italic">—</span>}</span>
       <span className="text-[#8A9AB0]">{product.category}</span>
-      <div className="flex gap-2 text-[#8A9AB0]">
-        <span>{product.specs?.fov_angle ? `${product.specs.fov_angle}°` : '—'}</span>
-        {product.specs?.power_watts && <span className="text-yellow-500/70">{product.specs.power_watts}W</span>}
-      </div>
       <div className="flex items-center justify-end gap-2">
         <button onClick={() => setEditing(true)} className="text-xs text-[#8A9AB0] hover:text-white transition-colors opacity-0 group-hover:opacity-100">
           Edit
@@ -2841,7 +2827,7 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
 // ─── AddProductForm ───────────────────────────────────────────────────────────
 function AddProductForm({ onAdded }) {
   const emptyRow = () => ({
-    part_number: '', name: '', manufacturer: '', category: 'Dome Camera',
+    part_number: '', name: '', description: '', manufacturer: '', category: 'Dome Camera',
     industry: 'security', fov_angle: '', ir_range: '', power_watts: '', _id: Math.random()
   })
 
@@ -2890,6 +2876,7 @@ function AddProductForm({ onAdded }) {
     const toInsert = valid.map(r => ({
       part_number:  r.part_number.trim().toUpperCase(),
       name:         r.name.trim() || `${r.manufacturer.trim()} ${r.part_number.trim()}`,
+      description:  r.description.trim() || null,
       manufacturer: r.manufacturer.trim(),
       category:     r.category,
       industry:     r.industry,
@@ -2931,12 +2918,13 @@ function AddProductForm({ onAdded }) {
 
       {/* Column headers */}
       <div className="grid grid-cols-12 gap-1.5 mb-1.5 px-1">
-        {['Part Number *', 'Name', 'Manufacturer *', 'Category', 'Industry', 'FOV°', 'IR ft', 'Watts', ''].map(h => (
+        {['Part Number *', 'Name', 'Description', 'Manufacturer *', 'Category', 'Industry', 'FOV°', 'IR ft', 'Watts', ''].map(h => (
           <div key={h} className={`text-[#8A9AB0] text-xs font-medium ${
             h === 'Part Number *'  ? 'col-span-2' :
             h === 'Name'           ? 'col-span-2' :
-            h === 'Manufacturer *' ? 'col-span-2' :
-            h === 'Category'       ? 'col-span-2' :
+            h === 'Description'    ? 'col-span-2' :
+            h === 'Manufacturer *' ? 'col-span-1' :
+            h === 'Category'       ? 'col-span-1' :
             'col-span-1'
           }`}>{h}</div>
         ))}
@@ -2957,11 +2945,16 @@ function AddProductForm({ onAdded }) {
                 className={inputClass} />
             </div>
             <div className="col-span-2">
+              <input placeholder="e.g. PNB-A6001 - 2MP Box AI camera" value={row.description}
+                onChange={e => update(idx, 'description', e.target.value)}
+                className={inputClass} />
+            </div>
+            <div className="col-span-1">
               <input placeholder="e.g. Kantech" value={row.manufacturer}
                 onChange={e => update(idx, 'manufacturer', e.target.value)}
                 className={inputClass} />
             </div>
-            <div className="col-span-2">
+            <div className="col-span-1">
               <select value={row.category} onChange={e => update(idx, 'category', e.target.value)}
                 className={selectClass}>
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
