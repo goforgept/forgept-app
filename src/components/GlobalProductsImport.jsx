@@ -141,7 +141,7 @@ async function parseSystemSurveyorFile(file) {
   let labelColIdx   = 3  // default col D
   let productColStart = 4 // default col E
 
-  // Find the label column by searching for known labels
+  // Find the label column by searching for known labels — never change modelRowIdx (always row 3 = index 2)
   for (let ri = 0; ri < Math.min(rawRows.length, 15); ri++) {
     const row = rawRows[ri] || []
     for (let ci = 0; ci < row.length; ci++) {
@@ -149,9 +149,6 @@ async function parseSystemSurveyorFile(file) {
       if (v === 'Component Manufacturer' || v === 'Component Model #' || v === 'Descriptive Label') {
         labelColIdx     = ci
         productColStart = ci + 1
-      }
-      if (v === 'Component Model #' || (ri === 2 && v === 'Attribute Tab')) {
-        modelRowIdx = ri === 2 ? ri : ri
       }
     }
   }
