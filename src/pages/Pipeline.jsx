@@ -70,7 +70,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
     }
 
     const [proposalsRes, clientsRes] = await Promise.all([
-      supabase.from('proposals').select('*').eq('org_id', profile.org_id).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('*').eq('org_id', profile.org_id).eq('is_current_revision', true).order('created_at', { ascending: false }),
       supabase.from('clients').select('id, company, client_type, first_name, last_name').eq('org_id', profile.org_id)
     ])
 

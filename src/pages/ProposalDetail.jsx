@@ -2777,6 +2777,31 @@ export default function ProposalDetail({ isAdmin }) {
     navigate(`/proposal/${newProposal.id}`)
   }
 
+  const deleteRevision = async (rev) => {
+    if (revisions.length <= 1) { alert('Cannot delete the only revision. Delete the proposal instead.'); return }
+    if (!window.confirm(`Delete Rev ${rev.revision_number} — "${rev.proposal_name}"? This cannot be undone.`)) return
+
+    // If deleting the current revision, promote the highest-numbered remaining one
+    if (rev.is_current_revision) {
+      const next = [...revisions].filter(r => r.id !== rev.id).sort((a, b) => b.revision_number - a.revision_number)[0]
+      if (next) await supabase.from('proposals').update({ is_current_revision: true }).eq('id', next.id)
+    }
+
+    await supabase.from('bom_line_items').delete().eq('proposal_id', rev.id)
+    await supabase.from('proposal_photos').delete().eq('proposal_id', rev.id)
+    await supabase.from('drawing_sheets').delete().eq('proposal_id', rev.id)
+    await supabase.from('proposals').delete().eq('id', rev.id)
+
+    // If we just deleted the revision we're currently viewing, navigate to the original
+    if (rev.id === id) {
+      const originalId = proposal?.original_proposal_id || id
+      const next = [...revisions].filter(r => r.id !== rev.id).sort((a, b) => b.revision_number - a.revision_number)[0]
+      navigate(`/proposal/${next?.id || originalId}`)
+    } else {
+      fetchProposal()
+    }
+  }
+
   const deleteProposal = async () => {
     if (deleteConfirmText !== proposal?.proposal_name) return
     setDeletingProposal(true)
@@ -3953,6 +3978,12 @@ const analyzeDrawing = async () => {
                         }`}>{rev.status}</span>
                         <span className="text-fp-muted text-xs">{new Date(rev.created_at).toLocaleDateString()}</span>
                         {!isViewing && <span className="text-fp-muted text-xs">→</span>}
+                        <button
+                          onClick={e => { e.stopPropagation(); deleteRevision(rev) }}
+                          className="text-red-400/50 hover:text-red-400 text-xs transition-colors opacity-0 group-hover:opacity-100 ml-1"
+                          title="Delete this revision">
+                          ✕
+                        </button>
                       </div>
                     </div>
                   )

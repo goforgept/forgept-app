@@ -322,8 +322,8 @@ async function parseSystemSurveyorFile(file) {
     if (mountHeight)  specs.mount_height  = parseFloat(mountHeight)
 
     const descLabel = getVal('Descriptive Label', offset) || getVal('Product Description', offset) || getVal('Description', offset)
-    // model = the Attribute Tab name from row 3 (e.g. "PNB-A6001 - 2MP Box AI camera")
-    const attrTab = model !== partNum ? model : null
+    // model = the Attribute Tab name from row 3 col C — always the product description
+    const attrTab = model || null
 
     products.push({
       industry,

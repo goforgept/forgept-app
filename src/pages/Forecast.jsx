@@ -17,7 +17,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
   const fetchData = async () => {
     if (!profile?.org_id) { setLoading(false); return }
     const [proposalsRes, stagesRes] = await Promise.all([
-      supabase.from('proposals').select('*').eq('org_id', profile.org_id).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('*').eq('org_id', profile.org_id).eq('is_current_revision', true).order('created_at', { ascending: false }),
       supabase.from('pipeline_stages').select('*').eq('org_id', profile.org_id).order('position')
     ])
     setProposals(proposalsRes.data || [])
