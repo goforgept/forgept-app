@@ -1769,7 +1769,7 @@ export default function ProposalDetail({ isAdmin }) {
         children: ['Description', 'Quantity', 'Total'].map((h, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, shading: { fill: primaryColor, type: ShadingType.CLEAR }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 18 })] })] }))
       })
       const lumpRow = new TableRow({
-        children: ['Labor', `${hoursStr} hrs`, `$${docxAllLaborForLumpSum.toLocaleString('en-US', { minimumFractionDigits: 2 })}`].map((val, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
+        children: ['Labor', '', `$${docxAllLaborForLumpSum.toLocaleString('en-US', { minimumFractionDigits: 2 })}`].map((val, i) => new TableCell({ borders: lbs, width: { size: lcw[i], type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 }, children: [new Paragraph({ children: [new TextRun({ text: val, size: 18 })] })] }))
       })
       children.push(
         new Paragraph({ children: [new TextRun({ text: '' })] }),
@@ -3372,11 +3372,9 @@ const analyzeDrawing = async () => {
           }
           if (secLabor.length > 0) {
             if (p?.lump_sum_labor) {
-              const secLaborHours = secLabor.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0)
               const secLaborAmt = secLabor.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
-              const hrsLabel = `${secLaborHours % 1 === 0 ? secLaborHours : secLaborHours.toFixed(2)} hrs`
               doc.setFontSize(9); doc.setFont(pdfFont, 'normal'); doc.setTextColor(80, 80, 80)
-              doc.text(`Labor (${hrsLabel})`, 17, yPos + 4)
+              doc.text('Labor', 17, yPos + 4)
               doc.setFont(pdfFont, 'bold'); doc.setTextColor(30, 30, 30)
               doc.text(`$${secLaborAmt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, pageWidth - 14, yPos + 4, { align: 'right' })
               yPos += 8
@@ -3422,7 +3420,7 @@ const analyzeDrawing = async () => {
         startY: tableEnd + 6,
         theme: freshPdfStriped ? 'striped' : 'plain',
         head: [['Description', 'Quantity', 'Total']],
-        body: [['Labor', `${generalLaborHours % 1 === 0 ? generalLaborHours : generalLaborHours.toFixed(2)} hrs`, `$${proposalLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
+        body: [['Labor', '', `$${proposalLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`]],
         headStyles: { fillColor: hdrFill, textColor: hdrText },
         columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } },
         didParseCell: (data) => { if (data.section === 'head' && data.column.index > 0) data.cell.styles.halign = 'right' },
