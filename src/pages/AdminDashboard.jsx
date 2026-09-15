@@ -43,11 +43,13 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const navigate = useNavigate()
 
   useEffect(() => { if (profile?.org_id) fetchOrgData() }, [profile?.org_id])
-  useEffect(() => { if (profile?.dashboard_widgets_admin) setWidgetConfig(profile.dashboard_widgets_admin) }, [profile])
+  useEffect(() => { if (Array.isArray(profile?.dashboard_widgets_admin)) setWidgetConfig(profile.dashboard_widgets_admin) }, [profile])
 
   const saveWidgetConfig = async (cfg) => {
     setWidgetConfig(cfg)
-    if (profile?.id) await supabase.from('profiles').update({ dashboard_widgets_admin: cfg }).eq('id', profile.id)
+    if (!profile?.id) return
+    const { error } = await supabase.from('profiles').update({ dashboard_widgets_admin: cfg }).eq('id', profile.id)
+    if (error) console.error('dashboard_widgets_admin save failed:', error.message, error)
   }
   const toggleWidget = (id) => saveWidgetConfig(widgetConfig.includes(id) ? widgetConfig.filter(w => w !== id) : [...widgetConfig, id])
   const on = (id) => widgetConfig.includes(id)

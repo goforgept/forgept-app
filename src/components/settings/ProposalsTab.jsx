@@ -150,7 +150,7 @@ export default function ProposalsTab({
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button
-                  onClick={() => setDefaultTcFontSize(s => Math.max(7, s - 1))}
+                  onClick={() => setDefaultTcFontSize(s => Math.max(5, s - 1))}
                   className="w-7 h-7 flex items-center justify-center rounded bg-fp-inset hover:bg-fp-hover text-fp-muted hover:text-fp-text text-sm transition-colors"
                 >−</button>
                 <span className="text-fp-text text-sm font-semibold w-12 text-center">{defaultTcFontSize}pt</span>

@@ -58,7 +58,7 @@ export default function WarrantySection({ proposal, warrantyTemplates = [], onSa
             {onSaveFontSize && (
               <div className="flex items-center gap-1" title="PDF font size (applies to T&C and Warranty)">
                 <button
-                  onClick={() => onSaveFontSize(Math.max(7, tcFontSize - 1))}
+                  onClick={() => onSaveFontSize(Math.max(5, tcFontSize - 1))}
                   className="w-5 h-5 flex items-center justify-center rounded bg-fp-inset hover:bg-fp-hover text-fp-muted hover:text-fp-text text-xs transition-colors"
                 >−</button>
                 <span className="text-fp-muted text-xs w-9 text-center">{tcFontSize}pt</span>

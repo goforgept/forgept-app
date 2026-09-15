@@ -242,7 +242,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
       .select('id, full_name, email, org_id, role, org_role, company_name, logo_url, primary_color, default_markup_percent, followup_days, dispatch_zone, google_calendar_connected, google_calendar_id, microsoft_calendar_connected, team_id, is_regional_vp, is_operations_manager, dashboard_widgets, organizations(org_type)')
       .eq('id', user.id).single()
     setProfile(profileData)
-    if (profileData?.dashboard_widgets) setWidgetConfig(profileData.dashboard_widgets)
+    if (Array.isArray(profileData?.dashboard_widgets)) setWidgetConfig(profileData.dashboard_widgets)
     if (!profileData?.org_id) { setLoading(false); return }
 
     const now = new Date()
@@ -283,8 +283,10 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
 
   const saveWidgetConfig = async (cfg) => {
     setWidgetConfig(cfg)
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('profiles').update({ dashboard_widgets: cfg }).eq('id', user.id)
+    const uid = profile?.id
+    if (!uid) return
+    const { error } = await supabase.from('profiles').update({ dashboard_widgets: cfg }).eq('id', uid)
+    if (error) console.error('dashboard_widgets save failed:', error.message, error)
   }
 
   const toggleWidget = (id) => {
