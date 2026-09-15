@@ -585,7 +585,7 @@ export default function BomSection({
                         </div>
                         <div className="p-4">
                           {secItems.length > 0 && <ViewTable items={secItems} />}
-                          {section.include_labor && (section.labor_items || []).filter(l => l.role).length > 0 && !proposal?.lump_sum_labor && (
+                          {section.include_labor && (section.labor_items || []).filter(l => l.role).length > 0 && (
                             <div className="mt-4 pt-4 border-t border-fp-border">
                               <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Section Labor</p>
                               <table className="w-full text-sm">
@@ -631,7 +631,6 @@ export default function BomSection({
                   })}
 
                   {proposal?.labor_items?.filter(l => l.role).length > 0 && (
-                    proposal?.lump_sum_labor ? null : (
                     <div className="border border-fp-border rounded-xl overflow-hidden">
                       <div className="px-4 py-3 bg-fp-inset border-b border-fp-border">
                         <span className="text-fp-text font-semibold text-sm">Labor</span>
@@ -674,15 +673,12 @@ export default function BomSection({
                         </table>
                       </div>
                     </div>
-                    )
                   )}
 
                   {(() => {
                     const sectionLaborTotal = sections.reduce((sum, s) => sum + (s.include_labor ? (s.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0) : 0), 0)
                     const allLaborTotal = laborTotal + sectionLaborTotal
-                    const allLaborHours = (proposal?.labor_items || []).filter(l => l.role).reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0) + sections.reduce((s, sec) => s + (sec.include_labor ? (sec.labor_items || []).filter(l => l.role).reduce((ss, l) => ss + (parseFloat(l.quantity) || 0), 0) : 0), 0)
                     const adjustedGrandTotal = materialsTotal + allLaborTotal + taxAmount
-                    const lumpSumLabor = proposal?.lump_sum_labor
                     return (
                       <table className="w-full text-sm">
                         <tfoot>
@@ -690,7 +686,7 @@ export default function BomSection({
                           {allLaborTotal > 0 && (
                             <tr>
                               <td colSpan="6" className="text-fp-muted pt-1 text-right font-semibold">
-                                Labor Total{lumpSumLabor ? ` (${allLaborHours % 1 === 0 ? String(allLaborHours) : allLaborHours.toFixed(2)} hrs)` : ''}
+                                Labor Total
                               </td>
                               <td className="text-fp-text pt-1 text-right font-bold pr-4">${allLaborTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               <td></td>
