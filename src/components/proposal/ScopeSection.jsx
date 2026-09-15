@@ -88,7 +88,7 @@ export default function ScopeSection({
             </button>
           )}
           <button onClick={() => setShowPricingModal(true)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${(proposal?.hide_material_prices || proposal?.hide_labor_breakdown || proposal?.show_cover_page) ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${(proposal?.hide_material_prices || proposal?.hide_labor_breakdown || proposal?.lump_sum_labor || proposal?.lump_sum_pricing || proposal?.show_cover_page) ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
             ⚙ Options
           </button>
           <div className="relative" ref={dlRef}>

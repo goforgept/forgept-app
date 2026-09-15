@@ -321,7 +321,7 @@ async function parseSystemSurveyorFile(file) {
     if (installNotes) specs.install_notes = installNotes
     if (mountHeight)  specs.mount_height  = parseFloat(mountHeight)
 
-    const descLabel = getVal('Descriptive Label', offset) || getVal('Product Description', offset) || getVal('Description', offset)
+    const descLabel = getVal('Attribute Tab', offset) || getVal('Descriptive Label', offset) || getVal('Product Description', offset) || getVal('Description', offset)
 
     products.push({
       industry,
