@@ -3,6 +3,7 @@ import { savePdf, nativeDownload } from '../nativeDownload'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 import Sidebar from '../components/Sidebar'
 import POList from '../components/POList'
 import jsPDF from 'jspdf'
@@ -47,6 +48,7 @@ export default function ProposalDetail({ isAdmin }) {
   const { id } = useParams()
   const navigate = useNavigate()
   const { profile, features } = useProfile()
+  const { canWrite: canWritePermission } = usePermissions()
   const pdfFont = profile?.organizations?.doc_font || 'helvetica'
   const pdfStriped = (profile?.organizations?.pdf_table_style || 'striped') === 'striped'
   const [proposal, setProposal] = useState(null)
@@ -252,7 +254,7 @@ export default function ProposalDetail({ isAdmin }) {
       isRegionalManagerOfDeal = ownerProfile?.region_id === profile.region_id
     }
 
-    setCanEdit(isAdminUser || isOwner || isCollaborator || isRegionalManagerOfDeal)
+    setCanEdit((isAdminUser || isOwner || isCollaborator || isRegionalManagerOfDeal) && canWritePermission('proposals'))
 
     // Backward-compat: fall back to old singular columns only when the array column is absent (null/undefined), not when it's an intentional empty array
     let slaArr = (data?.sla_contracts != null) ? data.sla_contracts : (data?.sla_contract ? [data.sla_contract] : [])

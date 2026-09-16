@@ -15,8 +15,8 @@ export default function ChangeOrdersTab({ changeOrders, totalCOAmount, onOpenCOM
     <div className="bg-fp-card rounded-xl p-6">
       <div className="flex justify-between items-center mb-5">
         <h3 className="text-fp-text font-bold text-lg">Change Orders</h3>
-        <button onClick={onOpenCOModal}
-          className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+        <button onClick={onOpenCOModal} disabled={!onOpenCOModal}
+          className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${onOpenCOModal ? 'bg-fp-brand text-white hover:bg-[#b5571f]' : 'bg-fp-brand/40 text-white/50 cursor-not-allowed'}`}>
           + New Change Order
         </button>
       </div>
@@ -63,12 +63,14 @@ export default function ChangeOrdersTab({ changeOrders, totalCOAmount, onOpenCOM
                         </span>
 
                         {/* Edit button — always visible */}
-                        <button
-                          onClick={() => onEditCO(co)}
-                          className="text-fp-muted hover:text-fp-text text-xs px-2 py-1 rounded border border-fp-border hover:border-fp-brand transition-colors"
-                        >
-                          Edit
-                        </button>
+                        {onEditCO && (
+                          <button
+                            onClick={() => onEditCO(co)}
+                            className="text-fp-muted hover:text-fp-text text-xs px-2 py-1 rounded border border-fp-border hover:border-fp-brand transition-colors"
+                          >
+                            Edit
+                          </button>
+                        )}
 
                         {/* Generate PDF for approval */}
                         <button
@@ -80,7 +82,7 @@ export default function ChangeOrdersTab({ changeOrders, totalCOAmount, onOpenCOM
                         </button>
 
                         {/* Approve / Reject (pending only) */}
-                        {co.status === 'Pending' && (
+                        {co.status === 'Pending' && onUpdateCOStatus && (
                           <div className="flex gap-1">
                             <button onClick={() => onUpdateCOStatus(co.id, 'Approved')}
                               className="bg-green-600 text-white px-3 py-1 rounded text-xs font-semibold hover:bg-green-700 transition-colors">

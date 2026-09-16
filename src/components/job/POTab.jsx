@@ -45,7 +45,7 @@ function JobPOList({ proposalId }) {
   )
 }
 
-export default function POTab({ lineItems, selectedForPO, setSelectedForPO, job, onOpenPOModal }) {
+export default function POTab({ lineItems, selectedForPO, setSelectedForPO, job, onOpenPOModal, canGenerate = true }) {
   const [allocations, setAllocations] = useState([])
 
   useEffect(() => {
@@ -70,9 +70,9 @@ export default function POTab({ lineItems, selectedForPO, setSelectedForPO, job,
     <div className="bg-fp-card rounded-xl p-6">
       <div className="flex justify-between items-center mb-5">
         <h3 className="text-fp-text font-bold text-lg">Purchase Orders</h3>
-        <button onClick={onOpenPOModal}
-          disabled={selectedForPO.size === 0}
-          title={selectedForPO.size === 0 ? 'Check items below to select for PO' : `Generate PO for ${selectedForPO.size} items`}
+        <button onClick={canGenerate ? onOpenPOModal : undefined}
+          disabled={selectedForPO.size === 0 || !canGenerate}
+          title={!canGenerate ? 'Read-only access' : selectedForPO.size === 0 ? 'Check items below to select for PO' : `Generate PO for ${selectedForPO.size} items`}
           className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
           {selectedForPO.size > 0 ? `Generate PO (${selectedForPO.size})` : 'Generate PO'}
         </button>

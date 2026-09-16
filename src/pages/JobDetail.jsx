@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 import SignaturePad from '../components/SignaturePad'
 import ChecklistTab from '../components/job/ChecklistTab'
 import FulfillmentTab from '../components/job/FulfillmentTab'
@@ -60,6 +61,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const { id } = useParams()
   const navigate = useNavigate()
   const { profile } = useProfile()
+  const { canWrite } = usePermissions()
   const pdfStriped = (profile?.organizations?.pdf_table_style || 'striped') === 'striped'
   const [job, setJob] = useState(null)
   const [editingJobName, setEditingJobName] = useState(false)
@@ -1564,8 +1566,8 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                   </div>
                 ) : (
                   <h2
-                    onClick={() => { setJobNameDraft(job?.name || ''); setEditingJobName(true) }}
-                    className="text-fp-text text-lg lg:text-2xl font-bold cursor-pointer hover:text-fp-brand transition-colors truncate">
+                    onClick={() => canWrite('jobs') && (setJobNameDraft(job?.name || ''), setEditingJobName(true))}
+                    className={`text-fp-text text-lg lg:text-2xl font-bold transition-colors truncate ${canWrite('jobs') ? 'cursor-pointer hover:text-fp-brand' : 'cursor-default'}`}>
                     {job?.name}
                   </h2>
                 )}
@@ -1610,7 +1612,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                 <span className="lg:hidden">{job?.completion_signature_data ? '✅' : '✍️'}</span>
                 <span className="hidden lg:inline">{job?.completion_signature_data ? '✅ Re-sign' : '✍️ Get Signature'}</span>
               </button>
-              <select value={job?.status || 'In Progress'} onChange={e => updateJobStatus(e.target.value)} disabled={savingStatus}
+              <select value={job?.status || 'In Progress'} onChange={e => updateJobStatus(e.target.value)} disabled={savingStatus || !canWrite('jobs')}
                 className="bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:border-fp-brand">
                 {jobStages.map(s => <option key={s.key || s.name}>{s.name || s.key}</option>)}
               </select>
@@ -1835,9 +1837,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           <ChangeOrdersTab
             changeOrders={changeOrders}
             totalCOAmount={totalCOAmount}
-            onOpenCOModal={() => { setEditingCOId(null); setCoForm(emptyCoForm); setShowCOModal(true) }}
-            onUpdateCOStatus={updateCOStatus}
-            onEditCO={openEditCO}
+            onOpenCOModal={canWrite('jobs') ? () => { setEditingCOId(null); setCoForm(emptyCoForm); setShowCOModal(true) } : undefined}
+            onUpdateCOStatus={canWrite('jobs') ? updateCOStatus : undefined}
+            onEditCO={canWrite('jobs') ? openEditCO : undefined}
             onGeneratePDF={generateCOPdf}
           />
         )}
@@ -1850,6 +1852,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             setSelectedForPO={setSelectedForPO}
             job={job}
             onOpenPOModal={() => setShowPOModal(true)}
+          canGenerate={canWrite('jobs')}
           />
         )}
 

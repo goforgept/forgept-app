@@ -4,6 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 import SignaturePad from '../components/SignaturePad'
 
 const STATUS_COLORS = {
@@ -24,6 +25,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
   const { id } = useParams()
   const navigate = useNavigate()
   const { profile } = useProfile()
+  const { canWrite } = usePermissions()
   const [ticket, setTicket] = useState(null)
   const [loading, setLoading] = useState(true)
   const [techs, setTechs] = useState([])
@@ -735,7 +737,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                   <button onClick={() => setConfirmDelete(false)} className="text-fp-muted hover:text-fp-text text-xs px-3 py-1.5 transition-colors">Cancel</button>
                 </div>
               ) : (
-                <button onClick={() => setConfirmDelete(true)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Delete</button>
+                canWrite('serviceTickets') && <button onClick={() => setConfirmDelete(true)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Delete</button>
               )}
             </div>
           </div>
@@ -744,26 +746,26 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
             <div>
               <p className="text-fp-muted text-xs mb-1">Status</p>
-              <select value={ticket.status} onChange={e => updateTicket('status', e.target.value)} disabled={saving} className={`w-full ${inputClass}`}>
+              <select value={ticket.status} onChange={e => updateTicket('status', e.target.value)} disabled={saving || !canWrite('serviceTickets')} className={`w-full ${inputClass}`}>
                 {['Open', 'In Progress', 'Resolved', 'Cancelled'].map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div>
               <p className="text-fp-muted text-xs mb-1">Priority</p>
-              <select value={ticket.priority} onChange={e => updateTicket('priority', e.target.value)} disabled={saving} className={`w-full ${inputClass}`}>
+              <select value={ticket.priority} onChange={e => updateTicket('priority', e.target.value)} disabled={saving || !canWrite('serviceTickets')} className={`w-full ${inputClass}`}>
                 {['Low', 'Normal', 'High', 'Urgent'].map(p => <option key={p}>{p}</option>)}
               </select>
             </div>
             <div>
               <p className="text-fp-muted text-xs mb-1">Technician</p>
-              <select value={ticket.assigned_tech_id || ''} onChange={e => updateTicket('assigned_tech_id', e.target.value)} disabled={saving} className={`w-full ${inputClass}`}>
+              <select value={ticket.assigned_tech_id || ''} onChange={e => updateTicket('assigned_tech_id', e.target.value)} disabled={saving || !canWrite('serviceTickets')} className={`w-full ${inputClass}`}>
                 <option value="">Unassigned</option>
                 {techs.map(t => <option key={t.id} value={t.id}>{t.full_name}{t.dispatch_zone ? ` · ${t.dispatch_zone}` : ''}</option>)}
               </select>
             </div>
             <div>
               <p className="text-fp-muted text-xs mb-1">Scheduled</p>
-              <input type="date" value={ticket.scheduled_date || ''} onChange={e => updateTicket('scheduled_date', e.target.value)} className={`w-full ${inputClass}`} />
+              <input type="date" value={ticket.scheduled_date || ''} onChange={e => canWrite('serviceTickets') && updateTicket('scheduled_date', e.target.value)} readOnly={!canWrite('serviceTickets')} className={`w-full ${inputClass}`} />
             </div>
             <div>
               <p className="text-fp-muted text-xs mb-1">Duration</p>
@@ -859,7 +861,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                   />
                   <div className="flex gap-3">
                     <button onClick={() => setEditingNotes(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
-                    <button onClick={saveNotesEdit} disabled={savingNotesEdit}
+                    <button onClick={saveNotesEdit} disabled={savingNotesEdit || !canWrite('serviceTickets')}
                       className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                       {savingNotesEdit ? 'Saving...' : 'Save Notes'}
                     </button>
@@ -872,7 +874,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                       onKeyDown={e => e.key === 'Enter' && addNote()}
                       placeholder="Add a note or update..."
                       className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder-[#8A9AB0]" />
-                    <button onClick={addNote} disabled={savingNote || !newNote.trim()}
+                    <button onClick={addNote} disabled={savingNote || !newNote.trim() || !canWrite('serviceTickets')}
                       className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                       {savingNote ? '...' : 'Add'}
                     </button>
@@ -1080,7 +1082,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
             )}
 
             <div className="flex justify-end">
-              <button onClick={saveItems} disabled={savingItems}
+              <button onClick={saveItems} disabled={savingItems || !canWrite('serviceTickets')}
                 className="bg-fp-brand text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                 {savingItems ? 'Saving...' : 'Save'}
               </button>
