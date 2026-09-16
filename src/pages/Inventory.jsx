@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 
 export default function Inventory({ isAdmin, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, role, isSalesManager, isPM, isTechnician }) {
   const { profile } = useProfile()
+  const { canWrite } = usePermissions()
   const [warehouses, setWarehouses] = useState([])
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -176,8 +178,9 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
               className="px-4 py-2 rounded-lg text-sm font-semibold bg-fp-card text-fp-muted hover:text-fp-text border border-fp-border transition-colors">
               Warehouses
             </button>
-            <button onClick={() => setShowAddItem(true)}
-              className="px-4 py-2 rounded-lg text-sm font-semibold bg-fp-brand text-white hover:bg-[#b5571f] transition-colors">
+            <button onClick={() => canWrite('inventory') && setShowAddItem(true)}
+              disabled={!canWrite('inventory')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${canWrite('inventory') ? 'bg-fp-brand text-white hover:bg-[#b5571f]' : 'bg-fp-brand/40 text-white/50 cursor-not-allowed'}`}>
               + Add Item
             </button>
           </div>
@@ -243,16 +246,19 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
                       <td className="px-4 py-3 text-fp-muted tabular-nums">${(parseFloat(item.unit_cost) || 0).toFixed(2)}</td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
-                          <button onClick={() => setShowAdjust(item)}
-                            className="text-xs text-fp-muted hover:text-fp-brand transition-colors px-2 py-1 border border-fp-border rounded-lg">
+                          <button onClick={() => canWrite('inventory') && setShowAdjust(item)}
+                            disabled={!canWrite('inventory')}
+                            className={`text-xs px-2 py-1 border border-fp-border rounded-lg transition-colors ${canWrite('inventory') ? 'text-fp-muted hover:text-fp-brand' : 'text-fp-muted/40 cursor-not-allowed'}`}>
                             Adjust
                           </button>
-                          <button onClick={() => { setShowEditItem(item); setEditItemForm({ part_number: item.part_number || '', description: item.description, warehouse_id: item.warehouse_id || '', unit_cost: item.unit_cost || '', min_stock_level: item.min_stock_level || '' }) }}
-                            className="text-xs text-fp-muted hover:text-fp-text transition-colors px-2 py-1 border border-fp-border rounded-lg">
+                          <button onClick={() => canWrite('inventory') && (setShowEditItem(item), setEditItemForm({ part_number: item.part_number || '', description: item.description, warehouse_id: item.warehouse_id || '', unit_cost: item.unit_cost || '', min_stock_level: item.min_stock_level || '' }))}
+                            disabled={!canWrite('inventory')}
+                            className={`text-xs px-2 py-1 border border-fp-border rounded-lg transition-colors ${canWrite('inventory') ? 'text-fp-muted hover:text-fp-text' : 'text-fp-muted/40 cursor-not-allowed'}`}>
                             Edit
                           </button>
-                          <button onClick={() => handleDeleteItem(item)}
-                            className="text-xs text-fp-muted hover:text-red-400 transition-colors px-2 py-1 border border-fp-border rounded-lg">
+                          <button onClick={() => canWrite('inventory') && handleDeleteItem(item)}
+                            disabled={!canWrite('inventory')}
+                            className={`text-xs px-2 py-1 border border-fp-border rounded-lg transition-colors ${canWrite('inventory') ? 'text-fp-muted hover:text-red-400' : 'text-fp-muted/40 cursor-not-allowed'}`}>
                             Delete
                           </button>
                         </div>

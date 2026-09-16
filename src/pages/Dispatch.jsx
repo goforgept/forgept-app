@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 
 const STATUS_COLORS = {
   'Open': 'border-blue-500/40 bg-blue-500/5',
@@ -44,6 +45,7 @@ function getWeekDates(referenceDate) {
 export default function Dispatch({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false, featureInventory = false, isSalesManager = false }) {
   const navigate = useNavigate()
   const { profile } = useProfile()
+  const { canWrite } = usePermissions()
   const [tickets, setTickets] = useState([])
   const [jobs, setJobs] = useState([])
   const [jobSchedules, setJobSchedules] = useState([])
@@ -418,7 +420,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                       <div className="p-3 space-y-2 min-h-32">
                         {/* Job blocks */}
                         {techJobSchedules.map(schedule => (
-                          <JobBlock key={schedule.id} schedule={schedule} onRemove={() => removeJobSchedule(schedule.id)} onNavigate={() => navigate(`/jobs/${schedule.job_id}`)} />
+                          <JobBlock key={schedule.id} schedule={schedule} onRemove={() => removeJobSchedule(schedule.id)} onNavigate={() => navigate(`/jobs/${schedule.job_id}`)} canRemove={canWrite('jobs')} />
                         ))}
                         {/* Ticket blocks */}
                         {techTickets.length === 0 && techJobSchedules.length === 0 ? (
@@ -701,7 +703,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                 <button onClick={() => navigate(`/service-tickets/${selectedTicket.id}`)}
                   className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">View Ticket →</button>
                 <button onClick={() => setShowTicketModal(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
-                <button onClick={saveTicketAssignment} disabled={saving}
+                <button onClick={saveTicketAssignment} disabled={saving || !canWrite('serviceTickets')}
                   className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {saving ? 'Saving...' : 'Save'}
                 </button>
@@ -761,7 +763,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
               <p className="text-fp-muted text-xs">You can schedule the same job on multiple days or assign multiple techs by adding additional schedule entries.</p>
               <div className="flex gap-3 pt-2">
                 <button onClick={() => setShowJobModal(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
-                <button onClick={saveJobSchedule} disabled={saving || !editJobTechId || !editJobDate}
+                <button onClick={saveJobSchedule} disabled={saving || !editJobTechId || !editJobDate || !canWrite('jobs')}
                   className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
                   {saving ? 'Saving...' : 'Schedule'}
                 </button>
@@ -802,7 +804,7 @@ function TechHeader({ tech, capacity, techTickets, techJobSchedules }) {
   )
 }
 
-function JobBlock({ schedule, onRemove, onNavigate }) {
+function JobBlock({ schedule, onRemove, onNavigate, canRemove = true }) {
   return (
     <div className="p-3 rounded-lg border border-blue-500/30 bg-blue-500/10 group">
       <div className="flex items-start justify-between gap-2">
@@ -814,7 +816,7 @@ function JobBlock({ schedule, onRemove, onNavigate }) {
           {schedule.jobs?.clients?.company && <p className="text-blue-400/70 text-xs truncate">{schedule.jobs.clients.company}</p>}
           <p className="text-blue-400/70 text-xs mt-0.5">{schedule.hours_allocated}h allocated</p>
         </div>
-        <button onClick={onRemove} className="opacity-0 group-hover:opacity-100 text-fp-muted hover:text-red-400 text-xs transition-all flex-shrink-0">✕</button>
+        {canRemove && <button onClick={onRemove} className="opacity-0 group-hover:opacity-100 text-fp-muted hover:text-red-400 text-xs transition-all flex-shrink-0">✕</button>}
       </div>
     </div>
   )

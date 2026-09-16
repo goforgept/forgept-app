@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 
 export default function Contracts({ isAdmin, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, featureSla, featureMonitoring, role, isSalesManager, isPM, isTechnician, featureInventory = false }) {
   const navigate = useNavigate()
   const { profile } = useProfile()
+  const { canWrite } = usePermissions()
   const [contracts, setContracts] = useState([])
   const [recurringItems, setRecurringItems] = useState([])
   const [loading, setLoading] = useState(true)
@@ -703,16 +705,18 @@ export default function Contracts({ isAdmin, featureProposals, featureCRM, featu
                         </td>
                         <td className="px-3 py-4" onClick={e => e.stopPropagation()}>
                           <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {c.recurring_fee > 0 && (
+                            {c.recurring_fee > 0 && canWrite('contracts') && (
                               <button onClick={e => { e.stopPropagation(); createManualInvoice(c) }}
                                 className="text-blue-400 hover:text-blue-300 text-xs font-medium px-3 py-1.5 rounded-lg border border-blue-400/30 hover:border-blue-300/50 transition-colors">
                                 + Invoice
                               </button>
                             )}
-                            <button onClick={e => openEditContract(e, c)}
-                              className="text-fp-muted hover:text-fp-text text-xs font-medium px-3 py-1.5 rounded-lg border border-fp-border hover:border-fp-text/30 transition-colors">
-                              Edit
-                            </button>
+                            {canWrite('contracts') && (
+                              <button onClick={e => openEditContract(e, c)}
+                                className="text-fp-muted hover:text-fp-text text-xs font-medium px-3 py-1.5 rounded-lg border border-fp-border hover:border-fp-text/30 transition-colors">
+                                Edit
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

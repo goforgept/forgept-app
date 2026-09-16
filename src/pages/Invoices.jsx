@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 
 const STATUS_COLORS = {
   'Draft': 'bg-fp-inset text-fp-muted',
@@ -15,6 +16,7 @@ const STATUS_COLORS = {
 export default function Invoices({ isAdmin, featureProposals = true, featureCRM = false }) {
   const navigate = useNavigate()
   const { profile } = useProfile()
+  const { canWrite } = usePermissions()
   const [invoices, setInvoices] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('All')
@@ -101,8 +103,9 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-fp-text text-2xl font-bold">Invoices</h2>
           <button
-            onClick={() => navigate('/invoices/new')}
-            className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+            onClick={() => canWrite('invoices') && navigate('/invoices/new')}
+            disabled={!canWrite('invoices')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${canWrite('invoices') ? 'bg-fp-brand text-white hover:bg-[#b5571f]' : 'bg-fp-brand/40 text-white/50 cursor-not-allowed'}`}
           >
             + New Invoice
           </button>
@@ -160,7 +163,7 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
           <div className="bg-fp-card rounded-xl p-12 text-center">
             <p className="text-fp-text font-semibold mb-2">No invoices yet</p>
             <p className="text-fp-muted text-sm mb-4">Create an invoice from any Won proposal, or start a new one.</p>
-            <button onClick={() => navigate('/invoices/new')} className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+            <button onClick={() => canWrite('invoices') && navigate('/invoices/new')} disabled={!canWrite('invoices')} className={`px-6 py-2 rounded-lg text-sm font-semibold transition-colors ${canWrite('invoices') ? 'bg-fp-brand text-white hover:bg-[#b5571f]' : 'bg-fp-brand/40 text-white/50 cursor-not-allowed'}`}>
               + New Invoice
             </button>
           </div>

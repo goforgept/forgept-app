@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { usePermissions } from '../hooks/usePermissions'
 
 const emptyForm = {
   vendor_name: '', contact_name: '', contact_email: '',
@@ -9,6 +10,7 @@ const emptyForm = {
 }
 
 export default function Vendors({ isAdmin, featureProposals = true, featureCRM = false }) {
+  const { canWrite } = usePermissions()
   const [vendors, setVendors] = useState([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
@@ -128,12 +130,18 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
       <div className="flex-1 p-6 space-y-6 min-w-0">
         <div className="flex justify-between items-center">
           <h2 className="text-fp-text text-2xl font-bold">Vendors</h2>
-          <button
-            onClick={() => { setShowForm(!showForm); setError(null) }}
-            className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
-          >
-            {showForm ? 'Cancel' : '+ Add Vendor'}
-          </button>
+          {canWrite('vendors') ? (
+            <button
+              onClick={() => { setShowForm(!showForm); setError(null) }}
+              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+            >
+              {showForm ? 'Cancel' : '+ Add Vendor'}
+            </button>
+          ) : (
+            <button disabled className="bg-fp-brand/40 text-white/50 cursor-not-allowed px-4 py-2 rounded-lg text-sm font-semibold">
+              + Add Vendor
+            </button>
+          )}
         </div>
 
         {success && <p className="text-green-400 text-sm">{success}</p>}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 
 const STATUS_COLORS = {
   'Open': 'bg-blue-500/20 text-blue-400',
@@ -21,6 +22,7 @@ const PRIORITY_COLORS = {
 export default function ServiceTickets({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false, featureInventory = false, isSalesManager = false }) {
   const navigate = useNavigate()
   const { profile } = useProfile()
+  const { canWrite } = usePermissions()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [clients, setClients] = useState([])
@@ -149,7 +151,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
           </div>
           <div className="flex gap-3">
             <button onClick={() => navigate('/dispatch')} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">🗺 Dispatch Board</button>
-            <button onClick={() => setShowModal(true)} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ New Ticket</button>
+            <button onClick={() => canWrite('serviceTickets') && setShowModal(true)} disabled={!canWrite('serviceTickets')} className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${canWrite('serviceTickets') ? 'bg-fp-brand text-white hover:bg-[#b5571f]' : 'bg-fp-brand/40 text-white/50 cursor-not-allowed'}`}>+ New Ticket</button>
           </div>
         </div>
 
@@ -192,7 +194,7 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
           <div className="text-center py-16 bg-fp-card rounded-xl border-2 border-dashed border-fp-border">
             <p className="text-fp-muted text-lg mb-2">No tickets yet</p>
             <p className="text-fp-muted text-sm mb-4">Create a service ticket to track field work requests.</p>
-            <button onClick={() => setShowModal(true)} className="bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ New Ticket</button>
+            <button onClick={() => canWrite('serviceTickets') && setShowModal(true)} disabled={!canWrite('serviceTickets')} className={`px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${canWrite('serviceTickets') ? 'bg-fp-brand text-white hover:bg-[#b5571f]' : 'bg-fp-brand/40 text-white/50 cursor-not-allowed'}`}>+ New Ticket</button>
           </div>
         ) : (
           <div className="space-y-3">

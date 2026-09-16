@@ -4,9 +4,11 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 
 export default function PurchaseOrders({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false, featureInventory = false, isSalesManager = false }) {
   const { profile } = useProfile()
+  const { canWrite } = usePermissions()
   const [pos, setPOs] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('All')
@@ -586,8 +588,9 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
       <div className="flex-1 p-6 space-y-6 min-w-0">
         <div className="flex justify-between items-center">
           <h2 className="text-fp-text text-2xl font-bold">Purchase Orders</h2>
-          <button onClick={() => setShowNewPO(true)}
-            className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+          <button onClick={() => canWrite('purchaseOrders') && setShowNewPO(true)}
+            disabled={!canWrite('purchaseOrders')}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${canWrite('purchaseOrders') ? 'bg-fp-brand text-white hover:bg-[#b5571f]' : 'bg-fp-brand/40 text-white/50 cursor-not-allowed'}`}>
             + New PO
           </button>
         </div>
