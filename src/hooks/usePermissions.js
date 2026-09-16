@@ -37,13 +37,16 @@ Object.assign(TECH_DEFAULT_PERMISSIONS, {
   jobs: 'write',
   serviceTickets: 'write',
   dispatch: 'read',
-  settings: 'write', // own profile/password
+  tasks: 'read',
+  inventory: 'read',
+  settings: 'write',
 })
 
 // Default scopes for technicians — admins can restrict to 'own' via role settings
 const TECH_DEFAULT_SCOPES = {
   jobs: 'all',
   serviceTickets: 'all',
+  tasks: 'own',
 }
 
 export function computePermissions(orgRole, overrides, isAdmin) {

@@ -7,7 +7,7 @@ import { usePermissions } from '../hooks/usePermissions'
 
 export default function Tasks({ isAdmin, featureProposals = true, featureCRM = false }) {
   const { profile } = useProfile()
-  const { canWrite } = usePermissions()
+  const { canWrite, scope } = usePermissions()
   const [tasks, setTasks] = useState([])
   const [profiles, setProfiles] = useState([])
   const [clients, setClients] = useState([])
@@ -38,7 +38,11 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
     if (!profile?.org_id) { setLoading(false); return }
 
     const [tasksRes, profilesRes, clientsRes] = await Promise.all([
-      supabase.from('tasks').select('*, clients(company), profiles!tasks_assigned_to_fkey(full_name)').eq('org_id', profile.org_id).order('due_date', { ascending: true }),
+      (() => {
+        let q = supabase.from('tasks').select('*, clients(company), profiles!tasks_assigned_to_fkey(full_name)').eq('org_id', profile.org_id).order('due_date', { ascending: true })
+        if (scope('tasks') === 'own') q = q.eq('assigned_to', profile.id)
+        return q
+      })(),
       supabase.from('profiles').select('id, full_name').eq('org_id', profile.org_id),
       supabase.from('clients').select('id, company').eq('org_id', profile.org_id).order('company')
     ])

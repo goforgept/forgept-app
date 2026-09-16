@@ -588,16 +588,16 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureInventory={featureInventory} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
-      <div className="flex-1 p-6 space-y-6 min-w-0">
-        <div className="flex justify-between items-center">
+      <div className="flex-1 p-4 lg:p-6 space-y-4 lg:space-y-6 min-w-0">
+        <div className="flex flex-wrap justify-between items-center gap-3">
           <div>
-            <h2 className="text-fp-text text-2xl font-bold">Tech Daily Log</h2>
+            <h2 className="text-fp-text text-xl lg:text-2xl font-bold">Tech Daily Log</h2>
             <p className="text-fp-muted text-sm mt-0.5">Track daily hours and work notes by job or service ticket</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-shrink-0">
             {filteredLogs.length > 0 && (
               <button onClick={exportCSV}
-                className="border border-fp-border text-fp-muted px-4 py-2 rounded-lg text-sm font-medium hover:text-fp-text hover:border-fp-brand/50 transition-colors">
+                className="border border-fp-border text-fp-muted px-3 py-2 rounded-lg text-sm font-medium hover:text-fp-text hover:border-fp-brand/50 transition-colors">
                 Export CSV
               </button>
             )}
@@ -608,7 +608,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: 'Total Hours Logged', value: totalHours.toFixed(1), color: 'text-fp-text' },
             { label: 'Days Worked', value: uniqueDays, color: 'text-fp-text' },

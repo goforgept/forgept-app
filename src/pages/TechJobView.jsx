@@ -134,18 +134,18 @@ export default function TechJobView({ isAdmin, featureProposals = true, featureC
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} role={role} isTechnician={isTechnician} />
 
-      <div className="flex-1 p-6 space-y-6 min-w-0">
+      <div className="flex-1 p-4 lg:p-6 space-y-4 lg:space-y-6 min-w-0">
 
         {/* Header */}
         <div className="bg-fp-card rounded-xl p-6">
           <button onClick={() => navigate('/jobs')} className="text-fp-muted hover:text-fp-text text-xs mb-3 transition-colors block">← Jobs</button>
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-3 mb-1 flex-wrap">
                 {job?.job_number && (
                   <span className="text-fp-muted text-sm font-mono bg-fp-inset px-2 py-0.5 rounded">{job.job_number}</span>
                 )}
-                <h2 className="text-fp-text text-2xl font-bold">{job?.name}</h2>
+                <h2 className="text-fp-text text-xl lg:text-2xl font-bold">{job?.name}</h2>
               </div>
               {job?.clients?.company && (
                 <p className="text-fp-muted mt-0.5">🏢 {job.clients.company}</p>
@@ -178,7 +178,7 @@ export default function TechJobView({ isAdmin, featureProposals = true, featureC
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-shrink-0">
               <span className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${
                 job?.status === 'Active' ? 'bg-green-500/20 text-green-400' :
                 job?.status === 'On Hold' ? 'bg-yellow-500/20 text-yellow-400' :

@@ -649,11 +649,11 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureInventory={featureInventory} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
-      <div className="flex-1 p-6 space-y-6 max-w-5xl min-w-0">
+      <div className="flex-1 p-4 lg:p-6 space-y-4 lg:space-y-6 max-w-5xl min-w-0">
 
         {/* Header */}
         <div className="bg-fp-card rounded-xl p-6">
-          <div className="flex justify-between items-start mb-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
             <div>
               <button onClick={() => navigate('/service-tickets')} className="text-fp-muted hover:text-fp-text text-xs mb-2 transition-colors">← Service Tickets</button>
               <div className="flex items-center gap-3 mb-1">
