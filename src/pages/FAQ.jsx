@@ -227,7 +227,7 @@ const faqs = [
 
 const GUIDES_URL = 'https://quilled-income-ab4.notion.site/How-to-Guides-3cfe4fc05815809ab371e6095ec60ac5'
 
-export default function FAQ({ isAdmin, featureProposals = true, featureCRM = false, featureAiAgent = false }) {
+export default function FAQ({ isAdmin, featureProposals = true, featureCRM = false, featureAiAgent = false, isTechnician = false, isSalesManager = false, isPM = false }) {
   const { profile } = useProfile()
   const [openItem, setOpenItem] = useState(null)
   const [search, setSearch] = useState('')
@@ -297,7 +297,7 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
 
   return (
     <div className="flex min-h-screen bg-fp-inset">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 space-y-6 max-w-3xl">
         <div>

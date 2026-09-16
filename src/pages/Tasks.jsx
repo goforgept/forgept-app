@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
 import { usePermissions } from '../hooks/usePermissions'
 
-export default function Tasks({ isAdmin, featureProposals = true, featureCRM = false }) {
+export default function Tasks({ isAdmin, featureProposals = true, featureCRM = false, isTechnician = false, isSalesManager = false, isPM = false, featureInventory = false }) {
   const { profile } = useProfile()
   const { canWrite, scope } = usePermissions()
   const [tasks, setTasks] = useState([])
@@ -348,7 +348,7 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
 
   return (
     <div className="flex min-h-screen bg-fp-inset">
-      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
+      <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} featureInventory={featureInventory} />
 
       <div className="flex-1 p-6 space-y-6 min-w-0">
         <div className="flex justify-between items-center">
