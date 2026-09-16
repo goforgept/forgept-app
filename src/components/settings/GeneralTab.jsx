@@ -92,7 +92,10 @@ export default function GeneralTab({
 
       {/* Bill To / Ship To */}
       <div className="bg-fp-card rounded-xl p-6">
-        <h3 className="text-fp-text font-bold mb-1">Bill To / Ship To</h3>
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-fp-text font-bold">Bill To / Ship To</h3>
+          {readOnly && <span className="text-fp-muted text-xs">Admin only</span>}
+        </div>
         <p className="text-fp-muted text-sm mb-5">Your company's addresses printed on every purchase order.</p>
         <div className="space-y-5">
           <div>
@@ -100,45 +103,41 @@ export default function GeneralTab({
             <div className="space-y-3">
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Street Address</label>
-                <input type="text" value={form.ship_to_address} onChange={e => setForm(prev => ({ ...prev, ship_to_address: e.target.value }))} placeholder="123 Main St" className={inputClass} />
+                <input type="text" value={form.ship_to_address} onChange={e => setForm(prev => ({ ...prev, ship_to_address: e.target.value }))} placeholder="123 Main St" disabled={readOnly} className={`${inputClass} ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`} />
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div><label className="text-fp-muted text-xs mb-1 block">City</label><input type="text" value={form.ship_to_city} onChange={e => setForm(prev => ({ ...prev, ship_to_city: e.target.value }))} placeholder="Nashville" className={inputClass} /></div>
-                <div><label className="text-fp-muted text-xs mb-1 block">State</label><input type="text" value={form.ship_to_state} onChange={e => setForm(prev => ({ ...prev, ship_to_state: e.target.value }))} placeholder="TN" className={inputClass} /></div>
-                <div><label className="text-fp-muted text-xs mb-1 block">ZIP</label><input type="text" value={form.ship_to_zip} onChange={e => setForm(prev => ({ ...prev, ship_to_zip: e.target.value }))} placeholder="37201" className={inputClass} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">City</label><input type="text" value={form.ship_to_city} onChange={e => setForm(prev => ({ ...prev, ship_to_city: e.target.value }))} placeholder="Nashville" disabled={readOnly} className={`${inputClass} ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">State</label><input type="text" value={form.ship_to_state} onChange={e => setForm(prev => ({ ...prev, ship_to_state: e.target.value }))} placeholder="TN" disabled={readOnly} className={`${inputClass} ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">ZIP</label><input type="text" value={form.ship_to_zip} onChange={e => setForm(prev => ({ ...prev, ship_to_zip: e.target.value }))} placeholder="37201" disabled={readOnly} className={`${inputClass} ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
               </div>
             </div>
           </div>
           <div>
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-fp-text text-sm font-semibold">Bill To</h4>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={sameAsShipTo} onChange={e => handleSameAsShipTo(e.target.checked)} className="accent-fp-brand" />
+              <label className={`flex items-center gap-2 ${readOnly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                <input type="checkbox" checked={sameAsShipTo} onChange={e => !readOnly && handleSameAsShipTo(e.target.checked)} disabled={readOnly} className="accent-fp-brand" />
                 <span className="text-fp-muted text-xs">Same as Ship To</span>
               </label>
             </div>
             <div className="space-y-3">
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Street Address</label>
-                <input type="text" value={form.bill_to_address} onChange={e => setForm(prev => ({ ...prev, bill_to_address: e.target.value }))} placeholder="123 Main St" disabled={sameAsShipTo} className={`${inputClass} ${sameAsShipTo ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                <input type="text" value={form.bill_to_address} onChange={e => setForm(prev => ({ ...prev, bill_to_address: e.target.value }))} placeholder="123 Main St" disabled={sameAsShipTo || readOnly} className={`${inputClass} ${(sameAsShipTo || readOnly) ? 'opacity-50 cursor-not-allowed' : ''}`} />
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <div><label className="text-fp-muted text-xs mb-1 block">City</label><input type="text" value={form.bill_to_city} onChange={e => setForm(prev => ({ ...prev, bill_to_city: e.target.value }))} placeholder="Nashville" disabled={sameAsShipTo} className={`${inputClass} ${sameAsShipTo ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
-                <div><label className="text-fp-muted text-xs mb-1 block">State</label><input type="text" value={form.bill_to_state} onChange={e => setForm(prev => ({ ...prev, bill_to_state: e.target.value }))} placeholder="TN" disabled={sameAsShipTo} className={`${inputClass} ${sameAsShipTo ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
-                <div><label className="text-fp-muted text-xs mb-1 block">ZIP</label><input type="text" value={form.bill_to_zip} onChange={e => setForm(prev => ({ ...prev, bill_to_zip: e.target.value }))} placeholder="37201" disabled={sameAsShipTo} className={`${inputClass} ${sameAsShipTo ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">City</label><input type="text" value={form.bill_to_city} onChange={e => setForm(prev => ({ ...prev, bill_to_city: e.target.value }))} placeholder="Nashville" disabled={sameAsShipTo || readOnly} className={`${inputClass} ${(sameAsShipTo || readOnly) ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">State</label><input type="text" value={form.bill_to_state} onChange={e => setForm(prev => ({ ...prev, bill_to_state: e.target.value }))} placeholder="TN" disabled={sameAsShipTo || readOnly} className={`${inputClass} ${(sameAsShipTo || readOnly) ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">ZIP</label><input type="text" value={form.bill_to_zip} onChange={e => setForm(prev => ({ ...prev, bill_to_zip: e.target.value }))} placeholder="37201" disabled={sameAsShipTo || readOnly} className={`${inputClass} ${(sameAsShipTo || readOnly) ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {readOnly ? (
-        <p className="text-fp-muted text-sm">Settings can only be changed by an admin.</p>
-      ) : (
-        <button onClick={handleSave} disabled={saving} className="bg-fp-brand text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-colors disabled:opacity-50">
-          {saving ? 'Saving...' : 'Save Settings'}
-        </button>
-      )}
+      <button onClick={handleSave} disabled={saving} className="bg-fp-brand text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-colors disabled:opacity-50">
+        {saving ? 'Saving...' : 'Save Settings'}
+      </button>
     </div>
   )
 }

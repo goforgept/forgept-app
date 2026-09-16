@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 import ActivityTimeline from '../components/ActivityTimeline'
 import TaskList from '../components/TaskList'
 import { clientName } from '../utils/client'
@@ -31,6 +32,7 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const { id } = useParams()
   const navigate = useNavigate()
   const { profile } = useProfile()
+  const { canWrite } = usePermissions()
   const [client, setClient] = useState(null)
   const [proposals, setProposals] = useState([])
   const [teamProfiles, setTeamProfiles] = useState([])
@@ -715,17 +717,17 @@ const deleteMeeting = async (meetingId) => {
               </div>
             </div>
             <div className="flex gap-2">
-              {featureAiEmail && (
+              {featureAiEmail && canWrite('clients') && (
                 <button onClick={() => {
                   if (!client?.email) { alert('Add an email address to this client first.'); return }
                   setShowEmailModal(true); setDraftedEmail(''); setEmailForm({ subject: '', context: '' })
                 }}
                   className="bg-purple-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✍️ Draft Email</button>
               )}
-              <button onClick={archiveClient} className="text-fp-muted text-sm hover:text-yellow-400 transition-colors px-2">Archive</button>
-              <button onClick={deleteClient} className="text-fp-muted text-sm hover:text-red-400 transition-colors px-2">Delete</button>
-              <button onClick={() => setEditingClient(true)} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">Edit Client</button>
-              <button onClick={handleNewProposal} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ New Proposal</button>
+              {canWrite('clients') && <button onClick={archiveClient} className="text-fp-muted text-sm hover:text-yellow-400 transition-colors px-2">Archive</button>}
+              {canWrite('clients') && <button onClick={deleteClient} className="text-fp-muted text-sm hover:text-red-400 transition-colors px-2">Delete</button>}
+              {canWrite('clients') && <button onClick={() => setEditingClient(true)} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">Edit Client</button>}
+              {canWrite('proposals') && <button onClick={handleNewProposal} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ New Proposal</button>}
             </div>
           </div>
           <div className="grid grid-cols-5 gap-4 mt-6">
@@ -826,7 +828,7 @@ const deleteMeeting = async (meetingId) => {
             {proposals.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-fp-muted mb-4">No proposals yet for this client.</p>
-                <button onClick={handleNewProposal} className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Create First Proposal</button>
+                {canWrite('proposals') && <button onClick={handleNewProposal} className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Create First Proposal</button>}
               </div>
             ) : (
               <div className="space-y-3">
@@ -907,10 +909,10 @@ const deleteMeeting = async (meetingId) => {
                       <div className="flex items-center gap-3">
                         <button onClick={() => navigate(`/proposal/${group.proposalId}`)}
                           className="text-fp-muted hover:text-fp-text text-xs transition-colors">View Proposal →</button>
-                        <button onClick={() => createInvoiceForProposal(group.proposalId, group.proposalName, group.company)}
+                        {canWrite('invoices') && <button onClick={() => createInvoiceForProposal(group.proposalId, group.proposalName, group.company)}
                           className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
                           + Invoice
-                        </button>
+                        </button>}
                       </div>
                     </div>
                     <div className="divide-y divide-fp-border">
@@ -943,8 +945,8 @@ const deleteMeeting = async (meetingId) => {
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0">
                               <p className="text-fp-text text-sm font-bold">${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                              <button onClick={() => openEditSub(item)}
-                                className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>
+                              {canWrite('clients') && <button onClick={() => openEditSub(item)}
+                                className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>}
                             </div>
                           </div>
                         )
@@ -966,7 +968,7 @@ const deleteMeeting = async (meetingId) => {
           <div className="bg-fp-card rounded-xl overflow-hidden">
             <div className="flex justify-between items-center px-6 py-4 border-b border-fp-border">
               <h3 className="text-fp-text font-bold text-lg">Contacts</h3>
-              <button onClick={openAddContact} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Contact</button>
+              {canWrite('clients') && <button onClick={openAddContact} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Contact</button>}
             </div>
             {contacts.length === 0 ? (
               <div className="text-center py-12 border-2 border-dashed border-fp-border m-6 rounded-xl">
@@ -984,8 +986,8 @@ const deleteMeeting = async (meetingId) => {
                 </div>
                 <div className="divide-y divide-fp-border">
                   {contacts.map(contact => (
-                    <div key={contact.id} onClick={() => openEditContact(contact)}
-                      className="grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_1fr_1fr_auto] gap-4 items-center px-6 py-4 cursor-pointer hover:bg-fp-hover transition-colors group">
+                    <div key={contact.id} onClick={() => canWrite('clients') && openEditContact(contact)}
+                      className={`grid grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_1fr_1fr_auto] gap-4 items-center px-6 py-4 transition-colors group ${canWrite('clients') ? 'cursor-pointer hover:bg-fp-hover' : ''}`}>
                       <div className="w-9 h-9 rounded-full bg-[#C8622A]/15 flex items-center justify-center flex-shrink-0">
                         <span className="text-[#C8622A] text-sm font-bold">{(contact.full_name || '?')[0].toUpperCase()}</span>
                       </div>
@@ -1020,7 +1022,7 @@ const deleteMeeting = async (meetingId) => {
           <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-fp-text font-bold text-lg">Locations</h3>
-              <button onClick={openAddLocation} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Location</button>
+              {canWrite('clients') && <button onClick={openAddLocation} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ Add Location</button>}
             </div>
             {locations.length === 0 ? (
               <div className="text-center py-8 border-2 border-dashed border-fp-border rounded-xl">
@@ -1043,10 +1045,12 @@ const deleteMeeting = async (meetingId) => {
                           </div>
                           {addr && <a href={`https://maps.google.com/?q=${encodeURIComponent(addrMapQuery)}`} target="_blank" rel="noreferrer" className="text-fp-muted text-xs hover:text-[#C8622A] transition-colors mt-0.5 block">{addr}</a>}
                         </div>
-                        <div className="flex gap-2 flex-shrink-0 ml-2">
-                          <button onClick={() => openEditLocation(loc)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>
-                          <button onClick={() => deleteLocation(loc.id)} className="text-red-400 hover:text-red-300 text-xs transition-colors">Delete</button>
-                        </div>
+                        {canWrite('clients') && (
+                          <div className="flex gap-2 flex-shrink-0 ml-2">
+                            <button onClick={() => openEditLocation(loc)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>
+                            <button onClick={() => deleteLocation(loc.id)} className="text-red-400 hover:text-red-300 text-xs transition-colors">Delete</button>
+                          </div>
+                        )}
                       </div>
                       {loc.access_notes && (
                         <div className="bg-fp-card rounded-lg px-3 py-2 mb-2">
@@ -1075,10 +1079,12 @@ const deleteMeeting = async (meetingId) => {
                         return null
                       })()}
                       {loc.notes && <p className="text-fp-muted text-xs mt-2 italic">{loc.notes}</p>}
-                      <div className="mt-3 pt-2 border-t border-fp-border">
-                        <button onClick={() => navigate(`/new?clientId=${id}&locationId=${loc.id}`)}
-                          className="text-[#C8622A] text-xs hover:text-fp-text transition-colors">+ Proposal for this location →</button>
-                      </div>
+                      {canWrite('proposals') && (
+                        <div className="mt-3 pt-2 border-t border-fp-border">
+                          <button onClick={() => navigate(`/new?clientId=${id}&locationId=${loc.id}`)}
+                            className="text-[#C8622A] text-xs hover:text-fp-text transition-colors">+ Proposal for this location →</button>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -1091,7 +1097,7 @@ const deleteMeeting = async (meetingId) => {
           <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-fp-text font-bold text-lg">Service Tickets</h3>
-              <button onClick={() => navigate('/service-tickets')} className="text-fp-muted hover:text-fp-text text-sm transition-colors">+ New Ticket</button>
+              {canWrite('serviceTickets') && <button onClick={() => navigate('/service-tickets')} className="text-fp-muted hover:text-fp-text text-sm transition-colors">+ New Ticket</button>}
             </div>
             {clientTickets.length === 0 ? (
               <p className="text-fp-muted text-sm">No service tickets for this client yet.</p>
@@ -1125,10 +1131,10 @@ const deleteMeeting = async (meetingId) => {
           <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-fp-text font-bold text-lg">Meetings</h3>
-              <button onClick={() => { setEditingMeeting(null); setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false, contact_id: '' }); setShowMeetingModal(true) }}
+              {canWrite('clients') && <button onClick={() => { setEditingMeeting(null); setMeetingForm({ title: '', due_date: '', start_time: '', duration_minutes: 60, meeting_type: 'Sales Call', is_virtual: false, assigned_to: profile.id, meeting_notes: '', customer_notified: false, contact_id: '' }); setShowMeetingModal(true) }}
                 className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                 + Schedule Meeting
-              </button>
+              </button>}
             </div>
             {clientMeetings.length === 0 ? (
               <p className="text-fp-muted text-sm">No meetings scheduled yet.</p>
@@ -1161,8 +1167,8 @@ const deleteMeeting = async (meetingId) => {
                         </div>
                         <div className="flex items-center gap-2">
                           {meeting.customer_notified && <span className="text-xs text-green-400">✉ Notified</span>}
-                          <button onClick={() => openEditMeeting(meeting)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>
-                          <button onClick={() => deleteMeeting(meeting.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Delete</button>
+                          {canWrite('clients') && <button onClick={() => openEditMeeting(meeting)} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Edit</button>}
+                          {canWrite('clients') && <button onClick={() => deleteMeeting(meeting.id)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Delete</button>}
                         </div>
                       </div>
                     </div>
@@ -1180,7 +1186,7 @@ const deleteMeeting = async (meetingId) => {
           <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-fp-text font-bold text-lg">Email History</h3>
-              {featureAiEmail && (
+              {featureAiEmail && canWrite('clients') && (
                 <button onClick={() => {
                   if (!client?.email) { alert('Add an email address to this client first.'); return }
                   setShowEmailModal(true); setDraftedEmail(''); setEmailForm({ subject: '', context: '' })
@@ -1211,7 +1217,7 @@ const deleteMeeting = async (meetingId) => {
           <div className="bg-fp-card rounded-xl p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-fp-text font-bold text-lg">Notes</h3>
-              {!editingClient && <button onClick={() => setEditingClient(true)} className="text-fp-muted hover:text-fp-text text-sm transition-colors">Edit</button>}
+              {!editingClient && canWrite('clients') && <button onClick={() => setEditingClient(true)} className="text-fp-muted hover:text-fp-text text-sm transition-colors">Edit</button>}
             </div>
             {client?.notes ? <p className="text-fp-muted text-sm leading-relaxed whitespace-pre-wrap">{client.notes}</p> : <p className="text-fp-muted text-sm italic">No notes yet.</p>}
           </div>

@@ -24,29 +24,31 @@ export default function ProposalsTab({
         <div className="space-y-4">
           <div>
             <label className="text-fp-muted text-xs mb-1 block">Company Name</label>
-            <input type="text" value={form.company_name} onChange={e => setForm(prev => ({ ...prev, company_name: e.target.value }))} placeholder="Your company name" className={inputClass} />
+            <input type="text" value={form.company_name} onChange={e => !readOnly && setForm(prev => ({ ...prev, company_name: e.target.value }))} placeholder="Your company name" disabled={readOnly} className={`${inputClass} ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`} />
           </div>
           <div>
             <label className="text-fp-muted text-xs mb-1 block">License Number</label>
-            <input type="text" value={form.license_number || ''} onChange={e => setForm(prev => ({ ...prev, license_number: e.target.value }))} placeholder="e.g. LIC-123456" className={inputClass} />
+            <input type="text" value={form.license_number || ''} onChange={e => !readOnly && setForm(prev => ({ ...prev, license_number: e.target.value }))} placeholder="e.g. LIC-123456" disabled={readOnly} className={`${inputClass} ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`} />
             <p className="text-fp-muted text-xs mt-1">If entered, printed on all PDF proposals. Required by some states.</p>
           </div>
           <div>
             <label className="text-fp-muted text-xs mb-1 block">Company Logo</label>
             {logoUrl && <div className="mb-3"><img src={logoUrl} alt="Company logo" className="h-16 object-contain bg-white rounded-lg p-2" /></div>}
-            <label className="cursor-pointer">
-              <div className="bg-fp-bg border border-dashed border-fp-border rounded-lg px-4 py-3 text-sm text-fp-muted hover:border-fp-brand transition-colors inline-block">
-                {uploadingLogo ? 'Uploading...' : logoUrl ? '↑ Replace Logo' : '↑ Upload Logo'}
-              </div>
-              <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
-            </label>
+            {!readOnly && (
+              <label className="cursor-pointer">
+                <div className="bg-fp-bg border border-dashed border-fp-border rounded-lg px-4 py-3 text-sm text-fp-muted hover:border-fp-brand transition-colors inline-block">
+                  {uploadingLogo ? 'Uploading...' : logoUrl ? '↑ Replace Logo' : '↑ Upload Logo'}
+                </div>
+                <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+              </label>
+            )}
             <p className="text-fp-muted text-xs mt-1">PNG or JPG recommended.</p>
           </div>
           <div>
             <label className="text-fp-muted text-xs mb-1 block">Brand Color</label>
             <div className="flex items-center gap-3">
-              <input type="color" value={form.primary_color} onChange={e => setForm(prev => ({ ...prev, primary_color: e.target.value }))} className="w-12 h-10 rounded cursor-pointer border border-fp-border bg-transparent" />
-              <input type="text" value={form.primary_color} onChange={e => setForm(prev => ({ ...prev, primary_color: e.target.value }))} className="w-32 bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+              <input type="color" value={form.primary_color} onChange={e => !readOnly && setForm(prev => ({ ...prev, primary_color: e.target.value }))} disabled={readOnly} className={`w-12 h-10 rounded border border-fp-border bg-transparent ${readOnly ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`} />
+              <input type="text" value={form.primary_color} onChange={e => !readOnly && setForm(prev => ({ ...prev, primary_color: e.target.value }))} disabled={readOnly} className={`w-32 bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`} />
             </div>
             <p className="text-fp-muted text-xs mt-1">Used in PDF proposals and purchase orders.</p>
           </div>
@@ -59,9 +61,10 @@ export default function ProposalsTab({
         <p className="text-fp-muted text-sm mb-4">Appears at the top of every proposal — before the scope of work. Use this to introduce your company, highlight certifications, years in business, service areas, or anything that builds confidence with the client.</p>
         <RichTextEditor
           value={form.about_us || ''}
-          onChange={val => setForm(prev => ({ ...prev, about_us: val }))}
+          onChange={val => !readOnly && setForm(prev => ({ ...prev, about_us: val }))}
           placeholder="e.g. Founded in 2010, Acme AV has been designing and installing commercial AV systems..."
           rows={6}
+          readOnly={readOnly}
         />
       </div>
 
@@ -71,9 +74,10 @@ export default function ProposalsTab({
         <p className="text-fp-muted text-sm mb-4">Appears at the bottom of every PDF proposal.</p>
         <RichTextEditor
           value={form.terms_and_conditions || ''}
-          onChange={val => setForm(prev => ({ ...prev, terms_and_conditions: val }))}
+          onChange={val => !readOnly && setForm(prev => ({ ...prev, terms_and_conditions: val }))}
           placeholder="Enter your standard terms and conditions here..."
           rows={8}
+          readOnly={readOnly}
         />
       </div>
 
@@ -88,31 +92,37 @@ export default function ProposalsTab({
                 <input
                   type="text"
                   value={tmpl.name}
-                  onChange={e => setWarrantyTemplates(prev => prev.map((t, j) => j === i ? { ...t, name: e.target.value } : t))}
+                  onChange={e => !readOnly && setWarrantyTemplates(prev => prev.map((t, j) => j === i ? { ...t, name: e.target.value } : t))}
                   placeholder="Template name (e.g. Standard, Extended)"
-                  className="flex-1 bg-transparent text-fp-text text-sm font-semibold focus:outline-none border-b border-fp-border focus:border-fp-brand pb-1"
+                  disabled={readOnly}
+                  className={`flex-1 bg-transparent text-fp-text text-sm font-semibold focus:outline-none border-b border-fp-border focus:border-fp-brand pb-1 ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`}
                 />
-                <button
-                  onClick={() => setWarrantyTemplates(prev => prev.filter((_, j) => j !== i))}
-                  className="text-fp-muted hover:text-red-400 text-xs transition-colors flex-shrink-0"
-                >
-                  Remove
-                </button>
+                {!readOnly && (
+                  <button
+                    onClick={() => setWarrantyTemplates(prev => prev.filter((_, j) => j !== i))}
+                    className="text-fp-muted hover:text-red-400 text-xs transition-colors flex-shrink-0"
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
               <RichTextEditor
                 value={tmpl.text}
-                onChange={val => setWarrantyTemplates(prev => prev.map((t, j) => j === i ? { ...t, text: val } : t))}
+                onChange={val => !readOnly && setWarrantyTemplates(prev => prev.map((t, j) => j === i ? { ...t, text: val } : t))}
                 placeholder="Warranty text..."
                 rows={4}
+                readOnly={readOnly}
               />
             </div>
           ))}
-          <button
-            onClick={() => setWarrantyTemplates(prev => [...(prev || []), { id: crypto.randomUUID(), name: '', text: '' }])}
-            className="text-fp-muted hover:text-fp-text text-sm transition-colors"
-          >
-            + Add Warranty Template
-          </button>
+          {!readOnly && (
+            <button
+              onClick={() => setWarrantyTemplates(prev => [...(prev || []), { id: crypto.randomUUID(), name: '', text: '' }])}
+              className="text-fp-muted hover:text-fp-text text-sm transition-colors"
+            >
+              + Add Warranty Template
+            </button>
+          )}
         </div>
       </div>
 

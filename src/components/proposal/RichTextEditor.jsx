@@ -234,7 +234,7 @@ const AlignRightIcon = () => (
 
 // ── Main editor component ─────────────────────────────────────────────────
 
-export default function RichTextEditor({ value, onChange, placeholder, rows = 6 }) {
+export default function RichTextEditor({ value, onChange, placeholder, rows = 6, readOnly = false }) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
@@ -243,7 +243,8 @@ export default function RichTextEditor({ value, onChange, placeholder, rows = 6 
       Placeholder.configure({ placeholder: placeholder || '' }),
     ],
     content: value || '',
-    onUpdate: ({ editor }) => onChange(editor.getHTML()),
+    editable: !readOnly,
+    onUpdate: ({ editor }) => onChange?.(editor.getHTML()),
   })
 
   // Sync content when value changes externally (form reset / load)
@@ -269,8 +270,8 @@ export default function RichTextEditor({ value, onChange, placeholder, rows = 6 
   }
 
   return (
-    <div className="border border-fp-border rounded-lg overflow-hidden focus-within:border-fp-brand transition-colors">
-      {editor && (
+    <div className={`border border-fp-border rounded-lg overflow-hidden transition-colors ${readOnly ? 'opacity-60' : 'focus-within:border-fp-brand'}`}>
+      {editor && !readOnly && (
         <div className="flex flex-wrap items-center gap-0.5 px-2 py-1.5 bg-fp-inset border-b border-fp-border">
           <select
             value={headingLevel}
