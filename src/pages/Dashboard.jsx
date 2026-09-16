@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { usePermissions } from '../hooks/usePermissions'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -232,8 +233,12 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
   const [widgetConfig, setWidgetConfig]     = useState(DEFAULT_WIDGETS)
   const [showCustomize, setShowCustomize]   = useState(false)
   const navigate = useNavigate()
+  const { isTechnician } = usePermissions()
 
-  useEffect(() => { fetchAll() }, [])
+  useEffect(() => {
+    if (isTechnician) { navigate('/tech-log', { replace: true }); return }
+    fetchAll()
+  }, [isTechnician])
 
   const fetchAll = async () => {
     const { data: { user } } = await supabase.auth.getUser()

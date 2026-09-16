@@ -112,6 +112,8 @@ function ScopeToggle({ value, onChange, disabled }) {
 }
 
 // ── Permission matrix for role editing ────────────────────────────────────────
+const TECH_SALES_AREAS = new Set(['dashboard', 'proposals', 'pipeline', 'clients', 'invoices', 'purchaseOrders', 'contracts', 'vendors', 'productLibrary', 'reports'])
+
 function PermissionMatrix({ permissions, scopes, onChange, onScopeChange, isAdminRole, baseRole = 'rep' }) {
   const grouped = useMemo(() => {
     const groups = {}
@@ -129,6 +131,12 @@ function PermissionMatrix({ permissions, scopes, onChange, onScopeChange, isAdmi
           Admin roles bypass all permission checks — members have full access to everything.
         </div>
       )}
+      {!isAdminRole && baseRole === 'technician' && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2.5 text-xs text-yellow-400 space-y-1">
+          <p className="font-semibold">Technician defaults are applied automatically.</p>
+          <p className="text-yellow-400/80">Techs get access to Jobs, Service Tickets, Dispatch (read), and Settings by default — sales and admin areas are hidden. If this role needs elevated privileges beyond the tech baseline, consider creating a separate custom role instead.</p>
+        </div>
+      )}
       {Object.entries(grouped).map(([group, areas]) => (
         <div key={group}>
           <p className="text-fp-muted text-xs font-semibold uppercase tracking-wider mb-2">{group}</p>
@@ -137,9 +145,13 @@ function PermissionMatrix({ permissions, scopes, onChange, onScopeChange, isAdmi
               const level = isAdminRole ? 'write' : (permissions[area.key] ?? effectiveDefault(baseRole, area.key))
               const scopeable = SCOPEABLE_AREAS.has(area.key)
               const showScope = scopeable && level !== 'none'
+              const isTechIrrelevant = baseRole === 'technician' && TECH_SALES_AREAS.has(area.key)
               return (
                 <div key={area.key} className="flex items-center justify-between py-1.5 gap-2">
-                  <span className={`text-sm flex-1 ${isAdminRole ? 'text-fp-muted' : 'text-fp-text'}`}>{area.label}</span>
+                  <div className="flex-1 min-w-0">
+                    <span className={`text-sm ${isAdminRole ? 'text-fp-muted' : 'text-fp-text'}`}>{area.label}</span>
+                    {isTechIrrelevant && <span className="ml-2 text-[10px] text-fp-muted/60 italic">not applicable for techs</span>}
+                  </div>
                   <div className="flex items-center gap-2">
                     {showScope && (
                       <ScopeToggle
