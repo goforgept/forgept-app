@@ -59,12 +59,16 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
   const fetchAll = async () => {
     const [jobsRes, logsRes, orgRes, ticketsRes, ratesRes, inventoryRes] = await Promise.all([
-      supabase
-        .from('jobs')
-        .select('id, name, job_number, status, clients(company)')
-        .eq('org_id', profile.org_id)
-        .not('status', 'in', '("Completed","Cancelled")')
-        .order('created_at', { ascending: false }),
+      (() => {
+        let q = supabase
+          .from('jobs')
+          .select('id, name, job_number, status, clients(company)')
+          .eq('org_id', profile.org_id)
+          .not('status', 'in', '("Completed","Cancelled")')
+          .order('created_at', { ascending: false })
+        if (isTechnician) q = q.or(`tech_id.eq.${profile.id},tech_ids.cs.{${profile.id}}`)
+        return q
+      })(),
 
       (() => {
         let q = supabase

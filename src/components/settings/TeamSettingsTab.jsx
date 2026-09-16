@@ -469,7 +469,7 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
   const [loading, setLoading] = useState(true)
 
   const [showInvite, setShowInvite] = useState(false)
-  const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', org_role: 'rep' })
+  const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', org_role: 'rep', org_role_id: '' })
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState(null)
   const [inviteSuccess, setInviteSuccess] = useState(null)
@@ -518,12 +518,18 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
       const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/invite-team-member', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ email: inviteForm.email, fullName: inviteForm.full_name, orgId, orgRole: inviteForm.org_role })
+        body: JSON.stringify({ email: inviteForm.email, fullName: inviteForm.full_name, orgId, orgRole: inviteForm.org_role, orgRoleId: inviteForm.org_role_id || null })
       })
       const result = await res.json()
       if (result.error) { setInviteError(result.error); return }
+      if (inviteForm.org_role_id) {
+        await supabase.from('profiles')
+          .update({ org_role_id: inviteForm.org_role_id })
+          .eq('email', inviteForm.email)
+          .eq('org_id', orgId)
+      }
       setInviteSuccess(`Invite sent to ${inviteForm.email}`)
-      setInviteForm({ email: '', full_name: '', org_role: 'rep' })
+      setInviteForm({ email: '', full_name: '', org_role: 'rep', org_role_id: '' })
       setShowInvite(false)
     } catch (err) {
       setInviteError('Failed: ' + (err?.message || String(err)))
@@ -622,14 +628,29 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
             </div>
           </div>
           {!featureDesignerOnly && (
-            <div>
-              <label className="text-fp-muted text-xs mb-1 block">System Role</label>
-              <select value={inviteForm.org_role} onChange={e => setInviteForm(p => ({ ...p, org_role: e.target.value }))} className={inputClass}>
-                <option value="rep">Member</option>
-                <option value="admin">Admin</option>
-              </select>
-              <p className="text-fp-muted text-xs mt-1">You can assign a custom role with detailed permissions after they join.</p>
-            </div>
+            <>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">System Role</label>
+                <select value={inviteForm.org_role} onChange={e => setInviteForm(p => ({ ...p, org_role: e.target.value }))} className={inputClass}>
+                  <option value="rep">Member</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <p className="text-fp-muted text-xs mt-1">Admins bypass all permission checks and can manage team settings.</p>
+              </div>
+              <div>
+                <label className="text-fp-muted text-xs mb-1 block">Assigned Role (optional)</label>
+                <select value={inviteForm.org_role_id} onChange={e => setInviteForm(p => ({ ...p, org_role_id: e.target.value }))} className={inputClass}>
+                  <option value="">No custom role (full access)</option>
+                  {roles.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+                {inviteForm.org_role_id && (() => {
+                  const role = roles.find(r => r.id === inviteForm.org_role_id)
+                  return role?.description ? <p className="text-fp-muted text-xs mt-1">{role.description}</p> : null
+                })()}
+              </div>
+            </>
           )}
           <div className="flex gap-2">
             <button onClick={() => setShowInvite(false)} className="flex-1 py-2 text-sm border border-fp-border text-fp-muted rounded-lg hover:text-fp-text transition-colors">Cancel</button>
