@@ -4,6 +4,7 @@ import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { clientName } from '../utils/client'
 import AddressAutocomplete from '../components/AddressAutocomplete'
+import { usePermissions } from '../hooks/usePermissions'
 
 const emptyForm = {
   client_type: 'commercial',
@@ -60,6 +61,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
   const [companySuggestions, setCompanySuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const navigate = useNavigate()
+  const { canWrite } = usePermissions()
 
   useEffect(() => { fetchOrgAndClients() }, [])
 
@@ -242,8 +244,9 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
             )}
             {!showArchived && (
               <button
-                onClick={() => { setShowModal(true); setError(null) }}
-                className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+                onClick={() => canWrite('clients') && (setShowModal(true), setError(null))}
+                disabled={!canWrite('clients')}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${canWrite('clients') ? 'bg-fp-brand text-white hover:bg-[#b5571f]' : 'bg-fp-brand/40 text-white/50 cursor-not-allowed'}`}
               >
                 + Add Client
               </button>
@@ -385,7 +388,7 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                       })()}
                     </div>
                     <div className="flex gap-2 items-center">
-                      {!isArchived && (
+                      {!isArchived && canWrite('clients') && (
                         <button
                           onClick={async e => {
                             e.stopPropagation()
@@ -402,15 +405,17 @@ export default function Clients({ isAdmin, featureProposals = true, featureCRM =
                       )}
                       {isArchived ? (
                         <button
-                          onClick={e => restoreCompany(e, company)}
-                          className="text-fp-muted hover:text-green-400 text-xs transition-colors opacity-0 group-hover:opacity-100"
+                          onClick={e => canWrite('clients') && restoreCompany(e, company)}
+                          disabled={!canWrite('clients')}
+                          className={`text-xs transition-colors opacity-0 group-hover:opacity-100 ${canWrite('clients') ? 'text-fp-muted hover:text-green-400' : 'text-fp-muted/40 cursor-not-allowed'}`}
                         >
                           Restore
                         </button>
                       ) : (
                         <button
-                          onClick={e => archiveCompany(e, company)}
-                          className="text-fp-muted hover:text-[#C8622A] text-xs transition-colors opacity-0 group-hover:opacity-100"
+                          onClick={e => canWrite('clients') && archiveCompany(e, company)}
+                          disabled={!canWrite('clients')}
+                          className={`text-xs transition-colors opacity-0 group-hover:opacity-100 ${canWrite('clients') ? 'text-fp-muted hover:text-[#C8622A]' : 'text-fp-muted/40 cursor-not-allowed'}`}
                         >
                           Archive
                         </button>

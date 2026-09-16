@@ -159,8 +159,9 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
             )}
             {!showArchived && (
               <button
-                onClick={() => navigate('/new')}
-                className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+                onClick={() => canWrite('proposals') && navigate('/new')}
+                disabled={!canWrite('proposals')}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${canWrite('proposals') ? 'bg-fp-brand text-white hover:bg-[#b5571f]' : 'bg-fp-brand/40 text-white/50 cursor-not-allowed'}`}
               >
                 + New Proposal
               </button>
@@ -280,15 +281,17 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                   <p className="text-fp-muted text-sm">{proposal.close_date}</p>
                   {proposal.archived_at ? (
                     <button
-                      onClick={e => restoreProposal(e, proposal.id)}
-                      className="opacity-0 group-hover:opacity-100 text-fp-muted hover:text-green-400 text-xs transition-all"
+                      onClick={e => canWrite('proposals') && restoreProposal(e, proposal.id)}
+                      disabled={!canWrite('proposals')}
+                      className={`opacity-0 group-hover:opacity-100 text-xs transition-all ${canWrite('proposals') ? 'text-fp-muted hover:text-green-400' : 'text-fp-muted/40 cursor-not-allowed'}`}
                     >
                       Restore
                     </button>
                   ) : (
                     <button
-                      onClick={e => archiveProposal(e, proposal.id)}
-                      className="opacity-0 group-hover:opacity-100 text-fp-muted hover:text-[#C8622A] text-xs transition-all"
+                      onClick={e => canWrite('proposals') && archiveProposal(e, proposal.id)}
+                      disabled={!canWrite('proposals')}
+                      className={`opacity-0 group-hover:opacity-100 text-xs transition-all ${canWrite('proposals') ? 'text-fp-muted hover:text-[#C8622A]' : 'text-fp-muted/40 cursor-not-allowed'}`}
                     >
                       Archive
                     </button>

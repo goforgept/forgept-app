@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 
 export default function Tasks({ isAdmin, featureProposals = true, featureCRM = false }) {
   const { profile } = useProfile()
+  const { canWrite } = usePermissions()
   const [tasks, setTasks] = useState([])
   const [profiles, setProfiles] = useState([])
   const [clients, setClients] = useState([])
@@ -359,8 +361,10 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                 📅 Calendar
               </button>
             </div>
-            <button onClick={() => { setShowForm(v => { if (v) { setEditTask(null); setShowMeeting(false) } return !v }); }}
-              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+            <button
+              onClick={() => { if (!canWrite('tasks') && !showForm) return; setShowForm(v => { if (v) { setEditTask(null); setShowMeeting(false) } return !v }) }}
+              disabled={!canWrite('tasks') && !showForm}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${canWrite('tasks') || showForm ? 'bg-fp-brand text-white hover:bg-[#b5571f]' : 'bg-fp-brand/40 text-white/50 cursor-not-allowed'}`}>
               {showForm ? 'Cancel' : '+ New Task'}
             </button>
           </div>
@@ -628,9 +632,10 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                           'border-fp-border'
                         }`}>
                           <div className="flex items-start gap-2">
-                            <button onClick={() => toggleComplete(task)}
+                            <button onClick={() => canWrite('tasks') && toggleComplete(task)}
+                              disabled={!canWrite('tasks')}
                               className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
-                                task.completed ? 'bg-green-500 border-green-500' : 'border-fp-border hover:border-fp-brand'
+                                task.completed ? 'bg-green-500 border-green-500' : canWrite('tasks') ? 'border-fp-border hover:border-fp-brand' : 'border-fp-border/40 cursor-not-allowed'
                               }`}>
                               {task.completed && <span className="text-fp-text text-xs">✓</span>}
                             </button>
@@ -655,12 +660,14 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                               <span className={`text-xs font-semibold capitalize ${priorityColor(task.priority)}`}>
                                 {task.priority}
                               </span>
-                              <button onClick={() => startEdit(task)}
-                                className="text-fp-muted hover:text-fp-text px-1.5 py-1 rounded transition-colors ml-1">
+                              <button onClick={() => canWrite('tasks') && startEdit(task)}
+                                disabled={!canWrite('tasks')}
+                                className={`px-1.5 py-1 rounded transition-colors ml-1 ${canWrite('tasks') ? 'text-fp-muted hover:text-fp-text' : 'text-fp-muted/40 cursor-not-allowed'}`}>
                                 Edit
                               </button>
-                              <button onClick={() => handleDelete(task.id)}
-                                className="text-fp-muted hover:text-red-400 px-1.5 py-1 rounded transition-colors">
+                              <button onClick={() => canWrite('tasks') && handleDelete(task.id)}
+                                disabled={!canWrite('tasks')}
+                                className={`px-1.5 py-1 rounded transition-colors ${canWrite('tasks') ? 'text-fp-muted hover:text-red-400' : 'text-fp-muted/40 cursor-not-allowed'}`}>
                                 ✕
                               </button>
                             </div>
@@ -715,9 +722,10 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                       isDueToday(task) ? 'border-[#C8622A]/20 bg-[#C8622A]/5' :
                       'border-fp-border/50 bg-fp-inset/50'
                     }`}>
-                      <button onClick={() => toggleComplete(task)}
+                      <button onClick={() => canWrite('tasks') && toggleComplete(task)}
+                        disabled={!canWrite('tasks')}
                         className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                          task.completed ? 'bg-green-500 border-green-500' : 'border-fp-border hover:border-fp-brand'
+                          task.completed ? 'bg-green-500 border-green-500' : canWrite('tasks') ? 'border-fp-border hover:border-fp-brand' : 'border-fp-border/40 cursor-not-allowed'
                         }`}>
                         {task.completed && <span className="text-fp-text text-xs">✓</span>}
                       </button>
@@ -758,12 +766,14 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                           })()}
                         </span>
                       )}
-                      <button onClick={() => startEdit(task)}
-                        className="text-fp-muted hover:text-fp-text text-xs px-2 py-1 rounded hover:bg-fp-hover transition-colors">
+                      <button onClick={() => canWrite('tasks') && startEdit(task)}
+                        disabled={!canWrite('tasks')}
+                        className={`text-xs px-2 py-1 rounded transition-colors ${canWrite('tasks') ? 'text-fp-muted hover:text-fp-text hover:bg-fp-hover' : 'text-fp-muted/40 cursor-not-allowed'}`}>
                         Edit
                       </button>
-                      <button onClick={() => handleDelete(task.id)}
-                        className="text-fp-muted hover:text-red-400 text-xs px-2 py-1 rounded hover:bg-fp-hover transition-colors">
+                      <button onClick={() => canWrite('tasks') && handleDelete(task.id)}
+                        disabled={!canWrite('tasks')}
+                        className={`text-xs px-2 py-1 rounded transition-colors ${canWrite('tasks') ? 'text-fp-muted hover:text-red-400 hover:bg-fp-hover' : 'text-fp-muted/40 cursor-not-allowed'}`}>
                         ✕
                       </button>
                     </div>

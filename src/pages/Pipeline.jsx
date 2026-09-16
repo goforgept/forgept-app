@@ -240,15 +240,18 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
               onChange={e => setSearch(e.target.value)}
               className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm w-48 focus:outline-none focus:border-fp-brand placeholder-fp-muted"
             />
+            {canWrite('pipeline') && (
+              <button
+                onClick={() => setShowManageStages(true)}
+                className="bg-fp-card text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm transition-colors"
+              >
+                Manage Stages
+              </button>
+            )}
             <button
-              onClick={() => setShowManageStages(true)}
-              className="bg-fp-card text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm transition-colors"
-            >
-              Manage Stages
-            </button>
-            <button
-              onClick={() => navigate('/new')}
-              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors"
+              onClick={() => canWrite('pipeline') && navigate('/new')}
+              disabled={!canWrite('pipeline')}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${canWrite('pipeline') ? 'bg-fp-brand text-white hover:bg-[#b5571f]' : 'bg-fp-brand/40 text-white/50 cursor-not-allowed'}`}
             >
               + New Deal
             </button>
@@ -265,8 +268,8 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
               <div
                 key={stage.id}
                 className="flex-shrink-0 w-72"
-                onDragOver={handleDragOver}
-                onDrop={e => handleDrop(e, stage)}
+                onDragOver={canWrite('pipeline') ? handleDragOver : undefined}
+                onDrop={canWrite('pipeline') ? e => handleDrop(e, stage) : undefined}
               >
                 {/* Stage Header */}
                 <div className="flex items-center justify-between mb-3">
@@ -299,8 +302,8 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
                   {stageProposals.map(proposal => (
                     <div
                       key={proposal.id}
-                      draggable
-                      onDragStart={e => handleDragStart(e, proposal)}
+                      draggable={canWrite('pipeline')}
+                      onDragStart={canWrite('pipeline') ? e => handleDragStart(e, proposal) : undefined}
                       onClick={() => navigate(`/proposal/${proposal.id}`)}
                       className="bg-fp-card border border-fp-border rounded-xl p-3 cursor-pointer hover:border-fp-brand/50 transition-colors group"
                     >
