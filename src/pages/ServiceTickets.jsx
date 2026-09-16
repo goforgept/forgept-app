@@ -22,7 +22,7 @@ const PRIORITY_COLORS = {
 export default function ServiceTickets({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'admin', isPM = false, isTechnician = false, featureInventory = false, isSalesManager = false }) {
   const navigate = useNavigate()
   const { profile } = useProfile()
-  const { canWrite } = usePermissions()
+  const { canWrite, scope } = usePermissions()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [clients, setClients] = useState([])
@@ -46,11 +46,13 @@ export default function ServiceTickets({ isAdmin, featureProposals = true, featu
   useEffect(() => { if (profile?.org_id) fetchAll() }, [profile?.org_id])
 
   const fetchAll = async () => {
-    const { data: ticketData } = await supabase
+    let tq = supabase
       .from('service_tickets')
       .select('*, clients(company, client_name), profiles!service_tickets_assigned_tech_id_fkey(full_name), jobs(name, job_number)')
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
+    if (scope('serviceTickets') === 'own') tq = tq.eq('assigned_tech_id', profile.id)
+    const { data: ticketData } = await tq
     setTickets(ticketData || [])
 
     const { data: clientData } = await supabase

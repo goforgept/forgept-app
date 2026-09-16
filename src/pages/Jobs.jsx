@@ -30,7 +30,7 @@ const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits:
 export default function Jobs({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, isTechnician = false, featureInventory = false, isSalesManager = false, isPM = false }) {
   const navigate = useNavigate()
   const { profile } = useProfile()
-  const { canWrite } = usePermissions()
+  const { canWrite, scope } = usePermissions()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -73,7 +73,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
       .select('*, proposals(proposal_name, proposal_value), clients(company, client_type, first_name, last_name, address, city, state, zip), profiles!jobs_assigned_pm_fkey(full_name), job_checklist_items(id, completed)')
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
-    if (isTechnician) q = q.or(`tech_id.eq.${profile.id},tech_ids.cs.{${profile.id}}`)
+    if (scope('jobs') === 'own') q = q.or(`tech_id.eq.${profile.id},tech_ids.cs.{${profile.id}}`)
     const { data, error } = await q
     if (error) console.error('fetchJobs error:', error.message, error.details)
     // Remap legacy 'Active' status (not a valid stage) to 'Pending' in memory

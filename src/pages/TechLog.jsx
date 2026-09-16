@@ -4,10 +4,12 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 
 export default function TechLog({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, role = 'rep', isPM = false, isTechnician = false, featureInventory = false, isSalesManager = false }) {
   const navigate = useNavigate()
   const { profile } = useProfile()
+  const { scope } = usePermissions()
   const [jobs, setJobs] = useState([])
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -67,7 +69,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
           .eq('org_id', profile.org_id)
           .not('status', 'in', '("Completed","Cancelled")')
           .order('created_at', { ascending: false })
-        if (isTechnician) q = q.or(`tech_id.eq.${profile.id},tech_ids.cs.{${profile.id}}`)
+        if (scope('jobs') === 'own') q = q.or(`tech_id.eq.${profile.id},tech_ids.cs.{${profile.id}}`)
         return q
       })(),
 
@@ -95,7 +97,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
           .eq('org_id', profile.org_id)
           .in('status', ['Open', 'In Progress'])
           .order('created_at', { ascending: false })
-        if (isTechnician) q = q.eq('assigned_tech_id', profile.id)
+        if (scope('serviceTickets') === 'own') q = q.eq('assigned_tech_id', profile.id)
         return q
       })(),
 

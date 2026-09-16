@@ -29,22 +29,45 @@ const DEFAULT_ALL_WRITE = Object.fromEntries(
   PERMISSION_AREAS.map(a => [a.key, 'write'])
 )
 
+// Default permissions for the technician base role
+const TECH_DEFAULT_PERMISSIONS = Object.fromEntries(
+  PERMISSION_AREAS.map(a => [a.key, 'none'])
+)
+Object.assign(TECH_DEFAULT_PERMISSIONS, {
+  jobs: 'write',
+  serviceTickets: 'write',
+  dispatch: 'read',
+  settings: 'write', // own profile/password
+})
+
+// Default scopes for technicians — own assigned records only
+const TECH_DEFAULT_SCOPES = {
+  jobs: 'own',
+  serviceTickets: 'own',
+}
+
 export function computePermissions(orgRole, overrides, isAdmin) {
   if (isAdmin) return { ...DEFAULT_ALL_WRITE }
   if (!orgRole) return { ...DEFAULT_ALL_WRITE }
   if (orgRole.is_admin) return { ...DEFAULT_ALL_WRITE }
-  const base = { ...DEFAULT_ALL_WRITE, ...(orgRole.permissions || {}) }
+  const isTech = orgRole.base_role === 'technician'
+  const base = isTech
+    ? { ...TECH_DEFAULT_PERMISSIONS, ...(orgRole.permissions || {}) }
+    : { ...DEFAULT_ALL_WRITE, ...(orgRole.permissions || {}) }
   return { ...base, ...(overrides || {}) }
 }
 
 export function computeScopes(orgRole, overrides, isAdmin) {
   if (isAdmin || !orgRole || orgRole.is_admin) return {}
-  return { ...(orgRole.scopes || {}), ...(overrides || {}) }
+  const isTech = orgRole.base_role === 'technician'
+  const base = isTech ? { ...TECH_DEFAULT_SCOPES, ...(orgRole.scopes || {}) } : { ...(orgRole.scopes || {}) }
+  return { ...base, ...(overrides || {}) }
 }
 
 export function usePermissions() {
   const { profile } = useProfile()
   const isAdmin = profile?.org_role === 'admin' || profile?.role === 'admin'
+  const baseRole = profile?.org_roles?.base_role || profile?.org_role || profile?.role || 'rep'
 
   const perms  = computePermissions(profile?.org_roles, profile?.permission_overrides, isAdmin)
   const scopes = computeScopes(profile?.org_roles, profile?.scope_overrides, isAdmin)
@@ -75,5 +98,6 @@ export function usePermissions() {
     allScopes: scopes,
 
     roleName: profile?.org_roles?.name || null,
+    isTechnician: baseRole === 'technician',
   }
 }
