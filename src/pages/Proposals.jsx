@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { usePermissions } from '../hooks/usePermissions'
 
 export default function Proposals({ isAdmin, featureProposals = true, featureCRM = false }) {
   const [proposals, setProposals] = useState([])
@@ -14,6 +15,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
   const [clientTypeFilter, setClientTypeFilter] = useState('all')
   const navigate = useNavigate()
   const location = useLocation()
+  const { canWrite, scope } = usePermissions()
 
   useEffect(() => {
     fetchOrgAndProposals()
@@ -43,7 +45,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
       .eq('org_id', profile.org_id)
       .eq('is_current_revision', true)
       .order('created_at', { ascending: false })
-    if (profile.org_role === 'rep') proposalsQuery = proposalsQuery.eq('user_id', profile.id)
+    if (scope('proposals') === 'own') proposalsQuery = proposalsQuery.eq('user_id', profile.id)
 
     const [{ data, error }, { data: clientRows }] = await Promise.all([
       proposalsQuery,

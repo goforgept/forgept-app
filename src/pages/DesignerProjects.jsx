@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
+import { usePermissions } from '../hooks/usePermissions'
 
 // ─── DesignerProjects ─────────────────────────────────────────────────────────
 // Entry point for full ForgePt users accessing Designer from Sidebar.
@@ -9,6 +10,7 @@ import Sidebar from '../components/Sidebar'
 // a new drawing on any proposal.
 export default function DesignerProjects({ isAdmin, featureProposals, featureCRM, featurePurchaseOrders, featureInvoices, featureSla, featureMonitoring, featureDrawingTool, featureDesignerOnly, role, isSalesManager, isPM, isTechnician }) {
   const navigate = useNavigate()
+  const { scope } = usePermissions()
   const [projects, setProjects]   = useState([])
   const [proposals, setProposals] = useState([])
   const [loading, setLoading]     = useState(true)
@@ -57,7 +59,7 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
         .eq('id', user.id)
         .single()
 
-      const isRep = profile.org_role === 'rep'
+      const isOwnScope = scope('proposals') === 'own'
 
       // Load drawing sheets for the org
       const { data: sheets } = await supabase
@@ -66,13 +68,13 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
         .eq('org_id', profile.org_id)
         .order('last_activity_at', { ascending: false })
 
-      // Load proposals — reps only see their own (used for "start new drawing" list)
+      // Load proposals — scoped to own or all based on role setting
       let proposalsQuery = supabase
         .from('proposals')
         .select('id, proposal_name, company, client_name, status, created_at')
         .eq('org_id', profile.org_id)
         .order('created_at', { ascending: false })
-      if (isRep) proposalsQuery = proposalsQuery.eq('user_id', profile.id)
+      if (isOwnScope) proposalsQuery = proposalsQuery.eq('user_id', profile.id)
       const { data: allProposals } = await proposalsQuery
 
       setProposals(allProposals || [])
@@ -84,7 +86,7 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
       const grouped = {}
       ;(sheets || []).forEach(sheet => {
         const key = sheet.proposal_id || 'standalone'
-        if (isRep && sheet.proposal_id && !allowedProposalIds.has(sheet.proposal_id)) return
+        if (isOwnScope && sheet.proposal_id && !allowedProposalIds.has(sheet.proposal_id)) return
         if (!grouped[key]) grouped[key] = []
         grouped[key].push(sheet)
       })

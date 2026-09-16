@@ -20,33 +20,34 @@ export const PERMISSION_AREAS = [
   { key: 'settings',       label: 'Settings & Team',      group: 'Manage' },
 ]
 
-// Default when no custom role is assigned: full write access to everything
+// Areas where "own vs all" data scoping is meaningful
+export const SCOPEABLE_AREAS = new Set([
+  'proposals', 'pipeline', 'jobs', 'serviceTickets', 'tasks', 'contracts',
+])
+
 const DEFAULT_ALL_WRITE = Object.fromEntries(
   PERMISSION_AREAS.map(a => [a.key, 'write'])
 )
 
-/**
- * Compute effective permissions for a user.
- * Priority: admin bypass > role.is_admin bypass > role defaults + user overrides
- */
 export function computePermissions(orgRole, overrides, isAdmin) {
   if (isAdmin) return { ...DEFAULT_ALL_WRITE }
-  if (!orgRole) return { ...DEFAULT_ALL_WRITE }           // no custom role → full access
-  if (orgRole.is_admin) return { ...DEFAULT_ALL_WRITE }  // role flagged as admin
-
+  if (!orgRole) return { ...DEFAULT_ALL_WRITE }
+  if (orgRole.is_admin) return { ...DEFAULT_ALL_WRITE }
   const base = { ...DEFAULT_ALL_WRITE, ...(orgRole.permissions || {}) }
   return { ...base, ...(overrides || {}) }
+}
+
+export function computeScopes(orgRole, overrides, isAdmin) {
+  if (isAdmin || !orgRole || orgRole.is_admin) return {}
+  return { ...(orgRole.scopes || {}), ...(overrides || {}) }
 }
 
 export function usePermissions() {
   const { profile } = useProfile()
   const isAdmin = profile?.org_role === 'admin' || profile?.role === 'admin'
 
-  const perms = computePermissions(
-    profile?.org_roles,           // joined via org_role_id (null if none assigned)
-    profile?.permission_overrides,
-    isAdmin
-  )
+  const perms  = computePermissions(profile?.org_roles, profile?.permission_overrides, isAdmin)
+  const scopes = computeScopes(profile?.org_roles, profile?.scope_overrides, isAdmin)
 
   return {
     isAdmin,
@@ -60,10 +61,19 @@ export function usePermissions() {
     /** 'none' | 'read' | 'write' */
     level: (area) => perms[area] || 'write',
 
-    /** Full map for rendering permission matrices */
-    all: perms,
+    /**
+     * 'own' | 'all' — only meaningful for SCOPEABLE_AREAS.
+     * Admins always get 'all'. Non-scopeable areas always return 'all'.
+     */
+    scope: (area) => {
+      if (isAdmin || !SCOPEABLE_AREAS.has(area)) return 'all'
+      return scopes[area] || 'all'
+    },
 
-    /** Name of the custom role, if assigned */
+    /** Full maps for rendering permission/scope matrices */
+    all: perms,
+    allScopes: scopes,
+
     roleName: profile?.org_roles?.name || null,
   }
 }

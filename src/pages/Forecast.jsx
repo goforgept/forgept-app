@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 
 export default function Forecast({ isAdmin, featureProposals = true, featureCRM = false }) {
   const { profile } = useProfile()
+  const { scope } = usePermissions()
   const [proposals, setProposals] = useState([])
   const [stages, setStages] = useState([])
   const [loading, setLoading] = useState(true)
@@ -17,7 +19,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
   const fetchData = async () => {
     if (!profile?.org_id) { setLoading(false); return }
     let proposalsQuery = supabase.from('proposals').select('*').eq('org_id', profile.org_id).eq('is_current_revision', true).order('created_at', { ascending: false })
-    if (profile.org_role === 'rep') proposalsQuery = proposalsQuery.eq('user_id', profile.id)
+    if (scope('pipeline') === 'own') proposalsQuery = proposalsQuery.eq('user_id', profile.id)
 
     const [proposalsRes, stagesRes] = await Promise.all([
       proposalsQuery,

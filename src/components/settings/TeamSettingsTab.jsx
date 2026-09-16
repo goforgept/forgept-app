@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../supabase'
-import { PERMISSION_AREAS } from '../../hooks/usePermissions'
+import { PERMISSION_AREAS, SCOPEABLE_AREAS } from '../../hooks/usePermissions'
 
 // Default role templates seeded for every new org (editable per org)
 const DEFAULT_ROLE_TEMPLATES = [
@@ -84,8 +84,30 @@ function LevelToggle({ value, onChange, disabled }) {
   )
 }
 
+// ── Scope toggle (Own / All) ──────────────────────────────────────────────────
+function ScopeToggle({ value, onChange, disabled }) {
+  return (
+    <div className="flex rounded-lg overflow-hidden border border-fp-border bg-fp-inset text-xs">
+      {['own', 'all'].map(s => (
+        <button
+          key={s}
+          disabled={disabled}
+          onClick={() => onChange(s)}
+          className={`px-2.5 py-1 font-medium transition-colors capitalize ${
+            value === s
+              ? s === 'own' ? 'bg-purple-500/20 text-purple-400' : 'bg-fp-brand/20 text-fp-brand'
+              : 'text-fp-muted hover:text-fp-text'
+          } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}
+        >
+          {s === 'own' ? 'Own' : 'All'}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // ── Permission matrix for role editing ────────────────────────────────────────
-function PermissionMatrix({ permissions, onChange, isAdminRole }) {
+function PermissionMatrix({ permissions, scopes, onChange, onScopeChange, isAdminRole }) {
   const grouped = useMemo(() => {
     const groups = {}
     for (const area of PERMISSION_AREAS) {
@@ -106,16 +128,30 @@ function PermissionMatrix({ permissions, onChange, isAdminRole }) {
         <div key={group}>
           <p className="text-fp-muted text-xs font-semibold uppercase tracking-wider mb-2">{group}</p>
           <div className="space-y-1">
-            {areas.map(area => (
-              <div key={area.key} className="flex items-center justify-between py-1.5">
-                <span className={`text-sm ${isAdminRole ? 'text-fp-muted' : 'text-fp-text'}`}>{area.label}</span>
-                <LevelToggle
-                  value={isAdminRole ? 'write' : (permissions[area.key] ?? 'write')}
-                  onChange={v => onChange(area.key, v)}
-                  disabled={isAdminRole}
-                />
-              </div>
-            ))}
+            {areas.map(area => {
+              const level = isAdminRole ? 'write' : (permissions[area.key] ?? 'write')
+              const scopeable = SCOPEABLE_AREAS.has(area.key)
+              const showScope = scopeable && level !== 'none'
+              return (
+                <div key={area.key} className="flex items-center justify-between py-1.5 gap-2">
+                  <span className={`text-sm flex-1 ${isAdminRole ? 'text-fp-muted' : 'text-fp-text'}`}>{area.label}</span>
+                  <div className="flex items-center gap-2">
+                    {showScope && (
+                      <ScopeToggle
+                        value={isAdminRole ? 'all' : (scopes?.[area.key] ?? 'all')}
+                        onChange={v => onScopeChange(area.key, v)}
+                        disabled={isAdminRole}
+                      />
+                    )}
+                    <LevelToggle
+                      value={level}
+                      onChange={v => onChange(area.key, v)}
+                      disabled={isAdminRole}
+                    />
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       ))}
@@ -124,7 +160,7 @@ function PermissionMatrix({ permissions, onChange, isAdminRole }) {
 }
 
 // ── User permission overrides (vs role defaults) ───────────────────────────────
-function UserPermissionOverrides({ rolePermissions, overrides, onChange, isAdminRole }) {
+function UserPermissionOverrides({ rolePermissions, roleScopes, overrides, scopeOverrides, onChange, onScopeChange, isAdminRole }) {
   const grouped = useMemo(() => {
     const groups = {}
     for (const area of PERMISSION_AREAS) {
@@ -152,29 +188,47 @@ function UserPermissionOverrides({ rolePermissions, overrides, onChange, isAdmin
           <p className="text-fp-muted text-xs font-semibold uppercase tracking-wider mb-2">{group}</p>
           <div className="space-y-1">
             {areas.map(area => {
-              const roleDefault = rolePermissions?.[area.key] ?? 'write'
-              const override = overrides?.[area.key]
-              const effective = override ?? roleDefault
+              const roleDefault  = rolePermissions?.[area.key] ?? 'write'
+              const override     = overrides?.[area.key]
+              const effective    = override ?? roleDefault
               const isOverridden = override !== undefined && override !== roleDefault
+
+              const roleScopeDefault  = roleScopes?.[area.key] ?? 'all'
+              const scopeOverride     = scopeOverrides?.[area.key]
+              const effectiveScope    = scopeOverride ?? roleScopeDefault
+              const isScopeOverridden = scopeOverride !== undefined && scopeOverride !== roleScopeDefault
+
+              const scopeable  = SCOPEABLE_AREAS.has(area.key)
+              const showScope  = scopeable && effective !== 'none'
+              const anyChanged = isOverridden || isScopeOverridden
+
               return (
-                <div key={area.key} className={`flex items-center justify-between py-1.5 rounded px-1 -mx-1 ${isOverridden ? 'bg-yellow-500/5' : ''}`}>
-                  <div>
+                <div key={area.key} className={`flex items-center justify-between py-1.5 rounded px-1 -mx-1 gap-2 ${anyChanged ? 'bg-yellow-500/5' : ''}`}>
+                  <div className="flex-1 min-w-0">
                     <span className={`text-sm ${isAdminRole ? 'text-fp-muted' : 'text-fp-text'}`}>{area.label}</span>
                     {isOverridden && (
-                      <span className="ml-2 text-xs text-yellow-400">
-                        (role: {LEVEL_LABELS[roleDefault]})
-                      </span>
+                      <span className="ml-2 text-xs text-yellow-400">(role: {LEVEL_LABELS[roleDefault]})</span>
+                    )}
+                    {isScopeOverridden && (
+                      <span className="ml-2 text-xs text-yellow-400">(role: {roleScopeDefault})</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {isOverridden && (
+                    {anyChanged && (
                       <button
-                        onClick={() => onChange(area.key, null)}
+                        onClick={() => { onChange(area.key, null); onScopeChange(area.key, null) }}
                         className="text-xs text-fp-muted hover:text-fp-text transition-colors"
-                        title="Reset to role default"
+                        title="Reset to role defaults"
                       >
                         ↺
                       </button>
+                    )}
+                    {showScope && (
+                      <ScopeToggle
+                        value={isAdminRole ? 'all' : effectiveScope}
+                        onChange={v => onScopeChange(area.key, v === roleScopeDefault ? null : v)}
+                        disabled={isAdminRole}
+                      />
                     )}
                     <LevelToggle
                       value={isAdminRole ? 'write' : effective}
@@ -199,6 +253,7 @@ function RoleModal({ role, orgId, onSave, onClose }) {
     description: role?.description || '',
     base_role: role?.base_role || 'rep',
     permissions: role?.permissions || {},
+    scopes: role?.scopes || {},
     is_admin: role?.is_admin || false,
   })
   const [saving, setSaving] = useState(false)
@@ -267,8 +322,10 @@ function RoleModal({ role, orgId, onSave, onClose }) {
             <p className="text-fp-text text-sm font-semibold mb-3">Default Permissions</p>
             <PermissionMatrix
               permissions={form.permissions}
+              scopes={form.scopes}
               isAdminRole={form.is_admin}
               onChange={(key, val) => setForm(p => ({ ...p, permissions: { ...p.permissions, [key]: val } }))}
+              onScopeChange={(key, val) => setForm(p => ({ ...p, scopes: { ...p.scopes, [key]: val } }))}
             />
           </div>
         </div>
@@ -298,6 +355,7 @@ function MemberModal({ member, roles, onSave, onClose }) {
   })
   const [roleId, setRoleId] = useState(member.org_role_id || '')
   const [overrides, setOverrides] = useState(member.permission_overrides || {})
+  const [scopeOverrides, setScopeOverrides] = useState(member.scope_overrides || {})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -311,7 +369,15 @@ function MemberModal({ member, roles, onSave, onClose }) {
     })
   }
 
-  const overrideCount = Object.keys(overrides).length
+  const handleScopeOverride = (key, val) => {
+    setScopeOverrides(prev => {
+      const next = { ...prev }
+      if (val === null) { delete next[key] } else { next[key] = val }
+      return next
+    })
+  }
+
+  const overrideCount = Object.keys(overrides).length + Object.keys(scopeOverrides).length
 
   const handleSave = async () => {
     setSaving(true); setError(null)
@@ -322,6 +388,7 @@ function MemberModal({ member, roles, onSave, onClose }) {
       org_role: info.org_role,
       org_role_id: roleId || null,
       permission_overrides: overrides,
+      scope_overrides: scopeOverrides,
     }).eq('id', member.id)
     setSaving(false)
     if (error) { setError(error.message); return }
@@ -333,6 +400,7 @@ function MemberModal({ member, roles, onSave, onClose }) {
       org_role: info.org_role,
       org_role_id: roleId || null,
       permission_overrides: overrides,
+      scope_overrides: scopeOverrides,
       org_roles: selectedRole,
     })
   }
@@ -340,6 +408,7 @@ function MemberModal({ member, roles, onSave, onClose }) {
   const rolePerms = selectedRole
     ? { ...Object.fromEntries(PERMISSION_AREAS.map(a => [a.key, 'write'])), ...(selectedRole.permissions || {}) }
     : null
+  const roleScopes = selectedRole?.scopes || null
 
   const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
@@ -437,8 +506,11 @@ function MemberModal({ member, roles, onSave, onClose }) {
                 </div>
                 <UserPermissionOverrides
                   rolePermissions={rolePerms}
+                  roleScopes={roleScopes}
                   overrides={overrides}
+                  scopeOverrides={scopeOverrides}
                   onChange={handleOverride}
+                  onScopeChange={handleScopeOverride}
                   isAdminRole={selectedRole?.is_admin || info.org_role === 'admin'}
                 />
               </div>
