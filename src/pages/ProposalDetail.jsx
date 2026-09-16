@@ -2820,6 +2820,7 @@ export default function ProposalDetail({ isAdmin }) {
     await supabase.from('bom_line_items').delete().eq('proposal_id', rev.id)
     await supabase.from('proposal_photos').delete().eq('proposal_id', rev.id)
     await supabase.from('drawing_sheets').delete().eq('proposal_id', rev.id)
+    await supabase.from('manufacturer_orders').update({ proposal_id: null }).eq('proposal_id', rev.id)
     await supabase.from('proposals').delete().eq('id', rev.id)
 
     // If we just deleted the revision we're currently viewing, navigate to the original
@@ -2856,6 +2857,7 @@ export default function ProposalDetail({ isAdmin }) {
       await supabase.from('contracts').delete().eq('proposal_id', id)
       await supabase.from('invoices').update({ proposal_id: null }).eq('proposal_id', id)
       await supabase.from('jobs').update({ proposal_id: null }).eq('proposal_id', id)
+      await supabase.from('manufacturer_orders').update({ proposal_id: null }).eq('proposal_id', id)
       const r5 = await supabase.from('proposals').delete().eq('id', id)
       if (r5.error) { console.error('proposals delete error:', r5.error); alert('Error: ' + r5.error.message); setDeletingProposal(false); return }
       navigate('/proposals')
