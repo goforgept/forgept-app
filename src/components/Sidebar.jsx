@@ -224,7 +224,6 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
         { label: 'Proposals', path: '/proposals', icon: '📋' },
       ] : []),
       { label: 'Clients', path: '/clients', icon: '🏢' },
-      ...(featureDrawingTool && orgType !== 'manufacturer' ? [{ label: 'Designer', path: '/designer', icon: '📐' }] : []),
     ])
   },
   {
@@ -249,6 +248,7 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
     key: 'manage',
     label: 'Manage',
     links: withPermission([
+      ...(featureDrawingTool && orgType !== 'manufacturer' ? [{ label: 'Designer', path: '/designer', icon: '📐' }] : []),
       ...(orgType === 'manufacturer' ? [{ label: 'Roadmap', path: '/roadmap', icon: '🗺️' }] : []),
       { label: 'Settings', path: '/settings', icon: '⚙️' },
       { label: 'Help', path: '/faq', icon: '❓' },
