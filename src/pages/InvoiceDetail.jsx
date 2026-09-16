@@ -635,16 +635,21 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                     <button onClick={() => setEditingInvoiceNumber(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">✕</button>
                   </div>
                 ) : (
-                  <button onClick={() => { setInvoiceNumberValue(invoice.invoice_number || ''); setEditingInvoiceNumber(true) }}
-                    className="group flex items-center gap-2">
+                  canWrite('invoices') ? (
+                    <button onClick={() => { setInvoiceNumberValue(invoice.invoice_number || ''); setEditingInvoiceNumber(true) }}
+                      className="group flex items-center gap-2">
+                      <h2 className="text-fp-text text-2xl font-bold">{invoice.invoice_number}</h2>
+                      <svg className="w-4 h-4 text-fp-muted opacity-0 group-hover:opacity-60 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </button>
+                  ) : (
                     <h2 className="text-fp-text text-2xl font-bold">{invoice.invoice_number}</h2>
-                    <svg className="w-4 h-4 text-fp-muted opacity-0 group-hover:opacity-60 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                  </button>
+                  )
                 )}
                 <select
                   value={invoice.status || 'Draft'}
                   onChange={e => updateStatus(e.target.value)}
-                  className={`text-xs font-semibold px-2 py-1 rounded border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-fp-brand ${STATUS_COLORS[invoice.status] || 'bg-fp-inset text-fp-muted'}`}
+                  disabled={!canWrite('invoices')}
+                  className={`text-xs font-semibold px-2 py-1 rounded border-0 focus:outline-none focus:ring-1 focus:ring-fp-brand ${canWrite('invoices') ? 'cursor-pointer' : 'cursor-default opacity-70'} ${STATUS_COLORS[invoice.status] || 'bg-fp-inset text-fp-muted'}`}
                   style={{ background: 'transparent' }}
                 >
                   {['Draft', 'Sent', 'Partially Paid', 'Paid', 'Overdue'].map(s => (
@@ -654,7 +659,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
               </div>
               <div className="flex items-center gap-2 mt-0.5">
                 <p className="text-fp-muted">{invoice.proposals?.company || ticketClient?.clients?.company || invoice.clients?.company || <span className="italic">No customer set</span>}{(invoice.proposals?.client_name || ticketClient?.clients?.client_name || invoice.clients?.contact_name) ? ` · ${invoice.proposals?.client_name || ticketClient?.clients?.client_name || invoice.clients?.contact_name}` : ''}</p>
-                <button onClick={openBillToModal} className="text-[#C8622A] text-xs hover:text-fp-text transition-colors">Change</button>
+                {canWrite('invoices') && <button onClick={openBillToModal} className="text-[#C8622A] text-xs hover:text-fp-text transition-colors">Change</button>}
               </div>
               <p className="text-fp-muted text-xs mt-0.5">{invoice.proposals?.proposal_name || ticketClient?.title}</p>
             </div>
@@ -821,9 +826,13 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                   <button onClick={() => { setDueDateValue(invoice.due_date || ''); setEditingDueDate(false) }} className="text-fp-muted text-xs hover:text-fp-text transition-colors">✕</button>
                 </div>
               ) : (
-                <button onClick={() => setEditingDueDate(true)} className="text-fp-text text-sm font-medium hover:text-[#C8622A] transition-colors text-left">
-                  {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : <span className="text-fp-muted">Set date</span>}
-                </button>
+                canWrite('invoices') ? (
+                  <button onClick={() => setEditingDueDate(true)} className="text-fp-text text-sm font-medium hover:text-[#C8622A] transition-colors text-left">
+                    {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : <span className="text-fp-muted">Set date</span>}
+                  </button>
+                ) : (
+                  <p className="text-fp-text text-sm font-medium">{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '—'}</p>
+                )
               )}
             </div>
             <div><p className="text-fp-muted text-xs">Terms</p><p className="text-fp-text text-sm font-medium">{clientNetTerms || '—'}</p></div>
@@ -837,10 +846,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-fp-text font-bold">Description of Work</h3>
             {!editingDescription
-              ? <button onClick={() => setEditingDescription(true)} className="text-[#C8622A] text-sm hover:text-fp-text transition-colors">Edit</button>
+              ? (canWrite('invoices') && <button onClick={() => setEditingDescription(true)} className="text-[#C8622A] text-sm hover:text-fp-text transition-colors">Edit</button>)
               : <div className="flex gap-2">
                   <button onClick={() => setEditingDescription(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">Cancel</button>
-                  <button onClick={saveDescription} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors">Save</button>
+                  <button onClick={saveDescription} disabled={!canWrite('invoices')} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors disabled:opacity-50">Save</button>
                 </div>
             }
           </div>
@@ -950,10 +959,10 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-fp-text font-bold">Notes</h3>
             {!editingNotes
-              ? <button onClick={() => setEditingNotes(true)} className="text-[#C8622A] text-sm hover:text-fp-text transition-colors">Edit</button>
+              ? (canWrite('invoices') && <button onClick={() => setEditingNotes(true)} className="text-[#C8622A] text-sm hover:text-fp-text transition-colors">Edit</button>)
               : <div className="flex gap-2">
                   <button onClick={() => setEditingNotes(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors">Cancel</button>
-                  <button onClick={saveNotes} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors">Save</button>
+                  <button onClick={saveNotes} disabled={!canWrite('invoices')} className="text-[#C8622A] text-sm font-semibold hover:text-fp-text transition-colors disabled:opacity-50">Save</button>
                 </div>
             }
           </div>

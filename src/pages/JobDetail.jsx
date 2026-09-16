@@ -1751,7 +1751,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           const primaryTabs = [
             { key: 'checklist',  label: 'Checklist',       countLabel: `${completedCount}/${checklist.length}` },
             { key: 'pos',        label: 'Purchase Orders',  countLabel: null },
-            { key: 'techlog',    label: 'Tech Log',         countLabel: techLogs.length > 0 ? String(techLogs.length) : null },
+            ...(canWrite('jobs') ? [{ key: 'techlog', label: 'Tech Log', countLabel: techLogs.length > 0 ? String(techLogs.length) : null }] : []),
             { key: 'costReport', label: 'Cost Report',      countLabel: null },
           ]
           const overflowTabs = [
@@ -1881,7 +1881,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         )}
 
         {/* TECH LOG TAB */}
-        {activeTab === 'techlog' && (
+        {activeTab === 'techlog' && canWrite('jobs') && (
           <TechLogTab techLogs={techLogs} />
         )}
 
