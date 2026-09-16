@@ -31,19 +31,22 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('org_id, id, org_role')
       .eq('id', user.id)
       .single()
 
     if (!profile?.org_id) { setLoading(false); return }
 
+    let proposalsQuery = supabase
+      .from('proposals')
+      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id')
+      .eq('org_id', profile.org_id)
+      .eq('is_current_revision', true)
+      .order('created_at', { ascending: false })
+    if (profile.org_role === 'rep') proposalsQuery = proposalsQuery.eq('user_id', profile.id)
+
     const [{ data, error }, { data: clientRows }] = await Promise.all([
-      supabase
-        .from('proposals')
-        .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id')
-        .eq('org_id', profile.org_id)
-        .eq('is_current_revision', true)
-        .order('created_at', { ascending: false }),
+      proposalsQuery,
       supabase.from('clients').select('id,client_type').eq('org_id', profile.org_id)
     ])
 

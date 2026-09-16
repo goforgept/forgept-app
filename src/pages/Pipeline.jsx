@@ -38,7 +38,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('org_id, id, org_role')
       .eq('id', user.id)
       .single()
 
@@ -69,8 +69,11 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
       stageData = newStages || []
     }
 
+    let proposalsQuery = supabase.from('proposals').select('*').eq('org_id', profile.org_id).eq('is_current_revision', true).order('created_at', { ascending: false })
+    if (profile.org_role === 'rep') proposalsQuery = proposalsQuery.eq('user_id', profile.id)
+
     const [proposalsRes, clientsRes] = await Promise.all([
-      supabase.from('proposals').select('*').eq('org_id', profile.org_id).eq('is_current_revision', true).order('created_at', { ascending: false }),
+      proposalsQuery,
       supabase.from('clients').select('id, company, client_type, first_name, last_name').eq('org_id', profile.org_id)
     ])
 
