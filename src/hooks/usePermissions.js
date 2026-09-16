@@ -72,10 +72,14 @@ export function usePermissions() {
   const isAdmin = profile?.org_role === 'admin' || profile?.role === 'admin'
   const baseRole = profile?.org_roles?.base_role || profile?.org_role || profile?.role || 'rep'
 
-  // Augment orgRole with base_role from profile.role when org_roles doesn't have one
-  // so computePermissions detects the technician baseline even without a custom role record
+  // Augment orgRole with base_role from profile.role when org_roles doesn't have one.
+  // If there is no org_roles record at all but the system role is 'technician', synthesize
+  // a minimal role object so computePermissions applies TECH_DEFAULT_PERMISSIONS instead
+  // of falling back to DEFAULT_ALL_WRITE.
   const orgRoleWithBase = profile?.org_roles
-    ? (profile.org_roles.base_role ? profile.org_roles : { ...profile.org_roles, base_role: profile?.org_role || profile?.role })
+    ? (profile.org_roles.base_role ? profile.org_roles : { ...profile.org_roles, base_role: baseRole })
+    : baseRole === 'technician'
+    ? { base_role: 'technician', permissions: {}, scopes: {}, is_admin: false }
     : null
 
   const perms  = computePermissions(orgRoleWithBase, profile?.permission_overrides, isAdmin)
@@ -107,6 +111,10 @@ export function usePermissions() {
     allScopes: scopes,
 
     roleName: profile?.org_roles?.name || null,
-    isTechnician: baseRole === 'technician',
+    isTechnician:    baseRole === 'technician',
+    isSalesManager:  baseRole === 'sales_manager',
+    isPM:            baseRole === 'project_manager',
+    isProductManager: baseRole === 'product_manager',
+    isDevTeam:       baseRole === 'dev',
   }
 }

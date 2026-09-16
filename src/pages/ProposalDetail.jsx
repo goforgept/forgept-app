@@ -188,6 +188,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [savingContractDates, setSavingContractDates] = useState(false)
   const [activityRefreshKey, setActivityRefreshKey] = useState(0)
   const [pipelineStages, setPipelineStages] = useState([])
+  const [linkedJob, setLinkedJob] = useState(null)
 
   useEffect(() => {
     fetchProposal()
@@ -226,6 +227,13 @@ export default function ProposalDetail({ isAdmin }) {
 
     setProposal(data)
     if (!data) return
+
+    // Load linked job (if any) so the header can show View/Create Job
+    if (data.status === 'Won') {
+      const { data: jobRow } = await supabase
+        .from('jobs').select('id, job_number, status').eq('proposal_id', data.id).maybeSingle()
+      setLinkedJob(jobRow || null)
+    }
 
     // Load revision history — always check so rev 1 can see newer revisions
     const originalId = data.original_proposal_id || data.id
@@ -480,8 +488,8 @@ export default function ProposalDetail({ isAdmin }) {
         if (existingJob.status === 'Active') {
           await supabase.from('jobs').update({ status: 'Pending' }).eq('id', existingJob.id)
         }
-      } else if (proposal?.status !== 'Won') {
-        // First time winning — create the job
+      } else {
+        // No job found — create one (handles first-time wins and recovery from failed creation)
         const { data: orgData } = await supabase.from('organizations').select('job_counter').eq('id', proposal.org_id).single()
         const jobNumber = `JOB-${orgData?.job_counter || 1000}`
         await supabase.from('organizations').update({ job_counter: (orgData?.job_counter || 1000) + 1 }).eq('id', proposal.org_id)
@@ -550,6 +558,26 @@ export default function ProposalDetail({ isAdmin }) {
     else if (stage.name === 'Lost') newStatus = 'Lost'
     else if (stage.name === 'Proposal Sent') newStatus = 'Sent'
     await updateStatus(newStatus, stageId)
+  }
+
+  const createLinkedJob = async () => {
+    if (!proposal) return
+    const { data: existing } = await supabase.from('jobs').select('id, job_number, status').eq('proposal_id', id).maybeSingle()
+    if (existing) { setLinkedJob(existing); return }
+    const { data: orgData } = await supabase.from('organizations').select('job_counter').eq('id', proposal.org_id).single()
+    const jobNumber = `JOB-${orgData?.job_counter || 1000}`
+    await supabase.from('organizations').update({ job_counter: (orgData?.job_counter || 1000) + 1 }).eq('id', proposal.org_id)
+    const { data: newJob, error: jobErr } = await supabase.from('jobs').insert({
+      org_id: proposal.org_id,
+      proposal_id: id,
+      client_id: proposal.client_id || null,
+      job_number: jobNumber,
+      name: proposal.proposal_name,
+      status: 'Pending',
+    }).select('id, job_number, status').single()
+    if (jobErr) { console.error('Job creation failed:', jobErr.message); return }
+    setLinkedJob(newJob)
+    navigate(`/jobs/${newJob.id}`)
   }
 
   const saveRenewalModalDates = async ({ frequencies = {}, autoInvoice = {} } = {}) => {
@@ -3779,6 +3807,7 @@ const analyzeDrawing = async () => {
           setDeleteConfirmText={setDeleteConfirmText} setShowDeleteModal={setShowDeleteModal}
           onArchive={archiveProposal} onRestore={restoreProposal}
           onCreateRevision={createRevision}
+          linkedJob={linkedJob} onCreateJob={createLinkedJob}
           canEdit={canEdit}
         />
 

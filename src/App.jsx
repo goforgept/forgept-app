@@ -216,7 +216,7 @@ function App() {
                 ? <TechLog {...sharedProps} />
                 : <Dashboard {...sharedProps} />
             } />
-            <Route path="/admin" element={<AdminDashboard {...sharedProps} />} />
+            <Route path="/admin" element={isTechnician ? <Navigate to="/tech-log" replace /> : <AdminDashboard {...sharedProps} />} />
             <Route path="/rep" element={isTechnician ? <Navigate to="/tech-log" replace /> : <Dashboard {...sharedProps} />} />
             <Route path="/new" element={<PermRoute area="proposals"><NewProposal /></PermRoute>} />
             <Route path="/proposal/:id" element={<PermRoute area="proposals"><ProposalDetail {...sharedProps} /></PermRoute>} />

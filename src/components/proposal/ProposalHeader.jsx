@@ -16,6 +16,7 @@ export default function ProposalHeader({
   editingProposalName, proposalNameDraft, setProposalNameDraft, setEditingProposalName, saveProposalName,
   openEditClientModal, clientAddress, locationName, collaborators, orgProfiles,
   updateStatus, updateStage, pipelineStages = [], onUpdateRep,
+  linkedJob, onCreateJob,
   quoteNumberError, setQuoteNumberError,
   saveQuoteNumber, setEditingQuoteNumber,
   saveContractNumber, setEditingContractNumber,
@@ -206,6 +207,21 @@ export default function ProposalHeader({
               </div>
             )}
           </div>
+
+          {/* Won — linked job chip */}
+          {proposal?.status === 'Won' && (
+            linkedJob ? (
+              <a href={`/jobs/${linkedJob.id}`}
+                className="text-green-400 text-xs font-semibold hover:underline">
+                View Job ({linkedJob.job_number}) →
+              </a>
+            ) : onCreateJob ? (
+              <button onClick={onCreateJob}
+                className="text-[#C8622A] text-xs font-semibold hover:underline">
+                + Create Job
+              </button>
+            ) : null
+          )}
 
           {/* Proposal Sent — sits below stage */}
           <button

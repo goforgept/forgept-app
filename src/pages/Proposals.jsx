@@ -82,7 +82,9 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
     .filter(p => {
       if (showArchived) return true
       const isClosed = p.status === 'Won' || p.status === 'Lost'
-      if (isClosed) {
+      // Only apply the 60-day recency cutoff when browsing All/Active — not when
+      // the user has explicitly filtered to Won or Lost.
+      if (isClosed && statusFilter !== p.status) {
         const refDate = new Date(p.close_date || p.created_at)
         if (refDate < sixtyDaysAgo) return false
       }

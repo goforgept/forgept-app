@@ -258,9 +258,17 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
   }
 ]
 
-export default function Sidebar({ isAdmin, isDevTeam = false, isProductManager = false, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, featureDesignerOnly = false, featureInventory: featureInventoryProp = false, role = 'rep', isSalesManager = false, isPM = false, isTechnician = false }) {
+export default function Sidebar({ isAdmin: isAdminProp, isDevTeam: isDevTeamProp = false, isProductManager: isProductManagerProp = false, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla: featurSlaProp = false, featureMonitoring: featureMonitoringProp = false, featureDrawingTool = false, featureDesignerOnly = false, featureInventory: featureInventoryProp = false, role = 'rep', isSalesManager: isSalesManagerProp = false, isPM: isPMProp = false, isTechnician: isTechnicianProp = false }) {
   const location = useLocation()
-  const { can, roleName } = usePermissions()
+  const { can, roleName, isAdmin: isAdminHook, isTechnician: isTechnicianHook, isSalesManager: isSalesManagerHook, isPM: isPMHook, isProductManager: isProductManagerHook, isDevTeam: isDevTeamHook } = usePermissions()
+
+  // Prefer hook-derived role values (always accurate); props serve as fallback for early renders
+  const isAdmin        = isAdminHook        || isAdminProp
+  const isTechnician   = isTechnicianHook   || isTechnicianProp
+  const isSalesManager = isSalesManagerHook || isSalesManagerProp
+  const isPM           = isPMHook           || isPMProp
+  const isProductManager = isProductManagerHook || isProductManagerProp
+  const isDevTeam      = isDevTeamHook      || isDevTeamProp
   const [userId, setUserId] = useState(null)
   const [orgType, setOrgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
   const featureSla = featurSlaProp || sessionStorage.getItem('featureSla') === 'true'
