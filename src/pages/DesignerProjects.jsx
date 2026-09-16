@@ -53,30 +53,38 @@ export default function DesignerProjects({ isAdmin, featureProposals, featureCRM
       const { data: { user } } = await supabase.auth.getUser()
       const { data: profile }  = await supabase
         .from('profiles')
-        .select('org_id')
+        .select('org_id, id, org_role')
         .eq('id', user.id)
         .single()
 
-      // Load all drawing sheets with proposal info
+      const isRep = profile.org_role === 'rep'
+
+      // Load drawing sheets for the org
       const { data: sheets } = await supabase
         .from('drawing_sheets')
         .select('id, name, status, proposal_id, sort_order, created_at, last_activity_at')
         .eq('org_id', profile.org_id)
         .order('last_activity_at', { ascending: false })
 
-      // Load all proposals for this org (for "start new drawing" list)
-      const { data: allProposals } = await supabase
+      // Load proposals — reps only see their own (used for "start new drawing" list)
+      let proposalsQuery = supabase
         .from('proposals')
         .select('id, proposal_name, company, client_name, status, created_at')
         .eq('org_id', profile.org_id)
         .order('created_at', { ascending: false })
+      if (isRep) proposalsQuery = proposalsQuery.eq('user_id', profile.id)
+      const { data: allProposals } = await proposalsQuery
 
       setProposals(allProposals || [])
 
-      // Group sheets by proposal_id
+      // Build a set of proposal IDs the current user can see
+      const allowedProposalIds = new Set((allProposals || []).map(p => p.id))
+
+      // Group sheets by proposal_id — reps only see sheets tied to their proposals
       const grouped = {}
       ;(sheets || []).forEach(sheet => {
         const key = sheet.proposal_id || 'standalone'
+        if (isRep && sheet.proposal_id && !allowedProposalIds.has(sheet.proposal_id)) return
         if (!grouped[key]) grouped[key] = []
         grouped[key].push(sheet)
       })
