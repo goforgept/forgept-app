@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 import JobStagesModal from '../components/jobs/JobStagesModal'
 
 // Kept as export for JobDetail fallback; DB-driven stages take precedence
@@ -29,6 +30,7 @@ const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits:
 export default function Jobs({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, isTechnician = false, featureInventory = false, isSalesManager = false, isPM = false }) {
   const navigate = useNavigate()
   const { profile } = useProfile()
+  const { canWrite } = usePermissions()
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -230,7 +232,10 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
         {loading ? (
           <p className="text-fp-muted">Loading...</p>
         ) : view === 'board' ? (
-          <KanbanBoard jobs={filtered} jobStages={jobStages} onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}
+          <KanbanBoard jobs={filtered} jobStages={jobStages}
+            onDragStart={canWrite('jobs') ? onDragStart : undefined}
+            onDragOver={canWrite('jobs') ? onDragOver : undefined}
+            onDrop={canWrite('jobs') ? onDrop : undefined}
             jobUrl={jobUrl} navigate={navigate} getProgress={getProgress} isAdmin={isAdmin}
             onArchive={archiveJob} onRestore={restoreJob} onDelete={deleteJob} showArchived={showArchived} />
         ) : (
@@ -335,9 +340,9 @@ function KanbanBoard({ jobs, jobStages, onDragStart, onDragOver, onDrop, jobUrl,
       <div className="flex gap-4" style={{ minWidth: `${jobStages.length * 252}px` }}>
         {columns.map(col => (
           <div key={col.key}
-            onDragOver={e => { onDragOver(e); setDragOver(col.key) }}
-            onDragLeave={() => setDragOver(null)}
-            onDrop={e => { onDrop(e, col.key); setDragOver(null) }}
+            onDragOver={onDragOver ? e => { onDragOver(e); setDragOver(col.key) } : undefined}
+            onDragLeave={onDragOver ? () => setDragOver(null) : undefined}
+            onDrop={onDrop ? e => { onDrop(e, col.key); setDragOver(null) } : undefined}
             className={`flex flex-col w-60 min-w-[240px] rounded-xl transition-colors ${dragOver === col.key ? 'bg-fp-brand/10 ring-2 ring-fp-brand/30' : 'bg-fp-card/50'}`}>
             {/* Column header */}
             <div className="px-3 py-3 border-b border-fp-border flex items-center justify-between">
@@ -355,8 +360,8 @@ function KanbanBoard({ jobs, jobStages, onDragStart, onDragOver, onDrop, jobUrl,
                 const progress = getProgress(job)
                 return (
                   <div key={job.id}
-                    draggable
-                    onDragStart={e => onDragStart(e, job)}
+                    draggable={!!onDragStart}
+                    onDragStart={onDragStart ? e => onDragStart(e, job) : undefined}
                     onClick={() => navigate(jobUrl(job))}
                     className="bg-fp-card rounded-lg p-3 cursor-pointer hover:bg-fp-hover transition-colors border border-fp-border hover:border-fp-brand/30 group active:opacity-60 select-none">
                     {job.job_number && (
