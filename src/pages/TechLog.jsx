@@ -654,42 +654,56 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
         {isTechnician && upcomingSchedules.length > 0 && (
           <div className="bg-fp-card rounded-xl p-5">
-            <p className="text-fp-text font-semibold text-sm mb-3">My Upcoming Schedule</p>
-            <div className="space-y-2">
-              {upcomingSchedules.map((s, i) => {
-                const isJob = s.type === 'job'
-                const title = isJob ? s.jobs?.name : s.title
-                const client = isJob ? s.jobs?.clients : s.clients
-                const loc = !isJob && s.location_id ? s.client_locations : null
-                const addrSrc = loc || client
-                const addr = [addrSrc?.address, addrSrc?.city, addrSrc?.state].filter(Boolean).join(', ')
-                const addrLabel = loc?.site_name ? `${loc.site_name} — ${addr}` : addr
-                const dateLabel = new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                const isToday = s.date === new Date().toISOString().split('T')[0]
-                const viewHref = isJob ? `/tech/job/${s.jobs?.id}` : `/service-tickets/${s.id}`
-                return (
-                  <div key={i} className={`flex items-start gap-3 rounded-lg px-4 py-3 ${isToday ? 'bg-fp-brand/10 border border-fp-brand/30' : 'bg-fp-inset'}`}>
-                    <div className="flex-shrink-0 text-center min-w-[52px]">
-                      <p className={`text-xs font-semibold ${isToday ? 'text-fp-brand' : 'text-fp-muted'}`}>{isToday ? 'TODAY' : dateLabel.split(',')[0]}</p>
-                      <p className={`text-sm font-bold ${isToday ? 'text-fp-brand' : 'text-fp-text'}`}>{dateLabel.split(',').slice(1).join(',').trim()}</p>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${isJob ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
-                          {isJob ? 'Job' : 'Ticket'}
-                        </span>
-                        <p className="text-fp-text text-sm font-semibold truncate">{title}</p>
+            <p className="text-fp-text font-semibold text-sm mb-4">My Upcoming Schedule</p>
+            <div className="space-y-5">
+              {(() => {
+                const today = new Date().toISOString().split('T')[0]
+                const byDay = upcomingSchedules.reduce((acc, s) => {
+                  if (!acc[s.date]) acc[s.date] = []
+                  acc[s.date].push(s)
+                  return acc
+                }, {})
+                return Object.entries(byDay).map(([date, items]) => {
+                  const isToday = date === today
+                  const dateLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+                  return (
+                    <div key={date}>
+                      <div className={`flex items-center gap-2 mb-2 pb-1.5 border-b ${isToday ? 'border-fp-brand/40' : 'border-fp-border'}`}>
+                        {isToday && <span className="text-[10px] bg-fp-brand text-white px-2 py-0.5 rounded-full font-semibold uppercase tracking-wide">Today</span>}
+                        <p className={`text-sm font-bold ${isToday ? 'text-fp-brand' : 'text-fp-text'}`}>{dateLabel}</p>
                       </div>
-                      {client?.company && <p className="text-fp-muted text-xs mt-0.5">🏢 {client.company}</p>}
-                      {addr && (
-                        <a href={`https://maps.google.com/?q=${encodeURIComponent(addr)}`} target="_blank" rel="noreferrer"
-                          className="text-[#C8622A] text-xs hover:underline">📍 {addrLabel}</a>
-                      )}
+                      <div className="space-y-2 pl-1">
+                        {items.map((s, i) => {
+                          const isJob = s.type === 'job'
+                          const title = isJob ? s.jobs?.name : s.title
+                          const client = isJob ? s.jobs?.clients : s.clients
+                          const loc = !isJob && s.location_id ? s.client_locations : null
+                          const addrSrc = loc || client
+                          const addr = [addrSrc?.address, addrSrc?.city, addrSrc?.state].filter(Boolean).join(', ')
+                          const addrLabel = loc?.site_name ? `${loc.site_name} — ${addr}` : addr
+                          const viewHref = isJob ? `/tech/job/${s.jobs?.id}` : `/service-tickets/${s.id}`
+                          return (
+                            <div key={i} className="flex items-start gap-3 bg-fp-inset rounded-lg px-3 py-2.5">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold mt-0.5 flex-shrink-0 ${isJob ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
+                                {isJob ? 'Job' : 'Ticket'}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-fp-text text-sm font-semibold truncate">{title}</p>
+                                {client?.company && <p className="text-fp-muted text-xs mt-0.5">🏢 {client.company}</p>}
+                                {addr && (
+                                  <a href={`https://maps.google.com/?q=${encodeURIComponent(addr)}`} target="_blank" rel="noreferrer"
+                                    className="text-[#C8622A] text-xs hover:underline">📍 {addrLabel}</a>
+                                )}
+                              </div>
+                              <a href={viewHref} className="text-fp-muted hover:text-fp-brand text-xs transition-colors flex-shrink-0 self-center">View →</a>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
-                    <a href={viewHref} className="text-fp-muted hover:text-fp-brand text-xs transition-colors flex-shrink-0 self-center">View →</a>
-                  </div>
-                )
-              })}
+                  )
+                })
+              })()}
             </div>
           </div>
         )}
