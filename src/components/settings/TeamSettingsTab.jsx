@@ -1,6 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../supabase'
-import { PERMISSION_AREAS, SCOPEABLE_AREAS } from '../../hooks/usePermissions'
+import { PERMISSION_AREAS, SCOPEABLE_AREAS, TECH_DEFAULT_PERMISSIONS } from '../../hooks/usePermissions'
+
+function effectiveDefault(baseRole, areaKey) {
+  if (baseRole === 'technician') return TECH_DEFAULT_PERMISSIONS[areaKey] ?? 'none'
+  return 'write'
+}
 
 // Default role templates seeded for every new org (editable per org)
 const DEFAULT_ROLE_TEMPLATES = [
@@ -107,7 +112,7 @@ function ScopeToggle({ value, onChange, disabled }) {
 }
 
 // ── Permission matrix for role editing ────────────────────────────────────────
-function PermissionMatrix({ permissions, scopes, onChange, onScopeChange, isAdminRole }) {
+function PermissionMatrix({ permissions, scopes, onChange, onScopeChange, isAdminRole, baseRole = 'rep' }) {
   const grouped = useMemo(() => {
     const groups = {}
     for (const area of PERMISSION_AREAS) {
@@ -129,7 +134,7 @@ function PermissionMatrix({ permissions, scopes, onChange, onScopeChange, isAdmi
           <p className="text-fp-muted text-xs font-semibold uppercase tracking-wider mb-2">{group}</p>
           <div className="space-y-1">
             {areas.map(area => {
-              const level = isAdminRole ? 'write' : (permissions[area.key] ?? 'write')
+              const level = isAdminRole ? 'write' : (permissions[area.key] ?? effectiveDefault(baseRole, area.key))
               const scopeable = SCOPEABLE_AREAS.has(area.key)
               const showScope = scopeable && level !== 'none'
               return (
@@ -324,6 +329,7 @@ function RoleModal({ role, orgId, onSave, onClose }) {
               permissions={form.permissions}
               scopes={form.scopes}
               isAdminRole={form.is_admin}
+              baseRole={form.base_role}
               onChange={(key, val) => setForm(p => ({ ...p, permissions: { ...p.permissions, [key]: val } }))}
               onScopeChange={(key, val) => setForm(p => ({ ...p, scopes: { ...p.scopes, [key]: val } }))}
             />
@@ -406,7 +412,10 @@ function MemberModal({ member, roles, onSave, onClose }) {
   }
 
   const rolePerms = selectedRole
-    ? { ...Object.fromEntries(PERMISSION_AREAS.map(a => [a.key, 'write'])), ...(selectedRole.permissions || {}) }
+    ? {
+        ...Object.fromEntries(PERMISSION_AREAS.map(a => [a.key, effectiveDefault(selectedRole.base_role, a.key)])),
+        ...(selectedRole.permissions || {}),
+      }
     : null
   const roleScopes = selectedRole?.scopes || null
 
@@ -820,8 +829,8 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
           {roles.map(role => {
             const memberCount = roleMemberCount(role.id)
             const areaCount = PERMISSION_AREAS.length
-            const noneCount = role.is_admin ? 0 : PERMISSION_AREAS.filter(a => (role.permissions?.[a.key] ?? 'write') === 'none').length
-            const readCount = role.is_admin ? 0 : PERMISSION_AREAS.filter(a => (role.permissions?.[a.key] ?? 'write') === 'read').length
+            const noneCount = role.is_admin ? 0 : PERMISSION_AREAS.filter(a => (role.permissions?.[a.key] ?? effectiveDefault(role.base_role, a.key)) === 'none').length
+            const readCount = role.is_admin ? 0 : PERMISSION_AREAS.filter(a => (role.permissions?.[a.key] ?? effectiveDefault(role.base_role, a.key)) === 'read').length
             return (
               <div key={role.id} className="bg-fp-card border border-fp-border rounded-xl p-4">
                 <div className="flex items-start justify-between gap-3">

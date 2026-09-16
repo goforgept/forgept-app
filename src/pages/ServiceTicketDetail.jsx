@@ -737,7 +737,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                   <button onClick={() => setConfirmDelete(false)} className="text-fp-muted hover:text-fp-text text-xs px-3 py-1.5 transition-colors">Cancel</button>
                 </div>
               ) : (
-                canWrite('serviceTickets') && <button onClick={() => setConfirmDelete(true)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Delete</button>
+                canWrite('serviceTickets') && !isTechnician && <button onClick={() => setConfirmDelete(true)} className="text-fp-muted hover:text-red-400 text-xs transition-colors">Delete</button>
               )}
             </div>
           </div>

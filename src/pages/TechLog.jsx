@@ -124,14 +124,26 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
 
     if (isTechnician && profile?.id) {
       const today = new Date().toISOString().split('T')[0]
-      const { data: schedData } = await supabase
-        .from('job_tech_schedules')
-        .select('date, jobs(id, name, job_number, status, clients(company, address, city, state, zip))')
-        .eq('tech_id', profile.id)
-        .gte('date', today)
-        .order('date', { ascending: true })
-        .limit(10)
-      setUpcomingSchedules(schedData || [])
+      const [{ data: jobSched }, { data: ticketSched }] = await Promise.all([
+        supabase
+          .from('job_tech_schedules')
+          .select('date, jobs(id, name, job_number, status, clients(company, address, city, state, zip))')
+          .eq('tech_id', profile.id)
+          .gte('date', today)
+          .order('date', { ascending: true })
+          .limit(10),
+        supabase
+          .from('service_tickets')
+          .select('id, title, scheduled_date, clients(company, address, city, state, zip)')
+          .eq('assigned_tech_id', profile.id)
+          .gte('scheduled_date', today)
+          .order('scheduled_date', { ascending: true })
+          .limit(10),
+      ])
+      const jobs = (jobSched || []).map(s => ({ date: s.date, type: 'job', ...s }))
+      const tickets = (ticketSched || []).map(t => ({ date: t.scheduled_date, type: 'ticket', ...t }))
+      const merged = [...jobs, ...tickets].sort((a, b) => a.date.localeCompare(b.date))
+      setUpcomingSchedules(merged)
     }
 
     setLoading(false)
@@ -645,10 +657,13 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
             <p className="text-fp-text font-semibold text-sm mb-3">My Upcoming Schedule</p>
             <div className="space-y-2">
               {upcomingSchedules.map((s, i) => {
-                const job = s.jobs
-                const addr = [job?.clients?.address, job?.clients?.city, job?.clients?.state].filter(Boolean).join(', ')
+                const isJob = s.type === 'job'
+                const title = isJob ? s.jobs?.name : s.title
+                const client = isJob ? s.jobs?.clients : s.clients
+                const addr = [client?.address, client?.city, client?.state].filter(Boolean).join(', ')
                 const dateLabel = new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
                 const isToday = s.date === new Date().toISOString().split('T')[0]
+                const viewHref = isJob ? `/tech/job/${s.jobs?.id}` : `/service-tickets/${s.id}`
                 return (
                   <div key={i} className={`flex items-start gap-3 rounded-lg px-4 py-3 ${isToday ? 'bg-fp-brand/10 border border-fp-brand/30' : 'bg-fp-inset'}`}>
                     <div className="flex-shrink-0 text-center min-w-[52px]">
@@ -656,16 +671,19 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                       <p className={`text-sm font-bold ${isToday ? 'text-fp-brand' : 'text-fp-text'}`}>{dateLabel.split(',').slice(1).join(',').trim()}</p>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-fp-text text-sm font-semibold truncate">{job?.name}</p>
-                      {job?.clients?.company && <p className="text-fp-muted text-xs">🏢 {job.clients.company}</p>}
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${isJob ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}`}>
+                          {isJob ? 'Job' : 'Ticket'}
+                        </span>
+                        <p className="text-fp-text text-sm font-semibold truncate">{title}</p>
+                      </div>
+                      {client?.company && <p className="text-fp-muted text-xs mt-0.5">🏢 {client.company}</p>}
                       {addr && (
                         <a href={`https://maps.google.com/?q=${encodeURIComponent(addr)}`} target="_blank" rel="noreferrer"
                           className="text-[#C8622A] text-xs hover:underline">📍 {addr}</a>
                       )}
                     </div>
-                    {job?.id && (
-                      <a href={`/tech/job/${job.id}`} className="text-fp-muted hover:text-fp-brand text-xs transition-colors flex-shrink-0 self-center">View →</a>
-                    )}
+                    <a href={viewHref} className="text-fp-muted hover:text-fp-brand text-xs transition-colors flex-shrink-0 self-center">View →</a>
                   </div>
                 )
               })}

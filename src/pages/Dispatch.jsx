@@ -46,6 +46,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
   const navigate = useNavigate()
   const { profile } = useProfile()
   const { canWrite } = usePermissions()
+  const canEdit = canWrite('dispatch')
   const [tickets, setTickets] = useState([])
   const [jobs, setJobs] = useState([])
   const [jobSchedules, setJobSchedules] = useState([])
@@ -145,11 +146,13 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
     jobSchedules.filter(s => s.tech_id === techId && s.date === date)
 
   const handleDragStart = (e, ticketId) => {
+    if (!canEdit) return
     setDragging({ ticketId })
     e.dataTransfer.effectAllowed = 'move'
   }
 
   const handleDragOver = (e, techId, date) => {
+    if (!canEdit) return
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
     setDragOver({ techId, date })
@@ -157,7 +160,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
 
   const handleDrop = async (e, techId, date) => {
     e.preventDefault()
-    if (!dragging) return
+    if (!dragging || !canEdit) return
     setSaving(true)
     const updates = techId
       ? { assigned_tech_id: techId, scheduled_date: date || selectedDate }
@@ -398,7 +401,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                       </div>
                     ) : (
                       unassignedTickets.map(ticket => (
-                        <TicketCard key={ticket.id} ticket={ticket} selectedDate={selectedDate} onDragStart={handleDragStart} onClick={() => openTicketModal(ticket)} />
+                        <TicketCard key={ticket.id} ticket={ticket} selectedDate={selectedDate} onDragStart={handleDragStart} onClick={() => openTicketModal(ticket)} canDrag={canEdit} />
                       ))
                     )}
                   </div>
@@ -431,7 +434,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                           techTickets
                             .sort((a, b) => (a.scheduled_time || '99:99').localeCompare(b.scheduled_time || '99:99'))
                             .map(ticket => (
-                              <TicketCard key={ticket.id} ticket={ticket} selectedDate={selectedDate} onDragStart={handleDragStart} onClick={() => openTicketModal(ticket)} />
+                              <TicketCard key={ticket.id} ticket={ticket} selectedDate={selectedDate} onDragStart={handleDragStart} onClick={() => openTicketModal(ticket)} canDrag={canEdit} />
                             ))
                         )}
                       </div>
@@ -456,10 +459,10 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                     {unassignedTickets.map(ticket => (
                       <div
                         key={ticket.id}
-                        draggable
-                        onDragStart={e => handleDragStart(e, ticket.id)}
+                        draggable={canEdit}
+                        onDragStart={canEdit ? e => handleDragStart(e, ticket.id) : undefined}
                         onClick={() => openTicketModal(ticket)}
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-grab active:cursor-grabbing hover:border-fp-brand/40 transition-colors ${STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg border hover:border-fp-brand/40 transition-colors ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${PRIORITY_DOT[ticket.priority] || PRIORITY_DOT.Normal}`} />
                         <div>
                           <p className="text-fp-text text-xs font-medium">{ticket.title}</p>
@@ -535,10 +538,10 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                                 ))}
                                 {dayTickets.map(ticket => (
                                   <div key={ticket.id}
-                                    draggable
-                                    onDragStart={e => handleDragStart(e, ticket.id)}
+                                    draggable={canEdit}
+                                    onDragStart={canEdit ? e => handleDragStart(e, ticket.id) : undefined}
                                     onClick={() => openTicketModal(ticket)}
-                                    className="bg-green-500/10 border border-green-500/30 rounded p-1.5 text-xs cursor-grab hover:bg-green-500/20 transition-colors">
+                                    className={`bg-green-500/10 border border-green-500/30 rounded p-1.5 text-xs hover:bg-green-500/20 transition-colors ${canEdit ? 'cursor-grab' : 'cursor-pointer'}`}>
                                     <p className="text-green-300 font-semibold truncate">🎫 {ticket.title}</p>
                                     <div className="flex items-center gap-1 mt-0.5">
                                       {ticket.scheduled_time && <p className="text-green-400/70">{ticket.scheduled_time.slice(0, 5)}</p>}
@@ -703,9 +706,9 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                 <button onClick={() => navigate(`/service-tickets/${selectedTicket.id}`)}
                   className="px-4 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">View Ticket →</button>
                 <button onClick={() => setShowTicketModal(false)} className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">Cancel</button>
-                <button onClick={saveTicketAssignment} disabled={saving || !canWrite('serviceTickets')}
+                <button onClick={saveTicketAssignment} disabled={saving || !canEdit}
                   className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                  {saving ? 'Saving...' : 'Save'}
+                  {saving ? 'Saving...' : canEdit ? 'Save' : 'Read Only'}
                 </button>
               </div>
             </div>
@@ -822,7 +825,7 @@ function JobBlock({ schedule, onRemove, onNavigate, canRemove = true }) {
   )
 }
 
-function TicketCard({ ticket, selectedDate, onDragStart, onClick }) {
+function TicketCard({ ticket, selectedDate, onDragStart, onClick, canDrag = true }) {
   const today = new Date().toISOString().split('T')[0]
   const isOtherDay = ticket.scheduled_date && ticket.scheduled_date !== selectedDate
   const isPastDue = ticket.scheduled_date && ticket.scheduled_date < today
@@ -832,10 +835,10 @@ function TicketCard({ ticket, selectedDate, onDragStart, onClick }) {
 
   return (
     <div
-      draggable
-      onDragStart={e => onDragStart(e, ticket.id)}
+      draggable={canDrag}
+      onDragStart={canDrag ? e => onDragStart(e, ticket.id) : undefined}
       onClick={onClick}
-      className={`p-3 rounded-lg border cursor-grab active:cursor-grabbing hover:border-fp-brand/40 transition-colors ${isPastDue ? 'border-red-500/50 bg-red-500/5' : isOtherDay ? 'border-fp-border bg-fp-inset/60 opacity-70' : STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>
+      className={`p-3 rounded-lg border hover:border-fp-brand/40 transition-colors ${canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'} ${isPastDue ? 'border-red-500/50 bg-red-500/5' : isOtherDay ? 'border-fp-border bg-fp-inset/60 opacity-70' : STATUS_COLORS[ticket.status] || STATUS_COLORS.Open}`}>
       <div className="flex items-start gap-2">
         <div className={`w-2 h-2 rounded-full flex-shrink-0 mt-1 ${PRIORITY_DOT[ticket.priority] || PRIORITY_DOT.Normal}`} />
         <div className="flex-1 min-w-0">

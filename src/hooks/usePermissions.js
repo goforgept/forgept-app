@@ -30,7 +30,7 @@ const DEFAULT_ALL_WRITE = Object.fromEntries(
 )
 
 // Default permissions for the technician base role
-const TECH_DEFAULT_PERMISSIONS = Object.fromEntries(
+export const TECH_DEFAULT_PERMISSIONS = Object.fromEntries(
   PERMISSION_AREAS.map(a => [a.key, 'none'])
 )
 Object.assign(TECH_DEFAULT_PERMISSIONS, {
@@ -40,10 +40,10 @@ Object.assign(TECH_DEFAULT_PERMISSIONS, {
   settings: 'write', // own profile/password
 })
 
-// Default scopes for technicians — own assigned records only
+// Default scopes for technicians — admins can restrict to 'own' via role settings
 const TECH_DEFAULT_SCOPES = {
-  jobs: 'own',
-  serviceTickets: 'own',
+  jobs: 'all',
+  serviceTickets: 'all',
 }
 
 export function computePermissions(orgRole, overrides, isAdmin) {
@@ -69,8 +69,14 @@ export function usePermissions() {
   const isAdmin = profile?.org_role === 'admin' || profile?.role === 'admin'
   const baseRole = profile?.org_roles?.base_role || profile?.org_role || profile?.role || 'rep'
 
-  const perms  = computePermissions(profile?.org_roles, profile?.permission_overrides, isAdmin)
-  const scopes = computeScopes(profile?.org_roles, profile?.scope_overrides, isAdmin)
+  // Augment orgRole with base_role from profile.role when org_roles doesn't have one
+  // so computePermissions detects the technician baseline even without a custom role record
+  const orgRoleWithBase = profile?.org_roles
+    ? (profile.org_roles.base_role ? profile.org_roles : { ...profile.org_roles, base_role: profile?.org_role || profile?.role })
+    : null
+
+  const perms  = computePermissions(orgRoleWithBase, profile?.permission_overrides, isAdmin)
+  const scopes = computeScopes(orgRoleWithBase, profile?.scope_overrides, isAdmin)
 
   return {
     isAdmin,
