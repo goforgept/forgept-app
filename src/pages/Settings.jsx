@@ -545,7 +545,11 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
   const inputClass = "w-full bg-fp-bg text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
   const navGroups = [
-    { items: [{ key: 'general', label: 'General' }, { key: 'proposals', label: 'Proposals' }, { key: 'security', label: 'Security' }] },
+    { items: [
+      { key: 'general', label: 'General' },
+      ...(!isTechnician ? [{ key: 'proposals', label: 'Proposals' }] : []),
+      { key: 'security', label: 'Security' },
+    ] },
     ...(isAdmin && !featureDesignerOnly ? [{
       label: 'Admin',
       items: [
