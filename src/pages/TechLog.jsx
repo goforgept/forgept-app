@@ -134,7 +134,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
           .limit(10),
         supabase
           .from('service_tickets')
-          .select('id, title, scheduled_date, clients(company, address, city, state, zip)')
+          .select('id, title, scheduled_date, location_id, client_locations(site_name, address, city, state), clients(company, address, city, state, zip)')
           .eq('assigned_tech_id', profile.id)
           .gte('scheduled_date', today)
           .order('scheduled_date', { ascending: true })
@@ -660,7 +660,10 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                 const isJob = s.type === 'job'
                 const title = isJob ? s.jobs?.name : s.title
                 const client = isJob ? s.jobs?.clients : s.clients
-                const addr = [client?.address, client?.city, client?.state].filter(Boolean).join(', ')
+                const loc = !isJob && s.location_id ? s.client_locations : null
+                const addrSrc = loc || client
+                const addr = [addrSrc?.address, addrSrc?.city, addrSrc?.state].filter(Boolean).join(', ')
+                const addrLabel = loc?.site_name ? `${loc.site_name} — ${addr}` : addr
                 const dateLabel = new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
                 const isToday = s.date === new Date().toISOString().split('T')[0]
                 const viewHref = isJob ? `/tech/job/${s.jobs?.id}` : `/service-tickets/${s.id}`
@@ -680,7 +683,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                       {client?.company && <p className="text-fp-muted text-xs mt-0.5">🏢 {client.company}</p>}
                       {addr && (
                         <a href={`https://maps.google.com/?q=${encodeURIComponent(addr)}`} target="_blank" rel="noreferrer"
-                          className="text-[#C8622A] text-xs hover:underline">📍 {addr}</a>
+                          className="text-[#C8622A] text-xs hover:underline">📍 {addrLabel}</a>
                       )}
                     </div>
                     <a href={viewHref} className="text-fp-muted hover:text-fp-brand text-xs transition-colors flex-shrink-0 self-center">View →</a>

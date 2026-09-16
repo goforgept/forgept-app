@@ -64,7 +64,7 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
 
     const { data: ticketData } = await supabase
       .from('service_tickets')
-      .select('*, clients(id, company, client_name, email), profiles!service_tickets_assigned_tech_id_fkey(full_name, email), jobs(id, name, job_number), client_contacts(id, full_name, title)')
+      .select('*, clients(id, company, client_name, email, address, city, state, zip), profiles!service_tickets_assigned_tech_id_fkey(full_name, email), jobs(id, name, job_number), client_contacts(id, full_name, title)')
       .eq('id', id)
       .single()
     setTicket(ticketData)
@@ -697,6 +697,30 @@ export default function ServiceTicketDetail({ isAdmin, featureProposals = true, 
                   <button onClick={() => navigate(`/jobs/${ticket.jobs.id}`)} className="text-fp-muted text-sm hover:text-[#C8622A] transition-colors">🔨 {ticket.jobs.job_number ? `${ticket.jobs.job_number} — ` : ''}{ticket.jobs.name}</button>
                 )}
               </div>
+              {(() => {
+                const loc = ticket.location_id ? clientLocations.find(l => l.id === ticket.location_id) : null
+                const addr = loc
+                  ? [loc.address, loc.city, loc.state].filter(Boolean).join(', ')
+                  : [ticket.clients?.address, ticket.clients?.city, ticket.clients?.state].filter(Boolean).join(', ')
+                const poc = ticket.contact_id ? clientContacts.find(c => c.id === ticket.contact_id) : null
+                return (
+                  <div className="flex flex-col gap-1 mt-1.5">
+                    {addr && (
+                      <a href={`https://maps.google.com/?q=${encodeURIComponent(addr)}`} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[#C8622A] text-sm hover:underline">
+                        📍 {loc?.site_name ? `${loc.site_name} — ${addr}` : addr}
+                      </a>
+                    )}
+                    {poc && (
+                      <div className="flex items-center gap-2 flex-wrap text-sm text-fp-muted">
+                        <span>👤 {poc.full_name}{poc.title ? ` · ${poc.title}` : ''}</span>
+                        {poc.phone && <a href={`tel:${poc.phone}`} className="text-fp-brand hover:underline">{poc.phone}</a>}
+                        {poc.email && <a href={`mailto:${poc.email}`} className="text-fp-brand hover:underline">{poc.email}</a>}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
             <div>
               <div className="flex flex-col gap-2 mb-3">

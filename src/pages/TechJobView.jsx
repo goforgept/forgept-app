@@ -15,6 +15,7 @@ export default function TechJobView({ isAdmin, featureProposals = true, featureC
   const [techLogs, setTechLogs] = useState([])
   const [jobSchedules, setJobSchedules] = useState([])
   const [orgProfiles, setOrgProfiles] = useState([])
+  const [primaryContact, setPrimaryContact] = useState(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
 
@@ -27,6 +28,17 @@ export default function TechJobView({ isAdmin, featureProposals = true, featureC
       .eq('id', id)
       .single()
     setJob(jobData)
+
+    if (jobData?.client_id) {
+      const { data: contactData } = await supabase
+        .from('client_contacts')
+        .select('id, full_name, title, phone, email')
+        .eq('client_id', jobData.client_id)
+        .order('is_primary', { ascending: false })
+        .limit(1)
+        .single()
+      setPrimaryContact(contactData || null)
+    }
 
     if (profile?.org_id) {
       const { data: profilesData } = await supabase
@@ -147,6 +159,13 @@ export default function TechJobView({ isAdmin, featureProposals = true, featureC
                   </a>
                 ) : null
               })()}
+              {primaryContact && (
+                <div className="flex items-center gap-2 flex-wrap mt-1 text-sm text-fp-muted">
+                  <span>👤 {primaryContact.full_name}{primaryContact.title ? ` · ${primaryContact.title}` : ''}</span>
+                  {primaryContact.phone && <a href={`tel:${primaryContact.phone}`} className="text-fp-brand hover:underline">{primaryContact.phone}</a>}
+                  {primaryContact.email && <a href={`mailto:${primaryContact.email}`} className="text-fp-brand hover:underline">{primaryContact.email}</a>}
+                </div>
+              )}
               <div className="flex items-center gap-4 mt-2 text-sm text-fp-muted">
                 {job?.profiles?.full_name && (
                   <span>👤 PM: <span className="text-fp-text">{job.profiles.full_name}</span></span>
