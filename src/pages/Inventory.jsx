@@ -215,7 +215,7 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
             <table className="w-full text-sm min-w-[720px]">
               <thead>
                 <tr className="border-b border-fp-border">
-                  {['Part #', 'Description', 'Warehouse', 'On Hand', 'Reserved', 'Available', 'Unit Cost', ''].map(h => (
+                  {['Part #', 'Description', 'Warehouse', 'On Hand', 'Reserved', 'Available', ...(!isTechnician ? ['Unit Cost'] : []), ''].map(h => (
                     <th key={h} className="text-left text-fp-muted text-xs uppercase tracking-wide px-4 py-3 font-semibold">{h}</th>
                   ))}
                 </tr>
@@ -243,7 +243,7 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
                       <td className="px-4 py-3 tabular-nums">
                         <span className={`font-bold ${available <= 0 ? 'text-red-400' : isLow ? 'text-yellow-400' : 'text-green-400'}`}>{available}</span>
                       </td>
-                      <td className="px-4 py-3 text-fp-muted tabular-nums">${(parseFloat(item.unit_cost) || 0).toFixed(2)}</td>
+                      {!isTechnician && <td className="px-4 py-3 text-fp-muted tabular-nums">${(parseFloat(item.unit_cost) || 0).toFixed(2)}</td>}
                       <td className="px-4 py-3">
                         <div className="flex gap-1">
                           <button onClick={() => canWrite('inventory') && setShowAdjust(item)}
@@ -298,10 +298,12 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
                   <label className="text-fp-muted text-xs mb-1 block">Qty on Hand</label>
                   <input type="number" min="0" step="1" value={itemForm.qty_on_hand} onChange={e => setItemForm(p => ({ ...p, qty_on_hand: e.target.value }))} className={inputClass} placeholder="0" />
                 </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Unit Cost ($)</label>
-                  <input type="number" min="0" step="0.01" value={itemForm.unit_cost} onChange={e => setItemForm(p => ({ ...p, unit_cost: e.target.value }))} className={inputClass} placeholder="0.00" />
-                </div>
+                {!isTechnician && (
+                  <div>
+                    <label className="text-fp-muted text-xs mb-1 block">Unit Cost ($)</label>
+                    <input type="number" min="0" step="0.01" value={itemForm.unit_cost} onChange={e => setItemForm(p => ({ ...p, unit_cost: e.target.value }))} className={inputClass} placeholder="0.00" />
+                  </div>
+                )}
                 <div className="col-span-2">
                   <label className="text-fp-muted text-xs mb-1 block">Min Stock Level (for low-stock alert)</label>
                   <input type="number" min="0" step="1" value={itemForm.min_stock_level} onChange={e => setItemForm(p => ({ ...p, min_stock_level: e.target.value }))} className={inputClass} placeholder="0" />
@@ -441,10 +443,12 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
                     {warehouses.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
                   </select>
                 </div>
-                <div>
-                  <label className="text-fp-muted text-xs mb-1 block">Unit Cost ($)</label>
-                  <input type="number" min="0" step="0.01" value={editItemForm.unit_cost} onChange={e => setEditItemForm(p => ({ ...p, unit_cost: e.target.value }))} className={inputClass} />
-                </div>
+                {!isTechnician && (
+                  <div>
+                    <label className="text-fp-muted text-xs mb-1 block">Unit Cost ($)</label>
+                    <input type="number" min="0" step="0.01" value={editItemForm.unit_cost} onChange={e => setEditItemForm(p => ({ ...p, unit_cost: e.target.value }))} className={inputClass} />
+                  </div>
+                )}
                 <div>
                   <label className="text-fp-muted text-xs mb-1 block">Min Stock Level</label>
                   <input type="number" min="0" step="1" value={editItemForm.min_stock_level} onChange={e => setEditItemForm(p => ({ ...p, min_stock_level: e.target.value }))} className={inputClass} />

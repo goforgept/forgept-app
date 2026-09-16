@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -202,6 +203,8 @@ const BLANK_FILTERS = { clients: [], rep: '', industry: '', tech: '', status: ''
 export default function Reports(props) {
   const { profile } = useProfile()
   const navigate    = useNavigate()
+  const { can, canWrite } = usePermissions()
+  const canExport = canWrite('reports')
 
   const orgType   = profile?.organizations?.org_type || 'integrator'
   const navGroups = getNavGroups(orgType)
@@ -236,8 +239,8 @@ export default function Reports(props) {
   const [regionRepNames, setRegionRepNames] = useState(null)
 
   useEffect(() => {
-    if (!props.isAdmin) { navigate('/'); return }
-  }, [props.isAdmin])
+    if (profile && !can('reports')) { navigate('/'); return }
+  }, [profile])
 
   // If orgType loads and the active report is now hidden, reset to first available
   useEffect(() => {
@@ -1077,7 +1080,7 @@ export default function Reports(props) {
               <h1 className="text-fp-text text-2xl font-bold">Reports</h1>
               <p className="text-fp-muted text-sm mt-1">Export data as Excel or PDF</p>
             </div>
-            {activeReport !== 'client_report' && (
+            {activeReport !== 'client_report' && canExport && (
               <div className="flex items-center gap-4">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input

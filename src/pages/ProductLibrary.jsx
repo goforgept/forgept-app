@@ -3,6 +3,7 @@ import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
 import * as XLSX from 'xlsx'
 import { useProfile } from '../context/ProfileContext'
+import { usePermissions } from '../hooks/usePermissions'
 
 const CATEGORIES = ['Electrical','Mechanical','Audio/Visual','Security','Networking','Material','Roofing Materials','Insulation','Windows & Doors','Flooring','Painting & Finishing','Plumbing','HVAC','Solar','Hardware','Other']
 
@@ -20,6 +21,8 @@ const AgeBadge = ({ days }) => {
 
 export default function ProductLibrary({ isAdmin, featureProposals = true, featureCRM = false, featurePurchaseOrders = true, featureInvoices = true, featureSla = false, featureMonitoring = false, isSalesManager = false, isPM = false, isTechnician = false }) {
   const { profile, features } = useProfile()
+  const { canWrite, isTechnician: isTech } = usePermissions()
+  const canEdit = canWrite('productLibrary')
   const featureMsrp = features.msrp
   const featureComplianceFields = features.complianceFields
   const [products, setProducts] = useState([])   // product_library rows
@@ -446,17 +449,19 @@ if (!finalCost) continue
             <h2 className="text-fp-text text-2xl font-bold">Product Library</h2>
             <p className="text-fp-muted text-sm mt-0.5">{products.length} products · {Object.values(pricing).flat().length} vendor prices</p>
           </div>
-          <div className="flex gap-2">
-            <button onClick={downloadTemplate} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">↓ Template</button>
-            <label className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors cursor-pointer">
-              {uploading ? 'Importing...' : '↑ Import Excel'}
-              <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" disabled={uploading} />
-            </label>
-            <button onClick={() => { setShowAddForm(p => !p); setError(null) }}
-              className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-              {showAddForm ? 'Cancel' : '+ Add Product'}
-            </button>
-          </div>
+          {canEdit && (
+            <div className="flex gap-2">
+              <button onClick={downloadTemplate} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">↓ Template</button>
+              <label className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors cursor-pointer">
+                {uploading ? 'Importing...' : '↑ Import Excel'}
+                <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" disabled={uploading} />
+              </label>
+              <button onClick={() => { setShowAddForm(p => !p); setError(null) }}
+                className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                {showAddForm ? 'Cancel' : '+ Add Product'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Import result */}
@@ -476,7 +481,7 @@ if (!finalCost) continue
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
         {/* Add product form */}
-        {showAddForm && (
+        {showAddForm && canEdit && (
           <div className="bg-fp-card rounded-xl p-6">
             <h3 className="text-fp-text font-bold mb-4">New Product</h3>
             <div className="grid grid-cols-3 gap-4 mb-4">
@@ -599,8 +604,8 @@ if (!finalCost) continue
           )}
         </div>
 
-        {/* Pricing freshness legend (library tab only) */}
-        {activeTab === 'library' && (
+        {/* Pricing freshness legend (library tab only, hidden for techs) */}
+        {activeTab === 'library' && !isTech && (
           <div className="flex items-center gap-4 text-xs text-fp-muted">
             <span className="font-semibold">Pricing age:</span>
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-green-400 inline-block" /> &lt; 30 days — Current</span>
@@ -707,19 +712,21 @@ if (!finalCost) continue
                         </div>
                       </div>
                       <div className="flex items-center gap-4 shrink-0">
-                        {vendorPrices.length > 0 ? (
+                        {!isTech && (vendorPrices.length > 0 ? (
                           <div className="text-right">
                             <p className="text-[#C8622A] text-sm font-semibold">{fmt(bestCost)}</p>
                             <p className="text-fp-muted text-xs">best of {vendorPrices.length} vendor{vendorPrices.length !== 1 ? 's' : ''}</p>
                           </div>
                         ) : (
                           <span className="text-fp-muted text-xs">No pricing</span>
+                        ))}
+                        {canEdit && (
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDeleteProduct(p.id) }}
+                            title="Delete product"
+                            className="text-fp-muted hover:text-red-400 text-xs transition-colors px-1"
+                          >✕</button>
                         )}
-                        <button
-                          onClick={e => { e.stopPropagation(); handleDeleteProduct(p.id) }}
-                          title="Delete product"
-                          className="text-fp-muted hover:text-red-400 text-xs transition-colors px-1"
-                        >✕</button>
                         <span className="text-fp-muted text-lg leading-none">{isOpen ? '−' : '+'}</span>
                       </div>
                     </div>
@@ -824,13 +831,15 @@ if (!finalCost) continue
             </div>
           )}
         </div>
-        <button onClick={() => { setEditingProductId(p.id); setEditForm({ item_name: p.item_name, manufacturer: p.manufacturer, part_number: p.part_number, category: p.category, sub_category: p.sub_category || '', unit: p.unit, description: p.description, msrp: p.msrp ?? '', lead_time: p.lead_time || '', country_of_origin: p.country_of_origin || '', berry_compliance: p.berry_compliance || '', is_component: p.is_component || false }) }}
-          className="text-fp-muted hover:text-fp-text text-xs transition-colors">✎ Edit</button>
+        {canEdit && (
+          <button onClick={() => { setEditingProductId(p.id); setEditForm({ item_name: p.item_name, manufacturer: p.manufacturer, part_number: p.part_number, category: p.category, sub_category: p.sub_category || '', unit: p.unit, description: p.description, msrp: p.msrp ?? '', lead_time: p.lead_time || '', country_of_origin: p.country_of_origin || '', berry_compliance: p.berry_compliance || '', is_component: p.is_component || false }) }}
+            className="text-fp-muted hover:text-fp-text text-xs transition-colors">✎ Edit</button>
+        )}
       </div>
     )}
 
-                        {/* Vendor price table */}
-                        {vendorPrices.length > 0 && (
+                        {/* Vendor price table — hidden for techs */}
+                        {!isTech && vendorPrices.length > 0 && (
                           <table className="w-full text-sm mb-3">
                             <thead>
                               <tr className="border-b border-fp-border">
@@ -867,8 +876,8 @@ if (!finalCost) continue
                           </table>
                         )}
 
-                        {/* Add vendor price */}
-                        {addingPriceFor === p.id ? (
+                        {/* Add vendor price — hidden for techs */}
+                        {!isTech && addingPriceFor === p.id ? (
                           <div className="bg-fp-card rounded-lg p-4 space-y-3">
                             <p className="text-fp-text text-xs font-semibold">Add Vendor Price</p>
                             <div className="grid grid-cols-3 gap-3">
@@ -884,10 +893,10 @@ if (!finalCost) continue
                               </button>
                             </div>
                           </div>
-                        ) : (
+                        ) : (!isTech && (
                           <button onClick={() => { setAddingPriceFor(p.id); setPriceForm({ vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] }) }}
                             className="text-[#C8622A] hover:text-fp-text text-xs transition-colors">+ Add vendor price</button>
-                        )}
+                        ))}
                       </div>
                     )}
                   </div>
