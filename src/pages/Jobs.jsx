@@ -68,11 +68,13 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
 
   const fetchJobs = async () => {
     if (!profile?.org_id) { setLoading(false); return }
-    const { data, error } = await supabase
+    let q = supabase
       .from('jobs')
-      .select('*, proposals(proposal_name, proposal_value), clients(company, client_type, first_name, last_name), profiles!jobs_assigned_pm_fkey(full_name), job_checklist_items(id, completed)')
+      .select('*, proposals(proposal_name, proposal_value), clients(company, client_type, first_name, last_name, address, city, state, zip), profiles!jobs_assigned_pm_fkey(full_name), job_checklist_items(id, completed)')
       .eq('org_id', profile.org_id)
       .order('created_at', { ascending: false })
+    if (isTechnician) q = q.or(`tech_id.eq.${profile.id},tech_ids.cs.{${profile.id}}`)
+    const { data, error } = await q
     if (error) console.error('fetchJobs error:', error.message, error.details)
     // Remap legacy 'Active' status (not a valid stage) to 'Pending' in memory
     const mapped = (data || []).map(j => j.status === 'Active' ? { ...j, status: 'Pending' } : j)
@@ -189,12 +191,12 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-4">
+        <div className={`grid gap-4 ${isTechnician ? 'grid-cols-3' : 'grid-cols-4'}`}>
           {[
             { label: 'In Progress', value: (activeByStatus['In Progress'] || 0), color: 'text-green-400' },
             { label: 'Scheduled', value: (activeByStatus['Scheduled'] || 0), color: 'text-purple-400' },
             { label: 'Waiting on Parts', value: (activeByStatus['Waiting on Parts'] || 0), color: 'text-orange-400' },
-            { label: 'Total Value', value: fmt(totalValue), color: 'text-fp-brand' },
+            ...(!isTechnician ? [{ label: 'Total Value', value: fmt(totalValue), color: 'text-fp-brand' }] : []),
           ].map(stat => (
             <div key={stat.label} className="bg-fp-card rounded-xl p-4">
               <p className="text-fp-muted text-xs mb-1">{stat.label}</p>
@@ -237,7 +239,8 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
             onDragOver={canWrite('jobs') ? onDragOver : undefined}
             onDrop={canWrite('jobs') ? onDrop : undefined}
             jobUrl={jobUrl} navigate={navigate} getProgress={getProgress} isAdmin={isAdmin}
-            onArchive={archiveJob} onRestore={restoreJob} onDelete={deleteJob} showArchived={showArchived} />
+            onArchive={archiveJob} onRestore={restoreJob} onDelete={deleteJob} showArchived={showArchived}
+            isTechnician={isTechnician} />
         ) : (
           filtered.length === 0 ? (
             <div className="text-center py-16 bg-fp-card rounded-xl border-2 border-dashed border-fp-border">
@@ -257,15 +260,19 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
                           {job.job_number && <span className="text-fp-muted text-xs font-mono bg-fp-inset px-2 py-0.5 rounded">{job.job_number}</span>}
                           <h3 className="text-fp-text font-semibold group-hover:text-fp-brand transition-colors">{job.name}</h3>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-fp-muted">
+                        <div className="flex items-center gap-4 text-sm text-fp-muted flex-wrap">
                           {job.clients?.company && <span>🏢 {job.clients.company}</span>}
                           {job.profiles?.full_name && <span>👤 {job.profiles.full_name}</span>}
                           {job.start_date && <span>📅 {new Date(job.start_date).toLocaleDateString()}</span>}
                           {job.end_date && <span>→ {new Date(job.end_date).toLocaleDateString()}</span>}
+                          {isTechnician && (() => {
+                            const addr = [job.clients?.address, job.clients?.city, job.clients?.state].filter(Boolean).join(', ')
+                            return addr ? <span>📍 {addr}</span> : null
+                          })()}
                         </div>
                       </div>
                       <div className="flex items-center gap-4 ml-4">
-                        {job.proposals?.proposal_value > 0 && (
+                        {!isTechnician && job.proposals?.proposal_value > 0 && (
                           <div className="text-right">
                             <p className="text-fp-muted text-xs">Value</p>
                             <p className="text-fp-text font-semibold">{fmt(job.proposals.proposal_value)}</p>
@@ -325,7 +332,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
   )
 }
 
-function KanbanBoard({ jobs, jobStages, onDragStart, onDragOver, onDrop, jobUrl, navigate, getProgress, isAdmin, onArchive, onRestore, onDelete, showArchived }) {
+function KanbanBoard({ jobs, jobStages, onDragStart, onDragOver, onDrop, jobUrl, navigate, getProgress, isAdmin, onArchive, onRestore, onDelete, showArchived, isTechnician }) {
   const [dragOver, setDragOver] = useState(null)
 
   const columns = jobStages.map(s => ({
@@ -351,7 +358,7 @@ function KanbanBoard({ jobs, jobStages, onDragStart, onDragOver, onDrop, jobUrl,
                 <span className="text-fp-text font-semibold text-sm">{col.key}</span>
                 <span className="text-fp-muted text-xs bg-fp-inset px-1.5 py-0.5 rounded-full">{col.jobs.length}</span>
               </div>
-              {col.value > 0 && <span className="text-fp-muted text-xs">{fmt(col.value)}</span>}
+              {!isTechnician && col.value > 0 && <span className="text-fp-muted text-xs">{fmt(col.value)}</span>}
             </div>
 
             {/* Cards */}
@@ -371,8 +378,12 @@ function KanbanBoard({ jobs, jobStages, onDragStart, onDragOver, onDrop, jobUrl,
                     {job.clients?.company && (
                       <p className="text-fp-muted text-xs mt-1 truncate">🏢 {job.clients.company}</p>
                     )}
+                    {isTechnician && (() => {
+                      const addr = [job.clients?.address, job.clients?.city, job.clients?.state].filter(Boolean).join(', ')
+                      return addr ? <p className="text-fp-muted text-xs mt-0.5 truncate">📍 {addr}</p> : null
+                    })()}
                     <div className="flex items-center justify-between mt-2">
-                      {job.proposals?.proposal_value > 0 && (
+                      {!isTechnician && job.proposals?.proposal_value > 0 && (
                         <span className="text-fp-brand text-xs font-semibold">{fmt(job.proposals.proposal_value)}</span>
                       )}
                       {job.start_date && (

@@ -23,7 +23,7 @@ export default function TechJobView({ isAdmin, featureProposals = true, featureC
   const fetchAll = async () => {
     const { data: jobData } = await supabase
       .from('jobs')
-      .select('*, clients(company, client_name), profiles!jobs_assigned_pm_fkey(full_name)')
+      .select('*, clients(company, client_name, address, city, state, zip), profiles!jobs_assigned_pm_fkey(full_name)')
       .eq('id', id)
       .single()
     setJob(jobData)
@@ -138,6 +138,15 @@ export default function TechJobView({ isAdmin, featureProposals = true, featureC
               {job?.clients?.company && (
                 <p className="text-fp-muted mt-0.5">🏢 {job.clients.company}</p>
               )}
+              {(() => {
+                const addr = [job?.clients?.address, job?.clients?.city, job?.clients?.state, job?.clients?.zip].filter(Boolean).join(', ')
+                return addr ? (
+                  <a href={`https://maps.google.com/?q=${encodeURIComponent(addr)}`} target="_blank" rel="noreferrer"
+                    className="text-[#C8622A] text-sm mt-0.5 hover:underline inline-block">
+                    📍 {addr}
+                  </a>
+                ) : null
+              })()}
               <div className="flex items-center gap-4 mt-2 text-sm text-fp-muted">
                 {job?.profiles?.full_name && (
                   <span>👤 PM: <span className="text-fp-text">{job.profiles.full_name}</span></span>

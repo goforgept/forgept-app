@@ -52,8 +52,9 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
   const [stMaterials, setStMaterials] = useState([])
   const [stSummary, setStSummary] = useState('')
   const [inventoryItems, setInventoryItems] = useState([])
-  const [stInventoryPulls, setStInventoryPulls] = useState([]) // [{item, qty_used}]
+  const [stInventoryPulls, setStInventoryPulls] = useState([])
   const [inventorySearch, setInventorySearch] = useState('')
+  const [upcomingSchedules, setUpcomingSchedules] = useState([])
 
   useEffect(() => { if (profile?.org_id) fetchAll() }, [profile?.org_id])
 
@@ -118,6 +119,19 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
     setOrgServiceSettings(orgRes.data || {})
     setServiceTickets(ticketsRes.data || [])
     setInventoryItems(inventoryRes.data || [])
+
+    if (isTechnician && profile?.id) {
+      const today = new Date().toISOString().split('T')[0]
+      const { data: schedData } = await supabase
+        .from('job_tech_schedules')
+        .select('date, jobs(id, name, job_number, status, clients(company, address, city, state, zip))')
+        .eq('tech_id', profile.id)
+        .gte('date', today)
+        .order('date', { ascending: true })
+        .limit(10)
+      setUpcomingSchedules(schedData || [])
+    }
+
     setLoading(false)
   }
 
@@ -620,6 +634,39 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
                   )
                 })}
               </div>
+            </div>
+          </div>
+        )}
+
+        {isTechnician && upcomingSchedules.length > 0 && (
+          <div className="bg-fp-card rounded-xl p-5">
+            <p className="text-fp-text font-semibold text-sm mb-3">My Upcoming Schedule</p>
+            <div className="space-y-2">
+              {upcomingSchedules.map((s, i) => {
+                const job = s.jobs
+                const addr = [job?.clients?.address, job?.clients?.city, job?.clients?.state].filter(Boolean).join(', ')
+                const dateLabel = new Date(s.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                const isToday = s.date === new Date().toISOString().split('T')[0]
+                return (
+                  <div key={i} className={`flex items-start gap-3 rounded-lg px-4 py-3 ${isToday ? 'bg-fp-brand/10 border border-fp-brand/30' : 'bg-fp-inset'}`}>
+                    <div className="flex-shrink-0 text-center min-w-[52px]">
+                      <p className={`text-xs font-semibold ${isToday ? 'text-fp-brand' : 'text-fp-muted'}`}>{isToday ? 'TODAY' : dateLabel.split(',')[0]}</p>
+                      <p className={`text-sm font-bold ${isToday ? 'text-fp-brand' : 'text-fp-text'}`}>{dateLabel.split(',').slice(1).join(',').trim()}</p>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-fp-text text-sm font-semibold truncate">{job?.name}</p>
+                      {job?.clients?.company && <p className="text-fp-muted text-xs">🏢 {job.clients.company}</p>}
+                      {addr && (
+                        <a href={`https://maps.google.com/?q=${encodeURIComponent(addr)}`} target="_blank" rel="noreferrer"
+                          className="text-[#C8622A] text-xs hover:underline">📍 {addr}</a>
+                      )}
+                    </div>
+                    {job?.id && (
+                      <a href={`/tech/job/${job.id}`} className="text-fp-muted hover:text-fp-brand text-xs transition-colors flex-shrink-0 self-center">View →</a>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
