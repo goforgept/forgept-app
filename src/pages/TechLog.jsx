@@ -63,7 +63,7 @@ export default function TechLog({ isAdmin, featureProposals = true, featureCRM =
         .from('jobs')
         .select('id, name, job_number, status, clients(company)')
         .eq('org_id', profile.org_id)
-        .in('status', ['Active', 'On Hold'])
+        .not('status', 'in', '("Completed","Cancelled")')
         .order('created_at', { ascending: false }),
 
       (() => {
