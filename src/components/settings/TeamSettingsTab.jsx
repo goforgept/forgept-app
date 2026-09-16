@@ -37,15 +37,15 @@ const DEFAULT_ROLE_TEMPLATES = [
   },
   {
     name: 'Field Tech',
-    description: 'Field access — service tickets, jobs, and tech log only',
+    description: 'Field access — jobs, service tickets, tasks, inventory, and profile settings',
     base_role: 'technician',
     is_admin: false,
     permissions: {
-      dashboard: 'read', proposals: 'none', clients: 'none', pipeline: 'none', tasks: 'write',
-      jobs: 'read', serviceTickets: 'write', dispatch: 'read',
+      dashboard: 'none', proposals: 'none', clients: 'none', pipeline: 'none', tasks: 'read',
+      jobs: 'write', serviceTickets: 'write', dispatch: 'read',
       invoices: 'none', purchaseOrders: 'none', inventory: 'read',
       contracts: 'none', vendors: 'none', productLibrary: 'none',
-      reports: 'none', settings: 'none',
+      reports: 'none', settings: 'write',
     },
   },
   {

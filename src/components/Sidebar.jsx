@@ -178,6 +178,9 @@ const NAV_GROUPS_TECH = () => [
       { label: 'Tech Log', path: '/tech-log', icon: '📋' },
       { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
       { label: 'Jobs', path: '/jobs', icon: '🔨' },
+      { label: 'Dispatch', path: '/dispatch', icon: '📡' },
+      { label: 'Tasks', path: '/tasks', icon: '✅' },
+      { label: 'Inventory', path: '/inventory', icon: '🏭' },
     ])
   },
   {
