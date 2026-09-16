@@ -217,24 +217,24 @@ function App() {
                 : <Dashboard {...sharedProps} />
             } />
             <Route path="/admin" element={<AdminDashboard {...sharedProps} />} />
-            <Route path="/rep" element={<Dashboard {...sharedProps} />} />
-            <Route path="/new" element={<NewProposal />} />
-            <Route path="/proposal/:id" element={<ProposalDetail {...sharedProps} />} />
+            <Route path="/rep" element={isTechnician ? <Navigate to="/tech-log" replace /> : <Dashboard {...sharedProps} />} />
+            <Route path="/new" element={<PermRoute area="proposals"><NewProposal /></PermRoute>} />
+            <Route path="/proposal/:id" element={<PermRoute area="proposals"><ProposalDetail {...sharedProps} /></PermRoute>} />
             <Route path="/reps" element={<Navigate to="/settings" replace />} />
             <Route path="/proposals" element={<PermRoute area="proposals"><Proposals {...sharedProps} /></PermRoute>} />
-            <Route path="/vendors" element={<Vendors {...sharedProps} />} />
+            <Route path="/vendors" element={<PermRoute area="vendors"><Vendors {...sharedProps} /></PermRoute>} />
             <Route path="/settings" element={<Settings {...sharedProps} />} />
-            <Route path="/clients" element={<Clients {...sharedProps} />} />
+            <Route path="/clients" element={<PermRoute area="clients"><Clients {...sharedProps} /></PermRoute>} />
             {profile?.is_superadmin && <Route path="/superadmin" element={<SuperAdmin />} />}
-            <Route path="/client/:id" element={<ClientDetail {...sharedProps} />} />
+            <Route path="/client/:id" element={<PermRoute area="clients"><ClientDetail {...sharedProps} /></PermRoute>} />
             <Route path="/purchase-orders" element={<PermRoute area="purchaseOrders"><PurchaseOrders {...sharedProps} /></PermRoute>} />
             <Route path="/faq" element={<FAQ {...sharedProps} />} />
             <Route path="/tasks" element={<Tasks {...sharedProps} />} />
-            <Route path="/pipeline" element={<Pipeline {...sharedProps} />} />
-            <Route path="/forecast" element={<Forecast {...sharedProps} />} />
-            <Route path="/sales-kpi" element={<SalesKPI {...sharedProps} />} />
+            <Route path="/pipeline" element={<PermRoute area="pipeline"><Pipeline {...sharedProps} /></PermRoute>} />
+            <Route path="/forecast" element={<PermRoute area="pipeline"><Forecast {...sharedProps} /></PermRoute>} />
+            <Route path="/sales-kpi" element={<PermRoute area="pipeline"><SalesKPI {...sharedProps} /></PermRoute>} />
             <Route path="/catalog" element={<Catalog {...sharedProps} />} />
-            <Route path="/templates" element={<Templates isAdmin={isAdmin} />} />
+            <Route path="/templates" element={<PermRoute area="proposals"><Templates isAdmin={isAdmin} /></PermRoute>} />
             <Route path="/invoices" element={<PermRoute area="invoices"><Invoices {...sharedProps} /></PermRoute>} />
             <Route path="/invoices/new" element={<PermRoute area="invoices"><NewInvoice {...sharedProps} /></PermRoute>} />
             <Route path="/invoices/:id" element={<PermRoute area="invoices"><InvoiceDetail {...sharedProps} /></PermRoute>} />
@@ -250,7 +250,7 @@ function App() {
             <Route path="/integrations/google/callback" element={<GoogleCallback />} />
             <Route path="/integrations/microsoft/callback" element={<MicrosoftCallback />} />
             <Route path="/reports" element={<PermRoute area="reports"><Reports {...sharedProps} /></PermRoute>} />
-            <Route path="/product-library" element={<ProductLibrary {...sharedProps} />} />
+            <Route path="/product-library" element={<PermRoute area="productLibrary"><ProductLibrary {...sharedProps} /></PermRoute>} />
             {(features.sla || features.monitoring) && <Route path="/contracts" element={<Contracts {...sharedProps} />} />}
             <Route path="/designer" element={<DesignerProjects {...sharedProps} />} />
             <Route path="/designer/:proposalId" element={<Designer {...sharedProps} />} />

@@ -392,9 +392,11 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
     }
   }
 
+  if (isTechnician) return null
+
   return (
     <div className="flex h-screen bg-fp-bg">
-      <Sidebar isAdmin={false} featureProposals={featureProposals} featureCRM={featureCRM} />
+      <Sidebar isAdmin={false} featureProposals={featureProposals} featureCRM={featureCRM} isTechnician={isTechnician} />
 
       <div className="flex-1 p-6 min-w-0 overflow-y-auto">
 
