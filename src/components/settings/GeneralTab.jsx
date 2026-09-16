@@ -2,7 +2,7 @@ export default function GeneralTab({
   form, setForm, inputClass,
   orgTimezone, setOrgTimezone,
   passwordForm, setPasswordForm, passwordError, passwordSuccess, savingPassword, handleChangePassword,
-  sameAsShipTo, handleSameAsShipTo, profile, saving, handleSave,
+  sameAsShipTo, handleSameAsShipTo, profile, saving, handleSave, readOnly = false,
   currentTheme = 'dark', applyTheme,
 }) {
   return (
@@ -132,9 +132,13 @@ export default function GeneralTab({
         </div>
       </div>
 
-      <button onClick={handleSave} disabled={saving} className="bg-fp-brand text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-colors disabled:opacity-50">
-        {saving ? 'Saving...' : 'Save Settings'}
-      </button>
+      {readOnly ? (
+        <p className="text-fp-muted text-sm">Settings can only be changed by an admin.</p>
+      ) : (
+        <button onClick={handleSave} disabled={saving} className="bg-fp-brand text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-colors disabled:opacity-50">
+          {saving ? 'Saving...' : 'Save Settings'}
+        </button>
+      )}
     </div>
   )
 }

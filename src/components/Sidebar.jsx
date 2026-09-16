@@ -232,7 +232,6 @@ const NAV_GROUPS_REP = (featureProposals, featureCRM, featureInvoices, orgType, 
     links: withPermission([
       ...(orgType !== 'manufacturer' ? [
         { label: 'Jobs', path: '/jobs', icon: '🔨' },
-        { label: 'Tech Log', path: '/tech-log', icon: '📋' },
         { label: 'Service Tickets', path: '/service-tickets', icon: '🎫' },
         { label: 'Dispatch', path: '/dispatch', icon: '📍' },
       ] : []),

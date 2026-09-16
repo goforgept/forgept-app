@@ -608,7 +608,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
               passwordForm={passwordForm} setPasswordForm={setPasswordForm} passwordError={passwordError} passwordSuccess={passwordSuccess}
               savingPassword={savingPassword} handleChangePassword={handleChangePassword}
               sameAsShipTo={sameAsShipTo} handleSameAsShipTo={handleSameAsShipTo} profile={profile} saving={saving} handleSave={handleSave}
-              currentTheme={currentTheme} applyTheme={applyTheme} />
+              currentTheme={currentTheme} applyTheme={applyTheme} readOnly={!isAdmin} />
           )}
 
           {activeTab === 'proposals' && (
@@ -650,7 +650,7 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
                 await supabase.from('organizations').update({ pdf_color_headers: next }).eq('id', orgId)
                 refreshProfile()
               }}
-              saving={saving} handleSave={handleSave} />
+              saving={saving} handleSave={handleSave} readOnly={!isAdmin} />
           )}
 
           {activeTab === 'invoicing' && isAdmin && (

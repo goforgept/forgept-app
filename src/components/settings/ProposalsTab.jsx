@@ -13,6 +13,7 @@ export default function ProposalsTab({
   pdfHeaderStyle, onChangePdfHeaderStyle,
   pdfColorHeaders, onChangePdfColorHeaders,
   saving, handleSave,
+  readOnly = false,
 }) {
   return (
     <div className="space-y-6">
@@ -165,8 +166,8 @@ export default function ProposalsTab({
                 <p className="text-fp-text text-sm font-semibold">Enable MSRP</p>
                 <p className="text-fp-muted text-xs mt-0.5">Adds an MSRP field to the product library and BOM. Control visibility per proposal in Pricing options.</p>
               </div>
-              <button onClick={onToggleMsrp}
-                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${msrpEnabled ? 'bg-fp-brand' : 'bg-fp-border'}`}>
+              <button onClick={readOnly ? undefined : onToggleMsrp} disabled={readOnly}
+                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${readOnly ? 'opacity-50 cursor-not-allowed' : ''} ${msrpEnabled ? 'bg-fp-brand' : 'bg-fp-border'}`}>
                 <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${msrpEnabled ? 'left-6' : 'left-1'}`} />
               </button>
             </div>
@@ -178,8 +179,8 @@ export default function ProposalsTab({
                   { value: 'times', label: 'Serif' },
                   { value: 'courier', label: 'Monospace' },
                 ].map(opt => (
-                  <button key={opt.value} onClick={() => onChangeDocFont?.(opt.value)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${docFont === opt.value ? 'bg-fp-brand text-white' : 'bg-fp-bg text-fp-muted hover:text-fp-text border border-fp-border'}`}>
+                  <button key={opt.value} onClick={readOnly ? undefined : () => onChangeDocFont?.(opt.value)} disabled={readOnly}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${readOnly ? 'opacity-50 cursor-not-allowed' : ''} ${docFont === opt.value ? 'bg-fp-brand text-white' : 'bg-fp-bg text-fp-muted hover:text-fp-text border border-fp-border'}`}>
                     {opt.label}
                   </button>
                 ))}
@@ -190,8 +191,8 @@ export default function ProposalsTab({
                 <p className="text-fp-text text-sm font-semibold">Color Bands</p>
                 <p className="text-fp-muted text-xs mt-0.5">Applies your brand color to table headers and alternating row shading. Turn off for a plain grey and white look.</p>
               </div>
-              <button onClick={onChangePdfColorHeaders}
-                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${pdfColorHeaders ? 'bg-fp-brand' : 'bg-fp-border'}`}>
+              <button onClick={readOnly ? undefined : onChangePdfColorHeaders} disabled={readOnly}
+                className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${readOnly ? 'opacity-50 cursor-not-allowed' : ''} ${pdfColorHeaders ? 'bg-fp-brand' : 'bg-fp-border'}`}>
                 <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${pdfColorHeaders ? 'left-6' : 'left-1'}`} />
               </button>
             </div>
@@ -204,8 +205,8 @@ export default function ProposalsTab({
                   { value: 'large', label: 'Large', desc: 'Bigger logo, taller header' },
                   { value: 'full-logo', label: 'Full Width', desc: 'Logo spans the entire top' },
                 ].map(opt => (
-                  <button key={opt.value} onClick={() => onChangePdfHeaderStyle?.(opt.value)}
-                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors border text-left ${pdfHeaderStyle === opt.value ? 'bg-fp-brand text-white border-fp-brand' : 'bg-fp-bg text-fp-muted hover:text-fp-text border-fp-border'}`}>
+                  <button key={opt.value} onClick={readOnly ? undefined : () => onChangePdfHeaderStyle?.(opt.value)} disabled={readOnly}
+                    className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors border text-left ${readOnly ? 'opacity-50 cursor-not-allowed' : ''} ${pdfHeaderStyle === opt.value ? 'bg-fp-brand text-white border-fp-brand' : 'bg-fp-bg text-fp-muted hover:text-fp-text border-fp-border'}`}>
                     <span className="block font-semibold">{opt.label}</span>
                     <span className={`block text-xs mt-0.5 ${pdfHeaderStyle === opt.value ? 'text-white/70' : 'text-fp-muted'}`}>{opt.desc}</span>
                   </button>
@@ -216,9 +217,13 @@ export default function ProposalsTab({
         </div>
       )}
 
-      <button onClick={handleSave} disabled={saving} className="bg-fp-brand text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-colors disabled:opacity-50">
-        {saving ? 'Saving...' : 'Save Settings'}
-      </button>
+      {readOnly ? (
+        <p className="text-fp-muted text-sm">Settings can only be changed by an admin.</p>
+      ) : (
+        <button onClick={handleSave} disabled={saving} className="bg-fp-brand text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-colors disabled:opacity-50">
+          {saving ? 'Saving...' : 'Save Settings'}
+        </button>
+      )}
     </div>
   )
 }
