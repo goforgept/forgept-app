@@ -104,6 +104,49 @@ const TOOLS = [
     },
   },
   {
+    name: "update_client",
+    description: "Update fields on an existing client account (address, phone, email, website, industry, notes). Only updates fields you provide — leave others blank to keep them unchanged.",
+    input_schema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Company name to find the client" },
+        email: { type: "string", description: "New email address" },
+        phone: { type: "string", description: "New phone number" },
+        address: { type: "string", description: "New street address" },
+        city: { type: "string", description: "New city" },
+        state: { type: "string", description: "New state" },
+        zip: { type: "string", description: "New zip code" },
+        website: { type: "string", description: "New website URL" },
+        industry: { type: "string", description: "New industry" },
+        notes: { type: "string", description: "New internal notes (replaces existing notes)" },
+      },
+      required: ["company"],
+    },
+  },
+  {
+    name: "search_proposals",
+    description: "Search or look up proposals by client name, proposal name, or status",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search term — company name, proposal name, or rep name" },
+        status: { type: "string", description: "Filter by status: Draft, Sent, Won, Lost, etc." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_client_overview",
+    description: "Get a full snapshot of a client — their open proposals, open service tickets, and pending tasks all in one view",
+    input_schema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Company name to look up" },
+      },
+      required: ["company"],
+    },
+  },
+  {
     name: "update_client_poc",
     description: "Update the main point of contact (POC) name on a client account. ALWAYS call search_clients first to find the client and check the current POC. Then show the user the current POC and ask for confirmation before calling this tool. Never call this without user confirmation.",
     input_schema: {
@@ -114,6 +157,34 @@ const TOOLS = [
         confirmed: { type: "boolean", description: "Must be true — user has explicitly confirmed they want to overwrite the existing POC" },
       },
       required: ["company", "new_poc_name", "confirmed"],
+    },
+  },
+  {
+    name: "log_activity",
+    description: "Log a call, email, meeting, or note against a client or proposal. Use this when the user mentions they spoke with someone, had a meeting, sent an email, or wants to record a note. Optionally creates a follow-up task.",
+    input_schema: {
+      type: "object",
+      properties: {
+        type: { type: "string", enum: ["call", "email", "meeting", "note"], description: "Type of activity" },
+        title: { type: "string", description: "Short summary — e.g. 'Called Marcus, no answer'" },
+        body: { type: "string", description: "Longer notes — what was discussed, objections, next steps" },
+        company: { type: "string", description: "Client company name to associate this activity with" },
+        proposal_name: { type: "string", description: "Proposal name to link this activity to (optional)" },
+        follow_up_date: { type: "string", description: "If a follow-up task should be created, the due date in YYYY-MM-DD format" },
+      },
+      required: ["type", "title"],
+    },
+  },
+  {
+    name: "get_deal_summary",
+    description: "Get a full summary of where a deal stands — proposal details, recent activity, open tasks — and provide a recommendation on how to move it forward",
+    input_schema: {
+      type: "object",
+      properties: {
+        proposal_name: { type: "string", description: "Proposal name to summarize" },
+        company: { type: "string", description: "Client company name (used if proposal name is not known)" },
+      },
+      required: [],
     },
   },
   {
@@ -159,6 +230,11 @@ const TOOL_PERMS: Record<string, { area: string; write?: boolean }> = {
   create_proposal:        { area: 'proposals',      write: true },
   create_contact:         { area: 'clients',        write: true },
   update_client_poc:      { area: 'clients',        write: true },
+  update_client:          { area: 'clients',        write: true },
+  search_proposals:       { area: 'proposals' },
+  get_client_overview:    { area: 'clients' },
+  log_activity:           { area: 'clients',        write: true },
+  get_deal_summary:       { area: 'proposals' },
   get_pipeline_summary:   { area: 'pipeline' },
   get_recent_activity:    { area: 'dashboard' },
 }
@@ -331,6 +407,147 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       return { results: [] }
     }
 
+    case "log_activity": {
+      let clientId = null, proposalId = null
+      if (input.company) {
+        const { data: cl } = await supabase.from("clients")
+          .select("id").eq("org_id", orgId)
+          .ilike("company", `%${input.company}%`).limit(1).maybeSingle()
+        clientId = cl?.id || null
+      }
+      if (input.proposal_name) {
+        const { data: pr } = await supabase.from("proposals")
+          .select("id, client_id").eq("org_id", orgId)
+          .ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
+        if (pr) { proposalId = pr.id; if (!clientId) clientId = pr.client_id }
+      }
+      await supabase.from("activities").insert({
+        org_id: orgId,
+        user_id: userId,
+        client_id: clientId,
+        proposal_id: proposalId,
+        type: input.type,
+        title: input.title,
+        body: input.body || null,
+        source: "ai",
+      })
+      if (input.follow_up_date) {
+        await supabase.from("tasks").insert({
+          org_id: orgId,
+          user_id: userId,
+          client_id: clientId,
+          title: `Follow up: ${input.title}`,
+          due_date: input.follow_up_date,
+          status: "pending",
+        })
+      }
+      return { success: true, type: input.type, title: input.title, follow_up_created: !!input.follow_up_date, action: "logged_activity" }
+    }
+
+    case "get_deal_summary": {
+      let proposal = null
+      if (input.proposal_name) {
+        const { data } = await supabase.from("proposals")
+          .select("id, proposal_name, company, client_name, status, proposal_value, created_at, pipeline_stages(name)")
+          .eq("org_id", orgId)
+          .ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
+        proposal = data
+      } else if (input.company) {
+        const { data } = await supabase.from("proposals")
+          .select("id, proposal_name, company, client_name, status, proposal_value, created_at, pipeline_stages(name)")
+          .eq("org_id", orgId)
+          .ilike("company", `%${input.company}%`)
+          .not("status", "in", '("Won","Lost")')
+          .order("created_at", { ascending: false }).limit(1).maybeSingle()
+        proposal = data
+      }
+      if (!proposal) return { error: "No matching proposal found." }
+
+      const [{ data: activities }, { data: tasks }] = await Promise.all([
+        supabase.from("activities")
+          .select("type, title, body, created_at, profiles(full_name)")
+          .eq("proposal_id", proposal.id)
+          .order("created_at", { ascending: false }).limit(10),
+        supabase.from("tasks")
+          .select("title, due_date, status")
+          .eq("org_id", orgId).eq("client_id", proposal.id)
+          .neq("status", "completed").limit(5),
+      ])
+
+      return {
+        proposal: {
+          name: proposal.proposal_name,
+          company: proposal.company,
+          contact: proposal.client_name,
+          status: proposal.status,
+          stage: proposal.pipeline_stages?.name || null,
+          value: proposal.proposal_value,
+          created: proposal.created_at,
+        },
+        recent_activity: (activities || []).map(a => ({ type: a.type, title: a.title, notes: a.body, by: a.profiles?.full_name, date: a.created_at })),
+        open_tasks: tasks || [],
+      }
+    }
+
+    case "update_client": {
+      const { data: client } = await supabase.from("clients")
+        .select("id, company").eq("org_id", orgId)
+        .ilike("company", `%${input.company}%`).limit(1).maybeSingle()
+      if (!client) return { error: `No client found matching "${input.company}".` }
+      const updates: Record<string, any> = {}
+      if (input.email    !== undefined) updates.email    = input.email
+      if (input.phone    !== undefined) updates.phone    = input.phone
+      if (input.address  !== undefined) updates.address  = input.address
+      if (input.city     !== undefined) updates.city     = input.city
+      if (input.state    !== undefined) updates.state    = input.state
+      if (input.zip      !== undefined) updates.zip      = input.zip
+      if (input.website  !== undefined) updates.website  = input.website
+      if (input.industry !== undefined) updates.industry = input.industry
+      if (input.notes    !== undefined) updates.notes    = input.notes
+      if (Object.keys(updates).length === 0) return { error: "No fields provided to update." }
+      const { error } = await supabase.from("clients").update(updates).eq("id", client.id)
+      if (error) return { error: error.message }
+      return { success: true, company: client.company, updated_fields: Object.keys(updates), action: "updated_client" }
+    }
+
+    case "search_proposals": {
+      let query = supabase.from("proposals")
+        .select("id, proposal_name, company, client_name, status, proposal_value, created_at")
+        .eq("org_id", orgId)
+        .order("created_at", { ascending: false })
+        .limit(8)
+      if (input.status) query = query.ilike("status", `%${input.status}%`)
+      if (input.query) {
+        const q = `%${input.query}%`
+        query = query.or(`proposal_name.ilike.${q},company.ilike.${q},client_name.ilike.${q}`)
+      }
+      const { data } = await query
+      return { results: data || [] }
+    }
+
+    case "get_client_overview": {
+      const { data: client } = await supabase.from("clients")
+        .select("id, company, client_name, email, phone, address, city, state, website, notes")
+        .eq("org_id", orgId)
+        .ilike("company", `%${input.company}%`).limit(1).maybeSingle()
+      if (!client) return { error: `No client found matching "${input.company}".` }
+      const [{ data: proposals }, { data: tickets }, { data: tasks }] = await Promise.all([
+        supabase.from("proposals")
+          .select("id, proposal_name, status, proposal_value")
+          .eq("org_id", orgId).eq("client_id", client.id)
+          .not("status", "in", '("Won","Lost")').limit(5),
+        supabase.from("service_tickets")
+          .select("id, title, status, priority")
+          .eq("org_id", orgId).eq("client_id", client.id)
+          .neq("status", "closed").limit(5),
+        supabase.from("tasks")
+          .select("id, title, due_date, status")
+          .eq("org_id", orgId).eq("client_id", client.id)
+          .neq("status", "completed").limit(5),
+      ])
+      return { client, open_proposals: proposals || [], open_tickets: tickets || [], pending_tasks: tasks || [] }
+    }
+
     default:
       return { error: `Unknown tool: ${name}` }
   }
@@ -430,7 +647,7 @@ ${helpContext}
 Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`
       : `You are a helpful assistant built into ForgePt, a field service and sales management platform. You help users manage their business by creating and retrieving data through natural language.
 
-You have access to tools to create clients, service tickets, tasks, and proposals, search clients, and view pipeline summaries. You can also answer questions about how ForgePt features work.
+You have access to tools to create and update clients, search clients and proposals, log activity (calls, emails, meetings, notes) against clients or proposals, get a deal summary with AI recommendations, get a full client overview, create service tickets, tasks, and proposals, and view pipeline summaries. You can also answer questions about how ForgePt features work.
 ${helpContext}
 
 Guidelines:

@@ -1179,7 +1179,7 @@ const deleteMeeting = async (meetingId) => {
           </div>
         )}
 
-        {activeTab === 'activity' && <ActivityTimeline clientId={id} orgId={client?.org_id} userId={profile?.id} contacts={contacts} />}
+        {activeTab === 'activity' && <ActivityTimeline clientId={id} orgId={client?.org_id} userId={profile?.id} contacts={contacts} proposals={proposals} />}
         {activeTab === 'tasks' && <TaskList clientId={id} orgId={client?.org_id} userId={profile?.id} profiles={teamProfiles} />}
 
         {activeTab === 'emails' && (

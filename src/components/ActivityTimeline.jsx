@@ -8,41 +8,35 @@ const ACTIVITY_TYPES = [
   { value: 'note', label: 'Note', icon: '📝' },
 ]
 
-export default function ActivityTimeline({ clientId, proposalId, orgId, userId, contacts = [] }) {
+export default function ActivityTimeline({ clientId, proposalId, orgId, userId, contacts = [], proposals = [] }) {
   const [activities, setActivities] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ type: 'note', title: '', body: '', contact_id: '' })
+  const [form, setForm] = useState({
+    type: 'note', title: '', body: '', contact_id: '',
+    proposal_id: proposalId || '',
+    followUp: false, followUpDate: '',
+  })
 
-  useEffect(() => {
-    fetchActivities()
-  }, [clientId, proposalId])
+  useEffect(() => { fetchActivities() }, [clientId, proposalId])
 
   const fetchActivities = async () => {
     setLoading(true)
 
     if (clientId) {
-      // For client view: fetch all activities for this client
-      // including those logged against any of their proposals
       const { data: clientProposals } = await supabase
-        .from('proposals')
-        .select('id')
-        .eq('client_id', clientId)
-
+        .from('proposals').select('id').eq('client_id', clientId)
       const proposalIds = (clientProposals || []).map(p => p.id)
 
-      let allActivities = []
-
-      // Direct client activities
       const { data: clientActs } = await supabase
         .from('activities')
         .select('*, profiles(full_name), proposals(proposal_name), client_contacts(full_name)')
         .eq('client_id', clientId)
         .order('created_at', { ascending: false })
-      allActivities = [...(clientActs || [])]
 
-      // Proposal-level activities not already captured
+      let allActivities = [...(clientActs || [])]
+
       if (proposalIds.length > 0) {
         const { data: proposalActs } = await supabase
           .from('activities')
@@ -53,7 +47,6 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId, 
         allActivities = [...allActivities, ...(proposalActs || [])]
       }
 
-      // Sort merged list newest first
       allActivities.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
       setActivities(allActivities)
     } else if (proposalId) {
@@ -71,17 +64,30 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId, 
   const handleAdd = async () => {
     if (!form.title) return
     setSaving(true)
+
     await supabase.from('activities').insert({
       org_id: orgId,
       client_id: clientId || null,
-      proposal_id: proposalId || null,
+      proposal_id: form.proposal_id || proposalId || null,
       user_id: userId,
       type: form.type,
       title: form.title,
-      body: form.body,
+      body: form.body || null,
       contact_id: form.contact_id || null,
     })
-    setForm({ type: 'note', title: '', body: '', contact_id: '' })
+
+    if (form.followUp && form.followUpDate) {
+      await supabase.from('tasks').insert({
+        org_id: orgId,
+        user_id: userId,
+        client_id: clientId || null,
+        title: `Follow up: ${form.title}`,
+        due_date: form.followUpDate,
+        status: 'pending',
+      })
+    }
+
+    setForm({ type: 'note', title: '', body: '', contact_id: '', proposal_id: proposalId || '', followUp: false, followUpDate: '' })
     setShowForm(false)
     fetchActivities()
     setSaving(false)
@@ -114,7 +120,7 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId, 
 
       {showForm && (
         <div className="bg-fp-inset rounded-xl p-4 mb-4 space-y-3">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {ACTIVITY_TYPES.map(t => (
               <button
                 key={t.value}
@@ -127,32 +133,72 @@ export default function ActivityTimeline({ clientId, proposalId, orgId, userId, 
               </button>
             ))}
           </div>
-          {contacts.length > 0 && (
-            <select
-              value={form.contact_id}
-              onChange={e => setForm(prev => ({ ...prev, contact_id: e.target.value }))}
-              className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-            >
-              <option value="">Contact (optional)</option>
-              {contacts.map(c => (
-                <option key={c.id} value={c.id}>{c.full_name}{c.title ? ` — ${c.title}` : ''}</option>
-              ))}
-            </select>
-          )}
+
           <input
             type="text"
-            placeholder="Title — e.g. Meeting with John about Q3 project"
+            placeholder="Title — e.g. Called Marcus, discussed timeline"
             value={form.title}
             onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAdd()}
             className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
           />
+
           <textarea
-            placeholder="Notes (optional)"
+            placeholder="Notes (optional) — what was discussed, objections, next steps..."
             value={form.body}
             onChange={e => setForm(prev => ({ ...prev, body: e.target.value }))}
             rows={2}
             className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none"
           />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {contacts.length > 0 && (
+              <select
+                value={form.contact_id}
+                onChange={e => setForm(prev => ({ ...prev, contact_id: e.target.value }))}
+                className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+              >
+                <option value="">Contact (optional)</option>
+                {contacts.map(c => (
+                  <option key={c.id} value={c.id}>{c.full_name}{c.title ? ` — ${c.title}` : ''}</option>
+                ))}
+              </select>
+            )}
+
+            {proposals.length > 0 && !proposalId && (
+              <select
+                value={form.proposal_id}
+                onChange={e => setForm(prev => ({ ...prev, proposal_id: e.target.value }))}
+                className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+              >
+                <option value="">Link to proposal (optional)</option>
+                {proposals.filter(p => p.status !== 'Lost').map(p => (
+                  <option key={p.id} value={p.id}>{p.proposal_name}{p.status ? ` — ${p.status}` : ''}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-fp-muted hover:text-fp-text">
+              <input
+                type="checkbox"
+                checked={form.followUp}
+                onChange={e => setForm(prev => ({ ...prev, followUp: e.target.checked }))}
+                className="accent-fp-brand"
+              />
+              Schedule follow-up
+            </label>
+            {form.followUp && (
+              <input
+                type="date"
+                value={form.followUpDate}
+                onChange={e => setForm(prev => ({ ...prev, followUpDate: e.target.value }))}
+                className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-fp-brand"
+              />
+            )}
+          </div>
+
           <button
             onClick={handleAdd}
             disabled={saving || !form.title}
