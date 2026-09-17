@@ -66,6 +66,7 @@ function App() {
   const location = useLocation()
   const navigate  = useNavigate()
   const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const isSuperAdmin = profile?.is_superadmin === true
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
@@ -86,6 +87,14 @@ function App() {
       window.removeEventListener('online',  goOnline)
     }
   }, [navigate])
+
+  // Superadmin accounts have no org context — redirect them to /superadmin
+  // from anywhere so they never land on a broken page.
+  useEffect(() => {
+    if (isSuperAdmin && location.pathname !== '/superadmin') {
+      navigate('/superadmin', { replace: true })
+    }
+  }, [isSuperAdmin, location.pathname, navigate])
 
   if (loading) return (
     <div className="min-h-screen bg-fp-inset flex items-center justify-center">
@@ -204,7 +213,9 @@ function App() {
         ) : (
           <>
             <Route path="/" element={
-              features.designerOnly
+              isSuperAdmin
+                ? <Navigate to="/superadmin" replace />
+                : features.designerOnly
                 ? <Navigate to="/designer" replace />
                 : isDevTeam || isProductManager
                 ? <Navigate to="/roadmap" replace />

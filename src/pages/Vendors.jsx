@@ -111,6 +111,12 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
     fetchOrgAndVendors()
   }
 
+  const deleteVendor = async (vendor) => {
+    if (!window.confirm(`Delete "${vendor.vendor_name}"? This cannot be undone.`)) return
+    await supabase.from('vendors').delete().eq('id', vendor.id)
+    setVendors(prev => prev.filter(v => v.id !== vendor.id))
+  }
+
   const fields = [
     ['vendor_name', 'Vendor Name'],
     ['contact_name', 'Contact Name'],
@@ -259,12 +265,22 @@ export default function Vendors({ isAdmin, featureProposals = true, featureCRM =
                           </div>
                         )}
                       </div>
-                      <button
-                        onClick={() => startEditing(v)}
-                        className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs hover:bg-fp-hover transition-colors ml-4 shrink-0"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex items-center gap-2 ml-4 shrink-0">
+                        <button
+                          onClick={() => startEditing(v)}
+                          className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs hover:bg-fp-hover transition-colors"
+                        >
+                          Edit
+                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => deleteVendor(v)}
+                            className="text-red-500/50 hover:text-red-400 text-xs transition-colors px-2 py-1.5"
+                          >
+                            Delete
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
