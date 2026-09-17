@@ -114,7 +114,46 @@ const TOOLS = [
   },
 ]
 
-async function executeTool(name: string, input: any, supabase: any, orgId: string, userId: string) {
+const DEFAULT_ALL_WRITE: Record<string, string> = {
+  dashboard: 'write', proposals: 'write', clients: 'write', pipeline: 'write',
+  tasks: 'write', jobs: 'write', serviceTickets: 'write', dispatch: 'write',
+  invoices: 'write', purchaseOrders: 'write', inventory: 'write', contracts: 'write',
+  vendors: 'write', productLibrary: 'write', reports: 'write', settings: 'write',
+}
+const TECH_DEFAULT: Record<string, string> = {
+  dashboard: 'none', proposals: 'none', clients: 'none', pipeline: 'none',
+  tasks: 'read', jobs: 'write', serviceTickets: 'write', dispatch: 'read',
+  invoices: 'none', purchaseOrders: 'none', inventory: 'read', contracts: 'none',
+  vendors: 'none', productLibrary: 'none', reports: 'none', settings: 'write',
+}
+
+function buildPerms(orgRole: any, overrides: any, isAdmin: boolean): Record<string, string> {
+  if (isAdmin || !orgRole) return { ...DEFAULT_ALL_WRITE }
+  if (orgRole.is_admin) return { ...DEFAULT_ALL_WRITE }
+  const isTech = orgRole.base_role === 'technician'
+  return { ...(isTech ? TECH_DEFAULT : DEFAULT_ALL_WRITE), ...(orgRole.permissions || {}), ...(overrides || {}) }
+}
+
+// Tool → required permission area and minimum level
+const TOOL_PERMS: Record<string, { area: string; write?: boolean }> = {
+  create_client:          { area: 'clients',        write: true },
+  search_clients:         { area: 'clients' },
+  create_service_ticket:  { area: 'serviceTickets', write: true },
+  create_task:            { area: 'tasks',          write: true },
+  create_proposal:        { area: 'proposals',      write: true },
+  create_contact:         { area: 'clients',        write: true },
+  get_pipeline_summary:   { area: 'pipeline' },
+  get_recent_activity:    { area: 'dashboard' },
+}
+
+async function executeTool(name: string, input: any, supabase: any, orgId: string, userId: string, perms: Record<string, string>) {
+  // Permission gate
+  const rule = TOOL_PERMS[name]
+  if (rule) {
+    const level = perms[rule.area] || 'write'
+    if (level === 'none') return { error: `You don't have access to ${rule.area}.` }
+    if (rule.write && level !== 'write') return { error: `You don't have permission to create/edit ${rule.area}.` }
+  }
   switch (name) {
     case "create_client": {
       const { data, error } = await supabase.from("clients").insert({
@@ -277,6 +316,14 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   )
 
+  // Block technicians
+  const effectiveRole = profile.org_role || profile.role || ''
+  if (effectiveRole === 'technician') {
+    return new Response(JSON.stringify({ error: "AI Agent not available for technicians" }), {
+      status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" }
+    })
+  }
+
   // Check feature flag
   const { data: org } = await supabase.from("organizations")
     .select("feature_ai_agent").eq("id", profile.org_id).single()
@@ -285,6 +332,18 @@ Deno.serve(async (req) => {
       status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" }
     })
   }
+
+  // Build permission map for this user (mirrors frontend computePermissions)
+  const isAdmin = profile.org_role === 'admin' || profile.role === 'admin'
+  const { data: orgRoleRow } = await supabase.from("org_roles")
+    .select("base_role, permissions, is_admin")
+    .eq("id", profile.org_role)
+    .maybeSingle()
+  const { data: profileFull } = await supabase.from("profiles")
+    .select("permission_overrides")
+    .eq("id", (await supabase.auth.getUser()).data.user?.id ?? '')
+    .maybeSingle()
+  const userPerms = buildPerms(orgRoleRow, profileFull?.permission_overrides, isAdmin)
 
   try {
     const { messages, helpMode } = await req.json()
@@ -388,7 +447,7 @@ Guidelines:
         const toolResultBlocks = []
 
         for (const block of toolUseBlocks) {
-          const result = await executeTool(block.name, block.input, supabase, profile.org_id, profile.id)
+          const result = await executeTool(block.name, block.input, supabase, profile.org_id, profile.id, userPerms)
           toolResults.push({ tool: block.name, input: block.input, result })
           toolResultBlocks.push({
             type: "tool_result",

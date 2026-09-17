@@ -273,7 +273,7 @@ function App() {
           </>
         )}
       </Routes>
-      {session && features.aiAgent && <AIAgent />}
+      {session && features.aiAgent && !isTechnician && <AIAgent />}
     </>
   )
 }

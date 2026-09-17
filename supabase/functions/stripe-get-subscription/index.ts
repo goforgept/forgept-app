@@ -46,6 +46,7 @@ Deno.serve(async (req) => {
     }
 
     const customerId = org.stripe_customer_id
+    console.log('stripe-get-subscription: orgId=', orgId, 'customerId=', customerId)
 
     // Fetch subscriptions for this customer directly from Stripe (no DB column needed)
     const subsRes = await fetch(
@@ -73,11 +74,29 @@ Deno.serve(async (req) => {
         || subsData.data.find((s: any) => s.status === 'incomplete')
         || subsData.data[0]
 
+      // current_period_end was removed in Stripe API 2025+; compute from billing_cycle_anchor + interval
+      let periodEnd: number | null = sub.current_period_end || null
+      if (!periodEnd || periodEnd < Math.floor(Date.now() / 1000)) {
+        const anchor = sub.billing_cycle_anchor
+        const interval: string = sub.plan?.interval || 'year'
+        const intervalCount: number = sub.plan?.interval_count || 1
+        if (anchor) {
+          const nextDate = new Date(anchor * 1000)
+          const now = new Date()
+          if (interval === 'year') {
+            while (nextDate <= now) nextDate.setFullYear(nextDate.getFullYear() + intervalCount)
+          } else {
+            while (nextDate <= now) nextDate.setMonth(nextDate.getMonth() + intervalCount)
+          }
+          periodEnd = Math.floor(nextDate.getTime() / 1000)
+        }
+      }
+
       subscription = {
         id: sub.id,
         status: sub.status,
-        current_period_end: sub.current_period_end,
-        due_date: sub.latest_invoice?.due_date ?? null,
+        current_period_end: periodEnd,
+        due_date: sub.latest_invoice?.status === 'open' ? (sub.latest_invoice?.due_date ?? null) : null,
         cancel_at_period_end: sub.cancel_at_period_end,
         amount: sub.items?.data?.[0]?.price?.unit_amount,
         interval: sub.items?.data?.[0]?.price?.recurring?.interval,
