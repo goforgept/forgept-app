@@ -5,18 +5,30 @@ import GlobalProductsImport from '../components/GlobalProductsImport'
 import AccessoriesEditor from '../components/AccessoriesEditor'
 
 const PLANS = [
-  { name: 'Trial', rate: 0, color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
-  { name: 'Early Adopter Annual', rate: 1200, color: 'text-green-400', bg: 'bg-green-500/20' },
-  { name: 'Early Adopter', rate: 100, color: 'text-green-400', bg: 'bg-green-500/20' },
-  { name: 'Early Adopter - CRM/Designer Solo', rate: 800, color: 'text-green-400', bg: 'bg-green-500/20' },
-  { name: 'Early Adopter - CRM/Designer Solo Annual', rate: 800, color: 'text-green-400', bg: 'bg-green-500/20' },
-  { name: 'Designer Only', rate: 49, color: 'text-blue-400', bg: 'bg-blue-500/20' },
-  { name: 'Small Team', rate: 99, color: 'text-purple-400', bg: 'bg-purple-500/20' },
-  { name: 'Team', rate: 149, color: 'text-indigo-400', bg: 'bg-indigo-500/20' },
-  { name: 'Business', rate: 199, color: 'text-[#C8622A]', bg: 'bg-[#C8622A]/20' },
-  { name: 'QuickBooks Add-on', rate: 25, color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
-  { name: 'Enterprise', rate: null, color: 'text-green-400', bg: 'bg-green-500/20' },
+  { name: 'Trial', rate: 0, annual: false, color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
+  { name: 'Early Adopter Annual', rate: 1200, annual: true, color: 'text-green-400', bg: 'bg-green-500/20' },
+  { name: 'Early Adopter', rate: 100, annual: false, color: 'text-green-400', bg: 'bg-green-500/20' },
+  { name: 'Early Adopter - CRM/Designer Solo', rate: 800, annual: false, color: 'text-green-400', bg: 'bg-green-500/20' },
+  { name: 'Early Adopter - CRM/Designer Solo Annual', rate: 800, annual: true, color: 'text-green-400', bg: 'bg-green-500/20' },
+  { name: 'Designer Only', rate: 49, annual: false, color: 'text-blue-400', bg: 'bg-blue-500/20' },
+  { name: 'Small Team', rate: 99, annual: false, color: 'text-purple-400', bg: 'bg-purple-500/20' },
+  { name: 'Team', rate: 149, annual: false, color: 'text-indigo-400', bg: 'bg-indigo-500/20' },
+  { name: 'Business', rate: 199, annual: false, color: 'text-[#C8622A]', bg: 'bg-[#C8622A]/20' },
+  { name: 'QuickBooks Add-on', rate: 25, annual: false, color: 'text-yellow-400', bg: 'bg-yellow-500/20' },
+  { name: 'Enterprise', rate: null, annual: false, color: 'text-green-400', bg: 'bg-green-500/20' },
 ]
+
+function planMonthlyRate(planName) {
+  const p = PLANS.find(p => p.name === planName)
+  if (!p || p.rate == null) return null
+  return p.annual ? p.rate / 12 : p.rate
+}
+
+function planARR(planName, monthlyRate) {
+  const p = PLANS.find(p => p.name === planName)
+  if (p?.annual) return p.rate  // use exact annual price, never re-derive from rounded monthly
+  return (parseFloat(monthlyRate) || 0) * 12
+}
 
 const ORG_TYPES = [
   { value: 'integrator', label: 'Integrator', desc: 'Trades contractor — full BOM, proposals, POs' },
@@ -730,7 +742,7 @@ export default function SuperAdmin() {
 
   const pendingRequests = requests.filter(r => r.status === 'pending')
   const mrr = orgs.filter(o => o.billing_status === 'active').reduce((sum, o) => sum + (parseFloat(o.monthly_rate) || 0), 0)
-  const arr = Math.round(mrr * 12)
+  const arr = Math.round(orgs.filter(o => o.billing_status === 'active').reduce((sum, o) => sum + planARR(o.plan, o.monthly_rate), 0))
   const activeOrgs = orgs.filter(o => o.billing_status === 'active').length
   const trialOrgs = orgs.filter(o => o.billing_status === 'trial').length
   const pendingOrgs = orgs.filter(o => o.billing_status === 'pending').length
@@ -1240,7 +1252,10 @@ export default function SuperAdmin() {
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <label className="text-[#8A9AB0] text-xs mb-1 block">Plan</label>
-                              <select value={billingForm.plan} onChange={e => setBillingForm(p => ({ ...p, plan: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
+                              <select value={billingForm.plan} onChange={e => {
+                                const suggested = planMonthlyRate(e.target.value)
+                                setBillingForm(p => ({ ...p, plan: e.target.value, ...(suggested != null ? { monthly_rate: suggested } : {}) }))
+                              }} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]">
                                 {PLANS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
                               </select>
                             </div>
