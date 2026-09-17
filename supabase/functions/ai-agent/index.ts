@@ -17,6 +17,9 @@ const TOOLS = [
         city: { type: "string", description: "City" },
         state: { type: "string", description: "State" },
         zip: { type: "string", description: "Zip code" },
+        website: { type: "string", description: "Website URL" },
+        industry: { type: "string", description: "Industry or vertical" },
+        notes: { type: "string", description: "Internal notes about the client" },
       },
       required: ["company"],
     },
@@ -101,6 +104,19 @@ const TOOLS = [
     },
   },
   {
+    name: "update_client_poc",
+    description: "Update the main point of contact (POC) name on a client account. ALWAYS call search_clients first to find the client and check the current POC. Then show the user the current POC and ask for confirmation before calling this tool. Never call this without user confirmation.",
+    input_schema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Company name to find the client" },
+        new_poc_name: { type: "string", description: "New main POC full name to set" },
+        confirmed: { type: "boolean", description: "Must be true — user has explicitly confirmed they want to overwrite the existing POC" },
+      },
+      required: ["company", "new_poc_name", "confirmed"],
+    },
+  },
+  {
     name: "get_recent_activity",
     description: "Get recent clients, proposals, or service tickets",
     input_schema: {
@@ -142,6 +158,7 @@ const TOOL_PERMS: Record<string, { area: string; write?: boolean }> = {
   create_task:            { area: 'tasks',          write: true },
   create_proposal:        { area: 'proposals',      write: true },
   create_contact:         { area: 'clients',        write: true },
+  update_client_poc:      { area: 'clients',        write: true },
   get_pipeline_summary:   { area: 'pipeline' },
   get_recent_activity:    { area: 'dashboard' },
 }
@@ -166,6 +183,9 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         city: input.city || null,
         state: input.state || null,
         zip: input.zip || null,
+        website: input.website || null,
+        industry: input.industry || null,
+        notes: input.notes || null,
       }).select("id, company").single()
       if (error) return { error: error.message }
       return { success: true, id: data.id, company: data.company, action: "created_client" }
@@ -242,6 +262,17 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       }).select("id, full_name").single()
       if (error) return { error: error.message }
       return { success: true, id: data.id, full_name: data.full_name, company: client.company, action: "created_contact" }
+    }
+
+    case "update_client_poc": {
+      if (!input.confirmed) return { error: "User confirmation required before updating the main POC." }
+      const { data: client } = await supabase.from("clients")
+        .select("id, company, client_name").eq("org_id", orgId)
+        .ilike("company", `%${input.company}%`).limit(1).maybeSingle()
+      if (!client) return { error: `No client found matching "${input.company}".` }
+      const { error } = await supabase.from("clients").update({ client_name: input.new_poc_name }).eq("id", client.id)
+      if (error) return { error: error.message }
+      return { success: true, company: client.company, previous_poc: client.client_name || "(none)", new_poc: input.new_poc_name, action: "updated_poc" }
     }
 
     case "get_pipeline_summary": {
@@ -408,6 +439,8 @@ Guidelines:
 - If a required field is missing (like company name for a client), ask for just that field.
 - Format dollar amounts with $ and commas. Format dates as Month Day, Year.
 - IMPORTANT: When adding a contact person to an existing company, always use create_contact (not create_client). create_client creates a new company account. create_contact adds a person to an existing company's Contacts tab.
+- When creating a new client, use create_client for the company (with address, website, industry, notes), then immediately follow up with create_contact to add the primary contact person (name, title, email, phone) — do both in sequence without asking.
+- NEVER use create_client to change the main POC on an existing client — that creates a duplicate. To change the main POC, use update_client_poc. Always search the client first, tell the user the current POC ("Pinnacle Group's main POC is currently Marcus Delgado — replace with Sarah Chen?"), and only call update_client_poc after the user confirms.
 - Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`
 
     // Agentic loop — keep calling Claude until it stops using tools
