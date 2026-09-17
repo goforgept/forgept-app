@@ -50,6 +50,9 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [savingPrice, setSavingPrice] = useState(false)
   const [editingProductId, setEditingProductId] = useState(null)
   const [editForm, setEditForm] = useState({})
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false)
+  const [bulkEditForm, setBulkEditForm] = useState({ category: '', sub_category: '', manufacturer: '', unit: '' })
   // Catalogs
   const [enabledCatalogs, setEnabledCatalogs] = useState([]) // [{ slug, label }]
   const [catalogItems, setCatalogItems] = useState([])        // catalog_products rows for active slugs
@@ -388,6 +391,34 @@ if (!finalCost) continue
     fetchAll()
   }
 
+  const toggleSelect = (id) => setSelectedIds(prev => {
+    const next = new Set(prev)
+    next.has(id) ? next.delete(id) : next.add(id)
+    return next
+  })
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) setSelectedIds(new Set())
+    else setSelectedIds(new Set(filtered.map(p => p.id)))
+  }
+
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`Remove ${selectedIds.size} product${selectedIds.size !== 1 ? 's' : ''} from the library?`)) return
+    await Promise.all([...selectedIds].map(id => supabase.from('product_library').update({ active: false }).eq('id', id)))
+    setSelectedIds(new Set())
+    fetchAll()
+  }
+
+  const handleBulkEdit = async () => {
+    const updates = Object.fromEntries(Object.entries(bulkEditForm).filter(([, v]) => v.trim() !== ''))
+    if (Object.keys(updates).length === 0) return
+    await Promise.all([...selectedIds].map(id => supabase.from('product_library').update(updates).eq('id', id)))
+    setSelectedIds(new Set())
+    setShowBulkEditModal(false)
+    setBulkEditForm({ category: '', sub_category: '', manufacturer: '', unit: '' })
+    fetchAll()
+  }
+
   // ─── Filters ──────────────────────────────────────────────────────────────
   const allVendors = [...new Set(Object.values(pricing).flat().map(p => p.vendor).filter(Boolean))].sort()
   const categories = [...new Set(products.map(p => p.category).filter(Boolean))].sort()
@@ -666,7 +697,36 @@ if (!finalCost) continue
 
         {/* Product list (library tab) */}
         {activeTab === 'library' && <div className="bg-fp-card rounded-xl p-6">
-          <h3 className="text-fp-text font-bold mb-4">All Products ({filtered.length})</h3>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              {canEdit && (
+                <input type="checkbox"
+                  checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                  onChange={toggleSelectAll}
+                  className="w-4 h-4 accent-fp-brand cursor-pointer"
+                  title="Select all"
+                />
+              )}
+              <h3 className="text-fp-text font-bold">All Products ({filtered.length})</h3>
+            </div>
+            {selectedIds.size > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-fp-muted text-sm">{selectedIds.size} selected</span>
+                <button onClick={() => { setShowBulkEditModal(true); setBulkEditForm({ category: '', sub_category: '', manufacturer: '', unit: '' }) }}
+                  className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-fp-hover transition-colors border border-fp-border">
+                  Edit Selected
+                </button>
+                <button onClick={handleBulkDelete}
+                  className="bg-red-500/10 text-red-400 hover:bg-red-500/20 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border border-red-500/20">
+                  Delete Selected
+                </button>
+                <button onClick={() => setSelectedIds(new Set())}
+                  className="text-fp-muted hover:text-fp-text text-xs transition-colors">
+                  ✕ Clear
+                </button>
+              </div>
+            )}
+          </div>
 
           {loading ? (
             <div className="space-y-3">
@@ -695,10 +755,18 @@ if (!finalCost) continue
                   <div key={p.id} className="bg-fp-inset rounded-xl overflow-hidden border border-fp-border">
                     {/* Product row */}
                     <div
-                      className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-fp-inset transition-colors"
+                      className="flex items-center justify-between px-4 py-3 hover:bg-fp-inset transition-colors"
                       onClick={() => setExpandedId(isOpen ? null : p.id)}
                     >
                       <div className="flex items-center gap-4 min-w-0">
+                        {canEdit && (
+                          <input type="checkbox"
+                            checked={selectedIds.has(p.id)}
+                            onChange={e => { e.stopPropagation(); toggleSelect(p.id) }}
+                            onClick={e => e.stopPropagation()}
+                            className="w-4 h-4 accent-fp-brand cursor-pointer shrink-0"
+                          />
+                        )}
                         <div className="min-w-0">
                           <p className="text-fp-text text-sm font-semibold truncate">{p.item_name}</p>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -906,6 +974,44 @@ if (!finalCost) continue
           )}
         </div>}
       </div>
+
+      {/* Bulk Edit Modal */}
+      {showBulkEditModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+          <div className="bg-fp-card rounded-2xl p-6 w-full max-w-sm">
+            <h3 className="text-fp-text font-bold text-lg mb-1">Edit {selectedIds.size} Product{selectedIds.size !== 1 ? 's' : ''}</h3>
+            <p className="text-fp-muted text-sm mb-5">Leave a field blank to keep existing values unchanged.</p>
+            <div className="space-y-3">
+              {[
+                ['category', 'Category'],
+                ['sub_category', 'Sub-Category'],
+                ['manufacturer', 'Manufacturer'],
+                ['unit', 'Unit'],
+              ].map(([field, label]) => (
+                <div key={field}>
+                  <label className="text-fp-muted text-xs mb-1 block">{label}</label>
+                  <input
+                    value={bulkEditForm[field]}
+                    onChange={e => setBulkEditForm(prev => ({ ...prev, [field]: e.target.value }))}
+                    placeholder={`Leave blank to skip`}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setShowBulkEditModal(false)}
+                className="flex-1 py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">
+                Cancel
+              </button>
+              <button onClick={handleBulkEdit}
+                className="flex-1 bg-fp-brand text-white py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                Apply Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
