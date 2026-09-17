@@ -82,6 +82,11 @@ export default function NotificationBell({ userId: userIdProp }) {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })))
   }
 
+  const clearAll = async () => {
+    await supabase.from('notifications').delete().eq('user_id', resolvedUserId)
+    setNotifications([])
+  }
+
   const handleClick = async (notification) => {
     await supabase.from('notifications').update({ read: true }).eq('id', notification.id)
     setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, read: true } : n))
@@ -132,6 +137,11 @@ export default function NotificationBell({ userId: userIdProp }) {
                 {unreadCount > 0 && (
                   <button onClick={markAllRead} className="text-fp-muted hover:text-fp-text text-xs transition-colors">
                     Mark all read
+                  </button>
+                )}
+                {visible.length > 0 && (
+                  <button onClick={clearAll} className="text-fp-muted hover:text-red-400 text-xs transition-colors">
+                    Clear all
                   </button>
                 )}
                 <button
