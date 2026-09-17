@@ -1010,6 +1010,17 @@ export default function SuperAdmin() {
                             }
                           </p>
                         </div>
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Delete user ${u.email}? This cannot be undone.`)) return
+                            const { error } = await supabase.functions.invoke('delete-org-users', { body: { userId: u.id } })
+                            if (error) { alert('Failed to delete user: ' + error.message); return }
+                            fetchOrgDetail(org.id)
+                          }}
+                          className="text-red-500/50 hover:text-red-400 text-xs transition-colors px-2 py-1 shrink-0"
+                        >
+                          Delete
+                        </button>
                       </div>
                     ))}
                     {members.length === 0 && <p className="text-[#8A9AB0] text-sm">No users yet.</p>}

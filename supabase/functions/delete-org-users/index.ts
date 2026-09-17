@@ -31,9 +31,30 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { orgId } = await req.json()
+    const body = await req.json()
+    const { orgId, userId } = body
+
+    // ── Single user delete ───────────────────────────────────────────────────
+    if (userId && !orgId) {
+      const admin = createClient(supabaseUrl, serviceKey)
+      await admin.from('profiles').delete().eq('id', userId)
+      const res = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+      })
+      if (!res.ok) {
+        const txt = await res.text()
+        return new Response(JSON.stringify({ error: `Auth delete failed: ${txt}` }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     if (!orgId) {
-      return new Response(JSON.stringify({ error: 'orgId required' }), {
+      return new Response(JSON.stringify({ error: 'orgId or userId required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
