@@ -560,6 +560,9 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
   const [members, setMembers] = useState([])
   const [orgId, setOrgId] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState(null)
+  const [currentOrgRole, setCurrentOrgRole] = useState(null)
+  const [removingId, setRemovingId] = useState(null)
 
   const [showInvite, setShowInvite] = useState(false)
   const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', org_role: 'rep', org_role_id: '' })
@@ -575,9 +578,11 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
   useEffect(() => {
     const load = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      const { data: profile } = await supabase.from('profiles').select('org_id').eq('id', user.id).single()
+      const { data: profile } = await supabase.from('profiles').select('org_id, org_role').eq('id', user.id).single()
       if (!profile?.org_id) { setLoading(false); return }
       setOrgId(profile.org_id)
+      setCurrentUserId(user.id)
+      setCurrentOrgRole(profile.org_role)
 
       const [{ data: rolesData }, { data: membersData }] = await Promise.all([
         supabase.from('org_roles').select('*').eq('org_id', profile.org_id).order('created_at'),
@@ -637,6 +642,26 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
       return idx >= 0 ? prev.map(r => r.id === savedRole.id ? savedRole : r) : [...prev, savedRole]
     })
     setEditRole(null)
+  }
+
+  const handleRemoveMember = async (memberId) => {
+    if (!confirm('Remove this team member? They will lose access immediately.')) return
+    setRemovingId(memberId)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('https://qxypaepvmtmkhbssedki.supabase.co/functions/v1/remove-team-member', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ userId: memberId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Failed to remove member')
+      setMembers(prev => prev.filter(m => m.id !== memberId))
+    } catch (err) {
+      alert('Error: ' + err.message)
+    } finally {
+      setRemovingId(null)
+    }
   }
 
   const handleDeleteRole = async (roleId) => {
@@ -811,10 +836,21 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
                     </td>
                     <td className="px-4 py-2.5 text-fp-muted text-xs hidden sm:table-cell">{m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-2.5">
-                      <button onClick={() => setEditMember(m)}
-                        className="text-fp-muted hover:text-fp-brand text-xs transition-colors font-medium whitespace-nowrap">
-                        Edit
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setEditMember(m)}
+                          className="text-fp-muted hover:text-fp-brand text-xs transition-colors font-medium whitespace-nowrap">
+                          Edit
+                        </button>
+                        {currentOrgRole === 'admin' && m.id !== currentUserId && m.org_role !== 'admin' && !m.org_roles?.is_admin && (
+                          <button
+                            onClick={() => handleRemoveMember(m.id)}
+                            disabled={removingId === m.id}
+                            className="text-red-500/50 hover:text-red-400 text-xs transition-colors font-medium whitespace-nowrap disabled:opacity-50"
+                          >
+                            {removingId === m.id ? '...' : 'Remove'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 )
