@@ -19,8 +19,8 @@ Deno.serve(async (req) => {
   const userClient = createClient(supabaseUrl, anonKey, { global: { headers: { Authorization: authHeader } } })
   const { data: { user }, error: authError } = await userClient.auth.getUser()
   if (authError || !user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: corsHeaders })
-  const { data: profile } = await userClient.from('profiles').select('role').eq('id', user.id).single()
-  if (profile?.role !== 'superadmin') return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders })
+  const { data: profile } = await userClient.from('profiles').select('role, is_superadmin').eq('id', user.id).single()
+  if (profile?.role !== 'superadmin' && !profile?.is_superadmin) return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: corsHeaders })
 
   try {
     const { orgId } = await req.json()
