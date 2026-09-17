@@ -787,7 +787,12 @@ export default function SuperAdmin() {
           <h1 className="text-white text-xl font-bold">ForgePt<span className="text-[#C8622A]">.</span></h1>
           <span className="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded-full font-semibold">Super Admin</span>
         </div>
-        <button onClick={() => navigate('/')} className="text-[#8A9AB0] hover:text-white text-sm transition-colors">← Back to App</button>
+        <button
+          onClick={async () => { await supabase.auth.signOut(); navigate('/') }}
+          className="text-[#8A9AB0] hover:text-red-400 text-sm transition-colors"
+        >
+          Sign Out
+        </button>
       </div>
 
       <div className="p-6 space-y-6">
