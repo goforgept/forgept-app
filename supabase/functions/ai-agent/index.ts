@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { validateUser, corsHeaders } from "../_shared/auth.ts"
+import { checkAndIncrementAIUsage } from "../_shared/ai-usage.ts"
 
 const TOOLS = [
   {
@@ -572,12 +573,20 @@ Deno.serve(async (req) => {
     })
   }
 
-  // Check feature flag
+  // Check feature flag + load limit
   const { data: org } = await supabase.from("organizations")
-    .select("feature_ai_agent").eq("id", profile.org_id).single()
+    .select("feature_ai_agent, ai_request_limit").eq("id", profile.org_id).single()
   if (!org?.feature_ai_agent) {
     return new Response(JSON.stringify({ error: "AI Agent not enabled for this organization" }), {
       status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" }
+    })
+  }
+
+  // Usage gate
+  const usageError = await checkAndIncrementAIUsage(profile.org_id)
+  if (usageError) {
+    return new Response(JSON.stringify({ error: usageError }), {
+      status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" }
     })
   }
 

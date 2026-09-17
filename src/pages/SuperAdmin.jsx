@@ -441,13 +441,12 @@ export default function SuperAdmin() {
   const fetchOrgDetail = async (orgId) => {
     if (orgDetail[orgId]) return // already cached
     setLoadingDetail(orgId)
-    const { data: activities } = await supabase
-      .from('activities')
-      .select('*')
-      .eq('org_id', orgId)
-      .order('created_at', { ascending: false })
-      .limit(8)
-    setOrgDetail(prev => ({ ...prev, [orgId]: { activities: activities || [] } }))
+    const month = new Date().toISOString().slice(0, 7)
+    const [{ data: activities }, { data: aiUsage }] = await Promise.all([
+      supabase.from('activities').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(8),
+      supabase.from('ai_usage').select('request_count').eq('org_id', orgId).eq('month', month).maybeSingle(),
+    ])
+    setOrgDetail(prev => ({ ...prev, [orgId]: { activities: activities || [], aiUsageThisMonth: aiUsage?.request_count ?? 0 } }))
     setLoadingDetail(null)
   }
 
@@ -1237,6 +1236,40 @@ export default function SuperAdmin() {
                               {' '}({Math.ceil((new Date(org.trial_ends_at) - new Date()) / 86400000)}d)
                             </p>
                           ) : <span className="text-[#8A9AB0] text-xs">Not set</span>}
+                        </div>
+                      </div>
+
+                      {/* AI Usage */}
+                      <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[#8A9AB0] text-xs">AI Requests This Month</p>
+                          <p className="text-white text-xs font-semibold font-mono">
+                            {orgDetail[org.id]?.aiUsageThisMonth ?? '—'} / {org.ai_request_limit ?? 1000}
+                          </p>
+                        </div>
+                        <div className="w-full bg-[#1a2d45] rounded-full h-1.5">
+                          <div
+                            className="h-1.5 rounded-full transition-all"
+                            style={{
+                              width: `${Math.min(100, ((orgDetail[org.id]?.aiUsageThisMonth ?? 0) / (org.ai_request_limit ?? 1000)) * 100)}%`,
+                              backgroundColor: ((orgDetail[org.id]?.aiUsageThisMonth ?? 0) / (org.ai_request_limit ?? 1000)) > 0.8 ? '#ef4444' : '#C8622A'
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span className="text-[#8A9AB0] text-xs">Limit:</span>
+                          <input
+                            type="number"
+                            defaultValue={org.ai_request_limit ?? 1000}
+                            onBlur={async e => {
+                              const val = parseInt(e.target.value)
+                              if (!val || val < 1) return
+                              await supabase.from('organizations').update({ ai_request_limit: val }).eq('id', org.id)
+                              setOrgs(prev => prev.map(o => o.id === org.id ? { ...o, ai_request_limit: val } : o))
+                            }}
+                            className="w-24 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-0.5 text-xs focus:outline-none focus:border-[#C8622A]"
+                          />
+                          <span className="text-[#8A9AB0] text-xs">requests/mo</span>
                         </div>
                       </div>
 

@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { checkAndIncrementAIUsage } from "../_shared/ai-usage.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -45,6 +46,14 @@ Deno.serve(async (req) => {
   if (profileError || !profile?.org_id) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
       status: 401,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
+
+  const usageError = await checkAndIncrementAIUsage(profile.org_id)
+  if (usageError) {
+    return new Response(JSON.stringify({ error: usageError }), {
+      status: 429,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }

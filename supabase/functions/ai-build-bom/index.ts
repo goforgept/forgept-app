@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { validateUser, corsHeaders } from "../_shared/auth.ts"
+import { checkAndIncrementAIUsage } from "../_shared/ai-usage.ts"
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -10,6 +11,14 @@ Deno.serve(async (req) => {
       status: 401,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
+
+  const usageError = await checkAndIncrementAIUsage(profile.org_id)
+  if (usageError) {
+    return new Response(JSON.stringify({ error: usageError }), {
+      status: 429,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
+  }
   }
 
   try {
