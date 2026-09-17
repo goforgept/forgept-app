@@ -1,11 +1,11 @@
-// Shared email helper — sends via Postmark API
+// Shared email helper — sends via Resend API
 
 export interface EmailAttachment {
   /** Base64-encoded file content */
   content:  string
   /** File name, e.g. "proposal.pdf" */
   filename: string
-  /** MIME type, e.g. "application/pdf" */
+  /** MIME type (unused by Resend but kept for interface compatibility) */
   mimeType?: string
 }
 
@@ -17,42 +17,44 @@ interface EmailOptions {
   fromName?:    string
   cc?:          string[]
   attachments?: EmailAttachment[]
+  trackOpens?:  boolean
 }
 
-export async function sendEmail(opts: EmailOptions): Promise<void> {
-  const POSTMARK_API_KEY = Deno.env.get('POSTMARK_API_KEY')!
-  const FROM_EMAIL = Deno.env.get('FROM_EMAIL') ?? 'hello@goforgept.com'
+export async function sendEmail(opts: EmailOptions): Promise<{ messageId: string | null }> {
+  const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
+  const FROM_EMAIL = Deno.env.get('FROM_EMAIL') ?? 'hello@mail.goforgept.com'
 
   const body: Record<string, unknown> = {
-    From:     `${opts.fromName || 'ForgePt.'} <${FROM_EMAIL}>`,
-    To:       Array.isArray(opts.to) ? opts.to.join(',') : opts.to,
-    Subject:  opts.subject,
-    HtmlBody: opts.html,
+    from:    `${opts.fromName || 'ForgePt.'} <${FROM_EMAIL}>`,
+    to:      Array.isArray(opts.to) ? opts.to : [opts.to],
+    subject: opts.subject,
+    html:    opts.html,
   }
 
-  if (opts.replyTo)    body.ReplyTo = opts.replyTo
-  if (opts.cc?.length) body.Cc = opts.cc.join(',')
+  if (opts.replyTo)    body.reply_to = opts.replyTo
+  if (opts.cc?.length) body.cc       = opts.cc
 
   if (opts.attachments?.length) {
-    body.Attachments = opts.attachments.map(a => ({
-      Name:        a.filename,
-      Content:     a.content,
-      ContentType: a.mimeType ?? 'application/octet-stream',
+    body.attachments = opts.attachments.map(a => ({
+      filename: a.filename,
+      content:  a.content,
     }))
   }
 
-  const res = await fetch('https://api.postmarkapp.com/email', {
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
-      'Accept':                  'application/json',
-      'Content-Type':            'application/json',
-      'X-Postmark-Server-Token': POSTMARK_API_KEY,
+      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Content-Type':  'application/json',
     },
     body: JSON.stringify(body),
   })
 
   if (!res.ok) {
     const err = await res.text()
-    throw new Error(`Postmark error (${res.status}): ${err}`)
+    throw new Error(`Resend error (${res.status}): ${err}`)
   }
+
+  const json = await res.json()
+  return { messageId: json.id ?? null }
 }

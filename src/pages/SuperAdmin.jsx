@@ -345,6 +345,7 @@ export default function SuperAdmin() {
   // New state
   const [allProposals, setAllProposals] = useState([])
   const [allClients, setAllClients] = useState([])
+  const [aiUsageSummary, setAiUsageSummary] = useState({ total: 0, byOrg: [] })
   const [expandedOrg, setExpandedOrg] = useState(null)
   const [selectedOrg, setSelectedOrg] = useState(null)
   const [orgNotes, setOrgNotes] = useState({})
@@ -396,17 +397,20 @@ export default function SuperAdmin() {
 
   const fetchData = async () => {
     const saPassword = getSaPassword()
+    const month = new Date().toISOString().slice(0, 7)
     const [
       { data: orgsData },
       { data: requestsData },
       { data: proposalsData },
       { data: clientsData },
+      { data: aiUsageData },
       profilesResult,
     ] = await Promise.all([
       supabase.from('organizations').select('*').order('created_at', { ascending: false }),
       supabase.from('access_requests').select('*').order('created_at', { ascending: false }),
       supabase.from('proposals').select('id, org_id, created_at, status, proposal_value, proposal_name').order('created_at', { ascending: false }),
       supabase.from('clients').select('id, org_id'),
+      supabase.from('ai_usage').select('org_id, request_count').eq('month', month),
       supabase.functions.invoke('superadmin-get-data', { body: { sa_password: saPassword } }),
     ])
 
@@ -427,6 +431,11 @@ export default function SuperAdmin() {
     setRequests(requestsData || [])
     setAllProposals(proposalsData || [])
     setAllClients(clientsData || [])
+    const usageRows = aiUsageData || []
+    setAiUsageSummary({
+      total: usageRows.reduce((s, r) => s + (r.request_count || 0), 0),
+      byOrg: usageRows.sort((a, b) => b.request_count - a.request_count),
+    })
     setRoadmapItems(profilesResult?.data?.roadmap_items || [])
     setEmbedUsage(profilesResult?.data?.embed_usage || {})
 
@@ -807,13 +816,37 @@ export default function SuperAdmin() {
       </div>
 
       <div className="p-6 space-y-6">
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Total Orgs</p><p className="text-white text-2xl font-bold">{orgs.length}</p></div>
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Total Users</p><p className="text-white text-2xl font-bold">{profiles.length}</p></div>
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Pending Requests</p><p className="text-yellow-400 text-2xl font-bold">{pendingRequests.length}</p></div>
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">Active Paying</p><p className="text-green-400 text-2xl font-bold">{activeOrgs}</p></div>
           <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">MRR</p><p className="text-[#C8622A] text-2xl font-bold">${mrr.toLocaleString()}</p></div>
+          <div className="bg-[#1a2d45] rounded-xl p-5"><p className="text-[#8A9AB0] text-sm mb-1">AI Requests (mo)</p><p className="text-purple-400 text-2xl font-bold">{aiUsageSummary.total.toLocaleString()}</p></div>
         </div>
+
+        {/* AI Usage breakdown */}
+        {aiUsageSummary.byOrg.length > 0 && (
+          <div className="bg-[#1a2d45] rounded-xl p-5">
+            <p className="text-white font-semibold text-sm mb-3">AI Usage This Month — Top Orgs</p>
+            <div className="space-y-2">
+              {aiUsageSummary.byOrg.slice(0, 8).map(row => {
+                const org = orgs.find(o => o.id === row.org_id)
+                const limit = org?.ai_request_limit ?? 1000
+                const pct = Math.min(100, Math.round((row.request_count / limit) * 100))
+                return (
+                  <div key={row.org_id} className="flex items-center gap-3">
+                    <p className="text-[#8A9AB0] text-xs w-40 truncate shrink-0">{org?.name || row.org_id}</p>
+                    <div className="flex-1 bg-[#0F1C2E] rounded-full h-1.5">
+                      <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: pct > 80 ? '#ef4444' : '#a78bfa' }} />
+                    </div>
+                    <p className="text-[#8A9AB0] text-xs font-mono w-20 text-right shrink-0">{row.request_count} / {limit}</p>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Support Code Lookup */}
         <div className="bg-[#1a2d45] rounded-xl p-5">

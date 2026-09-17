@@ -464,7 +464,7 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       }
       if (!proposal) return { error: "No matching proposal found." }
 
-      const [{ data: activities }, { data: tasks }] = await Promise.all([
+      const [{ data: activities }, { data: tasks }, { data: emails }] = await Promise.all([
         supabase.from("activities")
           .select("type, title, body, created_at, profiles(full_name)")
           .eq("proposal_id", proposal.id)
@@ -473,6 +473,10 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           .select("title, due_date, status")
           .eq("org_id", orgId).eq("client_id", proposal.id)
           .neq("status", "completed").limit(5),
+        supabase.from("client_emails")
+          .select("subject, sent_at, opened_at, open_count, to_email")
+          .eq("proposal_id", proposal.id)
+          .order("sent_at", { ascending: false }).limit(5),
       ])
 
       return {
@@ -487,6 +491,13 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         },
         recent_activity: (activities || []).map(a => ({ type: a.type, title: a.title, notes: a.body, by: a.profiles?.full_name, date: a.created_at })),
         open_tasks: tasks || [],
+        email_history: (emails || []).map(e => ({
+          subject: e.subject,
+          sent: e.sent_at,
+          opened: e.opened_at ?? null,
+          open_count: e.open_count ?? 0,
+          to: e.to_email,
+        })),
       }
     }
 

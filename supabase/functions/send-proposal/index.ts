@@ -41,12 +41,13 @@ Deno.serve(async (req) => {
       </div>
     `
 
-    await sendEmail({
+    const { messageId } = await sendEmail({
       to:       clientEmail,
       subject,
       html:     bodyHtml,
       replyTo:  repEmail,
       fromName: repName || SENDER_NAME,
+      trackOpens: true,
       attachments: pdfBase64 ? [{
         content:  pdfBase64,
         filename: `${proposalName}.pdf`,
@@ -54,17 +55,31 @@ Deno.serve(async (req) => {
       }] : undefined,
     })
 
-    // Mark proposal as Sent — scoped to caller's org
     const adminSupabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    await adminSupabase
-      .from('proposals')
-      .update({ status: 'Sent' })
-      .eq('id', proposalId)
-      .eq('org_id', profile.org_id)
+    // Look up client_id from proposal
+    const { data: proposal } = await adminSupabase
+      .from('proposals').select('client_id').eq('id', proposalId).maybeSingle()
+
+    await Promise.all([
+      // Mark proposal as Sent
+      adminSupabase.from('proposals').update({ status: 'Sent' }).eq('id', proposalId).eq('org_id', profile.org_id),
+      // Store email record for open tracking
+      adminSupabase.from('client_emails').insert({
+        org_id:               profile.org_id,
+        client_id:            proposal?.client_id ?? null,
+        proposal_id:          proposalId,
+        sent_by:              (await adminSupabase.auth.getUser()).data.user?.id ?? null,
+        subject,
+        to_email:             clientEmail,
+        postmark_message_id:  messageId,
+        sent_at:              new Date().toISOString(),
+        open_count:           0,
+      }),
+    ])
 
     return new Response(
       JSON.stringify({ success: true }),
