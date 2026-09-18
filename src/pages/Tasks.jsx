@@ -584,7 +584,14 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
                   return (
                     <div
                       key={day}
-                      onClick={() => setSelectedDay(isSelected ? null : day)}
+                      onClick={() => {
+                        const newDay = isSelected ? null : day
+                        setSelectedDay(newDay)
+                        if (newDay) {
+                          const dateStr = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(newDay).padStart(2, '0')}`
+                          setForm(prev => ({ ...prev, due_date: dateStr }))
+                        }
+                      }}
                       className={`min-h-[64px] rounded-lg p-1.5 cursor-pointer transition-colors border ${
                         isSelected ? 'border-[#C8622A] bg-[#C8622A]/10' :
                         isToday ? 'border-[#C8622A]/40 bg-[#C8622A]/5' :
@@ -621,9 +628,18 @@ export default function Tasks({ isAdmin, featureProposals = true, featureCRM = f
             <div className="bg-fp-card rounded-xl p-5">
               {selectedDay ? (
                 <>
-                  <h3 className="text-fp-text font-bold mb-1">
-                    {new Date(calYear, calMonth, selectedDay).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                  </h3>
+                  <div className="flex justify-between items-start mb-1">
+                    <h3 className="text-fp-text font-bold">
+                      {new Date(calYear, calMonth, selectedDay).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                    </h3>
+                    {canWrite('tasks') && (
+                      <button
+                        onClick={() => { setShowForm(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+                        className="text-xs bg-fp-brand text-white px-2.5 py-1 rounded-lg font-semibold hover:bg-[#b5571f] transition-colors shrink-0 ml-2">
+                        + Add Task
+                      </button>
+                    )}
+                  </div>
                   <p className="text-fp-muted text-xs mb-4">{selectedDayTasks.length} task{selectedDayTasks.length !== 1 ? 's' : ''}</p>
                   {selectedDayTasks.length === 0 ? (
                     <p className="text-fp-muted text-sm">No tasks this day.</p>

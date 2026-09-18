@@ -77,7 +77,12 @@ const faqs = [
       { q: 'What is a Job in ForgePt.?', a: 'A Job represents a field installation or service project linked to a proposal or client. Jobs have a job number, progress checklist, assigned technicians, and status tracking from Scheduled through to Complete.' },
       { q: 'How do I create a Job?', a: 'Go to the Jobs page and click New Job. Select the client and proposal it relates to, set a scheduled date, assign technicians, and add checklist items for the work to be completed.' },
       { q: 'How does Job progress tracking work?', a: 'Each job has a list of checklist items (tasks to complete on site). As items are marked done, the job progress bar updates in real time. When all items are checked, the job is considered complete.' },
-      { q: 'Can technicians see their jobs?', a: 'Yes — technicians log in with their own credentials and see only the jobs assigned to them. They can update checklist items, log time, and add notes directly from the job view.' }
+      { q: 'Can technicians see their jobs?', a: 'Yes — technicians log in with their own credentials and see only the jobs assigned to them. They can update checklist items, log time, and add notes directly from the job view.' },
+      { q: 'What does the Cost Report tab show?', a: 'The Cost Report tab (on any job detail page) gives you a full profitability breakdown: total quoted revenue vs. actual cost, margin by category (materials, labor, change orders, freeform POs), and labor-specific tracking showing budgeted vs. actual hours and cost. It also shows a per-tech breakdown so you can see exactly who logged time and at what rate.' },
+      { q: 'How is labor cost calculated on a job?', a: 'Labor cost is calculated using each technician\'s assigned rate card role. Go to Settings → Team and assign each tech a Labor Rate Card Role. When they log time on a job, ForgePt uses their role\'s cost-per-hour from the Rate Card. If a tech has no role assigned, the system falls back to a blended average based on the job\'s total budgeted labor.' },
+      { q: 'What happens when a job goes over its labor budget?', a: 'The Cost Report flags it clearly. The Hours card turns red and shows the overage in hours. The Budgeted Cost card shows the dollar overage (actual cost vs. budgeted). The per-tech table shows which technician\'s hours are driving the overage and how much over budget each role is.' },
+      { q: 'What is the PM True-Up and when do I use it?', a: 'The PM True-Up (on the Cost Report tab) lets a Project Manager add labor or materials without going through a tech daily log. Use it to log PM coordination time for a specific tech, record materials that were pulled from stock but not logged in the field, or add freeform cost adjustments. For labor, pick the tech from the dropdown and their rate is pulled automatically. For materials, pick from the job\'s BOM items (flows into used/remaining tracking) or enter a freeform cost amount.' },
+      { q: 'How do Change Orders affect job profitability?', a: 'Approved change orders are included in the job\'s total revenue on the Cost Report. If you add line items to the CO, their costs are calculated automatically. For lump-sum COs with no line items, enter a "Your Cost" amount in the change order form so the profitability numbers stay accurate.' },
     ]
   },
   {
@@ -190,6 +195,7 @@ const faqs = [
     items: [
       { q: 'What is the AI Agent?', a: 'The AI Agent is a built-in assistant that lets you create and find things in ForgePt using plain language. It appears as an orange chat button in the bottom-right corner of every page. Type something like "Create a client named Acme Corp" or "Show me the pipeline summary" and it handles the rest.' },
       { q: 'What can the AI Agent do?', a: 'The AI Agent can create clients, service tickets, tasks, and proposals — and can search for existing clients or pull a pipeline summary. Just describe what you need in plain English. Example commands: "Create a service ticket — AC unit down, high priority", "Create a proposal for Acme Corp worth $15,000", "Find clients named Smith", "What does my pipeline look like this month?"' },
+      { q: 'Can the AI Agent help me with jobs and cost tracking?', a: 'Yes — when you are on a job\'s Cost Report tab, the AI Agent automatically picks up the full cost snapshot for that job: total revenue, budgeted vs. actual costs, labor hours logged, margin by category, and change order status. Just open the agent and ask things like "Are we over budget on labor?", "What\'s our projected margin?", "How many hours are left?", or "Summarize this job\'s profitability." The agent answers with the live numbers from the report — no copy-pasting required.' },
       { q: 'How do I enable the AI Agent?', a: 'The AI Agent is a feature that must be enabled by your ForgePt account manager. If you do not see the orange chat button, contact support at hello@goforgept.com to have it turned on for your organization.' },
       { q: 'Does the AI Agent see my data?', a: 'Yes — the agent is scoped to your organization only. It can only read and create records within your account. No data is shared across organizations. Conversations are not stored and are only used in-session to complete your request.' },
       { q: 'Can the AI Agent answer questions about ForgePt?', a: 'Yes — in addition to taking action, the agent can answer how-to questions about ForgePt features. For help questions you can also use the "Ask AI" panel at the top of this Help page, which is optimized for answering questions rather than creating records.' },
@@ -305,6 +311,16 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
           <p className="text-fp-muted mt-1">Everything you need to know about using ForgePt.</p>
         </div>
 
+        {/* Welcome banner */}
+        <div className="bg-fp-card rounded-xl p-6 border border-fp-border relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-[#C8622A] rounded-l-xl" />
+          <div className="pl-4">
+            <p className="text-fp-text font-bold text-base mb-2">Thank you for being part of ForgePt.</p>
+            <p className="text-fp-muted text-sm leading-relaxed">As we continue to grow and add features, we're all building a more robust platform together. Your feedback and ideas directly shape what gets built next — keep them coming. Every suggestion gets read, and the best ones ship.</p>
+            <p className="text-fp-muted text-sm mt-2">Have an idea? Use the <span className="text-fp-text font-medium">Request a Feature</span> section at the bottom of this page.</p>
+          </div>
+        </div>
+
         {/* Embedded AI Help Chat */}
         <div className="bg-fp-card rounded-xl border border-fp-border overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-fp-border">
@@ -383,15 +399,33 @@ export default function FAQ({ isAdmin, featureProposals = true, featureCRM = fal
         </div>
 
         {/* How-To Guides */}
-        <div className="bg-fp-card rounded-xl p-6 flex items-center justify-between gap-4">
-          <div>
-            <h3 className="text-fp-text font-bold text-lg mb-1">How-To Guides</h3>
-            <p className="text-fp-muted text-sm">Step-by-step guides for common tasks — creating clients, building proposals, using the Designer, and more.</p>
+        <div className="bg-fp-card rounded-xl p-6">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h3 className="text-fp-text font-bold text-lg mb-1">How-To Guides</h3>
+              <p className="text-fp-muted text-sm">Step-by-step walkthroughs for every major workflow in ForgePt. — with screenshots and examples.</p>
+            </div>
+            <a href={GUIDES_URL} target="_blank" rel="noreferrer"
+              className="shrink-0 bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+              Open Guides →
+            </a>
           </div>
-          <a href={GUIDES_URL} target="_blank" rel="noreferrer"
-            className="shrink-0 bg-fp-brand text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-            How to Guides
-          </a>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {[
+              { label: 'Building your first proposal', icon: '📄' },
+              { label: 'Setting up your Rate Card', icon: '💰' },
+              { label: 'Using the Designer tool', icon: '✏️' },
+              { label: 'Tracking a job to completion', icon: '🔧' },
+              { label: 'Reading the Cost Report', icon: '📊' },
+              { label: 'Connecting QuickBooks', icon: '🔗' },
+            ].map(g => (
+              <a key={g.label} href={GUIDES_URL} target="_blank" rel="noreferrer"
+                className="flex items-center gap-2 bg-fp-inset hover:bg-fp-hover rounded-lg px-3 py-2.5 text-xs text-fp-muted hover:text-fp-text transition-colors">
+                <span>{g.icon}</span>
+                <span>{g.label}</span>
+              </a>
+            ))}
+          </div>
         </div>
 
         <input type="text" placeholder="Search FAQ..." value={search} onChange={e => setSearch(e.target.value)}
