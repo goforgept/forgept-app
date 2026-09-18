@@ -84,7 +84,7 @@ export default function CategoryIcon({ category, size = 40 }) {
       return <svg {...props}><rect x="4" y="10" width="32" height="20" rx="2" strokeWidth="1.5"/><rect x="12" y="14" width="16" height="8" rx="1" strokeWidth="1.5"/><path d="M19 16 L17 20 L20 20 L21 24 L23 20 L20 20" fill="currentColor" strokeWidth="0.5"/></svg>
     case 'Panel': case 'Power Supply':
       return <svg {...props}><rect x="10" y="6" width="20" height="28" rx="2" strokeWidth="1.5"/><path d="M14 12 L26 12 M14 16 L26 16 M14 20 L26 20 M14 24 L26 24 M14 28 L22 28" strokeWidth="1" strokeLinecap="round"/></svg>
-    case 'Rack': case 'Server':
+    case 'Rack': case 'Server': case 'Rack Server':
       return <svg {...props}><rect x="8" y="4" width="24" height="32" rx="2" strokeWidth="1.5"/><rect x="10" y="8" width="20" height="5" rx="1" strokeWidth="1"/><rect x="10" y="15" width="20" height="5" rx="1" strokeWidth="1"/><rect x="10" y="22" width="20" height="5" rx="1" strokeWidth="1"/><circle cx="28" cy="10" r="1" fill="currentColor"/><circle cx="28" cy="17" r="1" fill="currentColor"/></svg>
     // AV
     case 'Display':

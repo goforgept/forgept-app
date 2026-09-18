@@ -2609,7 +2609,7 @@ function GlobalProductStats() {
       })
       setStats(Object.entries(grouped)
         .map(([mfr, d]) => ({ manufacturer: mfr, count: d.count, active: d.active, industries: [...d.industries] }))
-        .sort((a, b) => b.count - a.count))
+        .sort((a, b) => a.manufacturer.localeCompare(b.manufacturer)))
       setLoading(false)
     }
 
@@ -2820,7 +2820,7 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
     'Dome Camera','Bullet Camera','PTZ Camera','Turret Camera','Multi-Lens Camera','Fisheye Camera',
     'LPR Camera','NVR','Video Encoder','Cabinet System','Cabinet Solar System',
     'Access Reader','Access Control Door','Controller',
-    'Workstation','Thin Client','Thick Client','Badging Station','KVM',
+    'Workstation','Thin Client','Thick Client','Badging Station','KVM','Server','Rack Server',
     'Nurse Call Controller','Patient Station','Staff Station','Dome Light','Pull Cord Station','Corridor Light',
     'Code Blue Phone','Code Blue Light','Code Blue Panel',
     'Area of Rescue Station','Area of Rescue Remote Master','Area of Rescue Annunciator',
@@ -2937,7 +2937,7 @@ function AddProductForm({ onAdded }) {
     'Dome Camera','Bullet Camera','PTZ Camera','Turret Camera','Multi-Lens Camera','Fisheye Camera',
     'LPR Camera','NVR','Video Encoder','Cabinet System','Cabinet Solar System',
     'Access Reader','Access Control Door','Controller',
-    'Workstation','Thin Client','Thick Client','Badging Station','KVM',
+    'Workstation','Thin Client','Thick Client','Badging Station','KVM','Server','Rack Server',
     'Nurse Call Controller','Patient Station','Staff Station','Dome Light','Pull Cord Station','Corridor Light',
     'Code Blue Phone','Code Blue Light','Code Blue Panel',
     'Area of Rescue Station','Area of Rescue Remote Master','Area of Rescue Annunciator',
