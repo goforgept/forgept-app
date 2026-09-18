@@ -78,10 +78,25 @@ export default function CostReportTab({ job, proposal, proposalSections = [], li
   const laborQuotedRevenue = allLaborItems.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
   const laborBudgetedCost = allLaborItems.reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
   const laborActualCost = actualLaborCost
+  const laborCostOverage = laborActualCost - laborBudgetedCost // positive = over budget
   const laborBudgetMargin = laborQuotedRevenue - laborBudgetedCost
   const laborActualMargin = laborQuotedRevenue - laborActualCost
   const laborBudgetMarginPct = laborQuotedRevenue > 0 ? (laborBudgetMargin / laborQuotedRevenue * 100).toFixed(1) : null
   const laborActualMarginPct = laborQuotedRevenue > 0 ? (laborActualMargin / laborQuotedRevenue * 100).toFixed(1) : null
+
+  // Per-tech breakdown
+  const techBreakdown = Object.values(
+    techLogs.reduce((acc, log) => {
+      const name = log.profiles?.full_name || 'Unknown'
+      const role = log.profiles?.labor_role || null
+      const rate = role && rateByRole[role] != null ? rateByRole[role] : blendedLaborRate
+      const hrs = log.hours_worked || 0
+      if (!acc[name]) acc[name] = { name, role, hrs: 0, cost: 0 }
+      acc[name].hrs += hrs
+      acc[name].cost += hrs * rate
+      return acc
+    }, {})
+  ).sort((a, b) => b.cost - a.cost)
 
   // PM true-up form state
   const [showTrueUp, setShowTrueUp] = useState(false)
@@ -358,13 +373,16 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                 <p className="text-fp-muted text-xs mb-1">Quoted Revenue</p>
                 <p className="text-fp-text font-bold text-sm">${fmt(laborQuotedRevenue)}</p>
               </div>
-              <div className="bg-fp-inset rounded-lg px-4 py-3">
+              <div className={`rounded-lg px-4 py-3 ${laborCostOverage > 0 && hoursLogged > 0 ? 'bg-red-500/10 border border-red-500/20' : 'bg-fp-inset'}`}>
                 <p className="text-fp-muted text-xs mb-1">Budgeted Cost</p>
                 <p className="text-fp-text font-bold text-sm">${fmt(laborBudgetedCost)}</p>
-                {laborBudgetMarginPct !== null && (
-                  <p className={`text-xs mt-0.5 ${laborBudgetMargin >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {laborBudgetMargin >= 0 ? '+' : ''}${fmt(laborBudgetMargin)} · {laborBudgetMarginPct}% margin
+                {hoursLogged > 0 && Math.abs(laborCostOverage) > 0.01 && (
+                  <p className={`text-xs mt-0.5 font-semibold ${laborCostOverage > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                    {laborCostOverage > 0 ? `+$${fmt(laborCostOverage)} over budget` : `-$${fmt(Math.abs(laborCostOverage))} under budget`}
                   </p>
+                )}
+                {laborBudgetMarginPct !== null && (
+                  <p className="text-fp-muted text-xs mt-0.5">{laborBudgetMarginPct}% quoted margin</p>
                 )}
               </div>
               <div className={`rounded-lg px-4 py-3 ${laborOver ? 'bg-red-500/10 border border-red-500/20' : 'bg-fp-inset'}`}>
@@ -416,6 +434,73 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                 </tbody>
               </table>
             </div>
+
+            {/* Per-tech hours & cost breakdown */}
+            {techBreakdown.length > 0 && (
+              <div className="mt-4">
+                <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Logged Hours by Tech</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-fp-border">
+                        {['Tech', 'Role', 'Hours Logged', 'Rate/hr', 'Actual Cost', 'vs Budget'].map(h => (
+                          <th key={h} className="text-fp-muted text-left py-1.5 pr-3 font-normal">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {techBreakdown.map((t, i) => {
+                        // Find planned hours for this role across labor items
+                        const plannedHrs = allLaborItems.filter(l => l.role === t.role).reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0)
+                        const plannedCost = allLaborItems.filter(l => l.role === t.role).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+                        const costDelta = plannedCost > 0 ? t.cost - plannedCost : null
+                        const usingBlended = !t.role || rateByRole[t.role] == null
+                        return (
+                          <tr key={i} className="border-b border-fp-border/30">
+                            <td className="text-fp-text py-2 pr-3 font-medium">{t.name}</td>
+                            <td className="py-2 pr-3">
+                              {t.role
+                                ? <span className="text-fp-muted">{t.role}</span>
+                                : <span className="text-yellow-400 text-[10px]">No role set</span>}
+                            </td>
+                            <td className="text-fp-text py-2 pr-3 font-variant-numeric tabular-nums">{t.hrs.toFixed(1)} hrs</td>
+                            <td className="text-fp-muted py-2 pr-3">
+                              ${fmt(usingBlended ? blendedLaborRate : rateByRole[t.role])}
+                              {usingBlended && <span className="text-yellow-400 text-[10px] ml-1">blended</span>}
+                            </td>
+                            <td className="text-fp-text py-2 pr-3 font-semibold">${fmt(t.cost)}</td>
+                            <td className="py-2 pr-3">
+                              {costDelta === null
+                                ? <span className="text-fp-muted">—</span>
+                                : costDelta > 0.01
+                                  ? <span className="text-red-400 font-semibold">+${fmt(costDelta)} over</span>
+                                  : costDelta < -0.01
+                                    ? <span className="text-green-400">-${fmt(Math.abs(costDelta))} under</span>
+                                    : <span className="text-green-400">on budget</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-fp-border">
+                        <td colSpan="2" className="text-fp-muted pt-2 font-semibold">Total</td>
+                        <td className="text-fp-text pt-2 pr-3 font-semibold">{hoursLogged.toFixed(1)} hrs</td>
+                        <td></td>
+                        <td className="text-fp-text pt-2 pr-3 font-semibold">${fmt(laborActualCost)}</td>
+                        <td className="pt-2">
+                          {hoursLogged > 0 && Math.abs(laborCostOverage) > 0.01 && (
+                            <span className={`font-semibold text-xs ${laborCostOverage > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                              {laborCostOverage > 0 ? `+$${fmt(laborCostOverage)} over` : `-$${fmt(Math.abs(laborCostOverage))} under`}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

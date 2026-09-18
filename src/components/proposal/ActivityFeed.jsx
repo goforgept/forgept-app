@@ -7,12 +7,17 @@ export default function ActivityFeed({ proposalId, clientId, orgId, refreshKey }
   const [savingActivity, setSavingActivity] = useState(false)
 
   const fetchActivity = async () => {
-    const { data } = await supabase
-      .from('activities')
-      .select('*, profiles(full_name)')
-      .eq('proposal_id', proposalId)
-      .order('created_at', { ascending: false })
-    setActivity(data || [])
+    const [{ data: acts }, { data: flogs }] = await Promise.all([
+      supabase.from('activities').select('*, profiles(full_name)').eq('proposal_id', proposalId).order('created_at', { ascending: false }),
+      supabase.from('followup_log').select('proposal_id, days_until_close, created_at, sent_at').eq('proposal_id', proposalId).order('created_at', { ascending: false }),
+    ])
+    const followupItems = (flogs || []).map(f => {
+      const d = f.days_until_close
+      const label = d === 0 ? 'Close-date follow-up sent' : `${d}-day follow-up sent`
+      return { id: `flog_${f.created_at}`, type: 'followup_email', title: label, created_at: f.sent_at || f.created_at, profiles: null, source: 'system' }
+    })
+    const merged = [...(acts || []), ...followupItems].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    setActivity(merged)
   }
 
   useEffect(() => { fetchActivity() }, [proposalId, refreshKey])
@@ -34,7 +39,7 @@ export default function ActivityFeed({ proposalId, clientId, orgId, refreshKey }
       <h3 className="text-fp-text font-bold text-lg mb-4">Activity</h3>
       <div className="bg-fp-inset rounded-xl p-4 mb-5 space-y-3">
         <div className="flex gap-2">
-          {[{value:'note',label:'Note',icon:'📝'},{value:'call',label:'Call',icon:'📞'},{value:'email',label:'Email',icon:'✉️'},{value:'meeting',label:'Meeting',icon:'🤝'}].map(t => (
+          {[{value:'note',label:'Note',icon:'📝'},{value:'call',label:'Call',icon:'📞'},{value:'email',label:'Email',icon:'✉️'},{value:'meeting',label:'Meeting',icon:'🤝'},{value:'followup_email',label:'Follow-up Sent',icon:'📨'}].map(t => (
             <button key={t.value} onClick={() => setNewActivityNote(prev => ({ ...prev, type: t.value }))}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${(newActivityNote?.type || 'note') === t.value ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'}`}>
               {t.icon} {t.label}
@@ -57,7 +62,7 @@ export default function ActivityFeed({ proposalId, clientId, orgId, refreshKey }
       ) : (
         <div className="space-y-0">
           {activity.map((item, i) => {
-            const icons = { call: '📞', email: '✉️', meeting: '🤝', note: '📝' }
+            const icons = { call: '📞', email: '✉️', meeting: '🤝', note: '📝', followup_email: '📨' }
             const icon = icons[item.type] || '📝'
             return (
               <div key={item.id} className="flex gap-3 relative">

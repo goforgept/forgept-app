@@ -268,6 +268,24 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ proposal_id: proposal.id, days_until_close: daysUntilClose })
         })
 
+        // Log to activities so the timeline and AI agent see it
+        const activityTitle = daysUntilClose === 0
+          ? `Close-date follow-up sent to ${clientName}`
+          : `${daysUntilClose}-day follow-up sent to ${clientName}`
+        await fetch(`${supabaseUrl}/rest/v1/activities`, {
+          method: 'POST',
+          headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
+          body: JSON.stringify({
+            proposal_id: proposal.id,
+            client_id: proposal.client_id || null,
+            org_id: proposal.org_id,
+            user_id: proposal.user_id,
+            type: 'followup_email',
+            title: activityTitle,
+            source: 'system',
+          })
+        })
+
       } catch (proposalErr) {
         console.error(`Error processing proposal ${proposal.id}:`, proposalErr)
         errors++
