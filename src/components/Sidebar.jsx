@@ -355,18 +355,18 @@ export default function Sidebar({ isAdmin: isAdminProp, isDevTeam: isDevTeamProp
   return (
     <>
       {/* Mobile thin strip — stays in layout flow (never overlaps content) and above backdrop/sidebar so it can close the menu */}
-      <div className="lg:hidden relative z-[60] flex-shrink-0 w-10 h-screen bg-fp-card border-r border-fp-border flex flex-col items-center pt-4">
+      <div className="lg:hidden relative z-[60] flex-shrink-0 w-14 h-screen bg-fp-card border-r border-fp-border flex flex-col items-center pt-2">
         <button
           onClick={() => setMobileOpen(o => !o)}
-          className="p-1.5 text-fp-muted hover:text-fp-text transition-colors rounded"
+          className="w-12 h-12 flex items-center justify-center text-fp-muted hover:text-fp-text active:bg-fp-inset transition-colors rounded-xl"
           aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
         >
           {mobileOpen ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
             </svg>
           ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
             </svg>
           )}
@@ -383,7 +383,7 @@ export default function Sidebar({ isAdmin: isAdminProp, isDevTeam: isDevTeamProp
 
     <div className={`
       h-full bg-fp-card border-r border-fp-border flex flex-col
-      fixed top-0 left-10 z-50 w-64
+      fixed top-0 left-14 z-50 w-64
       transition-all duration-300 ease-in-out
       lg:relative lg:left-auto lg:top-auto lg:flex-shrink-0 lg:translate-x-0
       ${desktopCollapsed ? 'lg:w-12' : 'lg:w-56'}
