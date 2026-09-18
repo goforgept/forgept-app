@@ -10,7 +10,7 @@ Deno.serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  const { profile, error } = await validateUser(req)
+  const { profile, user, error } = await validateUser(req)
   if (error) {
     return new Response(JSON.stringify({ error }), {
       status: 401,
@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
         org_id:               profile.org_id,
         client_id:            proposal?.client_id ?? null,
         proposal_id:          proposalId,
-        sent_by:              (await adminSupabase.auth.getUser()).data.user?.id ?? null,
+        sent_by:              user!.id,
         subject,
         to_email:             clientEmail,
         postmark_message_id:  messageId,

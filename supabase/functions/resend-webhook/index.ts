@@ -39,7 +39,6 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await verifyAndParse(req, WEBHOOK_SECRET) as any
-
     if (payload.type !== 'email.opened') {
       return new Response('ok', { headers: corsHeaders })
     }
@@ -100,7 +99,7 @@ Deno.serve(async (req) => {
     })
 
   } catch (err: any) {
-    console.error('resend-webhook error:', err?.message)
+    console.error('resend-webhook error:', err?.message, err?.stack)
     return new Response('ok', { headers: corsHeaders }) // always 200 to Resend
   }
 })
