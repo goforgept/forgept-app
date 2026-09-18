@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
           title:   `Email opened: ${emailFull.subject}`,
           body:    `${emailFull.to_email} opened your email.`,
           link:    emailRow.proposal_id
-            ? `/proposals/${emailRow.proposal_id}`
+            ? `/proposal/${emailRow.proposal_id}`
             : emailRow.client_id
             ? `/clients/${emailRow.client_id}`
             : null,
