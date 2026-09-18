@@ -11,7 +11,7 @@ import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType, AlignmentType } from 'docx'
 import DrawingToolSummary from '../components/drawing/DrawingToolSummary'
-import ActivityFeed from '../components/proposal/ActivityFeed'
+import ActivityTimeline from '../components/ActivityTimeline'
 import DeleteProposalModal from '../components/proposal/DeleteProposalModal'
 import ShareModal from '../components/proposal/ShareModal'
 import SaveTemplateModal from '../components/proposal/SaveTemplateModal'
@@ -190,6 +190,7 @@ export default function ProposalDetail({ isAdmin }) {
   const [pipelineStages, setPipelineStages] = useState([])
   const [linkedJob, setLinkedJob] = useState(null)
   const [emailOpenData, setEmailOpenData] = useState(null)
+  const [proposalContacts, setProposalContacts] = useState([])
 
   useEffect(() => {
     if (!id) return
@@ -202,6 +203,15 @@ export default function ProposalDetail({ isAdmin }) {
       .maybeSingle()
       .then(({ data }) => setEmailOpenData(data))
   }, [id])
+
+  useEffect(() => {
+    if (!proposal?.client_id) return
+    supabase.from('client_contacts')
+      .select('id, full_name, title, email')
+      .eq('client_id', proposal.client_id)
+      .order('full_name')
+      .then(({ data }) => setProposalContacts(data || []))
+  }, [proposal?.client_id])
 
   useEffect(() => {
     fetchProposal()
@@ -4046,7 +4056,7 @@ const analyzeDrawing = async () => {
           </>
         )}
 
-        <ActivityFeed proposalId={id} clientId={proposal?.client_id} orgId={proposal?.org_id} refreshKey={activityRefreshKey} />
+        <ActivityTimeline proposalId={id} orgId={proposal?.org_id} userId={profile?.id} contacts={proposalContacts} />
 
         <POList proposalId={id} />
 

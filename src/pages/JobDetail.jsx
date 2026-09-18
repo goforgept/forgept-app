@@ -159,7 +159,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     if (profile?.org_id) {
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('id, full_name, email, role')
+        .select('id, full_name, email, role, labor_role')
         .eq('org_id', profile.org_id)
         .order('full_name')
       setOrgProfiles(profilesData || [])
@@ -969,11 +969,12 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   }
 
   const addManualLaborEntry = async (entry) => {
+    const { profile_id: entryProfileId, ...rest } = entry
     const { data } = await supabase.from('tech_daily_logs').insert({
       job_id: id,
       org_id: profile?.org_id,
-      profile_id: profile?.id,
-      ...entry,
+      profile_id: entryProfileId || profile?.id,
+      ...rest,
     }).select('*, profiles(full_name, labor_role)').single()
     if (data) setTechLogs(prev => [data, ...prev])
   }
@@ -1916,6 +1917,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             techLogs={techLogs}
             checklist={checklist}
             laborRates={laborRates}
+            orgProfiles={orgProfiles}
             onExportPDF={exportCostReport}
             onAddManualEntry={addManualLaborEntry}
           />

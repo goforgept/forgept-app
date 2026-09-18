@@ -3,7 +3,7 @@ import { setAIPageContext, clearAIPageContext } from '../../aiPageContext'
 
 const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function CostReportTab({ job, proposal, proposalSections = [], lineItems, freeformPOItems, changeOrders, techLogs, checklist, onExportPDF, laborRates = [], onAddManualEntry }) {
+export default function CostReportTab({ job, proposal, proposalSections = [], lineItems, freeformPOItems, changeOrders, techLogs, checklist, onExportPDF, laborRates = [], orgProfiles = [], onAddManualEntry }) {
   // Merge proposal-level labor with section labor items
   const allLaborItems = [
     ...(proposal?.labor_items || []),
@@ -101,25 +101,36 @@ export default function CostReportTab({ job, proposal, proposalSections = [], li
   // PM true-up form state
   const [showTrueUp, setShowTrueUp] = useState(false)
   const [trueUpType, setTrueUpType] = useState('labor') // 'labor' | 'materials'
-  const [trueUpForm, setTrueUpForm] = useState({ role: '', hours: '', matCost: '', matDesc: '', date: new Date().toISOString().slice(0, 10), note: '' })
+  const [trueUpForm, setTrueUpForm] = useState({ techId: '', hours: '', bomItemId: '', bomQty: '', matCost: '', matDesc: '', date: new Date().toISOString().slice(0, 10), note: '' })
   const [savingTrueUp, setSavingTrueUp] = useState(false)
+
+  const selectedTech = orgProfiles.find(p => p.id === trueUpForm.techId) || null
+  const techRole = selectedTech?.labor_role || null
+  const techRate = techRole && rateByRole[techRole] != null ? rateByRole[techRole] : blendedLaborRate
+  const selectedBOMItem = lineItems.find(i => i.id === trueUpForm.bomItemId) || null
+
   const handleTrueUpSave = async () => {
     setSavingTrueUp(true)
-    const role = trueUpForm.role || null
-    const rateForRole = role && rateByRole[role] != null ? rateByRole[role] : blendedLaborRate
     if (trueUpType === 'labor') {
       if (!trueUpForm.hours || parseFloat(trueUpForm.hours) <= 0) { setSavingTrueUp(false); return }
       await onAddManualEntry?.({
+        profile_id: selectedTech?.id || undefined,
         hours_worked: parseFloat(trueUpForm.hours),
         log_date: trueUpForm.date,
         notes: trueUpForm.note || null,
-        labor_role: role,
-        cost_per_hour: rateForRole,
+        labor_role: techRole,
+        cost_per_hour: techRate,
         is_manual_entry: true,
       })
     } else {
-      if (!trueUpForm.matCost || parseFloat(trueUpForm.matCost) <= 0) { setSavingTrueUp(false); return }
-      const matEntry = [{ id: `adj_${Date.now()}`, name: trueUpForm.matDesc || 'Material adjustment', qty: 1, cost: parseFloat(trueUpForm.matCost) }]
+      // Materials — either from BOM or freeform
+      let matEntry
+      if (selectedBOMItem && trueUpForm.bomQty && parseFloat(trueUpForm.bomQty) > 0) {
+        matEntry = [{ id: selectedBOMItem.id, name: selectedBOMItem.item_name, qty: parseFloat(trueUpForm.bomQty) }]
+      } else {
+        if (!trueUpForm.matCost || parseFloat(trueUpForm.matCost) <= 0) { setSavingTrueUp(false); return }
+        matEntry = [{ id: `adj_${Date.now()}`, name: trueUpForm.matDesc || 'Material adjustment', qty: 1, cost: parseFloat(trueUpForm.matCost) }]
+      }
       await onAddManualEntry?.({
         hours_worked: 0,
         log_date: trueUpForm.date,
@@ -128,7 +139,7 @@ export default function CostReportTab({ job, proposal, proposalSections = [], li
         is_manual_entry: true,
       })
     }
-    setTrueUpForm({ role: '', hours: '', matCost: '', matDesc: '', date: new Date().toISOString().slice(0, 10), note: '' })
+    setTrueUpForm({ techId: '', hours: '', bomItemId: '', bomQty: '', matCost: '', matDesc: '', date: new Date().toISOString().slice(0, 10), note: '' })
     setShowTrueUp(false)
     setSavingTrueUp(false)
   }
@@ -528,34 +539,68 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                   {trueUpType === 'labor' ? (
                     <>
                       <div>
-                        <label className="text-fp-muted text-xs mb-1 block">Role</label>
-                        <select value={trueUpForm.role} onChange={e => setTrueUpForm(p => ({ ...p, role: e.target.value }))}
+                        <label className="text-fp-muted text-xs mb-1 block">Tech <span className="text-[#C8622A]">*</span></label>
+                        <select value={trueUpForm.techId} onChange={e => setTrueUpForm(p => ({ ...p, techId: e.target.value }))}
                           className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
-                          <option value="">— Blended rate —</option>
-                          {laborRates.map(r => <option key={r.role} value={r.role}>{r.role} (${fmt(r.cost_per_hour)}/hr)</option>)}
+                          <option value="">— Select tech —</option>
+                          {orgProfiles.map(p => (
+                            <option key={p.id} value={p.id}>{p.full_name}{p.labor_role ? ` · ${p.labor_role}` : ''}</option>
+                          ))}
                         </select>
+                        {selectedTech && (
+                          <p className="text-fp-muted text-[10px] mt-0.5">
+                            Rate: ${fmt(techRate)}/hr {!techRole && <span className="text-yellow-400">(blended — no role set)</span>}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <label className="text-fp-muted text-xs mb-1 block">Hours <span className="text-[#C8622A]">*</span></label>
                         <input type="number" min="0.25" step="0.25" placeholder="0.0"
                           value={trueUpForm.hours} onChange={e => setTrueUpForm(p => ({ ...p, hours: e.target.value }))}
                           className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                        {selectedTech && trueUpForm.hours && parseFloat(trueUpForm.hours) > 0 && (
+                          <p className="text-fp-muted text-[10px] mt-0.5">Cost: ${fmt(parseFloat(trueUpForm.hours) * techRate)}</p>
+                        )}
                       </div>
                     </>
                   ) : (
                     <>
-                      <div>
-                        <label className="text-fp-muted text-xs mb-1 block">Description</label>
-                        <input type="text" placeholder="e.g. Extra conduit, misc hardware"
-                          value={trueUpForm.matDesc} onChange={e => setTrueUpForm(p => ({ ...p, matDesc: e.target.value }))}
-                          className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                      <div className="col-span-2">
+                        <label className="text-fp-muted text-xs mb-1 block">Item</label>
+                        <select value={trueUpForm.bomItemId} onChange={e => setTrueUpForm(p => ({ ...p, bomItemId: e.target.value, bomQty: '', matCost: '', matDesc: '' }))}
+                          className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                          <option value="">— Freeform (not on BOM) —</option>
+                          {lineItems.map(i => <option key={i.id} value={i.id}>{i.item_name} ({i.quantity} {i.unit || 'ea'} planned)</option>)}
+                        </select>
                       </div>
-                      <div>
-                        <label className="text-fp-muted text-xs mb-1 block">Cost ($) <span className="text-[#C8622A]">*</span></label>
-                        <input type="number" min="0.01" step="0.01" placeholder="0.00"
-                          value={trueUpForm.matCost} onChange={e => setTrueUpForm(p => ({ ...p, matCost: e.target.value }))}
-                          className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
-                      </div>
+                      {trueUpForm.bomItemId ? (
+                        <div className="col-span-2">
+                          <label className="text-fp-muted text-xs mb-1 block">Qty Used <span className="text-[#C8622A]">*</span></label>
+                          <input type="number" min="0.01" step="0.01" placeholder="0"
+                            value={trueUpForm.bomQty} onChange={e => setTrueUpForm(p => ({ ...p, bomQty: e.target.value }))}
+                            className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                          {selectedBOMItem && trueUpForm.bomQty && (
+                            <p className="text-fp-muted text-[10px] mt-0.5">
+                              Cost: ${fmt((parseFloat(trueUpForm.bomQty) || 0) * (selectedBOMItem.your_cost_unit || 0))} · {selectedBOMItem.unit || 'ea'} @ ${fmt(selectedBOMItem.your_cost_unit || 0)} each
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <label className="text-fp-muted text-xs mb-1 block">Description</label>
+                            <input type="text" placeholder="e.g. Extra conduit, misc hardware"
+                              value={trueUpForm.matDesc} onChange={e => setTrueUpForm(p => ({ ...p, matDesc: e.target.value }))}
+                              className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                          </div>
+                          <div>
+                            <label className="text-fp-muted text-xs mb-1 block">Cost ($) <span className="text-[#C8622A]">*</span></label>
+                            <input type="number" min="0.01" step="0.01" placeholder="0.00"
+                              value={trueUpForm.matCost} onChange={e => setTrueUpForm(p => ({ ...p, matCost: e.target.value }))}
+                              className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                   <div>
@@ -565,16 +610,18 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                   </div>
                   <div>
                     <label className="text-fp-muted text-xs mb-1 block">Note (optional)</label>
-                    <input type="text" placeholder="e.g. PM time, site coordination"
+                    <input type="text" placeholder="e.g. PM adjustment, site pull"
                       value={trueUpForm.note} onChange={e => setTrueUpForm(p => ({ ...p, note: e.target.value }))}
                       className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                   </div>
                 </div>
                 <div className="flex gap-2 justify-end">
                   <button onClick={() => setShowTrueUp(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors px-3 py-1.5">Cancel</button>
-                  <button onClick={handleTrueUpSave} disabled={savingTrueUp || (trueUpType === 'labor' ? !trueUpForm.hours || parseFloat(trueUpForm.hours) <= 0 : !trueUpForm.matCost || parseFloat(trueUpForm.matCost) <= 0)}
+                  <button onClick={handleTrueUpSave} disabled={savingTrueUp || (trueUpType === 'labor'
+                    ? !trueUpForm.techId || !trueUpForm.hours || parseFloat(trueUpForm.hours) <= 0
+                    : trueUpForm.bomItemId ? !trueUpForm.bomQty || parseFloat(trueUpForm.bomQty) <= 0 : !trueUpForm.matCost || parseFloat(trueUpForm.matCost) <= 0)}
                     className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-                    {savingTrueUp ? 'Saving...' : trueUpType === 'labor' ? 'Add Hours' : 'Add Cost'}
+                    {savingTrueUp ? 'Saving...' : trueUpType === 'labor' ? 'Add Hours' : 'Add Materials'}
                   </button>
                 </div>
               </div>
