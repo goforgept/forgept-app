@@ -17,6 +17,7 @@ export default function ScopeSection({
   onToggleCoverPage,
   setShowPhotosModal,
   canEdit = true,
+  emailOpenData,
 }) {
   const [dlOpen, setDlOpen] = useState(false)
   const dlRef = useRef(null)
@@ -32,10 +33,26 @@ export default function ScopeSection({
     .replace(/\{\{proposalName\}\}/g, proposal?.proposal_name || '')
     .replace(/\{\{repName\}\}/g, proposal?.rep_name || '')
     .replace(/\{\{companyName\}\}/g, proposal?.company || '')
+  const fmtDate = (iso) => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  }
+
   return (
     <div className="bg-fp-card rounded-xl p-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-fp-text font-bold text-lg">Scope of Work</h3>
+      <div className="flex justify-between items-start mb-4">
+        <div>
+          <h3 className="text-fp-text font-bold text-lg">Scope of Work</h3>
+          {emailOpenData?.opened_at && (
+            <p className="text-green-400 text-xs mt-0.5">
+              👁 Opened {emailOpenData.open_count}× · First opened {fmtDate(emailOpenData.opened_at)}
+            </p>
+          )}
+          {emailOpenData && !emailOpenData.opened_at && (
+            <p className="text-fp-muted text-xs mt-0.5">✉ Sent · not yet opened</p>
+          )}
+        </div>
         <div className="flex gap-2 flex-wrap">
           {canEdit && features.sendProposal && (
             <button onClick={() => {

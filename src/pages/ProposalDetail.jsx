@@ -189,6 +189,19 @@ export default function ProposalDetail({ isAdmin }) {
   const [activityRefreshKey, setActivityRefreshKey] = useState(0)
   const [pipelineStages, setPipelineStages] = useState([])
   const [linkedJob, setLinkedJob] = useState(null)
+  const [emailOpenData, setEmailOpenData] = useState(null)
+
+  useEffect(() => {
+    if (!id) return
+    supabase.from('client_emails')
+      .select('opened_at, open_count, sent_at')
+      .eq('proposal_id', id)
+      .not('postmark_message_id', 'is', null)
+      .order('sent_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setEmailOpenData(data))
+  }, [id])
 
   useEffect(() => {
     fetchProposal()
@@ -3850,6 +3863,7 @@ const analyzeDrawing = async () => {
           onToggleCoverPage={toggleCoverPage}
           setShowPhotosModal={setShowPhotosModal}
           canEdit={canEdit}
+          emailOpenData={emailOpenData}
         />
 
         {(lineItems.length > 0 || editingBOM || canEdit) && <BomSection
