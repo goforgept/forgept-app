@@ -1135,6 +1135,7 @@ export default function ProposalDetail({ isAdmin }) {
 
   const addLibraryItemsToBOM = async () => {
     const STALE_DAYS = 120
+    const defMkp = parseFloat(profile?.default_markup_percent) || 35
     const newLines = []
 
     for (const prod of libraryResults) {
@@ -1163,7 +1164,7 @@ export default function ProposalDetail({ isAdmin }) {
           category: prod.category || '',
           vendor: '',
           your_cost_unit: '',
-          markup_percent: '35',
+          markup_percent: String(defMkp),
           customer_price_unit: '',
           customer_price_total: '',
           pricing_status: 'Needs Pricing',
@@ -1188,8 +1189,8 @@ export default function ProposalDetail({ isAdmin }) {
         category: prod.category || '',
         vendor: selectedPricing?.vendor || '',
         your_cost_unit: isStale ? '' : String(cost),
-        markup_percent: '35',
-        customer_price_unit: isStale ? '' : (cost * 1.35).toFixed(2),
+        markup_percent: String(defMkp),
+        customer_price_unit: isStale ? '' : (cost * (1 + defMkp / 100)).toFixed(2),
         customer_price_total: '',
         pricing_status: isStale ? 'Needs Pricing' : 'Confirmed',
         msrp_unit: prod.msrp ? String(prod.msrp) : '',
@@ -1219,7 +1220,7 @@ export default function ProposalDetail({ isAdmin }) {
       category: item.category || '',
       vendor: item.vendor || '',
       your_cost_unit: item.your_cost_unit || '',
-      markup_percent: item.markup_percent || '35',
+      markup_percent: item.markup_percent || String(parseFloat(profile?.default_markup_percent) || 35),
       customer_price_unit: item.customer_price_unit || '',
       customer_price_total: '',
       pricing_status: item.pricing_status || 'Needs Pricing',
@@ -2418,12 +2419,14 @@ export default function ProposalDetail({ isAdmin }) {
   }
 
   const updateEditLine = (index, field, value) => {
+    const defaultMkp = parseFloat(profile?.default_markup_percent) || 35
     setEditLines(prev => {
       const updated = [...prev]
       updated[index] = { ...updated[index], [field]: value }
       if (field === 'your_cost_unit' || field === 'markup_percent') {
         const cost = parseFloat(updated[index].your_cost_unit) || 0
-        const markup = parseFloat(updated[index].markup_percent) || 0
+        const rawMarkup = updated[index].markup_percent
+        const markup = rawMarkup !== '' && rawMarkup != null ? (parseFloat(rawMarkup) || 0) : defaultMkp
         updated[index].customer_price_unit = (cost * (1 + markup / 100)).toFixed(2)
       } else if (field === 'customer_price_unit') {
         const cost = parseFloat(updated[index].your_cost_unit) || 0
@@ -2478,9 +2481,10 @@ export default function ProposalDetail({ isAdmin }) {
   }
 
   const addEditLine = () => {
+    const defMkp = String(parseFloat(profile?.default_markup_percent) || 35)
     setEditLines(prev => [...prev, {
       proposal_id: id, item_name: '', part_number_sku: '', quantity: '', unit: 'ea', category: '',
-      vendor: '', your_cost_unit: '', markup_percent: '35', customer_price_unit: '', customer_price_total: '', pricing_status: 'Needs Pricing'
+      vendor: '', your_cost_unit: '', markup_percent: defMkp, customer_price_unit: '', customer_price_total: '', pricing_status: 'Needs Pricing'
     }])
   }
 
@@ -3034,12 +3038,13 @@ const analyzeDrawing = async () => {
 
   const applyDrawingBOM = async () => {
     if (drawingPreview.length === 0) return
+    const defMkp = parseFloat(profile?.default_markup_percent) || 35
     const laborItems = drawingPreview.filter(i => i.category === 'Labor')
     const materials = drawingPreview.filter(i => i.category !== 'Labor')
     const newLines = materials.map(item => ({
       proposal_id: id, item_name: item.item_name, part_number_sku: '', quantity: item.quantity,
       unit: item.unit || 'ea', category: item.category || '', vendor: '', your_cost_unit: '',
-      markup_percent: '35', customer_price_unit: '', customer_price_total: '',
+      markup_percent: String(defMkp), customer_price_unit: '', customer_price_total: '',
       pricing_status: 'Needs Pricing', recurring: false
     }))
     setEditLines([...lineItems.map(l => ({ ...l })), ...newLines])
@@ -3047,7 +3052,7 @@ const analyzeDrawing = async () => {
       const newLaborItems = laborItems.map(item => ({
         role: item.item_name, quantity: String(item.quantity),
         unit: item.unit === 'hr' ? 'hr' : item.unit === 'day' ? 'day' : 'lot',
-        your_cost: '', markup: 35, customer_price: 0
+        your_cost: '', markup: defMkp, customer_price: 0
       }))
       setLaborItems(prev => [...prev.filter(l => l.role), ...newLaborItems])
     }
@@ -3076,15 +3081,16 @@ const analyzeDrawing = async () => {
 
   const applyAIBOM = async () => {
     if (aiBOMPreview.length === 0) return
+    const defMkp = parseFloat(profile?.default_markup_percent) || 35
     const laborAI = aiBOMPreview.filter(i => i.category === 'Labor')
     const materialsAI = aiBOMPreview.filter(i => i.category !== 'Labor')
     const newLines = materialsAI.map(item => ({
       proposal_id: id, item_name: item.item_name, part_number_sku: '', quantity: item.quantity, unit: item.unit || 'ea',
-      category: item.category || '', vendor: '', your_cost_unit: '', markup_percent: '35', customer_price_unit: '', customer_price_total: '', pricing_status: 'Needs Pricing', recurring: false
+      category: item.category || '', vendor: '', your_cost_unit: '', markup_percent: String(defMkp), customer_price_unit: '', customer_price_total: '', pricing_status: 'Needs Pricing', recurring: false
     }))
     setEditLines([...lineItems.map(l => ({ ...l })), ...newLines])
     if (laborAI.length > 0) {
-      const newLaborItems = laborAI.map(item => ({ role: item.item_name, quantity: String(item.quantity), unit: item.unit === 'hr' ? 'hr' : item.unit === 'day' ? 'day' : 'lot', your_cost: '', markup: 35, customer_price: 0 }))
+      const newLaborItems = laborAI.map(item => ({ role: item.item_name, quantity: String(item.quantity), unit: item.unit === 'hr' ? 'hr' : item.unit === 'day' ? 'day' : 'lot', your_cost: '', markup: defMkp, customer_price: 0 }))
       setLaborItems(prev => { const existing = prev.filter(l => l.role); return [...existing, ...newLaborItems] })
     }
     setEditingBOM(true)

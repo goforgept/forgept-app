@@ -71,6 +71,12 @@ Deno.serve(async (req) => {
     }
 
     // Step 2: stamp org_id on the profile (update existing or insert if trigger didn't create it)
+    const { data: org } = await adminSupabase
+      .from('organizations')
+      .select('name')
+      .eq('id', profile.org_id)
+      .single()
+
     const profilePayload = {
       id: userId,
       email,
@@ -78,6 +84,7 @@ Deno.serve(async (req) => {
       org_id: profile.org_id,
       org_role: orgRole,
       role: orgRole,
+      company_name: org?.name ?? null,
     }
 
     const { error: upsertError } = await adminSupabase

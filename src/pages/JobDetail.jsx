@@ -83,6 +83,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   const [orgTimezone, setOrgTimezone] = useState('America/Chicago')
   // Freeform PO line items (from purchase_order_line_items where job_id = id)
   const [freeformPOItems, setFreeformPOItems] = useState([])
+  const [proposalSections, setProposalSections] = useState([])
 
   // Bulk BOM edit
   const [editingBOM, setEditingBOM] = useState(false)
@@ -174,6 +175,13 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
         .eq('id', jobData.proposal_id)
         .single()
       setProposal(propData)
+
+      const { data: sectionsData } = await supabase
+        .from('proposal_sections')
+        .select('id, name, include_labor, labor_items')
+        .eq('proposal_id', jobData.proposal_id)
+        .order('position')
+      setProposalSections((sectionsData || []).filter(s => s.include_labor && (s.labor_items || []).length > 0))
 
       const { data: lineData } = await supabase
         .from('bom_line_items')
@@ -848,12 +856,16 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       y = doc.lastAutoTable.finalY + 10
     }
 
-    if ((proposal?.labor_items || []).length > 0) {
+    const allLaborForPDF = [
+      ...(proposal?.labor_items || []),
+      ...(proposalSections || []).flatMap(s => (s.labor_items || []).map(l => ({ ...l, _sectionName: s.name }))),
+    ]
+    if (allLaborForPDF.length > 0) {
       doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(primaryRgb[0], primaryRgb[1], primaryRgb[2])
       doc.text('Labor — Line Item Detail', 14, y); y += 4
       autoTable(doc, {
-        startY: y, head: [['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price', 'Margin']],
-        body: (proposal.labor_items || []).map(l => [l.role || '—', l.quantity || '—', l.unit || 'hr', `$${(parseFloat(l.your_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${((parseFloat(l.customer_price) || 0) - (parseFloat(l.your_cost) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
+        startY: y, head: [['Role', 'Section', 'Planned Hrs', 'Your Cost/hr', 'Customer Price', 'Margin']],
+        body: allLaborForPDF.map(l => [l.role || '—', l._sectionName || '—', `${parseFloat(l.quantity) || 0} ${l.unit || 'hr'}`, `$${(parseFloat(l.your_cost) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${(parseFloat(l.customer_price) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, `$${((parseFloat(l.customer_price) || 0) - (parseFloat(l.your_cost) || 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`]),
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 8 }
       })
       y = doc.lastAutoTable.finalY + 10
@@ -1871,6 +1883,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           <CostReportTab
             job={job}
             proposal={proposal}
+            proposalSections={proposalSections}
             lineItems={lineItems}
             freeformPOItems={freeformPOItems}
             changeOrders={changeOrders}

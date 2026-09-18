@@ -1,11 +1,20 @@
+import { useState } from 'react'
+import { supabase } from '../../supabase'
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function CostReportTab({ job, proposal, lineItems, freeformPOItems, changeOrders, techLogs, checklist, onExportPDF }) {
+export default function CostReportTab({ job, proposal, proposalSections = [], lineItems, freeformPOItems, changeOrders, techLogs, checklist, onExportPDF }) {
+  // Merge proposal-level labor with section labor items
+  const allLaborItems = [
+    ...(proposal?.labor_items || []),
+    ...(proposalSections || []).flatMap(s => (s.labor_items || []).map(l => ({ ...l, _sectionName: s.name }))),
+  ]
   const quotedMaterials = lineItems.reduce((sum, i) => sum + (i.customer_price_total || 0), 0)
-  const quotedLabor = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
+  const quotedLabor = allLaborItems.reduce((sum, l) => sum + (parseFloat(l.customer_price) || 0), 0)
   const quotedTotal = quotedMaterials + quotedLabor
   const costMaterials = lineItems.reduce((sum, i) => sum + ((i.your_cost_unit || 0) * (i.quantity || 0)), 0)
-  const costLabor = (proposal?.labor_items || []).reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+  const costLabor = allLaborItems.reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
   const approvedCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, c) => sum + (c.amount || 0), 0)
   const costCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, co) => {
     const matCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
@@ -41,7 +50,7 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
   const totalUsedUnits = lineItems.reduce((sum, i) => sum + (usedByItemId[i.id] || 0), 0)
   const materialsPct = totalPlannedUnits > 0 ? Math.min((totalUsedUnits / totalPlannedUnits) * 100, 100) : 0
   const materialsOver = totalUsedUnits > totalPlannedUnits
-  const estimatedHours = (proposal?.labor_items || []).reduce((sum, l) => sum + (parseFloat(l.quantity) || 0), 0)
+  const estimatedHours = allLaborItems.reduce((sum, l) => sum + (parseFloat(l.quantity) || 0), 0)
   const laborPct = estimatedHours > 0 ? Math.min((hoursLogged / estimatedHours) * 100, 100) : 0
   const laborOver = hoursLogged > estimatedHours
   const checklistTotal = checklist.length
@@ -52,6 +61,73 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
   const actualLaborCost = hoursLogged * laborRate
   const actualCostTotal = actualMaterialCost + actualLaborCost
   const costBurnPct = totalCost > 0 ? Math.min((actualCostTotal / totalCost) * 100, 100) : 0
+
+  // Labor profitability
+  const laborQuotedRevenue = allLaborItems.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
+  const laborBudgetedCost = allLaborItems.reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+  const laborActualCost = actualLaborCost
+  const laborBudgetMargin = laborQuotedRevenue - laborBudgetedCost
+  const laborActualMargin = laborQuotedRevenue - laborActualCost
+  const laborBudgetMarginPct = laborQuotedRevenue > 0 ? (laborBudgetMargin / laborQuotedRevenue * 100).toFixed(1) : null
+  const laborActualMarginPct = laborQuotedRevenue > 0 ? (laborActualMargin / laborQuotedRevenue * 100).toFixed(1) : null
+
+  // AI state
+  const [aiInput, setAiInput] = useState('')
+  const [aiMessages, setAiMessages] = useState([])
+  const [aiLoading, setAiLoading] = useState(false)
+
+  const buildCostContext = () => `
+Job: ${job?.job_name || job?.name || 'Unknown'}
+Status: ${job?.status || '—'}
+
+FINANCIALS
+Quoted Revenue: $${fmt(totalRevenue)}
+Total Budgeted Cost: $${fmt(totalCost)}
+Gross Margin (Quoted): ${grossMargin}%
+${overBudget ? `⚠ OVER BUDGET by $${fmt(totalCost - totalRevenue)}` : `Remaining Budget: $${fmt(totalRevenue - totalCost)}`}
+
+LABOR
+Quoted Labor Revenue: $${fmt(laborQuotedRevenue)}
+Budgeted Labor Cost: $${fmt(laborBudgetedCost)}
+Budgeted Labor Margin: $${fmt(laborBudgetMargin)} (${laborBudgetMarginPct ?? '—'}%)
+Hours Estimated: ${estimatedHours.toFixed(1)} hrs
+Hours Logged: ${hoursLogged.toFixed(1)} hrs
+${laborOver ? `⚠ Labor over budget by ${(hoursLogged - estimatedHours).toFixed(1)} hrs` : `Labor hours remaining: ${(estimatedHours - hoursLogged).toFixed(1)} hrs`}
+Actual Labor Cost (based on logged hrs): $${fmt(laborActualCost)}
+Projected Labor Margin: $${fmt(laborActualMargin)} (${laborActualMarginPct ?? '—'}%)
+
+MATERIALS
+Quoted Materials Revenue: $${fmt(quotedMaterials)}
+Budgeted Materials Cost: $${fmt(costMaterials)}
+Materials Margin: $${fmt(quotedMaterials - costMaterials)}
+${freeformPOCost > 0 ? `Freeform PO Costs: $${fmt(freeformPOCost)}` : ''}
+${approvedCOs > 0 ? `Approved Change Orders: $${fmt(approvedCOs)} revenue, $${fmt(costCOs)} cost` : ''}
+
+CHECKLIST: ${checklistDone} of ${checklistTotal} items complete
+`.trim()
+
+  const askAI = async () => {
+    const text = aiInput.trim()
+    if (!text || aiLoading) return
+    const contextMsg = { role: 'user', content: `[Job Cost Report Context]\n${buildCostContext()}\n\n[User Question]\n${text}` }
+    const nextMessages = [...aiMessages, contextMsg]
+    setAiMessages(prev => [...prev, { role: 'user', content: text }])
+    setAiInput('')
+    setAiLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ messages: nextMessages }),
+      })
+      const data = await res.json()
+      setAiMessages(prev => [...prev, { role: 'assistant', content: data.reply || 'No response.' }])
+    } catch {
+      setAiMessages(prev => [...prev, { role: 'assistant', content: 'Error reaching AI. Try again.' }])
+    }
+    setAiLoading(false)
+  }
 
   return (
     <div className="bg-fp-card rounded-xl p-6">
@@ -210,30 +286,64 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
         )}
 
         {/* Labor detail */}
-        {(proposal?.labor_items || []).length > 0 && (
+        {allLaborItems.length > 0 && (
           <div>
             <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Labor — Line Item Detail</p>
+            {/* Labor hours + profitability */}
+            <div className="grid grid-cols-2 gap-3 mb-4 sm:grid-cols-4">
+              <div className="bg-fp-inset rounded-lg px-4 py-3">
+                <p className="text-fp-muted text-xs mb-1">Quoted Revenue</p>
+                <p className="text-fp-text font-bold text-sm">${fmt(laborQuotedRevenue)}</p>
+              </div>
+              <div className="bg-fp-inset rounded-lg px-4 py-3">
+                <p className="text-fp-muted text-xs mb-1">Budgeted Cost</p>
+                <p className="text-fp-text font-bold text-sm">${fmt(laborBudgetedCost)}</p>
+                {laborBudgetMarginPct !== null && (
+                  <p className={`text-xs mt-0.5 ${laborBudgetMargin >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {laborBudgetMargin >= 0 ? '+' : ''}${fmt(laborBudgetMargin)} · {laborBudgetMarginPct}% margin
+                  </p>
+                )}
+              </div>
+              <div className={`rounded-lg px-4 py-3 ${laborOver ? 'bg-red-500/10 border border-red-500/20' : 'bg-fp-inset'}`}>
+                <p className="text-fp-muted text-xs mb-1">Hours {laborOver ? 'Over' : 'Remaining'}</p>
+                <p className={`font-bold text-sm ${laborOver ? 'text-red-400' : 'text-green-400'}`}>
+                  {laborOver ? '+' : ''}{Math.abs(estimatedHours - hoursLogged).toFixed(1)} hrs{laborOver ? ' ⚠' : ''}
+                </p>
+                <p className="text-fp-muted text-xs mt-0.5">{hoursLogged.toFixed(1)} of {estimatedHours.toFixed(1)} logged</p>
+              </div>
+              <div className={`rounded-lg px-4 py-3 ${laborActualMargin < 0 ? 'bg-red-500/10 border border-red-500/20' : laborActualMargin < laborBudgetMargin * 0.8 ? 'bg-yellow-500/10 border border-yellow-500/20' : 'bg-green-500/10 border border-green-500/20'}`}>
+                <p className="text-fp-muted text-xs mb-1">Projected Profit</p>
+                <p className={`font-bold text-sm ${laborActualMargin < 0 ? 'text-red-400' : laborActualMargin < laborBudgetMargin * 0.8 ? 'text-yellow-400' : 'text-green-400'}`}>
+                  {laborActualMargin < 0 ? '' : '+'}${fmt(laborActualMargin)}
+                </p>
+                {laborActualMarginPct !== null && (
+                  <p className={`text-xs mt-0.5 ${laborActualMargin < 0 ? 'text-red-400' : 'text-fp-muted'}`}>{laborActualMarginPct}% margin</p>
+                )}
+              </div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-fp-border">
-                    {['Role', 'Planned Qty', 'Unit', 'Your Cost', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
+                    {['Role', 'Section', 'Planned Hrs', 'Your Cost/hr', 'Customer Price', 'Margin $', 'Margin %'].map(h => (
                       <th key={h} className="text-fp-muted text-left py-2 pr-3 font-normal">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {(proposal.labor_items || []).map((l, i) => {
-                    const cost = parseFloat(l.your_cost) || 0
+                  {allLaborItems.map((l, i) => {
+                    const costPerUnit = parseFloat(l.your_cost) || 0
+                    const qty = parseFloat(l.quantity) || 0
+                    const totalCostRow = costPerUnit * qty
                     const revenue = parseFloat(l.customer_price) || 0
-                    const margin = revenue - cost
+                    const margin = revenue - totalCostRow
                     const marginPct = revenue > 0 ? ((margin / revenue) * 100).toFixed(1) : '—'
                     return (
                       <tr key={i} className="border-b border-fp-border/30">
                         <td className="text-fp-text py-2 pr-3 font-medium">{l.role || '—'}</td>
-                        <td className="text-fp-text py-2 pr-3">{l.quantity || '—'}</td>
-                        <td className="text-fp-muted py-2 pr-3">{l.unit || 'hr'}</td>
-                        <td className="text-fp-text py-2 pr-3">${fmt(cost)}</td>
+                        <td className="text-fp-muted py-2 pr-3">{l._sectionName || '—'}</td>
+                        <td className="text-fp-text py-2 pr-3">{qty > 0 ? `${qty} ${l.unit || 'hr'}` : '—'}</td>
+                        <td className="text-fp-text py-2 pr-3">${fmt(costPerUnit)}</td>
                         <td className="text-fp-text py-2 pr-3">${fmt(revenue)}</td>
                         <td className={`py-2 pr-3 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>${fmt(margin)}</td>
                         <td className={`py-2 font-semibold ${margin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{marginPct}{marginPct !== '—' ? '%' : ''}</td>
@@ -319,6 +429,41 @@ export default function CostReportTab({ job, proposal, lineItems, freeformPOItem
             </div>
           </div>
         )}
+
+        {/* AI Job Analysis */}
+        <div className="border-t border-fp-border pt-5">
+          <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Ask AI about this Job</p>
+          {aiMessages.length > 0 && (
+            <div className="space-y-3 mb-3 max-h-72 overflow-y-auto">
+              {aiMessages.map((m, i) => (
+                <div key={i} className={`text-sm rounded-lg px-4 py-3 ${m.role === 'user' ? 'bg-fp-inset text-fp-text ml-8' : 'bg-[#C8622A]/10 text-fp-text mr-8'}`}>
+                  {m.role === 'assistant' && <p className="text-[#C8622A] text-xs font-semibold mb-1">AI</p>}
+                  <p className="whitespace-pre-wrap">{m.content}</p>
+                </div>
+              ))}
+              {aiLoading && (
+                <div className="bg-[#C8622A]/10 rounded-lg px-4 py-3 mr-8">
+                  <p className="text-[#C8622A] text-xs font-semibold mb-1">AI</p>
+                  <p className="text-fp-muted text-sm">Thinking...</p>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              value={aiInput}
+              onChange={e => setAiInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && askAI()}
+              placeholder="e.g. Are we profitable on labor? What's our risk? How are we trending?"
+              className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+              disabled={aiLoading}
+            />
+            <button onClick={askAI} disabled={aiLoading || !aiInput.trim()}
+              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+              Ask
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   )
