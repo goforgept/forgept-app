@@ -86,6 +86,12 @@ body {
   background: transparent;
 }
 
+/* ── Mobile bottom nav clearance ────────────────────────────────────── */
+@media (max-width: 1023px) {
+  /* Push page content above the bottom tab bar (56px bar + safe area) */
+  .flex-1.p-6, .flex-1 > .space-y-6 { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+}
+
 /* ── Mobile responsive overrides (< 768px) ──────────────────────────── */
 @media (max-width: 767px) {
   /* Collapse 3+ column stat grids to 2 columns */

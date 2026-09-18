@@ -352,25 +352,46 @@ export default function Sidebar({ isAdmin: isAdminProp, isDevTeam: isDevTeamProp
   const isActive = (path) =>
     location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'))
 
+  // Bottom nav tabs for mobile
+  const bottomNavItems = [
+    { label: 'Home', path: '/', icon: '🏠' },
+    ...(featureCRM ? [{ label: 'Clients', path: '/clients', icon: '👥' }] : []),
+    { label: 'Tasks', path: '/tasks', icon: '✓' },
+    { label: 'Jobs', path: '/jobs', icon: '🔧' },
+    { label: 'More', path: null, icon: '☰' },
+  ]
+
   return (
     <>
-      {/* Mobile thin strip — stays in layout flow (never overlaps content) and above backdrop/sidebar so it can close the menu */}
-      <div className="lg:hidden relative z-[60] flex-shrink-0 w-14 h-screen bg-fp-card border-r border-fp-border flex flex-col items-center pt-2">
-        <button
-          onClick={() => setMobileOpen(o => !o)}
-          className="w-12 h-12 flex items-center justify-center text-fp-muted hover:text-fp-text active:bg-fp-inset transition-colors rounded-xl"
-          aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-        >
-          {mobileOpen ? (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
+      {/* Mobile bottom nav bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-[60] bg-fp-card border-t border-fp-border flex items-stretch"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        {bottomNavItems.map(item => {
+          const active = item.path && isActive(item.path)
+          return item.path ? (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
+                active ? 'text-[#C8622A]' : 'text-fp-muted'
+              }`}
+            >
+              <span className="text-lg leading-none">{item.icon}</span>
+              <span className="text-[10px] font-semibold">{item.label}</span>
+            </Link>
           ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-            </svg>
-          )}
-        </button>
+            <button
+              key="more"
+              onClick={() => setMobileOpen(o => !o)}
+              className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
+                mobileOpen ? 'text-[#C8622A]' : 'text-fp-muted'
+              }`}
+            >
+              <span className="text-lg leading-none">{item.icon}</span>
+              <span className="text-[10px] font-semibold">{item.label}</span>
+            </button>
+          )
+        })}
       </div>
 
       {/* Backdrop */}
@@ -383,7 +404,7 @@ export default function Sidebar({ isAdmin: isAdminProp, isDevTeam: isDevTeamProp
 
     <div className={`
       h-full bg-fp-card border-r border-fp-border flex flex-col
-      fixed top-0 left-14 z-50 w-64
+      fixed top-0 left-0 z-50 w-72
       transition-all duration-300 ease-in-out
       lg:relative lg:left-auto lg:top-auto lg:flex-shrink-0 lg:translate-x-0
       ${desktopCollapsed ? 'lg:w-12' : 'lg:w-56'}
