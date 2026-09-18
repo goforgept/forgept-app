@@ -1,7 +1,6 @@
-import { useState } from 'react'
-import { supabase } from '../../supabase'
+import { useState, useEffect } from 'react'
+import { setAIPageContext, clearAIPageContext } from '../../aiPageContext'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export default function CostReportTab({ job, proposal, proposalSections = [], lineItems, freeformPOItems, changeOrders, techLogs, checklist, onExportPDF }) {
@@ -71,63 +70,19 @@ export default function CostReportTab({ job, proposal, proposalSections = [], li
   const laborBudgetMarginPct = laborQuotedRevenue > 0 ? (laborBudgetMargin / laborQuotedRevenue * 100).toFixed(1) : null
   const laborActualMarginPct = laborQuotedRevenue > 0 ? (laborActualMargin / laborQuotedRevenue * 100).toFixed(1) : null
 
-  // AI state
-  const [aiInput, setAiInput] = useState('')
-  const [aiMessages, setAiMessages] = useState([])
-  const [aiLoading, setAiLoading] = useState(false)
-
-  const buildCostContext = () => `
-Job: ${job?.job_name || job?.name || 'Unknown'}
+  // Push cost report data into the global AI agent context
+  useEffect(() => {
+    setAIPageContext(`[Job Cost Report — ${job?.job_name || job?.name || 'Current Job'}]
 Status: ${job?.status || '—'}
-
-FINANCIALS
-Quoted Revenue: $${fmt(totalRevenue)}
-Total Budgeted Cost: $${fmt(totalCost)}
-Gross Margin (Quoted): ${grossMargin}%
-${overBudget ? `⚠ OVER BUDGET by $${fmt(totalCost - totalRevenue)}` : `Remaining Budget: $${fmt(totalRevenue - totalCost)}`}
-
-LABOR
-Quoted Labor Revenue: $${fmt(laborQuotedRevenue)}
-Budgeted Labor Cost: $${fmt(laborBudgetedCost)}
-Budgeted Labor Margin: $${fmt(laborBudgetMargin)} (${laborBudgetMarginPct ?? '—'}%)
-Hours Estimated: ${estimatedHours.toFixed(1)} hrs
-Hours Logged: ${hoursLogged.toFixed(1)} hrs
-${laborOver ? `⚠ Labor over budget by ${(hoursLogged - estimatedHours).toFixed(1)} hrs` : `Labor hours remaining: ${(estimatedHours - hoursLogged).toFixed(1)} hrs`}
-Actual Labor Cost (based on logged hrs): $${fmt(laborActualCost)}
+Quoted Revenue: $${fmt(totalRevenue)} | Total Budgeted Cost: $${fmt(totalCost)} | Gross Margin: ${grossMargin}%
+${overBudget ? `OVER BUDGET by $${fmt(totalCost - totalRevenue)}` : `Remaining Budget: $${fmt(totalRevenue - totalCost)}`}
+Labor — Quoted: $${fmt(laborQuotedRevenue)} | Budgeted Cost: $${fmt(laborBudgetedCost)} | Margin: $${fmt(laborBudgetMargin)} (${laborBudgetMarginPct ?? '—'}%)
+Hours: ${hoursLogged.toFixed(1)} logged of ${estimatedHours.toFixed(1)} estimated${laborOver ? ` — OVER by ${(hoursLogged - estimatedHours).toFixed(1)} hrs` : ` — ${(estimatedHours - hoursLogged).toFixed(1)} remaining`}
 Projected Labor Margin: $${fmt(laborActualMargin)} (${laborActualMarginPct ?? '—'}%)
-
-MATERIALS
-Quoted Materials Revenue: $${fmt(quotedMaterials)}
-Budgeted Materials Cost: $${fmt(costMaterials)}
-Materials Margin: $${fmt(quotedMaterials - costMaterials)}
-${freeformPOCost > 0 ? `Freeform PO Costs: $${fmt(freeformPOCost)}` : ''}
-${approvedCOs > 0 ? `Approved Change Orders: $${fmt(approvedCOs)} revenue, $${fmt(costCOs)} cost` : ''}
-
-CHECKLIST: ${checklistDone} of ${checklistTotal} items complete
-`.trim()
-
-  const askAI = async () => {
-    const text = aiInput.trim()
-    if (!text || aiLoading) return
-    const contextMsg = { role: 'user', content: `[Job Cost Report Context]\n${buildCostContext()}\n\n[User Question]\n${text}` }
-    const nextMessages = [...aiMessages, contextMsg]
-    setAiMessages(prev => [...prev, { role: 'user', content: text }])
-    setAiInput('')
-    setAiLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-agent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ messages: nextMessages }),
-      })
-      const data = await res.json()
-      setAiMessages(prev => [...prev, { role: 'assistant', content: data.reply || 'No response.' }])
-    } catch {
-      setAiMessages(prev => [...prev, { role: 'assistant', content: 'Error reaching AI. Try again.' }])
-    }
-    setAiLoading(false)
-  }
+Materials — Quoted: $${fmt(quotedMaterials)} | Cost: $${fmt(costMaterials)} | Margin: $${fmt(quotedMaterials - costMaterials)}${freeformPOCost > 0 ? ` | Freeform POs: $${fmt(freeformPOCost)}` : ''}${approvedCOs > 0 ? ` | COs: $${fmt(approvedCOs)}` : ''}
+Checklist: ${checklistDone}/${checklistTotal} complete`)
+    return () => clearAIPageContext()
+  }, [totalRevenue, totalCost, hoursLogged, estimatedHours, laborQuotedRevenue, laborBudgetedCost])
 
   return (
     <div className="bg-fp-card rounded-xl p-6">
@@ -185,12 +140,72 @@ CHECKLIST: ${checklistDone} of ${checklistTotal} items complete
           ))}
         </div>
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-4 gap-4">
-          <div className="bg-fp-inset rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Total Revenue</p><p className="text-fp-text font-bold text-xl">${fmt(totalRevenue)}</p></div>
-          <div className="bg-fp-inset rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Total Cost</p><p className="text-fp-text font-bold text-xl">${fmt(totalCost)}</p>{freeformPOCost > 0 && <p className="text-blue-400 text-xs mt-1">incl. ${fmt(freeformPOCost)} freeform POs</p>}</div>
-          <div className="bg-fp-inset rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Gross Margin</p><p className={`font-bold text-xl ${parseFloat(grossMargin) >= 30 ? 'text-green-400' : parseFloat(grossMargin) >= 15 ? 'text-[#C8622A]' : 'text-red-400'}`}>{grossMargin}%</p></div>
-          <div className="bg-fp-inset rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Hours Logged</p><p className="text-fp-text font-bold text-xl">{hoursLogged.toFixed(1)}</p></div>
+        {/* Job Profitability */}
+        <div className="bg-fp-inset rounded-xl p-5">
+          <p className="text-fp-text font-semibold text-sm mb-4">Job Profitability</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
+            <div>
+              <p className="text-fp-muted text-xs mb-1">Total Revenue</p>
+              <p className="text-fp-text font-bold text-xl">${fmt(totalRevenue)}</p>
+              {approvedCOs > 0 && <p className="text-[#C8622A] text-xs mt-0.5">incl. ${fmt(approvedCOs)} in COs</p>}
+            </div>
+            <div>
+              <p className="text-fp-muted text-xs mb-1">Total Cost</p>
+              <p className="text-fp-text font-bold text-xl">${fmt(totalCost)}</p>
+              {freeformPOCost > 0 && <p className="text-blue-400 text-xs mt-0.5">incl. ${fmt(freeformPOCost)} freeform POs</p>}
+            </div>
+            <div>
+              <p className="text-fp-muted text-xs mb-1">Gross Profit</p>
+              <p className={`font-bold text-xl ${totalRevenue - totalCost >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {totalRevenue - totalCost < 0 ? '-' : '+'}${fmt(Math.abs(totalRevenue - totalCost))}
+              </p>
+            </div>
+            <div>
+              <p className="text-fp-muted text-xs mb-1">Gross Margin</p>
+              <p className={`font-bold text-xl ${parseFloat(grossMargin) >= 30 ? 'text-green-400' : parseFloat(grossMargin) >= 15 ? 'text-[#C8622A]' : 'text-red-400'}`}>{grossMargin}%</p>
+            </div>
+          </div>
+          {/* Category breakdown */}
+          <div className="space-y-2">
+            {[
+              { label: 'Materials', revenue: quotedMaterials, cost: costMaterials },
+              ...(quotedLabor > 0 ? [{ label: 'Labor', revenue: quotedLabor, cost: costLabor }] : []),
+              ...(approvedCOs > 0 ? [{ label: 'Change Orders', revenue: approvedCOs, cost: costCOs }] : []),
+              ...(freeformPOCost > 0 ? [{ label: 'Freeform POs', revenue: 0, cost: freeformPOCost }] : []),
+            ].map(({ label, revenue, cost }) => {
+              const profit = revenue - cost
+              const pct = revenue > 0 ? (profit / revenue * 100).toFixed(1) : null
+              const barPct = totalRevenue > 0 ? Math.min((revenue / totalRevenue) * 100, 100) : 0
+              return (
+                <div key={label} className="flex items-center gap-3 text-xs">
+                  <span className="text-fp-muted w-28 shrink-0">{label}</span>
+                  <div className="flex-1 bg-fp-card rounded-full h-1.5 min-w-0">
+                    <div className="h-1.5 rounded-full bg-[#C8622A]/60" style={{ width: `${barPct}%` }} />
+                  </div>
+                  <span className="text-fp-muted w-24 text-right shrink-0">${fmt(revenue)} rev</span>
+                  <span className="text-fp-muted w-24 text-right shrink-0">${fmt(cost)} cost</span>
+                  <span className={`w-28 text-right font-semibold shrink-0 ${profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {profit >= 0 ? '+' : ''}${fmt(profit)}{pct !== null ? ` (${pct}%)` : ''}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          <div className="border-t border-fp-border/50 mt-3 pt-3 flex items-center gap-3 text-xs">
+            <span className="text-fp-text font-semibold w-28 shrink-0">Total</span>
+            <div className="flex-1" />
+            <span className="text-fp-text font-semibold w-24 text-right shrink-0">${fmt(totalRevenue)}</span>
+            <span className="text-fp-text font-semibold w-24 text-right shrink-0">${fmt(totalCost)}</span>
+            <span className={`w-28 text-right font-bold shrink-0 ${totalRevenue - totalCost >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+              {totalRevenue - totalCost >= 0 ? '+' : ''}${fmt(totalRevenue - totalCost)} ({grossMargin}%)
+            </span>
+          </div>
+        </div>
+
+        {/* Hours logged card */}
+        <div className="bg-fp-inset rounded-xl px-5 py-4 flex items-center justify-between">
+          <p className="text-fp-muted text-sm">Hours Logged</p>
+          <p className="text-fp-text font-bold text-xl">{hoursLogged.toFixed(1)} hrs</p>
         </div>
 
         {/* Breakdown table */}
@@ -430,40 +445,6 @@ CHECKLIST: ${checklistDone} of ${checklistTotal} items complete
           </div>
         )}
 
-        {/* AI Job Analysis */}
-        <div className="border-t border-fp-border pt-5">
-          <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Ask AI about this Job</p>
-          {aiMessages.length > 0 && (
-            <div className="space-y-3 mb-3 max-h-72 overflow-y-auto">
-              {aiMessages.map((m, i) => (
-                <div key={i} className={`text-sm rounded-lg px-4 py-3 ${m.role === 'user' ? 'bg-fp-inset text-fp-text ml-8' : 'bg-[#C8622A]/10 text-fp-text mr-8'}`}>
-                  {m.role === 'assistant' && <p className="text-[#C8622A] text-xs font-semibold mb-1">AI</p>}
-                  <p className="whitespace-pre-wrap">{m.content}</p>
-                </div>
-              ))}
-              {aiLoading && (
-                <div className="bg-[#C8622A]/10 rounded-lg px-4 py-3 mr-8">
-                  <p className="text-[#C8622A] text-xs font-semibold mb-1">AI</p>
-                  <p className="text-fp-muted text-sm">Thinking...</p>
-                </div>
-              )}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input
-              value={aiInput}
-              onChange={e => setAiInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && askAI()}
-              placeholder="e.g. Are we profitable on labor? What's our risk? How are we trending?"
-              className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-              disabled={aiLoading}
-            />
-            <button onClick={askAI} disabled={aiLoading || !aiInput.trim()}
-              className="bg-[#C8622A] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
-              Ask
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   )

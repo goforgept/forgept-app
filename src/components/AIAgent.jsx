@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { useNavigate } from 'react-router-dom'
+import { getAIPageContext } from '../aiPageContext'
 
 const SUPABASE_URL = 'https://qxypaepvmtmkhbssedki.supabase.co'
 
@@ -55,9 +56,12 @@ export default function AIAgent() {
     const text = input.trim()
     if (!text || loading) return
 
-    const userMsg = { role: 'user', content: text }
+    const pageCtx = getAIPageContext()
+    const content = pageCtx ? `${pageCtx}\n\n${text}` : text
+    const userMsg = { role: 'user', content }
+    const displayMsg = { role: 'user', content: text }
     const newMessages = [...messages, userMsg]
-    setMessages(newMessages)
+    setMessages(prev => [...prev, displayMsg])
     setInput('')
     setLoading(true)
 
