@@ -2646,9 +2646,10 @@ function GlobalProductStats() {
   )
 
   const total = stats.reduce((s, r) => s + r.count, 0)
-  const filteredStats = search.trim()
+  const filteredStats = (search.trim()
     ? stats.filter(r => r.manufacturer.toLowerCase().includes(search.toLowerCase()))
     : stats
+  ).slice().sort((a, b) => a.manufacturer.localeCompare(b.manufacturer))
   const filteredProducts = productSearch.trim()
     ? products.filter(p =>
         (p.name || '').toLowerCase().includes(productSearch.toLowerCase()) ||
