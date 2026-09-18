@@ -9,6 +9,7 @@ export default function ChangeOrderModal({ coForm, setCoForm, savingCO, onSave, 
   const taxPct = parseFloat(coForm.tax_percent) || 0
   const taxAmt = subtotal * taxPct / 100
   const coTotal = subtotal + taxAmt
+  const hasLineItems = (coForm.line_items || []).length > 0 || (coForm.labor_items || []).length > 0
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
@@ -119,15 +120,32 @@ export default function ChangeOrderModal({ coForm, setCoForm, savingCO, onSave, 
 
           <div className="bg-fp-inset rounded-xl p-4">
             <div className="flex items-end justify-between gap-4">
-              <div>
-                <label className="text-fp-muted text-xs mb-1 block">Tax Rate (%)</label>
-                <input
-                  type="number" min="0" max="100" step="0.1"
-                  placeholder="0.00"
-                  value={coForm.tax_percent ?? ''}
-                  onChange={e => setCoForm(p => ({ ...p, tax_percent: e.target.value }))}
-                  className="w-28 bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-                />
+              <div className="space-y-3">
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Tax Rate (%)</label>
+                  <input
+                    type="number" min="0" max="100" step="0.1"
+                    placeholder="0.00"
+                    value={coForm.tax_percent ?? ''}
+                    onChange={e => setCoForm(p => ({ ...p, tax_percent: e.target.value }))}
+                    className="w-28 bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                  />
+                </div>
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">
+                    Your Cost {hasLineItems ? '(override)' : ''}
+                  </label>
+                  <input
+                    type="number" min="0" step="0.01"
+                    placeholder="0.00"
+                    value={coForm.your_cost ?? ''}
+                    onChange={e => setCoForm(p => ({ ...p, your_cost: e.target.value }))}
+                    className="w-28 bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                  />
+                  <p className="text-fp-muted text-[10px] mt-0.5 w-28">
+                    {hasLineItems ? 'Overrides calculated cost' : 'Total cost for this CO'}
+                  </p>
+                </div>
               </div>
               <div className="text-right text-sm space-y-0.5">
                 {(coForm.line_items||[]).length > 0 && <p className="text-fp-muted">Materials: <span className="text-fp-text">${matTotal.toLocaleString('en-US',{minimumFractionDigits:2})}</span></p>}

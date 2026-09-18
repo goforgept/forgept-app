@@ -363,13 +363,14 @@ function RoleModal({ role, orgId, onSave, onClose }) {
 }
 
 // ── Member edit modal ─────────────────────────────────────────────────────────
-function MemberModal({ member, roles, onSave, onClose }) {
+function MemberModal({ member, roles, laborRates = [], onSave, onClose }) {
   const [tab, setTab] = useState('info')
   const [info, setInfo] = useState({
     full_name: member.full_name || '',
     job_title: member.job_title || '',
     phone: member.phone || '',
     org_role: member.org_role || 'rep',
+    labor_role: member.labor_role || '',
   })
   const [roleId, setRoleId] = useState(member.org_role_id || '')
   const [overrides, setOverrides] = useState(member.permission_overrides || {})
@@ -405,6 +406,7 @@ function MemberModal({ member, roles, onSave, onClose }) {
       phone: info.phone || null,
       org_role: info.org_role,
       org_role_id: roleId || null,
+      labor_role: info.labor_role || null,
       permission_overrides: overrides,
       scope_overrides: scopeOverrides,
     }).eq('id', member.id)
@@ -494,6 +496,16 @@ function MemberModal({ member, roles, onSave, onClose }) {
                 </select>
                 <p className="text-fp-muted text-xs mt-1">Admins bypass all permission checks and can manage team settings.</p>
               </div>
+              {laborRates.length > 0 && (
+                <div>
+                  <label className="text-fp-muted text-xs mb-1 block">Labor Rate Card Role</label>
+                  <select value={info.labor_role} onChange={e => setInfo(p => ({ ...p, labor_role: e.target.value }))} className={inputClass}>
+                    <option value="">— Not set —</option>
+                    {laborRates.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                  <p className="text-fp-muted text-xs mt-1">Used to calculate labor cost when this person logs time on a job.</p>
+                </div>
+              )}
             </>
           )}
 
@@ -558,6 +570,7 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
   const [tab, setTab] = useState('members')
   const [roles, setRoles] = useState([])
   const [members, setMembers] = useState([])
+  const [laborRates, setLaborRates] = useState([])
   const [orgId, setOrgId] = useState(null)
   const [loading, setLoading] = useState(true)
   const [currentUserId, setCurrentUserId] = useState(null)
@@ -584,12 +597,13 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
       setCurrentUserId(user.id)
       setCurrentOrgRole(profile.org_role)
 
-      const [{ data: rolesData }, { data: membersData }] = await Promise.all([
+      const [{ data: rolesData }, { data: membersData }, { data: laborRatesData }] = await Promise.all([
         supabase.from('org_roles').select('*').eq('org_id', profile.org_id).order('created_at'),
         supabase.from('profiles')
-          .select('id, full_name, email, org_role, org_role_id, permission_overrides, created_at, job_title, phone, org_roles(id, name, is_admin)')
+          .select('id, full_name, email, org_role, org_role_id, permission_overrides, created_at, job_title, phone, labor_role, org_roles(id, name, is_admin)')
           .eq('org_id', profile.org_id)
           .order('created_at'),
+        supabase.from('labor_rates').select('role').eq('org_id', profile.org_id).order('sort_order'),
       ])
 
       let finalRoles = rolesData || []
@@ -603,6 +617,7 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
 
       setRoles(finalRoles)
       setMembers(membersData || [])
+      setLaborRates((laborRatesData || []).map(r => r.role).filter(Boolean))
       setLoading(false)
     }
     load()
@@ -707,6 +722,7 @@ export default function TeamSettingsTab({ featureDesignerOnly }) {
         <MemberModal
           member={editMember}
           roles={roles}
+          laborRates={laborRates}
           onSave={handleMemberSaved}
           onClose={() => setEditMember(null)}
         />

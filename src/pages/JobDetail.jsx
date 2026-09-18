@@ -84,6 +84,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   // Freeform PO line items (from purchase_order_line_items where job_id = id)
   const [freeformPOItems, setFreeformPOItems] = useState([])
   const [proposalSections, setProposalSections] = useState([])
+  const [laborRates, setLaborRates] = useState([])
 
   // Bulk BOM edit
   const [editingBOM, setEditingBOM] = useState(false)
@@ -240,10 +241,19 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     // Fetch tech daily logs
     const { data: logData } = await supabase
       .from('tech_daily_logs')
-      .select('*, profiles(full_name)')
+      .select('*, profiles(full_name, labor_role)')
       .eq('job_id', id)
       .order('log_date', { ascending: false })
     setTechLogs(logData || [])
+
+    if (profile?.org_id) {
+      const { data: ratesData } = await supabase
+        .from('labor_rates')
+        .select('role, cost_per_hour')
+        .eq('org_id', profile.org_id)
+        .order('sort_order')
+      setLaborRates(ratesData || [])
+    }
 
     await autoCheckItems(id, jobData)
 
@@ -798,6 +808,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     const costLabor = (proposal?.labor_items || []).reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
     const approvedCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, c) => sum + (c.amount || 0), 0)
     const costCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, co) => {
+      if (co.your_cost != null) return sum + parseFloat(co.your_cost)
       const matCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
       const labCost = (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
       return sum + matCost + labCost
@@ -888,8 +899,11 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       autoTable(doc, {
         startY: y, head: [['Name', 'Status', 'Amount', 'Your Cost']],
         body: changeOrders.map(co => {
-          const coCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0) + (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
-          return [co.name, co.status, `$${(co.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, coCost > 0 ? `$${coCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—']
+          const coCost = co.your_cost != null
+            ? parseFloat(co.your_cost)
+            : (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0) + (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+          const hasCost = co.your_cost != null || (co.line_items || []).length > 0 || (co.labor_items || []).length > 0
+          return [co.name, co.status, `$${(co.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`, hasCost ? `$${coCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—']
         }),
         headStyles: { fillColor: primaryRgb, textColor: [255, 255, 255] }, theme: pdfStriped ? 'striped' : 'plain', alternateRowStyles: pdfStriped ? { fillColor: [245, 245, 245] } : { fillColor: [255, 255, 255] }, styles: { fontSize: 8 }
       })
@@ -913,6 +927,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       line_items: co.line_items || [],
       labor_items: co.labor_items || [],
       tax_percent: co.tax_percent ?? defaultTaxRate,
+      your_cost: co.your_cost ?? '',
     })
     setShowCOModal(true)
   }
@@ -937,6 +952,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
       amount: total, tax_percent: taxPct,
       line_items: coForm.line_items?.length > 0 ? coForm.line_items : null,
       labor_items: coForm.labor_items?.length > 0 ? coForm.labor_items : null,
+      your_cost: coForm.your_cost !== '' && coForm.your_cost != null ? parseFloat(coForm.your_cost) : null,
     }
     if (editingCOId) {
       const { data } = await supabase.from('change_orders').update(patch).eq('id', editingCOId).select().single()
@@ -950,6 +966,16 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
     }
     closeCOModal()
     setSavingCO(false)
+  }
+
+  const addManualLaborEntry = async (entry) => {
+    const { data } = await supabase.from('tech_daily_logs').insert({
+      job_id: id,
+      org_id: profile?.org_id,
+      profile_id: profile?.id,
+      ...entry,
+    }).select('*, profiles(full_name, labor_role)').single()
+    if (data) setTechLogs(prev => [data, ...prev])
   }
 
   const updateCOStatus = async (coId, status) => {
@@ -1889,7 +1915,9 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             changeOrders={changeOrders}
             techLogs={techLogs}
             checklist={checklist}
+            laborRates={laborRates}
             onExportPDF={exportCostReport}
+            onAddManualEntry={addManualLaborEntry}
           />
         )}
 

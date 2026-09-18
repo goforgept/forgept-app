@@ -3,7 +3,7 @@ import { setAIPageContext, clearAIPageContext } from '../../aiPageContext'
 
 const fmt = (n) => (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-export default function CostReportTab({ job, proposal, proposalSections = [], lineItems, freeformPOItems, changeOrders, techLogs, checklist, onExportPDF }) {
+export default function CostReportTab({ job, proposal, proposalSections = [], lineItems, freeformPOItems, changeOrders, techLogs, checklist, onExportPDF, laborRates = [], onAddManualEntry }) {
   // Merge proposal-level labor with section labor items
   const allLaborItems = [
     ...(proposal?.labor_items || []),
@@ -16,6 +16,7 @@ export default function CostReportTab({ job, proposal, proposalSections = [], li
   const costLabor = allLaborItems.reduce((sum, l) => sum + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
   const approvedCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, c) => sum + (c.amount || 0), 0)
   const costCOs = changeOrders.filter(c => c.status === 'Approved').reduce((sum, co) => {
+    if (co.your_cost != null) return sum + parseFloat(co.your_cost)
     const matCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0)
     const labCost = (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
     return sum + matCost + labCost
@@ -36,12 +37,18 @@ export default function CostReportTab({ job, proposal, proposalSections = [], li
   ]
 
   const usedByItemId = {}
+  let materialAdjustmentCost = 0
   techLogs.forEach(log => {
     if (!log.materials_used) return
     try {
       const parsed = JSON.parse(log.materials_used)
       if (Array.isArray(parsed)) parsed.forEach(m => {
-        usedByItemId[m.id] = (usedByItemId[m.id] || 0) + (parseFloat(m.qty) || 0)
+        if (m.id?.startsWith('adj_')) {
+          // Manual adjustment entry — has a direct cost field
+          materialAdjustmentCost += parseFloat(m.cost) || 0
+        } else {
+          usedByItemId[m.id] = (usedByItemId[m.id] || 0) + (parseFloat(m.qty) || 0)
+        }
       })
     } catch {}
   })
@@ -55,9 +62,15 @@ export default function CostReportTab({ job, proposal, proposalSections = [], li
   const checklistTotal = checklist.length
   const checklistDone = checklist.filter(c => c.completed).length
   const checklistPct = checklistTotal > 0 ? (checklistDone / checklistTotal) * 100 : 0
-  const actualMaterialCost = lineItems.reduce((sum, i) => sum + ((usedByItemId[i.id] || 0) * (i.your_cost_unit || 0)), 0)
-  const laborRate = estimatedHours > 0 ? costLabor / estimatedHours : 0
-  const actualLaborCost = hoursLogged * laborRate
+  const actualMaterialCost = lineItems.reduce((sum, i) => sum + ((usedByItemId[i.id] || 0) * (i.your_cost_unit || 0)), 0) + materialAdjustmentCost
+  // Per-tech rate: use profile.labor_role → laborRates lookup, fall back to blended average
+  const rateByRole = Object.fromEntries(laborRates.map(r => [r.role, parseFloat(r.cost_per_hour) || 0]))
+  const blendedLaborRate = estimatedHours > 0 ? costLabor / estimatedHours : 0
+  const actualLaborCost = techLogs.reduce((sum, log) => {
+    const role = log.profiles?.labor_role
+    const rate = role && rateByRole[role] != null ? rateByRole[role] : blendedLaborRate
+    return sum + (log.hours_worked || 0) * rate
+  }, 0)
   const actualCostTotal = actualMaterialCost + actualLaborCost
   const costBurnPct = totalCost > 0 ? Math.min((actualCostTotal / totalCost) * 100, 100) : 0
 
@@ -69,6 +82,41 @@ export default function CostReportTab({ job, proposal, proposalSections = [], li
   const laborActualMargin = laborQuotedRevenue - laborActualCost
   const laborBudgetMarginPct = laborQuotedRevenue > 0 ? (laborBudgetMargin / laborQuotedRevenue * 100).toFixed(1) : null
   const laborActualMarginPct = laborQuotedRevenue > 0 ? (laborActualMargin / laborQuotedRevenue * 100).toFixed(1) : null
+
+  // PM true-up form state
+  const [showTrueUp, setShowTrueUp] = useState(false)
+  const [trueUpType, setTrueUpType] = useState('labor') // 'labor' | 'materials'
+  const [trueUpForm, setTrueUpForm] = useState({ role: '', hours: '', matCost: '', matDesc: '', date: new Date().toISOString().slice(0, 10), note: '' })
+  const [savingTrueUp, setSavingTrueUp] = useState(false)
+  const handleTrueUpSave = async () => {
+    setSavingTrueUp(true)
+    const role = trueUpForm.role || null
+    const rateForRole = role && rateByRole[role] != null ? rateByRole[role] : blendedLaborRate
+    if (trueUpType === 'labor') {
+      if (!trueUpForm.hours || parseFloat(trueUpForm.hours) <= 0) { setSavingTrueUp(false); return }
+      await onAddManualEntry?.({
+        hours_worked: parseFloat(trueUpForm.hours),
+        log_date: trueUpForm.date,
+        notes: trueUpForm.note || null,
+        labor_role: role,
+        cost_per_hour: rateForRole,
+        is_manual_entry: true,
+      })
+    } else {
+      if (!trueUpForm.matCost || parseFloat(trueUpForm.matCost) <= 0) { setSavingTrueUp(false); return }
+      const matEntry = [{ id: `adj_${Date.now()}`, name: trueUpForm.matDesc || 'Material adjustment', qty: 1, cost: parseFloat(trueUpForm.matCost) }]
+      await onAddManualEntry?.({
+        hours_worked: 0,
+        log_date: trueUpForm.date,
+        notes: trueUpForm.note || null,
+        materials_used: JSON.stringify(matEntry),
+        is_manual_entry: true,
+      })
+    }
+    setTrueUpForm({ role: '', hours: '', matCost: '', matDesc: '', date: new Date().toISOString().slice(0, 10), note: '' })
+    setShowTrueUp(false)
+    setSavingTrueUp(false)
+  }
 
   // Push cost report data into the global AI agent context
   useEffect(() => {
@@ -371,6 +419,122 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
           </div>
         )}
 
+        {/* PM Labor True-Up */}
+        {onAddManualEntry && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide">PM Labor True-Up</p>
+              <button onClick={() => setShowTrueUp(v => !v)} className="text-[#C8622A] text-xs hover:text-fp-text transition-colors">
+                {showTrueUp ? 'Cancel' : '+ Add Manual Hours'}
+              </button>
+            </div>
+            {showTrueUp && (
+              <div className="bg-fp-inset rounded-xl p-4 space-y-3">
+                <p className="text-fp-muted text-xs">Add cost directly without a tech daily log — use to true-up hours or materials the PM managed.</p>
+                <div className="flex gap-2">
+                  {['labor', 'materials'].map(t => (
+                    <button key={t} onClick={() => setTrueUpType(t)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${trueUpType === t ? 'bg-[#C8622A] text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text border border-fp-border'}`}>
+                      {t === 'labor' ? 'Labor Hours' : 'Materials Cost'}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {trueUpType === 'labor' ? (
+                    <>
+                      <div>
+                        <label className="text-fp-muted text-xs mb-1 block">Role</label>
+                        <select value={trueUpForm.role} onChange={e => setTrueUpForm(p => ({ ...p, role: e.target.value }))}
+                          className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
+                          <option value="">— Blended rate —</option>
+                          {laborRates.map(r => <option key={r.role} value={r.role}>{r.role} (${fmt(r.cost_per_hour)}/hr)</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-fp-muted text-xs mb-1 block">Hours <span className="text-[#C8622A]">*</span></label>
+                        <input type="number" min="0.25" step="0.25" placeholder="0.0"
+                          value={trueUpForm.hours} onChange={e => setTrueUpForm(p => ({ ...p, hours: e.target.value }))}
+                          className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="text-fp-muted text-xs mb-1 block">Description</label>
+                        <input type="text" placeholder="e.g. Extra conduit, misc hardware"
+                          value={trueUpForm.matDesc} onChange={e => setTrueUpForm(p => ({ ...p, matDesc: e.target.value }))}
+                          className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                      </div>
+                      <div>
+                        <label className="text-fp-muted text-xs mb-1 block">Cost ($) <span className="text-[#C8622A]">*</span></label>
+                        <input type="number" min="0.01" step="0.01" placeholder="0.00"
+                          value={trueUpForm.matCost} onChange={e => setTrueUpForm(p => ({ ...p, matCost: e.target.value }))}
+                          className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <label className="text-fp-muted text-xs mb-1 block">Date</label>
+                    <input type="date" value={trueUpForm.date} onChange={e => setTrueUpForm(p => ({ ...p, date: e.target.value }))}
+                      className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                  </div>
+                  <div>
+                    <label className="text-fp-muted text-xs mb-1 block">Note (optional)</label>
+                    <input type="text" placeholder="e.g. PM time, site coordination"
+                      value={trueUpForm.note} onChange={e => setTrueUpForm(p => ({ ...p, note: e.target.value }))}
+                      className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setShowTrueUp(false)} className="text-fp-muted text-sm hover:text-fp-text transition-colors px-3 py-1.5">Cancel</button>
+                  <button onClick={handleTrueUpSave} disabled={savingTrueUp || (trueUpType === 'labor' ? !trueUpForm.hours || parseFloat(trueUpForm.hours) <= 0 : !trueUpForm.matCost || parseFloat(trueUpForm.matCost) <= 0)}
+                    className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                    {savingTrueUp ? 'Saving...' : trueUpType === 'labor' ? 'Add Hours' : 'Add Cost'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {techLogs.filter(l => l.is_manual_entry).length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-fp-border">
+                      {['Date', 'Type', 'Detail', 'Amount', 'Note'].map(h => (
+                        <th key={h} className="text-fp-muted text-left py-1.5 pr-3 font-normal">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {techLogs.filter(l => l.is_manual_entry).map((l, i) => {
+                      const isMat = l.hours_worked === 0 && l.materials_used
+                      let matAdj = null
+                      if (isMat) { try { const p = JSON.parse(l.materials_used); matAdj = p?.find(m => m.id?.startsWith('adj_')) } catch {} }
+                      return (
+                        <tr key={i} className="border-b border-fp-border/30">
+                          <td className="text-fp-muted py-1.5 pr-3">{l.log_date || '—'}</td>
+                          <td className="py-1.5 pr-3">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${isMat ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'}`}>
+                              {isMat ? 'Materials' : 'Labor'}
+                            </span>
+                          </td>
+                          <td className="text-fp-text py-1.5 pr-3">{isMat ? (matAdj?.name || '—') : (l.labor_role || 'Blended')}</td>
+                          <td className="text-fp-text py-1.5 pr-3">
+                            {isMat
+                              ? (matAdj ? `$${fmt(matAdj.cost)}` : '—')
+                              : `${l.hours_worked} hrs${l.cost_per_hour != null ? ` @ $${fmt(l.cost_per_hour)}/hr` : ''}`
+                            }
+                          </td>
+                          <td className="text-fp-muted py-1.5">{l.notes || '—'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Freeform PO line items */}
         {freeformPOItems.length > 0 && (
           <div>
@@ -423,7 +587,10 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                 </thead>
                 <tbody>
                   {changeOrders.map(co => {
-                    const coCost = (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0) + (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+                    const coCost = co.your_cost != null
+                      ? parseFloat(co.your_cost)
+                      : (co.line_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost_unit) || 0) * (parseFloat(l.quantity) || 0)), 0) + (co.labor_items || []).reduce((s, l) => s + ((parseFloat(l.your_cost) || 0) * (parseFloat(l.quantity) || 0)), 0)
+                    const hasCost = co.your_cost != null || (co.line_items || []).length > 0 || (co.labor_items || []).length > 0
                     const coMargin = co.amount - coCost
                     return (
                       <tr key={co.id} className="border-b border-fp-border/30">
@@ -434,8 +601,8 @@ Checklist: ${checklistDone}/${checklistTotal} complete`)
                           </span>
                         </td>
                         <td className="text-[#C8622A] py-2 pr-3 font-semibold">${fmt(co.amount)}</td>
-                        <td className="text-fp-text py-2 pr-3">{coCost > 0 ? `$${fmt(coCost)}` : '—'}</td>
-                        <td className={`py-2 font-semibold ${coMargin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{coCost > 0 ? `$${fmt(coMargin)}` : '—'}</td>
+                        <td className="text-fp-text py-2 pr-3">{hasCost ? `$${fmt(coCost)}` : '—'}</td>
+                        <td className={`py-2 font-semibold ${coMargin >= 0 ? 'text-green-400' : 'text-red-400'}`}>{hasCost ? `$${fmt(coMargin)}` : '—'}</td>
                       </tr>
                     )
                   })}
