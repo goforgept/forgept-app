@@ -93,6 +93,7 @@ Deno.serve(async (req) => {
     for (const ticket of (tickets || [])) {
       const ot = orgTime[ticket.org_id]
       if (!ot || ticket.scheduled_date >= ot.today) continue
+      if (ot.hour !== '06') continue
       const recipients = new Set<string>([
         ...(ticket.assigned_tech_id ? [ticket.assigned_tech_id] : []),
         ...(adminsByOrg[ticket.org_id] || []),
@@ -118,6 +119,7 @@ Deno.serve(async (req) => {
     for (const inv of (invoices || [])) {
       const ot = orgTime[inv.org_id]
       if (!ot || inv.due_date >= ot.today) continue
+      if (ot.hour !== '06') continue
       const client = (inv.proposals as any)?.company || (inv.proposals as any)?.client_name || 'Unknown'
       for (const userId of (adminsByOrg[inv.org_id] || [])) {
         allNotifications.push({
@@ -140,6 +142,7 @@ Deno.serve(async (req) => {
     for (const p of (proposals || [])) {
       const ot = orgTime[p.org_id]
       if (!ot || p.close_date >= ot.today) continue
+      if (ot.hour !== '06') continue
       const client = p.company || p.client_name || 'Unknown'
       for (const userId of (adminsByOrg[p.org_id] || [])) {
         allNotifications.push({
@@ -176,6 +179,7 @@ Deno.serve(async (req) => {
       }
 
       if (!isOverdue) continue
+      if (ot.hour !== '06') continue
 
       const recipients = new Set<string>([
         ...(task.assigned_to ? [task.assigned_to] : []),
