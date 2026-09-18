@@ -86,6 +86,22 @@ body {
   background: transparent;
 }
 
+/* ── Mobile responsive overrides (< 768px) ──────────────────────────── */
+@media (max-width: 767px) {
+  /* Collapse 3+ column stat grids to 2 columns */
+  .grid-cols-3 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .grid-cols-5 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+
+  /* Let page header rows (title + buttons) wrap instead of squishing */
+  .flex.justify-between.items-center { flex-wrap: wrap; gap: 8px; }
+
+  /* Reduce page padding on small screens */
+  .p-6 { padding: 12px !important; }
+  .p-8 { padding: 16px !important; }
+  .space-y-6 > * + * { margin-top: 12px !important; }
+}
+
 /* ── Hide scrollbar utility ─────────────────────────────────────────── */
 .scrollbar-none {
   scrollbar-width: none;
