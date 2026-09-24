@@ -140,9 +140,12 @@ export default function AIAgent() {
               <span className="text-fp-text text-sm font-semibold">ForgePt Agent</span>
               <span className="text-[10px] text-fp-muted bg-fp-inset px-1.5 py-0.5 rounded-full">AI</span>
             </div>
-            {messages.length > 0 && (
-              <button onClick={clearChat} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Clear</button>
-            )}
+            <div className="flex items-center gap-3">
+              {messages.length > 0 && (
+                <button onClick={clearChat} className="text-fp-muted hover:text-fp-text text-xs transition-colors">Clear</button>
+              )}
+              <button onClick={() => setOpen(false)} className="text-fp-muted hover:text-fp-text text-lg leading-none transition-colors">×</button>
+            </div>
           </div>
 
           {/* Messages */}
