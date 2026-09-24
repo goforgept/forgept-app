@@ -443,7 +443,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
               </div>
             ))}
             {halfWidgets.length > 0 && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {halfWidgets.map(d => renderWidget(d.id))}
               </div>
             )}
@@ -451,7 +451,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
         )}
 
         {/* ── AR + PO Summary ── */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="bg-fp-card rounded-xl p-5 border border-fp-border/40 cursor-pointer hover:bg-fp-hover transition-colors" onClick={() => navigate('/invoices')}>
             <p className="text-fp-text font-bold mb-3">Invoicing & AR</p>
             <div className="grid grid-cols-3 gap-3">
@@ -566,14 +566,16 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
             <button onClick={() => navigate('/new')} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity">+ New Proposal</button>
           </div>
         </div>
-        <div className="flex gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row gap-3 mb-4">
           <input type="text" placeholder="Search by name or company…" value={search} onChange={e => setSearch(e.target.value)}
             className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand placeholder:text-fp-muted" />
-          <div className="flex gap-2">
-            {['All', 'Draft', 'Sent', 'Won', 'Lost'].map(s => (
-              <button key={s} onClick={() => setStatusFilter(s)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${statusFilter === s ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted border border-fp-border hover:text-fp-text'}`}>{s}</button>
-            ))}
+          <div className="overflow-x-auto scrollbar-none">
+            <div className="flex gap-2 min-w-max">
+              {['All', 'Draft', 'Sent', 'Won', 'Lost'].map(s => (
+                <button key={s} onClick={() => setStatusFilter(s)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${statusFilter === s ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted border border-fp-border hover:text-fp-text'}`}>{s}</button>
+              ))}
+            </div>
           </div>
         </div>
         {loading ? <p className="text-fp-muted">Loading…</p> : filtered.length === 0 ? (
@@ -587,15 +589,15 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
                   <p className="text-fp-text font-semibold group-hover:text-fp-brand transition-colors">{p.proposal_name}</p>
                   <p className="text-fp-muted text-sm">{p.company} · {p.rep_name}</p>
                 </div>
-                <div className="flex items-center gap-4">
-                  {p.total_gross_margin_percent && <p className="text-fp-brand text-sm font-semibold">{p.total_gross_margin_percent.toFixed(1)}%</p>}
-                  <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                <div className="flex items-center gap-2 sm:gap-4 shrink-0 ml-2">
+                  {p.total_gross_margin_percent && <p className="hidden sm:block text-fp-brand text-sm font-semibold">{p.total_gross_margin_percent.toFixed(1)}%</p>}
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                     p.status === 'Won'  ? 'bg-green-500/20 text-green-400'  :
                     p.status === 'Sent' ? 'bg-blue-500/20 text-blue-400'   :
                     p.status === 'Lost' ? 'bg-red-500/20 text-red-400'     :
                     'bg-fp-border/40 text-fp-muted'}`}>{p.status}</span>
-                  <p className="text-fp-text text-sm font-semibold">{fmt(p.proposal_value)}</p>
-                  {p.close_date && <p className="text-fp-muted text-sm">{p.close_date}</p>}
+                  <p className="text-fp-text text-sm font-semibold tabular-nums">{fmt(p.proposal_value)}</p>
+                  {p.close_date && <p className="hidden sm:block text-fp-muted text-sm">{p.close_date}</p>}
                   <span className="text-fp-muted group-hover:text-fp-brand transition-colors">→</span>
                 </div>
               </div>

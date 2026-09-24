@@ -670,16 +670,16 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                   <button onClick={() => {
                     setSendForm({ subject: `Invoice ${invoice.invoice_number}`, message: `Hi ${invoice.proposals?.client_name || ticketClient?.clients?.client_name || 'there'},\n\nPlease find your invoice attached. Payment instructions are included on the invoice.\n\nThank you for your business.\n\n${invoice.proposals?.rep_name || profile?.full_name || ''}` })
                     setShowSendModal(true)
-                  }} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700 transition-colors">
-                    ✉ Send Invoice
+                  }} className="bg-green-600 text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-semibold hover:bg-green-700 transition-colors">
+                    ✉ <span className="hidden sm:inline">Send </span>Invoice
                   </button>
                 )}
-                <button onClick={downloadPDF} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-fp-hover transition-colors">
+                <button onClick={downloadPDF} className="bg-fp-inset text-fp-text px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-semibold hover:bg-fp-hover transition-colors">
                   ↓ PDF
                 </button>
                 {canWrite('invoices') && (
-                  <button onClick={() => setShowPaymentModal(true)} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
-                    + Record Payment
+                  <button onClick={() => setShowPaymentModal(true)} className="bg-fp-brand text-white px-3 py-1.5 md:px-4 md:py-2 rounded-lg text-xs md:text-sm font-semibold hover:bg-[#b5571f] transition-colors">
+                    + <span className="hidden sm:inline">Record </span>Payment
                   </button>
                 )}
               </div>

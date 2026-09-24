@@ -105,10 +105,11 @@ body {
 }
 
 /* ── Mobile bottom nav clearance ────────────────────────────────────── */
-/* Targets the main content div (flex-1 direct child of the page shell).
-   Comes AFTER the p-6 shorthand override so padding-bottom isn't clobbered. */
+/* Targets the main content div on both min-h-screen (most pages) and
+   h-screen (Dashboard) layouts. Comes AFTER p-6 shorthand override. */
 @media (max-width: 1023px) {
-  .flex.min-h-screen > .flex-1 { padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important; }
+  .flex.min-h-screen > .flex-1,
+  .flex.h-screen > .flex-1 { padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important; }
 }
 
 /* ── Hide scrollbar utility ─────────────────────────────────────────── */
