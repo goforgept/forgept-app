@@ -814,7 +814,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
             </div>
           )}
 
-          <div className="grid grid-cols-5 gap-4 mt-6">
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-4 mt-6">
             <div><p className="text-fp-muted text-xs">Invoice Date</p><p className="text-fp-text text-sm font-medium">{invoice.issued_date ? new Date(invoice.issued_date).toLocaleDateString() : '—'}</p></div>
             <div>
               <p className="text-fp-muted text-xs">Due Date</p>
@@ -896,7 +896,8 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 className="text-[#C8622A] text-sm hover:text-fp-text transition-colors pt-1">+ Add Line</button>
             </div>
           ) : (
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[400px] text-sm">
               <thead>
                 <tr className="border-b border-fp-border">
                   <th className="text-fp-muted text-left py-2 pr-4 font-normal">Description</th>
@@ -925,6 +926,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 </>}
               </tfoot>
             </table>
+            </div>
           )}
         </div>
 
@@ -932,7 +934,8 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
         {payments.length > 0 && (
           <div className="bg-fp-card rounded-xl p-6">
             <h3 className="text-fp-text font-bold text-lg mb-4">Payment History</h3>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[360px] text-sm">
               <thead>
                 <tr className="border-b border-fp-border">
                   {['Date', 'Amount', 'Method', 'Notes'].map(h => (
@@ -951,6 +954,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
 
