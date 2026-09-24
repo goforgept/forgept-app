@@ -203,10 +203,79 @@ export default function Inventory({ isAdmin, featureProposals, featureCRM, featu
         {/* Search */}
         <input type="text" placeholder="Search by description or part number..." value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full max-w-sm bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+          className="w-full md:max-w-sm bg-fp-card text-fp-text border border-fp-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-fp-brand" />
 
-        {/* Table */}
-        <div className="bg-fp-card rounded-xl overflow-x-auto">
+        {/* Mobile empty / loading state */}
+        {loading && <div className="md:hidden p-8 text-center text-fp-muted text-sm">Loading inventory...</div>}
+        {!loading && filtered.length === 0 && <div className="md:hidden p-8 text-center text-fp-muted text-sm">No items found. Add your first inventory item.</div>}
+
+        {/* Mobile cards (< md) */}
+        {!loading && filtered.length > 0 && (
+          <div className="md:hidden space-y-2">
+            {filtered.map(item => {
+              const onHand = parseFloat(item.qty_on_hand) || 0
+              const reserved = parseFloat(item.qty_reserved) || 0
+              const available = onHand - reserved
+              const isLow = item.min_stock_level > 0 && available <= parseFloat(item.min_stock_level)
+              return (
+                <div key={item.id} className="bg-fp-card rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0">
+                      <button onClick={() => openDetail(item)} className="text-fp-text font-semibold text-left leading-snug hover:text-fp-brand transition-colors">
+                        {item.description}
+                      </button>
+                      {item.part_number && <p className="text-fp-muted font-mono text-xs mt-0.5">{item.part_number}</p>}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      {isLow && <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full">Low Stock</span>}
+                      {item.warehouses?.name && <span className="text-fp-muted text-xs">{item.warehouses.name}</span>}
+                    </div>
+                  </div>
+                  <div className="flex gap-4 text-sm mb-3">
+                    <div>
+                      <span className="text-fp-muted text-xs block">On Hand</span>
+                      <span className="text-fp-text font-semibold tabular-nums">{onHand}</span>
+                    </div>
+                    <div>
+                      <span className="text-fp-muted text-xs block">Reserved</span>
+                      <span className={`font-semibold tabular-nums ${reserved > 0 ? 'text-yellow-400' : 'text-fp-muted'}`}>{reserved}</span>
+                    </div>
+                    <div>
+                      <span className="text-fp-muted text-xs block">Available</span>
+                      <span className={`font-bold tabular-nums ${available <= 0 ? 'text-red-400' : isLow ? 'text-yellow-400' : 'text-green-400'}`}>{available}</span>
+                    </div>
+                    {!isTechnician && (
+                      <div>
+                        <span className="text-fp-muted text-xs block">Unit Cost</span>
+                        <span className="text-fp-muted tabular-nums">${(parseFloat(item.unit_cost) || 0).toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => canWrite('inventory') && setShowAdjust(item)}
+                      disabled={!canWrite('inventory')}
+                      className={`flex-1 text-xs py-1.5 border border-fp-border rounded-lg transition-colors ${canWrite('inventory') ? 'text-fp-muted hover:text-fp-brand' : 'text-fp-muted/40 cursor-not-allowed'}`}>
+                      Adjust
+                    </button>
+                    <button onClick={() => canWrite('inventory') && (setShowEditItem(item), setEditItemForm({ part_number: item.part_number || '', description: item.description, warehouse_id: item.warehouse_id || '', unit_cost: item.unit_cost || '', min_stock_level: item.min_stock_level || '' }))}
+                      disabled={!canWrite('inventory')}
+                      className={`flex-1 text-xs py-1.5 border border-fp-border rounded-lg transition-colors ${canWrite('inventory') ? 'text-fp-muted hover:text-fp-text' : 'text-fp-muted/40 cursor-not-allowed'}`}>
+                      Edit
+                    </button>
+                    <button onClick={() => canWrite('inventory') && handleDeleteItem(item)}
+                      disabled={!canWrite('inventory')}
+                      className={`flex-1 text-xs py-1.5 border border-fp-border rounded-lg transition-colors ${canWrite('inventory') ? 'text-fp-muted hover:text-red-400' : 'text-fp-muted/40 cursor-not-allowed'}`}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Table (md+) */}
+        <div className="hidden md:block bg-fp-card rounded-xl overflow-x-auto">
           {loading ? (
             <div className="p-8 text-center text-fp-muted text-sm">Loading inventory...</div>
           ) : filtered.length === 0 ? (

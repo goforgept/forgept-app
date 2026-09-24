@@ -189,7 +189,7 @@ export default function Invoices({ isAdmin, featureProposals = true, featureCRM 
                       {inv.proposals?.proposal_name || inv.service_tickets?.title || '—'}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right ml-auto shrink-0">
                     <p className="text-fp-text font-bold">${(inv.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                     {inv.balance_due > 0 && (
                       <p className="text-[#C8622A] text-sm">Balance: ${inv.balance_due.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
