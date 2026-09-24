@@ -48,6 +48,12 @@ export default function AIAgent() {
   }, [open])
 
   useEffect(() => {
+    const handler = () => setOpen(true)
+    window.addEventListener('open-ai-agent', handler)
+    return () => window.removeEventListener('open-ai-agent', handler)
+  }, [])
+
+  useEffect(() => {
     const el = messagesContainerRef.current
     if (el) el.scrollTop = el.scrollHeight
   }, [messages, loading])
@@ -109,7 +115,7 @@ export default function AIAgent() {
       {/* Floating button */}
       <button
         onClick={() => setOpen(v => !v)}
-        className="fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-[#C8622A] text-white shadow-lg hover:bg-[#b5571f] transition-all duration-200 flex items-center justify-center"
+        className="hidden lg:flex fixed bottom-6 right-6 z-50 w-12 h-12 rounded-full bg-[#C8622A] text-white shadow-lg hover:bg-[#b5571f] transition-all duration-200 items-center justify-center"
         title="AI Agent"
       >
         {open ? (
@@ -125,7 +131,8 @@ export default function AIAgent() {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-22 right-6 z-50 w-96 max-h-[600px] bg-fp-card border border-fp-border rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="fixed bottom-0 left-0 right-0 lg:bottom-22 lg:left-auto lg:right-6 lg:w-96 z-[65] max-h-[85vh] lg:max-h-[600px] bg-fp-card border border-fp-border rounded-t-2xl lg:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-fp-border">
             <div className="flex items-center gap-2">

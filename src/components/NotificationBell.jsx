@@ -121,7 +121,7 @@ export default function NotificationBell({ userId: userIdProp }) {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => { setOpen(false); setShowSettings(false) }} />
-          <div className="absolute left-0 top-11 w-80 bg-fp-card border border-fp-border rounded-xl shadow-2xl z-50 overflow-hidden">
+          <div className="fixed left-2 right-2 top-16 lg:absolute lg:inset-x-auto lg:left-0 lg:top-11 lg:w-80 bg-fp-card border border-fp-border rounded-xl shadow-2xl z-[70] overflow-hidden">
 
             {/* Header */}
             <div className="flex justify-between items-center px-4 py-3 border-b border-fp-border">

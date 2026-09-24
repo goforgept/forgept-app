@@ -352,12 +352,15 @@ export default function Sidebar({ isAdmin: isAdminProp, isDevTeam: isDevTeamProp
   const isActive = (path) =>
     location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'))
 
+  const featureAiAgent = sessionStorage.getItem('featureAiAgent') === 'true'
+
   // Bottom nav tabs for mobile
   const bottomNavItems = [
     { label: 'Home', path: '/', icon: '🏠' },
     ...(featureCRM ? [{ label: 'Clients', path: '/clients', icon: '👥' }] : []),
     { label: 'Tasks', path: '/tasks', icon: '✓' },
     { label: 'Jobs', path: '/jobs', icon: '🔧' },
+    ...(featureAiAgent ? [{ label: 'AI', path: null, action: 'ai', icon: '🤖' }] : []),
     { label: 'More', path: null, icon: '☰' },
   ]
 
@@ -381,10 +384,16 @@ export default function Sidebar({ isAdmin: isAdminProp, isDevTeam: isDevTeamProp
             </Link>
           ) : (
             <button
-              key="more"
-              onClick={() => setMobileOpen(o => !o)}
+              key={item.action === 'ai' ? 'ai' : 'more'}
+              onClick={() => {
+                if (item.action === 'ai') {
+                  window.dispatchEvent(new Event('open-ai-agent'))
+                } else {
+                  setMobileOpen(o => !o)
+                }
+              }}
               className={`flex-1 flex flex-col items-center justify-center py-2 gap-0.5 transition-colors ${
-                mobileOpen ? 'text-[#C8622A]' : 'text-fp-muted'
+                item.action === 'ai' ? 'text-fp-muted' : mobileOpen ? 'text-[#C8622A]' : 'text-fp-muted'
               }`}
             >
               <span className="text-lg leading-none">{item.icon}</span>
