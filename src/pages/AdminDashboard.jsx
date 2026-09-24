@@ -354,7 +354,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         {(() => {
           const myLast30 = proposals.filter(p => p.user_id === profile?.id && new Date(p.created_at) >= new Date(Date.now() - 30 * 864e5)).length
           return (
-            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-4 mb-6">
               <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-4 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Active Pipeline</p><p className="text-fp-text text-xl font-bold truncate">${activePipeline.toLocaleString()}</p></div>
               <div onClick={() => navigate('/proposals')} className="bg-fp-card rounded-xl p-4 cursor-pointer hover:bg-fp-hover transition-colors"><p className="text-fp-muted text-xs mb-1">Won Revenue</p><p className="text-green-400 text-xl font-bold truncate">${wonPipeline.toLocaleString()}</p></div>
               <div className="bg-fp-card rounded-xl p-4"><p className="text-fp-muted text-xs mb-1">Avg Margin</p><p className="text-fp-brand text-xl font-bold truncate">{avgMargin ? `${avgMargin}%` : '—'}</p></div>
@@ -368,7 +368,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
 
         {/* ── Customizable Analytics Widgets ── */}
         {!loading && (on('pipeline-chart') || on('top-clients')) && (
-          <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             {on('pipeline-chart') && (() => {
               const stages = ['Draft','Sent','Won','Lost']
               const data = stages.map(s => ({ stage: s, count: filteredProposals.filter(p => p.status === s).length, value: filteredProposals.filter(p => p.status === s).reduce((sum, p) => sum + (p.proposal_value || 0), 0) }))
@@ -482,7 +482,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           <div className="space-y-5">
 
             {/* PM Stats row */}
-            <div className="grid grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               {[
                 { label: 'Active Jobs', value: activeJobs.length, color: 'text-green-400', click: () => navigate('/jobs') },
                 { label: 'On Hold', value: jobs.filter(j => j.status === 'On Hold').length, color: 'text-yellow-400', click: () => navigate('/jobs') },
@@ -530,7 +530,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Active Jobs with progress */}
               <div className="bg-fp-card rounded-xl p-5">
                 <div className="flex justify-between items-center mb-4">
@@ -620,7 +620,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {/* Hours Logged This Week */}
               <div className="bg-fp-card rounded-xl p-5">
                 <div className="flex justify-between items-center mb-4">
@@ -798,7 +798,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           </div>
         )}
 
-        <div className={`grid ${on('team-leaderboard') ? 'grid-cols-2' : 'grid-cols-1'} gap-6 mb-6`}>
+        <div className={`grid grid-cols-1 ${on('team-leaderboard') ? 'md:grid-cols-2' : ''} gap-6 mb-6`}>
           {/* Rep Leaderboard — toggle controlled */}
           {on('team-leaderboard') && (
             <div className="bg-fp-card rounded-xl p-6">
@@ -950,7 +950,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-6 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="bg-fp-card rounded-xl p-6">
             <h3 className="text-fp-text font-bold text-lg mb-4">Top Vendors{periodShort[period]}</h3>
             {loading ? <p className="text-fp-muted">Loading...</p> : topVendors.length === 0 ? <p className="text-fp-muted">No vendor data yet.</p> : (
