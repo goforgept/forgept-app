@@ -773,8 +773,9 @@ const deleteMeeting = async (meetingId) => {
           const activeTabData = allTabs.find(t => t.key === activeTab)
 
           return (
-            <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-2">
+            <div className="overflow-x-auto flex-1 scrollbar-none">
+            <div className="flex items-center gap-2 min-w-max">
               {primaryTabs.map(t => (
                 <button key={t.key} onClick={() => setActiveTab(t.key)}
                   className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
@@ -812,9 +813,10 @@ const deleteMeeting = async (meetingId) => {
                 )}
               </div>
             </div>
+            </div>
 
             {activeTabData?.count !== null && (
-              <span className="text-fp-muted text-sm tabular-nums">
+              <span className="text-fp-muted text-sm tabular-nums shrink-0">
                 Count: <span className="text-fp-text font-semibold">{activeTabData.count}</span>
               </span>
             )}

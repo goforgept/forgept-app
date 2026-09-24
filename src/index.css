@@ -43,8 +43,8 @@ body {
 }
 
 /* ── Base ────────────────────────────────────────────────────────────── */
-html {
-  overflow-x: hidden;           /* prevent horizontal page scroll on Windows */
+html, body {
+  overflow-x: hidden;           /* prevent horizontal page scroll / fixed-elem drift on mobile */
 }
 
 body {
