@@ -623,7 +623,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
       <div className="flex-1 p-6 space-y-6 max-w-4xl">
         {/* Header */}
         <div className="bg-fp-card rounded-xl p-6">
-          <div className="flex justify-between items-start">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
             <div>
               <div className="flex items-center gap-3 mb-1">
                 {editingInvoiceNumber ? (
@@ -663,9 +663,9 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
               </div>
               <p className="text-fp-muted text-xs mt-0.5">{invoice.proposals?.proposal_name || ticketClient?.title}</p>
             </div>
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex flex-col gap-2 md:items-end">
               {/* Primary actions */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {canWrite('invoices') && (
                   <button onClick={() => {
                     setSendForm({ subject: `Invoice ${invoice.invoice_number}`, message: `Hi ${invoice.proposals?.client_name || ticketClient?.clients?.client_name || 'there'},\n\nPlease find your invoice attached. Payment instructions are included on the invoice.\n\nThank you for your business.\n\n${invoice.proposals?.rep_name || profile?.full_name || ''}` })
@@ -684,7 +684,7 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
                 )}
               </div>
               {/* Integrations + delete */}
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 {canWrite('invoices') && (
                   <button onClick={deleteInvoice}
                     className="text-red-400 text-xs hover:text-red-300 transition-colors">

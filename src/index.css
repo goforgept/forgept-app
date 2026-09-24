@@ -86,12 +86,6 @@ body {
   background: transparent;
 }
 
-/* ── Mobile bottom nav clearance ────────────────────────────────────── */
-@media (max-width: 1023px) {
-  /* Push page content above the bottom tab bar (56px bar + safe area) */
-  .flex-1.p-6, .flex-1 > .space-y-6 { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
-}
-
 /* ── Mobile responsive overrides (< 768px) ──────────────────────────── */
 @media (max-width: 767px) {
   /* Collapse 3+ column stat grids to 2 columns */
@@ -100,12 +94,20 @@ body {
   .grid-cols-5 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 
   /* Let page header rows (title + buttons) wrap instead of squishing */
-  .flex.justify-between.items-center { flex-wrap: wrap; gap: 8px; }
+  .flex.justify-between.items-center,
+  .flex.justify-between.items-start { flex-wrap: wrap; gap: 8px; }
 
-  /* Reduce page padding on small screens */
-  .p-6 { padding: 12px !important; }
-  .p-8 { padding: 16px !important; }
+  /* Reduce page padding on small screens — sides and top only;
+     bottom is handled by the nav clearance rule below */
+  .p-6 { padding-top: 12px !important; padding-left: 12px !important; padding-right: 12px !important; }
+  .p-8 { padding-top: 16px !important; padding-left: 16px !important; padding-right: 16px !important; }
   .space-y-6 > * + * { margin-top: 12px !important; }
+}
+
+/* ── Mobile bottom nav clearance ────────────────────────────────────── */
+/* Comes AFTER the p-6 override so padding-bottom isn't clobbered by shorthand */
+@media (max-width: 1023px) {
+  .flex-1.p-6, .flex-1 > .space-y-6 { padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important; }
 }
 
 /* ── Hide scrollbar utility ─────────────────────────────────────────── */
