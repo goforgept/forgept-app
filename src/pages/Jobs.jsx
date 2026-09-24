@@ -38,7 +38,7 @@ export default function Jobs({ isAdmin, featureProposals = true, featureCRM = fa
   const [clientTypeFilter, setClientTypeFilter] = useState('all')
   const [dateRange, setDateRange] = useState(0)
   const [showArchived, setShowArchived] = useState(false)
-  const [view, setView] = useState(() => localStorage.getItem('jobs_view') || 'board')
+  const [view, setView] = useState(() => localStorage.getItem('jobs_view') || (window.innerWidth < 1024 ? 'list' : 'board'))
   const [jobStages, setJobStages] = useState(JOB_STATUSES.map(s => ({ id: s.key, name: s.key, color: s.color })))
   const [showManageStages, setShowManageStages] = useState(false)
   const dragJob = useRef(null)
