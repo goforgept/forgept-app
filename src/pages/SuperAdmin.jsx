@@ -360,6 +360,10 @@ export default function SuperAdmin() {
   const [codeLookupLoading, setCodeLookupLoading] = useState(false)
   const [codeError, setCodeError] = useState(null)
 
+  const [editingBillingAddress, setEditingBillingAddress] = useState(null) // orgId
+  const [billingAddressForm, setBillingAddressForm] = useState({})
+  const [savingBillingAddress, setSavingBillingAddress] = useState(false)
+
   // Password gate
   const [passwordInput, setPasswordInput] = useState('')
   const [passwordError, setPasswordError] = useState('')
@@ -1040,65 +1044,146 @@ export default function SuperAdmin() {
 
                 {/* Customer Information */}
                 <div className="bg-[#1a2d45] rounded-xl p-5">
-                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-4">Customer Information</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {/* Bill-to address */}
-                    <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Bill To</p>
-                      {admin?.bill_to_address ? (
-                        <>
-                          <p className="text-white text-sm">{admin.full_name || org.name}</p>
-                          <p className="text-[#8A9AB0] text-xs">{admin.bill_to_address}</p>
-                          <p className="text-[#8A9AB0] text-xs">
-                            {[admin.bill_to_city, admin.bill_to_state, admin.bill_to_zip].filter(Boolean).join(', ')}
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-[#4a5d75] text-xs">No billing address on file.</p>
-                      )}
-                    </div>
-
-                    {/* Ship-to address */}
-                    <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Ship To</p>
-                      {admin?.ship_to_address ? (
-                        <>
-                          <p className="text-white text-sm">{admin.full_name || org.name}</p>
-                          <p className="text-[#8A9AB0] text-xs">{admin.ship_to_address}</p>
-                          <p className="text-[#8A9AB0] text-xs">
-                            {[admin.ship_to_city, admin.ship_to_state, admin.ship_to_zip].filter(Boolean).join(', ')}
-                          </p>
-                        </>
-                      ) : (
-                        <p className="text-[#4a5d75] text-xs">No shipping address on file.</p>
-                      )}
-                    </div>
-
-                    {/* Account meta */}
-                    <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-2">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Account</p>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[#8A9AB0] text-xs shrink-0">Joined</span>
-                        <span className="text-white text-xs">{org.created_at ? new Date(org.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Customer Information</p>
+                    {editingBillingAddress !== org.id ? (
+                      <button onClick={() => {
+                        setEditingBillingAddress(org.id)
+                        setBillingAddressForm({
+                          bill_to_name: org.bill_to_name || admin?.company_name || org.name || '',
+                          bill_to_address: org.bill_to_address || admin?.bill_to_address || '',
+                          bill_to_city: org.bill_to_city || admin?.bill_to_city || '',
+                          bill_to_state: org.bill_to_state || admin?.bill_to_state || '',
+                          bill_to_zip: org.bill_to_zip || admin?.bill_to_zip || '',
+                          ship_to_address: org.ship_to_address || admin?.ship_to_address || '',
+                          ship_to_city: org.ship_to_city || admin?.ship_to_city || '',
+                          ship_to_state: org.ship_to_state || admin?.ship_to_state || '',
+                          ship_to_zip: org.ship_to_zip || admin?.ship_to_zip || '',
+                        })
+                      }} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">✎ Edit</button>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <button onClick={async () => {
+                          setSavingBillingAddress(true)
+                          await supabase.from('organizations').update({
+                            bill_to_name: billingAddressForm.bill_to_name || null,
+                            bill_to_address: billingAddressForm.bill_to_address || null,
+                            bill_to_city: billingAddressForm.bill_to_city || null,
+                            bill_to_state: billingAddressForm.bill_to_state || null,
+                            bill_to_zip: billingAddressForm.bill_to_zip || null,
+                            ship_to_address: billingAddressForm.ship_to_address || null,
+                            ship_to_city: billingAddressForm.ship_to_city || null,
+                            ship_to_state: billingAddressForm.ship_to_state || null,
+                            ship_to_zip: billingAddressForm.ship_to_zip || null,
+                          }).eq('id', org.id)
+                          setOrgs(prev => prev.map(o => o.id === org.id ? { ...o, ...billingAddressForm } : o))
+                          setSavingBillingAddress(false)
+                          setEditingBillingAddress(null)
+                        }} disabled={savingBillingAddress}
+                          className="bg-[#C8622A] text-white px-3 py-1 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+                          {savingBillingAddress ? 'Saving…' : 'Save'}
+                        </button>
+                        <button onClick={() => setEditingBillingAddress(null)} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">Cancel</button>
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-[#8A9AB0] text-xs shrink-0">Payment</span>
-                        <span className={`text-xs font-semibold px-2 py-0.5 rounded ${org.preferred_payment_method === 'Credit Card' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                          {org.preferred_payment_method || 'ACH'}
-                        </span>
-                      </div>
-                      {org.stripe_customer_id && (
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[#8A9AB0] text-xs shrink-0">Stripe</span>
-                          <span className="text-[#8A9AB0] text-xs font-mono truncate">{org.stripe_customer_id}</span>
-                        </div>
-                      )}
-                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#2a3d55]">
-                        <span className="text-[#4a5d75] text-xs shrink-0">Org ID</span>
-                        <span className="text-[#4a5d75] text-xs font-mono truncate">{org.id}</span>
-                      </div>
-                    </div>
+                    )}
                   </div>
+
+                  {editingBillingAddress === org.id ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Bill To</p>
+                        <input type="text" placeholder="Name / Company" value={billingAddressForm.bill_to_name || ''} onChange={e => setBillingAddressForm(p => ({ ...p, bill_to_name: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                        <input type="text" placeholder="Street address" value={billingAddressForm.bill_to_address || ''} onChange={e => setBillingAddressForm(p => ({ ...p, bill_to_address: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                        <div className="grid grid-cols-3 gap-2">
+                          <input type="text" placeholder="City" value={billingAddressForm.bill_to_city || ''} onChange={e => setBillingAddressForm(p => ({ ...p, bill_to_city: e.target.value }))} className="col-span-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                          <input type="text" placeholder="ST" value={billingAddressForm.bill_to_state || ''} onChange={e => setBillingAddressForm(p => ({ ...p, bill_to_state: e.target.value }))} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                          <input type="text" placeholder="ZIP" value={billingAddressForm.bill_to_zip || ''} onChange={e => setBillingAddressForm(p => ({ ...p, bill_to_zip: e.target.value }))} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Ship To</p>
+                        <input type="text" placeholder="Street address" value={billingAddressForm.ship_to_address || ''} onChange={e => setBillingAddressForm(p => ({ ...p, ship_to_address: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                        <div className="grid grid-cols-3 gap-2">
+                          <input type="text" placeholder="City" value={billingAddressForm.ship_to_city || ''} onChange={e => setBillingAddressForm(p => ({ ...p, ship_to_city: e.target.value }))} className="col-span-1 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                          <input type="text" placeholder="ST" value={billingAddressForm.ship_to_state || ''} onChange={e => setBillingAddressForm(p => ({ ...p, ship_to_state: e.target.value }))} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                          <input type="text" placeholder="ZIP" value={billingAddressForm.ship_to_zip || ''} onChange={e => setBillingAddressForm(p => ({ ...p, ship_to_zip: e.target.value }))} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Bill-to — org level wins, falls back to admin profile */}
+                      {(() => {
+                        const addr = org.bill_to_address || admin?.bill_to_address
+                        const city = org.bill_to_city || admin?.bill_to_city
+                        const state = org.bill_to_state || admin?.bill_to_state
+                        const zip = org.bill_to_zip || admin?.bill_to_zip
+                        const name = org.bill_to_name || admin?.company_name
+                        return (
+                          <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
+                            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Bill To</p>
+                            {addr ? (
+                              <>
+                                {name && <p className="text-white text-sm">{name}</p>}
+                                <p className="text-[#8A9AB0] text-xs">{addr}</p>
+                                <p className="text-[#8A9AB0] text-xs">{[city, state, zip].filter(Boolean).join(', ')}</p>
+                                {!org.bill_to_address && <p className="text-[#4a5d75] text-xs mt-1">From admin profile</p>}
+                              </>
+                            ) : (
+                              <p className="text-[#4a5d75] text-xs">No billing address on file.</p>
+                            )}
+                          </div>
+                        )
+                      })()}
+
+                      {/* Ship-to — org level wins, falls back to admin profile */}
+                      {(() => {
+                        const addr = org.ship_to_address || admin?.ship_to_address
+                        const city = org.ship_to_city || admin?.ship_to_city
+                        const state = org.ship_to_state || admin?.ship_to_state
+                        const zip = org.ship_to_zip || admin?.ship_to_zip
+                        return (
+                          <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
+                            <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Ship To</p>
+                            {addr ? (
+                              <>
+                                <p className="text-[#8A9AB0] text-xs">{addr}</p>
+                                <p className="text-[#8A9AB0] text-xs">{[city, state, zip].filter(Boolean).join(', ')}</p>
+                                {!org.ship_to_address && <p className="text-[#4a5d75] text-xs mt-1">From admin profile</p>}
+                              </>
+                            ) : (
+                              <p className="text-[#4a5d75] text-xs">No shipping address on file.</p>
+                            )}
+                          </div>
+                        )
+                      })()}
+
+                      {/* Account meta */}
+                      <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-2">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Account</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[#8A9AB0] text-xs shrink-0">Joined</span>
+                          <span className="text-white text-xs">{org.created_at ? new Date(org.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[#8A9AB0] text-xs shrink-0">Payment</span>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${org.preferred_payment_method === 'Credit Card' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                            {org.preferred_payment_method || 'ACH'}
+                          </span>
+                        </div>
+                        {org.stripe_customer_id && (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[#8A9AB0] text-xs shrink-0">Stripe</span>
+                            <span className="text-[#8A9AB0] text-xs font-mono truncate">{org.stripe_customer_id}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#2a3d55]">
+                          <span className="text-[#4a5d75] text-xs shrink-0">Org ID</span>
+                          <span className="text-[#4a5d75] text-xs font-mono truncate">{org.id}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Users */}
