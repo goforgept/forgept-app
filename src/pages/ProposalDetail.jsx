@@ -2509,16 +2509,18 @@ export default function ProposalDetail({ isAdmin }) {
     const sectionIdMap = {} // maps temp 'new_xxx' ids to real db ids
     for (const s of editSections) {
       if (s.isNew) {
-        const { data: newSec } = await supabase.from('proposal_sections').insert({
+        const { data: newSec, error: secInsertErr } = await supabase.from('proposal_sections').insert({
           proposal_id: id, org_id: profile?.org_id, name: s.name || 'Untitled Section',
           sort_order: s.sort_order, include_labor: s.include_labor, labor_items: s.labor_items || []
         }).select().single()
+        if (secInsertErr) { alert('Error saving section: ' + secInsertErr.message); setSaving(false); return }
         if (newSec) sectionIdMap[s.id] = newSec.id
       } else {
-        await supabase.from('proposal_sections').update({
+        const { error: secUpdateErr } = await supabase.from('proposal_sections').update({
           name: s.name, sort_order: s.sort_order,
           include_labor: s.include_labor, labor_items: s.labor_items || []
         }).eq('id', s.id)
+        if (secUpdateErr) { alert('Error updating section: ' + secUpdateErr.message); setSaving(false); return }
         sectionIdMap[s.id] = s.id
       }
     }
