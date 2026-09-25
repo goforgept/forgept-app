@@ -676,48 +676,41 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
               )}
             </div>
 
-            {/* Proposal + contact link */}
-            {(clientProposals.length > 0 || clientContacts.length > 0) && (
-              <div className="space-y-3">
-                {clientContacts.length > 0 && (
-                  <div>
-                    <p className="text-fp-muted text-xs mb-1.5">Contact <span className="text-fp-muted">(optional)</span></p>
-                    <div className="flex flex-wrap gap-2">
-                      {clientContacts.map((ct, i) => (
-                        <button key={ct.id ?? `poc-${i}`}
-                          onClick={() => setLogForm(f => ({
-                            ...f,
-                            contactId: f.contactId === ct.id ? null : ct.id,
-                          }))}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                            logForm.contactId === ct.id && ct.id !== null
-                              ? 'bg-fp-brand text-white'
-                              : 'bg-fp-inset text-fp-muted hover:text-fp-text border border-fp-border'
-                          }`}>
-                          {ct.full_name}{ct.isPOC ? ' ★' : ''}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {clientProposals.length > 0 && (
-                  <div>
-                    <p className="text-fp-muted text-xs mb-1.5">Link to proposal <span className="text-fp-muted">(optional)</span></p>
-                    <div className="flex flex-wrap gap-2">
-                      {clientProposals.map(p => (
-                        <button key={p.id}
-                          onClick={() => setLogForm(f => ({ ...f, proposalId: f.proposalId === p.id ? null : p.id }))}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors max-w-[220px] truncate ${
-                            logForm.proposalId === p.id
-                              ? 'bg-fp-brand text-white'
-                              : 'bg-fp-inset text-fp-muted hover:text-fp-text border border-fp-border'
-                          }`}>
-                          {p.proposal_name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+            {/* Contact picker */}
+            {clientContacts.length > 0 && (
+              <div>
+                <p className="text-fp-muted text-xs mb-1.5">Contact <span className="text-fp-muted">(optional)</span></p>
+                <select
+                  value={logForm.contactId || ''}
+                  onChange={e => setLogForm(f => ({ ...f, contactId: e.target.value || null }))}
+                  style={{ fontSize: '16px' }}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                >
+                  <option value="">— Select contact —</option>
+                  {clientContacts.map((ct, i) => (
+                    <option key={ct.id ?? `poc-${i}`} value={ct.id || ''}>
+                      {ct.full_name}{ct.isPOC ? ' (Main POC)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Proposal picker */}
+            {clientProposals.length > 0 && (
+              <div>
+                <p className="text-fp-muted text-xs mb-1.5">Link to proposal <span className="text-fp-muted">(optional)</span></p>
+                <select
+                  value={logForm.proposalId || ''}
+                  onChange={e => setLogForm(f => ({ ...f, proposalId: e.target.value || null }))}
+                  style={{ fontSize: '16px' }}
+                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                >
+                  <option value="">— Select proposal —</option>
+                  {clientProposals.map(p => (
+                    <option key={p.id} value={p.id}>{p.proposal_name}</option>
+                  ))}
+                </select>
               </div>
             )}
 
