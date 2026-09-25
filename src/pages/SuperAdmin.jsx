@@ -1038,6 +1038,83 @@ export default function SuperAdmin() {
                   </div>
                 </div>
 
+                {/* Customer Information */}
+                <div className="bg-[#1a2d45] rounded-xl p-5">
+                  <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-4">Customer Information</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Primary contact */}
+                    <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-2">
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Primary Contact</p>
+                      {admin ? (
+                        <>
+                          <p className="text-white text-sm font-semibold">{admin.full_name || '—'}</p>
+                          {admin.company_name && <p className="text-[#8A9AB0] text-xs">{admin.company_name}</p>}
+                          {admin.email && (
+                            <a href={`mailto:${admin.email}`} className="flex items-center gap-1.5 text-[#C8622A] text-xs hover:underline">
+                              <span>✉</span>{admin.email}
+                            </a>
+                          )}
+                          {admin.phone && (
+                            <a href={`tel:${admin.phone}`} className="flex items-center gap-1.5 text-[#8A9AB0] text-xs hover:text-white transition-colors">
+                              <span>📞</span>{admin.phone}
+                            </a>
+                          )}
+                          <p className="text-[#4a5d75] text-xs pt-1">Joined {org.created_at ? new Date(org.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</p>
+                        </>
+                      ) : (
+                        <p className="text-[#8A9AB0] text-xs">No admin user yet.</p>
+                      )}
+                    </div>
+
+                    {/* Bill-to address */}
+                    <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Bill To</p>
+                      {admin?.bill_to_address ? (
+                        <>
+                          <p className="text-white text-sm">{admin.bill_to_address}</p>
+                          <p className="text-white text-sm">
+                            {[admin.bill_to_city, admin.bill_to_state, admin.bill_to_zip].filter(Boolean).join(', ')}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-[#4a5d75] text-xs">No billing address on file.</p>
+                      )}
+                    </div>
+
+                    {/* Ship-to address — only show if different from bill-to */}
+                    {(admin?.ship_to_address && admin.ship_to_address !== admin.bill_to_address) && (
+                      <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Ship To</p>
+                        <p className="text-white text-sm">{admin.ship_to_address}</p>
+                        <p className="text-white text-sm">
+                          {[admin.ship_to_city, admin.ship_to_state, admin.ship_to_zip].filter(Boolean).join(', ')}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Org ID / support info */}
+                    <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1.5">
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Account</p>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#8A9AB0] text-xs">Org ID</span>
+                        <span className="text-white text-xs font-mono truncate max-w-[160px]">{org.id}</span>
+                      </div>
+                      {org.stripe_customer_id && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-[#8A9AB0] text-xs">Stripe</span>
+                          <span className="text-[#8A9AB0] text-xs font-mono">{org.stripe_customer_id}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-[#8A9AB0] text-xs">Payment method</span>
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded ${org.preferred_payment_method === 'Credit Card' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                          {org.preferred_payment_method || 'ACH'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Users */}
                 <div className="bg-[#1a2d45] rounded-xl p-5">
                   <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Users ({members.length})</p>
