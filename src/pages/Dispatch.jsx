@@ -93,7 +93,7 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
       supabase.from('organizations').select('timezone').eq('id', profile.org_id).single(),
       supabase.from('profiles').select('id, full_name, dispatch_zone, role').eq('org_id', profile.org_id).order('full_name'),
       supabase.from('service_tickets').select('*, clients(company), profiles!service_tickets_assigned_tech_id_fkey(full_name)').eq('org_id', profile.org_id).not('status', 'in', '("Resolved","Cancelled")').order('scheduled_date', { ascending: true, nullsFirst: false }),
-      supabase.from('jobs').select('*, clients(company), proposals(proposal_name)').eq('org_id', profile.org_id).not('status', 'in', '("Completed","Cancelled")').order('created_at', { ascending: false }),
+      supabase.from('jobs').select('*, clients(company), proposals(proposal_name)').eq('org_id', profile.org_id).not('status', 'in', '("Completed","Cancelled")').is('archived_at', null).order('created_at', { ascending: false }),
       supabase.from('job_tech_schedules').select('*, jobs(name, job_number, clients(company)), profiles(full_name)').eq('org_id', profile.org_id).gte('date', startDate).lte('date', endDate),
       supabase.from('job_tech_schedules').select('job_id').eq('org_id', profile.org_id).gte('date', today),
     ])
@@ -195,6 +195,12 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
     if (editTechId && editDate) pushTicketToCalendar(updatedTicket, editTechId)
     setShowTicketModal(false)
     setSaving(false)
+  }
+
+  const completeJob = async (jobId) => {
+    await supabase.from('jobs').update({ status: 'Completed' }).eq('id', jobId)
+    setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: 'Completed' } : j))
+    setUnscheduledJobs(prev => prev.filter(j => j.id !== jobId))
   }
 
   const openJobModal = (job, existingSchedule = null) => {
@@ -601,6 +607,10 @@ export default function Dispatch({ isAdmin, featureProposals = true, featureCRM 
                         <button onClick={() => navigate(`/jobs/${job.id}`)}
                           className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-xs hover:bg-fp-hover transition-colors">
                           View Job
+                        </button>
+                        <button onClick={() => { if (confirm('Mark this job as Completed?')) completeJob(job.id) }}
+                          className="bg-green-500/20 text-green-400 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-green-500/30 transition-colors">
+                          ✓ Complete
                         </button>
                       </div>
                     </div>
