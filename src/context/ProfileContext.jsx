@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { supabase } from '../supabase'
 import { mfaState } from '../mfaState'
+import { Capacitor } from '@capacitor/core'
 
 
 const ProfileContext = createContext(null)
@@ -49,7 +50,7 @@ export function ProfileProvider({ children }) {
       setSession(session)
       if (session) {
         fetchProfile(session.user.id)
-        supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', session.user.id)
+        supabase.from('profiles').update({ last_login: new Date().toISOString(), last_login_platform: Capacitor.getPlatform() }).eq('id', session.user.id)
       } else setLoading(false)
     })
 
@@ -62,7 +63,7 @@ export function ProfileProvider({ children }) {
           setSession(s)
           if (s) {
             fetchProfile(s.user.id)
-            supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', s.user.id)
+            supabase.from('profiles').update({ last_login: new Date().toISOString(), last_login_platform: Capacitor.getPlatform() }).eq('id', s.user.id)
           }
         }
         return
@@ -71,7 +72,7 @@ export function ProfileProvider({ children }) {
       if (session) {
         fetchProfile(session.user.id)
         if (_event === 'SIGNED_IN' || _event === 'MFA_CHALLENGE_VERIFIED') {
-          supabase.from('profiles').update({ last_login: new Date().toISOString() }).eq('id', session.user.id)
+          supabase.from('profiles').update({ last_login: new Date().toISOString(), last_login_platform: Capacitor.getPlatform() }).eq('id', session.user.id)
         }
       } else {
         setProfile(null)

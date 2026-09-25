@@ -1041,38 +1041,15 @@ export default function SuperAdmin() {
                 {/* Customer Information */}
                 <div className="bg-[#1a2d45] rounded-xl p-5">
                   <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-4">Customer Information</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Primary contact */}
-                    <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-2">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Primary Contact</p>
-                      {admin ? (
-                        <>
-                          <p className="text-white text-sm font-semibold">{admin.full_name || '—'}</p>
-                          {admin.company_name && <p className="text-[#8A9AB0] text-xs">{admin.company_name}</p>}
-                          {admin.email && (
-                            <a href={`mailto:${admin.email}`} className="flex items-center gap-1.5 text-[#C8622A] text-xs hover:underline">
-                              <span>✉</span>{admin.email}
-                            </a>
-                          )}
-                          {admin.phone && (
-                            <a href={`tel:${admin.phone}`} className="flex items-center gap-1.5 text-[#8A9AB0] text-xs hover:text-white transition-colors">
-                              <span>📞</span>{admin.phone}
-                            </a>
-                          )}
-                          <p className="text-[#4a5d75] text-xs pt-1">Joined {org.created_at ? new Date(org.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</p>
-                        </>
-                      ) : (
-                        <p className="text-[#8A9AB0] text-xs">No admin user yet.</p>
-                      )}
-                    </div>
-
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {/* Bill-to address */}
                     <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Bill To</p>
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Bill To</p>
                       {admin?.bill_to_address ? (
                         <>
-                          <p className="text-white text-sm">{admin.bill_to_address}</p>
-                          <p className="text-white text-sm">
+                          <p className="text-white text-sm">{admin.full_name || org.name}</p>
+                          <p className="text-[#8A9AB0] text-xs">{admin.bill_to_address}</p>
+                          <p className="text-[#8A9AB0] text-xs">
                             {[admin.bill_to_city, admin.bill_to_state, admin.bill_to_zip].filter(Boolean).join(', ')}
                           </p>
                         </>
@@ -1081,35 +1058,44 @@ export default function SuperAdmin() {
                       )}
                     </div>
 
-                    {/* Ship-to address — only show if different from bill-to */}
-                    {(admin?.ship_to_address && admin.ship_to_address !== admin.bill_to_address) && (
-                      <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
-                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Ship To</p>
-                        <p className="text-white text-sm">{admin.ship_to_address}</p>
-                        <p className="text-white text-sm">
-                          {[admin.ship_to_city, admin.ship_to_state, admin.ship_to_zip].filter(Boolean).join(', ')}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Org ID / support info */}
-                    <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1.5">
-                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Account</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#8A9AB0] text-xs">Org ID</span>
-                        <span className="text-white text-xs font-mono truncate max-w-[160px]">{org.id}</span>
-                      </div>
-                      {org.stripe_customer_id && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#8A9AB0] text-xs">Stripe</span>
-                          <span className="text-[#8A9AB0] text-xs font-mono">{org.stripe_customer_id}</span>
-                        </div>
+                    {/* Ship-to address */}
+                    <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Ship To</p>
+                      {admin?.ship_to_address ? (
+                        <>
+                          <p className="text-white text-sm">{admin.full_name || org.name}</p>
+                          <p className="text-[#8A9AB0] text-xs">{admin.ship_to_address}</p>
+                          <p className="text-[#8A9AB0] text-xs">
+                            {[admin.ship_to_city, admin.ship_to_state, admin.ship_to_zip].filter(Boolean).join(', ')}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-[#4a5d75] text-xs">No shipping address on file.</p>
                       )}
-                      <div className="flex items-center justify-between">
-                        <span className="text-[#8A9AB0] text-xs">Payment method</span>
+                    </div>
+
+                    {/* Account meta */}
+                    <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-2">
+                      <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Account</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[#8A9AB0] text-xs shrink-0">Joined</span>
+                        <span className="text-white text-xs">{org.created_at ? new Date(org.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[#8A9AB0] text-xs shrink-0">Payment</span>
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded ${org.preferred_payment_method === 'Credit Card' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-blue-500/20 text-blue-400'}`}>
                           {org.preferred_payment_method || 'ACH'}
                         </span>
+                      </div>
+                      {org.stripe_customer_id && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[#8A9AB0] text-xs shrink-0">Stripe</span>
+                          <span className="text-[#8A9AB0] text-xs font-mono truncate">{org.stripe_customer_id}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between gap-2 pt-1 border-t border-[#2a3d55]">
+                        <span className="text-[#4a5d75] text-xs shrink-0">Org ID</span>
+                        <span className="text-[#4a5d75] text-xs font-mono truncate">{org.id}</span>
                       </div>
                     </div>
                   </div>
@@ -1119,31 +1105,50 @@ export default function SuperAdmin() {
                 <div className="bg-[#1a2d45] rounded-xl p-5">
                   <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-3">Users ({members.length})</p>
                   <div className="space-y-2">
-                    {members.map(u => (
-                      <div key={u.id} className="flex items-center justify-between bg-[#0F1C2E] rounded-lg px-4 py-3 border border-[#2a3d55]">
-                        <div>
-                          <p className="text-white text-sm font-medium">{u.full_name || '—'}</p>
-                          <p className="text-[#8A9AB0] text-xs">{u.email} · {u.org_role || u.role}</p>
-                          <p className="text-[#8A9AB0] text-xs mt-0.5">
-                            {u.last_login
-                              ? <>Last login <span className="text-[#aab8c8]">{new Date(u.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></>
-                              : <span className="text-[#4a5d75]">Never logged in</span>
-                            }
-                          </p>
+                    {members.map(u => {
+                      const platform = u.last_login_platform
+                      const platformBadge = platform === 'ios'
+                        ? { label: 'iPhone', cls: 'bg-blue-500/20 text-blue-400' }
+                        : platform === 'android'
+                        ? { label: 'Android', cls: 'bg-green-500/20 text-green-400' }
+                        : platform === 'web'
+                        ? { label: 'Web', cls: 'bg-[#2a3d55] text-[#8A9AB0]' }
+                        : null
+                      return (
+                        <div key={u.id} className="flex items-center justify-between bg-[#0F1C2E] rounded-lg px-4 py-3 border border-[#2a3d55]">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-white text-sm font-medium">{u.full_name || '—'}</p>
+                              <span className="text-[#4a5d75] text-xs">{u.org_role || u.role}</span>
+                              {platformBadge && (
+                                <span className={`text-xs px-2 py-0.5 rounded font-semibold ${platformBadge.cls}`}>
+                                  {platformBadge.label}
+                                </span>
+                              )}
+                            </div>
+                            <a href={`mailto:${u.email}`} className="text-[#C8622A] text-xs hover:underline">{u.email}</a>
+                            {u.phone && <p className="text-[#8A9AB0] text-xs">{u.phone}</p>}
+                            <p className="text-[#4a5d75] text-xs mt-0.5">
+                              {u.last_login
+                                ? <>Last login <span className="text-[#8A9AB0]">{new Date(u.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span></>
+                                : 'Never logged in'
+                              }
+                            </p>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Delete user ${u.email}? This cannot be undone.`)) return
+                              const { error } = await supabase.functions.invoke('delete-org-users', { body: { userId: u.id } })
+                              if (error) { alert('Failed to delete user: ' + error.message); return }
+                              fetchOrgDetail(org.id)
+                            }}
+                            className="text-red-500/50 hover:text-red-400 text-xs transition-colors px-2 py-1 shrink-0"
+                          >
+                            Delete
+                          </button>
                         </div>
-                        <button
-                          onClick={async () => {
-                            if (!confirm(`Delete user ${u.email}? This cannot be undone.`)) return
-                            const { error } = await supabase.functions.invoke('delete-org-users', { body: { userId: u.id } })
-                            if (error) { alert('Failed to delete user: ' + error.message); return }
-                            fetchOrgDetail(org.id)
-                          }}
-                          className="text-red-500/50 hover:text-red-400 text-xs transition-colors px-2 py-1 shrink-0"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    ))}
+                      )
+                    })}
                     {members.length === 0 && <p className="text-[#8A9AB0] text-sm">No users yet.</p>}
                   </div>
                 </div>
