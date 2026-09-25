@@ -773,21 +773,23 @@ const deleteMeeting = async (meetingId) => {
           const activeTabData = allTabs.find(t => t.key === activeTab)
 
           return (
-            <div className="flex items-center justify-between gap-2">
-            <div className="overflow-x-auto flex-1 scrollbar-none">
-            <div className="flex items-center gap-2 min-w-max">
-              {primaryTabs.map(t => (
-                <button key={t.key} onClick={() => setActiveTab(t.key)}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                    activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-2">
+              <div className="overflow-x-auto flex-1 scrollbar-none">
+                <div className="flex items-center gap-2 min-w-max">
+                  {primaryTabs.map(t => (
+                    <button key={t.key} onClick={() => setActiveTab(t.key)}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-              {/* More overflow dropdown */}
-              <div ref={moreRef} className="relative">
+              {/* More dropdown — outside overflow-x-auto so it isn't clipped */}
+              <div ref={moreRef} className="relative shrink-0">
                 <button
                   onClick={() => setMoreOpen(o => !o)}
                   className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
@@ -798,7 +800,7 @@ const deleteMeeting = async (meetingId) => {
                   <span className="text-sm leading-none opacity-60">{moreOpen ? '−' : '+'}</span>
                 </button>
                 {moreOpen && (
-                  <div className="absolute top-full left-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-hidden">
+                  <div className="absolute top-full right-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-hidden">
                     {overflowTabs.map(t => (
                       <button key={t.key}
                         onClick={() => { setActiveTab(t.key); setMoreOpen(false) }}
@@ -812,14 +814,12 @@ const deleteMeeting = async (meetingId) => {
                   </div>
                 )}
               </div>
-            </div>
-            </div>
 
-            {activeTabData?.count !== null && (
-              <span className="text-fp-muted text-sm tabular-nums shrink-0">
-                Count: <span className="text-fp-text font-semibold">{activeTabData.count}</span>
-              </span>
-            )}
+              {activeTabData?.count !== null && (
+                <span className="text-fp-muted text-sm tabular-nums shrink-0">
+                  Count: <span className="text-fp-text font-semibold">{activeTabData.count}</span>
+                </span>
+              )}
             </div>
           )
         })()}

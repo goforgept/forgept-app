@@ -44,13 +44,7 @@ export default function AIAgent() {
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 50)
-      if (window.innerWidth < 1024) {
-        document.body.style.overflow = 'hidden'
-      }
-    } else {
-      document.body.style.overflow = ''
     }
-    return () => { document.body.style.overflow = '' }
   }, [open])
 
   useEffect(() => {
@@ -234,8 +228,8 @@ export default function AIAgent() {
                 onKeyDown={handleKey}
                 placeholder="Create a client, ticket, task..."
                 rows={1}
-                className="flex-1 bg-fp-inset text-fp-text text-sm rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-[#C8622A]/40 placeholder-fp-muted"
-                style={{ maxHeight: '100px', overflowY: 'auto' }}
+                className="flex-1 bg-fp-inset text-fp-text rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-[#C8622A]/40 placeholder-fp-muted"
+                style={{ maxHeight: '100px', overflowY: 'auto', fontSize: '16px' }}
               />
               <button onClick={send} disabled={!input.trim() || loading}
                 className="bg-[#C8622A] text-white w-9 h-9 rounded-xl flex items-center justify-center hover:bg-[#b5571f] transition-colors disabled:opacity-40 flex-shrink-0 self-end">
