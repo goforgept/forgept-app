@@ -268,12 +268,27 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
 
   const searchClients = async (query) => {
     if (!query || query.length < 2) { setClientSuggestions([]); return }
-    const { data } = await supabase.from('clients')
-      .select('id, company, client_name')
-      .eq('org_id', profile.org_id)
-      .ilike('company', `%${query}%`)
-      .limit(5)
-    setClientSuggestions(data || [])
+    const q = `%${query}%`
+    const [{ data: byCompany }, { data: byContact }] = await Promise.all([
+      supabase.from('clients')
+        .select('id, company, client_name')
+        .eq('org_id', profile.org_id)
+        .or(`company.ilike.${q},client_name.ilike.${q}`)
+        .limit(5),
+      supabase.from('client_contacts')
+        .select('id, full_name, client_id, clients(id, company, client_name)')
+        .eq('org_id', profile.org_id)
+        .ilike('full_name', q)
+        .limit(5),
+    ])
+    // Merge: contacts found via name → pull their parent client record
+    const contactClients = (byContact || [])
+      .filter(ct => ct.clients)
+      .map(ct => ({ id: ct.clients.id, company: ct.clients.company, client_name: ct.clients.client_name, _matchedContact: ct.full_name }))
+    // Dedupe by client id
+    const seen = new Set((byCompany || []).map(c => c.id))
+    const merged = [...(byCompany || []), ...contactClients.filter(c => !seen.has(c.id))]
+    setClientSuggestions(merged.slice(0, 6))
   }
 
   const handleLogActivity = async () => {
@@ -570,7 +585,12 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
     {/* Log Activity modal */}
     {logModal && (
       <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 px-0 sm:px-4" onClick={() => setLogModal(null)}>
-        <div className="bg-fp-card w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+        <div
+          className="bg-fp-card w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl flex flex-col max-h-[90dvh]"
+          onClick={e => e.stopPropagation()}
+          onTouchStart={e => e.stopPropagation()}
+          onPointerDown={e => e.stopPropagation()}
+        >
           <div className="flex items-center justify-between p-5 border-b border-fp-border shrink-0">
             <div>
               <p className="text-fp-text font-bold">Log Activity</p>
@@ -646,7 +666,10 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                         setClientContacts(allContacts)
                       }}
                       className="w-full text-left px-3 py-2 text-sm text-fp-text hover:bg-fp-inset transition-colors">
-                      {c.company}
+                      <span>{c.company}</span>
+                      {c._matchedContact && (
+                        <span className="text-fp-muted text-xs ml-2">· {c._matchedContact}</span>
+                      )}
                     </button>
                   ))}
                 </div>
