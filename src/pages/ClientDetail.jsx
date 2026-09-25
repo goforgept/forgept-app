@@ -694,7 +694,7 @@ const deleteMeeting = async (meetingId) => {
 
         {/* Header */}
         <div className="bg-fp-card rounded-xl p-6">
-          <div className="flex justify-between items-start">
+          <div className="flex flex-wrap justify-between items-start gap-3">
             <div className="flex items-start gap-4">
               <div className="w-14 h-14 rounded-xl bg-[#C8622A]/20 flex items-center justify-center flex-shrink-0">
                 <span className="text-[#C8622A] text-xl font-bold">{(clientName(client) || '?')[0].toUpperCase()}</span>
@@ -716,18 +716,18 @@ const deleteMeeting = async (meetingId) => {
                 {fullAddress && <p className="text-fp-muted text-sm mt-0.5">{fullAddress}</p>}
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {featureAiEmail && canWrite('clients') && (
                 <button onClick={() => {
                   if (!client?.email) { alert('Add an email address to this client first.'); return }
                   setShowEmailModal(true); setDraftedEmail(''); setEmailForm({ subject: '', context: '' })
                 }}
-                  className="bg-purple-600 text-fp-text px-4 py-2 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✍️ Draft Email</button>
+                  className="bg-purple-600 text-fp-text px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-purple-700 transition-colors">✍️ Draft Email</button>
               )}
               {canWrite('clients') && <button onClick={archiveClient} className="text-fp-muted text-sm hover:text-yellow-400 transition-colors px-2">Archive</button>}
               {canWrite('clients') && <button onClick={deleteClient} className="text-fp-muted text-sm hover:text-red-400 transition-colors px-2">Delete</button>}
-              {canWrite('clients') && <button onClick={() => setEditingClient(true)} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">Edit Client</button>}
-              {canWrite('proposals') && <button onClick={handleNewProposal} className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ New Proposal</button>}
+              {canWrite('clients') && <button onClick={() => setEditingClient(true)} className="bg-fp-inset text-fp-text px-3 py-1.5 rounded-lg text-sm hover:bg-fp-hover transition-colors">Edit Client</button>}
+              {canWrite('proposals') && <button onClick={handleNewProposal} className="bg-fp-brand text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">+ New Proposal</button>}
             </div>
           </div>
           <div className="grid grid-cols-5 gap-4 mt-6">
@@ -800,7 +800,7 @@ const deleteMeeting = async (meetingId) => {
                   <span className="text-sm leading-none opacity-60">{moreOpen ? '−' : '+'}</span>
                 </button>
                 {moreOpen && (
-                  <div className="absolute top-full right-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-hidden">
+                  <div className="absolute top-full right-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-y-auto max-h-[50vh]">
                     {overflowTabs.map(t => (
                       <button key={t.key}
                         onClick={() => { setActiveTab(t.key); setMoreOpen(false) }}

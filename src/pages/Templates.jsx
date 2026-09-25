@@ -464,10 +464,10 @@ export default function Templates({ isAdmin }) {
 
   const renderLibraryPanel = (setter, activeSects) => (
     <div className="bg-fp-inset rounded-xl p-4 space-y-3 border border-[#C8622A]/40 mb-4">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         <input autoFocus type="text" placeholder="Search product library…" value={libQuery}
           onChange={e => searchLibrary(e.target.value)}
-          className="flex-1 bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+          className="flex-1 min-w-0 bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
         {activeSects.length > 0 && (
           <select value={libSectionId || ''} onChange={e => setLibSectionId(e.target.value || null)}
             className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand">
@@ -475,7 +475,7 @@ export default function Templates({ isAdmin }) {
             {activeSects.map(s => <option key={s._id} value={s._id}>{s.name || 'Untitled Section'}</option>)}
           </select>
         )}
-        <button onClick={closeLib} className="text-fp-muted hover:text-fp-text text-sm px-2">✕</button>
+        <button onClick={closeLib} className="text-fp-muted hover:text-fp-text text-sm px-2 py-2">✕</button>
       </div>
       {libLoading && <p className="text-fp-muted text-xs">Searching…</p>}
       {!libLoading && libQuery && libResults.length === 0 && <p className="text-fp-muted text-xs">No products found.</p>}
@@ -648,7 +648,7 @@ export default function Templates({ isAdmin }) {
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar isAdmin={isAdmin} featureProposals={true} featureCRM={true} />
 
-      <div className="flex-1 p-6 space-y-6 min-w-0">
+      <div className="flex-1 p-4 sm:p-6 space-y-6 min-w-0">
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-fp-text text-2xl font-bold">Proposal Templates</h2>
@@ -669,7 +669,7 @@ export default function Templates({ isAdmin }) {
         {showForm && isAdmin && (
           <div className="bg-fp-card rounded-xl p-6 space-y-6">
             <h3 className="text-fp-text font-bold text-lg">New Template</h3>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Template Name <span className="text-[#C8622A]">*</span></label>
                 <input type="text" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
@@ -719,7 +719,7 @@ export default function Templates({ isAdmin }) {
           <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 px-4 py-6 overflow-y-auto">
             <div className="bg-fp-card rounded-2xl p-6 w-full max-w-5xl space-y-6">
               <h3 className="text-fp-text font-bold text-lg">Edit Template</h3>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="text-fp-muted text-xs mb-1 block">Template Name <span className="text-[#C8622A]">*</span></label>
                   <input type="text" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
@@ -779,32 +779,32 @@ export default function Templates({ isAdmin }) {
 
               return (
                 <div key={template.id} className="bg-fp-card rounded-xl overflow-hidden border border-fp-border">
-                  <div className="flex justify-between items-center p-5 cursor-pointer" onClick={() => toggleExpand(template.id)}>
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-[#C8622A]/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-[#C8622A] text-lg">📋</span>
+                  <div className="flex justify-between items-center gap-3 p-4 sm:p-5 cursor-pointer" onClick={() => toggleExpand(template.id)}>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[#C8622A]/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-[#C8622A] text-base sm:text-lg">📋</span>
                       </div>
-                      <div>
-                        <p className="text-fp-text font-semibold">{template.name}</p>
-                        <p className="text-fp-muted text-xs mt-0.5">
+                      <div className="min-w-0">
+                        <p className="text-fp-text font-semibold truncate">{template.name}</p>
+                        <p className="text-fp-muted text-xs mt-0.5 truncate">
                           {template.industry && <span className="mr-2">{template.industry}</span>}
                           {template.description}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       {(totalLabor + sectionLaborTotal) > 0 && (
-                        <span className="text-fp-muted text-xs">{fmt(totalLabor + sectionLaborTotal)} labor</span>
+                        <span className="hidden sm:inline text-fp-muted text-xs">{fmt(totalLabor + sectionLaborTotal)} labor</span>
                       )}
                       {isAdmin && (
                         <button onClick={e => { e.stopPropagation(); startEditing(template) }}
-                          className="text-fp-muted hover:text-fp-text text-xs transition-colors px-2">Edit</button>
+                          className="text-fp-muted hover:text-fp-text text-xs transition-colors px-2 py-1">Edit</button>
                       )}
                       {isAdmin && (
                         <button onClick={e => { e.stopPropagation(); handleDelete(template.id) }}
-                          className="text-fp-muted hover:text-red-400 text-xs transition-colors px-2">Delete</button>
+                          className="text-fp-muted hover:text-red-400 text-xs transition-colors px-2 py-1">Delete</button>
                       )}
-                      <span className="text-fp-muted text-lg leading-none">{isExpanded ? '−' : '+'}</span>
+                      <span className="text-fp-muted text-lg leading-none ml-1">{isExpanded ? '−' : '+'}</span>
                     </div>
                   </div>
 
