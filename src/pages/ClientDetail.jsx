@@ -800,7 +800,7 @@ const deleteMeeting = async (meetingId) => {
                   <span className="text-sm leading-none opacity-60">{moreOpen ? '−' : '+'}</span>
                 </button>
                 {moreOpen && (
-                  <div className="absolute top-full right-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-y-auto max-h-[50vh]">
+                  <div className="absolute bottom-full right-0 mb-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-y-auto max-h-[50vh]">
                     {overflowTabs.map(t => (
                       <button key={t.key}
                         onClick={() => { setActiveTab(t.key); setMoreOpen(false) }}
