@@ -45,6 +45,7 @@ body {
 /* ── Base ────────────────────────────────────────────────────────────── */
 html, body {
   overflow-x: hidden;           /* prevent horizontal page scroll / fixed-elem drift on mobile */
+  max-width: 100%;
 }
 
 body {
@@ -84,6 +85,14 @@ body {
 
 .win-scroll *::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* ── Mobile content area: contain overflow so fixed nav can't drift ── */
+/* Target only the flex-1 content div, NOT the outer shell, so the     */
+/* fixed sidebar drawer isn't clipped by a parent overflow context.    */
+@media (max-width: 1023px) {
+  .flex.min-h-screen > .flex-1,
+  .flex.h-screen > .flex-1 { overflow-x: hidden; }
 }
 
 /* ── Mobile responsive overrides (< 768px) ──────────────────────────── */

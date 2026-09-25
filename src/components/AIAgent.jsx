@@ -44,7 +44,13 @@ export default function AIAgent() {
   useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 50)
+      if (window.innerWidth < 1024) {
+        document.body.style.overflow = 'hidden'
+      }
+    } else {
+      document.body.style.overflow = ''
     }
+    return () => { document.body.style.overflow = '' }
   }, [open])
 
   useEffect(() => {
@@ -131,8 +137,8 @@ export default function AIAgent() {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed bottom-0 left-0 right-0 lg:bottom-22 lg:left-auto lg:right-6 lg:w-96 z-[65] max-h-[85vh] lg:max-h-[600px] bg-fp-card border border-fp-border rounded-t-2xl lg:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="fixed inset-0 lg:inset-auto lg:bottom-22 lg:left-auto lg:right-6 lg:w-96 lg:max-h-[600px] z-[65] bg-fp-card lg:border lg:border-fp-border lg:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+          style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-fp-border">
             <div className="flex items-center gap-2">
@@ -149,7 +155,7 @@ export default function AIAgent() {
           </div>
 
           {/* Messages */}
-          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-[300px]">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
             {messages.length === 0 && (
               <div className="text-center py-8">
                 <p className="text-fp-muted text-sm">Ask me anything or give me a command.</p>
