@@ -79,6 +79,12 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
   const [drilldownData, setDrilldownData] = useState([])
   const [drilldownLoading, setDrilldownLoading] = useState(false)
 
+  // Log activity modal
+  const [logModal, setLogModal] = useState(null) // { rep }
+  const [logForm, setLogForm] = useState({ type: 'call', clientQuery: '', clientId: null, title: '', body: '', followUpDate: '' })
+  const [clientSuggestions, setClientSuggestions] = useState([])
+  const [logSaving, setLogSaving] = useState(false)
+
   useEffect(() => {
     if (!profile?.org_id) return
     load()
@@ -250,6 +256,50 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
     setDrilldownLoading(false)
   }
 
+  const openLogModal = (rep) => {
+    setLogForm({ type: 'call', clientQuery: '', clientId: null, title: '', body: '', followUpDate: '' })
+    setClientSuggestions([])
+    setLogModal({ rep })
+  }
+
+  const searchClients = async (query) => {
+    if (!query || query.length < 2) { setClientSuggestions([]); return }
+    const { data } = await supabase.from('clients')
+      .select('id, company')
+      .eq('org_id', profile.org_id)
+      .ilike('company', `%${query}%`)
+      .limit(5)
+    setClientSuggestions(data || [])
+  }
+
+  const handleLogActivity = async () => {
+    if (!logForm.title) return
+    setLogSaving(true)
+    await supabase.from('activities').insert({
+      org_id: profile.org_id,
+      user_id: logModal.rep.id,
+      client_id: logForm.clientId || null,
+      type: logForm.type,
+      title: logForm.title,
+      body: logForm.body || null,
+    })
+    if (logForm.followUpDate) {
+      await supabase.from('tasks').insert({
+        org_id: profile.org_id,
+        user_id: logModal.rep.id,
+        client_id: logForm.clientId || null,
+        title: `Follow up: ${logForm.title}`,
+        due_date: logForm.followUpDate,
+        status: 'pending',
+      })
+    }
+    setLogModal(null)
+    setLogForm({ type: 'call', clientQuery: '', clientId: null, title: '', body: '', followUpDate: '' })
+    setClientSuggestions([])
+    setLogSaving(false)
+    load()
+  }
+
   const toggleCollapse = (repId) =>
     setCollapsed(prev => ({ ...prev, [repId]: !prev[repId] }))
 
@@ -332,6 +382,12 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                     </div>
                   </button>
                   <div className="flex items-center gap-2">
+                    {!isEditing && (
+                      <button onClick={() => openLogModal(rep)}
+                        className="text-fp-muted hover:text-fp-text text-xs transition-colors px-3 py-1.5 rounded-lg bg-fp-inset">
+                        + Log Activity
+                      </button>
+                    )}
                     {canManage && !isEditing && !isCollapsed && (
                       <>
                         <button onClick={() => exportRepCSV(rep)}
@@ -498,6 +554,115 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                 </div>
               )
             })}
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Log Activity modal */}
+    {logModal && (
+      <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 px-0 sm:px-4" onClick={() => setLogModal(null)}>
+        <div className="bg-fp-card w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+          <div className="flex items-center justify-between p-5 border-b border-fp-border shrink-0">
+            <div>
+              <p className="text-fp-text font-bold">Log Activity</p>
+              <p className="text-fp-muted text-xs mt-0.5">{logModal.rep.full_name}</p>
+            </div>
+            <button onClick={() => setLogModal(null)} className="text-fp-muted hover:text-fp-text text-xl leading-none">×</button>
+          </div>
+
+          <div className="p-5 space-y-4 overflow-y-auto">
+            {/* Type */}
+            <div>
+              <p className="text-fp-muted text-xs mb-2">Type</p>
+              <div className="flex gap-2 flex-wrap">
+                {[{ value: 'call', label: '📞 Call' }, { value: 'email', label: '✉️ Email' }, { value: 'meeting', label: '🤝 Meeting' }, { value: 'note', label: '📝 Note' }].map(t => (
+                  <button key={t.value} onClick={() => setLogForm(f => ({ ...f, type: t.value }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${logForm.type === t.value ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Client */}
+            <div className="relative">
+              <p className="text-fp-muted text-xs mb-1.5">Client <span className="text-fp-muted">(optional)</span></p>
+              <input
+                type="text"
+                value={logForm.clientQuery}
+                onChange={e => {
+                  const v = e.target.value
+                  setLogForm(f => ({ ...f, clientQuery: v, clientId: null }))
+                  searchClients(v)
+                }}
+                onBlur={() => setTimeout(() => setClientSuggestions([]), 150)}
+                placeholder="Search by company name..."
+                style={{ fontSize: '16px' }}
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+              />
+              {clientSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 bg-fp-card border border-fp-border rounded-lg mt-1 z-10 shadow-lg overflow-hidden">
+                  {clientSuggestions.map(c => (
+                    <button key={c.id} onMouseDown={() => {
+                      setLogForm(f => ({ ...f, clientQuery: c.company, clientId: c.id }))
+                      setClientSuggestions([])
+                    }} className="w-full text-left px-3 py-2 text-sm text-fp-text hover:bg-fp-inset transition-colors">
+                      {c.company}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Title */}
+            <div>
+              <p className="text-fp-muted text-xs mb-1.5">Summary <span className="text-fp-brand">*</span></p>
+              <input
+                type="text"
+                value={logForm.title}
+                onChange={e => setLogForm(f => ({ ...f, title: e.target.value }))}
+                placeholder={logForm.type === 'call' ? 'e.g. Called Marcus, left voicemail' : logForm.type === 'email' ? 'e.g. Sent follow-up on proposal' : logForm.type === 'meeting' ? 'e.g. Site walkthrough at HQ' : 'e.g. Client wants to revisit scope'}
+                style={{ fontSize: '16px' }}
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+              />
+            </div>
+
+            {/* Notes */}
+            <div>
+              <p className="text-fp-muted text-xs mb-1.5">Notes <span className="text-fp-muted">(optional)</span></p>
+              <textarea
+                value={logForm.body}
+                onChange={e => setLogForm(f => ({ ...f, body: e.target.value }))}
+                placeholder="What was discussed, objections, next steps..."
+                rows={3}
+                style={{ fontSize: '16px' }}
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand resize-none"
+              />
+            </div>
+
+            {/* Follow-up */}
+            <div>
+              <p className="text-fp-muted text-xs mb-1.5">Follow-up task <span className="text-fp-muted">(optional)</span></p>
+              <input
+                type="date"
+                value={logForm.followUpDate}
+                onChange={e => setLogForm(f => ({ ...f, followUpDate: e.target.value }))}
+                min={new Date().toISOString().split('T')[0]}
+                style={{ fontSize: '16px' }}
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3 p-5 border-t border-fp-border shrink-0">
+            <button onClick={() => setLogModal(null)} className="flex-1 text-fp-muted hover:text-fp-text text-sm py-2 rounded-lg bg-fp-inset transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleLogActivity} disabled={!logForm.title || logSaving}
+              className="flex-1 bg-fp-brand text-white text-sm font-semibold py-2 rounded-lg hover:bg-[#b5571f] transition-colors disabled:opacity-50">
+              {logSaving ? 'Saving...' : 'Log Activity'}
+            </button>
           </div>
         </div>
       </div>
