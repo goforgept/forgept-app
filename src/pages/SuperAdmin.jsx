@@ -1048,17 +1048,20 @@ export default function SuperAdmin() {
                     <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Customer Information</p>
                     {editingBillingAddress !== org.id ? (
                       <button onClick={() => {
+                        // Scan all members for any who has address data, prioritise admin
+                        const billSrc  = members.find(m => m.bill_to_address)
+                        const shipSrc  = members.find(m => m.ship_to_address)
                         setEditingBillingAddress(org.id)
                         setBillingAddressForm({
-                          bill_to_name: org.bill_to_name || admin?.company_name || org.name || '',
-                          bill_to_address: org.bill_to_address || admin?.bill_to_address || '',
-                          bill_to_city: org.bill_to_city || admin?.bill_to_city || '',
-                          bill_to_state: org.bill_to_state || admin?.bill_to_state || '',
-                          bill_to_zip: org.bill_to_zip || admin?.bill_to_zip || '',
-                          ship_to_address: org.ship_to_address || admin?.ship_to_address || '',
-                          ship_to_city: org.ship_to_city || admin?.ship_to_city || '',
-                          ship_to_state: org.ship_to_state || admin?.ship_to_state || '',
-                          ship_to_zip: org.ship_to_zip || admin?.ship_to_zip || '',
+                          bill_to_name:    org.bill_to_name    || admin?.company_name || org.name || '',
+                          bill_to_address: org.bill_to_address || billSrc?.bill_to_address || '',
+                          bill_to_city:    org.bill_to_city    || billSrc?.bill_to_city    || '',
+                          bill_to_state:   org.bill_to_state   || billSrc?.bill_to_state   || '',
+                          bill_to_zip:     org.bill_to_zip     || billSrc?.bill_to_zip     || '',
+                          ship_to_address: org.ship_to_address || shipSrc?.ship_to_address || '',
+                          ship_to_city:    org.ship_to_city    || shipSrc?.ship_to_city    || '',
+                          ship_to_state:   org.ship_to_state   || shipSrc?.ship_to_state   || '',
+                          ship_to_zip:     org.ship_to_zip     || shipSrc?.ship_to_zip     || '',
                         })
                       }} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">✎ Edit</button>
                     ) : (
@@ -1112,13 +1115,14 @@ export default function SuperAdmin() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      {/* Bill-to — org level wins, falls back to admin profile */}
+                      {/* Bill-to — org level wins, falls back to any member who has one */}
                       {(() => {
-                        const addr = org.bill_to_address || admin?.bill_to_address
-                        const city = org.bill_to_city || admin?.bill_to_city
-                        const state = org.bill_to_state || admin?.bill_to_state
-                        const zip = org.bill_to_zip || admin?.bill_to_zip
-                        const name = org.bill_to_name || admin?.company_name
+                        const src   = members.find(m => m.bill_to_address)
+                        const addr  = org.bill_to_address || src?.bill_to_address
+                        const city  = org.bill_to_city    || src?.bill_to_city
+                        const state = org.bill_to_state   || src?.bill_to_state
+                        const zip   = org.bill_to_zip     || src?.bill_to_zip
+                        const name  = org.bill_to_name    || src?.company_name
                         return (
                           <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
                             <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Bill To</p>
@@ -1136,12 +1140,13 @@ export default function SuperAdmin() {
                         )
                       })()}
 
-                      {/* Ship-to — org level wins, falls back to admin profile */}
+                      {/* Ship-to — org level wins, falls back to any member who has one */}
                       {(() => {
-                        const addr = org.ship_to_address || admin?.ship_to_address
-                        const city = org.ship_to_city || admin?.ship_to_city
-                        const state = org.ship_to_state || admin?.ship_to_state
-                        const zip = org.ship_to_zip || admin?.ship_to_zip
+                        const src   = members.find(m => m.ship_to_address)
+                        const addr  = org.ship_to_address || src?.ship_to_address
+                        const city  = org.ship_to_city    || src?.ship_to_city
+                        const state = org.ship_to_state   || src?.ship_to_state
+                        const zip   = org.ship_to_zip     || src?.ship_to_zip
                         return (
                           <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
                             <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Ship To</p>

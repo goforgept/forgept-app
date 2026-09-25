@@ -267,10 +267,24 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     })
     if (data?.org_id) {
       try {
-        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions, feature_msrp, doc_font, pdf_table_style, pdf_header_style, pdf_color_headers, stripe_connect_connected, default_hide_material_prices, default_hide_labor_breakdown, default_lump_sum_labor, default_tc_font_size, warranty_templates, warranty_text').eq('id', data.org_id).single()
+        const { data: orgData } = await supabase.from('organizations').select('default_tax_rate, timezone, qbo_connected, qbo_company_name, feature_sla, sla_auto_attach, sla_templates, feature_monitoring, monitoring_auto_attach, monitoring_templates, square_connected, square_merchant_id, inbound_email_enabled, inbound_email_domain, inbound_email_verified, inbound_email_auto_reply, feature_regions, feature_msrp, doc_font, pdf_table_style, pdf_header_style, pdf_color_headers, stripe_connect_connected, default_hide_material_prices, default_hide_labor_breakdown, default_lump_sum_labor, default_tc_font_size, warranty_templates, warranty_text, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip').eq('id', data.org_id).single()
         setOrgTaxRate(orgData?.default_tax_rate ?? '')
         setOrgTimezone(orgData?.timezone || 'America/Chicago')
         setOrgId(data.org_id)
+        // Org-level addresses override profile-level (org is source of truth; profile kept for PDF backward compat)
+        if (orgData?.bill_to_address || orgData?.ship_to_address) {
+          setForm(prev => ({
+            ...prev,
+            bill_to_address: orgData.bill_to_address || prev.bill_to_address,
+            bill_to_city:    orgData.bill_to_city    || prev.bill_to_city,
+            bill_to_state:   orgData.bill_to_state   || prev.bill_to_state,
+            bill_to_zip:     orgData.bill_to_zip     || prev.bill_to_zip,
+            ship_to_address: orgData.ship_to_address || prev.ship_to_address,
+            ship_to_city:    orgData.ship_to_city    || prev.ship_to_city,
+            ship_to_state:   orgData.ship_to_state   || prev.ship_to_state,
+            ship_to_zip:     orgData.ship_to_zip     || prev.ship_to_zip,
+          }))
+        }
         setQboConnected(orgData?.qbo_connected || false); setQboCompanyName(orgData?.qbo_company_name || '')
         setSquareConnected(orgData?.square_connected || false); setSquareMerchantId(orgData?.square_merchant_id || '')
         setStripeConnected(orgData?.stripe_connect_connected || false)
@@ -376,6 +390,15 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
           default_lump_sum_labor: defaultLumpSumLabor,
           default_tc_font_size: defaultTcFontSize,
           warranty_templates: warrantyTemplates.filter(t => t.name || t.text),
+          // Org-wide billing addresses — shared across all users in the org
+          bill_to_address: form.bill_to_address || null,
+          bill_to_city:    form.bill_to_city    || null,
+          bill_to_state:   form.bill_to_state   || null,
+          bill_to_zip:     form.bill_to_zip     || null,
+          ship_to_address: form.ship_to_address || null,
+          ship_to_city:    form.ship_to_city    || null,
+          ship_to_state:   form.ship_to_state   || null,
+          ship_to_zip:     form.ship_to_zip     || null,
         }).eq('id', orgId)
         if (orgErr) console.error('Org settings error:', orgErr.message)
       }
