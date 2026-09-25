@@ -137,7 +137,7 @@ export default function AIAgent() {
 
       {/* Chat panel */}
       {open && (
-        <div className="fixed inset-0 lg:inset-auto lg:bottom-22 lg:left-auto lg:right-6 lg:w-96 lg:max-h-[600px] z-[65] bg-fp-card lg:border lg:border-fp-border lg:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        <div className="fixed top-0 left-0 right-0 h-dvh lg:h-auto lg:inset-auto lg:top-auto lg:bottom-22 lg:left-auto lg:right-6 lg:w-96 lg:max-h-[600px] z-[65] bg-fp-card lg:border lg:border-fp-border lg:rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-fp-border">
