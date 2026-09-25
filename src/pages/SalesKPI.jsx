@@ -269,7 +269,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
   const searchClients = async (query) => {
     if (!query || query.length < 2) { setClientSuggestions([]); return }
     const { data } = await supabase.from('clients')
-      .select('id, company')
+      .select('id, company, client_name')
       .eq('org_id', profile.org_id)
       .ilike('company', `%${query}%`)
       .limit(5)
@@ -632,10 +632,18 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                             .eq('org_id', profile.org_id)
                             .eq('client_id', c.id)
                             .order('is_primary', { ascending: false })
-                            .limit(6),
+                            .limit(8),
                         ])
                         setClientProposals(props || [])
-                        setClientContacts(contacts || [])
+                        // Prepend main POC if not already in client_contacts
+                        const allContacts = contacts || []
+                        if (c.client_name) {
+                          const alreadyListed = allContacts.some(ct => ct.full_name === c.client_name)
+                          if (!alreadyListed) {
+                            allContacts.unshift({ id: null, full_name: c.client_name, isPOC: true })
+                          }
+                        }
+                        setClientContacts(allContacts)
                       }}
                       className="w-full text-left px-3 py-2 text-sm text-fp-text hover:bg-fp-inset transition-colors">
                       {c.company}
@@ -652,15 +660,18 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                   <div>
                     <p className="text-fp-muted text-xs mb-1.5">Contact <span className="text-fp-muted">(optional)</span></p>
                     <div className="flex flex-wrap gap-2">
-                      {clientContacts.map(ct => (
-                        <button key={ct.id}
-                          onClick={() => setLogForm(f => ({ ...f, contactId: f.contactId === ct.id ? null : ct.id }))}
+                      {clientContacts.map((ct, i) => (
+                        <button key={ct.id ?? `poc-${i}`}
+                          onClick={() => setLogForm(f => ({
+                            ...f,
+                            contactId: f.contactId === ct.id ? null : ct.id,
+                          }))}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                            logForm.contactId === ct.id
+                            logForm.contactId === ct.id && ct.id !== null
                               ? 'bg-fp-brand text-white'
                               : 'bg-fp-inset text-fp-muted hover:text-fp-text border border-fp-border'
                           }`}>
-                          {ct.full_name}
+                          {ct.full_name}{ct.isPOC ? ' ★' : ''}
                         </button>
                       ))}
                     </div>
