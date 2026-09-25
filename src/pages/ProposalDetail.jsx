@@ -1208,6 +1208,7 @@ export default function ProposalDetail({ isAdmin }) {
     }
     if (!editingBOM) {
       setEditLines([...lineItems.map(l => ({ ...l })), ...newLines])
+      setEditSections(sections.map(s => ({ ...s, labor_items: s.labor_items || [] })))
       setEditingBOM(true)
     } else {
       setEditLines(prev => [...prev, ...newLines])
@@ -1237,6 +1238,7 @@ export default function ProposalDetail({ isAdmin }) {
     }
     if (!editingBOM) {
       setEditLines([...lineItems.map(l => ({ ...l })), newLine])
+      setEditSections(sections.map(s => ({ ...s, labor_items: s.labor_items || [] })))
       setEditingBOM(true)
     } else {
       setEditLines(prev => [...prev, newLine])
@@ -2250,6 +2252,7 @@ export default function ProposalDetail({ isAdmin }) {
       })
 
       setEditLines(mapped)
+      setEditSections(sections.map(s => ({ ...s, labor_items: s.labor_items || [] })))
       setTimeout(() => { setEditingBOM(true) }, 0)
     } catch (err) {
       console.error('Excel upload error:', err)
@@ -3060,6 +3063,7 @@ const analyzeDrawing = async () => {
       pricing_status: 'Needs Pricing', recurring: false
     }))
     setEditLines([...lineItems.map(l => ({ ...l })), ...newLines])
+    setEditSections(sections.map(s => ({ ...s, labor_items: s.labor_items || [] })))
     if (laborItems.length > 0) {
       const newLaborItems = laborItems.map(item => ({
         role: item.item_name, quantity: String(item.quantity),
@@ -3101,6 +3105,7 @@ const analyzeDrawing = async () => {
       category: item.category || '', vendor: '', your_cost_unit: '', markup_percent: String(defMkp), customer_price_unit: '', customer_price_total: '', pricing_status: 'Needs Pricing', recurring: false
     }))
     setEditLines([...lineItems.map(l => ({ ...l })), ...newLines])
+    setEditSections(sections.map(s => ({ ...s, labor_items: s.labor_items || [] })))
     if (laborAI.length > 0) {
       const newLaborItems = laborAI.map(item => ({ role: item.item_name, quantity: String(item.quantity), unit: item.unit === 'hr' ? 'hr' : item.unit === 'day' ? 'day' : 'lot', your_cost: '', markup: defMkp, customer_price: 0 }))
       setLaborItems(prev => { const existing = prev.filter(l => l.role); return [...existing, ...newLaborItems] })
