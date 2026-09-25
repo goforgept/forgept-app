@@ -1806,50 +1806,53 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
           const activeTabData = allTabs.find(t => t.key === activeTab)
 
           return (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {primaryTabs.map(t => (
-                  <button key={t.key} onClick={() => setActiveTab(t.key)}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                      activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-
-                <div ref={moreRef} className="relative">
-                  <button
-                    onClick={() => setMoreOpen(o => !o)}
-                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                      overflowActive ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
-                    }`}
-                  >
-                    {overflowActive ? overflowActive.label : 'More'}
-                    <span className="text-sm leading-none opacity-60">{moreOpen ? '−' : '+'}</span>
-                  </button>
-                  {moreOpen && (
-                    <div className="absolute top-full left-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-hidden">
-                      {overflowTabs.map(t => (
-                        <button key={t.key}
-                          onClick={() => { setActiveTab(t.key); setMoreOpen(false) }}
-                          className={`w-full text-left px-4 py-2.5 text-sm font-medium flex items-center justify-between gap-4 transition-colors ${
-                            activeTab === t.key ? 'text-fp-brand bg-fp-inset' : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
-                          }`}
-                        >
-                          <span>{t.label}</span>
-                          {t.countLabel && (
-                            <span className="text-xs font-bold tabular-nums opacity-50 shrink-0">{t.countLabel}</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+            <div className="flex items-center gap-2">
+              <div className="overflow-x-auto flex-1 scrollbar-none">
+                <div className="flex items-center gap-2 min-w-max">
+                  {primaryTabs.map(t => (
+                    <button key={t.key} onClick={() => setActiveTab(t.key)}
+                      className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                        activeTab === t.key ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
+              {/* More dropdown — outside overflow-x-auto so it isn't clipped */}
+              <div ref={moreRef} className="relative shrink-0">
+                <button
+                  onClick={() => setMoreOpen(o => !o)}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                    overflowActive ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
+                  }`}
+                >
+                  {overflowActive ? overflowActive.label : 'More'}
+                  <span className="text-sm leading-none opacity-60">{moreOpen ? '−' : '+'}</span>
+                </button>
+                {moreOpen && (
+                  <div className="absolute top-full right-0 mt-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-hidden">
+                    {overflowTabs.map(t => (
+                      <button key={t.key}
+                        onClick={() => { setActiveTab(t.key); setMoreOpen(false) }}
+                        className={`w-full text-left px-4 py-2.5 text-sm font-medium flex items-center justify-between gap-4 transition-colors ${
+                          activeTab === t.key ? 'text-fp-brand bg-fp-inset' : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
+                        }`}
+                      >
+                        <span>{t.label}</span>
+                        {t.countLabel && (
+                          <span className="text-xs font-bold tabular-nums opacity-50 shrink-0">{t.countLabel}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {activeTabData?.countLabel && (
-                <span className="text-fp-muted text-sm tabular-nums">
+                <span className="text-fp-muted text-sm tabular-nums shrink-0">
                   Count: <span className="text-fp-text font-semibold">{activeTabData.countLabel}</span>
                 </span>
               )}

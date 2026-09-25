@@ -200,6 +200,19 @@ const TOOLS = [
       required: ["type"],
     },
   },
+  {
+    name: "get_inventory",
+    description: "Look up inventory stock levels. Can search by part number or description, filter by low/out-of-stock, or return everything.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search term — part number or description (optional)" },
+        filter: { type: "string", enum: ["all", "low_stock", "out_of_stock"], description: "Filter results (default: all)" },
+        warehouse: { type: "string", description: "Filter by warehouse name (optional)" },
+      },
+      required: [],
+    },
+  },
 ]
 
 const DEFAULT_ALL_WRITE: Record<string, string> = {
@@ -238,6 +251,7 @@ const TOOL_PERMS: Record<string, { area: string; write?: boolean }> = {
   get_deal_summary:       { area: 'proposals' },
   get_pipeline_summary:   { area: 'pipeline' },
   get_recent_activity:    { area: 'dashboard' },
+  get_inventory:          { area: 'inventory' },
 }
 
 async function executeTool(name: string, input: any, supabase: any, orgId: string, userId: string, perms: Record<string, string>) {
@@ -558,6 +572,43 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           .neq("status", "completed").limit(5),
       ])
       return { client, open_proposals: proposals || [], open_tickets: tickets || [], pending_tasks: tasks || [] }
+    }
+
+    case "get_inventory": {
+      let query = supabase.from("inventory_items")
+        .select("part_number, description, qty_on_hand, qty_reserved, reorder_point, warehouses(name)")
+        .eq("org_id", orgId)
+        .order("description")
+        .limit(50)
+
+      if (input.query) {
+        const q = `%${input.query}%`
+        query = query.or(`description.ilike.${q},part_number.ilike.${q}`)
+      }
+      if (input.warehouse) {
+        const { data: wh } = await supabase.from("warehouses")
+          .select("id").eq("org_id", orgId).ilike("name", `%${input.warehouse}%`).limit(1).maybeSingle()
+        if (wh) query = query.eq("warehouse_id", wh.id)
+      }
+
+      const { data: items } = await query
+      let results = (items || []).map((i: any) => ({
+        part_number: i.part_number || null,
+        description: i.description,
+        on_hand: i.qty_on_hand ?? 0,
+        reserved: i.qty_reserved ?? 0,
+        available: (i.qty_on_hand ?? 0) - (i.qty_reserved ?? 0),
+        reorder_point: i.reorder_point ?? null,
+        warehouse: i.warehouses?.name || null,
+      }))
+
+      if (input.filter === "out_of_stock") {
+        results = results.filter((i: any) => i.on_hand <= 0)
+      } else if (input.filter === "low_stock") {
+        results = results.filter((i: any) => i.reorder_point != null && i.on_hand <= i.reorder_point && i.on_hand > 0)
+      }
+
+      return { total_items: results.length, items: results }
     }
 
     default:
