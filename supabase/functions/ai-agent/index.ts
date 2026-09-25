@@ -633,7 +633,8 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         if (wh) query = query.eq("warehouse_id", wh.id)
       }
 
-      const { data: items } = await query
+      const { data: items, error: invError } = await query
+      if (invError) return { error: `Inventory query failed: ${invError.message}` }
       let results = (items || []).map((i: any) => ({
         part_number: i.part_number || null,
         description: i.description,
@@ -760,7 +761,8 @@ ${helpContext}
 Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`
       : `You are a helpful assistant built into ForgePt, a field service and sales management platform. You help users manage their business by creating and retrieving data through natural language.
 
-You have access to tools to create and update clients, search clients and proposals, log activity (calls, emails, meetings, notes) against clients or proposals, get a deal summary with AI recommendations, get a full client overview, create service tickets, tasks, and proposals, and view pipeline summaries. You can also answer questions about how ForgePt features work.
+You have access to tools to create and update clients, search clients and proposals, log activity (calls, emails, meetings, notes) against clients or proposals, get a deal summary with AI recommendations, get a full client overview, create service tickets, tasks, and proposals, view pipeline summaries, look up inventory stock levels, and search the product library. You can also answer questions about how ForgePt features work.
+- When a user asks about inventory, stock levels, what's in stock, or what parts are on hand — always call get_inventory. Never say inventory is empty without calling it first.
 ${helpContext}
 
 Guidelines:
