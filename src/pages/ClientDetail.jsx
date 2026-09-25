@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
 import Sidebar from '../components/Sidebar'
@@ -42,7 +43,9 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   const [savingClient, setSavingClient] = useState(false)
   const [activeTab, setActiveTab] = useState('proposals')
   const [moreOpen, setMoreOpen] = useState(false)
-  const moreRef = useRef(null)
+  const [moreMenuPos, setMoreMenuPos] = useState(null)
+  const moreRef     = useRef(null)
+  const moreMenuRef = useRef(null)
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [emailForm, setEmailForm] = useState({ subject: '', context: '' })
   const [draftedEmail, setDraftedEmail] = useState('')
@@ -95,7 +98,11 @@ export default function ClientDetail({ isAdmin, featureProposals = true, feature
   }, [])
 
   useEffect(() => {
-    const handler = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false) }
+    const handler = (e) => {
+      const inButton = moreRef.current?.contains(e.target)
+      const inMenu   = moreMenuRef.current?.contains(e.target)
+      if (!inButton && !inMenu) setMoreOpen(false)
+    }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
@@ -773,9 +780,9 @@ const deleteMeeting = async (meetingId) => {
           const activeTabData = allTabs.find(t => t.key === activeTab)
 
           return (
-            <div className="flex items-center gap-2">
-              {/* Tabs scroll independently; no flex-1 so More sits right beside them */}
-              <div className="overflow-x-auto scrollbar-none shrink-0 max-w-full">
+            <>
+              {/* Single scroll row — More button lives inside so it scrolls with the tabs on mobile */}
+              <div className="overflow-x-auto scrollbar-none">
                 <div className="flex items-center gap-2 min-w-max">
                   {primaryTabs.map(t => (
                     <button key={t.key} onClick={() => setActiveTab(t.key)}
@@ -786,36 +793,52 @@ const deleteMeeting = async (meetingId) => {
                       {t.label}
                     </button>
                   ))}
+
+                  {/* More button — dropdown portaled to body so it escapes the overflow clip */}
+                  <button
+                    ref={moreRef}
+                    onClick={() => {
+                      if (moreOpen) { setMoreOpen(false); setMoreMenuPos(null); return }
+                      const rect = moreRef.current.getBoundingClientRect()
+                      setMoreMenuPos({ top: rect.top, left: rect.left })
+                      setMoreOpen(true)
+                    }}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${
+                      overflowActive ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
+                    }`}
+                  >
+                    {overflowActive ? overflowActive.label : 'More'}
+                    <span className="text-sm leading-none opacity-60">{moreOpen ? '−' : '+'}</span>
+                  </button>
                 </div>
               </div>
 
-              {/* More — outside the overflow container so its dropdown isn't clipped */}
-              <div ref={moreRef} className="relative shrink-0">
-                <button
-                  onClick={() => setMoreOpen(o => !o)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                    overflowActive ? 'bg-fp-brand text-white' : 'bg-fp-card text-fp-muted hover:text-fp-text'
-                  }`}
+              {/* Portal dropdown — renders at body level to escape overflow clipping */}
+              {moreOpen && moreMenuPos && createPortal(
+                <div
+                  ref={moreMenuRef}
+                  style={{
+                    position: 'fixed',
+                    bottom: `${window.innerHeight - moreMenuPos.top + 6}px`,
+                    left: `${moreMenuPos.left}px`,
+                    zIndex: 9999,
+                  }}
+                  className="bg-fp-card border border-fp-border rounded-xl shadow-xl min-w-[200px] py-1 overflow-y-auto max-h-[50vh]"
                 >
-                  {overflowActive ? overflowActive.label : 'More'}
-                  <span className="text-sm leading-none opacity-60">{moreOpen ? '−' : '+'}</span>
-                </button>
-                {moreOpen && (
-                  <div className="absolute bottom-full left-0 mb-1.5 bg-fp-card border border-fp-border rounded-xl shadow-xl z-30 min-w-[200px] py-1 overflow-y-auto max-h-[50vh]">
-                    {overflowTabs.map(t => (
-                      <button key={t.key}
-                        onClick={() => { setActiveTab(t.key); setMoreOpen(false) }}
-                        className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
-                          activeTab === t.key ? 'text-fp-brand bg-fp-inset' : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+                  {overflowTabs.map(t => (
+                    <button key={t.key}
+                      onClick={() => { setActiveTab(t.key); setMoreOpen(false); setMoreMenuPos(null) }}
+                      className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${
+                        activeTab === t.key ? 'text-fp-brand bg-fp-inset' : 'text-fp-muted hover:text-fp-text hover:bg-fp-inset'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </div>,
+                document.body
+              )}
+            </>
           )
         })()}
 
