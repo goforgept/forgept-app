@@ -677,7 +677,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
             </div>
 
             {/* Contact picker */}
-            {clientContacts.length > 0 && (
+            {clientContacts.some(ct => ct.id) && (
               <div>
                 <p className="text-fp-muted text-xs mb-1.5">Contact <span className="text-fp-muted">(optional)</span></p>
                 <select
@@ -687,8 +687,8 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                   className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                 >
                   <option value="">— Select contact —</option>
-                  {clientContacts.map((ct, i) => (
-                    <option key={ct.id ?? `poc-${i}`} value={ct.id || ''}>
+                  {clientContacts.filter(ct => ct.id).map(ct => (
+                    <option key={ct.id} value={ct.id}>
                       {ct.full_name}{ct.isPOC ? ' (Main POC)' : ''}
                     </option>
                   ))}
