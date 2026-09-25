@@ -1075,13 +1075,13 @@ export default function Reports(props) {
       <div className="flex-1 p-8 overflow-auto">
         <div className="max-w-6xl mx-auto">
 
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-8">
             <div>
               <h1 className="text-fp-text text-2xl font-bold">Reports</h1>
               <p className="text-fp-muted text-sm mt-1">Export data as Excel or PDF</p>
             </div>
             {activeReport !== 'client_report' && canExport && (
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -1103,9 +1103,24 @@ export default function Reports(props) {
             )}
           </div>
 
+          {/* Mobile report selector */}
+          <div className="lg:hidden mb-5">
+            <select
+              value={activeReport}
+              onChange={e => switchReport(e.target.value)}
+              className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2.5 text-sm font-medium focus:outline-none focus:border-fp-brand"
+            >
+              {navGroups.map(group => (
+                <optgroup key={group.label} label={group.label}>
+                  {group.items.map(r => <option key={r.key} value={r.key}>{r.icon} {r.label}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
           <div className="flex gap-6">
-            {/* Left nav */}
-            <div className="w-48 shrink-0 space-y-4">
+            {/* Left nav — desktop only */}
+            <div className="hidden lg:block w-48 shrink-0 space-y-4">
               {navGroups.map(group => (
                 <div key={group.label}>
                   <p className="text-fp-muted text-xs font-semibold uppercase tracking-wider px-3 mb-1">{group.label}</p>

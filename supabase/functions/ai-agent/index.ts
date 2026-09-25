@@ -201,6 +201,19 @@ const TOOLS = [
     },
   },
   {
+    name: "search_products",
+    description: "Search the org's product library by name, part number, manufacturer, or category. Returns matching products with pricing.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search term — product name, part number, or manufacturer" },
+        category: { type: "string", description: "Filter by category (optional)" },
+        manufacturer: { type: "string", description: "Filter by manufacturer (optional)" },
+      },
+      required: [],
+    },
+  },
+  {
     name: "get_inventory",
     description: "Look up inventory stock levels. Can search by part number or description, filter by low/out-of-stock, or return everything.",
     input_schema: {
@@ -252,6 +265,7 @@ const TOOL_PERMS: Record<string, { area: string; write?: boolean }> = {
   get_pipeline_summary:   { area: 'pipeline' },
   get_recent_activity:    { area: 'dashboard' },
   get_inventory:          { area: 'inventory' },
+  search_products:        { area: 'productLibrary' },
 }
 
 async function executeTool(name: string, input: any, supabase: any, orgId: string, userId: string, perms: Record<string, string>) {
@@ -572,6 +586,34 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
           .neq("status", "completed").limit(5),
       ])
       return { client, open_proposals: proposals || [], open_tickets: tickets || [], pending_tasks: tasks || [] }
+    }
+
+    case "search_products": {
+      let query = supabase.from("product_library")
+        .select("item_name, part_number, manufacturer, category, description, msrp")
+        .eq("org_id", orgId)
+        .order("item_name")
+        .limit(30)
+
+      if (input.query) {
+        const q = `%${input.query}%`
+        query = query.or(`item_name.ilike.${q},part_number.ilike.${q},manufacturer.ilike.${q},description.ilike.${q}`)
+      }
+      if (input.category) query = query.ilike("category", `%${input.category}%`)
+      if (input.manufacturer) query = query.ilike("manufacturer", `%${input.manufacturer}%`)
+
+      const { data: products } = await query
+      return {
+        total: (products || []).length,
+        products: (products || []).map((p: any) => ({
+          name: p.item_name,
+          part_number: p.part_number || null,
+          manufacturer: p.manufacturer || null,
+          category: p.category || null,
+          description: p.description || null,
+          msrp: p.msrp != null ? `$${Number(p.msrp).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : null,
+        })),
+      }
     }
 
     case "get_inventory": {
