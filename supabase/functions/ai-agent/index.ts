@@ -617,8 +617,22 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
     }
 
     case "get_inventory": {
+      // Resolve warehouse filter first if provided
+      let warehouseFilterId: string | null = null
+      const { data: allWarehouses } = await supabase.from("warehouses")
+        .select("id, name").eq("org_id", orgId)
+      const warehouseMap: Record<string, string> = {}
+      for (const w of (allWarehouses || [])) warehouseMap[w.id] = w.name
+
+      if (input.warehouse) {
+        const match = (allWarehouses || []).find((w: any) =>
+          w.name.toLowerCase().includes(input.warehouse.toLowerCase())
+        )
+        if (match) warehouseFilterId = match.id
+      }
+
       let query = supabase.from("inventory_items")
-        .select("part_number, description, qty_on_hand, qty_reserved, reorder_point, warehouses(name)")
+        .select("part_number, description, qty_on_hand, qty_reserved, min_stock_level, warehouse_id")
         .eq("org_id", orgId)
         .order("description")
         .limit(50)
@@ -627,10 +641,8 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         const q = `%${input.query}%`
         query = query.or(`description.ilike.${q},part_number.ilike.${q}`)
       }
-      if (input.warehouse) {
-        const { data: wh } = await supabase.from("warehouses")
-          .select("id").eq("org_id", orgId).ilike("name", `%${input.warehouse}%`).limit(1).maybeSingle()
-        if (wh) query = query.eq("warehouse_id", wh.id)
+      if (warehouseFilterId) {
+        query = query.eq("warehouse_id", warehouseFilterId)
       }
 
       const { data: items, error: invError } = await query
@@ -641,14 +653,14 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
         on_hand: i.qty_on_hand ?? 0,
         reserved: i.qty_reserved ?? 0,
         available: (i.qty_on_hand ?? 0) - (i.qty_reserved ?? 0),
-        reorder_point: i.reorder_point ?? null,
-        warehouse: i.warehouses?.name || null,
+        min_stock_level: i.min_stock_level ?? null,
+        warehouse: i.warehouse_id ? (warehouseMap[i.warehouse_id] || null) : null,
       }))
 
       if (input.filter === "out_of_stock") {
         results = results.filter((i: any) => i.on_hand <= 0)
       } else if (input.filter === "low_stock") {
-        results = results.filter((i: any) => i.reorder_point != null && i.on_hand <= i.reorder_point && i.on_hand > 0)
+        results = results.filter((i: any) => i.min_stock_level != null && i.on_hand <= i.min_stock_level && i.on_hand > 0)
       }
 
       return { total_items: results.length, items: results }
