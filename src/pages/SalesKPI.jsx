@@ -84,6 +84,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
   const [logForm, setLogForm] = useState({ type: 'call', clientQuery: '', clientId: null, proposalId: null, title: '', body: '', followUpDate: '' })
   const [clientSuggestions, setClientSuggestions] = useState([])
   const [clientProposals, setClientProposals] = useState([])
+  const [clientContacts, setClientContacts] = useState([])
   const [logSaving, setLogSaving] = useState(false)
 
   useEffect(() => {
@@ -258,9 +259,10 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
   }
 
   const openLogModal = (rep) => {
-    setLogForm({ type: 'call', clientQuery: '', clientId: null, proposalId: null, title: '', body: '', followUpDate: '' })
+    setLogForm({ type: 'call', clientQuery: '', clientId: null, proposalId: null, contactId: null, title: '', body: '', followUpDate: '' })
     setClientSuggestions([])
     setClientProposals([])
+    setClientContacts([])
     setLogModal({ rep })
   }
 
@@ -282,6 +284,7 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
       user_id: logModal.rep.id,
       client_id: logForm.clientId || null,
       proposal_id: logForm.proposalId || null,
+      contact_id: logForm.contactId || null,
       type: logForm.type,
       title: logForm.title,
       body: logForm.body || null,
@@ -297,9 +300,10 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
       })
     }
     setLogModal(null)
-    setLogForm({ type: 'call', clientQuery: '', clientId: null, proposalId: null, title: '', body: '', followUpDate: '' })
+    setLogForm({ type: 'call', clientQuery: '', clientId: null, proposalId: null, contactId: null, title: '', body: '', followUpDate: '' })
     setClientSuggestions([])
     setClientProposals([])
+    setClientContacts([])
     setLogSaving(false)
     load()
   }
@@ -597,8 +601,8 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
                 value={logForm.clientQuery}
                 onChange={e => {
                   const v = e.target.value
-                  setLogForm(f => ({ ...f, clientQuery: v, clientId: null, proposalId: null }))
-                  if (!v) setClientProposals([])
+                  setLogForm(f => ({ ...f, clientQuery: v, clientId: null, proposalId: null, contactId: null }))
+                  if (!v) { setClientProposals([]); setClientContacts([]) }
                   searchClients(v)
                 }}
                 onBlur={() => setTimeout(() => setClientSuggestions([]), 150)}
@@ -609,18 +613,31 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
               {clientSuggestions.length > 0 && (
                 <div className="absolute top-full left-0 right-0 bg-fp-card border border-fp-border rounded-lg mt-1 z-10 shadow-lg overflow-hidden">
                   {clientSuggestions.map(c => (
-                    <button key={c.id} onMouseDown={async () => {
-                      setLogForm(f => ({ ...f, clientQuery: c.company, clientId: c.id, proposalId: null }))
-                      setClientSuggestions([])
-                      const { data } = await supabase.from('proposals')
-                        .select('id, proposal_name')
-                        .eq('org_id', profile.org_id)
-                        .eq('client_id', c.id)
-                        .not('status', 'in', '("Won","Lost")')
-                        .order('created_at', { ascending: false })
-                        .limit(6)
-                      setClientProposals(data || [])
-                    }} className="w-full text-left px-3 py-2 text-sm text-fp-text hover:bg-fp-inset transition-colors">
+                    <button key={c.id}
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        setLogForm(f => ({ ...f, clientQuery: c.company, clientId: c.id, proposalId: null, contactId: null }))
+                        setClientSuggestions([])
+                        const [{ data: props }, { data: contacts }] = await Promise.all([
+                          supabase.from('proposals')
+                            .select('id, proposal_name')
+                            .eq('org_id', profile.org_id)
+                            .eq('client_id', c.id)
+                            .not('status', 'in', '("Won","Lost")')
+                            .order('created_at', { ascending: false })
+                            .limit(6),
+                          supabase.from('client_contacts')
+                            .select('id, full_name')
+                            .eq('org_id', profile.org_id)
+                            .eq('client_id', c.id)
+                            .order('is_primary', { ascending: false })
+                            .limit(6),
+                        ])
+                        setClientProposals(props || [])
+                        setClientContacts(contacts || [])
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm text-fp-text hover:bg-fp-inset transition-colors">
                       {c.company}
                     </button>
                   ))}
@@ -628,23 +645,45 @@ export default function SalesKPI({ isAdmin, isSalesManager, featureProposals = t
               )}
             </div>
 
-            {/* Proposal link */}
-            {clientProposals.length > 0 && (
-              <div>
-                <p className="text-fp-muted text-xs mb-1.5">Link to proposal <span className="text-fp-muted">(optional)</span></p>
-                <div className="flex flex-wrap gap-2">
-                  {clientProposals.map(p => (
-                    <button key={p.id}
-                      onClick={() => setLogForm(f => ({ ...f, proposalId: f.proposalId === p.id ? null : p.id }))}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors max-w-[220px] truncate ${
-                        logForm.proposalId === p.id
-                          ? 'bg-fp-brand text-white'
-                          : 'bg-fp-inset text-fp-muted hover:text-fp-text border border-fp-border'
-                      }`}>
-                      {p.proposal_name}
-                    </button>
-                  ))}
-                </div>
+            {/* Proposal + contact link */}
+            {(clientProposals.length > 0 || clientContacts.length > 0) && (
+              <div className="space-y-3">
+                {clientContacts.length > 0 && (
+                  <div>
+                    <p className="text-fp-muted text-xs mb-1.5">Contact <span className="text-fp-muted">(optional)</span></p>
+                    <div className="flex flex-wrap gap-2">
+                      {clientContacts.map(ct => (
+                        <button key={ct.id}
+                          onClick={() => setLogForm(f => ({ ...f, contactId: f.contactId === ct.id ? null : ct.id }))}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            logForm.contactId === ct.id
+                              ? 'bg-fp-brand text-white'
+                              : 'bg-fp-inset text-fp-muted hover:text-fp-text border border-fp-border'
+                          }`}>
+                          {ct.full_name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {clientProposals.length > 0 && (
+                  <div>
+                    <p className="text-fp-muted text-xs mb-1.5">Link to proposal <span className="text-fp-muted">(optional)</span></p>
+                    <div className="flex flex-wrap gap-2">
+                      {clientProposals.map(p => (
+                        <button key={p.id}
+                          onClick={() => setLogForm(f => ({ ...f, proposalId: f.proposalId === p.id ? null : p.id }))}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors max-w-[220px] truncate ${
+                            logForm.proposalId === p.id
+                              ? 'bg-fp-brand text-white'
+                              : 'bg-fp-inset text-fp-muted hover:text-fp-text border border-fp-border'
+                          }`}>
+                          {p.proposal_name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
