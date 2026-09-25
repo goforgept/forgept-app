@@ -577,8 +577,8 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
     <div className="flex min-h-screen bg-fp-bg">
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} featurePurchaseOrders={featurePurchaseOrders} featureInvoices={featureInvoices} featureSla={featureSla} featureMonitoring={featureMonitoring} role={role} isSalesManager={isSalesManager} isPM={isPM} isTechnician={isTechnician} />
       <div className="flex flex-1 min-w-0">
-        {/* Settings nav */}
-        <div className="w-52 border-r border-fp-border p-4 shrink-0">
+        {/* Settings nav — desktop sidebar */}
+        <div className="hidden lg:block w-52 border-r border-fp-border p-4 shrink-0">
           <p className="text-fp-text font-bold text-lg mb-5 px-3">Settings</p>
           <nav className="space-y-0.5">
             {navGroups.map((group, gi) => (
@@ -604,6 +604,21 @@ export default function Settings({ isAdmin, featureProposals = true, featureCRM 
 
         {/* Tab content */}
         <div className="flex-1 p-6 min-w-0 max-w-3xl">
+          {/* Mobile tab selector */}
+          <div className="lg:hidden mb-5">
+            <select
+              value={activeTab}
+              onChange={e => { setActiveTab(e.target.value); setSuccess(null) }}
+              className="w-full bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2.5 text-sm font-medium focus:outline-none focus:border-fp-brand"
+            >
+              {navGroups.map((group, gi) =>
+                group.label
+                  ? <optgroup key={gi} label={group.label}>{group.items.map(item => <option key={item.key} value={item.key}>{item.label}</option>)}</optgroup>
+                  : group.items.map(item => <option key={item.key} value={item.key}>{item.label}</option>)
+              )}
+            </select>
+          </div>
+
           {success && <p className="text-green-400 text-sm mb-4">{success}</p>}
 
           {activeTab === 'general' && (
