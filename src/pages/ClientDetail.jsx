@@ -800,7 +800,13 @@ const deleteMeeting = async (meetingId) => {
                     onClick={() => {
                       if (moreOpen) { setMoreOpen(false); setMoreMenuPos(null); return }
                       const rect = moreRef.current.getBoundingClientRect()
-                      setMoreMenuPos({ top: rect.top, left: rect.left })
+                      const menuW = 200
+                      const clampedLeft = Math.min(rect.left, window.innerWidth - menuW - 8)
+                      const openAbove = rect.top > window.innerHeight - rect.bottom
+                      setMoreMenuPos(openAbove
+                        ? { bottom: window.innerHeight - rect.top + 6, left: clampedLeft }
+                        : { top: rect.bottom + 6,                      left: clampedLeft }
+                      )
                       setMoreOpen(true)
                     }}
                     className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors whitespace-nowrap ${
@@ -819,7 +825,7 @@ const deleteMeeting = async (meetingId) => {
                   ref={moreMenuRef}
                   style={{
                     position: 'fixed',
-                    bottom: `${window.innerHeight - moreMenuPos.top + 6}px`,
+                    ...(moreMenuPos.bottom != null ? { bottom: `${moreMenuPos.bottom}px` } : { top: `${moreMenuPos.top}px` }),
                     left: `${moreMenuPos.left}px`,
                     zIndex: 9999,
                   }}
