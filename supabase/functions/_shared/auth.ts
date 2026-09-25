@@ -24,7 +24,7 @@ export async function validateUser(req: Request) {
 
   const { data: profile, error: profileError } = await userSupabase
     .from('profiles')
-    .select('org_id, role, org_role, team_id, is_regional_vp, is_operations_manager, is_superadmin')
+    .select('id, org_id, role, org_role, org_role_id, team_id, is_regional_vp, is_operations_manager, is_superadmin, permission_overrides, org_roles(base_role, permissions, is_admin)')
     .eq('id', user.id)
     .single()
 

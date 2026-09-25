@@ -695,17 +695,15 @@ Deno.serve(async (req) => {
     })
   }
 
-  // Build permission map for this user (mirrors frontend computePermissions)
+  // Build permission map — mirrors frontend usePermissions logic
   const isAdmin = profile.org_role === 'admin' || profile.role === 'admin'
-  const { data: orgRoleRow } = await supabase.from("org_roles")
-    .select("base_role, permissions, is_admin")
-    .eq("id", profile.org_role)
-    .maybeSingle()
-  const { data: profileFull } = await supabase.from("profiles")
-    .select("permission_overrides")
-    .eq("id", (await supabase.auth.getUser()).data.user?.id ?? '')
-    .maybeSingle()
-  const userPerms = buildPerms(orgRoleRow, profileFull?.permission_overrides, isAdmin)
+  const baseRole = (profile.org_roles as any)?.base_role || profile.org_role || profile.role || 'rep'
+  const orgRoleWithBase = profile.org_roles
+    ? ((profile.org_roles as any).base_role ? profile.org_roles : { ...(profile.org_roles as any), base_role: baseRole })
+    : baseRole === 'technician'
+    ? { base_role: 'technician', permissions: {}, is_admin: false }
+    : null
+  const userPerms = buildPerms(orgRoleWithBase, profile.permission_overrides, isAdmin)
 
   try {
     const { messages, helpMode } = await req.json()
