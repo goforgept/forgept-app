@@ -4,6 +4,11 @@ import { supabase } from '../../supabase'
 import { useCategoryIcons } from './useCategoryIcons'
 import { PATHWAY_DEFS } from './SymbolPicker'
 import PDFWorkerConstructor from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
+import {
+  cacheSheetImage, getCachedSheetImage,
+  cachePlacementsForSheet, getCachedPlacementsForSheet, getPendingPlacements,
+  enqueueOp, cancelOp, updateQueuedOp,
+} from '../../offline/designerOffline'
 
 const LABEL_PREFIXES = {
   'Dome Camera':             'CAM',
@@ -151,7 +156,7 @@ const getNextLabel = async (category, sheetIds, reserved = []) => {
   return `${prefix}-${String(next).padStart(2, '0')}`
 }
 
-export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange, activeTool, onToolSelect, onPathwaySelect, deletedPathwayId, rooms, onRoomClick, onRoomPlace, onRoomMove }) {
+export default function DrawingSheet({ sheet, orgId, isOnline = true, selectedSymbol, onPlacementChange, onPlacementSelect, updatedPlacement, onCableSelect, editingCableId, onEditingCableDone, updatedCable, deletedCableId, copiedPlacement: externalCopied, onCopyPlacement, onStageReady, allSheetIds, showLabels, onToggleLabels, placementsRefreshKey, openPlacementId, onPlacementsChange, activeTool, onToolSelect, onPathwaySelect, deletedPathwayId, rooms, onRoomClick, onRoomPlace, onRoomMove }) {
   const containerRef = useRef(null)
   const stageRef     = useRef(null)
   // Session-local cache of addresses assigned this session so rapid placements
@@ -162,6 +167,84 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     if (addr) sessionAddressesRef.current = [...sessionAddressesRef.current, addr]
     return addr
   }, [])
+
+  // Offline label generation — uses only session-local addresses (no DB needed)
+  const nextLabelOffline = useCallback((category) => {
+    const prefix = LABEL_PREFIXES[category]
+    if (!prefix) return null
+    const used = sessionAddressesRef.current
+      .filter(a => a?.startsWith(`${prefix}-`))
+      .map(a => parseInt(a.replace(`${prefix}-`, ''), 10) || 0)
+      .filter(n => n > 0)
+    const next = used.length > 0 ? Math.max(...used) + 1 : 1
+    const addr = `${prefix}-${String(next).padStart(2, '0')}`
+    sessionAddressesRef.current = [...sessionAddressesRef.current, addr]
+    return addr
+  }, [])
+
+  /**
+   * createPlacement — single entry point for all device drops and clicks.
+   * Online: writes to Supabase immediately.
+   * Offline: assigns a PEND_ temp ID, writes to the local queue, and returns
+   *          a placement object that renders immediately on the canvas.
+   */
+  const createPlacement = useCallback(async (symbol, x, y, sheetId) => {
+    const roundedX = Math.round(x * 10000) / 10000
+    const roundedY = Math.round(y * 10000) / 10000
+
+    if (isOnline) {
+      const { data: catalogMatch } = await supabase
+        .from('products').select('id')
+        .eq('org_id', orgId).eq('part_number', symbol.part_number)
+        .maybeSingle()
+      const data = {
+        org_id: orgId, drawing_sheet_id: sheetId,
+        global_product_id: symbol.id, product_id: catalogMatch?.id || null,
+        x: roundedX, y: roundedY, rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
+        device_address: await nextLabel(symbol.category, allSheetIds || [sheetId]),
+      }
+      const { data: placement, error } = await supabase
+        .from('drawing_placements')
+        .insert(data)
+        .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories, description)')
+        .single()
+      if (error) throw error
+      return placement
+    }
+
+    // Offline path
+    const localId = `PEND_${crypto.randomUUID()}`
+    const data = {
+      org_id: orgId, drawing_sheet_id: sheetId,
+      global_product_id: symbol.id, product_id: null,
+      x: roundedX, y: roundedY, rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
+      device_address: nextLabelOffline(symbol.category),
+    }
+    await enqueueOp(sheet.proposal_id, {
+      type: 'insert_placement',
+      localId,
+      sheetLocalId: sheetId,
+      data,
+      symbolData: symbol,
+    })
+    return { ...data, id: localId, _pending: true, global_products: symbol }
+  }, [isOnline, orgId, nextLabel, nextLabelOffline, allSheetIds, sheet])
+
+  /**
+   * deletePlacement — single entry point for all placement removals.
+   * PEND_ items: cancel the queued insert + remove from local state.
+   * Real IDs online: Supabase delete.
+   * Real IDs offline: queue a delete op for when connectivity returns.
+   */
+  const deletePlacement = useCallback(async (id) => {
+    if (id.startsWith('PEND_')) {
+      await cancelOp(sheet.proposal_id, id)
+    } else if (isOnline) {
+      await supabase.from('drawing_placements').delete().eq('id', id)
+    } else {
+      await enqueueOp(sheet.proposal_id, { type: 'delete_placement', payload: { id } })
+    }
+  }, [isOnline, sheet])
 
   useEffect(() => {
     if (stageRef.current) onStageReady?.(stageRef.current)
@@ -295,7 +378,7 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     if (sheet.storage_path === 'pending') return
     if (sheet.storage_path === 'blank') { setLoading(false); return }
     loadFloorPlan()
-  }, [sheet?.storage_path])
+  }, [sheet?.storage_path, sheet?._fileId])
 
   const [loadStep, setLoadStep] = useState('')
 
@@ -305,35 +388,91 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     setLoadStep('Connecting…')
 
     const run = async () => {
+      const storagePath = sheet.storage_path
+
+      // ── Offline-pending: file stored locally, not yet uploaded ──────────────
+      if (storagePath.startsWith('offline_pending:')) {
+        const { getPendingFile } = await import('../../offline/designerOffline')
+        const fileData = await getPendingFile(sheet._fileId)
+        if (!fileData) throw new Error('Offline file not found. Reconnect to sync and reload.')
+        const isPDF = sheet._contentType === 'application/pdf'
+        if (isPDF) {
+          setLoadStep('Rendering PDF…')
+          await renderPDF(fileData, sheet.page_number || 1)
+        } else {
+          const blobUrl = URL.createObjectURL(new Blob([fileData], { type: sheet._contentType || 'image/jpeg' }))
+          setLoadStep('Loading image…')
+          await loadImageFromUrl(blobUrl)
+        }
+        return
+      }
+
+      // ── Try IDB image cache first (works online and offline) ─────────────────
+      const cached = await getCachedSheetImage(storagePath)
+      if (cached) {
+        const isPDF = storagePath.toLowerCase().endsWith('.pdf')
+        if (isPDF) {
+          setLoadStep('Loading PDF…')
+          await renderPDF(cached, sheet.page_number || 1)
+        } else {
+          const ext     = storagePath.split('.').pop().toLowerCase()
+          const mime    = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png' }[ext] || 'image/jpeg'
+          const blobUrl = URL.createObjectURL(new Blob([cached], { type: mime }))
+          setLoadStep('Loading image…')
+          await loadImageFromUrl(blobUrl)
+        }
+        return
+      }
+
+      // ── Not cached — fetch from R2 and cache for next time ─────────────────
       const { Capacitor } = await import('@capacitor/core')
       const isNative = Capacitor.isNativePlatform()
+      const isPDF    = storagePath.toLowerCase().endsWith('.pdf')
 
-      if (sheet.storage_path.toLowerCase().endsWith('.pdf')) {
+      if (isPDF) {
         let pdfData
         if (isNative) {
           setLoadStep('Downloading PDF…')
           const { getR2Bytes } = await import('../../r2')
-          pdfData = await getR2Bytes(sheet.storage_path)
+          pdfData = await getR2Bytes(storagePath)
           if (!pdfData) throw new Error('File not found in storage. Try re-uploading this sheet.')
         } else {
           setLoadStep('Getting file URL…')
           const { getR2Url } = await import('../../r2')
-          const signedUrl = await getR2Url(sheet.storage_path, 3600)
+          const signedUrl = await getR2Url(storagePath, 3600)
           if (!signedUrl) throw new Error('File not found in storage. Try re-uploading this sheet.')
           setLoadStep('Downloading PDF…')
           const fetchResp = await fetch(signedUrl)
           if (!fetchResp.ok) throw new Error(`Failed to download PDF (HTTP ${fetchResp.status}) — try re-uploading the file.`)
           pdfData = await fetchResp.arrayBuffer()
         }
+        await cacheSheetImage(storagePath, pdfData)
         setLoadStep('Loading PDF…')
         await renderPDF(pdfData, sheet.page_number || 1)
       } else {
-        setLoadStep('Getting file URL…')
-        const { getR2Url } = await import('../../r2')
-        const signedUrl = await getR2Url(sheet.storage_path, 3600)
-        if (!signedUrl) throw new Error('File not found in storage. Try re-uploading this sheet.')
+        // Images: fetch bytes for caching, then render
+        let imageData
+        if (isNative) {
+          setLoadStep('Downloading image…')
+          const { getR2Bytes } = await import('../../r2')
+          imageData = await getR2Bytes(storagePath)
+          if (!imageData) throw new Error('File not found in storage. Try re-uploading this sheet.')
+        } else {
+          setLoadStep('Getting file URL…')
+          const { getR2Url } = await import('../../r2')
+          const signedUrl = await getR2Url(storagePath, 3600)
+          if (!signedUrl) throw new Error('File not found in storage. Try re-uploading this sheet.')
+          setLoadStep('Downloading image…')
+          const fetchResp = await fetch(signedUrl)
+          if (!fetchResp.ok) throw new Error(`Failed to download image (HTTP ${fetchResp.status})`)
+          imageData = await fetchResp.arrayBuffer()
+        }
+        await cacheSheetImage(storagePath, imageData)
+        const ext     = storagePath.split('.').pop().toLowerCase()
+        const mime    = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png' }[ext] || 'image/jpeg'
+        const blobUrl = URL.createObjectURL(new Blob([imageData], { type: mime }))
         setLoadStep('Loading image…')
-        await loadImageFromUrl(signedUrl)
+        await loadImageFromUrl(blobUrl)
       }
     }
 
@@ -442,11 +581,23 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories, description)')
       .eq('drawing_sheet_id', sheet.id)
       .order('created_at')
+
     if (data) {
-      setPlacements(data)
-      onPlacementsChange?.(data)
+      // Online: cache and show
+      await cachePlacementsForSheet(sheet.id, data)
+      const pending = await getPendingPlacements(sheet.id, sheet.proposal_id)
+      const combined = [...data, ...pending]
+      setPlacements(combined)
+      onPlacementsChange?.(combined)
+    } else {
+      // Offline: serve from IDB cache + any locally-queued placements
+      const cached  = await getCachedPlacementsForSheet(sheet.id) ?? []
+      const pending = await getPendingPlacements(sheet.id, sheet.proposal_id)
+      const combined = [...cached, ...pending]
+      setPlacements(combined)
+      onPlacementsChange?.(combined)
     }
-  }, [sheet.id])
+  }, [sheet.id, sheet.proposal_id])
 
   useEffect(() => { loadPlacements() }, [loadPlacements, placementsRefreshKey ?? 0])
   useEffect(() => { onPlacementsChange?.(placements) }, [placements])
@@ -497,23 +648,8 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     const x = Math.min(Math.max(imgX / canvasWRef.current, 0.01), 0.99)
     const y = Math.min(Math.max(imgY / canvasHRef.current, 0.01), 0.99)
     try {
-      const { data: catalogMatch } = await supabase
-        .from('products').select('id')
-        .eq('org_id', orgIdRef.current).eq('part_number', symbol.part_number)
-        .maybeSingle()
-      const { data: placement, error } = await supabase
-        .from('drawing_placements')
-        .insert({
-          org_id: orgIdRef.current, drawing_sheet_id: sheetIdRef.current,
-          global_product_id: symbol.id, product_id: catalogMatch?.id || null,
-          x: Math.round(x * 10000) / 10000,
-          y: Math.round(y * 10000) / 10000,
-          rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
-          device_address: await nextLabel(symbol.category, allSheetIds || [sheetIdRef.current]),
-        })
-        .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories, description)')
-        .single()
-      if (!error && placement) {
+      const placement = await createPlacement(symbol, x, y, sheetIdRef.current)
+      if (placement) {
         setPlacements(prev => [...prev, placement])
         setSelectedId(placement.id)
         onPlacementSelect?.(placement)
@@ -574,13 +710,11 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
       // Delete selected placement
       if ((e.key === 'Delete' || e.key === 'Backspace') && !isInput) {
         if (selectedIds.size > 0) {
-          for (const id of selectedIds) {
-            await supabase.from('drawing_placements').delete().eq('id', id)
-          }
+          for (const id of selectedIds) { await deletePlacement(id) }
           setPlacements(prev => prev.filter(p => !selectedIds.has(p.id)))
           setSelectedIds(new Set())
         } else if (selectedId) {
-          await supabase.from('drawing_placements').delete().eq('id', selectedId)
+          await deletePlacement(selectedId)
           setPlacements(prev => prev.filter(p => p.id !== selectedId))
           setSelectedId(null)
         }
@@ -1173,25 +1307,14 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
     const x = Math.min(Math.max(imgX / canvasW, 0.01), 0.99)
     const y = Math.min(Math.max(imgY / canvasH, 0.01), 0.99)
     try {
-      const { data: catalogMatch } = await supabase
-        .from('products').select('id')
-        .eq('org_id', orgId).eq('part_number', selectedSymbol.part_number)
-        .maybeSingle()
-      const { data: placement, error } = await supabase
-        .from('drawing_placements')
-        .insert({
-          org_id: orgId, drawing_sheet_id: sheet.id,
-          global_product_id: selectedSymbol.id, product_id: catalogMatch?.id || null,
-          x: Math.round(x * 10000) / 10000, y: Math.round(y * 10000) / 10000,
-          rotation: 0, quantity: 1, symbol_size: 32, source: 'manual',
-          device_address: await nextLabel(selectedSymbol.category, allSheetIds || [sheet.id]),
-        })
-        .select('*, global_products(id, name, part_number, manufacturer, category, industry, specs, accessories, description)')
-        .single()
-      if (error) throw error
-      setPlacements(prev => [...prev, placement])
-      onPlacementChange?.()
-      await supabase.from('drawing_sheets').update({ last_activity_at: new Date().toISOString() }).eq('id', sheet.id)
+      const placement = await createPlacement(selectedSymbol, x, y, sheet.id)
+      if (placement) {
+        setPlacements(prev => [...prev, placement])
+        onPlacementChange?.()
+        if (isOnline) {
+          await supabase.from('drawing_sheets').update({ last_activity_at: new Date().toISOString() }).eq('id', sheet.id)
+        }
+      }
     } catch (err) {
       console.error('Failed to place device:', err)
     } finally {
@@ -1201,12 +1324,12 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   // ── Delete / Rotate / Drag ─────────────────────────────────────────────────
   const handleDelete = useCallback(async (id) => {
-    await supabase.from('drawing_placements').delete().eq('id', id)
+    await deletePlacement(id)
     setPlacements(prev => prev.filter(p => p.id !== id))
     setSelectedId(null)
     onPlacementSelect?.(null)
     onPlacementChange?.()
-  }, [onPlacementChange, onPlacementSelect])
+  }, [deletePlacement, onPlacementChange, onPlacementSelect])
 
   const handleRotate = useCallback(async (id) => {
     const p = placements.find(p => p.id === id)
@@ -1218,14 +1341,24 @@ export default function DrawingSheet({ sheet, orgId, selectedSymbol, onPlacement
 
   const handleDragEnd = useCallback(async (id, e) => {
     const node = e.target
-    const x = Math.min(Math.max((node.x() - position.x) / scale / canvasW, 0.01), 0.99)
-    const y = Math.min(Math.max((node.y() - position.y) / scale / canvasH, 0.01), 0.99)
+    const x  = Math.min(Math.max((node.x() - position.x) / scale / canvasW, 0.01), 0.99)
+    const y  = Math.min(Math.max((node.y() - position.y) / scale / canvasH, 0.01), 0.99)
     const rx = Math.round(x * 10000) / 10000
     const ry = Math.round(y * 10000) / 10000
-    await supabase.from('drawing_placements').update({ x: rx, y: ry }).eq('id', id)
+
+    // Update React state immediately regardless of connectivity
     setPlacements(prev => prev.map(p => p.id === id ? { ...p, x: rx, y: ry } : p))
     onPlacementChange?.()
-  }, [position, scale, canvasW, canvasH, onPlacementChange])
+
+    if (id.startsWith('PEND_')) {
+      // Update the queued insert payload so sync uses the final position
+      await updateQueuedOp(sheet.proposal_id, id, { data: { x: rx, y: ry } })
+    } else if (isOnline) {
+      await supabase.from('drawing_placements').update({ x: rx, y: ry }).eq('id', id)
+    } else {
+      await enqueueOp(sheet.proposal_id, { type: 'update_placement', payload: { id, changes: { x: rx, y: ry } } })
+    }
+  }, [position, scale, canvasW, canvasH, onPlacementChange, isOnline, sheet])
 
   // ── Zoom controls ──────────────────────────────────────────────────────────
   const zoomIn  = () => setScale(s => Math.min(s * 1.2, 15))

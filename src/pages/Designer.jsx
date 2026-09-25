@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import PDFWorkerConstructor from 'pdfjs-dist/build/pdf.worker.min.mjs?worker'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase'
+import { useOfflineSync } from '../offline/useOfflineSync'
+import {
+  cacheProposalData, getCachedProposalData,
+  enqueueOp, storePendingFile, getPendingPlacements,
+} from '../offline/designerOffline'
 import DrawingSheet from '../components/drawing/DrawingSheet'
 import SymbolPicker from '../components/drawing/SymbolPicker'
 import DrawingBOMPreview from '../components/drawing/DrawingBOMPreview'
@@ -63,6 +68,15 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
   const [creatingRevision,  setCreatingRevision]  = useState(false)
   const [nicetNumber, setNicetNumber] = useState('')
 
+  // Offline sync hook — auto-flushes queue on reconnect, exposes pending count
+  const { pendingCount, isSyncing, syncError } = useOfflineSync(proposalId, {
+    onSyncComplete: async ({ newSheets }) => {
+      // After sync, reload so newly uploaded sheets get real IDs
+      await load()
+      if (newSheets?.length > 0) setActiveSheetId(newSheets[0].id)
+    },
+  })
+
   useEffect(() => {
     const up   = () => setIsOnline(true)
     const down = () => setIsOnline(false)
@@ -95,11 +109,13 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
       setDesignerOnly(org?.feature_designer_only || false)
       setLaborDefaults(defaults || [])
 
+      let proposal = null
       if (proposalId && proposalId !== 'new') {
         const { data: p } = await supabase
           .from('proposals')
           .select('id, proposal_name, company, client_name, status, industry, client_id, location_id')
           .eq('id', proposalId).single()
+        proposal = p
         setProposal(p)
 
         if (p?.industry === 'fire_alarm') {
@@ -124,16 +140,59 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
       setSheets(sheetData || [])
       if (sheetData?.length > 0) setActiveSheetId(sheetData[0].id)
 
-      // Load rooms for this proposal
       const { data: roomData } = await supabase
         .from('rooms').select('*').eq('proposal_id', proposalId).order('sort_order')
       setRooms(roomData || [])
+
+      // Cache everything so the designer is accessible offline
+      await cacheProposalData(proposalId, {
+        proposal, sheets: sheetData || [], orgId: profile.org_id,
+        org: { laborEnabled: org?.designer_labor_enabled, allowedManufacturers: org?.designer_allowed_manufacturers, enabledIndustries: org?.designer_enabled_industries },
+      })
     } catch (err) {
+      // If we're offline, try serving from the local cache
+      if (!navigator.onLine) {
+        const cached = await getCachedProposalData(proposalId)
+        if (cached) {
+          setOrgId(cached.orgId)
+          setProposal(cached.proposal)
+          setLaborEnabled(cached.org?.laborEnabled ?? false)
+          setAllowedManufacturers(cached.org?.allowedManufacturers || null)
+          setEnabledIndustries(cached.org?.enabledIndustries?.length ? cached.org.enabledIndustries : null)
+
+          // Merge DB-cached sheets with any locally queued (offline-uploaded) sheets
+          const pendingSheets = await buildPendingSheets(proposalId, cached.orgId)
+          const allSheets     = [...(cached.sheets || []), ...pendingSheets]
+          setSheets(allSheets)
+          if (allSheets.length > 0) setActiveSheetId(allSheets[0].id)
+          setLoading(false)
+          return
+        }
+      }
       setError('Failed to load project.')
       console.error(err)
     } finally {
       setLoading(false)
     }
+  }
+
+  /** Reconstruct offline-uploaded sheets from the queue for display while offline. */
+  const buildPendingSheets = async (pid, oid) => {
+    const { getPendingOps } = await import('../offline/designerOffline')
+    const ops = await getPendingOps(pid)
+    return ops
+      .filter(op => op.type === 'upload_sheet')
+      .map(op => ({
+        id:           op.payload.localId,
+        proposal_id:  pid,
+        org_id:       oid,
+        name:         op.payload.name,
+        storage_path: `offline_pending:${op.payload.localId}`,  // marker for DrawingSheet
+        page_number:  op.payload.pageNumber,
+        sort_order:   op.payload.sortOrder,
+        _fileId:      op.payload.fileId,
+        _contentType: op.payload.contentType,
+      }))
   }
 
   const handleUpload = async (e) => {
@@ -146,49 +205,72 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
     setError(null)
 
     try {
-      const isPDF = file.type === 'application/pdf'
-      let numPages = 1
+      const isPDF      = file.type === 'application/pdf'
+      const ext        = file.name.split('.').pop().toLowerCase()
+      const baseName   = file.name.replace(/\.[^/.]+$/, '')
+      const fileBytes  = await file.arrayBuffer()
+      let   numPages   = 1
 
-      // Check page count for PDFs
       if (isPDF) {
-        const pdfjsLib  = await import('pdfjs-dist')
+        const pdfjsLib = await import('pdfjs-dist')
         if (!pdfjsLib.GlobalWorkerOptions.workerPort) pdfjsLib.GlobalWorkerOptions.workerPort = new PDFWorkerConstructor()
-        const arrayBuffer = await file.arrayBuffer()
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-        numPages = pdf.numPages
+        const pdf  = await pdfjsLib.getDocument({ data: fileBytes }).promise
+        numPages   = pdf.numPages
       }
 
-      const baseName = file.name.replace(/\.[^/.]+$/, '')
-      const ext      = file.name.split('.').pop()
-      const firstSheetId = null
+      const cleanName = baseName
+        .replace(/^\d{4}-\d{2}-\d{2}[_\s-]*/g, '')
+        .replace(/\s*[\(\[].+[\)\]]/g, '')
+        .trim()
+        .slice(0, 40)
 
-      // Upload the file once
+      // ── Offline path ────────────────────────────────────────────────────────
+      if (!isOnline) {
+        const fileId = crypto.randomUUID()
+        await storePendingFile(fileId, fileBytes)
+
+        const newSheets = []
+        for (let i = 1; i <= numPages; i++) {
+          const localId   = `OFFLINE_${crypto.randomUUID()}`
+          const sheetName = numPages > 1 ? `${cleanName} — P${i}` : cleanName
+
+          await enqueueOp(proposalId, {
+            type: 'upload_sheet',
+            payload: { localId, orgId, name: sheetName, fileId, contentType: file.type, ext, pageNumber: i, sortOrder: sheets.length + i - 1 },
+          })
+
+          newSheets.push({
+            id:           localId,
+            proposal_id:  proposalId,
+            org_id:       orgId,
+            name:         sheetName,
+            storage_path: `offline_pending:${localId}`,
+            page_number:  i,
+            sort_order:   sheets.length + i - 1,
+            _fileId:      fileId,
+            _contentType: file.type,
+          })
+        }
+
+        setSheets(prev => [...prev, ...newSheets])
+        setActiveSheetId(newSheets[0].id)
+        setUploading(false)
+        e.target.value = ''
+        return
+      }
+
+      // ── Online path ─────────────────────────────────────────────────────────
       const tempId      = crypto.randomUUID()
       const storagePath = `${orgId}/${proposalId}/${tempId}.${ext}`
       const { uploadToR2 } = await import('../r2')
       await uploadToR2(storagePath, file, file.type)
 
-      // Create one sheet per page
       let firstId = null
       for (let i = 1; i <= numPages; i++) {
-        // Clean up filename — remove date prefixes and long suffixes
-        const cleanName = baseName
-          .replace(/^\d{4}-\d{2}-\d{2}[_\s-]*/g, '') // remove date prefix
-          .replace(/\s*[\(\[].+[\)\]]/g, '')            // remove parenthetical
-          .trim()
-          .slice(0, 40)                                  // cap at 40 chars
         const sheetName = numPages > 1 ? `${cleanName} — P${i}` : cleanName
         const { data: sheet, error: insertErr } = await supabase
           .from('drawing_sheets')
-          .insert({
-            org_id:       orgId,
-            proposal_id:  proposalId,
-            name:         sheetName,
-            storage_path: storagePath,
-            page_number:  i,
-            sort_order:   sheets.length + i - 1,
-            last_activity_at: new Date().toISOString(),
-          })
+          .insert({ org_id: orgId, proposal_id: proposalId, name: sheetName, storage_path: storagePath, page_number: i, sort_order: sheets.length + i - 1, last_activity_at: new Date().toISOString() })
           .select().single()
         if (insertErr) throw insertErr
         if (i === 1) firstId = sheet.id
@@ -196,12 +278,6 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
 
       await load()
       if (firstId) setActiveSheetId(firstId)
-
-      if (numPages > 1) {
-        setError(null)
-        // Show success message briefly
-        setTimeout(() => {}, 100)
-      }
     } catch (err) {
       setError('Upload failed. Please try again.')
       console.error(err)
@@ -605,14 +681,24 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
             onMoveRight={() => handleReorderSheet(sheet.id, 1)} />
         ))}
 
-        {/* Upload */}
-        <label title={!isOnline ? 'Unavailable offline' : undefined} className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-dashed border-[#2a3d55] text-[#8A9AB0] transition-colors whitespace-nowrap ${uploading || !isOnline ? 'opacity-40 pointer-events-none cursor-not-allowed' : 'hover:border-[#C8622A] hover:text-[#C8622A] cursor-pointer'}`}>
+        {/* Upload (works online and offline) */}
+        <label className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg border border-dashed transition-colors whitespace-nowrap ${uploading ? 'opacity-40 pointer-events-none cursor-not-allowed border-[#2a3d55] text-[#8A9AB0]' : 'border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A] cursor-pointer'}`}>
           {uploading
-            ? <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>Uploading...</>
-            : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>Upload Floor Plan</>
+            ? <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>Saving…</>
+            : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4"/></svg>{isOnline ? 'Upload Floor Plan' : 'Upload (saves offline)'}</>
           }
-          <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleUpload} disabled={uploading || !isOnline} />
+          <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleUpload} disabled={uploading} />
         </label>
+
+        {/* Pending sync badge */}
+        {(pendingCount > 0 || isSyncing) && (
+          <div className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border whitespace-nowrap ${isSyncing ? 'border-blue-500/40 text-blue-400 bg-blue-900/20' : 'border-yellow-500/40 text-yellow-400 bg-yellow-900/20'}`}>
+            {isSyncing
+              ? <><svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>Syncing…</>
+              : <>{pendingCount} pending sync</>
+            }
+          </div>
+        )}
 
         {/* Blank canvas */}
         <button onClick={handleAddBlankSheet}
@@ -643,9 +729,9 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap justify-center">
-                  <label title={!isOnline ? 'Unavailable offline' : undefined} className={`px-5 py-2.5 text-white text-sm font-semibold rounded-lg transition-colors ${!isOnline ? 'bg-[#C8622A]/40 cursor-not-allowed' : 'bg-[#C8622A] hover:bg-[#b5571f] cursor-pointer'}`}>
-                    📄 Upload Floor Plan
-                    <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleUpload} disabled={!isOnline} />
+                  <label className="px-5 py-2.5 text-white text-sm font-semibold rounded-lg transition-colors bg-[#C8622A] hover:bg-[#b5571f] cursor-pointer">
+                    📄 {isOnline ? 'Upload Floor Plan' : 'Upload (saves offline)'}
+                    <input type="file" accept=".pdf,.png,.jpg,.jpeg" className="hidden" onChange={handleUpload} />
                   </label>
                   <button onClick={handleAddBlankSheet}
                     className="px-5 py-2.5 bg-[#1a2d45] text-white text-sm font-semibold rounded-lg border border-[#2a3d55] hover:border-[#C8622A] transition-colors">
@@ -690,6 +776,7 @@ export default function Designer({ featureDrawingTool, featureDesignerOnly }) {
                         key={activeSheet.id}
                         sheet={activeSheet}
                         orgId={orgId}
+                        isOnline={isOnline}
                         selectedSymbol={selectedSymbol}
                         onPlacementChange={() => {}}
                         onPlacementsChange={setSheetPlacements}
