@@ -5,6 +5,38 @@ import { getAIPageContext } from '../aiPageContext'
 
 const SUPABASE_URL = 'https://qxypaepvmtmkhbssedki.supabase.co'
 
+function getExportable(toolResults) {
+  for (const tr of toolResults) {
+    if (tr.result?.error) continue
+    if (tr.tool === 'get_inventory' && tr.result?.items?.length) {
+      return { label: `Export ${tr.result.items.length} inventory items`, rows: tr.result.items, filename: 'inventory' }
+    }
+    if (tr.tool === 'search_clients' && tr.result?.results?.length) {
+      return { label: `Export ${tr.result.results.length} clients`, rows: tr.result.results, filename: 'clients' }
+    }
+    if (tr.tool === 'search_proposals' && tr.result?.results?.length) {
+      return { label: `Export ${tr.result.results.length} proposals`, rows: tr.result.results, filename: 'proposals' }
+    }
+    if (tr.tool === 'get_pipeline_summary' && tr.result?.stages) {
+      const rows = Object.entries(tr.result.stages).map(([stage, d]) => ({ stage, count: d.count, value: d.value }))
+      if (rows.length) return { label: 'Export pipeline summary', rows, filename: 'pipeline' }
+    }
+  }
+  return null
+}
+
+function exportCSV({ rows, filename }) {
+  if (!rows?.length) return
+  const keys = Object.keys(rows[0])
+  const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const csv = [keys.join(','), ...rows.map(r => keys.map(k => escape(r[k])).join(','))].join('\n')
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
+  a.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
 const ACTION_LINKS = {
   created_client:   (r) => ({ label: `View ${r.company}`, path: `/client/${r.id}` }),
   created_ticket:   (r) => ({ label: `View ticket`, path: `/service-tickets` }),
@@ -197,6 +229,19 @@ export default function AIAgent() {
                           </button>
                         ) : null
                       })}
+                      {/* CSV export for list results */}
+                      {(() => {
+                        const exp = msg.toolResults?.length ? getExportable(msg.toolResults) : null
+                        return exp ? (
+                          <button onClick={() => exportCSV(exp)}
+                            className="inline-flex items-center gap-1.5 text-[#C8622A] text-xs font-semibold hover:underline mt-0.5">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            {exp.label} (.csv)
+                          </button>
+                        ) : null
+                      })()}
                     </>
                   ) : (
                     msg.content
