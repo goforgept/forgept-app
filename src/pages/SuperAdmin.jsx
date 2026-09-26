@@ -1844,7 +1844,7 @@ export default function SuperAdmin() {
                               <p className="text-white text-sm font-medium">{org.name}</p>
                               <p className="text-[#8A9AB0] text-xs">{org.plan} · ${org.monthly_rate || 0}/mo</p>
                             </div>
-                            <button onClick={() => { setActiveTab('orgs'); setExpandedOrg(org.id); fetchOrgDetail(org.id) }}
+                            <button onClick={() => { setActiveTab('orgs'); setSelectedOrg(org.id); setOrgDetailTab('overview'); setEditingOrg(null); startEditingOrg(org); fetchOrgDetail(org.id); setStripeData(null); setStripeDataError(null); fetchStripeData(org.id) }}
                               className="text-[#C8622A] text-xs hover:text-white transition-colors">View →</button>
                           </div>
                         ))}
@@ -1865,7 +1865,7 @@ export default function SuperAdmin() {
                               <p className={`text-xs font-semibold ${org.daysLeft <= 7 ? 'text-red-400' : 'text-yellow-400'}`}>
                                 {org.daysLeft <= 0 ? 'Expired' : `${org.daysLeft}d left`}
                               </p>
-                              <button onClick={() => { setActiveTab('orgs'); setExpandedOrg(org.id); fetchOrgDetail(org.id) }}
+                              <button onClick={() => { setActiveTab('orgs'); setSelectedOrg(org.id); setOrgDetailTab('overview'); setEditingOrg(null); startEditingOrg(org); fetchOrgDetail(org.id); setStripeData(null); setStripeDataError(null); fetchStripeData(org.id) }}
                                 className="text-[#8A9AB0] text-xs hover:text-white transition-colors">View →</button>
                             </div>
                           </div>
@@ -1891,7 +1891,7 @@ export default function SuperAdmin() {
                     <tbody>
                       {activeTable.map(org => (
                         <tr key={org.id} className="border-b border-[#2a3d55]/50 hover:bg-[#2a3d55]/20 cursor-pointer transition-colors"
-                          onClick={() => { setActiveTab('orgs'); setExpandedOrg(org.id); fetchOrgDetail(org.id) }}>
+                          onClick={() => { setActiveTab('orgs'); setSelectedOrg(org.id); setOrgDetailTab('overview'); setEditingOrg(null); startEditingOrg(org); fetchOrgDetail(org.id); setStripeData(null); setStripeDataError(null); fetchStripeData(org.id) }}>
                           <td className="py-2.5 pr-4">
                             <p className="text-white text-xs font-medium">{org.name}</p>
                           </td>
@@ -1968,7 +1968,7 @@ export default function SuperAdmin() {
                       const userCount = getOrgProfiles(org.id).length
 
                       return (
-                        <tr key={org.id} className={`border-b transition-colors cursor-pointer ${metricsRowColor(health.status)}`} onClick={() => { setActiveTab('orgs'); setExpandedOrg(org.id); fetchOrgDetail(org.id) }}>
+                        <tr key={org.id} className={`border-b transition-colors cursor-pointer ${metricsRowColor(health.status)}`} onClick={() => { setActiveTab('orgs'); setSelectedOrg(org.id); setOrgDetailTab('overview'); setEditingOrg(null); startEditingOrg(org); fetchOrgDetail(org.id); setStripeData(null); setStripeDataError(null); fetchStripeData(org.id) }}>
                           <td className="py-3 pr-4">
                             <div className="flex items-center gap-2">
                               <div className={`w-2 h-2 rounded-full flex-shrink-0 ${health.dot}`} />
