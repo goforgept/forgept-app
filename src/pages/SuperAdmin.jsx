@@ -323,6 +323,7 @@ export default function SuperAdmin() {
   const [embedUsage, setEmbedUsage] = useState({})
   const [loading, setLoading] = useState(true)
   const [activeTab,      setActiveTab]      = useState('requests')
+  const [orgDetailTab,   setOrgDetailTab]   = useState('overview')
   const [showImport,     setShowImport]     = useState(false)
   const [productCount,   setProductCount]   = useState(0)
   const [editingBilling, setEditingBilling] = useState(null)
@@ -1042,6 +1043,23 @@ export default function SuperAdmin() {
                   </div>
                 </div>
 
+                {/* Inner tab bar */}
+                <div className="flex gap-2">
+                  {[
+                    { key: 'overview', label: 'Overview' },
+                    { key: 'billing',  label: 'Billing' },
+                    { key: 'settings', label: 'Settings' },
+                  ].map(t => (
+                    <button key={t.key} onClick={() => setOrgDetailTab(t.key)}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors ${orgDetailTab === t.key ? 'bg-[#C8622A] text-white' : 'bg-[#1a2d45] text-[#8A9AB0] hover:text-white'}`}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* ── Overview Tab ── */}
+                {orgDetailTab === 'overview' && <>
+
                 {/* Customer Information */}
                 <div className="bg-[#1a2d45] rounded-xl p-5">
                   <div className="flex items-center justify-between mb-4">
@@ -1242,6 +1260,11 @@ export default function SuperAdmin() {
                     {members.length === 0 && <p className="text-[#8A9AB0] text-sm">No users yet.</p>}
                   </div>
                 </div>
+
+                </>}
+
+                {/* ── Billing Tab ── */}
+                {orgDetailTab === 'billing' && <>
 
                 {/* Billing */}
                 <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
@@ -1529,8 +1552,12 @@ export default function SuperAdmin() {
                   )}
                 </div>
 
-                {/* Feature Settings */}
-                {/* Feature Flags — always visible, instant save */}
+                </>}
+
+                {/* ── Settings Tab ── */}
+                {orgDetailTab === 'settings' && <>
+
+                {/* Feature Flags */}
                 <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
                   <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Features</p>
                   {Object.entries(
@@ -1634,6 +1661,8 @@ export default function SuperAdmin() {
                     <button onClick={() => saveOrgNote(org.id)} disabled={savingNote === org.id} className="bg-[#C8622A] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">{savingNote === org.id ? 'Saving...' : 'Save Note'}</button>
                   </div>
                 </div>
+
+                </>}
               </div>
             )
           })() : (
@@ -1667,7 +1696,7 @@ export default function SuperAdmin() {
                   const stats = getOrgStats(org.id)
 
                   return (
-                    <div key={org.id} onClick={() => { setSelectedOrg(org.id); setEditingOrg(null); startEditingOrg(org); fetchOrgDetail(org.id); setStripeData(null); setStripeDataError(null); fetchStripeData(org.id) }}
+                    <div key={org.id} onClick={() => { setSelectedOrg(org.id); setEditingOrg(null); setOrgDetailTab('overview'); startEditingOrg(org); fetchOrgDetail(org.id); setStripeData(null); setStripeDataError(null); fetchStripeData(org.id) }}
                       className="bg-[#0F1C2E] border border-[#2a3d55] rounded-xl p-4 cursor-pointer hover:border-[#C8622A]/40 transition-all">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${health.dot}`} />
