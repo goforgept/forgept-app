@@ -50,7 +50,7 @@ export function ProfileProvider({ children }) {
       setSession(session)
       if (session) {
         fetchProfile(session.user.id)
-        supabase.rpc('update_last_login', { platform: Capacitor.getPlatform() }).then(({ error }) => { if (error) console.error('update_last_login error:', error) })
+        supabase.rpc('update_last_login', { p_user_id: session.user.id, p_platform: Capacitor.getPlatform() }).then(({ error }) => { if (error) console.error('update_last_login error:', error) })
       } else setLoading(false)
     })
 
@@ -63,7 +63,7 @@ export function ProfileProvider({ children }) {
           setSession(s)
           if (s) {
             fetchProfile(s.user.id)
-            supabase.rpc('update_last_login', { platform: Capacitor.getPlatform() })
+            supabase.rpc('update_last_login', { p_user_id: s.user.id, p_platform: Capacitor.getPlatform() })
           }
         }
         return
@@ -72,7 +72,7 @@ export function ProfileProvider({ children }) {
       if (session) {
         fetchProfile(session.user.id)
         if (_event === 'SIGNED_IN' || _event === 'MFA_CHALLENGE_VERIFIED') {
-          supabase.rpc('update_last_login', { platform: Capacitor.getPlatform() })
+          supabase.rpc('update_last_login', { p_user_id: session.user.id, p_platform: Capacitor.getPlatform() })
         }
       } else {
         setProfile(null)
