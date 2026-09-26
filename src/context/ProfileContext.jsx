@@ -50,7 +50,7 @@ export function ProfileProvider({ children }) {
       setSession(session)
       if (session) {
         fetchProfile(session.user.id)
-        supabase.rpc('update_last_login', { platform: Capacitor.getPlatform() })
+        supabase.rpc('update_last_login', { platform: Capacitor.getPlatform() }).then(({ error }) => { if (error) console.error('update_last_login error:', error) })
       } else setLoading(false)
     })
 
