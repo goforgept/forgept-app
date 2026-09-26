@@ -1472,18 +1472,22 @@ export default function SuperAdmin() {
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-[#8A9AB0] text-xs">AI Requests This Month</p>
                           <p className="text-white text-xs font-semibold font-mono">
-                            {orgDetail[org.id]?.aiUsageThisMonth ?? '—'} / {org.ai_request_limit ?? 1000}
+                            {orgDetail[org.id] ? (orgDetail[org.id].aiUsageThisMonth ?? 0) : '—'} / {org.ai_request_limit ?? 1000}
                           </p>
                         </div>
                         <div className="w-full bg-[#1a2d45] rounded-full h-1.5">
                           <div
                             className="h-1.5 rounded-full transition-all"
                             style={{
-                              width: `${Math.min(100, ((orgDetail[org.id]?.aiUsageThisMonth ?? 0) / (org.ai_request_limit ?? 1000)) * 100)}%`,
-                              backgroundColor: ((orgDetail[org.id]?.aiUsageThisMonth ?? 0) / (org.ai_request_limit ?? 1000)) > 0.8 ? '#ef4444' : '#C8622A'
+                              width: orgDetail[org.id] ? `${Math.max(2, Math.min(100, ((orgDetail[org.id].aiUsageThisMonth ?? 0) / (org.ai_request_limit ?? 1000)) * 100))}%` : '0%',
+                              backgroundColor: ((orgDetail[org.id]?.aiUsageThisMonth ?? 0) / (org.ai_request_limit ?? 1000)) > 0.8 ? '#ef4444' : '#C8622A',
+                              opacity: orgDetail[org.id] ? 1 : 0,
                             }}
                           />
                         </div>
+                        {orgDetail[org.id] && (orgDetail[org.id].aiUsageThisMonth ?? 0) === 0 && (
+                          <p className="text-[#4a5d75] text-xs mt-1">No usage this month</p>
+                        )}
                         <div className="flex items-center gap-2 mt-2">
                           <span className="text-[#8A9AB0] text-xs">Limit:</span>
                           <input
