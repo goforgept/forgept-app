@@ -624,10 +624,7 @@ export default function Reports(props) {
 
     // ── User Activity ─────────────────────────────────────────────────────────
     if (activeReport === 'user_activity') {
-      const { data: rows, error: actErr } = await supabase
-        .from('profiles').select('full_name, email, org_role, last_login, created_at')
-        .eq('org_id', profile.org_id)
-        .order('created_at', { ascending: false })
+      const { data: rows, error: actErr } = await supabase.rpc('get_org_user_activity')
       if (actErr) console.error('user_activity query error:', actErr)
       setData((rows || []).map(r => ({
         'Name':         r.full_name || '—',
@@ -636,6 +633,7 @@ export default function Reports(props) {
         'Last Login':   r.last_login
           ? new Date(r.last_login).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
           : 'Never',
+        'Device':       r.last_login_platform === 'ios' ? 'iPhone' : r.last_login_platform === 'android' ? 'Android' : r.last_login_platform === 'web' ? 'Web' : '—',
         'Member Since': r.created_at?.slice(0, 10) || '—',
       })))
     }
