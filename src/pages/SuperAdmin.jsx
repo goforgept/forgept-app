@@ -1266,7 +1266,42 @@ export default function SuperAdmin() {
                 {/* ── Billing Tab ── */}
                 {orgDetailTab === 'billing' && <>
 
-                {/* Billing */}
+                {/* AI Usage — top of billing tab */}
+                {(() => {
+                  const aiCount = orgDetail[org.id]?.aiUsageThisMonth ?? aiUsageSummary.byOrg.find(r => r.org_id === org.id)?.request_count ?? null
+                  const limit = org.ai_request_limit ?? 1000
+                  const pct = aiCount !== null ? Math.min(100, (aiCount / limit) * 100) : 0
+                  return (
+                    <div className="bg-[#1a2d45] rounded-xl p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">AI Requests This Month</p>
+                        <p className="text-white text-sm font-bold font-mono">{aiCount ?? '—'} / {limit}</p>
+                      </div>
+                      <div className="w-full bg-[#0F1C2E] rounded-full h-2 mb-3">
+                        <div className="h-2 rounded-full transition-all" style={{
+                          width: `${Math.max(aiCount > 0 ? 2 : 0, pct)}%`,
+                          backgroundColor: pct > 80 ? '#ef4444' : '#C8622A',
+                        }} />
+                      </div>
+                      {aiCount === 0 && <p className="text-[#4a5d75] text-xs mb-2">No usage this month</p>}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#8A9AB0] text-xs">Monthly limit:</span>
+                        <input type="number" defaultValue={limit}
+                          onBlur={async e => {
+                            const val = parseInt(e.target.value)
+                            if (!val || val < 1) return
+                            await supabase.from('organizations').update({ ai_request_limit: val }).eq('id', org.id)
+                            setOrgs(prev => prev.map(o => o.id === org.id ? { ...o, ai_request_limit: val } : o))
+                          }}
+                          className="w-24 bg-[#0F1C2E] text-white border border-[#2a3d55] rounded px-2 py-0.5 text-xs focus:outline-none focus:border-[#C8622A]"
+                        />
+                        <span className="text-[#8A9AB0] text-xs">requests/mo</span>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Subscription */}
                 <div className="bg-[#1a2d45] rounded-xl p-5 space-y-4">
                   {org.stripe_customer_id ? (
                     <>
@@ -1467,43 +1502,6 @@ export default function SuperAdmin() {
                         </div>
                       </div>
 
-                      {/* AI Usage */}
-                      <div className="bg-[#0F1C2E] rounded-lg p-3 border border-[#2a3d55]">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-[#8A9AB0] text-xs">AI Requests This Month</p>
-                          <p className="text-white text-xs font-semibold font-mono">
-                            {orgDetail[org.id] ? (orgDetail[org.id].aiUsageThisMonth ?? 0) : '—'} / {org.ai_request_limit ?? 1000}
-                          </p>
-                        </div>
-                        <div className="w-full bg-[#1a2d45] rounded-full h-1.5">
-                          <div
-                            className="h-1.5 rounded-full transition-all"
-                            style={{
-                              width: orgDetail[org.id] ? `${Math.max(2, Math.min(100, ((orgDetail[org.id].aiUsageThisMonth ?? 0) / (org.ai_request_limit ?? 1000)) * 100))}%` : '0%',
-                              backgroundColor: ((orgDetail[org.id]?.aiUsageThisMonth ?? 0) / (org.ai_request_limit ?? 1000)) > 0.8 ? '#ef4444' : '#C8622A',
-                              opacity: orgDetail[org.id] ? 1 : 0,
-                            }}
-                          />
-                        </div>
-                        {orgDetail[org.id] && (orgDetail[org.id].aiUsageThisMonth ?? 0) === 0 && (
-                          <p className="text-[#4a5d75] text-xs mt-1">No usage this month</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className="text-[#8A9AB0] text-xs">Limit:</span>
-                          <input
-                            type="number"
-                            defaultValue={org.ai_request_limit ?? 1000}
-                            onBlur={async e => {
-                              const val = parseInt(e.target.value)
-                              if (!val || val < 1) return
-                              await supabase.from('organizations').update({ ai_request_limit: val }).eq('id', org.id)
-                              setOrgs(prev => prev.map(o => o.id === org.id ? { ...o, ai_request_limit: val } : o))
-                            }}
-                            className="w-24 bg-[#1a2d45] text-white border border-[#2a3d55] rounded px-2 py-0.5 text-xs focus:outline-none focus:border-[#C8622A]"
-                          />
-                          <span className="text-[#8A9AB0] text-xs">requests/mo</span>
-                        </div>
-                      </div>
 
                       <div className="pt-1 border-t border-[#2a3d55]">
                         <button onClick={() => editingBilling === org.id ? setEditingBilling(null) : startEditingBilling(org)}
