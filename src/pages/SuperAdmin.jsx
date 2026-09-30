@@ -3021,23 +3021,24 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
   const [saving, setSaving] = useState(false)
 
   const CATEGORIES = [
-    'Dome Camera','Bullet Camera','PTZ Camera','Turret Camera','Multi-Lens Camera','Fisheye Camera',
-    'LPR Camera','IR Illuminator','NVR','Video Encoder','Cabinet System','Cabinet Solar System',
-    'Access Reader','Access Control Door','Controller',
-    'Workstation','Thin Client','Thick Client','Badging Station','KVM','Server','Rack Server',
-    'Nurse Call Controller','Patient Station','Staff Station','Dome Light','Pull Cord Station','Corridor Light',
-    'Code Blue Phone','Code Blue Light','Code Blue Panel',
-    'Area of Rescue Station','Area of Rescue Remote Master','Area of Rescue Annunciator',
-    'Motion Sensor','Sensor','Intercom','Wireless Lock','Guard Tour',
-    'Speaker','Display','Projector','Amplifier','DSP','Network',
-    'Rack','UPS','Data Drop','Patch Panel','Cable Tray',
-    'Smoke Detector','Heat Detector','Horn Strobe','Horn','Strobe','Bell',
-    'Pull Station','Duct Detector','CO Detector','Beam Detector',
-    'Annunciator','Monitor Module','Control Module','Door Holder',
-    'Air Sampling','Suppression Panel','FACP',
-    'Waterflow Switch','Tamper Switch','Mass Notification Speaker',
-    'Firefighter Phone','Firefighter Phone Jack',
-    'Panel','Outlet','Thermostat','Other'
+    'Access Control Door','Access Control Enclosure','Access Reader','Air Sampling','Alarm Keypad','Alarm Panel',
+    'Amplifier','Annunciator','Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station',
+    'Badging Station','Beam Detector','Bell','Bullet Camera',
+    'Cabinet Solar System','Cabinet System','Cable Tray','CO Detector','Code Blue Light','Code Blue Panel','Code Blue Phone',
+    'Control Module','Controller','Corridor Light','Data Drop',
+    'Display','Dome Camera','Dome Light','Door Contact','Door Holder','Door Operator','DSP','Duct Detector','Dual Tech Detector',
+    'Exterior Siren','FACP','Firefighter Phone','Firefighter Phone Jack','Fisheye Camera',
+    'Glass Break','Guard Tour','Heat Detector','Horn','Horn Strobe',
+    'Intercom','Interior Siren','IR Illuminator',
+    'KVM','LPR Camera','Lighting',
+    'Mass Notification Speaker','Monitor Module','Motion Sensor','Multi-Lens Camera',
+    'Network','Nurse Call Controller','NVR',
+    'Outlet','Panel','Panic Button','Patch Panel','Patient Station','PIR Detector',
+    'PTZ Camera','Pull Cord Station','Pull Station',
+    'Rack','Rack Server','Server','Shock Sensor','Smoke Detector','Speaker','Staff Station','Strobe','Suppression Panel',
+    'Tamper Switch','Thermostat','Thick Client','Thin Client','Turret Camera',
+    'UPS','Video Encoder','Waterflow Switch','Wireless Lock','Workstation',
+    'Other'
   ]
 
   const inputClass = "w-full bg-[#0a1628] text-white border border-[#C8622A]/40 rounded px-1.5 py-0.5 text-xs focus:outline-none focus:border-[#C8622A]"
@@ -3138,23 +3139,24 @@ function AddProductForm({ onAdded }) {
   const [error,   setError]   = useState(null)
 
   const CATEGORIES = [
-    'Dome Camera','Bullet Camera','PTZ Camera','Turret Camera','Multi-Lens Camera','Fisheye Camera',
-    'LPR Camera','IR Illuminator','NVR','Video Encoder','Cabinet System','Cabinet Solar System',
-    'Access Reader','Access Control Door','Controller',
-    'Workstation','Thin Client','Thick Client','Badging Station','KVM','Server','Rack Server',
-    'Nurse Call Controller','Patient Station','Staff Station','Dome Light','Pull Cord Station','Corridor Light',
-    'Code Blue Phone','Code Blue Light','Code Blue Panel',
-    'Area of Rescue Station','Area of Rescue Remote Master','Area of Rescue Annunciator',
-    'Motion Sensor','Sensor','Intercom','Wireless Lock','Guard Tour',
-    'Speaker','Display','Projector','Amplifier','DSP','Network',
-    'Rack','UPS','Data Drop','Patch Panel','Cable Tray',
-    'Smoke Detector','Heat Detector','Horn Strobe','Horn','Strobe','Bell',
-    'Pull Station','Duct Detector','CO Detector','Beam Detector',
-    'Annunciator','Monitor Module','Control Module','Door Holder',
-    'Air Sampling','Suppression Panel','FACP',
-    'Waterflow Switch','Tamper Switch','Mass Notification Speaker',
-    'Firefighter Phone','Firefighter Phone Jack',
-    'Panel','Outlet','Thermostat','Other'
+    'Access Control Door','Access Control Enclosure','Access Reader','Air Sampling','Alarm Keypad','Alarm Panel',
+    'Amplifier','Annunciator','Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station',
+    'Badging Station','Beam Detector','Bell','Bullet Camera',
+    'Cabinet Solar System','Cabinet System','Cable Tray','CO Detector','Code Blue Light','Code Blue Panel','Code Blue Phone',
+    'Control Module','Controller','Corridor Light','Data Drop',
+    'Display','Dome Camera','Dome Light','Door Contact','Door Holder','Door Operator','DSP','Duct Detector','Dual Tech Detector',
+    'Exterior Siren','FACP','Firefighter Phone','Firefighter Phone Jack','Fisheye Camera',
+    'Glass Break','Guard Tour','Heat Detector','Horn','Horn Strobe',
+    'Intercom','Interior Siren','IR Illuminator',
+    'KVM','LPR Camera','Lighting',
+    'Mass Notification Speaker','Monitor Module','Motion Sensor','Multi-Lens Camera',
+    'Network','Nurse Call Controller','NVR',
+    'Outlet','Panel','Panic Button','Patch Panel','Patient Station','PIR Detector',
+    'PTZ Camera','Pull Cord Station','Pull Station',
+    'Rack','Rack Server','Server','Shock Sensor','Smoke Detector','Speaker','Staff Station','Strobe','Suppression Panel',
+    'Tamper Switch','Thermostat','Thick Client','Thin Client','Turret Camera',
+    'UPS','Video Encoder','Waterflow Switch','Wireless Lock','Workstation',
+    'Other'
   ]
 
   const INDUSTRIES = ['security','av','fire_alarm','low_voltage','hvac','electrical']

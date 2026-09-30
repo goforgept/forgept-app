@@ -70,6 +70,10 @@ const ELEMENT_TYPE_MAP = {
   'Video Encoder Element Profile Template':          { industry: 'security', defaultCategory: 'Video Encoder' },
   'Cabinet System Element Profile Template':         { industry: 'security', defaultCategory: 'Cabinet System' },
   'Cabinet Solar System Element Profile Template':   { industry: 'security', defaultCategory: 'Cabinet Solar System' },
+  // IR Illuminator
+  'IR Illuminator Element Profile Template':        { industry: 'security', defaultCategory: 'IR Illuminator' },
+  'Infrared Illuminator Element Profile Template':  { industry: 'security', defaultCategory: 'IR Illuminator' },
+  'Illuminator Element Profile Template':           { industry: 'security', defaultCategory: 'IR Illuminator' },
   // ACS Expansion
   'ACS Expansion Module Element Profile Template':  { industry: 'security', defaultCategory: 'Controller' },
   // Server / workstation types
@@ -262,6 +266,7 @@ async function parseSystemSurveyorFile(file) {
       else if (etLower.includes('panic'))                    category = 'Panic Button'
       else if (etLower.includes('shock'))                    category = 'Shock Sensor'
       else if (etLower.includes('door operator') || etLower.includes('automatic door') || etLower.includes('door opener')) category = 'Door Operator'
+      else if (etLower.includes('illuminator') || etLower.includes('ir illuminator') || etLower.includes('infrared illuminator')) category = 'IR Illuminator'
       else if (etLower.includes('turret'))                  category = 'Turret Camera'
       else if (etLower.includes('video encoder') || etLower.includes('encoder')) category = 'Video Encoder'
       else if (etLower.includes('cabinet solar'))           category = 'Cabinet Solar System'
