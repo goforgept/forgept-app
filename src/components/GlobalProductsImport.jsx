@@ -661,51 +661,104 @@ export default function GlobalProductsImport({ onClose, onImported }) {
                     <p className="text-fp-text font-semibold text-sm">ForgePt CSV Template</p>
                   </div>
                   <p className="text-fp-muted text-xs mb-3">
-                    Use our CSV template for any device type — cameras, AV equipment, intrusion detection, access control, and more. Set the <strong className="text-fp-text">Category</strong> column to any valid ForgePt category.
+                    Download our Excel template with built-in instructions and a full list of valid categories. Fill in your products and upload the file when ready.
                   </p>
                   <div className="flex gap-2">
                     <a
-                      href="/forgept_manufacturer_import_template.csv"
-                      download="forgept_manufacturer_import_template.csv"
+                      href="#"
+                      download="forgept_product_import_template.xlsx"
                       className="flex items-center gap-1.5 px-3 py-2 bg-fp-inset text-fp-muted text-xs font-medium rounded-lg hover:text-fp-text transition-colors"
                       onClick={async (e) => {
                         e.preventDefault()
-                        const csv = `Part Number,Product Name,Category,Manufacturer,Description,FOV Angle (degrees),IR Range (feet),Watts,Installation Notes
-# ── Security Cameras ──────────────────────────────────────────────────────────
-# Valid categories: Dome Camera | Bullet Camera | PTZ Camera | Fisheye Camera | Multi Sensor Camera | Indoor Camera
-EXAMPLE-CAM-001,Example Dome Camera,Dome Camera,Example Corp,2MP IR Dome Camera,90,98,7.5,PoE required
-EXAMPLE-CAM-002,Example Bullet Camera,Bullet Camera,Example Corp,4MP Varifocal Bullet,70,164,12,PoE or 12VDC
-# ── Access Control ────────────────────────────────────────────────────────────
-# Valid categories: Access Control Enclosure | Access Reader | Access Control Door | Controller | Intercom | Wireless Lock | Door Operator
-EXAMPLE-ACC-001,Example Card Reader,Access Reader,Example Corp,Multi-format RFID reader,,,3,
-EXAMPLE-ACC-002,Example Door Controller,Access Control Door,Example Corp,2-door access controller,,,15,
-EXAMPLE-ACC-003,Example AC Enclosure,Access Control Enclosure,Example Corp,8-door access control enclosure with power supply,,,45,
-# ── Intrusion Detection ────────────────────────────────────────────────────────
-# Valid categories: PIR Detector | Door Contact | Glass Break | Alarm Keypad | Alarm Panel | Interior Siren | Exterior Siren | Panic Button | Shock Sensor | Dual Tech Detector | Motion Sensor
-EXAMPLE-INT-001,Example PIR Detector,PIR Detector,Example Corp,Ceiling mount PIR,,,1,
-EXAMPLE-INT-002,Example Door Contact,Door Contact,Example Corp,Surface mount contact,,,0.5,
-EXAMPLE-INT-003,Example Alarm Keypad,Alarm Keypad,Example Corp,LCD alarm keypad,,,5,
-# ── AV ────────────────────────────────────────────────────────────────────────
-# Valid categories: Projector | Projection Screen | Ceiling Speaker | Subwoofer | Microphone | Wireless Mic | Touch Panel | Control Processor | Video Conference | Media Player | HDMI Extender | AV Receiver | Digital Signage | Display | Document Camera | Streaming Encoder | Wall Plate | Clock
-EXAMPLE-AV-001,Example Ceiling Speaker,Ceiling Speaker,Example Corp,8-inch 2-way ceiling speaker,,,70,
-EXAMPLE-AV-002,Example Projector,Projector,Example Corp,5000 lumen laser projector,,,500,
-EXAMPLE-AV-003,Example Touch Panel,Touch Panel,Example Corp,10-inch control touch panel,,,25,
-# ── Security — Video ──────────────────────────────────────────────────────────
-# Valid categories: NVR | Video Encoder | Cabinet System | Cabinet Solar System | Turret Camera
-EXAMPLE-NVR-001,Example 16ch NVR,NVR,Example Corp,16-channel 4K NVR,,,65,
-EXAMPLE-ENC-001,Example 4ch Encoder,Video Encoder,Example Corp,4-channel IP encoder,,,25,
-# ── Fire Alarm ────────────────────────────────────────────────────────────────
-# Valid categories: Smoke Detector | Heat Detector | Horn Strobe | Horn | Strobe | Bell | Pull Station | Duct Detector | CO Detector | Beam Detector | Annunciator | Monitor Module | Control Module | Door Holder | Air Sampling | Suppression Panel | FACP
-EXAMPLE-FA-001,Example Smoke Detector,Smoke Detector,Example Corp,Addressable smoke detector,,,1,
-EXAMPLE-FA-002,Example Horn Strobe,Horn Strobe,Example Corp,Wall mount horn strobe,,,0.5,`
-                        const blob = new Blob([csv], { type: 'text/csv' })
-                        await nativeDownload('forgept_manufacturer_import_template.csv', blob, 'text/csv')
+
+                        const VALID_CATEGORIES = [
+                          'Access Control Door','Access Control Enclosure','Access Reader','Air Sampling','Alarm Keypad','Alarm Panel',
+                          'Amplifier','Annunciator','Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station',
+                          'Badging Station','Beam Detector','Bell','Bullet Camera',
+                          'Cabinet Solar System','Cabinet System','Cable Tray','CO Detector','Code Blue Light','Code Blue Panel','Code Blue Phone',
+                          'Control Module','Controller','Corridor Light','Data Drop',
+                          'Display','Dome Camera','Dome Light','Door Contact','Door Holder','Door Operator','DSP','Duct Detector','Dual Tech Detector',
+                          'Exterior Siren','FACP','Firefighter Phone','Firefighter Phone Jack','Fisheye Camera',
+                          'Glass Break','Guard Tour','Heat Detector','Horn','Horn Strobe',
+                          'Intercom','Interior Siren','IR Illuminator',
+                          'KVM','LPR Camera','Lighting',
+                          'Mass Notification Speaker','Monitor Module','Motion Sensor','Multi-Lens Camera',
+                          'Network','Nurse Call Controller','NVR',
+                          'Outlet','Panel','Panic Button','Patch Panel','Patient Station','PIR Detector',
+                          'PTZ Camera','Pull Cord Station','Pull Station',
+                          'Rack','Rack Server','Server','Shock Sensor','Smoke Detector','Speaker','Staff Station','Strobe','Suppression Panel',
+                          'Tamper Switch','Thermostat','Thick Client','Thin Client','Turret Camera',
+                          'UPS','Video Encoder','Waterflow Switch','Wireless Lock','Workstation',
+                          'Other'
+                        ]
+
+                        const wb = XLSX.utils.book_new()
+
+                        // ── Sheet 1: Instructions ──────────────────────────
+                        const instrRows = [
+                          ['ForgePt Product Import Template'],
+                          [''],
+                          ['HOW TO USE THIS TEMPLATE'],
+                          ['1. Go to the "Products" sheet (tab at the bottom).'],
+                          ['2. Delete the example rows (rows starting with EXAMPLE-).'],
+                          ['3. Fill in your products — one product per row.'],
+                          ['4. Save the file as .xlsx or .csv, then upload it in ForgePt.'],
+                          [''],
+                          ['COLUMN GUIDE'],
+                          ['Part Number', '(Required) Your internal part number or SKU. Must be unique per manufacturer.'],
+                          ['Product Name', '(Required) The full product name as it should appear in proposals.'],
+                          ['Category', '(Required) Must exactly match one of the valid categories listed on the "Valid Categories" sheet.'],
+                          ['Manufacturer', '(Required) The manufacturer name (e.g. Axis, Hanwha, Bosch).'],
+                          ['Description', '(Optional) A short product description shown in proposals and purchase orders.'],
+                          ['FOV Angle (degrees)', '(Optional) Field of view in degrees. Used for camera products.'],
+                          ['IR Range (feet)', '(Optional) Infrared range in feet. Used for cameras with IR.'],
+                          ['Watts', '(Optional) Power consumption in watts. Used for load calculations.'],
+                          ['Installation Notes', '(Optional) Internal notes for estimators (not shown to customers).'],
+                          [''],
+                          ['TIPS'],
+                          ['• Category must match exactly — see the "Valid Categories" sheet for the full list.'],
+                          ['• Rows with a missing Part Number or Manufacturer will be skipped.'],
+                          ['• You can import multiple manufacturers in one file.'],
+                          ['• Existing products with the same Part Number + Manufacturer will be updated.'],
+                        ]
+                        const wsInstr = XLSX.utils.aoa_to_sheet(instrRows)
+                        wsInstr['!cols'] = [{ wch: 28 }, { wch: 80 }]
+                        XLSX.utils.book_append_sheet(wb, wsInstr, 'Instructions')
+
+                        // ── Sheet 2: Products ──────────────────────────────
+                        const headers = ['Part Number','Product Name','Category','Manufacturer','Description','FOV Angle (degrees)','IR Range (feet)','Watts','Installation Notes']
+                        const examples = [
+                          ['EXAMPLE-CAM-001','Dome Camera 2MP','Dome Camera','Example Corp','2MP IR dome, indoor/outdoor',90,98,7.5,'PoE required'],
+                          ['EXAMPLE-CAM-002','Bullet Camera 4MP','Bullet Camera','Example Corp','4MP varifocal bullet',70,164,12,'PoE or 12VDC'],
+                          ['EXAMPLE-CAM-003','PTZ Camera 4K','PTZ Camera','Example Corp','4K 36x optical zoom PTZ',null,492,25,'PoE+ required'],
+                          ['EXAMPLE-CAM-004','IR Illuminator 100ft','IR Illuminator','Example Corp','850nm IR illuminator, 100ft range',null,100,12,'12VDC'],
+                          ['EXAMPLE-ACC-001','Mullion Card Reader','Access Reader','Example Corp','Multi-format RFID reader',null,null,3,''],
+                          ['EXAMPLE-ACC-002','2-Door Controller','Access Control Door','Example Corp','2-door access controller',null,null,15,''],
+                          ['EXAMPLE-INT-001','PIR Ceiling Mount','PIR Detector','Example Corp','360° ceiling PIR',null,null,1,''],
+                          ['EXAMPLE-FA-001','Addressable Smoke','Smoke Detector','Example Corp','Addressable photoelectric smoke detector',null,null,1,''],
+                          ['EXAMPLE-FA-002','Horn Strobe Red','Horn Strobe','Example Corp','Wall mount horn strobe, red',null,null,0.5,''],
+                          ['EXAMPLE-NVR-001','16ch 4K NVR','NVR','Example Corp','16-channel 4K H.265 NVR, 8TB',null,null,65,''],
+                          ['EXAMPLE-AV-001','8in Ceiling Speaker','Speaker','Example Corp','8-inch 2-way ceiling speaker',null,null,70,''],
+                        ]
+                        const wsData = XLSX.utils.aoa_to_sheet([headers, ...examples])
+                        wsData['!cols'] = [{ wch: 18 },{ wch: 26 },{ wch: 22 },{ wch: 16 },{ wch: 40 },{ wch: 18 },{ wch: 16 },{ wch: 8 },{ wch: 28 }]
+                        XLSX.utils.book_append_sheet(wb, wsData, 'Products')
+
+                        // ── Sheet 3: Valid Categories ──────────────────────
+                        const catRows = [['Valid Categories'], [''], ...VALID_CATEGORIES.map(c => [c])]
+                        const wsCats = XLSX.utils.aoa_to_sheet(catRows)
+                        wsCats['!cols'] = [{ wch: 36 }]
+                        XLSX.utils.book_append_sheet(wb, wsCats, 'Valid Categories')
+
+                        const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+                        const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+                        await nativeDownload('forgept_product_import_template.xlsx', blob, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
                       }}
                     >
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                       </svg>
-                      Download Template
+                      Download Excel Template
                     </a>
                     <label className="flex items-center gap-1.5 px-3 py-2 bg-fp-brand text-white text-xs font-semibold rounded-lg cursor-pointer hover:bg-[#b5571f] transition-colors">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
