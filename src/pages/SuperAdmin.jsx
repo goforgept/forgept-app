@@ -512,13 +512,10 @@ export default function SuperAdmin() {
   }
 
   const getOrgHealth = (orgId) => {
-    const orgProps = allProposals.filter(p => p.org_id === orgId)
     const orgMembers = profiles.filter(p => p.org_id === orgId)
     const lastLogin = orgMembers.reduce((max, m) => m.last_login && new Date(m.last_login) > max ? new Date(m.last_login) : max, new Date(0))
-    const lastProposal = orgProps.length ? new Date(orgProps[0].created_at) : new Date(0)
-    const lastActive = lastLogin > lastProposal ? lastLogin : lastProposal
-    if (lastActive.getTime() === 0) return { label: 'No activity', dot: 'bg-gray-500', labelColor: 'text-[#8A9AB0]', status: 'silent' }
-    const days = Math.floor((Date.now() - lastActive) / 86400000)
+    if (lastLogin.getTime() === 0) return { label: 'No activity', dot: 'bg-gray-500', labelColor: 'text-[#8A9AB0]', status: 'silent' }
+    const days = Math.floor((Date.now() - lastLogin) / 86400000)
     if (days < 7) return { label: `Active ${days}d ago`, dot: 'bg-green-400', labelColor: 'text-green-400', status: 'active' }
     if (days < 30) return { label: `${days}d ago`, dot: 'bg-yellow-400', labelColor: 'text-yellow-400', status: 'moderate' }
     return { label: `Inactive ${days}d ago`, dot: 'bg-red-400', labelColor: 'text-red-400', status: 'inactive' }
