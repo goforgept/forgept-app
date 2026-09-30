@@ -39,36 +39,45 @@ Deno.serve(async (req) => {
 
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
 
-    const systemPrompt = `You are an expert estimator and systems engineer for trades contractors and systems integrators. You are reading a project specification document.
+    const systemPrompt = `You are a senior estimator and systems engineer with 20+ years of experience reading project specifications for trades contractors and systems integrators (security, fire alarm, AV, electrical, low voltage, HVAC, plumbing, etc.).
 
-Your job is to extract and summarize the following from the spec:
-1. Required manufacturers and approved product lists
-2. Compliance and code requirements (UL, NFPA, NEC, local codes, etc.)
-3. Submittal and documentation requirements
-4. Installation standards and workmanship requirements
-5. Testing and commissioning requirements
-6. Warranty requirements
-7. Any specific exclusions or restrictions
-8. Key scope items relevant to the trade
+Your job is to carefully read the provided specification section and extract only what is explicitly stated. Do NOT infer, assume, or invent information that is not clearly present in the document.
 
-Return ONLY a valid JSON object with no markdown, no explanation, no code fences. Just raw JSON.
+Extract the following categories:
 
-Format:
+1. **manufacturers** — Approved manufacturer lists by product category. Include any "or equal" language or substitution restrictions in notes.
+2. **compliance** — Specific codes, standards, and certifications required (UL listings, NFPA chapters, NEC articles, IBC, local AHJ requirements, etc.). Quote the exact standard number when visible.
+3. **submittals** — Documents the contractor must submit and when (shop drawings, product data, O&M manuals, as-builts, schedules).
+4. **installation** — Workmanship standards, conduit types, mounting heights, clearances, labeling requirements, specific installation methods called out.
+5. **testing** — Required tests, witness requirements, documentation, who performs and who witnesses.
+6. **warranty** — Duration, coverage, response time requirements, who holds the warranty.
+7. **exclusions** — Work explicitly stated as NIC (not in contract), by owner, or by others.
+8. **scope_notes** — Specific quantities, locations, or scope items that would directly impact the bid (e.g. "26 cameras per schedule A-101", "all exterior doors require access control").
+9. **flags** — Contractual or financial risk items that an estimator must review before bidding: liquidated damages, prevailing wage, bonding requirements, insurance minimums, indemnification language, phasing restrictions, or unusually tight schedules.
+
+Rules:
+- If a category has nothing explicitly stated in the document, return an empty array [] — never fabricate entries.
+- Be concise but complete. Each bullet should be a standalone fact an estimator can act on.
+- For manufacturers, group by system or product category.
+- For flags, be direct about the risk: "Liquidated damages: $500/day after substantial completion" is better than "Liquidated damages clause present".
+- Return ONLY a valid raw JSON object. No markdown, no code fences, no explanation before or after.
+
+JSON format:
 {
-  "manufacturers": [{ "category": "Security Cameras", "approved": ["Axis", "Hanwha"], "notes": "No substitutions without written approval" }],
-  "compliance": ["UL 2050", "NFPA 72", "NEC Article 760"],
-  "submittals": ["Shop drawings required 10 days prior", "O&M manuals at closeout"],
-  "installation": ["All conduit to be EMT minimum", "All connections weatherproof rated"],
-  "testing": ["100% camera coverage verification required", "Access control functional test with owner"],
-  "warranty": ["2 year parts and labor", "4 hour response time"],
-  "exclusions": ["Owner to provide network infrastructure", "No work above 14 feet without lift"],
-  "scope_notes": ["26 cameras total per schedule on drawing A-101", "All exterior doors to have access control"],
-  "flags": ["Liquidated damages clause present — review carefully", "Prevailing wage may apply"]
+  "manufacturers": [{ "category": "string", "approved": ["string"], "notes": "string or null" }],
+  "compliance": ["string"],
+  "submittals": ["string"],
+  "installation": ["string"],
+  "testing": ["string"],
+  "warranty": ["string"],
+  "exclusions": ["string"],
+  "scope_notes": ["string"],
+  "flags": ["string"]
 }`
 
-    const userPrompt = `Industry: ${industry || 'General'}
+    const userPrompt = `Industry/Trade: ${industry || 'General'}
 
-Read this specification document and extract all relevant information for a trades contractor estimating this project. Return only the JSON object.`
+Read the attached specification document and extract all relevant information following the instructions. Return only the JSON object with no other text.`
 
     const messageContent: any[] = []
 
@@ -105,7 +114,7 @@ Read this specification document and extract all relevant information for a trad
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-opus-4-6',
+        model: 'claude-sonnet-5',
         max_tokens: 4000,
         system: systemPrompt,
         messages: [{ role: 'user', content: messageContent }]

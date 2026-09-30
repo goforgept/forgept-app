@@ -3022,7 +3022,7 @@ function EditableProductRow({ product, onSaved, onDelete, onEditAccessories }) {
 
   const CATEGORIES = [
     'Dome Camera','Bullet Camera','PTZ Camera','Turret Camera','Multi-Lens Camera','Fisheye Camera',
-    'LPR Camera','NVR','Video Encoder','Cabinet System','Cabinet Solar System',
+    'LPR Camera','IR Illuminator','NVR','Video Encoder','Cabinet System','Cabinet Solar System',
     'Access Reader','Access Control Door','Controller',
     'Workstation','Thin Client','Thick Client','Badging Station','KVM','Server','Rack Server',
     'Nurse Call Controller','Patient Station','Staff Station','Dome Light','Pull Cord Station','Corridor Light',
@@ -3139,7 +3139,7 @@ function AddProductForm({ onAdded }) {
 
   const CATEGORIES = [
     'Dome Camera','Bullet Camera','PTZ Camera','Turret Camera','Multi-Lens Camera','Fisheye Camera',
-    'LPR Camera','NVR','Video Encoder','Cabinet System','Cabinet Solar System',
+    'LPR Camera','IR Illuminator','NVR','Video Encoder','Cabinet System','Cabinet Solar System',
     'Access Reader','Access Control Door','Controller',
     'Workstation','Thin Client','Thick Client','Badging Station','KVM','Server','Rack Server',
     'Nurse Call Controller','Patient Station','Staff Station','Dome Light','Pull Cord Station','Corridor Light',

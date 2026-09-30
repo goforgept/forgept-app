@@ -22,7 +22,7 @@ const ALL_CATEGORIES = [
   'Document Camera','Dome Camera','Door Contact','Door Operator','DSP',
   'Dual Tech Detector','Exterior Siren','FACP','Fiber Panel','Fisheye Camera',
   'Glass Break','Guard Tour','HDMI Extender','Heat Detector','Horn Strobe',
-  'Interior Siren','Intercom','Junction Box','LPR Camera','Lighting',
+  'Interior Siren','Intercom','IR Illuminator','Junction Box','LPR Camera','Lighting',
   'Media Player','Microphone','Motion Sensor','Multi-Lens Camera',
   'Network','NVR','Outlet','Panel','Panic Button','Patch Panel',
   'PIR Detector','Point to Point','Power Box','Projection Screen',
@@ -36,7 +36,7 @@ const ALL_CATEGORIES = [
 ]
 
 const CATEGORY_MAP = {
-  'Security':        ['Access Control Enclosure','Access Reader','Accessory','Alarm Keypad','Alarm Panel','Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station','Badging Station','Bullet Camera','Code Blue Light','Code Blue Panel','Code Blue Phone','Controller','Corridor Light','Doctor Light','Dome Camera','Dome Light','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','Interior Siren','KVM','Motion Sensor','Network','Nurse Call Controller','NVR','Panel','Panic Button','Patient Station','PIR Detector','PTZ Camera','Pull Cord Station','Shock Sensor','Staff Station','Thick Client','Thin Client','Workstation'],
+  'Security':        ['Access Control Enclosure','Access Reader','Accessory','Alarm Keypad','Alarm Panel','Area of Rescue Annunciator','Area of Rescue Remote Master','Area of Rescue Station','Badging Station','Bullet Camera','Code Blue Light','Code Blue Panel','Code Blue Phone','Controller','Corridor Light','Doctor Light','Dome Camera','Dome Light','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','Interior Siren','IR Illuminator','KVM','Motion Sensor','Network','Nurse Call Controller','NVR','Panel','Panic Button','Patient Station','PIR Detector','PTZ Camera','Pull Cord Station','Shock Sensor','Staff Station','Thick Client','Thin Client','Workstation'],
   'AV':              ['Accessory','AV Receiver','Ceiling Speaker','Clock','Control Processor','Digital Signage','Display','Document Camera','HDMI Extender','Media Player','Microphone','Network','Projection Screen','Projector','Speaker','Streaming Encoder','Subwoofer','Touch Panel','Video Conference','Wall Plate','Wireless Mic'],
   'IT / Networking': ['Accessory','Controller','Display','Network','Outlet','Panel','Wall Plate'],
   'Low Voltage':     ['Access Reader','Accessory','Controller','Display','Door Contact','Door Operator','Network','Outlet','Panel','Speaker','Wall Plate'],
@@ -44,7 +44,7 @@ const CATEGORY_MAP = {
   'HVAC':            ['Accessory','Controller','Diffuser','Network','Panel','Thermostat'],
   'Electrical':      ['Accessory','Controller','Lighting','Outlet','Panel'],
   'Telecom':         ['Accessory','Controller','Network','Outlet','Panel','Wall Plate'],
-  'Other':           ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','AV Receiver','Badging Station','Bullet Camera','Ceiling Speaker','Clock','Control Processor','Controller','Diffuser','Digital Signage','Display','Document Camera','Dome Camera','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','HDMI Extender','Interior Siren','KVM','Lighting','Media Player','Microphone','Motion Sensor','Network','NVR','Outlet','Panel','Panic Button','PIR Detector','PTZ Camera','Projection Screen','Projector','Shock Sensor','Speaker','Streaming Encoder','Subwoofer','Thermostat','Thick Client','Thin Client','Touch Panel','Video Conference','Wall Plate','Wireless Mic','Workstation'],
+  'Other':           ['Access Reader','Accessory','Alarm Keypad','Alarm Panel','AV Receiver','Badging Station','Bullet Camera','Ceiling Speaker','Clock','Control Processor','Controller','Diffuser','Digital Signage','Display','Document Camera','Dome Camera','Door Contact','Door Operator','Dual Tech Detector','Exterior Siren','Glass Break','HDMI Extender','Interior Siren','IR Illuminator','KVM','Lighting','Media Player','Microphone','Motion Sensor','Network','NVR','Outlet','Panel','Panic Button','PIR Detector','PTZ Camera','Projection Screen','Projector','Shock Sensor','Speaker','Streaming Encoder','Subwoofer','Thermostat','Thick Client','Thin Client','Touch Panel','Video Conference','Wall Plate','Wireless Mic','Workstation'],
 }
 
 const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
