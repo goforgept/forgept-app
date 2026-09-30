@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../supabase'
 import { APP_BASE_URL } from '../config'
 import { mfaState, clearMfaPending } from '../mfaState'
@@ -14,6 +14,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
+  const [honeypot, setHoneypot] = useState('')
+  const formLoadTime = useRef(Date.now())
   const [mfaFactorId, setMfaFactorId] = useState(null)
   const [mfaChallengeId, setMfaChallengeId] = useState(null)
   const [mfaCode, setMfaCode] = useState('')
@@ -58,6 +60,13 @@ export default function Login() {
   const handleRequestAccess = async () => {
     setLoading(true)
     setError(null)
+
+    // Bot protection: honeypot filled or form submitted too fast
+    if (honeypot || Date.now() - formLoadTime.current < 3000) {
+      setSuccess("Request submitted! We'll be in touch within 1 business day to schedule your walkthrough.")
+      setLoading(false)
+      return
+    }
 
     if (!fullName || !email || !companyName) {
       setError('Name, email and company are required')
@@ -130,7 +139,7 @@ export default function Login() {
                 Sign In
               </button>
               <button
-                onClick={() => { setTab('request'); setError(null); setSuccess(null) }}
+                onClick={() => { setTab('request'); setError(null); setSuccess(null); formLoadTime.current = Date.now() }}
                 className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
                   tab === 'request' ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'
                 }`}
@@ -212,6 +221,16 @@ export default function Login() {
           ) : (
             <div className="space-y-4">
               <p className="text-fp-muted text-sm">Tell us about your business and we will get you set up.</p>
+              {/* Honeypot — hidden from real users, bots fill it in */}
+              <input
+                type="text"
+                value={honeypot}
+                onChange={e => setHoneypot(e.target.value)}
+                tabIndex={-1}
+                aria-hidden="true"
+                autoComplete="off"
+                style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', opacity: 0 }}
+              />
               <div>
                 <label className="text-fp-muted text-xs mb-1 block">Full Name</label>
                 <input
