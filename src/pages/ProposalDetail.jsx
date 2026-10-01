@@ -2517,6 +2517,8 @@ export default function ProposalDetail({ isAdmin }) {
       category: l.category || 'Other',
       industry: 'Security',
       is_active: true,
+      ...(l.your_cost_unit ? { unit_cost: parseFloat(l.your_cost_unit) } : {}),
+      ...(l.vendor ? { vendor: l.vendor } : {}),
     }))
     const { error } = await supabase
       .from('org_products')
