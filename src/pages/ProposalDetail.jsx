@@ -2505,6 +2505,27 @@ export default function ProposalDetail({ isAdmin }) {
     setEditLines(prev => prev.filter((_, i) => i !== index))
   }
 
+  const addToOrgLibrary = async () => {
+    if (selectedForPO.size === 0) return
+    const items = lineItems.filter(l => selectedForPO.has(l.id) && l.item_name)
+    if (items.length === 0) return
+    const rows = items.map(l => ({
+      org_id: profile?.org_id,
+      name: l.item_name,
+      part_number: l.part_number_sku || l.item_name,
+      manufacturer: l.manufacturer || '',
+      category: l.category || 'Other',
+      industry: 'Security',
+      is_active: true,
+    }))
+    const { error } = await supabase
+      .from('org_products')
+      .upsert(rows, { onConflict: 'org_id,part_number' })
+    if (error) { alert('Error saving to library: ' + error.message); return }
+    setSelectedForPO(new Set())
+    alert(`${items.length} item${items.length !== 1 ? 's' : ''} added to your product library.`)
+  }
+
   const saveBOM = async () => {
     setSaving(true)
 
@@ -3931,6 +3952,7 @@ const analyzeDrawing = async () => {
           onStartEditing={startEditing}
           onCancelEditing={() => setEditingBOM(false)}
           onSaveBOM={saveBOM}
+          onAddToLibrary={addToOrgLibrary}
           onAddLibraryItems={addLibraryItemsToBOM}
           onSearchLibrary={searchLibrary}
           onToggleRecurring={toggleRecurring}

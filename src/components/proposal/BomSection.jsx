@@ -62,6 +62,7 @@ export default function BomSection({
   defaultMarkup = 35,
   onSaveLinePrice,
   onSaveLaborPrice,
+  onAddToLibrary,
 }) {
   const [aiOpen, setAiOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -319,6 +320,13 @@ export default function BomSection({
                       Send RFQs
                     </button>
                   )}
+                  <button
+                    onClick={() => { setMoreOpen(false); onAddToLibrary && onAddToLibrary() }}
+                    disabled={selectedForPO.size === 0}
+                    title={selectedForPO.size === 0 ? 'Check items below to select' : `Add ${selectedForPO.size} item${selectedForPO.size !== 1 ? 's' : ''} to your product library`}
+                    className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                    {selectedForPO.size > 0 ? `Add to Library (${selectedForPO.size})` : 'Add to Library'}
+                  </button>
                   <button onClick={() => { setMoreOpen(false); onLoadTemplate() }}
                     className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors">
                     Load Template

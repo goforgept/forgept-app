@@ -585,6 +585,85 @@ export default function GlobalProductsImport({ onClose, onImported }) {
 
   const inputClass = "bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
 
+  const [exporting, setExporting] = useState(false)
+  const [exportMfr, setExportMfr] = useState('__all__')
+  const [mfrList, setMfrList] = useState([])
+  const [showExportPicker, setShowExportPicker] = useState(false)
+
+  const openExportPicker = async () => {
+    if (mfrList.length === 0) {
+      const { data } = await supabase
+        .from('global_products')
+        .select('manufacturer')
+        .order('manufacturer', { ascending: true })
+      const unique = [...new Set((data || []).map(p => p.manufacturer).filter(Boolean))]
+      setMfrList(unique)
+    }
+    setShowExportPicker(true)
+  }
+
+  const exportExisting = async () => {
+    setExporting(true)
+    setShowExportPicker(false)
+    try {
+      let query = supabase
+        .from('global_products')
+        .select('part_number, name, category, manufacturer, description, specs, is_active')
+        .order('name', { ascending: true })
+      if (exportMfr !== '__all__') query = query.eq('manufacturer', exportMfr)
+
+      const { data, error } = await query
+      if (error) throw error
+
+      const headers = ['Part Number','Product Name','Category','Manufacturer','Description','FOV Angle (degrees)','IR Range (feet)','Watts','Installation Notes','Active']
+      const toRows = (items) => items.map(p => [
+        p.part_number || '',
+        p.name || '',
+        p.category || '',
+        p.manufacturer || '',
+        p.description || '',
+        p.specs?.fov_angle ?? '',
+        p.specs?.ir_range ?? '',
+        p.specs?.power_watts ?? '',
+        p.specs?.installation_notes ?? '',
+        p.is_active !== false ? 'Yes' : 'No',
+      ])
+      const colWidths = [{ wch: 18 },{ wch: 28 },{ wch: 22 },{ wch: 18 },{ wch: 40 },{ wch: 16 },{ wch: 14 },{ wch: 8 },{ wch: 30 },{ wch: 8 }]
+
+      const wb = XLSX.utils.book_new()
+
+      if (exportMfr === '__all__') {
+        // One sheet per manufacturer
+        const byMfr = {}
+        for (const p of (data || [])) {
+          const m = p.manufacturer || 'Unknown'
+          if (!byMfr[m]) byMfr[m] = []
+          byMfr[m].push(p)
+        }
+        for (const [mfr, items] of Object.entries(byMfr)) {
+          const ws = XLSX.utils.aoa_to_sheet([headers, ...toRows(items)])
+          ws['!cols'] = colWidths
+          // Sheet names max 31 chars, no special chars
+          const sheetName = mfr.replace(/[:\\/?*[\]]/g, '').slice(0, 31)
+          XLSX.utils.book_append_sheet(wb, ws, sheetName)
+        }
+      } else {
+        const ws = XLSX.utils.aoa_to_sheet([headers, ...toRows(data || [])])
+        ws['!cols'] = colWidths
+        XLSX.utils.book_append_sheet(wb, ws, exportMfr.replace(/[:\\/?*[\]]/g, '').slice(0, 31))
+      }
+
+      const safeName = exportMfr === '__all__' ? 'all_manufacturers' : exportMfr.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+      const filename = `forgept_products_${safeName}_${new Date().toISOString().slice(0,10)}.xlsx`
+      const buf = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      await nativeDownload(filename, blob, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    } catch (err) {
+      console.error('Export error:', err)
+    }
+    setExporting(false)
+  }
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="bg-fp-card border border-fp-border rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
@@ -597,11 +676,46 @@ export default function GlobalProductsImport({ onClose, onImported }) {
               System Surveyor Element Profile (.xlsx) or ForgePt CSV template (.csv)
             </p>
           </div>
-          <button onClick={onClose} className="text-fp-muted hover:text-fp-text transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <button
+                onClick={openExportPicker}
+                disabled={exporting}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-fp-inset text-fp-muted hover:text-fp-text text-xs font-medium rounded-lg border border-fp-border hover:border-fp-brand transition-colors disabled:opacity-50"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                {exporting ? 'Exporting…' : 'Export'}
+              </button>
+              {showExportPicker && (
+                <div className="absolute right-0 top-full mt-1 w-64 bg-fp-card border border-fp-border rounded-xl shadow-xl z-50 p-3 space-y-2">
+                  <p className="text-fp-text text-xs font-semibold">Export by Manufacturer</p>
+                  <select
+                    value={exportMfr}
+                    onChange={e => setExportMfr(e.target.value)}
+                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand"
+                  >
+                    <option value="__all__">All Manufacturers (one sheet each)</option>
+                    {mfrList.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                  <div className="flex gap-2 pt-1">
+                    <button onClick={exportExisting} className="flex-1 py-1.5 bg-fp-brand text-white text-xs font-semibold rounded-lg hover:bg-[#b5571f] transition-colors">
+                      Download
+                    </button>
+                    <button onClick={() => setShowExportPicker(false)} className="flex-1 py-1.5 bg-fp-inset text-fp-muted text-xs rounded-lg hover:text-fp-text transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button onClick={onClose} className="text-fp-muted hover:text-fp-text transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Content */}
