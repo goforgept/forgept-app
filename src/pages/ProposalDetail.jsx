@@ -2509,21 +2509,34 @@ export default function ProposalDetail({ isAdmin }) {
     if (selectedForPO.size === 0) return
     const items = lineItems.filter(l => selectedForPO.has(l.id) && l.item_name)
     if (items.length === 0) return
-    const rows = items.map(l => ({
-      org_id: profile?.org_id,
-      name: l.item_name,
-      part_number: l.part_number_sku || l.item_name,
-      manufacturer: l.manufacturer || '',
-      category: l.category || 'Other',
-      industry: 'Security',
-      is_active: true,
-      ...(l.your_cost_unit ? { unit_cost: parseFloat(l.your_cost_unit) } : {}),
-      ...(l.vendor ? { vendor: l.vendor } : {}),
-    }))
-    const { error } = await supabase
-      .from('org_products')
-      .upsert(rows, { onConflict: 'org_id,part_number' })
-    if (error) { alert('Error saving to library: ' + error.message); return }
+
+    for (const l of items) {
+      const { data: inserted, error } = await supabase
+        .from('product_library')
+        .insert({
+          org_id: proposal?.org_id,
+          item_name: l.item_name,
+          part_number: l.part_number_sku || null,
+          manufacturer: l.manufacturer || null,
+          category: l.category || null,
+          unit: l.unit || 'ea',
+          active: true,
+        })
+        .select('id')
+        .single()
+      if (error) { alert('Error saving to library: ' + error.message); return }
+
+      if (inserted && l.your_cost_unit && parseFloat(l.your_cost_unit) > 0) {
+        await supabase.from('product_library_pricing').insert({
+          product_id: inserted.id,
+          org_id: proposal?.org_id,
+          your_cost: parseFloat(l.your_cost_unit),
+          vendor: l.vendor || null,
+          pricing_date: new Date().toISOString(),
+        })
+      }
+    }
+
     setSelectedForPO(new Set())
     alert(`${items.length} item${items.length !== 1 ? 's' : ''} added to your product library.`)
   }
