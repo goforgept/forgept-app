@@ -306,15 +306,6 @@ export default function BomSection({
               {moreOpen && (
                 <div className="absolute right-0 top-full mt-1 z-50 bg-fp-card border border-fp-border rounded-xl shadow-2xl min-w-[190px] py-1 overflow-hidden">
                   {orgType !== 'manufacturer' && (
-                    <button
-                      onClick={() => { setMoreOpen(false); selectedForPO.size > 0 && onOpenPOModal() }}
-                      disabled={selectedForPO.size === 0}
-                      title={selectedForPO.size === 0 ? 'Check items below to select for PO' : `Generate PO for ${selectedForPO.size} items`}
-                      className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                      {selectedForPO.size > 0 ? `Generate PO (${selectedForPO.size})` : 'Generate PO'}
-                    </button>
-                  )}
-                  {orgType !== 'manufacturer' && (
                     <button onClick={() => { setMoreOpen(false); onOpenRFQModal() }}
                       className="w-full text-left px-4 py-2.5 text-sm text-fp-text hover:bg-fp-inset transition-colors">
                       Send RFQs
