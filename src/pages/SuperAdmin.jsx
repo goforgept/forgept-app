@@ -673,7 +673,20 @@ export default function SuperAdmin() {
     const defaultStartDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     const currentPlan = org.plan && org.plan !== 'Trial' && org.plan !== 'QuickBooks Add-on' ? org.plan : 'Early Adopter'
     const isAnnual = currentPlan.includes('Annual')
-    setStripeForm({ plan: isAnnual ? currentPlan.replace(' Annual', '') : currentPlan, billing_interval: isAnnual ? 'annual' : 'monthly', qboAddon: org.quickbooks_addon || false, email: admin?.email || '', address_line1: admin?.bill_to_address || admin?.ship_to_address || '', address_city: admin?.bill_to_city || admin?.ship_to_city || '', address_state: admin?.bill_to_state || admin?.ship_to_state || '', address_zip: admin?.bill_to_zip || admin?.ship_to_zip || '', address_country: 'US', days_until_due: 30, preferred_payment_method: org.preferred_payment_method || 'ACH', service_start_date: defaultStartDate })
+    setStripeForm({
+      plan: isAnnual ? currentPlan.replace(' Annual', '') : currentPlan,
+      billing_interval: isAnnual ? 'annual' : 'monthly',
+      qboAddon: org.quickbooks_addon || false,
+      email: admin?.email || '',
+      address_line1: org.bill_to_address || admin?.bill_to_address || admin?.ship_to_address || '',
+      address_city:  org.bill_to_city    || admin?.bill_to_city    || admin?.ship_to_city    || '',
+      address_state: org.bill_to_state   || admin?.bill_to_state   || admin?.ship_to_state   || '',
+      address_zip:   org.bill_to_zip     || admin?.bill_to_zip     || admin?.ship_to_zip     || '',
+      address_country: 'US',
+      days_until_due: 30,
+      preferred_payment_method: org.preferred_payment_method || 'ACH',
+      service_start_date: defaultStartDate,
+    })
     setStripeResult(null)
   }
 
