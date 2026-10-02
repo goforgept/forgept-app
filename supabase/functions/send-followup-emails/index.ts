@@ -173,6 +173,7 @@ Deno.serve(async (req) => {
         )
 
         if (!followupDays.includes(daysUntilClose)) continue
+        if (!proposal.client_email) { skipped++; continue }
 
         const logRes = await fetch(
           `${supabaseUrl}/rest/v1/followup_log?proposal_id=eq.${proposal.id}&days_until_close=eq.${daysUntilClose}`,
@@ -222,20 +223,23 @@ Deno.serve(async (req) => {
 
         const emailFooter = `<br/><p style="color:#aaa;font-size:11px;">This email was sent on behalf of ${repName} at ${companyName}.</p>`
 
-        if (proposal.client_email) {
-          try {
-            await sendEmail({
-              to:       proposal.client_email,
-              subject:  clientSubjectFilled,
-              html:     `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">${logoHeader}<div style="padding:28px;">${clientBodyFilled}${emailFooter}</div></div>`,
-              replyTo:  repEmail,
-              fromName: repName,
-            })
-            emailsSent++
-          } catch (e) {
-            console.error(`Client email failed for ${proposal.id}:`, e)
-          }
+        let clientEmailSent = false
+        try {
+          await sendEmail({
+            to:       proposal.client_email,
+            subject:  clientSubjectFilled,
+            html:     `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e0e0e0;border-radius:8px;overflow:hidden;">${logoHeader}<div style="padding:28px;">${clientBodyFilled}${emailFooter}</div></div>`,
+            replyTo:  repEmail,
+            fromName: repName,
+          })
+          clientEmailSent = true
+          emailsSent++
+        } catch (e) {
+          console.error(`Client email failed for ${proposal.id}:`, e)
+          errors++
         }
+
+        if (!clientEmailSent) continue
 
         // Rep notification email
         let repSubject = ''
