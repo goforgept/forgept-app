@@ -8,7 +8,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
   const [proposals, setProposals] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('All')
+  const [statusFilters, setStatusFilters] = useState(new Set())
   const [showArchived, setShowArchived] = useState(false)
   const [closingSoon, setClosingSoon] = useState(false)
   const [sortBy, setSortBy] = useState('newest')
@@ -24,8 +24,8 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
     const status = params.get('status')
     const rep = params.get('rep')
 
-    if (status === 'Won') setStatusFilter('Won')
-    else if (status === 'active') setStatusFilter('Active')
+    if (status === 'Won') setStatusFilters(new Set(['Won']))
+    else if (status === 'active') setStatusFilters(new Set(['Draft', 'Sent']))
     if (rep) setSearch(rep)
   }, [])
 
@@ -82,15 +82,13 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
     .filter(p => {
       if (showArchived) return true
       const isClosed = p.status === 'Won' || p.status === 'Lost'
-      // Only apply the 60-day recency cutoff when browsing All/Active — not when
-      // the user has explicitly filtered to Won or Lost.
-      if (isClosed && statusFilter !== p.status) {
+      // Only apply the 60-day recency cutoff when not explicitly filtering to Won/Lost
+      if (isClosed && !statusFilters.has(p.status)) {
         const refDate = new Date(p.close_date || p.created_at)
         if (refDate < sixtyDaysAgo) return false
       }
-      if (statusFilter === 'All') return true
-      if (statusFilter === 'Active') return !isClosed
-      return p.status === statusFilter
+      if (statusFilters.size === 0) return true
+      return statusFilters.has(p.status)
     })
     .filter(p => {
       const urlClosing = new URLSearchParams(location.search).get('closing') === '30'
@@ -217,22 +215,33 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                   </button>
                 ))}
               </div>
-              <select
-                value={closingSoon ? 'Closing Soon' : statusFilter}
-                onChange={e => {
-                  if (e.target.value === 'Closing Soon') { setClosingSoon(true); setStatusFilter('All') }
-                  else { setClosingSoon(false); setStatusFilter(e.target.value) }
-                }}
-                className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
-              >
-                <option value="All">All Statuses</option>
-                <option value="Active">Active</option>
-                <option value="Draft">Draft</option>
-                <option value="Sent">Sent</option>
-                <option value="Won">Won</option>
-                <option value="Lost">Lost</option>
-                <option value="Closing Soon">Closing Soon</option>
-              </select>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[['Draft', 'bg-fp-border/40 text-fp-muted', 'bg-[#2a3d55] text-white border-[#2a3d55]'],
+                  ['Sent', 'bg-blue-500/10 text-blue-400 border-blue-500/30', 'bg-blue-500/30 text-blue-300 border-blue-400'],
+                  ['Won', 'bg-green-500/10 text-green-400 border-green-500/30', 'bg-green-500/30 text-green-300 border-green-400'],
+                  ['Lost', 'bg-red-500/10 text-red-400 border-red-500/30', 'bg-red-500/30 text-red-300 border-red-400'],
+                  ['Closing Soon', 'bg-fp-border/40 text-fp-muted', 'bg-orange-500/30 text-orange-300 border-orange-400'],
+                ].map(([label, offCls, onCls]) => {
+                  const isOn = label === 'Closing Soon' ? closingSoon : statusFilters.has(label)
+                  return (
+                    <button key={label} onClick={() => {
+                      if (label === 'Closing Soon') {
+                        setClosingSoon(v => !v)
+                      } else {
+                        setClosingSoon(false)
+                        setStatusFilters(prev => {
+                          const next = new Set(prev)
+                          next.has(label) ? next.delete(label) : next.add(label)
+                          return next
+                        })
+                      }
+                    }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${isOn ? onCls : `border-fp-border ${offCls} hover:text-fp-text`}`}>
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>
