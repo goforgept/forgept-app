@@ -246,7 +246,8 @@ Deno.serve(async (req) => {
     // ── Invoice payment failed ───────────────────────────────────────────────
     case 'invoice.payment_failed': {
       const org = await getOrgByCustomerId(obj.customer)
-      if (org) {
+      // Only act if this invoice is for the subscription we track
+      if (org && (!obj.subscription || obj.subscription === org.stripe_subscription_id)) {
         await updateOrg(org.id, { billing_status: 'past_due' })
         await notifyPastDue(org).catch(console.error)
       }
@@ -256,7 +257,8 @@ Deno.serve(async (req) => {
     // ── Invoice overdue (send_invoice collection method) ─────────────────────
     case 'invoice.overdue': {
       const org = await getOrgByCustomerId(obj.customer)
-      if (org) {
+      // Only act if this invoice is for the subscription we track
+      if (org && (!obj.subscription || obj.subscription === org.stripe_subscription_id)) {
         await updateOrg(org.id, { billing_status: 'past_due' })
         await notifyPastDue(org).catch(console.error)
       }
@@ -267,6 +269,9 @@ Deno.serve(async (req) => {
     case 'customer.subscription.updated': {
       const org = await getOrgByCustomerId(obj.customer)
       if (!org) break
+
+      // Ignore events for subscriptions other than the one we track
+      if (org.stripe_subscription_id && obj.id !== org.stripe_subscription_id) break
 
       const stripeStatus = obj.status
       const billingStatus =
@@ -288,7 +293,8 @@ Deno.serve(async (req) => {
     // ── Subscription cancelled ───────────────────────────────────────────────
     case 'customer.subscription.deleted': {
       const org = await getOrgByCustomerId(obj.customer)
-      if (org) {
+      // Only clear if this is the subscription we're actually tracking
+      if (org && obj.id === org.stripe_subscription_id) {
         await updateOrg(org.id, {
           billing_status: 'cancelled',
           stripe_subscription_id: null,
