@@ -53,6 +53,8 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [showBulkEditModal, setShowBulkEditModal] = useState(false)
   const [bulkEditForm, setBulkEditForm] = useState({ category: '', sub_category: '', manufacturer: '', unit: '' })
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportVendor, setExportVendor] = useState('')
   // Catalogs
   const [enabledCatalogs, setEnabledCatalogs] = useState([]) // [{ slug, label }]
   const [catalogItems, setCatalogItems] = useState([])        // catalog_products rows for active slugs
@@ -317,6 +319,39 @@ if (!finalCost) continue
     e.target.value = '' // reset input
   }
 
+  // ─── Export library to Excel ──────────────────────────────────────────────
+  const vendorList = [...new Set(Object.values(pricing).flat().map(p => p.vendor).filter(Boolean))].sort()
+
+  const exportLibrary = (vendor) => {
+    const headers = ['Item Name', 'Manufacturer', 'Part #', 'Category', 'Unit', 'Description', 'Vendor', 'Your Cost', 'Pricing Date']
+    const rows = []
+    products.forEach(p => {
+      const allPrices = pricing[p.id] || []
+      const vendorPrice = vendor ? allPrices.find(pr => pr.vendor === vendor) : null
+      rows.push([
+        p.item_name,
+        p.manufacturer || '',
+        p.part_number  || '',
+        p.category     || '',
+        p.unit         || 'ea',
+        p.description  || '',
+        vendor || '',
+        vendorPrice?.your_cost != null ? vendorPrice.your_cost : '',
+        vendorPrice?.pricing_date ? vendorPrice.pricing_date.split('T')[0] : '',
+      ])
+    })
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+    ws['!cols'] = headers.map((_, i) => ({ wch: i === 0 || i === 5 ? 30 : 18 }))
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 }
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Product Library')
+    const date = new Date().toISOString().split('T')[0]
+    const safeName = vendor ? vendor.replace(/[^a-z0-9]/gi, '_') : 'NewVendor'
+    XLSX.writeFile(wb, `ForgePt_PricingRequest_${safeName}_${date}.xlsx`)
+    setShowExportModal(false)
+    setExportVendor('')
+  }
+
   // ─── Template download ────────────────────────────────────────────────────
   const downloadTemplate = () => {
     const headers = ['Item Name', 'Manufacturer', 'Part #', 'Category', 'Unit', 'Description', 'Vendor', 'Your Cost', 'Pricing Date']
@@ -483,6 +518,9 @@ if (!finalCost) continue
           {canEdit && (
             <div className="flex gap-2">
               <button onClick={downloadTemplate} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">↓ Template</button>
+              {products.length > 0 && (
+                <button onClick={() => { setExportVendor(''); setShowExportModal(true) }} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">↓ Export Library</button>
+              )}
               <label className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors cursor-pointer">
                 {uploading ? 'Importing...' : '↑ Import Excel'}
                 <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" disabled={uploading} />
@@ -1009,6 +1047,59 @@ if (!finalCost) continue
                 Apply Changes
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Vendor Picker Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-fp-card border border-fp-border rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h3 className="text-fp-text font-bold text-lg mb-1">Export for Vendor</h3>
+            <p className="text-fp-muted text-sm mb-5">Each vendor only sees their own pricing — no competitor costs included.</p>
+
+            <div className="space-y-3">
+              {vendorList.length > 0 && (
+                <div>
+                  <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">Existing Vendors</p>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {vendorList.map(v => (
+                      <button key={v} onClick={() => exportLibrary(v)}
+                        className="w-full text-left px-4 py-2.5 bg-fp-inset hover:bg-fp-hover rounded-lg text-fp-text text-sm transition-colors flex items-center justify-between group">
+                        <span>{v}</span>
+                        <span className="text-fp-muted text-xs group-hover:text-fp-brand transition-colors">
+                          {Object.values(pricing).flat().filter(p => p.vendor === v).length} prices
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className={vendorList.length > 0 ? 'pt-3 border-t border-fp-border' : ''}>
+                <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-2">New Vendor</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={exportVendor}
+                    onChange={e => setExportVendor(e.target.value)}
+                    placeholder="Vendor name"
+                    className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
+                  />
+                  <button onClick={() => exportLibrary(exportVendor || null)}
+                    disabled={!exportVendor.trim()}
+                    className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-40">
+                    Export
+                  </button>
+                </div>
+                <p className="text-fp-muted text-xs mt-1.5">Exports all products with blank pricing for them to fill in.</p>
+              </div>
+            </div>
+
+            <button onClick={() => setShowExportModal(false)}
+              className="mt-5 w-full py-2 text-fp-muted hover:text-fp-text text-sm transition-colors">
+              Cancel
+            </button>
           </div>
         </div>
       )}
