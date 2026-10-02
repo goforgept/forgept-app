@@ -462,7 +462,8 @@ export default function ProposalDetail({ isAdmin }) {
     const monCostTotal = monArr.reduce((sum, c) => sum + (parseFloat(c.monthly_cost) || 0) * 12, 0)
     const taxRateVal = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
     const taxAmt = Math.round(bomRevenue * (taxRateVal / 100) * 100) / 100
-    const newValue = bomRevenue + laborRevenue + slaRevenue + monRevenue + taxAmt
+    const preTaxValue = bomRevenue + laborRevenue + slaRevenue + monRevenue
+    const newValue = preTaxValue + taxAmt
     const newCost = bomCostTotal + laborCostTotal + slaCostTotal + monCostTotal
     const newMarginDollars = newValue - newCost
     const newMarginPct = newValue > 0 ? (newMarginDollars / newValue) * 100 : 0
@@ -477,7 +478,7 @@ export default function ProposalDetail({ isAdmin }) {
       total_gross_margin_dollars: newMarginDollars,
       total_gross_margin_percent: newMarginPct,
     }
-    if (hasItems) updatePayload.proposal_value = newValue
+    if (hasItems) { updatePayload.proposal_value = newValue; updatePayload.subtotal_value = preTaxValue }
     await supabase.from('proposals').update(updatePayload).eq('id', id)
   }
 
@@ -825,8 +826,8 @@ export default function ProposalDetail({ isAdmin }) {
 
   const saveDealAmount = async (val) => {
     const amount = parseFloat(val) || 0
-    await supabase.from('proposals').update({ proposal_value: amount, total_customer_value: amount }).eq('id', id)
-    setProposal(prev => ({ ...prev, proposal_value: amount, total_customer_value: amount }))
+    await supabase.from('proposals').update({ proposal_value: amount, subtotal_value: amount, total_customer_value: amount }).eq('id', id)
+    setProposal(prev => ({ ...prev, proposal_value: amount, subtotal_value: amount, total_customer_value: amount }))
   }
 
   const saveSOW = async () => {
@@ -2510,35 +2511,81 @@ export default function ProposalDetail({ isAdmin }) {
     const items = lineItems.filter(l => selectedForPO.has(l.id) && l.item_name)
     if (items.length === 0) return
 
-    for (const l of items) {
-      const { data: inserted, error } = await supabase
-        .from('product_library')
-        .insert({
-          org_id: proposal?.org_id,
-          item_name: l.item_name,
-          part_number: l.part_number_sku || null,
-          manufacturer: l.manufacturer || null,
-          category: l.category || null,
-          unit: l.unit || 'ea',
-          active: true,
-        })
-        .select('id')
-        .single()
-      if (error) { alert('Error saving to library: ' + error.message); return }
+    let added = 0, updated = 0, skipped = 0
 
-      if (inserted && l.your_cost_unit && parseFloat(l.your_cost_unit) > 0) {
-        await supabase.from('product_library_pricing').insert({
-          product_id: inserted.id,
-          org_id: proposal?.org_id,
-          your_cost: parseFloat(l.your_cost_unit),
-          vendor: l.vendor || null,
-          pricing_date: new Date().toISOString(),
-        })
+    for (const l of items) {
+      const orgId = proposal?.org_id
+      const partNum = l.part_number_sku || null
+      const cost = l.your_cost_unit ? parseFloat(l.your_cost_unit) : null
+      const vendor = l.vendor || null
+
+      // Check for existing library entry by part_number (only when part number is set)
+      let productId = null
+      if (partNum) {
+        const { data: existing } = await supabase
+          .from('product_library')
+          .select('id')
+          .eq('org_id', orgId)
+          .eq('part_number', partNum)
+          .maybeSingle()
+        if (existing) productId = existing.id
+      }
+
+      if (!productId) {
+        const { data: inserted, error } = await supabase
+          .from('product_library')
+          .insert({
+            org_id: orgId,
+            item_name: l.item_name,
+            part_number: partNum,
+            manufacturer: l.manufacturer || null,
+            category: l.category || null,
+            unit: l.unit || 'ea',
+            active: true,
+          })
+          .select('id')
+          .single()
+        if (error) { alert('Error saving to library: ' + error.message); return }
+        productId = inserted.id
+        added++
+      } else {
+        skipped++
+      }
+
+      // Add/update pricing if cost is set
+      if (cost && cost > 0) {
+        const { data: existingPrice } = await supabase
+          .from('product_library_pricing')
+          .select('id')
+          .eq('product_id', productId)
+          .eq('org_id', orgId)
+          .eq('vendor', vendor ?? '')
+          .maybeSingle()
+
+        if (existingPrice) {
+          await supabase.from('product_library_pricing')
+            .update({ your_cost: cost, pricing_date: new Date().toISOString(), source: 'manual' })
+            .eq('id', existingPrice.id)
+        } else {
+          await supabase.from('product_library_pricing').insert({
+            product_id: productId,
+            org_id: orgId,
+            your_cost: cost,
+            vendor: vendor,
+            pricing_date: new Date().toISOString(),
+            source: 'manual',
+          })
+        }
+        updated++
       }
     }
 
     setSelectedForPO(new Set())
-    alert(`${items.length} item${items.length !== 1 ? 's' : ''} added to your product library.`)
+    const parts = []
+    if (added > 0) parts.push(`${added} new item${added !== 1 ? 's' : ''} added`)
+    if (skipped > 0) parts.push(`${skipped} already in library`)
+    if (updated > 0) parts.push(`pricing saved`)
+    alert(parts.join(', ') + '.')
   }
 
   const saveBOM = async () => {
@@ -2627,7 +2674,8 @@ export default function ProposalDetail({ isAdmin }) {
     const grossMarginPercent = totalCustomer > 0 ? (grossMarginDollars / totalCustomer) * 100 : 0
 
     await supabase.from('proposals').update({
-      proposal_value: grandTotalWithTax, total_customer_value: grandTotalWithTax, total_your_cost: totalCost,
+      proposal_value: grandTotalWithTax, subtotal_value: totalCustomer,
+      total_customer_value: grandTotalWithTax, total_your_cost: totalCost,
       total_gross_margin_dollars: grossMarginDollars, total_gross_margin_percent: grossMarginPercent, labor_items: laborItems,
     }).eq('id', id)
 
@@ -2706,10 +2754,11 @@ export default function ProposalDetail({ isAdmin }) {
     setLineItems(updatedItems)
     const matTotal = updatedItems.reduce((s, l) => s + (l.customer_price_total || 0), 0)
     const labTotal = (proposal?.labor_items || []).reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
-    const taxRate = parseFloat(proposal?.tax_rate) || 0
-    const newTotal = matTotal + labTotal + (matTotal * taxRate / 100)
-    await supabase.from('proposals').update({ proposal_value: newTotal, total_customer_value: newTotal }).eq('id', id)
-    setProposal(prev => ({ ...prev, proposal_value: newTotal, total_customer_value: newTotal }))
+    const preTax = matTotal + labTotal
+    const taxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
+    const newTotal = preTax + (matTotal * taxRate / 100)
+    await supabase.from('proposals').update({ proposal_value: newTotal, subtotal_value: preTax, total_customer_value: newTotal }).eq('id', id)
+    setProposal(prev => ({ ...prev, proposal_value: newTotal, subtotal_value: preTax, total_customer_value: newTotal }))
   }
 
   const saveLaborPrice = async (laborKey, newPrice) => {
@@ -2742,10 +2791,11 @@ export default function ProposalDetail({ isAdmin }) {
     // Recalc proposal total
     const matTotal = lineItems.reduce((s, l) => s + (l.customer_price_total || 0), 0)
     const labTotal = newLaborItems.reduce((s, l) => s + (parseFloat(l.customer_price) || 0), 0)
-    const taxRate = parseFloat(proposal?.tax_rate) || 0
-    const newTotal = matTotal + labTotal + (matTotal * taxRate / 100)
-    await supabase.from('proposals').update({ proposal_value: newTotal, total_customer_value: newTotal }).eq('id', id)
-    setProposal(prev => ({ ...prev, proposal_value: newTotal, total_customer_value: newTotal }))
+    const preTax = matTotal + labTotal
+    const taxRate = (!proposal?.tax_exempt && proposal?.tax_rate) ? parseFloat(proposal.tax_rate) : 0
+    const newTotal = preTax + (matTotal * taxRate / 100)
+    await supabase.from('proposals').update({ proposal_value: newTotal, subtotal_value: preTax, total_customer_value: newTotal }).eq('id', id)
+    setProposal(prev => ({ ...prev, proposal_value: newTotal, subtotal_value: preTax, total_customer_value: newTotal }))
   }
 
   const saveRenewalDate = async (itemId, date) => {

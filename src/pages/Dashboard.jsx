@@ -17,6 +17,7 @@ const WIDGET_DEFS = [
 const DEFAULT_WIDGETS = ['revenue-metrics', 'pipeline-stage', 'recent-proposals', 'team-leaderboard', 'top-clients']
 const STATUS_COLOR = { Draft: '#6B7280', Sent: '#3B82F6', Won: '#22C55E', Lost: '#EF4444' }
 const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+const pval = p => p.subtotal_value ?? p.proposal_value ?? 0
 
 // ─── Widget: Revenue Metrics ─────────────────────────────────────────────────
 
@@ -24,10 +25,10 @@ function RevenueMetricsWidget({ proposals }) {
   const won    = proposals.filter(p => p.status === 'Won')
   const lost   = proposals.filter(p => p.status === 'Lost')
   const active = proposals.filter(p => p.status !== 'Won' && p.status !== 'Lost')
-  const wonVal    = won.reduce((s, p) => s + (p.proposal_value || 0), 0)
-  const activeVal = active.reduce((s, p) => s + (p.proposal_value || 0), 0)
+  const wonVal    = won.reduce((s, p) => s + pval(p), 0)
+  const activeVal = active.reduce((s, p) => s + pval(p), 0)
   const winRate = (won.length + lost.length) > 0 ? Math.round(won.length / (won.length + lost.length) * 100) : null
-  const avgDeal = proposals.length > 0 ? proposals.reduce((s, p) => s + (p.proposal_value || 0), 0) / proposals.length : 0
+  const avgDeal = proposals.length > 0 ? proposals.reduce((s, p) => s + pval(p), 0) / proposals.length : 0
   const closing = proposals.filter(p => {
     if (!p.close_date || p.status === 'Won' || p.status === 'Lost') return false
     const d = Math.ceil((new Date(p.close_date) - new Date()) / 864e5)
@@ -70,7 +71,7 @@ function PipelineStageWidget({ proposals }) {
   const data = stages.map(s => ({
     stage: s,
     count: proposals.filter(p => p.status === s).length,
-    value: proposals.filter(p => p.status === s).reduce((sum, p) => sum + (p.proposal_value || 0), 0),
+    value: proposals.filter(p => p.status === s).reduce((sum, p) => sum + pval(p), 0),
   }))
 
   const ChartTip = ({ active, payload }) => {
@@ -150,7 +151,7 @@ function TeamLeaderboardWidget({ orgProposals }) {
   orgProposals.forEach(p => {
     const name = p.rep_name || 'Unknown'
     if (!byRep[name]) byRep[name] = { name, won: 0, count: 0 }
-    if (p.status === 'Won') byRep[name].won += (p.proposal_value || 0)
+    if (p.status === 'Won') byRep[name].won += pval(p)
     byRep[name].count++
   })
   const sorted = Object.values(byRep).sort((a, b) => b.won - a.won).slice(0, 10)
@@ -190,8 +191,8 @@ function TopClientsWidget({ proposals }) {
   proposals.forEach(p => {
     const key = p.company || 'Unknown'
     if (!byClient[key]) byClient[key] = { name: key, total: 0, count: 0 }
-    byClient[key].total += (p.proposal_value || 0)
-    if (p.status === 'Won') byClient[key].won = (byClient[key].won || 0) + (p.proposal_value || 0)
+    byClient[key].total += pval(p)
+    if (p.status === 'Won') byClient[key].won = (byClient[key].won || 0) + pval(p)
     byClient[key].count++
   })
   const sorted = Object.values(byClient).sort((a, b) => b.total - a.total).slice(0, 20)
@@ -267,7 +268,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
     if (isAdmin) {
       const { data: orgProps } = await supabase
         .from('proposals')
-        .select('id, proposal_name, company, rep_name, status, proposal_value, created_at')
+        .select('id, proposal_name, company, rep_name, status, proposal_value, subtotal_value, created_at')
         .eq('org_id', profileData.org_id)
         .order('created_at', { ascending: false })
       setOrgProposals(orgProps || [])
@@ -312,7 +313,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
       return p.proposal_name?.toLowerCase().includes(s) || p.company?.toLowerCase().includes(s) || p.client_name?.toLowerCase().includes(s)
     })
 
-  const wonPipeline    = proposals.filter(p => p.status === 'Won').reduce((s, p) => s + (p.proposal_value || 0), 0)
+  const wonPipeline    = proposals.filter(p => p.status === 'Won').reduce((s, p) => s + pval(p), 0)
   const targetProgress = target ? Math.min(100, Math.round((wonPipeline / target.revenue_target) * 100)) : null
 
   const laborQuoted = proposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').reduce((s, p) => s + (p.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0), 0)

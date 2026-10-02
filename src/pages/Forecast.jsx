@@ -5,6 +5,8 @@ import Sidebar from '../components/Sidebar'
 import { useProfile } from '../context/ProfileContext'
 import { usePermissions } from '../hooks/usePermissions'
 
+const pval = p => p.subtotal_value ?? p.proposal_value ?? 0
+
 export default function Forecast({ isAdmin, featureProposals = true, featureCRM = false }) {
   const { profile } = useProfile()
   const { scope } = usePermissions()
@@ -51,8 +53,8 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
       d.setMonth(d.getMonth() - i)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' })
-      const won = proposals.filter(p => p.status === 'Won' && p.created_at?.startsWith(key)).reduce((sum, p) => sum + (p.proposal_value || 0), 0)
-      const total = proposals.filter(p => p.created_at?.startsWith(key)).reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+      const won = proposals.filter(p => p.status === 'Won' && p.created_at?.startsWith(key)).reduce((sum, p) => sum + pval(p), 0)
+      const total = proposals.filter(p => p.created_at?.startsWith(key)).reduce((sum, p) => sum + pval(p), 0)
       months.push({ key, label, won, total })
     }
     return months
@@ -68,7 +70,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
         if (stage.name === 'Lead') return !p.pipeline_stage_id && p.status === 'Draft'
         return false
       })
-      const value = stageProposals.reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+      const value = stageProposals.reduce((sum, p) => sum + pval(p), 0)
       const prob = stage.probability ?? (stage.name === 'Won' ? 100 : stage.name === 'Lost' ? 0 : 40)
       return { ...stage, count: stageProposals.length, value, prob }
     }).filter(s => s.count > 0)
@@ -102,20 +104,20 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
     filteredProposals.forEach(p => {
       const rep = p.rep_name || 'Unknown'
       if (!repMap[rep]) repMap[rep] = { name: rep, pipeline: 0, won: 0, count: 0 }
-      repMap[rep].pipeline += p.proposal_value || 0
+      repMap[rep].pipeline += pval(p)
       repMap[rep].count += 1
     })
     // All-time won — always shown regardless of filter
     proposals.filter(p => p.status === 'Won').forEach(p => {
       const rep = p.rep_name || 'Unknown'
       if (!repMap[rep]) repMap[rep] = { name: rep, pipeline: 0, won: 0, count: 0 }
-      repMap[rep].won += p.proposal_value || 0
+      repMap[rep].won += pval(p)
     })
     return Object.values(repMap).sort((a, b) => b.pipeline - a.pipeline)
   }, [filteredProposals, proposals])
 
-  const totalActivePipeline = filteredProposals.reduce((sum, p) => sum + (p.proposal_value || 0), 0)
-  const totalWon = proposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+  const totalActivePipeline = filteredProposals.reduce((sum, p) => sum + pval(p), 0)
+  const totalWon = proposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + pval(p), 0)
   const maxMonthlyValue = Math.max(...monthlyWon.map(m => m.total), 1)
   const maxStageValue = Math.max(...stageBreakdown.map(s => s.value), 1)
 
@@ -163,7 +165,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
           <div className="bg-fp-card rounded-xl p-5">
             <p className="text-fp-muted text-xs mb-1">Closing {dayRange === 'all' ? 'Upcoming' : `in ${dayRange}d`}</p>
             <p className="text-[#C8622A] text-2xl font-bold">{closingThisMonth.length}</p>
-            <p className="text-fp-muted text-xs mt-1">${fmt(closingThisMonth.reduce((s, p) => s + (p.proposal_value || 0), 0))} at stake</p>
+            <p className="text-fp-muted text-xs mt-1">${fmt(closingThisMonth.reduce((s, p) => s + pval(p), 0))} at stake</p>
           </div>
         </div>
 
@@ -276,7 +278,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
           <div className="bg-fp-card rounded-xl p-6">
             <h3 className="text-fp-text font-bold text-lg mb-4">
               {dayRange === 'all' ? 'Upcoming Closes' : `Closing in Next ${dayRange} Days`}
-              <span className="ml-2 text-sm font-normal text-fp-muted">— ${fmt(closingThisMonth.reduce((s, p) => s + (p.proposal_value || 0), 0))} at stake</span>
+              <span className="ml-2 text-sm font-normal text-fp-muted">— ${fmt(closingThisMonth.reduce((s, p) => s + pval(p), 0))} at stake</span>
             </h3>
             <div className="space-y-2">
               {closingThisMonth.map(p => {

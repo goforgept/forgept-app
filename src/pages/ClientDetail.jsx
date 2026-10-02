@@ -684,10 +684,11 @@ const deleteMeeting = async (meetingId) => {
   }
 
   const handleNewProposal = () => navigate(`/new?clientId=${id}`)
-  const totalPipeline = proposals.filter(p => p.status !== 'Lost').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
-  const wonPipeline = proposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+  const pval = p => p.subtotal_value ?? p.proposal_value ?? 0
+  const totalPipeline = proposals.filter(p => p.status !== 'Lost').reduce((sum, p) => sum + pval(p), 0)
+  const wonPipeline = proposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + pval(p), 0)
   const winRate = proposals.length > 0 ? Math.round((proposals.filter(p => p.status === 'Won').length / proposals.length) * 100) : 0
-  const avgDeal = proposals.length > 0 ? proposals.reduce((sum, p) => sum + (p.proposal_value || 0), 0) / proposals.length : 0
+  const avgDeal = proposals.length > 0 ? proposals.reduce((sum, p) => sum + pval(p), 0) / proposals.length : 0
   const fmt = (num) => num?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '0.00'
   const fullAddress = [client?.address, client?.city, client?.state, client?.zip].filter(Boolean).join(', ')
   const inputClass = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
