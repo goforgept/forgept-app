@@ -10,11 +10,11 @@ import { usePermissions } from '../hooks/usePermissions'
 const WIDGET_DEFS = [
   { id: 'revenue-metrics', label: 'Revenue Metrics', desc: 'Pipeline value, won revenue, win rate, avg deal size', full: true },
   { id: 'pipeline-stage',  label: 'Pipeline by Stage', desc: 'Chart of deal count and value at each stage', full: true },
-  { id: 'recent-proposals', label: 'Recent Proposals', desc: 'Your 10 most recently created proposals' },
+  { id: 'kpi-metrics',     label: 'My KPIs',          desc: 'Your activity metrics — calls, emails, meetings, deals won', full: true },
   { id: 'team-leaderboard', label: 'Team Leaderboard', desc: 'Top reps ranked by closed-won revenue (admin)', adminOnly: true },
   { id: 'top-clients',     label: 'Top Clients',      desc: 'Top 20 clients by total proposal value' },
 ]
-const DEFAULT_WIDGETS = ['revenue-metrics', 'pipeline-stage', 'recent-proposals', 'team-leaderboard', 'top-clients']
+const DEFAULT_WIDGETS = ['revenue-metrics', 'pipeline-stage', 'kpi-metrics', 'team-leaderboard', 'top-clients']
 const STATUS_COLOR = { Draft: '#6B7280', Sent: '#3B82F6', Won: '#22C55E', Lost: '#EF4444' }
 const fmt = (n) => `$${(n || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 const pval = p => p.subtotal_value ?? p.proposal_value ?? 0
@@ -111,33 +111,115 @@ function PipelineStageWidget({ proposals }) {
   )
 }
 
-// ─── Widget: Recent Proposals ─────────────────────────────────────────────────
+// ─── Widget: My KPIs ──────────────────────────────────────────────────────────
 
-function RecentProposalsWidget({ proposals, navigate }) {
-  const recent = [...proposals].sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 10)
+const KPI_METRICS = [
+  { key: 'calls',     label: 'Calls',        color: 'text-blue-400',   bg: 'bg-blue-500/10' },
+  { key: 'emails',    label: 'Emails',       color: 'text-purple-400', bg: 'bg-purple-500/10' },
+  { key: 'meetings',  label: 'Meetings',     color: 'text-yellow-400', bg: 'bg-yellow-500/10' },
+  { key: 'notes',     label: 'Notes',        color: 'text-teal-400',   bg: 'bg-teal-500/10' },
+  { key: 'proposals', label: 'Proposals',    color: 'text-fp-brand',   bg: 'bg-fp-brand/10' },
+  { key: 'deals_won', label: 'Deals Won',    color: 'text-green-400',  bg: 'bg-green-500/10' },
+]
+
+function getPeriodRange(key, offset) {
+  const now = new Date()
+  if (key === 'weekly') {
+    const day = now.getDay()
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1)
+    const start = new Date(now); start.setDate(diff + offset * 7); start.setHours(0,0,0,0)
+    const end = new Date(start); end.setDate(start.getDate() + 7)
+    const label = offset === 0 ? 'This Week' : offset === -1 ? 'Last Week'
+      : start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' – ' + new Date(end - 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return { start: start.toISOString(), end: end.toISOString(), label }
+  } else {
+    const start = new Date(now.getFullYear(), now.getMonth() + offset, 1)
+    const end   = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1)
+    const label = offset === 0 ? 'This Month' : offset === -1 ? 'Last Month'
+      : start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    return { start: start.toISOString(), end: end.toISOString(), label }
+  }
+}
+
+function KPIWidget({ userId, orgId }) {
+  const [period, setPeriod]       = useState('monthly')
+  const [offset, setOffset]       = useState(0)
+  const [actuals, setActuals]     = useState({ calls: 0, emails: 0, meetings: 0, notes: 0, proposals: 0, deals_won: 0 })
+  const [kpiTargets, setKpiTargets] = useState({})
+  const [loading, setLoading]     = useState(true)
+
+  useEffect(() => {
+    if (!userId || !orgId) return
+    const { start, end } = getPeriodRange(period, offset)
+    setLoading(true)
+    Promise.all([
+      supabase.from('activities').select('type').eq('org_id', orgId).eq('user_id', userId)
+        .gte('created_at', start).lt('created_at', end).not('source', 'eq', 'system'),
+      supabase.from('tasks').select('id').eq('org_id', orgId).eq('assigned_to', userId)
+        .gte('created_at', start).lt('created_at', end).not('meeting_type', 'is', null),
+      supabase.from('proposals').select('status').eq('org_id', orgId).eq('user_id', userId)
+        .gte('created_at', start).lt('created_at', end),
+      supabase.from('rep_kpi_targets').select('metric_type, target_value').eq('org_id', orgId).eq('rep_id', userId).eq('period_type', period),
+    ]).then(([{ data: acts }, { data: mtgs }, { data: props }, { data: tgts }]) => {
+      const a = { calls: 0, emails: 0, meetings: (mtgs || []).length, notes: 0, proposals: (props || []).length, deals_won: 0 }
+      ;(acts || []).forEach(x => {
+        if (x.type === 'call')    a.calls++
+        else if (x.type === 'email')   a.emails++
+        else if (x.type === 'meeting') a.meetings++
+        else if (x.type === 'note')    a.notes++
+      })
+      ;(props || []).forEach(p => { if (p.status === 'Won') a.deals_won++ })
+      const t = {}
+      ;(tgts || []).forEach(r => { t[r.metric_type] = r.target_value })
+      setActuals(a)
+      setKpiTargets(t)
+      setLoading(false)
+    })
+  }, [userId, orgId, period, offset])
+
+  const { label } = getPeriodRange(period, offset)
+
   return (
     <div>
-      <p className="text-fp-text font-bold mb-3">Recent Proposals</p>
-      {recent.length === 0
-        ? <p className="text-fp-muted text-sm">No proposals yet.</p>
-        : <div className="space-y-2">
-            {recent.map(p => (
-              <div key={p.id} onClick={() => navigate(`/proposal/${p.id}`)}
-                className="flex items-center justify-between bg-fp-inset rounded-lg px-3 py-2.5 cursor-pointer hover:bg-fp-hover transition-colors group">
-                <div className="min-w-0 flex-1 mr-3">
-                  <p className="text-fp-text text-sm font-medium truncate group-hover:text-fp-brand transition-colors">{p.proposal_name}</p>
-                  <p className="text-fp-muted text-xs truncate">{p.company}</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    p.status === 'Won'  ? 'bg-green-500/20 text-green-400' :
-                    p.status === 'Sent' ? 'bg-blue-500/20 text-blue-400'  :
-                    p.status === 'Lost' ? 'bg-red-500/20 text-red-400'    :
-                    'bg-fp-border/40 text-fp-muted'}`}>{p.status}</span>
-                  <span className="text-fp-text text-xs font-semibold">{fmt(pval(p))}</span>
-                </div>
-              </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <p className="text-fp-text font-bold">My KPIs</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => setOffset(o => o - 1)} className="text-fp-muted hover:text-fp-text text-sm px-1 transition-colors">‹</button>
+          <span className="text-fp-muted text-xs w-24 text-center">{label}</span>
+          <button onClick={() => setOffset(o => Math.min(0, o + 1))} disabled={offset >= 0} className="text-fp-muted hover:text-fp-text text-sm px-1 transition-colors disabled:opacity-30">›</button>
+          <div className="flex rounded-lg overflow-hidden border border-fp-border ml-1">
+            {['weekly', 'monthly'].map(p => (
+              <button key={p} onClick={() => { setPeriod(p); setOffset(0) }}
+                className={`px-3 py-1 text-xs font-medium transition-colors ${period === p ? 'bg-fp-brand text-white' : 'bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
+                {p === 'weekly' ? 'Wk' : 'Mo'}
+              </button>
             ))}
+          </div>
+        </div>
+      </div>
+      {loading
+        ? <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{KPI_METRICS.map(m => <div key={m.key} className="bg-fp-inset rounded-lg h-20 animate-pulse" />)}</div>
+        : <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {KPI_METRICS.map(m => {
+              const val = actuals[m.key] || 0
+              const tgt = kpiTargets[m.key] ?? null
+              const pct = tgt > 0 ? Math.min(100, Math.round((val / tgt) * 100)) : null
+              return (
+                <div key={m.key} className={`${m.bg} rounded-lg p-3`}>
+                  <p className="text-fp-muted text-xs mb-1">{m.label}</p>
+                  <p className={`text-2xl font-bold ${m.color}`}>{val}</p>
+                  {tgt !== null && (
+                    <>
+                      <p className="text-fp-muted text-xs mt-1">of {tgt} goal · {pct}%</p>
+                      <div className="w-full bg-black/20 rounded-full h-1 mt-1.5">
+                        <div className={`h-1 rounded-full transition-all ${pct >= 100 ? 'bg-green-400' : pct >= 60 ? 'bg-yellow-400' : 'bg-red-400'}`}
+                          style={{ width: `${pct}%` }} />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )
+            })}
           </div>
       }
     </div>
@@ -369,10 +451,10 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
         return <RevenueMetricsWidget key={id} proposals={proposals} />
       case 'pipeline-stage':
         return <PipelineStageWidget key={id} proposals={proposals} />
-      case 'recent-proposals':
+      case 'kpi-metrics':
         return (
           <div key={id} className="bg-fp-card rounded-xl p-5 border border-fp-border/40">
-            <RecentProposalsWidget proposals={proposals} navigate={navigate} />
+            <KPIWidget userId={profile?.id} orgId={profile?.org_id} />
           </div>
         )
       case 'team-leaderboard':

@@ -1256,12 +1256,19 @@ export default function SuperAdmin() {
                         : platform === 'web'
                         ? { label: 'Web', cls: 'bg-[#2a3d55] text-[#8A9AB0]' }
                         : null
+                      const roleLabel = u.org_role || u.role || 'user'
+                      const roleBadgeCls =
+                        roleLabel === 'admin'       ? 'bg-[#C8622A]/20 text-[#C8622A] border border-[#C8622A]/30' :
+                        roleLabel === 'technician'  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                        roleLabel === 'rep'         ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                        roleLabel === 'superadmin'  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                        'bg-[#2a3d55] text-[#8A9AB0] border border-[#2a3d55]'
                       return (
                         <div key={u.id} className="flex items-center justify-between bg-[#0F1C2E] rounded-lg px-4 py-3 border border-[#2a3d55]">
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-white text-sm font-medium">{u.full_name || '—'}</p>
-                              <span className="text-[#4a5d75] text-xs">{u.org_role || u.role}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded font-semibold capitalize ${roleBadgeCls}`}>{roleLabel}</span>
                               {platformBadge && (
                                 <span className={`text-xs px-2 py-0.5 rounded font-semibold ${platformBadge.cls}`}>
                                   {platformBadge.label}

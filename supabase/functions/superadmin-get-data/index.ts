@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
       adminClient
         .from('profiles')
         .select('id, full_name, email, org_id, role, org_role, company_name, phone, created_at, team_id, is_regional_vp, is_operations_manager, bill_to_address, bill_to_city, bill_to_state, bill_to_zip, ship_to_address, ship_to_city, ship_to_state, ship_to_zip, last_login_platform')
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: true }),
       adminClient.auth.admin.listUsers({ perPage: 1000 }),
       adminClient.from('profiles').select('id, full_name, email, created_at').eq('role', 'superadmin').order('created_at'),
       adminClient

@@ -226,6 +226,80 @@ const TOOLS = [
       required: [],
     },
   },
+  {
+    name: "update_proposal_status",
+    description: "Mark a proposal as Won or Lost. When marking Won, a job is automatically created. Always search for the proposal first to confirm which one the user means.",
+    input_schema: {
+      type: "object",
+      properties: {
+        proposal_name: { type: "string", description: "Name of the proposal to update" },
+        company: { type: "string", description: "Client company name (used if proposal name is not known)" },
+        status: { type: "string", enum: ["Won", "Lost"], description: "New status" },
+        confirmed: { type: "boolean", description: "Must be true — user has confirmed they want to mark it Won or Lost" },
+      },
+      required: ["status", "confirmed"],
+    },
+  },
+  {
+    name: "update_proposal",
+    description: "Update a proposal's pipeline stage, close date, or estimated value.",
+    input_schema: {
+      type: "object",
+      properties: {
+        proposal_name: { type: "string", description: "Name of the proposal to update" },
+        company: { type: "string", description: "Client company name (used if proposal name is not known)" },
+        stage_name: { type: "string", description: "Pipeline stage name to move the proposal to (optional)" },
+        close_date: { type: "string", description: "New close/target date in YYYY-MM-DD format (optional)" },
+        proposal_value: { type: "number", description: "New estimated value in dollars (optional)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "create_invoice",
+    description: "Create a draft invoice for a client, optionally linked to a proposal.",
+    input_schema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Client company name" },
+        proposal_name: { type: "string", description: "Proposal to link the invoice to (optional)" },
+        amount: { type: "number", description: "Invoice total amount in dollars" },
+        due_days: { type: "number", description: "Number of days until due (default 30)" },
+        description: { type: "string", description: "Invoice description or memo" },
+      },
+      required: ["company", "amount"],
+    },
+  },
+  {
+    name: "schedule_meeting",
+    description: "Schedule a meeting with a client. Stores it as a task with a meeting type so it appears in the client's Meetings tab.",
+    input_schema: {
+      type: "object",
+      properties: {
+        company: { type: "string", description: "Client company name" },
+        title: { type: "string", description: "Meeting subject/title" },
+        date: { type: "string", description: "Meeting date in YYYY-MM-DD format" },
+        time: { type: "string", description: "Meeting start time in HH:MM (24h) format (optional)" },
+        duration_minutes: { type: "number", description: "Duration in minutes (default 60)" },
+        meeting_type: { type: "string", enum: ["Sales Call", "Demo", "Follow-up", "Site Visit", "Kickoff", "Check-in", "Other"], description: "Type of meeting (default: Sales Call)" },
+        is_virtual: { type: "boolean", description: "Is this a virtual/video meeting? (default false)" },
+        notes: { type: "string", description: "Meeting notes or agenda (optional)" },
+      },
+      required: ["company", "title", "date"],
+    },
+  },
+  {
+    name: "get_reports",
+    description: "Pull revenue, pipeline, or win-rate reports. Can report by rep, by time period, or overall.",
+    input_schema: {
+      type: "object",
+      properties: {
+        type: { type: "string", enum: ["revenue_by_rep", "win_rate", "pipeline_value", "top_clients"], description: "Report type" },
+        period_days: { type: "number", description: "Number of days to look back (default 90). Use 30 for last month, 365 for last year." },
+      },
+      required: ["type"],
+    },
+  },
 ]
 
 const DEFAULT_ALL_WRITE: Record<string, string> = {
@@ -266,6 +340,11 @@ const TOOL_PERMS: Record<string, { area: string; write?: boolean }> = {
   get_recent_activity:    { area: 'dashboard' },
   get_inventory:          { area: 'inventory' },
   search_products:        { area: 'productLibrary' },
+  update_proposal_status: { area: 'proposals',      write: true },
+  update_proposal:        { area: 'proposals',      write: true },
+  create_invoice:         { area: 'invoices',       write: true },
+  schedule_meeting:       { area: 'clients',        write: true },
+  get_reports:            { area: 'reports' },
 }
 
 async function executeTool(name: string, input: any, supabase: any, orgId: string, userId: string, perms: Record<string, string>) {
@@ -666,6 +745,199 @@ async function executeTool(name: string, input: any, supabase: any, orgId: strin
       return { total_items: results.length, items: results }
     }
 
+    case "update_proposal_status": {
+      if (!input.confirmed) return { error: "User confirmation required before marking a proposal Won or Lost." }
+      let proposal = null
+      if (input.proposal_name) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company, status, org_id")
+          .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
+        proposal = data
+      } else if (input.company) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company, status, org_id")
+          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
+          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
+        proposal = data
+      }
+      if (!proposal) return { error: "No matching proposal found." }
+      if (proposal.status === input.status) return { error: `Proposal is already marked ${input.status}.` }
+
+      if (input.status === "Won") {
+        // Create a job for Won proposals
+        const { data: existingJob } = await supabase.from("jobs").select("id").eq("proposal_id", proposal.id).maybeSingle()
+        if (!existingJob) {
+          const { data: orgData } = await supabase.from("organizations").select("job_counter").eq("id", orgId).single()
+          const jobNumber = `JOB-${orgData?.job_counter || 1000}`
+          await supabase.from("organizations").update({ job_counter: (orgData?.job_counter || 1000) + 1 }).eq("id", orgId)
+          await supabase.from("jobs").insert({
+            org_id: orgId, proposal_id: proposal.id, job_number: jobNumber,
+            name: proposal.proposal_name, status: "Pending",
+          })
+        }
+      }
+
+      const { error } = await supabase.from("proposals").update({ status: input.status }).eq("id", proposal.id)
+      if (error) return { error: error.message }
+      return { success: true, proposal_name: proposal.proposal_name, company: proposal.company, status: input.status, action: "updated_proposal_status" }
+    }
+
+    case "update_proposal": {
+      let proposal = null
+      if (input.proposal_name) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company")
+          .eq("org_id", orgId).ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
+        proposal = data
+      } else if (input.company) {
+        const { data } = await supabase.from("proposals").select("id, proposal_name, company")
+          .eq("org_id", orgId).ilike("company", `%${input.company}%`)
+          .not("status", "in", '("Won","Lost")').order("created_at", { ascending: false }).limit(1).maybeSingle()
+        proposal = data
+      }
+      if (!proposal) return { error: "No matching proposal found." }
+
+      const updates: Record<string, any> = {}
+      if (input.close_date) updates.close_date = input.close_date
+      if (input.proposal_value !== undefined) updates.proposal_value = input.proposal_value
+
+      if (input.stage_name) {
+        const { data: stage } = await supabase.from("pipeline_stages")
+          .select("id, name").eq("org_id", orgId).ilike("name", `%${input.stage_name}%`).limit(1).maybeSingle()
+        if (!stage) return { error: `No pipeline stage found matching "${input.stage_name}".` }
+        updates.pipeline_stage_id = stage.id
+      }
+
+      if (Object.keys(updates).length === 0) return { error: "No fields provided to update." }
+      const { error } = await supabase.from("proposals").update(updates).eq("id", proposal.id)
+      if (error) return { error: error.message }
+      return { success: true, proposal_name: proposal.proposal_name, company: proposal.company, updated_fields: Object.keys(updates), action: "updated_proposal" }
+    }
+
+    case "create_invoice": {
+      const { data: client } = await supabase.from("clients")
+        .select("id, company").eq("org_id", orgId).ilike("company", `%${input.company}%`).limit(1).maybeSingle()
+      if (!client) return { error: `No client found matching "${input.company}".` }
+
+      let proposalId = null
+      if (input.proposal_name) {
+        const { data: pr } = await supabase.from("proposals")
+          .select("id").eq("org_id", orgId).eq("client_id", client.id)
+          .ilike("proposal_name", `%${input.proposal_name}%`).limit(1).maybeSingle()
+        proposalId = pr?.id || null
+      }
+
+      // Get next invoice number
+      const { data: orgData } = await supabase.from("organizations").select("invoice_counter").eq("id", orgId).single()
+      const counter = (orgData?.invoice_counter || 1000) + 1
+      await supabase.from("organizations").update({ invoice_counter: counter }).eq("id", orgId)
+      const invoiceNumber = `INV-${counter}`
+
+      const today = new Date().toISOString().split("T")[0]
+      const dueDays = input.due_days ?? 30
+      const dueDate = new Date(Date.now() + dueDays * 86400000).toISOString().split("T")[0]
+      const amount = input.amount
+
+      const { data: inv, error } = await supabase.from("invoices").insert({
+        org_id: orgId,
+        client_id: client.id,
+        proposal_id: proposalId,
+        invoice_number: invoiceNumber,
+        status: "Draft",
+        issued_date: today,
+        due_date: dueDate,
+        subtotal: amount,
+        tax_percent: 0,
+        tax_amount: 0,
+        total: amount,
+        amount_paid: 0,
+        balance_due: amount,
+        description: input.description || `Invoice for ${client.company}`,
+      }).select("id, invoice_number").single()
+      if (error) return { error: error.message }
+      return { success: true, id: inv.id, invoice_number: inv.invoice_number, amount, due_date: dueDate, action: "created_invoice" }
+    }
+
+    case "schedule_meeting": {
+      const { data: client } = await supabase.from("clients")
+        .select("id, company").eq("org_id", orgId).ilike("company", `%${input.company}%`).limit(1).maybeSingle()
+      if (!client) return { error: `No client found matching "${input.company}".` }
+
+      const { data, error } = await supabase.from("tasks").insert({
+        org_id: orgId,
+        user_id: userId,
+        assigned_to: userId,
+        created_by: userId,
+        client_id: client.id,
+        title: input.title,
+        due_date: input.date,
+        start_time: input.time || null,
+        duration_minutes: input.duration_minutes || 60,
+        meeting_type: input.meeting_type || "Sales Call",
+        is_virtual: input.is_virtual || false,
+        meeting_notes: input.notes || null,
+        completed: false,
+        priority: "normal",
+      }).select("id, title").single()
+      if (error) return { error: error.message }
+      return { success: true, id: data.id, title: data.title, company: client.company, date: input.date, time: input.time || null, action: "scheduled_meeting" }
+    }
+
+    case "get_reports": {
+      const periodDays = input.period_days ?? 90
+      const since = new Date(Date.now() - periodDays * 86400000).toISOString().split("T")[0]
+
+      if (input.type === "revenue_by_rep") {
+        const { data: proposals } = await supabase.from("proposals")
+          .select("rep_name, proposal_value, status, created_at")
+          .eq("org_id", orgId).gte("created_at", since)
+        const repMap: Record<string, { won: number; active: number; count: number }> = {}
+        for (const p of (proposals || [])) {
+          const rep = p.rep_name || "Unassigned"
+          if (!repMap[rep]) repMap[rep] = { won: 0, active: 0, count: 0 }
+          repMap[rep].count++
+          if (p.status === "Won") repMap[rep].won += p.proposal_value || 0
+          else if (!["Lost"].includes(p.status)) repMap[rep].active += p.proposal_value || 0
+        }
+        return { period_days: periodDays, by_rep: Object.entries(repMap).map(([rep, d]) => ({ rep, ...d })).sort((a, b) => b.won - a.won) }
+      }
+
+      if (input.type === "win_rate") {
+        const { data: proposals } = await supabase.from("proposals")
+          .select("status, proposal_value, rep_name").eq("org_id", orgId).gte("created_at", since)
+        const total = (proposals || []).length
+        const won = (proposals || []).filter(p => p.status === "Won").length
+        const lost = (proposals || []).filter(p => p.status === "Lost").length
+        const wonValue = (proposals || []).filter(p => p.status === "Won").reduce((s, p) => s + (p.proposal_value || 0), 0)
+        return { period_days: periodDays, total_proposals: total, won, lost, open: total - won - lost, win_rate_pct: total > 0 ? Math.round((won / (won + lost || 1)) * 100) : 0, won_value: wonValue }
+      }
+
+      if (input.type === "pipeline_value") {
+        const { data: proposals } = await supabase.from("proposals")
+          .select("status, proposal_value, pipeline_stages(name)").eq("org_id", orgId)
+          .not("status", "in", '("Won","Lost")')
+        const total = (proposals || []).reduce((s, p) => s + (p.proposal_value || 0), 0)
+        const byStage: Record<string, number> = {}
+        for (const p of (proposals || [])) {
+          const stage = (p.pipeline_stages as any)?.name || p.status || "Unknown"
+          byStage[stage] = (byStage[stage] || 0) + (p.proposal_value || 0)
+        }
+        return { total_pipeline: total, by_stage: byStage }
+      }
+
+      if (input.type === "top_clients") {
+        const { data: proposals } = await supabase.from("proposals")
+          .select("company, client_id, proposal_value, status").eq("org_id", orgId).gte("created_at", since)
+        const clientMap: Record<string, { won: number; total: number }> = {}
+        for (const p of (proposals || [])) {
+          const co = p.company || "Unknown"
+          if (!clientMap[co]) clientMap[co] = { won: 0, total: 0 }
+          clientMap[co].total += p.proposal_value || 0
+          if (p.status === "Won") clientMap[co].won += p.proposal_value || 0
+        }
+        return { period_days: periodDays, top_clients: Object.entries(clientMap).map(([company, d]) => ({ company, ...d })).sort((a, b) => b.won - a.won).slice(0, 10) }
+      }
+
+      return { error: "Unknown report type." }
+    }
+
     default:
       return { error: `Unknown tool: ${name}` }
   }
@@ -771,7 +1043,7 @@ ${helpContext}
 Today's date is ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.`
       : `You are a helpful assistant built into ForgePt, a field service and sales management platform. You help users manage their business by creating and retrieving data through natural language.
 
-You have access to tools to create and update clients, search clients and proposals, log activity (calls, emails, meetings, notes) against clients or proposals, get a deal summary with AI recommendations, get a full client overview, create service tickets, tasks, and proposals, view pipeline summaries, look up inventory stock levels, and search the product library. You can also answer questions about how ForgePt features work.
+You have access to tools to create and update clients, search clients and proposals, log activity (calls, emails, meetings, notes) against clients or proposals, get a deal summary with AI recommendations, get a full client overview, create service tickets, tasks, proposals, and invoices, view pipeline summaries, look up inventory stock levels, search the product library, schedule meetings, pull revenue and win-rate reports, update a proposal's stage or close date, and mark proposals as Won or Lost. You can also answer questions about how ForgePt features work.
 - When a user asks about inventory, stock levels, what's in stock, or what parts are on hand — always call get_inventory. Never say inventory is empty without calling it first.
 ${helpContext}
 
