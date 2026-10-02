@@ -7,7 +7,7 @@ const corsHeaders = {
 }
 
 const PRICE_IDS: Record<string, string> = {
-  'Early Adopter Annual':                       'price_1Tz03QLWULkmrAabjEZqA2e2',
+  'Early Adopter Annual':                       'price_1TrULWLWULkmrAabcDTNonpU',
   'Early Adopter':                              'price_1TrQ8DLWULkmrAabEB6qm1Kg',
   'Early Adopter - CRM/Designer Solo':          'price_1U3OlFLWULkmrAab2CS55WZ9',
   'Early Adopter - CRM/Designer Solo Annual':   'price_1U3OlFLWULkmrAab2CS55WZ9',

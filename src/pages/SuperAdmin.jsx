@@ -702,9 +702,10 @@ export default function SuperAdmin() {
       if (error) setStripeResult({ success: false, message: error.message })
       else if (result?.error) setStripeResult({ success: false, message: result.error })
       else {
-        setStripeResult({ success: true, message: `Subscription created! Status: ${result?.status}` })
+        setStripeResult({ success: true, message: `Subscription created! Invoice sent. Closing...` })
         fetchData()
         fetchStripeData(stripeModal.org.id)
+        setTimeout(() => { setStripeModal(null); setStripeResult(null) }, 2000)
       }
     } catch (err) {
       setStripeResult({ success: false, message: err.message })
@@ -1463,8 +1464,8 @@ export default function SuperAdmin() {
                             </div>
                           </div>
                           <div className="flex items-center justify-between pt-1">
-                            <p className="text-[#8A9AB0] text-xs font-mono">{stripeData.customerId}</p>
-                            <p className="text-[#8A9AB0] text-xs font-mono">{stripeData.subscription.id}</p>
+                            <a href={`https://dashboard.stripe.com/customers/${stripeData.customerId}`} target="_blank" rel="noreferrer" className="text-[#8A9AB0] text-xs font-mono hover:text-[#C8622A] transition-colors" title="Open in Stripe">{stripeData.customerId}</a>
+                            <a href={`https://dashboard.stripe.com/subscriptions/${stripeData.subscription.id}`} target="_blank" rel="noreferrer" className="text-[#8A9AB0] text-xs font-mono hover:text-[#C8622A] transition-colors" title="Open in Stripe">{stripeData.subscription.id}</a>
                           </div>
                         </>
                       )}
