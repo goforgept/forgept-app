@@ -2115,6 +2115,22 @@ export default function SuperAdmin() {
                 <input type="email" value={stripeForm.email || ''} onChange={e => setStripeForm(p => ({ ...p, email: e.target.value }))}
                   placeholder="customer@example.com"
                   className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                {(stripeModal.admin?.email || stripeModal.org.billing_contact_email) && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {stripeModal.admin?.email && (
+                      <button type="button" onClick={() => setStripeForm(p => ({ ...p, email: stripeModal.admin.email }))}
+                        className={`text-xs px-2 py-1 rounded border transition-colors ${stripeForm.email === stripeModal.admin.email ? 'border-[#C8622A] text-[#C8622A] bg-[#C8622A]/10' : 'border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A]'}`}>
+                        Admin: {stripeModal.admin.email}
+                      </button>
+                    )}
+                    {stripeModal.org.billing_contact_email && (
+                      <button type="button" onClick={() => setStripeForm(p => ({ ...p, email: stripeModal.org.billing_contact_email }))}
+                        className={`text-xs px-2 py-1 rounded border transition-colors ${stripeForm.email === stripeModal.org.billing_contact_email ? 'border-[#C8622A] text-[#C8622A] bg-[#C8622A]/10' : 'border-[#2a3d55] text-[#8A9AB0] hover:border-[#C8622A] hover:text-[#C8622A]'}`}>
+                        Billing: {stripeModal.org.billing_contact_email}
+                      </button>
+                    )}
+                  </div>
+                )}
                 <p className="text-[#8A9AB0] text-xs mt-1">Stripe will send the invoice to this address.</p>
               </div>
               <div>
