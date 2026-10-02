@@ -1098,7 +1098,7 @@ export default function SuperAdmin() {
                       <div className="flex items-center gap-3">
                         <button onClick={async () => {
                           setSavingBillingAddress(true)
-                          await supabase.from('organizations').update({
+                          const { error: saveErr } = await supabase.from('organizations').update({
                             bill_to_name:           billingAddressForm.bill_to_name  || null,
                             bill_to_address:        billingAddressForm.bill_to_address || null,
                             bill_to_city:           billingAddressForm.bill_to_city   || null,
@@ -1111,8 +1111,9 @@ export default function SuperAdmin() {
                             billing_contact_name:   billingAddressForm.billing_contact_name  || null,
                             billing_contact_email:  billingAddressForm.billing_contact_email || null,
                           }).eq('id', org.id)
-                          setOrgs(prev => prev.map(o => o.id === org.id ? { ...o, ...billingAddressForm } : o))
                           setSavingBillingAddress(false)
+                          if (saveErr) { alert('Error saving: ' + saveErr.message); return }
+                          setOrgs(prev => prev.map(o => o.id === org.id ? { ...o, ...billingAddressForm } : o))
                           setEditingBillingAddress(null)
                         }} disabled={savingBillingAddress}
                           className="bg-[#C8622A] text-white px-3 py-1 rounded text-xs font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
