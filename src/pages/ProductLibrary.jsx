@@ -533,7 +533,7 @@ if (!finalCost) continue
                 {showImportExportMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowImportExportMenu(false)} />
-                    <div className="absolute right-0 mt-1.5 w-52 bg-fp-card border border-fp-border rounded-xl shadow-xl z-20 overflow-hidden">
+                    <div className="absolute left-0 sm:left-auto sm:right-0 mt-1.5 w-52 bg-fp-card border border-fp-border rounded-xl shadow-xl z-20 overflow-hidden">
                       <label className="flex items-center gap-3 px-4 py-3 hover:bg-fp-hover cursor-pointer transition-colors group">
                         <span className="text-fp-brand text-base">↑</span>
                         <div>
