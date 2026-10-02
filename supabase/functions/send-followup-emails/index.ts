@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
     }
 
     const proposalsRes = await fetch(
-      `${supabaseUrl}/rest/v1/proposals?status=eq.Sent&select=*`,
+      `${supabaseUrl}/rest/v1/proposals?status=eq.Sent&is_current_revision=eq.true&select=*`,
       { headers: dbHeaders }
     )
     const proposals = await proposalsRes.json()
@@ -248,7 +248,7 @@ Deno.serve(async (req) => {
           repUrgency = `There are only ${daysUntilClose} days left until the close date. A follow-up email has been sent to the client.`
         } else {
           repSubject = `Follow-up sent — ${proposal.proposal_name}`
-          repUrgency = `A follow-up email has been sent to ${clientName} at ${proposal.company}. The close date is ${daysUntilClose} days away.`
+          repUrgency = `A follow-up email has been sent to ${proposal.client_name || proposal.company || 'the client'} at ${proposal.company}. The close date is ${daysUntilClose} days away.`
         }
 
         try {
@@ -262,11 +262,15 @@ Deno.serve(async (req) => {
           console.error(`Rep email failed for ${proposal.id}:`, e)
         }
 
-        await fetch(`${supabaseUrl}/rest/v1/followup_log`, {
+        const logInsertRes = await fetch(`${supabaseUrl}/rest/v1/followup_log`, {
           method: 'POST',
           headers: { ...dbHeaders, 'Prefer': 'return=minimal' },
           body: JSON.stringify({ proposal_id: proposal.id, days_until_close: daysUntilClose })
         })
+        if (!logInsertRes.ok) {
+          const logErr = await logInsertRes.text()
+          console.error(`followup_log insert failed for proposal ${proposal.id}:`, logErr)
+        }
 
         // Log to activities so the timeline and AI agent see it
         const activityTitle = daysUntilClose === 0
