@@ -784,10 +784,9 @@ export default function BomSection({
                               })
                             }} />
                         </th>
-                        {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ...(featureMsrp ? ['MSRP'] : []), ...(featureComplianceFields ? ['Lead Time', 'COO', 'Berry'] : []), '🔄', ''].map(h => (
+                        {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost', 'Markup %', 'Customer Price', ...(featureMsrp ? ['MSRP'] : []), ...(featureComplianceFields ? ['Lead Time', 'COO', 'Berry'] : []), '🔄', ...(editSections.length > 0 ? ['Move'] : []), ''].map(h => (
                           <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
                         ))}
-                        {editSections.length > 0 && <th className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">Move</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -898,15 +897,15 @@ export default function BomSection({
                             <td className="py-1 text-center">
                               <input type="checkbox" checked={!!line.recurring} onChange={e => onUpdateEditLine(i, 'recurring', e.target.checked)} className="accent-fp-brand cursor-pointer" title="Recurring" />
                             </td>
-                            <td className="py-1">
-                              <button onClick={() => setEditLines(prev => prev.filter((_, idx) => idx !== i))} className="text-fp-muted hover:text-red-400 text-xs">✕</button>
-                            </td>
                             {editSections.length > 0 && (
                               <td className="py-1">
                                 <button onClick={() => onMoveLineToSection(i)}
                                   className="bg-fp-inset hover:bg-[#C8622A]/20 hover:text-[#C8622A] text-fp-muted text-xs px-2 py-1 rounded transition-colors whitespace-nowrap" title="Move to section">⇄ Move</button>
                               </td>
                             )}
+                            <td className="py-1">
+                              <button onClick={() => setEditLines(prev => prev.filter((_, idx) => idx !== i))} className="text-fp-muted hover:text-red-400 text-xs">✕</button>
+                            </td>
                           </tr>
                         )
                       })}
