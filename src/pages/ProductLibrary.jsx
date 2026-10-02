@@ -55,6 +55,7 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [bulkEditForm, setBulkEditForm] = useState({ category: '', sub_category: '', manufacturer: '', unit: '' })
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportVendor, setExportVendor] = useState('')
+  const [showImportExportMenu, setShowImportExportMenu] = useState(false)
   // Catalogs
   const [enabledCatalogs, setEnabledCatalogs] = useState([]) // [{ slug, label }]
   const [catalogItems, setCatalogItems] = useState([])        // catalog_products rows for active slugs
@@ -325,7 +326,8 @@ if (!finalCost) continue
   const exportLibrary = (vendor) => {
     const headers = ['Item Name', 'Manufacturer', 'Part #', 'Category', 'Unit', 'Description', 'Vendor', 'Your Cost', 'Pricing Date']
     const rows = []
-    products.forEach(p => {
+    const sorted = [...products].sort((a, b) => (a.manufacturer || '').localeCompare(b.manufacturer || ''))
+    sorted.forEach(p => {
       const allPrices = pricing[p.id] || []
       const vendorPrice = vendor ? allPrices.find(pr => pr.vendor === vendor) : null
       rows.push([
@@ -516,15 +518,51 @@ if (!finalCost) continue
             <p className="text-fp-muted text-sm mt-0.5">{products.length} products · {Object.values(pricing).flat().length} vendor prices</p>
           </div>
           {canEdit && (
-            <div className="flex gap-2">
-              <button onClick={downloadTemplate} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">↓ Template</button>
-              {products.length > 0 && (
-                <button onClick={() => { setExportVendor(''); setShowExportModal(true) }} className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">↓ Export Library</button>
-              )}
-              <label className="bg-fp-inset text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors cursor-pointer">
-                {uploading ? 'Importing...' : '↑ Import Excel'}
-                <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" disabled={uploading} />
-              </label>
+            <div className="flex gap-2 items-center">
+              {/* Import/Export dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowImportExportMenu(p => !p)}
+                  className="flex items-center gap-1.5 bg-fp-card border border-fp-border text-fp-text px-4 py-2 rounded-lg text-sm hover:bg-fp-hover transition-colors">
+                  Import / Export
+                  <svg className={`w-3.5 h-3.5 text-fp-muted transition-transform ${showImportExportMenu ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                </button>
+                {showImportExportMenu && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowImportExportMenu(false)} />
+                    <div className="absolute right-0 mt-1.5 w-52 bg-fp-card border border-fp-border rounded-xl shadow-xl z-20 overflow-hidden">
+                      <label className="flex items-center gap-3 px-4 py-3 hover:bg-fp-hover cursor-pointer transition-colors group">
+                        <span className="text-fp-brand text-base">↑</span>
+                        <div>
+                          <p className="text-fp-text text-sm font-medium">{uploading ? 'Importing…' : 'Import Excel'}</p>
+                          <p className="text-fp-muted text-xs">Add or update products</p>
+                        </div>
+                        <input type="file" accept=".xlsx,.xls,.csv" onChange={e => { setShowImportExportMenu(false); handleFileUpload(e) }} className="hidden" disabled={uploading} />
+                      </label>
+                      <div className="border-t border-fp-border" />
+                      {products.length > 0 && (
+                        <button onClick={() => { setShowImportExportMenu(false); setExportVendor(''); setShowExportModal(true) }}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-fp-hover transition-colors text-left">
+                          <span className="text-fp-muted text-base">↓</span>
+                          <div>
+                            <p className="text-fp-text text-sm font-medium">Export for Vendor</p>
+                            <p className="text-fp-muted text-xs">Send for pricing requests</p>
+                          </div>
+                        </button>
+                      )}
+                      <div className="border-t border-fp-border" />
+                      <button onClick={() => { setShowImportExportMenu(false); downloadTemplate() }}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-fp-hover transition-colors text-left">
+                        <span className="text-fp-muted text-base">⬚</span>
+                        <div>
+                          <p className="text-fp-text text-sm font-medium">Download Template</p>
+                          <p className="text-fp-muted text-xs">Blank import sheet</p>
+                        </div>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
               <button onClick={() => { setShowAddForm(p => !p); setError(null) }}
                 className="bg-fp-brand text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors">
                 {showAddForm ? 'Cancel' : '+ Add Product'}
