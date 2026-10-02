@@ -30,7 +30,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
   const [invoices, setInvoices] = useState([])
   const [purchaseOrders, setPurchaseOrders] = useState([])
   const [loading, setLoading] = useState(true)
-  const [period, setPeriod] = useState('all')
+  const [period, setPeriod] = useState(() => localStorage.getItem('adminDashboardPeriod') || 'all')
   const [orgType] = useState(() => sessionStorage.getItem('orgType') || 'integrator')
   const [showSetTargetModal, setShowSetTargetModal] = useState(false)
   const [targetForm, setTargetForm] = useState({ profile_id: '', revenue_target: '', deals_target: '', period_start: new Date().toISOString().split('T')[0].slice(0, 7) + '-01' })
@@ -61,7 +61,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
     const [proposalsRes, lineItemsRes, clientsRes, profilesRes, targetsRes, invoicesRes, posRes, recurringRes, jobsRes, logsRes, coRes, expiredRes] = await Promise.all([
-      supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).is('archived_at', null).eq('is_current_revision', true).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('id,proposal_name,company,client_name,client_email,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,subtotal_value,total_customer_value,total_your_cost,total_gross_margin_dollars,total_gross_margin_percent,labor_items,created_at,org_id,user_id,collaborator_ids,has_recurring,scope_of_work,job_description,submission_type').eq('org_id', profile.org_id).is('archived_at', null).eq('is_current_revision', true).order('created_at', { ascending: false }),
       supabase.from('bom_line_items').select('vendor, customer_price_total, proposal_id'),
       supabase.from('clients').select('*').eq('org_id', profile.org_id).is('archived_at', null),
       supabase.from('profiles').select('id, full_name, email, region_id').eq('org_id', profile.org_id),
@@ -142,8 +142,9 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     return proposals.filter(p => new Date(p.created_at) >= startDate)
   }, [proposals, period])
 
-  const activePipeline = filteredProposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
-  const wonPipeline = filteredProposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+  const pval = p => p.subtotal_value ?? p.proposal_value ?? 0
+  const activePipeline = filteredProposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').reduce((sum, p) => sum + pval(p), 0)
+  const wonPipeline = filteredProposals.filter(p => p.status === 'Won').reduce((sum, p) => sum + pval(p), 0)
   const closingSoon = filteredProposals.filter(p => {
     if (!p.close_date) return false
     const days = Math.ceil((new Date(p.close_date) - new Date()) / (1000 * 60 * 60 * 24))
@@ -173,8 +174,8 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
       const rep = p.rep_name || 'Unknown'
       if (!acc.has(rep)) acc.set(rep, { name: rep, pipeline: 0, won: 0, count: 0, margins: [] })
       const entry = acc.get(rep)
-      entry.pipeline += p.proposal_value || 0
-      if (p.status === 'Won') entry.won += p.proposal_value || 0
+      entry.pipeline += pval(p)
+      if (p.status === 'Won') entry.won += pval(p)
       entry.count += 1
       if (p.total_gross_margin_percent) entry.margins.push(p.total_gross_margin_percent)
       return acc
@@ -199,8 +200,8 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
         if (!client) return
         clientMap[p.client_id] = { id: p.client_id, name: client.company || p.company || 'Unknown', pipeline: 0, won: 0, count: 0 }
       }
-      clientMap[p.client_id].pipeline += p.proposal_value || 0
-      if (p.status === 'Won') clientMap[p.client_id].won += p.proposal_value || 0
+      clientMap[p.client_id].pipeline += pval(p)
+      if (p.status === 'Won') clientMap[p.client_id].won += pval(p)
       clientMap[p.client_id].count += 1
     })
     return Object.values(clientMap).sort((a, b) => b.pipeline - a.pipeline).slice(0, 5)
@@ -311,7 +312,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
     return profiles.map(p => {
       const target = targets.find(t => t.profile_id === p.id && t.period_start === monthStart)
       const repProposals = proposals.filter(prop => prop.rep_name === p.full_name && prop.status === 'Won')
-      const wonRevenue = repProposals.reduce((sum, prop) => sum + (prop.proposal_value || 0), 0)
+      const wonRevenue = repProposals.reduce((sum, prop) => sum + pval(prop), 0)
       const wonDeals = repProposals.length
       return { ...p, target, wonRevenue, wonDeals, progress: target?.revenue_target > 0 ? Math.min(100, Math.round((wonRevenue / target.revenue_target) * 100)) : null }
     }).filter(p => p.target || p.wonRevenue > 0)
@@ -336,7 +337,7 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               )}
             </div>
             <div className="flex items-center gap-2">
-              <select value={period} onChange={e => setPeriod(e.target.value)}
+              <select value={period} onChange={e => { setPeriod(e.target.value); localStorage.setItem('adminDashboardPeriod', e.target.value) }}
                 className="bg-fp-card border border-fp-border text-fp-text text-xs font-semibold rounded-lg px-3 py-1.5 focus:outline-none focus:border-fp-brand cursor-pointer">
                 {Object.entries(periodLabels).map(([key, label]) => (
                   <option key={key} value={key}>{label}</option>
@@ -1076,22 +1077,36 @@ export default function AdminDashboard({ isAdmin, featureProposals = true, featu
               <button onClick={() => setShowCustomize(false)} className="text-[#8A9AB0] hover:text-white text-xl leading-none transition-colors">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
-              <p className="text-[#8A9AB0] text-xs mb-4">Toggle sections on or off. Changes save automatically.</p>
-              {ADMIN_WIDGET_DEFS.map(d => {
-                const isOn = widgetConfig.includes(d.id)
-                return (
-                  <div key={d.id} className="flex items-start justify-between gap-3 bg-[#0F1C2E] rounded-xl px-4 py-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-semibold">{d.label}</p>
-                      <p className="text-[#8A9AB0] text-xs mt-0.5 leading-relaxed">{d.desc}</p>
-                    </div>
-                    <button onClick={() => toggleWidget(d.id)}
-                      className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 relative mt-0.5 ${isOn ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
-                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isOn ? 'left-6' : 'left-1'}`} />
+              {/* Default Period Filter */}
+              <div className="mb-2">
+                <p className="text-white text-sm font-semibold mb-2">Default Period Filter</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(periodLabels).map(([val, label]) => (
+                    <button key={val} onClick={() => { setPeriod(val); localStorage.setItem('adminDashboardPeriod', val) }}
+                      className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors text-left ${period === val ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white border border-[#2a3d55]'}`}>
+                      {label}
                     </button>
-                  </div>
-                )
-              })}
+                  ))}
+                </div>
+              </div>
+              <div className="border-t border-[#2a3d55] pt-3">
+                <p className="text-[#8A9AB0] text-xs mb-3">Toggle sections on or off. Changes save automatically.</p>
+                {ADMIN_WIDGET_DEFS.map(d => {
+                  const isOn = widgetConfig.includes(d.id)
+                  return (
+                    <div key={d.id} className="flex items-start justify-between gap-3 bg-[#0F1C2E] rounded-xl px-4 py-3 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-semibold">{d.label}</p>
+                        <p className="text-[#8A9AB0] text-xs mt-0.5 leading-relaxed">{d.desc}</p>
+                      </div>
+                      <button onClick={() => toggleWidget(d.id)}
+                        className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 relative mt-0.5 ${isOn ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                        <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isOn ? 'left-6' : 'left-1'}`} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
             <div className="p-5 border-t border-[#2a3d55]">
               <button onClick={() => saveWidgetConfig(DEFAULT_ADMIN_WIDGETS)}
