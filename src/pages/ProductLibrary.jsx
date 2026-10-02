@@ -53,6 +53,7 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [showBulkEditModal, setShowBulkEditModal] = useState(false)
   const [bulkEditForm, setBulkEditForm] = useState({ category: '', sub_category: '', manufacturer: '', unit: '' })
+  const [bulkIsComponent, setBulkIsComponent] = useState(null) // null = don't change, true/false = set
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportVendor, setExportVendor] = useState('')
   const [showImportExportMenu, setShowImportExportMenu] = useState(false)
@@ -448,11 +449,13 @@ if (!finalCost) continue
 
   const handleBulkEdit = async () => {
     const updates = Object.fromEntries(Object.entries(bulkEditForm).filter(([, v]) => v.trim() !== ''))
+    if (bulkIsComponent !== null) updates.is_component = bulkIsComponent
     if (Object.keys(updates).length === 0) return
     await Promise.all([...selectedIds].map(id => supabase.from('product_library').update(updates).eq('id', id)))
     setSelectedIds(new Set())
     setShowBulkEditModal(false)
     setBulkEditForm({ category: '', sub_category: '', manufacturer: '', unit: '' })
+    setBulkIsComponent(null)
     fetchAll()
   }
 
@@ -1074,6 +1077,18 @@ if (!finalCost) continue
                   />
                 </div>
               ))}
+              <div className="pt-1">
+                <label className="text-fp-muted text-xs mb-2 block">Allow as Component</label>
+                <div className="flex gap-2">
+                  {[{ label: 'Don\'t change', val: null }, { label: 'Enable', val: true }, { label: 'Disable', val: false }].map(opt => (
+                    <button key={String(opt.val)} type="button"
+                      onClick={() => setBulkIsComponent(opt.val)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-medium border transition-colors ${bulkIsComponent === opt.val ? 'border-fp-brand bg-fp-brand/10 text-fp-brand' : 'border-fp-border bg-fp-inset text-fp-muted hover:text-fp-text'}`}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
             <div className="flex gap-3 mt-5">
               <button onClick={() => setShowBulkEditModal(false)}
