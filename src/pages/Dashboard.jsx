@@ -315,6 +315,9 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
   const [orgType]                           = useState(() => sessionStorage.getItem('orgType') || 'integrator')
   const [widgetConfig, setWidgetConfig]     = useState(DEFAULT_WIDGETS)
   const [showCustomize, setShowCustomize]   = useState(false)
+  const [dashboardPeriod, setDashboardPeriod] = useState(() => {
+    try { return localStorage.getItem('dashboard_period') || 'all' } catch { return 'all' }
+  })
   const navigate = useNavigate()
   const { isTechnician } = usePermissions()
 
@@ -337,7 +340,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
 
     const [proposalsRes, targetRes, invoicesRes, posRes] = await Promise.all([
-      supabase.from('proposals').select('*').eq('org_id', profileData.org_id).eq('user_id', user.id).eq('is_current_revision', true).order('created_at', { ascending: false }),
+      supabase.from('proposals').select('*').eq('org_id', profileData.org_id).eq('user_id', user.id).eq('is_current_revision', true).neq('is_archived', true).order('created_at', { ascending: false }),
       supabase.from('targets').select('*').eq('profile_id', user.id).eq('period', 'monthly').gte('period_start', monthStart).maybeSingle(),
       supabase.from('invoices').select('*').eq('org_id', profileData.org_id),
       supabase.from('purchase_orders').select('*').eq('org_id', profileData.org_id),
@@ -352,6 +355,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
         .from('proposals')
         .select('id, proposal_name, company, rep_name, status, proposal_value, subtotal_value, created_at')
         .eq('org_id', profileData.org_id)
+        .neq('is_archived', true)
         .order('created_at', { ascending: false })
       setOrgProposals(orgProps || [])
     }
@@ -387,6 +391,27 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
   }
 
   // ── Derived values ───────────────────────────────────────────────
+  const periodStart = (() => {
+    const now = new Date(); now.setHours(0,0,0,0)
+    if (dashboardPeriod === 'this_month')   { return new Date(now.getFullYear(), now.getMonth(), 1) }
+    if (dashboardPeriod === 'this_quarter') { const q = Math.floor(now.getMonth() / 3); return new Date(now.getFullYear(), q * 3, 1) }
+    if (dashboardPeriod === 'this_year')    { return new Date(now.getFullYear(), 0, 1) }
+    if (dashboardPeriod === 'last_30')      { return new Date(now.getTime() - 30 * 864e5) }
+    if (dashboardPeriod === 'last_90')      { return new Date(now.getTime() - 90 * 864e5) }
+    return null
+  })()
+
+  const periodProposals = periodStart
+    ? proposals.filter(p => new Date(p.created_at) >= periodStart)
+    : proposals
+
+  const PERIOD_LABELS = { all: 'All Time', this_month: 'This Month', this_quarter: 'This Quarter', this_year: 'This Year', last_30: 'Last 30 Days', last_90: 'Last 90 Days' }
+
+  const saveDashboardPeriod = (val) => {
+    setDashboardPeriod(val)
+    try { localStorage.setItem('dashboard_period', val) } catch {}
+  }
+
   const filtered = proposals
     .filter(p => statusFilter === 'All' || p.status === statusFilter)
     .filter(p => {
@@ -395,7 +420,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
       return p.proposal_name?.toLowerCase().includes(s) || p.company?.toLowerCase().includes(s) || p.client_name?.toLowerCase().includes(s)
     })
 
-  const wonPipeline    = proposals.filter(p => p.status === 'Won').reduce((s, p) => s + pval(p), 0)
+  const wonPipeline    = periodProposals.filter(p => p.status === 'Won').reduce((s, p) => s + pval(p), 0)
   const targetProgress = target ? Math.min(100, Math.round((wonPipeline / target.revenue_target) * 100)) : null
 
   const laborQuoted = proposals.filter(p => p.status !== 'Won' && p.status !== 'Lost').reduce((s, p) => s + (p.labor_items || []).reduce((ss, l) => ss + (parseFloat(l.customer_price) || 0), 0), 0)
@@ -448,9 +473,9 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
   const renderWidget = (id) => {
     switch (id) {
       case 'revenue-metrics':
-        return <RevenueMetricsWidget key={id} proposals={proposals} />
+        return <RevenueMetricsWidget key={id} proposals={periodProposals} />
       case 'pipeline-stage':
-        return <PipelineStageWidget key={id} proposals={proposals} />
+        return <PipelineStageWidget key={id} proposals={periodProposals} />
       case 'kpi-metrics':
         return (
           <div key={id} className="bg-fp-card rounded-xl p-5 border border-fp-border/40">
@@ -489,10 +514,17 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
             <h1 className="text-fp-text text-2xl font-bold">{greeting}{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}</h1>
             <p className="text-fp-muted text-sm mt-0.5">{dateStr}</p>
           </div>
-          <button onClick={() => setShowCustomize(true)}
-            className="flex items-center gap-2 bg-fp-card border border-fp-border text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm transition-colors">
-            ⚙ Customize
-          </button>
+          <div className="flex items-center gap-2">
+            {dashboardPeriod !== 'all' && (
+              <span className="text-xs bg-fp-card border border-fp-border text-[#C8622A] px-3 py-1.5 rounded-lg font-semibold">
+                {PERIOD_LABELS[dashboardPeriod]}
+              </span>
+            )}
+            <button onClick={() => setShowCustomize(true)}
+              className="flex items-center gap-2 bg-fp-card border border-fp-border text-fp-muted hover:text-fp-text px-4 py-2 rounded-lg text-sm transition-colors">
+              ⚙ Customize
+            </button>
+          </div>
         </div>
 
         {/* ── Monthly Target ── */}
@@ -699,22 +731,36 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
               <button onClick={() => setShowCustomize(false)} className="text-[#8A9AB0] hover:text-white text-xl leading-none transition-colors">✕</button>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-3">
-              <p className="text-[#8A9AB0] text-xs mb-4">Toggle widgets on or off. Changes save automatically.</p>
-              {WIDGET_DEFS.filter(d => !d.adminOnly || isAdmin).map(d => {
-                const on = widgetConfig.includes(d.id)
-                return (
-                  <div key={d.id} className="flex items-start justify-between gap-3 bg-[#0F1C2E] rounded-xl px-4 py-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-semibold">{d.label}</p>
-                      <p className="text-[#8A9AB0] text-xs mt-0.5 leading-relaxed">{d.desc}</p>
-                    </div>
-                    <button onClick={() => toggleWidget(d.id)}
-                      className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 relative mt-0.5 ${on ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
-                      <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${on ? 'left-6' : 'left-1'}`} />
+              {/* Default Period Filter */}
+              <div className="mb-2">
+                <p className="text-white text-sm font-semibold mb-2">Default Period Filter</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(PERIOD_LABELS).map(([val, label]) => (
+                    <button key={val} onClick={() => saveDashboardPeriod(val)}
+                      className={`px-3 py-2 rounded-lg text-xs font-semibold transition-colors text-left ${dashboardPeriod === val ? 'bg-[#C8622A] text-white' : 'bg-[#0F1C2E] text-[#8A9AB0] hover:text-white border border-[#2a3d55]'}`}>
+                      {label}
                     </button>
-                  </div>
-                )
-              })}
+                  ))}
+                </div>
+              </div>
+              <div className="border-t border-[#2a3d55] pt-3">
+                <p className="text-[#8A9AB0] text-xs mb-3">Toggle widgets on or off. Changes save automatically.</p>
+                {WIDGET_DEFS.filter(d => !d.adminOnly || isAdmin).map(d => {
+                  const on = widgetConfig.includes(d.id)
+                  return (
+                    <div key={d.id} className="flex items-start justify-between gap-3 bg-[#0F1C2E] rounded-xl px-4 py-3 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-semibold">{d.label}</p>
+                        <p className="text-[#8A9AB0] text-xs mt-0.5 leading-relaxed">{d.desc}</p>
+                      </div>
+                      <button onClick={() => toggleWidget(d.id)}
+                        className={`w-11 h-6 rounded-full transition-colors flex-shrink-0 relative mt-0.5 ${on ? 'bg-[#C8622A]' : 'bg-[#2a3d55]'}`}>
+                        <span className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${on ? 'left-6' : 'left-1'}`} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
             <div className="p-5 border-t border-[#2a3d55]">
               <button onClick={() => saveWidgetConfig(DEFAULT_WIDGETS)}
