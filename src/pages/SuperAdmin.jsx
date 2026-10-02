@@ -1068,15 +1068,17 @@ export default function SuperAdmin() {
                         const shipSrc  = members.find(m => m.ship_to_address)
                         setEditingBillingAddress(org.id)
                         setBillingAddressForm({
-                          bill_to_name:    org.bill_to_name    || admin?.company_name || org.name || '',
-                          bill_to_address: org.bill_to_address || billSrc?.bill_to_address || '',
-                          bill_to_city:    org.bill_to_city    || billSrc?.bill_to_city    || '',
-                          bill_to_state:   org.bill_to_state   || billSrc?.bill_to_state   || '',
-                          bill_to_zip:     org.bill_to_zip     || billSrc?.bill_to_zip     || '',
-                          ship_to_address: org.ship_to_address || shipSrc?.ship_to_address || '',
-                          ship_to_city:    org.ship_to_city    || shipSrc?.ship_to_city    || '',
-                          ship_to_state:   org.ship_to_state   || shipSrc?.ship_to_state   || '',
-                          ship_to_zip:     org.ship_to_zip     || shipSrc?.ship_to_zip     || '',
+                          bill_to_name:           org.bill_to_name    || admin?.company_name || org.name || '',
+                          bill_to_address:        org.bill_to_address || billSrc?.bill_to_address || '',
+                          bill_to_city:           org.bill_to_city    || billSrc?.bill_to_city    || '',
+                          bill_to_state:          org.bill_to_state   || billSrc?.bill_to_state   || '',
+                          bill_to_zip:            org.bill_to_zip     || billSrc?.bill_to_zip     || '',
+                          ship_to_address:        org.ship_to_address || shipSrc?.ship_to_address || '',
+                          ship_to_city:           org.ship_to_city    || shipSrc?.ship_to_city    || '',
+                          ship_to_state:          org.ship_to_state   || shipSrc?.ship_to_state   || '',
+                          ship_to_zip:            org.ship_to_zip     || shipSrc?.ship_to_zip     || '',
+                          billing_contact_name:   org.billing_contact_name  || '',
+                          billing_contact_email:  org.billing_contact_email || '',
                         })
                       }} className="text-[#8A9AB0] hover:text-white text-xs transition-colors">✎ Edit</button>
                     ) : (
@@ -1084,15 +1086,17 @@ export default function SuperAdmin() {
                         <button onClick={async () => {
                           setSavingBillingAddress(true)
                           await supabase.from('organizations').update({
-                            bill_to_name: billingAddressForm.bill_to_name || null,
-                            bill_to_address: billingAddressForm.bill_to_address || null,
-                            bill_to_city: billingAddressForm.bill_to_city || null,
-                            bill_to_state: billingAddressForm.bill_to_state || null,
-                            bill_to_zip: billingAddressForm.bill_to_zip || null,
-                            ship_to_address: billingAddressForm.ship_to_address || null,
-                            ship_to_city: billingAddressForm.ship_to_city || null,
-                            ship_to_state: billingAddressForm.ship_to_state || null,
-                            ship_to_zip: billingAddressForm.ship_to_zip || null,
+                            bill_to_name:           billingAddressForm.bill_to_name  || null,
+                            bill_to_address:        billingAddressForm.bill_to_address || null,
+                            bill_to_city:           billingAddressForm.bill_to_city   || null,
+                            bill_to_state:          billingAddressForm.bill_to_state  || null,
+                            bill_to_zip:            billingAddressForm.bill_to_zip    || null,
+                            ship_to_address:        billingAddressForm.ship_to_address || null,
+                            ship_to_city:           billingAddressForm.ship_to_city   || null,
+                            ship_to_state:          billingAddressForm.ship_to_state  || null,
+                            ship_to_zip:            billingAddressForm.ship_to_zip    || null,
+                            billing_contact_name:   billingAddressForm.billing_contact_name  || null,
+                            billing_contact_email:  billingAddressForm.billing_contact_email || null,
                           }).eq('id', org.id)
                           setOrgs(prev => prev.map(o => o.id === org.id ? { ...o, ...billingAddressForm } : o))
                           setSavingBillingAddress(false)
@@ -1126,6 +1130,11 @@ export default function SuperAdmin() {
                           <input type="text" placeholder="ST" value={billingAddressForm.ship_to_state || ''} onChange={e => setBillingAddressForm(p => ({ ...p, ship_to_state: e.target.value }))} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                           <input type="text" placeholder="ZIP" value={billingAddressForm.ship_to_zip || ''} onChange={e => setBillingAddressForm(p => ({ ...p, ship_to_zip: e.target.value }))} className="bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                         </div>
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide">Billing Contact</p>
+                        <input type="text" placeholder="Name" value={billingAddressForm.billing_contact_name || ''} onChange={e => setBillingAddressForm(p => ({ ...p, billing_contact_name: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
+                        <input type="email" placeholder="Email" value={billingAddressForm.billing_contact_email || ''} onChange={e => setBillingAddressForm(p => ({ ...p, billing_contact_email: e.target.value }))} className="w-full bg-[#0F1C2E] text-white border border-[#2a3d55] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#C8622A]" />
                       </div>
                     </div>
                   ) : (
@@ -1177,6 +1186,19 @@ export default function SuperAdmin() {
                           </div>
                         )
                       })()}
+
+                      {/* Billing Contact */}
+                      <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-1">
+                        <p className="text-[#8A9AB0] text-xs font-semibold uppercase tracking-wide mb-2">Billing Contact</p>
+                        {org.billing_contact_name || org.billing_contact_email ? (
+                          <>
+                            {org.billing_contact_name && <p className="text-white text-sm">{org.billing_contact_name}</p>}
+                            {org.billing_contact_email && <p className="text-[#8A9AB0] text-xs">{org.billing_contact_email}</p>}
+                          </>
+                        ) : (
+                          <p className="text-[#4a5d75] text-xs">No billing contact on file.</p>
+                        )}
+                      </div>
 
                       {/* Account meta */}
                       <div className="bg-[#0F1C2E] rounded-lg p-4 border border-[#2a3d55] space-y-2">
