@@ -870,7 +870,7 @@ const deleteMeeting = async (meetingId) => {
                       {proposal.total_gross_margin_percent != null && (
                         <div className="text-right"><p className="text-fp-muted text-xs">Margin</p><p className="text-[#C8622A] text-sm font-semibold">{proposal.total_gross_margin_percent.toFixed(1)}%</p></div>
                       )}
-                      <div className="text-right"><p className="text-fp-muted text-xs">Value</p><p className="text-fp-text text-sm font-bold">${(proposal.proposal_value || 0).toLocaleString()}</p></div>
+                      <div className="text-right"><p className="text-fp-muted text-xs">Value</p><p className="text-fp-text text-sm font-bold">${(pval(proposal) || 0).toLocaleString()}</p></div>
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${proposal.status === 'Won' ? 'bg-green-500/20 text-green-400' : proposal.status === 'Sent' ? 'bg-blue-500/20 text-blue-400' : proposal.status === 'Lost' ? 'bg-red-500/20 text-red-400' : 'bg-fp-muted/20 text-fp-muted'}`}>{proposal.status}</span>
                       <span className="text-fp-muted group-hover:text-fp-text transition-colors">→</span>
                     </div>

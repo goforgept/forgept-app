@@ -24,7 +24,7 @@ export default function ProposalTab({ job, proposal, navigate, downloadInstaller
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-fp-inset rounded-lg p-3"><p className="text-fp-muted text-xs mb-1">Proposal Name</p><p className="text-fp-text font-medium">{proposal.proposal_name}</p></div>
-            <div className="bg-fp-inset rounded-lg p-3"><p className="text-fp-muted text-xs mb-1">Value</p><p className="text-fp-text font-bold">${fmt(proposal.proposal_value)}</p></div>
+            <div className="bg-fp-inset rounded-lg p-3"><p className="text-fp-muted text-xs mb-1">Value</p><p className="text-fp-text font-bold">${fmt(proposal.subtotal_value ?? proposal.proposal_value)}</p></div>
             <div className="bg-fp-inset rounded-lg p-3"><p className="text-fp-muted text-xs mb-1">Margin</p><p className="text-[#C8622A] font-bold">{proposal.total_gross_margin_percent?.toFixed(1) || '—'}%</p></div>
           </div>
           {proposal.scope_of_work && (

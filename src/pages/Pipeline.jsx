@@ -191,11 +191,11 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
 
   const totalPipeline = filteredProposals
     .filter(p => p.status !== 'Won' && p.status !== 'Lost')
-    .reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+    .reduce((sum, p) => sum + (p.subtotal_value ?? p.proposal_value ?? 0), 0)
 
   const wonPipeline = filteredProposals
     .filter(p => p.status === 'Won')
-    .reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+    .reduce((sum, p) => sum + (p.subtotal_value ?? p.proposal_value ?? 0), 0)
 
   return (
     <div className="flex min-h-screen bg-fp-inset">
@@ -262,7 +262,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
         <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: '70vh' }}>
           {stages.map(stage => {
             const stageProposals = getProposalsForStage(stage)
-            const stageTotal = stageProposals.reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+            const stageTotal = stageProposals.reduce((sum, p) => sum + (p.subtotal_value ?? p.proposal_value ?? 0), 0)
 
             return (
               <div
@@ -314,11 +314,11 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
                       <div className="flex justify-between items-center mt-2">
                         <div>
                           <span className="text-fp-text text-sm font-bold">
-                            ${(proposal.proposal_value || 0).toLocaleString()}
+                            ${((proposal.subtotal_value ?? proposal.proposal_value) || 0).toLocaleString()}
                           </span>
                           {proposal.total_gross_margin_percent > 0 && (
                             <p className="text-green-500 text-xs font-semibold leading-tight">
-                              +${Math.round((proposal.proposal_value || 0) * proposal.total_gross_margin_percent / 100).toLocaleString()}
+                              +${Math.round(((proposal.subtotal_value ?? proposal.proposal_value) || 0) * proposal.total_gross_margin_percent / 100).toLocaleString()}
                             </p>
                           )}
                         </div>

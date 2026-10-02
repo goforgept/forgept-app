@@ -299,7 +299,7 @@ export default function Forecast({ isAdmin, featureProposals = true, featureCRM 
                       )}
                       <div className="text-right">
                         <p className="text-fp-muted text-xs">Value</p>
-                        <p className="text-fp-text text-sm font-bold">${fmt(p.proposal_value || 0)}</p>
+                        <p className="text-fp-text text-sm font-bold">${fmt(pval(p))}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-fp-muted text-xs">Closes</p>

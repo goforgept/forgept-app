@@ -41,7 +41,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
 
     let proposalsQuery = supabase
       .from('proposals')
-      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id')
+      .select('id,proposal_name,company,client_name,client_id,rep_name,rep_email,industry,status,close_date,proposal_value,subtotal_value,total_gross_margin_percent,created_at,org_id,user_id,quote_number,archived_at,revision_number,is_current_revision,original_proposal_id')
       .eq('org_id', profile.org_id)
       .eq('is_current_revision', true)
       .order('created_at', { ascending: false })
@@ -122,15 +122,15 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
         if (!b.close_date) return -1
         return new Date(a.close_date) - new Date(b.close_date)
       }
-      if (sortBy === 'value') return (b.proposal_value || 0) - (a.proposal_value || 0)
+      if (sortBy === 'value') return (b.subtotal_value ?? b.proposal_value ?? 0) - (a.subtotal_value ?? a.proposal_value ?? 0)
       return new Date(b.created_at) - new Date(a.created_at)
     })
 
   const params = new URLSearchParams(location.search)
   const isClosingFilter = params.get('closing') === '30'
 
-  const totalValue = filtered.reduce((sum, p) => sum + (p.proposal_value || 0), 0)
-  const wonValue = filtered.filter(p => p.status === 'Won').reduce((sum, p) => sum + (p.proposal_value || 0), 0)
+  const totalValue = filtered.reduce((sum, p) => sum + (p.subtotal_value ?? p.proposal_value ?? 0), 0)
+  const wonValue = filtered.filter(p => p.status === 'Won').reduce((sum, p) => sum + (p.subtotal_value ?? p.proposal_value ?? 0), 0)
   const archivedCount = proposals.filter(p => !!p.archived_at).length
 
   return (
@@ -266,8 +266,8 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
                   <p className="text-fp-muted text-xs">{proposal.rep_email}</p>
                 </div>
                 <div className="flex items-center gap-4">
-                  {proposal.proposal_value > 0 && (
-                    <p className="text-fp-text text-sm font-bold">${(proposal.proposal_value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  {(proposal.subtotal_value ?? proposal.proposal_value) > 0 && (
+                    <p className="text-fp-text text-sm font-bold">${((proposal.subtotal_value ?? proposal.proposal_value) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   )}
                   {proposal.total_gross_margin_percent && (
                     <p className="text-[#C8622A] text-sm font-semibold">{proposal.total_gross_margin_percent.toFixed(1)}%</p>

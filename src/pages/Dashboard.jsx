@@ -134,7 +134,7 @@ function RecentProposalsWidget({ proposals, navigate }) {
                     p.status === 'Sent' ? 'bg-blue-500/20 text-blue-400'  :
                     p.status === 'Lost' ? 'bg-red-500/20 text-red-400'    :
                     'bg-fp-border/40 text-fp-muted'}`}>{p.status}</span>
-                  <span className="text-fp-text text-xs font-semibold">{fmt(p.proposal_value)}</span>
+                  <span className="text-fp-text text-xs font-semibold">{fmt(pval(p))}</span>
                 </div>
               </div>
             ))}
@@ -519,7 +519,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
                       <p className="text-fp-muted text-xs">{p.company} · Created {daysSince} day{daysSince !== 1 ? 's' : ''} ago</p>
                     </div>
                     <div className="flex items-center gap-3 ml-4">
-                      <p className="text-fp-text text-sm font-semibold">{fmt(p.proposal_value)}</p>
+                      <p className="text-fp-text text-sm font-semibold">{fmt(pval(p))}</p>
                       <button onClick={() => markAsSent(p.id)} className="bg-fp-brand text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:opacity-90 transition-opacity">Mark as Sent</button>
                     </div>
                   </div>
@@ -597,7 +597,7 @@ export default function Dashboard({ isAdmin, featureProposals = true, featureCRM
                     p.status === 'Sent' ? 'bg-blue-500/20 text-blue-400'   :
                     p.status === 'Lost' ? 'bg-red-500/20 text-red-400'     :
                     'bg-fp-border/40 text-fp-muted'}`}>{p.status}</span>
-                  <p className="text-fp-text text-sm font-semibold tabular-nums">{fmt(p.proposal_value)}</p>
+                  <p className="text-fp-text text-sm font-semibold tabular-nums">{fmt(pval(p))}</p>
                   {p.close_date && <p className="hidden sm:block text-fp-muted text-sm">{p.close_date}</p>}
                   <span className="text-fp-muted group-hover:text-fp-brand transition-colors">→</span>
                 </div>

@@ -30,7 +30,8 @@ export default function ProposalHeader({
   const [quoteDraft,      setQuoteDraft]      = useState(proposal?.quote_number    ?? '')
   const [contractDraft,   setContractDraft]   = useState(proposal?.contract_number ?? '')
   const [taxRateDraft,    setTaxRateDraft]    = useState(proposal?.tax_rate        ?? '')
-  const [dealAmountDraft, setDealAmountDraft] = useState(proposal?.proposal_value != null ? String(proposal.proposal_value) : '')
+  const dealDisplayVal = proposal != null ? (proposal.subtotal_value ?? proposal.proposal_value) : null
+  const [dealAmountDraft, setDealAmountDraft] = useState(dealDisplayVal != null ? String(dealDisplayVal) : '')
   const [dealAmountDirty, setDealAmountDirty] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
   const menuRef = useRef(null)
@@ -38,7 +39,11 @@ export default function ProposalHeader({
   useEffect(() => { setQuoteDraft(proposal?.quote_number    ?? '') }, [proposal?.quote_number])
   useEffect(() => { setContractDraft(proposal?.contract_number ?? '') }, [proposal?.contract_number])
   useEffect(() => { setTaxRateDraft(proposal?.tax_rate        ?? '') }, [proposal?.tax_rate])
-  useEffect(() => { setDealAmountDraft(proposal?.proposal_value != null ? String(proposal.proposal_value) : ''); setDealAmountDirty(false) }, [proposal?.proposal_value])
+  useEffect(() => {
+    const v = proposal != null ? (proposal.subtotal_value ?? proposal.proposal_value) : null
+    setDealAmountDraft(v != null ? String(v) : '')
+    setDealAmountDirty(false)
+  }, [proposal?.subtotal_value, proposal?.proposal_value])
 
   // Close menu on outside click
   useEffect(() => {
@@ -310,12 +315,12 @@ export default function ProposalHeader({
               <input type="number" min="0" step="0.01" value={dealAmountDraft} placeholder="0.00"
                 onChange={e => { setDealAmountDraft(e.target.value); setDealAmountDirty(true) }}
                 onBlur={e => { if (dealAmountDirty && e.target.value !== '') { onSaveDealAmount?.(parseFloat(e.target.value) || 0); setDealAmountDirty(false) } }}
-                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setDealAmountDraft(proposal?.proposal_value != null ? String(proposal.proposal_value) : ''); setDealAmountDirty(false); e.currentTarget.blur() } }}
+                onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { const v = proposal != null ? (proposal.subtotal_value ?? proposal.proposal_value) : null; setDealAmountDraft(v != null ? String(v) : ''); setDealAmountDirty(false); e.currentTarget.blur() } }}
                 className={inputCls} />
             </div>
           ) : (
             <span className="text-fp-text text-sm font-bold text-[#C8622A]">
-              {proposal?.proposal_value != null ? `$${Number(proposal.proposal_value).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
+              {dealDisplayVal != null ? `$${Number(dealDisplayVal).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
             </span>
           )}
         </Cell>
