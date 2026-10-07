@@ -809,7 +809,7 @@ if (!finalCost) continue
                       const inLibrary = !!catalogCopied[item.id]
                       return (
                         <tr key={item.id} className="border-b border-fp-border/30 hover:bg-fp-inset/50">
-                          <td className="py-2 pr-4 font-mono text-fp-muted text-xs whitespace-nowrap">{item.part_number || '—'}</td>
+                          <td className="py-2 pr-4 font-mono text-fp-muted text-xs break-all max-w-[120px]">{item.part_number || '—'}</td>
                           <td className="py-2 pr-4">
                             <p className="text-fp-text text-sm font-medium">{item.model_name || item.part_number}</p>
                             {item.description && <p className="text-fp-muted text-xs mt-0.5 truncate max-w-xs">{item.description}</p>}
