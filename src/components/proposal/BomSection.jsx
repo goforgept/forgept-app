@@ -67,6 +67,7 @@ export default function BomSection({
   const [aiOpen, setAiOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [markupMode, setMarkupMode] = useState('markup') // 'markup' | 'gpm'
+  const [gpmDraft, setGpmDraft] = useState({}) // { rowIndex: string } — in-progress GPM text before blur
   const [colMenuOpen, setColMenuOpen] = useState(false)
   const [editingPrice, setEditingPrice] = useState(null) // { type: 'bom'|'labor', id: itemId|index, value: string }
   const [dragRowIdx, setDragRowIdx] = useState(null)
@@ -789,7 +790,7 @@ export default function BomSection({
                           <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
                         ))}
                         <th className="py-2 pr-2">
-                          <button onClick={() => setMarkupMode(m => m === 'markup' ? 'gpm' : 'markup')}
+                          <button onClick={() => { setMarkupMode(m => m === 'markup' ? 'gpm' : 'markup'); setGpmDraft({}) }}
                             className="text-xs font-normal text-fp-brand hover:text-fp-text transition-colors underline underline-offset-2 whitespace-nowrap" title="Toggle between Markup % and Gross Profit Margin %">
                             {markupMode === 'markup' ? 'Markup %' : 'GPM %'}
                           </button>
@@ -878,8 +879,14 @@ export default function BomSection({
                                   className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
                               ) : (
                                 <input type="number" placeholder={line.markup_percent ? (parseFloat(line.markup_percent) / (100 + parseFloat(line.markup_percent)) * 100).toFixed(1) : (defaultMarkup / (100 + defaultMarkup) * 100).toFixed(1)}
-                                  value={line.markup_percent ? (parseFloat(line.markup_percent) / (100 + parseFloat(line.markup_percent)) * 100).toFixed(1) : ''}
-                                  onChange={e => { const g = parseFloat(e.target.value); if (!isNaN(g) && g >= 0 && g < 100) onUpdateEditLine(i, 'markup_percent', (g / (100 - g) * 100).toFixed(2)); else if (e.target.value === '') onUpdateEditLine(i, 'markup_percent', '') }}
+                                  value={gpmDraft[i] !== undefined ? gpmDraft[i] : (line.markup_percent ? (parseFloat(line.markup_percent) / (100 + parseFloat(line.markup_percent)) * 100).toFixed(1) : '')}
+                                  onChange={e => setGpmDraft(d => ({ ...d, [i]: e.target.value }))}
+                                  onBlur={e => {
+                                    const g = parseFloat(e.target.value)
+                                    if (!isNaN(g) && g >= 0 && g < 100) onUpdateEditLine(i, 'markup_percent', (g / (100 - g) * 100).toFixed(2))
+                                    else if (e.target.value === '') onUpdateEditLine(i, 'markup_percent', '')
+                                    setGpmDraft(d => { const n = { ...d }; delete n[i]; return n })
+                                  }}
                                   className="w-16 bg-fp-inset text-fp-text border border-[#C8622A]/50 rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
                               )}
                             </td>

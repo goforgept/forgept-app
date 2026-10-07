@@ -100,11 +100,18 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
     // Fetch enabled catalogs for this org
     const { data: orgRow } = await supabase
       .from('organizations')
-      .select('enabled_catalogs, catalog_discounts')
+      .select('enabled_catalogs')
       .eq('id', profile.org_id)
       .single()
 
-    setCatalogDiscounts(orgRow?.catalog_discounts || {})
+    // catalog_discounts column may not exist yet — fetch separately so a missing column doesn't break the rest
+    const { data: discountRow } = await supabase
+      .from('organizations')
+      .select('catalog_discounts')
+      .eq('id', profile.org_id)
+      .single()
+    setCatalogDiscounts(discountRow?.catalog_discounts || {})
+
     const slugs = orgRow?.enabled_catalogs || []
     if (slugs.length > 0) {
       const { data: catProds } = await supabase
@@ -147,7 +154,7 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
       return
     }
     // Copy to product_library
-    const { data: newProd } = await supabase.from('product_library').insert({
+    const { data: newProd, error: insertErr } = await supabase.from('product_library').insert({
       org_id: profile.org_id,
       item_name: catItem.model_name || catItem.part_number,
       manufacturer: catItem.manufacturer || null,
@@ -159,10 +166,27 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
       catalog_product_id: catItem.id,
       active: true,
     }).select('id').single()
-    if (newProd?.id) {
+
+    let prodId = newProd?.id
+    if (!prodId && insertErr) {
+      // Row already exists (conflict on catalog_product_id + org_id) — find it
+      const { data: existing } = await supabase
+        .from('product_library')
+        .select('id')
+        .eq('org_id', profile.org_id)
+        .eq('catalog_product_id', catItem.id)
+        .single()
+      if (existing?.id) {
+        // Reactivate if it was deactivated
+        await supabase.from('product_library').update({ active: true }).eq('id', existing.id)
+        prodId = existing.id
+      }
+    }
+
+    if (prodId) {
       await fetchAll()
-      setExpandedId(newProd.id)
-      setAddingPriceFor(newProd.id)
+      setExpandedId(prodId)
+      setAddingPriceFor(prodId)
       setPriceForm({ vendor: catItem.manufacturer || '', your_cost: autoCost, pricing_date: new Date().toISOString().split('T')[0] })
       setActiveTab('library')
     }
