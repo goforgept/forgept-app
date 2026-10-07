@@ -57,6 +57,7 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportVendor, setExportVendor] = useState('')
   const [showImportExportMenu, setShowImportExportMenu] = useState(false)
+  const [importDiscount, setImportDiscount] = useState('')
   // Catalogs
   const [enabledCatalogs, setEnabledCatalogs] = useState([]) // [{ slug, label }]
   const [catalogItems, setCatalogItems] = useState([])        // catalog_products rows for active slugs
@@ -238,8 +239,14 @@ const skipNames = [
   // Skip known non-product names
   if (skipNames.some(s => itemName.toLowerCase().includes(s))) continue
 
+  const msrpRaw = clean(r['MSRP'] || r['msrp'] || r['List Price'] || r['List'] || '')
+  const msrp = parseFloat(msrpRaw) || null
+
+  const discountPct = parseFloat(importDiscount) || 0
   const costRaw = clean(r['Your Cost'] || r['Cost'] || r['your_cost'] || r['Unit Cost'] || '')
-  const cost = parseFloat(costRaw) || null
+  const costFromSheet = parseFloat(costRaw) || null
+  // If a discount % is set and MSRP is available, calculate cost from MSRP
+  const cost = (discountPct > 0 && msrp) ? parseFloat((msrp * (1 - discountPct / 100)).toFixed(4)) : (costFromSheet || null)
 
   const priceRaw = clean(r['Price'] || r['SellPrice'] || r['your_cost'] || '')
   const price = parseFloat(priceRaw) || null
@@ -533,7 +540,17 @@ if (!finalCost) continue
                 {showImportExportMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowImportExportMenu(false)} />
-                    <div className="absolute left-0 sm:left-auto sm:right-0 mt-1.5 w-52 bg-fp-card border border-fp-border rounded-xl shadow-xl z-20 overflow-hidden">
+                    <div className="absolute left-0 sm:left-auto sm:right-0 mt-1.5 w-64 bg-fp-card border border-fp-border rounded-xl shadow-xl z-20 overflow-hidden">
+                      <div className="px-4 pt-3 pb-2">
+                        <p className="text-fp-text text-xs font-semibold mb-1">Partner Discount % <span className="text-fp-muted font-normal">(optional)</span></p>
+                        <div className="flex items-center gap-1.5">
+                          <input type="number" min="0" max="99" step="0.1" placeholder="e.g. 45" value={importDiscount} onChange={e => setImportDiscount(e.target.value)}
+                            className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
+                          <span className="text-fp-muted text-xs">% off MSRP</span>
+                        </div>
+                        <p className="text-fp-muted text-xs mt-1">Calculates your cost from MSRP if your sheet has a List/MSRP column</p>
+                      </div>
+                      <div className="border-t border-fp-border" />
                       <label className="flex items-center gap-3 px-4 py-3 hover:bg-fp-hover cursor-pointer transition-colors group">
                         <span className="text-fp-brand text-base">↑</span>
                         <div>

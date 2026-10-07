@@ -196,6 +196,7 @@ export default function NewProposal() {
       hide_labor_breakdown: profile?.organizations?.default_hide_labor_breakdown || false,
       lump_sum_labor: profile?.organizations?.default_lump_sum_labor || false,
       tc_font_size: profile?.organizations?.default_tc_font_size || 9,
+      show_msrp: profile?.organizations?.feature_msrp || false,
       show_warranty: true,
       labor_items: [],
       proposal_value: parseFloat(dealAmount) || 0,
