@@ -57,11 +57,11 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportVendor, setExportVendor] = useState('')
   const [showImportExportMenu, setShowImportExportMenu] = useState(false)
-  const [importDiscount, setImportDiscount] = useState('')
   // Catalogs
   const [enabledCatalogs, setEnabledCatalogs] = useState([]) // [{ slug, label }]
   const [catalogItems, setCatalogItems] = useState([])        // catalog_products rows for active slugs
   const [catalogCopied, setCatalogCopied] = useState({})      // { catalog_product_id: product_library_id }
+  const [catalogDiscounts, setCatalogDiscounts] = useState({}) // { slug: pct_number }
 
   useEffect(() => { if (profile?.org_id) fetchAll() }, [profile?.org_id])
 
@@ -100,10 +100,11 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
     // Fetch enabled catalogs for this org
     const { data: orgRow } = await supabase
       .from('organizations')
-      .select('enabled_catalogs')
+      .select('enabled_catalogs, catalog_discounts')
       .eq('id', profile.org_id)
       .single()
 
+    setCatalogDiscounts(orgRow?.catalog_discounts || {})
     const slugs = orgRow?.enabled_catalogs || []
     if (slugs.length > 0) {
       const { data: catProds } = await supabase
@@ -133,11 +134,15 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
 
   // Copy a catalog item to this org's product_library, then open the pricing form
   const copyAndAddPricing = async (catItem) => {
+    const discountPct = parseFloat(catalogDiscounts[catItem.catalog_slug]) || 0
+    const autoCost = (discountPct > 0 && catItem.msrp)
+      ? parseFloat((catItem.msrp * (1 - discountPct / 100)).toFixed(4)).toString()
+      : ''
     // If already copied, just open pricing form for existing product_library row
     if (catalogCopied[catItem.id]) {
       setExpandedId(catalogCopied[catItem.id])
       setAddingPriceFor(catalogCopied[catItem.id])
-      setPriceForm({ vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] })
+      setPriceForm({ vendor: catItem.manufacturer || '', your_cost: autoCost, pricing_date: new Date().toISOString().split('T')[0] })
       setActiveTab('library')
       return
     }
@@ -158,9 +163,16 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
       await fetchAll()
       setExpandedId(newProd.id)
       setAddingPriceFor(newProd.id)
-      setPriceForm({ vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] })
+      setPriceForm({ vendor: catItem.manufacturer || '', your_cost: autoCost, pricing_date: new Date().toISOString().split('T')[0] })
       setActiveTab('library')
     }
+  }
+
+  const saveCatalogDiscount = async (slug, pct) => {
+    const updated = { ...catalogDiscounts, [slug]: pct === '' ? undefined : parseFloat(pct) }
+    if (pct === '') delete updated[slug]
+    setCatalogDiscounts(updated)
+    await supabase.from('organizations').update({ catalog_discounts: updated }).eq('id', orgId)
   }
 
   // ─── Excel import ─────────────────────────────────────────────────────────
@@ -242,11 +254,9 @@ const skipNames = [
   const msrpRaw = clean(r['MSRP'] || r['msrp'] || r['List Price'] || r['List'] || '')
   const msrp = parseFloat(msrpRaw) || null
 
-  const discountPct = parseFloat(importDiscount) || 0
   const costRaw = clean(r['Your Cost'] || r['Cost'] || r['your_cost'] || r['Unit Cost'] || '')
   const costFromSheet = parseFloat(costRaw) || null
-  // If a discount % is set and MSRP is available, calculate cost from MSRP
-  const cost = (discountPct > 0 && msrp) ? parseFloat((msrp * (1 - discountPct / 100)).toFixed(4)) : (costFromSheet || null)
+  const cost = costFromSheet || null
 
   const priceRaw = clean(r['Price'] || r['SellPrice'] || r['your_cost'] || '')
   const price = parseFloat(priceRaw) || null
@@ -540,17 +550,7 @@ if (!finalCost) continue
                 {showImportExportMenu && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => setShowImportExportMenu(false)} />
-                    <div className="absolute left-0 sm:left-auto sm:right-0 mt-1.5 w-64 bg-fp-card border border-fp-border rounded-xl shadow-xl z-20 overflow-hidden">
-                      <div className="px-4 pt-3 pb-2">
-                        <p className="text-fp-text text-xs font-semibold mb-1">Partner Discount % <span className="text-fp-muted font-normal">(optional)</span></p>
-                        <div className="flex items-center gap-1.5">
-                          <input type="number" min="0" max="99" step="0.1" placeholder="e.g. 45" value={importDiscount} onChange={e => setImportDiscount(e.target.value)}
-                            className="flex-1 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1.5 text-xs focus:outline-none focus:border-fp-brand" />
-                          <span className="text-fp-muted text-xs">% off MSRP</span>
-                        </div>
-                        <p className="text-fp-muted text-xs mt-1">Calculates your cost from MSRP if your sheet has a List/MSRP column</p>
-                      </div>
-                      <div className="border-t border-fp-border" />
+                    <div className="absolute left-0 sm:left-auto sm:right-0 mt-1.5 w-52 bg-fp-card border border-fp-border rounded-xl shadow-xl z-20 overflow-hidden">
                       <label className="flex items-center gap-3 px-4 py-3 hover:bg-fp-hover cursor-pointer transition-colors group">
                         <span className="text-fp-brand text-base">↑</span>
                         <div>
@@ -744,12 +744,29 @@ if (!finalCost) continue
         {/* Catalog product list */}
         {activeTab !== 'library' && (
           <div className="bg-fp-card rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-fp-text font-bold">
-                {enabledCatalogs.find(c => c.slug === activeTab)?.label || activeTab}
-                <span className="text-fp-muted font-normal text-sm ml-2">({filteredCatalog.length.toLocaleString()} products)</span>
-              </h3>
-              <p className="text-fp-muted text-xs">MSRP pricing only. Click "Add Pricing" to copy to your library and enter your distributor cost.</p>
+            <div className="flex items-start justify-between mb-4 gap-4">
+              <div>
+                <h3 className="text-fp-text font-bold">
+                  {enabledCatalogs.find(c => c.slug === activeTab)?.label || activeTab}
+                  <span className="text-fp-muted font-normal text-sm ml-2">({filteredCatalog.length.toLocaleString()} products)</span>
+                </h3>
+                <p className="text-fp-muted text-xs mt-0.5">MSRP pricing only. Click "+ Add Pricing" to copy to your library with your cost auto-filled.</p>
+              </div>
+              {canEdit && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <label className="text-fp-muted text-xs whitespace-nowrap">My discount</label>
+                  <div className="flex items-center gap-1">
+                    <input
+                      type="number" min="0" max="99" step="0.1"
+                      placeholder="0"
+                      value={catalogDiscounts[activeTab] ?? ''}
+                      onChange={e => saveCatalogDiscount(activeTab, e.target.value)}
+                      className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand text-right"
+                    />
+                    <span className="text-fp-muted text-xs">% off MSRP</span>
+                  </div>
+                </div>
+              )}
             </div>
             {filteredCatalog.length === 0 ? (
               <p className="text-fp-muted text-sm py-8 text-center">{search ? 'No matching products.' : 'No products in this catalog.'}</p>
@@ -758,8 +775,8 @@ if (!finalCost) continue
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-fp-border">
-                      {['Part #', 'Model / Description', 'Category', 'MSRP', ''].map(h => (
-                        <th key={h} className="text-fp-muted text-left py-2 pr-4 font-normal text-xs whitespace-nowrap">{h}</th>
+                      {['Part #', 'Model / Description', 'Category', 'MSRP', catalogDiscounts[activeTab] ? 'Your Cost' : '', ''].filter(h => h !== '').map((h, i) => (
+                        <th key={i} className="text-fp-muted text-left py-2 pr-4 font-normal text-xs whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -775,6 +792,11 @@ if (!finalCost) continue
                           </td>
                           <td className="py-2 pr-4 text-fp-muted text-xs whitespace-nowrap">{item.category || '—'}</td>
                           <td className="py-2 pr-4 text-fp-text font-semibold whitespace-nowrap">{fmt(item.msrp)}</td>
+                          {catalogDiscounts[activeTab] && (
+                            <td className="py-2 pr-4 text-green-400 font-semibold whitespace-nowrap text-sm">
+                              {item.msrp ? fmt(item.msrp * (1 - (parseFloat(catalogDiscounts[activeTab]) || 0) / 100)) : '—'}
+                            </td>
+                          )}
                           <td className="py-2">
                             <button onClick={() => copyAndAddPricing(item)}
                               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${inLibrary ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'bg-[#C8622A]/10 text-[#C8622A] hover:bg-[#C8622A]/20'}`}>
