@@ -2,10 +2,6 @@
   "appId": "com.forgept.app",
   "appName": "ForgePt",
   "webDir": "dist",
-  "server": {
-    "url": "https://app.goforgept.com",
-    "cleartext": false
-  },
   "plugins": {
     "StatusBar": {
       "overlaysWebView": false,
