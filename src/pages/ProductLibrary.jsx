@@ -768,7 +768,7 @@ if (!finalCost) continue
         {/* Catalog product list */}
         {activeTab !== 'library' && (
           <div className="bg-fp-card rounded-xl p-6">
-            <div className="flex items-start justify-between mb-4 gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-4 gap-3">
               <div>
                 <h3 className="text-fp-text font-bold">
                   {enabledCatalogs.find(c => c.slug === activeTab)?.label || activeTab}
@@ -779,16 +779,14 @@ if (!finalCost) continue
               {canEdit && (
                 <div className="flex items-center gap-2 shrink-0">
                   <label className="text-fp-muted text-xs whitespace-nowrap">My discount</label>
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number" min="0" max="99" step="0.1"
-                      placeholder="0"
-                      value={catalogDiscounts[activeTab] ?? ''}
-                      onChange={e => saveCatalogDiscount(activeTab, e.target.value)}
-                      className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand text-right"
-                    />
-                    <span className="text-fp-muted text-xs">% off MSRP</span>
-                  </div>
+                  <input
+                    type="number" min="0" max="99" step="0.1"
+                    placeholder="0"
+                    value={catalogDiscounts[activeTab] ?? ''}
+                    onChange={e => saveCatalogDiscount(activeTab, e.target.value)}
+                    className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand text-right"
+                  />
+                  <span className="text-fp-muted text-xs whitespace-nowrap">% off MSRP</span>
                 </div>
               )}
             </div>
