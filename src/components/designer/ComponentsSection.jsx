@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../supabase'
 
 const DEFAULT_COMPONENTS = {
@@ -72,6 +72,7 @@ export default function ComponentsSection({ placementId, orgId, category, produc
   const [addTab,          setAddTab]          = useState('quick') // 'quick' | 'library'
   const [libraryItems,    setLibraryItems]    = useState(null)
   const [librarySearch,   setLibrarySearch]   = useState('')
+  const saveTimers = useRef({}) // debounce timers keyed by `${id}-${field}`
 
   useEffect(() => {
     setAccessories(null) // reset on placement change
@@ -122,12 +123,19 @@ export default function ComponentsSection({ placementId, orgId, category, produc
   }
 
   const handleUpdate = (id, field, value) => {
-    // Update local state immediately for responsive UI
     setComponents(prev => prev.map(c => c.id === id ? { ...c, [field]: value } : c))
+    // Debounce DB save so navigating away doesn't lose the value
+    const key = `${id}-${field}`
+    clearTimeout(saveTimers.current[key])
+    saveTimers.current[key] = setTimeout(async () => {
+      await supabase.from('placement_components').update({ [field]: value }).eq('id', id)
+    }, 500)
   }
 
   const handleSave = async (id, field, value) => {
-    // Only save to DB on blur
+    // Flush immediately on blur, cancel any pending debounce
+    const key = `${id}-${field}`
+    clearTimeout(saveTimers.current[key])
     await supabase.from('placement_components').update({ [field]: value }).eq('id', id)
   }
 
