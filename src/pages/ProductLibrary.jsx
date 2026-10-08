@@ -266,6 +266,7 @@ const skipNames = [
   const itemType = String(r['Item type'] || r['Type'] || r['ItemType'] || '').trim().toLowerCase()
   const rawCategory = String(r['Category'] || r['category'] || '').trim()
   const category = mapCategory(rawCategory) || rawCategory || null
+  const subCategory = String(r['Sub Category'] || r['sub_category'] || r['SubCategory'] || r['Sub-Category'] || '').trim() || null
   const description = String(r['Sales Description'] || r['Purchase Description'] || r['Description'] || r['description'] || r['ShortDescription'] || '').trim() || null
   const manufacturer = String(r['Manufacturer'] || r['manufacturer'] || r['Mfr'] || r['Brand'] || '').trim() || null
 
@@ -305,6 +306,7 @@ const skipNames = [
     manufacturer,
     part_number: partNumber || null,
     category,
+    sub_category: subCategory,
     unit: String(r['Unit'] || r['unit'] || 'ea').trim().toLowerCase() || 'ea',
     description,
     msrp: price && price > 0 ? price : null,
