@@ -1262,7 +1262,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                 Cancel
               </button>
               <button
-                disabled={bulkApplying || bulkSelected.size === 0 || (!form.part_number_override && !form.manufacturer_override && !form.description_override)}
+                disabled={bulkApplying || bulkSelected.size === 0 || (!form.part_number_override && !form.manufacturer_override && !form.description_override && !(includeComponents && sourceComponents.length > 0))}
                 onClick={async () => {
                   setBulkApplying(true)
                   try {
