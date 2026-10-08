@@ -1313,7 +1313,7 @@ export default function PlacementPanel({ placement, onClose, onUpdate, onSaved, 
                   }
                 }}
                 className={`flex-1 py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  bulkApplying || (!form.part_number_override && !form.manufacturer_override && !form.description_override)
+                  bulkApplying || (bulkSelected.size === 0) || (!form.part_number_override && !form.manufacturer_override && !form.description_override && !(includeComponents && sourceComponents.length > 0))
                     ? 'bg-[#2a3d55] text-[#8A9AB0] cursor-not-allowed'
                     : 'bg-[#C8622A] text-white hover:bg-[#b5571f]'
                 }`}>
