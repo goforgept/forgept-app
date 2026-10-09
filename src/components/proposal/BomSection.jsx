@@ -68,6 +68,7 @@ export default function BomSection({
   const [moreOpen, setMoreOpen] = useState(false)
   const [markupMode, setMarkupMode] = useState('markup') // 'markup' | 'gpm'
   const [gpmDraft, setGpmDraft] = useState({}) // { rowIndex: string } — in-progress GPM text before blur
+  const [laborGpmDraft, setLaborGpmDraft] = useState({}) // keyed by 'm_${idx}' or 's_${sectionId}_${idx}'
   const [colMenuOpen, setColMenuOpen] = useState(false)
   const [editingPrice, setEditingPrice] = useState(null) // { type: 'bom'|'labor', id: itemId|index, value: string }
   const [dragRowIdx, setDragRowIdx] = useState(null)
@@ -790,10 +791,9 @@ export default function BomSection({
                           <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
                         ))}
                         <th className="py-2 pr-2">
-                          <button onClick={() => { setMarkupMode(m => m === 'markup' ? 'gpm' : 'markup'); setGpmDraft({}) }}
-                            className="text-xs font-normal text-fp-brand hover:text-fp-text transition-colors underline underline-offset-2 whitespace-nowrap" title="Toggle between Markup % and Gross Profit Margin %">
+                          <span className="text-fp-muted font-normal text-xs whitespace-nowrap">
                             {markupMode === 'markup' ? 'Markup %' : 'GPM %'}
-                          </button>
+                          </span>
                         </th>
                         {['Customer Price', ...(featureMsrp ? ['MSRP'] : []), ...(featureComplianceFields ? ['Lead Time', 'COO', 'Berry'] : []), '🔄', ...(editSections.length > 0 ? ['Move'] : []), ''].map(h => (
                           <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
@@ -949,6 +949,15 @@ export default function BomSection({
 
             return (
               <div className="space-y-6">
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => { setMarkupMode(m => m === 'markup' ? 'gpm' : 'markup'); setGpmDraft({}); setLaborGpmDraft({}) }}
+                    className="text-xs text-fp-brand hover:text-fp-text transition-colors underline underline-offset-2 whitespace-nowrap"
+                    title="Toggle between Markup % and Gross Profit Margin %"
+                  >
+                    {markupMode === 'markup' ? 'Switch to GPM %' : 'Switch to Markup %'}
+                  </button>
+                </div>
                 <div>
                   {editSections.length > 0 && (
                     <div className="flex items-center gap-2 mb-2">
@@ -980,16 +989,19 @@ export default function BomSection({
                       {section.include_labor && (
                         <div className="mt-4 pt-4 border-t border-fp-border">
                           <p className="text-fp-muted text-xs font-semibold uppercase tracking-wide mb-3">Section Labor</p>
+                          <div className="overflow-x-auto">
                           <table className="w-full text-sm">
                             <thead>
                               <tr className="border-b border-fp-border">
-                                {['Role','Qty','Unit','Your Cost/hr','Margin %','Total Labor',''].map(h => (
+                                {['Role','Qty','Unit','Your Cost/hr', markupMode === 'markup' ? 'Markup %' : 'GPM %','Total Labor',''].map(h => (
                                   <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
                                 ))}
                               </tr>
                             </thead>
                             <tbody>
-                              {(section.labor_items || []).map((item, idx) => (
+                              {(section.labor_items || []).map((item, idx) => {
+                                const draftKey = `s_${section.id}_${idx}`
+                                return (
                                 <tr key={idx} className="border-b border-fp-border/30">
                                   <td className="pr-2 py-1"><input type="text" placeholder="Role" list="labor-roles-list" value={item.role || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'role', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" /></td>
                                   <td className="pr-2 py-1"><input type="number" placeholder="0" value={item.quantity || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'quantity', e.target.value)} className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" /></td>
@@ -1000,21 +1012,31 @@ export default function BomSection({
                                   </td>
                                   <td className="pr-2 py-1"><input type="number" placeholder="0.00" value={item.your_cost || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'your_cost', e.target.value)} className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" /></td>
                                   <td className="pr-2 py-1">
-                                    <input type="number" placeholder="0" min="0" max="99.9" step="0.1"
-                                      value={item.markup != null && item.markup !== '' ? (parseFloat(item.markup) / (100 + parseFloat(item.markup)) * 100).toFixed(1) : ''}
-                                      onChange={e => {
-                                        const m = parseFloat(e.target.value)
-                                        const markup = (m >= 0 && m < 100) ? (m / (100 - m) * 100).toFixed(2) : '0'
-                                        onUpdateSectionLabor(section.id, idx, 'markup', markup)
-                                      }}
-                                      className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                    {markupMode === 'markup' ? (
+                                      <input type="number" placeholder="0" min="0" max="999" step="0.1"
+                                        value={item.markup != null && item.markup !== '' ? parseFloat(item.markup).toFixed(1) : ''}
+                                        onChange={e => onUpdateSectionLabor(section.id, idx, 'markup', e.target.value)}
+                                        className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                    ) : (
+                                      <input type="number" placeholder="0" min="0" max="99.9" step="0.1"
+                                        value={laborGpmDraft[draftKey] !== undefined ? laborGpmDraft[draftKey] : (item.markup != null && item.markup !== '' ? (parseFloat(item.markup) / (100 + parseFloat(item.markup)) * 100).toFixed(1) : '')}
+                                        onChange={e => setLaborGpmDraft(d => ({ ...d, [draftKey]: e.target.value }))}
+                                        onBlur={e => {
+                                          const g = parseFloat(e.target.value)
+                                          if (!isNaN(g) && g >= 0 && g < 100) onUpdateSectionLabor(section.id, idx, 'markup', (g / (100 - g) * 100).toFixed(2))
+                                          setLaborGpmDraft(d => { const n = { ...d }; delete n[draftKey]; return n })
+                                        }}
+                                        className="w-16 bg-fp-inset text-fp-text border border-[#C8622A]/50 rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                    )}
                                   </td>
                                   <td className="pr-2 py-1"><input type="number" placeholder="0.00" value={item.customer_price || ''} onChange={e => onUpdateSectionLabor(section.id, idx, 'customer_price', e.target.value)} className="w-20 bg-fp-inset text-[#C8622A] border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand font-semibold" /></td>
                                   <td className="py-1"><button onClick={() => onRemoveSectionLaborLine(section.id, idx)} className="text-fp-muted hover:text-red-400 text-xs">✕</button></td>
                                 </tr>
-                              ))}
+                                )
+                              })}
                             </tbody>
                           </table>
+                          </div>
                           <button onClick={() => onAddSectionLaborLine(section.id)} className="mt-2 text-[#C8622A] hover:text-fp-text text-xs transition-colors">+ Add Labor</button>
                         </div>
                       )}
@@ -1048,16 +1070,19 @@ export default function BomSection({
           {/* Labor Section */}
           <div className="mt-8">
             <h3 className="text-fp-text font-bold text-base mb-3">Labor</h3>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-fp-border">
-                  {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', 'Margin %', 'Total Labor', ''].map(h => (
+                  {['Role', 'Qty (hrs)', 'Unit', 'Your Cost/hr', markupMode === 'markup' ? 'Markup %' : 'GPM %', 'Total Labor', ''].map(h => (
                     <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {laborItems.map((item, index) => (
+                {laborItems.map((item, index) => {
+                  const draftKey = `m_${index}`
+                  return (
                   <tr key={index} className="border-b border-fp-border/30">
                     <td className="pr-2 py-1">
                       <input type="text" placeholder="e.g. Electrician" list="labor-roles-list" value={item.role} onChange={e => onUpdateLabor(index, 'role', e.target.value)} className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
@@ -1070,15 +1095,22 @@ export default function BomSection({
                     </td>
                     <td className="pr-2 py-1"><input type="number" placeholder="0.00" value={item.your_cost || ''} onChange={e => onUpdateLabor(index, 'your_cost', e.target.value)} className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" /></td>
                     <td className="pr-2 py-1">
-                      {/* Display margin %; convert to/from markup internally */}
-                      <input type="number" placeholder="0" min="0" max="99.9" step="0.1"
-                        value={item.markup != null && item.markup !== '' ? (parseFloat(item.markup) / (100 + parseFloat(item.markup)) * 100).toFixed(1) : ''}
-                        onChange={e => {
-                          const m = parseFloat(e.target.value)
-                          const markup = (m >= 0 && m < 100) ? (m / (100 - m) * 100).toFixed(2) : '0'
-                          onUpdateLabor(index, 'markup', markup)
-                        }}
-                        className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                      {markupMode === 'markup' ? (
+                        <input type="number" placeholder="0" min="0" max="999" step="0.1"
+                          value={item.markup != null && item.markup !== '' ? parseFloat(item.markup).toFixed(1) : ''}
+                          onChange={e => onUpdateLabor(index, 'markup', e.target.value)}
+                          className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                      ) : (
+                        <input type="number" placeholder="0" min="0" max="99.9" step="0.1"
+                          value={laborGpmDraft[draftKey] !== undefined ? laborGpmDraft[draftKey] : (item.markup != null && item.markup !== '' ? (parseFloat(item.markup) / (100 + parseFloat(item.markup)) * 100).toFixed(1) : '')}
+                          onChange={e => setLaborGpmDraft(d => ({ ...d, [draftKey]: e.target.value }))}
+                          onBlur={e => {
+                            const g = parseFloat(e.target.value)
+                            if (!isNaN(g) && g >= 0 && g < 100) onUpdateLabor(index, 'markup', (g / (100 - g) * 100).toFixed(2))
+                            setLaborGpmDraft(d => { const n = { ...d }; delete n[draftKey]; return n })
+                          }}
+                          className="w-16 bg-fp-inset text-fp-text border border-[#C8622A]/50 rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                      )}
                     </td>
                     <td className="pr-2 py-1"><input type="number" placeholder="0.00" value={item.customer_price || ''} onChange={e => onUpdateLabor(index, 'customer_price', e.target.value)} className="w-20 bg-fp-inset text-[#C8622A] border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand font-semibold" /></td>
                     <td className="py-1">
@@ -1106,7 +1138,8 @@ export default function BomSection({
                       </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
               <tfoot>
                 <tr>
@@ -1116,6 +1149,7 @@ export default function BomSection({
                 </tr>
               </tfoot>
             </table>
+            </div>
             <datalist id="labor-roles-list">
               {laborRates.map(r => <option key={r.role} value={r.role} />)}
             </datalist>
