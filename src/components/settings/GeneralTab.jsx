@@ -32,7 +32,7 @@ export default function GeneralTab({
       {/* Profile */}
       <div className="bg-fp-card rounded-xl p-6">
         <h3 className="text-fp-text font-bold mb-4">Profile</h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-fp-muted text-xs mb-1 block">Full Name</label>
             <input type="text" value={form.full_name} onChange={e => setForm(prev => ({ ...prev, full_name: e.target.value }))} className={inputClass} />
@@ -70,7 +70,7 @@ export default function GeneralTab({
         <h3 className="text-fp-text font-bold mb-4">Change Password</h3>
         {passwordError && <p className="text-red-400 text-sm mb-4">{passwordError}</p>}
         {passwordSuccess && <p className="text-green-400 text-sm mb-4">{passwordSuccess}</p>}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div className="col-span-2">
             <label className="text-fp-muted text-xs mb-1 block">Current Password</label>
             <input type="password" value={passwordForm.current} onChange={e => setPasswordForm(prev => ({ ...prev, current: e.target.value }))} placeholder="••••••••" className={inputClass} />
@@ -105,7 +105,7 @@ export default function GeneralTab({
                 <label className="text-fp-muted text-xs mb-1 block">Street Address</label>
                 <input type="text" value={form.ship_to_address} onChange={e => setForm(prev => ({ ...prev, ship_to_address: e.target.value }))} placeholder="123 Main St" disabled={readOnly} className={`${inputClass} ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`} />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div><label className="text-fp-muted text-xs mb-1 block">City</label><input type="text" value={form.ship_to_city} onChange={e => setForm(prev => ({ ...prev, ship_to_city: e.target.value }))} placeholder="Nashville" disabled={readOnly} className={`${inputClass} ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
                 <div><label className="text-fp-muted text-xs mb-1 block">State</label><input type="text" value={form.ship_to_state} onChange={e => setForm(prev => ({ ...prev, ship_to_state: e.target.value }))} placeholder="TN" disabled={readOnly} className={`${inputClass} ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
                 <div><label className="text-fp-muted text-xs mb-1 block">ZIP</label><input type="text" value={form.ship_to_zip} onChange={e => setForm(prev => ({ ...prev, ship_to_zip: e.target.value }))} placeholder="37201" disabled={readOnly} className={`${inputClass} ${readOnly ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
@@ -125,7 +125,7 @@ export default function GeneralTab({
                 <label className="text-fp-muted text-xs mb-1 block">Street Address</label>
                 <input type="text" value={form.bill_to_address} onChange={e => setForm(prev => ({ ...prev, bill_to_address: e.target.value }))} placeholder="123 Main St" disabled={sameAsShipTo || readOnly} className={`${inputClass} ${(sameAsShipTo || readOnly) ? 'opacity-50 cursor-not-allowed' : ''}`} />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div><label className="text-fp-muted text-xs mb-1 block">City</label><input type="text" value={form.bill_to_city} onChange={e => setForm(prev => ({ ...prev, bill_to_city: e.target.value }))} placeholder="Nashville" disabled={sameAsShipTo || readOnly} className={`${inputClass} ${(sameAsShipTo || readOnly) ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
                 <div><label className="text-fp-muted text-xs mb-1 block">State</label><input type="text" value={form.bill_to_state} onChange={e => setForm(prev => ({ ...prev, bill_to_state: e.target.value }))} placeholder="TN" disabled={sameAsShipTo || readOnly} className={`${inputClass} ${(sameAsShipTo || readOnly) ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>
                 <div><label className="text-fp-muted text-xs mb-1 block">ZIP</label><input type="text" value={form.bill_to_zip} onChange={e => setForm(prev => ({ ...prev, bill_to_zip: e.target.value }))} placeholder="37201" disabled={sameAsShipTo || readOnly} className={`${inputClass} ${(sameAsShipTo || readOnly) ? 'opacity-50 cursor-not-allowed' : ''}`} /></div>

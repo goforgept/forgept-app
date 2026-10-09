@@ -1667,7 +1667,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
             </div>
           )}
 
-          <div className="grid grid-cols-4 lg:grid-cols-8 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
             <div className="bg-fp-inset rounded-lg p-3">
               <p className="text-fp-muted text-xs mb-1">Contract Value</p>
               <p className="text-fp-text font-bold">${fmt(proposal?.proposal_value)}</p>
@@ -1727,7 +1727,7 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
                       </button>
                     </div>
                     {techPickerOpen && (
-                      <div className="absolute top-full left-0 mt-1 bg-fp-card border border-fp-border rounded-xl shadow-lg z-20 w-48 py-1 max-h-52 overflow-y-auto">
+                      <div className="absolute top-full right-0 sm:right-auto sm:left-0 mt-1 bg-fp-card border border-fp-border rounded-xl shadow-lg z-20 w-48 py-1 max-h-52 overflow-y-auto">
                         {orgProfiles.map(p => {
                           const checked = techIds.includes(p.id)
                           return (

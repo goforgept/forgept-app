@@ -874,15 +874,15 @@ export default function InvoiceDetail({ isAdmin, featureProposals = true, featur
             }
           </div>
           {editingLineItems ? (
-            <div className="space-y-2">
-              <div className="grid grid-cols-12 gap-2 text-fp-muted text-xs pb-1 border-b border-fp-border">
+            <div className="space-y-2 overflow-x-auto">
+              <div className="grid grid-cols-12 gap-2 text-fp-muted text-xs pb-1 border-b border-fp-border min-w-[480px]">
                 <div className="col-span-6">Description</div>
                 <div className="col-span-2 text-right">Qty</div>
                 <div className="col-span-3 text-right">Unit Price</div>
                 <div className="col-span-1"></div>
               </div>
               {editableItems.map((item, i) => (
-                <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                <div key={i} className="grid grid-cols-12 gap-2 items-center min-w-[480px]">
                   <input value={item.description || ''} onChange={e => setEditableItems(prev => prev.map((it, idx) => idx === i ? { ...it, description: e.target.value } : it))}
                     className="col-span-6 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-sm focus:outline-none focus:border-fp-brand" placeholder="Description" />
                   <input type="number" value={item.quantity ?? 1} onChange={e => setEditableItems(prev => prev.map((it, idx) => idx === i ? { ...it, quantity: e.target.value, total: (parseFloat(e.target.value) || 0) * (parseFloat(it.unit_price) || 0) } : it))}

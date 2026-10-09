@@ -596,7 +596,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-fp-card rounded-xl p-5">
             <p className="text-fp-muted text-sm mb-1">Total PO Value</p>
             <p className="text-fp-text text-2xl font-bold">${totalSent.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
@@ -685,7 +685,7 @@ export default function PurchaseOrders({ isAdmin, featureProposals = true, featu
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
                       <div className="text-right">
                         <p className="text-fp-text font-bold">${fmt(po.total_amount)}</p>
                         <p className="text-fp-muted text-xs">total</p>

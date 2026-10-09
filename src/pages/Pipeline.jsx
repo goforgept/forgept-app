@@ -207,14 +207,14 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
           <p className="text-fp-text">Loading...</p>
         </div>
       ) : (<>
-        <div className="flex justify-between items-center">
+        <div className="flex flex-wrap gap-3 items-start justify-between">
           <div>
             <h2 className="text-fp-text text-2xl font-bold">Pipeline</h2>
             <p className="text-fp-muted text-sm mt-0.5">
               ${totalPipeline.toLocaleString()} active · ${wonPipeline.toLocaleString()} won
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <select
               value={dateRange}
               onChange={e => setDateRange(Number(e.target.value))}
@@ -238,7 +238,7 @@ export default function Pipeline({ isAdmin, featureProposals = true, featureCRM 
               placeholder="Search deals..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm w-48 focus:outline-none focus:border-fp-brand placeholder-fp-muted"
+              className="bg-fp-card text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm w-full sm:w-48 focus:outline-none focus:border-fp-brand placeholder-fp-muted"
             />
             {canWrite('pipeline') && (
               <button

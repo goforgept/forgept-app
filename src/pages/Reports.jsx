@@ -1070,7 +1070,7 @@ export default function Reports(props) {
   return (
     <div className="flex min-h-screen bg-fp-inset">
       <Sidebar {...props} />
-      <div className="flex-1 p-8 overflow-auto">
+      <div className="flex-1 p-4 lg:p-8 overflow-auto">
         <div className="max-w-6xl mx-auto">
 
           <div className="flex flex-wrap items-start justify-between gap-3 mb-8">

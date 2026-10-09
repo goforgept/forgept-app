@@ -144,7 +144,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
       <Sidebar isAdmin={isAdmin} featureProposals={featureProposals} featureCRM={featureCRM} />
 
       <div className="flex-1 p-6 min-w-0">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-wrap gap-3 justify-between items-start mb-6">
           <div>
             <h2 className="text-fp-text text-2xl font-bold">
               {showArchived ? 'Archived Proposals' : 'Proposals'}
@@ -153,7 +153,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
               <p className="text-[#C8622A] text-sm mt-1">Showing proposals closing in 30 days</p>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <p className="text-fp-muted text-sm">{filtered.length} of {proposals.length}</p>
             {archivedCount > 0 && (
               <button
@@ -178,7 +178,7 @@ export default function Proposals({ isAdmin, featureProposals = true, featureCRM
         </div>
 
         {!showArchived && (
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
             <div className="bg-fp-card rounded-xl p-4">
               <p className="text-fp-muted text-xs mb-1">Total Value</p>
               <p className="text-fp-text text-xl font-bold">${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
