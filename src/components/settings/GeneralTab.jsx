@@ -1,3 +1,6 @@
+import { useState } from 'react'
+import { supabase } from '../../supabase'
+
 export default function GeneralTab({
   form, setForm, inputClass,
   orgTimezone, setOrgTimezone,
@@ -5,6 +8,23 @@ export default function GeneralTab({
   sameAsShipTo, handleSameAsShipTo, profile, saving, handleSave, readOnly = false,
   currentTheme = 'dark', applyTheme,
 }) {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+  }
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') return
+    setDeletingAccount(true)
+    try {
+      await supabase.functions.invoke('delete-account')
+    } catch (e) {}
+    await supabase.auth.signOut()
+  }
+
   return (
     <div className="space-y-6">
       {/* Appearance */}
@@ -138,6 +158,42 @@ export default function GeneralTab({
       <button onClick={handleSave} disabled={saving} className="bg-fp-brand text-white px-6 py-3 rounded-lg font-semibold hover:opacity-90 transition-colors disabled:opacity-50">
         {saving ? 'Saving...' : 'Save Settings'}
       </button>
+
+      {/* Account actions */}
+      <div className="bg-fp-card rounded-xl p-6">
+        <h3 className="text-fp-text font-bold mb-4">Account</h3>
+        <div className="space-y-3">
+          <button onClick={handleSignOut} className="w-full text-left px-4 py-3 rounded-lg border border-fp-border text-fp-text hover:bg-fp-inset transition-colors text-sm font-medium">
+            Sign Out
+          </button>
+          {!showDeleteConfirm ? (
+            <button onClick={() => setShowDeleteConfirm(true)} className="w-full text-left px-4 py-3 rounded-lg border border-red-900/40 text-red-400 hover:bg-red-900/10 transition-colors text-sm font-medium">
+              Delete Account
+            </button>
+          ) : (
+            <div className="border border-red-900/40 rounded-lg p-4 space-y-3">
+              <p className="text-red-400 text-sm font-semibold">This will permanently delete your account and cannot be undone.</p>
+              <p className="text-fp-muted text-xs">Type <span className="text-fp-text font-mono font-bold">DELETE</span> to confirm.</p>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder="Type DELETE"
+                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-red-400"
+              />
+              <div className="flex gap-2">
+                <button onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText('') }} className="flex-1 px-4 py-2 rounded-lg border border-fp-border text-fp-muted hover:text-fp-text text-sm transition-colors">
+                  Cancel
+                </button>
+                <button onClick={handleDeleteAccount} disabled={deleteConfirmText !== 'DELETE' || deletingAccount}
+                  className="flex-1 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-40">
+                  {deletingAccount ? 'Deleting...' : 'Delete My Account'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
