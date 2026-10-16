@@ -341,7 +341,6 @@ export default function JobDetail({ isAdmin, featureProposals = true, featureCRM
   }
 
   const toggleCheckItem = async (item) => {
-    if (item.is_auto) return
     const newVal = !item.completed
     await supabase.from('job_checklist_items').update({
       completed: newVal,

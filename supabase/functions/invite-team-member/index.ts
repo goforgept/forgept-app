@@ -59,15 +59,39 @@ Deno.serve(async (req) => {
     let userId = authData.id
 
     if (!userId) {
-      // Auth user already exists from a prior invite — look up their ID via profiles table
-      const { data: existing } = await adminSupabase
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .single()
+      // Auth user already exists — find their ID and reset their password to the new temp one
+      const lookupRes = await fetch(`${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(email)}`, {
+        headers: { 'apikey': serviceKey, 'Authorization': `Bearer ${serviceKey}` }
+      })
+      const lookupData = await lookupRes.json()
+      userId = lookupData?.users?.[0]?.id
 
-      userId = existing?.id
+      if (!userId) {
+        // Fallback: look up via profiles table
+        const { data: existing } = await adminSupabase
+          .from('profiles')
+          .select('id')
+          .eq('email', email)
+          .single()
+        userId = existing?.id
+      }
+
       if (!userId) throw new Error(authData.message || authData.msg || 'Failed to create or find user')
+
+      // Reset the password so the new temp password in the email actually works
+      const pwRes = await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`
+        },
+        body: JSON.stringify({ password: tempPassword })
+      })
+      if (!pwRes.ok) {
+        const txt = await pwRes.text()
+        throw new Error(`Password reset failed: ${txt}`)
+      }
     }
 
     // Step 2: stamp org_id on the profile (update existing or insert if trigger didn't create it)

@@ -129,6 +129,13 @@ body {
   display: none;
 }
 
+/* Prevent iOS Safari from zooming in when tapping inputs (requires font-size >= 16px) */
+@media (max-width: 1024px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(48%) sepia(79%) saturate(476%) hue-rotate(346deg) brightness(88%) contrast(86%);

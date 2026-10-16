@@ -518,8 +518,9 @@ export default function Sidebar({ isAdmin: isAdminProp, isDevTeam: isDevTeamProp
         </nav>
       )}
 
-      <div className={`border-t border-fp-border ${desktopCollapsed ? 'px-1 py-3 flex justify-center' : 'px-3 py-4'}`}>
-        {desktopCollapsed ? (
+      <div className={`border-t border-fp-border ${desktopCollapsed ? 'lg:px-1 lg:py-3 lg:flex lg:justify-center px-3 py-4' : 'px-3 py-4'}`}>
+        {/* Desktop collapsed: icon only */}
+        {desktopCollapsed && (
           <button
             onClick={handleSignOut}
             title="Sign Out"
@@ -527,15 +528,15 @@ export default function Sidebar({ isAdmin: isAdminProp, isDevTeam: isDevTeamProp
           >
             🚪
           </button>
-        ) : (
-          <button
-            onClick={handleSignOut}
-            className="w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-fp-muted hover:text-fp-text hover:bg-fp-inset transition-all duration-200 flex items-center gap-3"
-          >
-            <span>🚪</span>
-            Sign Out
-          </button>
         )}
+        {/* Full button: always on mobile, on desktop only when not collapsed */}
+        <button
+          onClick={handleSignOut}
+          className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium text-fp-muted hover:text-fp-text hover:bg-fp-inset transition-all duration-200 flex items-center gap-3 ${desktopCollapsed ? 'lg:hidden' : ''}`}
+        >
+          <span>🚪</span>
+          Sign Out
+        </button>
       </div>
     </div>
     </>

@@ -21,8 +21,8 @@ export default function ChecklistTab({ checklist, lineItems, newCheckItem, setNe
             !lineItems.every(l => l.po_status === 'PO Sent' || l.po_status === 'Received')
           return (
             <div key={item.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${item.completed ? 'bg-green-500/5 border-green-500/20' : isPartiallyOrdered ? 'bg-yellow-500/5 border-yellow-500/20' : 'bg-fp-inset border-fp-border'}`}>
-              <button onClick={() => onToggleItem(item)} disabled={item.is_auto}
-                className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${item.completed ? 'bg-green-500 border-green-500' : isPartiallyOrdered ? 'border-yellow-500' : 'border-fp-border hover:border-fp-brand'} ${item.is_auto ? 'cursor-default' : 'cursor-pointer'}`}>
+              <button onClick={() => onToggleItem(item)}
+                className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors cursor-pointer ${item.completed ? 'bg-green-500 border-green-500' : isPartiallyOrdered ? 'border-yellow-500' : 'border-fp-border hover:border-fp-brand'}`}>
                 {item.completed && <span className="text-fp-text text-xs">✓</span>}
                 {isPartiallyOrdered && <span className="text-yellow-400 text-xs">–</span>}
               </button>
