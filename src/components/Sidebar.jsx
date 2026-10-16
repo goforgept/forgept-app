@@ -518,7 +518,7 @@ export default function Sidebar({ isAdmin: isAdminProp, isDevTeam: isDevTeamProp
         </nav>
       )}
 
-      <div className={`border-t border-fp-border ${desktopCollapsed ? 'lg:px-1 lg:py-3 lg:flex lg:justify-center px-3 py-4' : 'px-3 py-4'}`}>
+      <div className={`border-t border-fp-border ${desktopCollapsed ? 'lg:px-1 lg:py-3 lg:flex lg:justify-center px-3 pt-4 pb-20 lg:pb-3' : 'px-3 pt-4 pb-20 lg:pb-4'}`}>
         {/* Desktop collapsed: icon only */}
         {desktopCollapsed && (
           <button
