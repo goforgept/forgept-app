@@ -42,7 +42,7 @@ export default function ProductLibrary({ isAdmin, featureProposals = true, featu
   const [activeTab, setActiveTab] = useState('library') // 'library' | catalog slug
   // Add product form
   const [showAddForm, setShowAddForm] = useState(false)
-  const [addForm, setAddForm] = useState({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '', lead_time: '', country_of_origin: '', berry_compliance: '', is_component: false })
+  const [addForm, setAddForm] = useState({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '', lead_time: '', country_of_origin: '', berry_compliance: '', is_component: false, vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] })
   const [saving, setSaving] = useState(false)
   // Add vendor price inline
   const [addingPriceFor, setAddingPriceFor] = useState(null) // product_id or `cat_${catalog_product_id}`
@@ -429,8 +429,6 @@ if (!finalCost) continue
       active: true,
     })
     if (err) { setError(err.message); setSaving(false); return }
-    setAddForm({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '', lead_time: '', country_of_origin: '', berry_compliance: '', is_component: false })
-    setShowAddForm(false); setSaving(false)
     const { data: newProd } = await supabase
       .from('product_library')
       .select('id')
@@ -438,12 +436,20 @@ if (!finalCost) continue
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
-    await fetchAll()
-    if (newProd?.id) {
-      setExpandedId(newProd.id)
-      setAddingPriceFor(newProd.id)
-      setPriceForm({ vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] })
+    if (newProd?.id && addForm.vendor && addForm.your_cost) {
+      await supabase.from('product_library_pricing').insert({
+        product_id: newProd.id,
+        org_id: orgId,
+        vendor: addForm.vendor,
+        your_cost: parseFloat(addForm.your_cost),
+        pricing_date: addForm.pricing_date || null,
+        source: 'manual',
+      })
     }
+    setAddForm({ item_name: '', manufacturer: '', part_number: '', category: '', sub_category: '', unit: 'ea', description: '', msrp: '', lead_time: '', country_of_origin: '', berry_compliance: '', is_component: false, vendor: '', your_cost: '', pricing_date: new Date().toISOString().split('T')[0] })
+    setShowAddForm(false); setSaving(false)
+    await fetchAll()
+    if (newProd?.id) setExpandedId(newProd.id)
   }
 
   // ─── Add vendor price ─────────────────────────────────────────────────────
@@ -668,7 +674,14 @@ if (!finalCost) continue
               {featureComplianceFields && <div><label className="text-fp-muted text-xs mb-1 block">COO</label><input type="text" placeholder="e.g. USA" value={addForm.country_of_origin} onChange={e => setAddForm(p => ({ ...p, country_of_origin: e.target.value }))} className={inputCls} /></div>}
               {featureComplianceFields && <div><label className="text-fp-muted text-xs mb-1 block">Berry Amendment</label><input type="text" placeholder="e.g. Compliant" value={addForm.berry_compliance} onChange={e => setAddForm(p => ({ ...p, berry_compliance: e.target.value }))} className={inputCls} /></div>}
             </div>
-            <p className="text-fp-muted text-xs mb-4">After saving, the vendor pricing form will open automatically so you can add costs right away.</p>
+            <div className="border-t border-fp-border pt-4 mt-2">
+              <p className="text-fp-text text-sm font-semibold mb-3">Vendor Pricing <span className="text-fp-muted font-normal">(optional)</span></p>
+              <div className="grid grid-cols-3 gap-4">
+                <div><label className="text-fp-muted text-xs mb-1 block">Vendor</label><input type="text" placeholder="e.g. Anixter" value={addForm.vendor} onChange={e => setAddForm(p => ({ ...p, vendor: e.target.value }))} className={inputCls} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Your Cost</label><input type="number" placeholder="0.00" value={addForm.your_cost} onChange={e => setAddForm(p => ({ ...p, your_cost: e.target.value }))} className={inputCls} /></div>
+                <div><label className="text-fp-muted text-xs mb-1 block">Pricing Date</label><input type="date" value={addForm.pricing_date} onChange={e => setAddForm(p => ({ ...p, pricing_date: e.target.value }))} className={inputCls} /></div>
+              </div>
+            </div>
             <button onClick={handleAddProduct} disabled={saving || !addForm.item_name}
               className="bg-fp-brand text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b5571f] transition-colors disabled:opacity-50">
               {saving ? 'Saving...' : 'Save Product'}
