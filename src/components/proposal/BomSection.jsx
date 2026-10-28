@@ -1268,21 +1268,22 @@ export default function BomSection({
             <div className="lg:hidden space-y-3">
               {laborItems.map((item, index) => {
                 const draftKey = `m_${index}`
+                const iCls = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
                 return (
                   <div key={index} className="rounded-xl border border-fp-border bg-fp-inset p-3 space-y-2">
-                    <input type="text" placeholder="e.g. Electrician" list="labor-roles-list" value={item.role} onChange={e => onUpdateLabor(index, 'role', e.target.value)} className={inputCls} />
+                    <input type="text" placeholder="e.g. Electrician" list="labor-roles-list" value={item.role} onChange={e => onUpdateLabor(index, 'role', e.target.value)} className={iCls} />
                     <div className="grid grid-cols-2 gap-2">
-                      <input type="number" placeholder="Qty" value={item.quantity || ''} onChange={e => onUpdateLabor(index, 'quantity', e.target.value)} className={inputCls} />
-                      <select value={item.unit || 'hr'} onChange={e => onUpdateLabor(index, 'unit', e.target.value)} className={inputCls}>
+                      <input type="number" placeholder="Qty" value={item.quantity || ''} onChange={e => onUpdateLabor(index, 'quantity', e.target.value)} className={iCls} />
+                      <select value={item.unit || 'hr'} onChange={e => onUpdateLabor(index, 'unit', e.target.value)} className={iCls}>
                         {['hr','day','lot'].map(u => <option key={u}>{u}</option>)}
                       </select>
                     </div>
                     <div className="grid grid-cols-3 gap-2">
-                      <div><label className="text-fp-muted text-xs mb-1 block">Your Cost</label><input type="number" placeholder="0.00" value={item.your_cost || ''} onChange={e => onUpdateLabor(index, 'your_cost', e.target.value)} className={inputCls} /></div>
+                      <div><label className="text-fp-muted text-xs mb-1 block">Your Cost</label><input type="number" placeholder="0.00" value={item.your_cost || ''} onChange={e => onUpdateLabor(index, 'your_cost', e.target.value)} className={iCls} /></div>
                       <div>
                         <label className="text-fp-muted text-xs mb-1 block">{markupMode === 'markup' ? 'Markup %' : 'GPM %'}</label>
                         {markupMode === 'markup' ? (
-                          <input type="number" placeholder="0" value={item.markup != null && item.markup !== '' ? parseFloat(item.markup).toFixed(1) : ''} onChange={e => onUpdateLabor(index, 'markup', e.target.value)} className={inputCls} />
+                          <input type="number" placeholder="0" value={item.markup != null && item.markup !== '' ? parseFloat(item.markup).toFixed(1) : ''} onChange={e => onUpdateLabor(index, 'markup', e.target.value)} className={iCls} />
                         ) : (
                           <input type="number" placeholder="0"
                             value={laborGpmDraft[draftKey] !== undefined ? laborGpmDraft[draftKey] : (item.markup != null && item.markup !== '' ? (parseFloat(item.markup) / (100 + parseFloat(item.markup)) * 100).toFixed(1) : '')}
