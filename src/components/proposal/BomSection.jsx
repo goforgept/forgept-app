@@ -825,121 +825,66 @@ export default function BomSection({
 
           {/* BOM Table */}
           {(() => {
+            const newLineDefaults = { proposal_id: proposalId, item_name: '', part_number_sku: '', quantity: '', unit: 'ea', category: '', vendor: '', your_cost_unit: '', markup_percent: String(defaultMarkup), customer_price_unit: '', customer_price_total: '', msrp_unit: '', lead_time: '', country_of_origin: '', berry_compliance: '', pricing_status: 'Needs Pricing' }
+            const inputCls = "w-full bg-fp-inset text-fp-text border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand"
             const BOMTable = ({ sectionId, sectionLabel }) => {
               const sectionLines = editLines
                 .map((l, i) => ({ ...l, _idx: i }))
                 .filter(l => sectionId === 'general' ? !l.section_id : l.section_id === sectionId)
+              const addLine = () => setEditLines(prev => [...prev, { ...newLineDefaults, section_id: sectionId === 'general' ? null : sectionId }])
               return (
-                <div className="overflow-x-auto mb-2">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-fp-border">
-                        <th className="w-5 py-2 pr-1" />
-                        <th className="py-2 pr-2 w-8">
-                          <input type="checkbox" className="accent-fp-brand"
-                            checked={sectionLines.length > 0 && sectionLines.every(l => bulkSelectedLines.has(l.id || l.item_name + l.quantity))}
-                            onChange={() => {
-                              const keys = sectionLines.map(l => l.id || l.item_name + l.quantity)
-                              const allSel = keys.every(k => bulkSelectedLines.has(k))
-                              setBulkSelectedLines(prev => {
-                                const next = new Set(prev)
-                                keys.forEach(k => allSel ? next.delete(k) : next.add(k))
-                                return next
-                              })
-                            }} />
-                        </th>
-                        {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost'].map(h => (
-                          <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
-                        ))}
-                        <th className="py-2 pr-2">
-                          <span className="text-fp-muted font-normal text-xs whitespace-nowrap">
-                            {markupMode === 'markup' ? 'Markup %' : 'GPM %'}
-                          </span>
-                        </th>
-                        {['Customer Price', ...(featureMsrp ? ['MSRP'] : []), ...(featureComplianceFields ? ['Lead Time', 'COO', 'Berry'] : []), '🔄', ...(editSections.length > 0 ? ['Move'] : []), ''].map(h => (
-                          <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sectionLines.map(line => {
-                        const i = line._idx
-                        const rowKey = line.id || line.item_name + line.quantity
-                        const isDragging = dragRowIdx === i
-                        const isDragOver = dragOverRowIdx === i && dragRowIdx !== i
-                        return (
-                          <tr
-                            key={i}
-                            draggable
-                            onDragStart={() => setDragRowIdx(i)}
-                            onDragEnd={() => { setDragRowIdx(null); setDragOverRowIdx(null) }}
-                            onDragOver={e => { e.preventDefault(); if (dragRowIdx !== null && dragOverRowIdx !== i) setDragOverRowIdx(i) }}
-                            onDrop={e => {
-                              e.preventDefault()
-                              if (dragRowIdx !== null && dragRowIdx !== i) {
-                                setEditLines(prev => {
-                                  const next = [...prev]
-                                  const [moved] = next.splice(dragRowIdx, 1)
-                                  next.splice(dragRowIdx < i ? i - 1 : i, 0, moved)
-                                  return next
-                                })
-                              }
-                              setDragRowIdx(null)
-                              setDragOverRowIdx(null)
-                            }}
-                            className={`border-b transition-opacity ${isDragOver ? 'border-t-2 border-t-[#C8622A] border-b-fp-border/30' : 'border-fp-border/30'} ${bulkSelectedLines.has(rowKey) ? 'bg-[#C8622A]/5' : ''} ${isDragging ? 'opacity-40' : ''}`}
-                          >
-                            <td className="pr-1 py-1 cursor-grab active:cursor-grabbing text-fp-muted hover:text-fp-text select-none text-center" title="Drag to reorder">⠿</td>
-                            <td className="pr-2 py-1">
-                              <input type="checkbox" className="accent-fp-brand cursor-pointer"
-                                checked={bulkSelectedLines.has(rowKey)}
-                                onChange={() => setBulkSelectedLines(prev => {
-                                  const next = new Set(prev)
-                                  next.has(rowKey) ? next.delete(rowKey) : next.add(rowKey)
-                                  return next
-                                })} />
-                            </td>
-                            {[['item_name','text','Item name'],['manufacturer','text','Manufacturer'],['part_number_sku','text','Part #'],['quantity','number','Qty']].map(([field,type,placeholder]) => (
-                              <td key={field} className="pr-2 py-1">
-                                <input type={type} placeholder={placeholder} value={line[field] || ''} onChange={e => onUpdateEditLine(i, field, e.target.value)}
-                                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
-                              </td>
-                            ))}
-                            <td className="pr-2 py-1">
-                              <select value={line.unit || 'ea'} onChange={e => onUpdateEditLine(i, 'unit', e.target.value)} className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
-                                {['ea','ft','lot','hr','box','roll'].map(u => <option key={u}>{u}</option>)}
-                              </select>
-                            </td>
-                            <td className="pr-2 py-1">
-                              <select value={line.category || ''} onChange={e => onUpdateEditLine(i, 'category', e.target.value)} className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
-                                <option value="">Category</option>
-                                {categories.map(c => <option key={c}>{c}</option>)}
-                              </select>
-                            </td>
-                            <td className="pr-2 py-1 min-w-[120px]">
-                              <select value={vendors.some(v => v.vendor_name === line.vendor) ? line.vendor : (line.vendor ? '__other__' : '')}
-                                onChange={e => onUpdateEditLine(i, 'vendor', e.target.value === '__other__' ? '__custom__' : e.target.value)}
-                                className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
-                                <option value="">— Vendor —</option>
-                                {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
-                                <option value="__other__">Other...</option>
-                              </select>
-                              {line.vendor && !vendors.some(v => v.vendor_name === line.vendor) && (
-                                <input type="text" placeholder="Vendor name" value={line.vendor === '__custom__' ? '' : line.vendor}
-                                  onChange={e => onUpdateEditLine(i, 'vendor', e.target.value || '__custom__')}
-                                  className="w-full mt-1 bg-fp-inset text-fp-text border border-[#C8622A]/40 rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
-                              )}
-                            </td>
-                            <td className="pr-2 py-1">
-                              <input type="number" placeholder="0.00" value={line.your_cost_unit || ''} onChange={e => onUpdateEditLine(i, 'your_cost_unit', e.target.value)}
-                                className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
-                            </td>
-                            <td className="pr-2 py-1">
+                <div className="mb-2">
+                  {/* Mobile card layout */}
+                  <div className="lg:hidden space-y-3">
+                    {sectionLines.map(line => {
+                      const i = line._idx
+                      const rowKey = line.id || line.item_name + line.quantity
+                      return (
+                        <div key={i} className={`rounded-xl border p-3 space-y-2 ${bulkSelectedLines.has(rowKey) ? 'border-[#C8622A]/40 bg-[#C8622A]/5' : 'border-fp-border bg-fp-inset'}`}>
+                          {/* Item name */}
+                          <input type="text" placeholder="Item name" value={line.item_name || ''} onChange={e => onUpdateEditLine(i, 'item_name', e.target.value)} className={inputCls} />
+                          {/* Mfr + Part # */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <input type="text" placeholder="Manufacturer" value={line.manufacturer || ''} onChange={e => onUpdateEditLine(i, 'manufacturer', e.target.value)} className={inputCls} />
+                            <input type="text" placeholder="Part #" value={line.part_number_sku || ''} onChange={e => onUpdateEditLine(i, 'part_number_sku', e.target.value)} className={inputCls} />
+                          </div>
+                          {/* Qty + Unit + Category */}
+                          <div className="grid grid-cols-3 gap-2">
+                            <input type="number" placeholder="Qty" value={line.quantity || ''} onChange={e => onUpdateEditLine(i, 'quantity', e.target.value)} className={inputCls} />
+                            <select value={line.unit || 'ea'} onChange={e => onUpdateEditLine(i, 'unit', e.target.value)} className={inputCls}>
+                              {['ea','ft','lot','hr','box','roll'].map(u => <option key={u}>{u}</option>)}
+                            </select>
+                            <select value={line.category || ''} onChange={e => onUpdateEditLine(i, 'category', e.target.value)} className={inputCls}>
+                              <option value="">Category</option>
+                              {categories.map(c => <option key={c}>{c}</option>)}
+                            </select>
+                          </div>
+                          {/* Vendor */}
+                          <select value={vendors.some(v => v.vendor_name === line.vendor) ? line.vendor : (line.vendor ? '__other__' : '')}
+                            onChange={e => onUpdateEditLine(i, 'vendor', e.target.value === '__other__' ? '__custom__' : e.target.value)}
+                            className={inputCls}>
+                            <option value="">— Vendor —</option>
+                            {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
+                            <option value="__other__">Other...</option>
+                          </select>
+                          {line.vendor && !vendors.some(v => v.vendor_name === line.vendor) && (
+                            <input type="text" placeholder="Vendor name" value={line.vendor === '__custom__' ? '' : line.vendor}
+                              onChange={e => onUpdateEditLine(i, 'vendor', e.target.value || '__custom__')}
+                              className="w-full bg-fp-inset text-fp-text border border-[#C8622A]/40 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
+                          )}
+                          {/* Costs */}
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <label className="text-fp-muted text-xs mb-1 block">Your Cost</label>
+                              <input type="number" placeholder="0.00" value={line.your_cost_unit || ''} onChange={e => onUpdateEditLine(i, 'your_cost_unit', e.target.value)} className={inputCls} />
+                            </div>
+                            <div>
+                              <label className="text-fp-muted text-xs mb-1 block">{markupMode === 'markup' ? 'Markup %' : 'GPM %'}</label>
                               {markupMode === 'markup' ? (
-                                <input type="number" placeholder={String(defaultMarkup)} value={line.markup_percent || ''} onChange={e => onUpdateEditLine(i, 'markup_percent', e.target.value)}
-                                  className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                <input type="number" placeholder={String(defaultMarkup)} value={line.markup_percent || ''} onChange={e => onUpdateEditLine(i, 'markup_percent', e.target.value)} className={inputCls} />
                               ) : (
-                                <input type="number" placeholder={line.markup_percent ? (parseFloat(line.markup_percent) / (100 + parseFloat(line.markup_percent)) * 100).toFixed(1) : (defaultMarkup / (100 + defaultMarkup) * 100).toFixed(1)}
+                                <input type="number"
+                                  placeholder={line.markup_percent ? (parseFloat(line.markup_percent) / (100 + parseFloat(line.markup_percent)) * 100).toFixed(1) : (defaultMarkup / (100 + defaultMarkup) * 100).toFixed(1)}
                                   value={gpmDraft[i] !== undefined ? gpmDraft[i] : (line.markup_percent ? (parseFloat(line.markup_percent) / (100 + parseFloat(line.markup_percent)) * 100).toFixed(1) : '')}
                                   onChange={e => setGpmDraft(d => ({ ...d, [i]: e.target.value }))}
                                   onBlur={e => {
@@ -948,62 +893,221 @@ export default function BomSection({
                                     else if (e.target.value === '') onUpdateEditLine(i, 'markup_percent', '')
                                     setGpmDraft(d => { const n = { ...d }; delete n[i]; return n })
                                   }}
-                                  className="w-16 bg-fp-inset text-fp-text border border-[#C8622A]/50 rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                  className="w-full bg-fp-inset text-fp-text border border-[#C8622A]/50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand" />
                               )}
-                            </td>
-                            <td className="pr-2 py-1">
-                              <input type="number" placeholder="0.00" value={line.customer_price_unit || ''} onChange={e => onUpdateEditLine(i, 'customer_price_unit', e.target.value)}
-                                className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
-                            </td>
-                            {featureMsrp && (
-                              <td className="pr-2 py-1">
-                                <input type="number" placeholder="MSRP" value={line.msrp_unit || ''} onChange={e => onUpdateEditLine(i, 'msrp_unit', e.target.value)}
-                                  className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
-                              </td>
-                            )}
-                            {featureComplianceFields && (
-                              <td className="pr-2 py-1">
-                                <input type="text" placeholder="Lead time" value={line.lead_time || ''} onChange={e => onUpdateEditLine(i, 'lead_time', e.target.value)}
-                                  className="w-24 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
-                              </td>
-                            )}
-                            {featureComplianceFields && (
-                              <td className="pr-2 py-1">
-                                <input type="text" placeholder="COO" value={line.country_of_origin || ''} onChange={e => onUpdateEditLine(i, 'country_of_origin', e.target.value)}
-                                  className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
-                              </td>
-                            )}
-                            {featureComplianceFields && (
-                              <td className="pr-2 py-1">
-                                <input type="text" placeholder="Berry status" value={line.berry_compliance || ''} onChange={e => onUpdateEditLine(i, 'berry_compliance', e.target.value)}
-                                  className="w-28 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
-                              </td>
-                            )}
-                            <td className="py-1 text-center">
-                              <input type="checkbox" checked={!!line.recurring} onChange={e => onUpdateEditLine(i, 'recurring', e.target.checked)} className="accent-fp-brand cursor-pointer" title="Recurring" />
-                            </td>
+                            </div>
+                            <div>
+                              <label className="text-fp-muted text-xs mb-1 block">Customer Price</label>
+                              <input type="number" placeholder="0.00" value={line.customer_price_unit || ''} onChange={e => onUpdateEditLine(i, 'customer_price_unit', e.target.value)} className="w-full bg-fp-inset text-[#C8622A] border border-fp-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fp-brand font-semibold" />
+                            </div>
+                          </div>
+                          {featureMsrp && (
+                            <input type="number" placeholder="MSRP" value={line.msrp_unit || ''} onChange={e => onUpdateEditLine(i, 'msrp_unit', e.target.value)} className={inputCls} />
+                          )}
+                          {featureComplianceFields && (
+                            <div className="grid grid-cols-3 gap-2">
+                              <input type="text" placeholder="Lead time" value={line.lead_time || ''} onChange={e => onUpdateEditLine(i, 'lead_time', e.target.value)} className={inputCls} />
+                              <input type="text" placeholder="COO" value={line.country_of_origin || ''} onChange={e => onUpdateEditLine(i, 'country_of_origin', e.target.value)} className={inputCls} />
+                              <input type="text" placeholder="Berry" value={line.berry_compliance || ''} onChange={e => onUpdateEditLine(i, 'berry_compliance', e.target.value)} className={inputCls} />
+                            </div>
+                          )}
+                          {/* Footer row: bulk select + recurring + move + delete */}
+                          <div className="flex items-center gap-3 pt-1 border-t border-fp-border/50">
+                            <label className="flex items-center gap-1.5 text-xs text-fp-muted cursor-pointer">
+                              <input type="checkbox" className="accent-fp-brand" checked={bulkSelectedLines.has(rowKey)}
+                                onChange={() => setBulkSelectedLines(prev => { const next = new Set(prev); next.has(rowKey) ? next.delete(rowKey) : next.add(rowKey); return next })} />
+                              Bulk
+                            </label>
+                            <label className="flex items-center gap-1.5 text-xs text-fp-muted cursor-pointer">
+                              <input type="checkbox" checked={!!line.recurring} onChange={e => onUpdateEditLine(i, 'recurring', e.target.checked)} className="accent-fp-brand cursor-pointer" />
+                              Recurring
+                            </label>
+                            <div className="flex-1" />
                             {editSections.length > 0 && (
-                              <td className="py-1">
-                                <button onClick={() => onMoveLineToSection(i)}
-                                  className="bg-fp-inset hover:bg-[#C8622A]/20 hover:text-[#C8622A] text-fp-muted text-xs px-2 py-1 rounded transition-colors whitespace-nowrap" title="Move to section">⇄ Move</button>
-                              </td>
+                              <button onClick={() => onMoveLineToSection(i)}
+                                className="text-fp-muted hover:text-[#C8622A] text-xs transition-colors">⇄ Move</button>
                             )}
-                            <td className="py-1">
-                              <button onClick={() => setEditLines(prev => prev.filter((_, idx) => idx !== i))} className="text-fp-muted hover:text-red-400 text-xs">✕</button>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                  <button onClick={() => setEditLines(prev => [...prev, {
-                    proposal_id: proposalId, item_name: '', part_number_sku: '', quantity: '', unit: 'ea', category: '',
-                    vendor: '', your_cost_unit: '', markup_percent: String(defaultMarkup), customer_price_unit: '', customer_price_total: '', msrp_unit: '',
-                    lead_time: '', country_of_origin: '', berry_compliance: '',
-                    pricing_status: 'Needs Pricing', section_id: sectionId === 'general' ? null : sectionId
-                  }])} className="mt-2 text-[#C8622A] hover:text-fp-text text-xs transition-colors">
-                    + Add Item{sectionLabel ? ` to ${sectionLabel}` : ''}
-                  </button>
+                            <button onClick={() => setEditLines(prev => prev.filter((_, idx) => idx !== i))}
+                              className="text-red-400 hover:text-red-300 text-xs transition-colors">✕ Remove</button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    <button onClick={addLine} className="w-full text-center py-3 rounded-xl border border-dashed border-fp-border text-[#C8622A] hover:border-[#C8622A]/50 text-sm transition-colors">
+                      + Add Item{sectionLabel ? ` to ${sectionLabel}` : ''}
+                    </button>
+                  </div>
+                  {/* Desktop table */}
+                  <div className="hidden lg:block overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-fp-border">
+                          <th className="w-5 py-2 pr-1" />
+                          <th className="py-2 pr-2 w-8">
+                            <input type="checkbox" className="accent-fp-brand"
+                              checked={sectionLines.length > 0 && sectionLines.every(l => bulkSelectedLines.has(l.id || l.item_name + l.quantity))}
+                              onChange={() => {
+                                const keys = sectionLines.map(l => l.id || l.item_name + l.quantity)
+                                const allSel = keys.every(k => bulkSelectedLines.has(k))
+                                setBulkSelectedLines(prev => {
+                                  const next = new Set(prev)
+                                  keys.forEach(k => allSel ? next.delete(k) : next.add(k))
+                                  return next
+                                })
+                              }} />
+                          </th>
+                          {['Item Name', 'Manufacturer', 'Part #', 'Qty', 'Unit', 'Category', 'Vendor', 'Your Cost'].map(h => (
+                            <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
+                          ))}
+                          <th className="py-2 pr-2">
+                            <span className="text-fp-muted font-normal text-xs whitespace-nowrap">
+                              {markupMode === 'markup' ? 'Markup %' : 'GPM %'}
+                            </span>
+                          </th>
+                          {['Customer Price', ...(featureMsrp ? ['MSRP'] : []), ...(featureComplianceFields ? ['Lead Time', 'COO', 'Berry'] : []), '🔄', ...(editSections.length > 0 ? ['Move'] : []), ''].map(h => (
+                            <th key={h} className="text-fp-muted text-left py-2 pr-2 font-normal text-xs">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sectionLines.map(line => {
+                          const i = line._idx
+                          const rowKey = line.id || line.item_name + line.quantity
+                          const isDragging = dragRowIdx === i
+                          const isDragOver = dragOverRowIdx === i && dragRowIdx !== i
+                          return (
+                            <tr
+                              key={i}
+                              draggable
+                              onDragStart={() => setDragRowIdx(i)}
+                              onDragEnd={() => { setDragRowIdx(null); setDragOverRowIdx(null) }}
+                              onDragOver={e => { e.preventDefault(); if (dragRowIdx !== null && dragOverRowIdx !== i) setDragOverRowIdx(i) }}
+                              onDrop={e => {
+                                e.preventDefault()
+                                if (dragRowIdx !== null && dragRowIdx !== i) {
+                                  setEditLines(prev => {
+                                    const next = [...prev]
+                                    const [moved] = next.splice(dragRowIdx, 1)
+                                    next.splice(dragRowIdx < i ? i - 1 : i, 0, moved)
+                                    return next
+                                  })
+                                }
+                                setDragRowIdx(null)
+                                setDragOverRowIdx(null)
+                              }}
+                              className={`border-b transition-opacity ${isDragOver ? 'border-t-2 border-t-[#C8622A] border-b-fp-border/30' : 'border-fp-border/30'} ${bulkSelectedLines.has(rowKey) ? 'bg-[#C8622A]/5' : ''} ${isDragging ? 'opacity-40' : ''}`}
+                            >
+                              <td className="pr-1 py-1 cursor-grab active:cursor-grabbing text-fp-muted hover:text-fp-text select-none text-center" title="Drag to reorder">⠿</td>
+                              <td className="pr-2 py-1">
+                                <input type="checkbox" className="accent-fp-brand cursor-pointer"
+                                  checked={bulkSelectedLines.has(rowKey)}
+                                  onChange={() => setBulkSelectedLines(prev => {
+                                    const next = new Set(prev)
+                                    next.has(rowKey) ? next.delete(rowKey) : next.add(rowKey)
+                                    return next
+                                  })} />
+                              </td>
+                              {[['item_name','text','Item name'],['manufacturer','text','Manufacturer'],['part_number_sku','text','Part #'],['quantity','number','Qty']].map(([field,type,placeholder]) => (
+                                <td key={field} className="pr-2 py-1">
+                                  <input type={type} placeholder={placeholder} value={line[field] || ''} onChange={e => onUpdateEditLine(i, field, e.target.value)}
+                                    className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                </td>
+                              ))}
+                              <td className="pr-2 py-1">
+                                <select value={line.unit || 'ea'} onChange={e => onUpdateEditLine(i, 'unit', e.target.value)} className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
+                                  {['ea','ft','lot','hr','box','roll'].map(u => <option key={u}>{u}</option>)}
+                                </select>
+                              </td>
+                              <td className="pr-2 py-1">
+                                <select value={line.category || ''} onChange={e => onUpdateEditLine(i, 'category', e.target.value)} className="bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
+                                  <option value="">Category</option>
+                                  {categories.map(c => <option key={c}>{c}</option>)}
+                                </select>
+                              </td>
+                              <td className="pr-2 py-1 min-w-[120px]">
+                                <select value={vendors.some(v => v.vendor_name === line.vendor) ? line.vendor : (line.vendor ? '__other__' : '')}
+                                  onChange={e => onUpdateEditLine(i, 'vendor', e.target.value === '__other__' ? '__custom__' : e.target.value)}
+                                  className="w-full bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand">
+                                  <option value="">— Vendor —</option>
+                                  {vendors.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
+                                  <option value="__other__">Other...</option>
+                                </select>
+                                {line.vendor && !vendors.some(v => v.vendor_name === line.vendor) && (
+                                  <input type="text" placeholder="Vendor name" value={line.vendor === '__custom__' ? '' : line.vendor}
+                                    onChange={e => onUpdateEditLine(i, 'vendor', e.target.value || '__custom__')}
+                                    className="w-full mt-1 bg-fp-inset text-fp-text border border-[#C8622A]/40 rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                )}
+                              </td>
+                              <td className="pr-2 py-1">
+                                <input type="number" placeholder="0.00" value={line.your_cost_unit || ''} onChange={e => onUpdateEditLine(i, 'your_cost_unit', e.target.value)}
+                                  className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                              </td>
+                              <td className="pr-2 py-1">
+                                {markupMode === 'markup' ? (
+                                  <input type="number" placeholder={String(defaultMarkup)} value={line.markup_percent || ''} onChange={e => onUpdateEditLine(i, 'markup_percent', e.target.value)}
+                                    className="w-16 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                ) : (
+                                  <input type="number" placeholder={line.markup_percent ? (parseFloat(line.markup_percent) / (100 + parseFloat(line.markup_percent)) * 100).toFixed(1) : (defaultMarkup / (100 + defaultMarkup) * 100).toFixed(1)}
+                                    value={gpmDraft[i] !== undefined ? gpmDraft[i] : (line.markup_percent ? (parseFloat(line.markup_percent) / (100 + parseFloat(line.markup_percent)) * 100).toFixed(1) : '')}
+                                    onChange={e => setGpmDraft(d => ({ ...d, [i]: e.target.value }))}
+                                    onBlur={e => {
+                                      const g = parseFloat(e.target.value)
+                                      if (!isNaN(g) && g >= 0 && g < 100) onUpdateEditLine(i, 'markup_percent', (g / (100 - g) * 100).toFixed(2))
+                                      else if (e.target.value === '') onUpdateEditLine(i, 'markup_percent', '')
+                                      setGpmDraft(d => { const n = { ...d }; delete n[i]; return n })
+                                    }}
+                                    className="w-16 bg-fp-inset text-fp-text border border-[#C8622A]/50 rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                )}
+                              </td>
+                              <td className="pr-2 py-1">
+                                <input type="number" placeholder="0.00" value={line.customer_price_unit || ''} onChange={e => onUpdateEditLine(i, 'customer_price_unit', e.target.value)}
+                                  className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                              </td>
+                              {featureMsrp && (
+                                <td className="pr-2 py-1">
+                                  <input type="number" placeholder="MSRP" value={line.msrp_unit || ''} onChange={e => onUpdateEditLine(i, 'msrp_unit', e.target.value)}
+                                    className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                </td>
+                              )}
+                              {featureComplianceFields && (
+                                <td className="pr-2 py-1">
+                                  <input type="text" placeholder="Lead time" value={line.lead_time || ''} onChange={e => onUpdateEditLine(i, 'lead_time', e.target.value)}
+                                    className="w-24 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                </td>
+                              )}
+                              {featureComplianceFields && (
+                                <td className="pr-2 py-1">
+                                  <input type="text" placeholder="COO" value={line.country_of_origin || ''} onChange={e => onUpdateEditLine(i, 'country_of_origin', e.target.value)}
+                                    className="w-20 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                </td>
+                              )}
+                              {featureComplianceFields && (
+                                <td className="pr-2 py-1">
+                                  <input type="text" placeholder="Berry status" value={line.berry_compliance || ''} onChange={e => onUpdateEditLine(i, 'berry_compliance', e.target.value)}
+                                    className="w-28 bg-fp-inset text-fp-text border border-fp-border rounded px-2 py-1 text-xs focus:outline-none focus:border-fp-brand" />
+                                </td>
+                              )}
+                              <td className="py-1 text-center">
+                                <input type="checkbox" checked={!!line.recurring} onChange={e => onUpdateEditLine(i, 'recurring', e.target.checked)} className="accent-fp-brand cursor-pointer" title="Recurring" />
+                              </td>
+                              {editSections.length > 0 && (
+                                <td className="py-1">
+                                  <button onClick={() => onMoveLineToSection(i)}
+                                    className="bg-fp-inset hover:bg-[#C8622A]/20 hover:text-[#C8622A] text-fp-muted text-xs px-2 py-1 rounded transition-colors whitespace-nowrap" title="Move to section">⇄ Move</button>
+                                </td>
+                              )}
+                              <td className="py-1">
+                                <button onClick={() => setEditLines(prev => prev.filter((_, idx) => idx !== i))} className="text-fp-muted hover:text-red-400 text-xs">✕</button>
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                    <button onClick={addLine} className="mt-2 text-[#C8622A] hover:text-fp-text text-xs transition-colors">
+                      + Add Item{sectionLabel ? ` to ${sectionLabel}` : ''}
+                    </button>
+                  </div>
                 </div>
               )
             }
