@@ -13,7 +13,19 @@ export function ProfileProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
+  const PROFILE_CACHE_KEY = (uid) => `fp_profile_cache_${uid}`
+
   const fetchProfile = async (userId) => {
+    // If offline, serve from localStorage cache immediately
+    if (!navigator.onLine) {
+      try {
+        const cached = JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY(userId)) || 'null')
+        if (cached) { setProfile(cached); setLoading(false); return }
+      } catch {}
+      setLoading(false)
+      return
+    }
+
     for (let i = 0; i < 5; i++) {
       const { data, error } = await supabase
         .from('profiles')
@@ -22,12 +34,18 @@ export function ProfileProvider({ children }) {
         .single()
 
       if (error && error.code !== 'PGRST116') {
+        // Network error while online — try cache as fallback
+        try {
+          const cached = JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY(userId)) || 'null')
+          if (cached) { setProfile(cached); setLoading(false); return }
+        } catch {}
         console.error('Profile fetch error:', error.message)
         setLoading(false)
         return
       }
 
       if (data?.org_role) {
+        try { localStorage.setItem(PROFILE_CACHE_KEY(userId), JSON.stringify(data)) } catch {}
         setProfile(data)
         setLoading(false)
         return
@@ -41,6 +59,9 @@ export function ProfileProvider({ children }) {
       .select(PROFILE_SELECT)
       .eq('id', userId)
       .single()
+    if (data) {
+      try { localStorage.setItem(PROFILE_CACHE_KEY(userId), JSON.stringify(data)) } catch {}
+    }
     setProfile(data)
     setLoading(false)
   }
