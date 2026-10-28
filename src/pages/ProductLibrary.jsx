@@ -417,8 +417,9 @@ if (!finalCost) continue
   const handleAddProduct = async () => {
     if (!addForm.item_name) { setError('Item name is required'); return }
     setSaving(true); setError(null)
+    const { vendor: _v, your_cost: _c, pricing_date: _pd, ...productFields } = addForm
     const { error: err } = await supabase.from('product_library').insert({
-      ...addForm,
+      ...productFields,
       org_id: orgId,
       part_number: addForm.part_number || null,
       sub_category: addForm.sub_category || null,
